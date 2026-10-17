@@ -476,6 +476,88 @@ test("an exact-budget data slot paired with worst-case standard fields stays wir
   assert.throws(() => Protocol.validateActionResult(over));
 });
 
+test("party exit prompt data is exactly bounded", () => {
+  const prompt = {
+    operation: "surrender",
+    confirmation_token: "S-1-9f8e7d6c",
+    scope: "party",
+    consequence: "整隊退出戰鬥，並結算目前已累積的戰鬥時間。\n一般戰鬥會以戰敗收場。",
+  };
+  const validated = Protocol.validateActionResult(
+    actionResult({ code: "party_exit_prompt", data: prompt })
+  );
+  assert.deepEqual(validated.data, prompt);
+  assert.deepEqual(
+    Protocol.validateActionResult(
+      actionResult({
+        code: "party_exit_prompt",
+        data: { ...prompt, operation: "retreat" },
+      })
+    ).data.operation,
+    "retreat"
+  );
+  // The prompt requires its exact four bounded fields: a missing slot, a
+  // missing or extra field, a non-literal scope, a non-member operation, a
+  // non-URL-safe or oversized token, and an empty or oversized consequence
+  // all reject at the result envelope itself.
+  const missingField = { ...prompt };
+  delete missingField.operation;
+  const bad = [
+    undefined,
+    { ...prompt, scope: "self" },
+    { ...prompt, operation: "charge" },
+    { ...prompt, confirmation_token: "a b" },
+    { ...prompt, confirmation_token: "" },
+    { ...prompt, confirmation_token: "a".repeat(129) },
+    { ...prompt, consequence: "" },
+    { ...prompt, consequence: "字".repeat(513) },
+    { ...prompt, session_id: "hostile:1:0" },
+    { ...prompt, round_revision: 1 },
+    missingField,
+  ];
+  for (const value of bad) {
+    const overrides = { code: "party_exit_prompt" };
+    if (value !== undefined) {
+      overrides.data = value;
+    }
+    assert.throws(
+      () => Protocol.validateActionResult(actionResult(overrides)),
+      undefined,
+      JSON.stringify(overrides.data === undefined ? "missing slot" : Object.keys(overrides.data))
+    );
+  }
+});
+
+test("the other combat result codes carry no data slot", () => {
+  const codes = [
+    "actor_choices",
+    "draft_saved",
+    "needs_selection",
+    "already_committed",
+    "round_committed",
+    "combat_terminal",
+    "stale_command",
+  ];
+  for (const code of codes) {
+    assert.doesNotThrow(
+      () => Protocol.validateActionResult(actionResult({ code })),
+      undefined,
+      code
+    );
+    assert.throws(
+      () => Protocol.validateActionResult(actionResult({ code, data: { note: "x" } })),
+      undefined,
+      code
+    );
+  }
+  // An unrelated code keeps its own legal data slot.
+  assert.doesNotThrow(() =>
+    Protocol.validateActionResult(
+      actionResult({ code: "name_rolled", data: { display_name: "加斯帕" } })
+    )
+  );
+});
+
 test("validates exact ui_protocol_error envelopes", () => {
   assert.doesNotThrow(() => Protocol.validateProtocolError(protocolError()));
   assert.doesNotThrow(() =>

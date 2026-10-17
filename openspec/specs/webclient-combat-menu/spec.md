@@ -412,37 +412,6 @@ The combat menu's target-selection options (`all-enemies`, `all-allies`, `all`) 
 - **WHEN** the combat menu offers `all-enemies` for a damage skill
 - **THEN** the option is a convenience expansion; selecting an explicit ally target for the same skill is equally valid and submits normally
 
-### Requirement: Production combat actions are narrow and server-authoritative
-The production action registry SHALL register exactly `combat.cast`, `combat.flee`, and
-`combat.forfeit` for this delivery unit in addition to no unrelated gameplay adapter.
-`combat.cast` SHALL accept only the TargetSpec-dependent exact payload forms and SHALL
-reject the reserved `flee` skill key; `combat.flee` SHALL accept exactly an empty
-object; and `combat.forfeit` SHALL accept exactly the current bounded session ID as a
-stale-selection guard.
-
-#### Scenario: Tampered remote target cannot enter combat resolution
-- **WHEN** `combat.cast` carries a valid ObjectDB ID that is not a participant in the authenticated actor's current session
-- **THEN** the adapter rejects before preflight or initiative and no state changes
-
-#### Scenario: Flee cannot select another actor
-- **WHEN** a client submits `combat.flee`
-- **THEN** the adapter builds the innate SELF request for the session puppet and accepts no actor or target field
-
-#### Scenario: Flee has only one graphical action path
-- **WHEN** a modified client submits `combat.cast` with `skill_key` equal to `flee`
-- **THEN** the cast adapter rejects before session submission and only the exact empty `combat.flee` action can request the innate flee path
-
-#### Scenario: Stale Forfeit confirmation cannot end a replacement session
-- **WHEN** a Forfeit payload names a session ID that no longer equals the actor's active record
-- **THEN** the adapter rejects without settling or clearing the current session
-
-#### Scenario: Adapters are session-derived and side-effect-free by hand
-- **WHEN** any of the three combat adapters runs
-- **THEN** it obtains the actor from the authenticated session, re-reads the active
-  session, re-resolves referenced IDs from its participants, invokes a public
-  combat-session API, and assigns no `.db`, traits, buffs, sexual state, location,
-  quests, wallet, inventory, or battlefield members directly
-
 ### Requirement: Combat results update canonical panels and preserve narrative logs
 After an admitted combat action settles, the server SHALL emit every returned EventLog
 and terminal message through Evennia's ordinary escaped text output path. The dispatcher
@@ -500,10 +469,9 @@ catalog and scene in the same `ui_update`.
 ### Requirement: A combat round plays beat by beat
 When a committed publication carries an available `combat_beats` panel whose round the
 client has not presented in the current epoch, and that publication completes the
-player's own `combat.cast`, `combat.flee`, or `inventory.use` action, the client SHALL
+player's own final `combat.command` or confirmed retreat `combat.exit_confirm` action that actually committed a round, the client SHALL
 present that round as one step per beat, in the beats' order, attached to that action's
-response. A round seen in any other way, including after a reconnect, SHALL NOT be
-presented as steps, and no round SHALL be presented twice.
+response. Any other round SHALL NOT be presented as steps, and no round SHALL be presented twice.
 
 #### Scenario: A round plays one beat per page
 - **WHEN** the effective level is `full` and an accepted basic attack settles a non-terminal round with a
@@ -633,20 +601,20 @@ presented as steps, and no round SHALL be presented twice.
 WebSocket loss SHALL preserve the last rendered combat view under the foundation offline
 overlay and lock every combat mutation. After reconnect, the first valid new-epoch
 snapshot SHALL rebuild the current session ID, mode, round, participants, status,
-skills, targets, and root menu from canonical persistence even when its revision is
+actor summaries, requested actor choices, durable draft progress, targets and root menu from canonical persistence even when its revision is
 lower than the retired epoch.
 
 #### Scenario: Active combat reconnect resumes the same round boundary
 - **WHEN** transport disconnects after a valid nonterminal round and reconnects without another game action
-- **THEN** the new snapshot shows the same persisted session and round, starts at the combat root, and no additional round or world time is consumed
+- **THEN** the new snapshot shows the same persisted session and round, restores confirmed progress and selects the first required actor still needing a command, and no additional round or world time is consumed
 
 #### Scenario: Disconnect after submit never retries
-- **WHEN** transport closes after sending a cast but before its result is observed
-- **THEN** reconnect synchronizes canonical combat state, displays the uncertain-result notice, and sends no automatic replacement cast
+- **WHEN** transport closes after sending a command confirmation but before its result is observed
+- **THEN** reconnect synchronizes canonical combat state, displays the uncertain-result notice, and sends no automatic replacement confirmation
 
 #### Scenario: Unreconstructable participant offers safe recovery
 - **WHEN** a strictly parsed active record references a participant that can no longer be reconstructed
-- **THEN** combat presentation exposes a bounded recovery state with no cast or flee action, retains confirmed Forfeit and ordinary text access, and performs no mutation while rendering
+- **THEN** combat presentation exposes a bounded recovery state with no personal action, retains confirmed party surrender and ordinary text access, and performs no mutation while rendering
 
 #### Scenario: Epoch hygiene on reconnect
 - **WHEN** the browser reconnects into a new epoch
@@ -948,3 +916,29 @@ Ready combat SHALL use root keys attack,skills,items,defend,dodge,taunt,retreat 
 #### Scenario: Recovery retains the surrender admission revision
 - **WHEN** a validly parsed session has unreconstructable participants and null draft choices
 - **THEN** its session.round_revision remains authoritative for surrender prompt and confirmation, without deriving a revision from missing draft fields
+
+### Requirement: Party command and exit adapters accept only guarded exact payloads
+Interactive actions SHALL be combat.actor_choices, combat.command, combat.exit_prompt and combat.exit_confirm. Command SHALL include session_id, round_revision, draft_version, actor_id and the closed skill/item/tactic command. Exit requests SHALL include session_id, round_revision and operation; confirmation SHALL also require its token. Unknown or irrelevant fields SHALL reject.
+
+#### Scenario: Actor authorization
+- **WHEN** a syntactically valid actor ID is not commandable by the authenticated commander
+- **THEN** the shared rules boundary rejects without state change; menu contents never authorize it
+
+#### Scenario: Reserved flee and old routes
+- **WHEN** a client submits personal flee, a retired combat action or actorless inventory.use during combat
+- **THEN** the request cannot mutate or bypass the party draft/confirmation
+
+#### Scenario: Canonical pending result
+- **WHEN** a confirmation saves a nonfinal member command
+- **THEN** canonical progress publishes before its safe result, with no combat beats or implied round; final committed round and terminal results retain canonical refresh
+
+### Requirement: Exit prompt result data is exact and ordinary results use canonical panels
+Only success code party_exit_prompt SHALL carry exact operation,confirmation_token,scope,consequence data, with scope party and bounded token/text. Other command/query results SHALL carry no data; progress/reselection reasons SHALL come from canonical v7 panels. Non-success results SHALL retain the existing no-data rule.
+
+#### Scenario: Prompt safety
+- **WHEN** a retreat or surrender prompt succeeds
+- **THEN** its token and consequence are returned in the bounded success data slot, with session/round bound to the initiating request and token rather than forbidden result state keys
+
+#### Scenario: Draft result ordering
+- **WHEN** a command is saved, needs reselection or commits a round
+- **THEN** canonical panels publish first and codes draft_saved, needs_selection or round_committed distinguish outcomes; only a committed round carries beats

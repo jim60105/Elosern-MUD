@@ -192,74 +192,65 @@ test("explore.move has no typed command and emits the exit label", () => {
   );
 });
 
-test("combat.cast without a target resolves to cast <skill>", () => {
+test("explore.cast without a target resolves to cast <skill>", () => {
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: T_SELF_SKILL }, { skillLabel: T_SELF_LABEL }),
+    Echo.commandLine("explore.cast", { skill_key: T_SELF_SKILL }, { skillLabel: T_SELF_LABEL }),
     `cast ${T_SELF_LABEL}`
   );
 });
 
-test("combat.cast with a target token resolves to cast <skill>=<target>", () => {
+test("explore.cast with a target resolves to cast <skill>=<target>", () => {
   assert.strictEqual(
     Echo.commandLine(
-      "combat.cast",
-      { skill_key: T_SKILL, target_ids: ["goblin_1"] },
+      "explore.cast",
+      { skill_key: T_SKILL, target_ids: [7] },
       { skillLabel: T_SKILL_LABEL, targetLabel: "哥布林" }
     ),
     `cast ${T_SKILL_LABEL}=哥布林`
   );
 });
 
-test("combat.cast with an AREA shorthand resolves to cast <skill>=<shorthand>", () => {
+test("explore.cast echoes the chosen freeform magnitude label", () => {
   assert.strictEqual(
     Echo.commandLine(
-      "combat.cast",
-      { skill_key: T_SKILL, target_shorthand: "all-enemies" },
-      { skillLabel: T_SKILL_LABEL }
-    ),
-    `cast ${T_SKILL_LABEL}=all-enemies`
-  );
-});
-
-test("combat.cast echoes the chosen freeform magnitude label", () => {
-  assert.strictEqual(
-    Echo.commandLine(
-      "combat.cast",
+      "explore.cast",
       { skill_key: T_AREA, scale: 2, target_ids: [2] },
       { skillLabel: T_AREA_LABEL, scaleLabel: "2", targetLabel: "哥布林" }
     ),
     `cast ${T_AREA_LABEL}（威力×2）=哥布林`
   );
+});
+
+test("explore.cast without a scale label stays byte-identical", () => {
   assert.strictEqual(
     Echo.commandLine(
-      "combat.cast",
-      { skill_key: T_AREA, scale: 0.5, target_shorthand: "all-enemies" },
-      { skillLabel: T_AREA_LABEL, scaleLabel: "1/2" }
+      "explore.cast",
+      { skill_key: T_AREA, target_ids: [2] },
+      { skillLabel: T_AREA_LABEL, targetLabel: "哥布林" }
     ),
-    `cast ${T_AREA_LABEL}（威力×1/2）=all-enemies`
+    `cast ${T_AREA_LABEL}=哥布林`
   );
 });
 
-test("combat.cast without a scale label stays byte-identical", () => {
-  assert.strictEqual(
-    Echo.commandLine(
-      "combat.cast",
-      { skill_key: T_AREA, target_shorthand: "all-enemies" },
-      { skillLabel: T_AREA_LABEL }
-    ),
-    `cast ${T_AREA_LABEL}=all-enemies`
-  );
-});
-
-test("combat.forfeit resolves to combat forfeit", () => {
-  assert.strictEqual(Echo.commandLine("combat.forfeit", {}, {}), "combat forfeit");
-});
-
-test("combat.flee has no typed command and emits its button label", () => {
-  assert.strictEqual(
-    Echo.commandLine("combat.flee", {}, { actionLabel: "逃跑" }),
-    "逃跑"
-  );
+// The guarded party combat actions are registered but have no client producer
+// yet, so the catalog declares them silent: no fabricated command line, and
+// the exact declarations are pinned together with the manifest. The typed
+// combat command surface and its own spellings belong to the
+// party-combat-text-commands slice of the same batch.
+test("the guarded party combat actions are declared silent", () => {
+  for (const actionId of [
+    "combat.actor_choices",
+    "combat.command",
+    "combat.exit_prompt",
+    "combat.exit_confirm",
+  ]) {
+    assert.ok(Echo.isSilentPresentationControl(actionId), `${actionId} must be silent`);
+    assert.strictEqual(
+      Echo.commandLine(actionId, { skill_key: T_SKILL }, { skillLabel: T_SKILL_LABEL }),
+      null
+    );
+    assert.strictEqual(Echo.commandLine(actionId, {}, {}), null);
+  }
 });
 
 test("guild.register resolves to guild register", () => {
@@ -353,9 +344,9 @@ test("a missing descriptor label stays silent rather than fabricating a name", (
   );
   assert.strictEqual(Echo.commandLine("explore.engage", {}, {}), null);
   assert.strictEqual(
-    Echo.commandLine("combat.flee", {}, {}),
+    Echo.commandLine("explore.move", {}, {}),
     null,
-    "a flee echo without a server label must not invent one"
+    "an exit echo without a server label must not invent one"
   );
 });
 
@@ -571,39 +562,33 @@ test("title echoes keep the full 64-code-point contract cap, never 60", () => {
   assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
 });
 
-test("combat.cast echoes explicit multi-target labels in payload order (D3b)", () => {
+test("explore.cast echoes explicit multi-target labels in payload order (D3b)", () => {
   const line = Echo.commandLine(
-    "combat.cast",
-    { skill_key: T_AREA, target_ids: ["goblin_1", "orc_2"] },
+    "explore.cast",
+    { skill_key: T_AREA, target_ids: [7, 9] },
     { skillLabel: T_AREA_LABEL, targetLabels: ["哥布林", "岩牙族"] }
   );
   assert.strictEqual(line, `cast ${T_AREA_LABEL}=哥布林、岩牙族`);
 });
 
-test("combat.cast bounds multi-target labels and prefers shorthand over them", () => {
+test("explore.cast bounds multi-target labels", () => {
   const huge = "太".repeat(Echo.MAX_LABEL_LENGTH + 10);
   const line = Echo.commandLine(
-    "combat.cast",
-    { skill_key: T_AREA, target_ids: ["a", "b"] },
+    "explore.cast",
+    { skill_key: T_AREA, target_ids: [7, 9] },
     { skillLabel: T_MIN_LABEL, targetLabels: [huge, "乙"] }
   );
   assert.ok(line !== null);
   assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
-  const shorthand = Echo.commandLine(
-    "combat.cast",
-    { skill_key: T_AREA, target_shorthand: "all-enemies", target_ids: ["a"] },
-    { skillLabel: T_MIN_LABEL, targetLabels: ["甲", "乙"] }
-  );
-  assert.strictEqual(shorthand, `cast ${T_MIN_LABEL}=all-enemies`);
 });
 
-test("combat.cast with empty or non-array targetLabels falls back like before", () => {
+test("explore.cast with empty or non-array targetLabels falls back like before", () => {
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: [] }),
+    Echo.commandLine("explore.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: [] }),
     `cast ${T_MIN_LABEL}`
   );
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: "甲" }),
+    Echo.commandLine("explore.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: "甲" }),
     `cast ${T_MIN_LABEL}`
   );
 });
@@ -638,10 +623,11 @@ const COVERAGE_MANIFEST = require("./command_echo_coverage_manifest.json");
 const REGISTERED_MUTATION_ACTIONS = {
   "account.character.create": null,
   "account.character.switch": null,
-  "combat.cast": { payload: { skill_key: T_AREA }, display: { skillLabel: T_AREA_LABEL } },
   "character.persona.update": { payload: { field: "habit", text: "清晨練劍" }, display: {} },
-  "combat.flee": { payload: {}, display: { actionLabel: "逃跑" } },
-  "combat.forfeit": { payload: {}, display: {} },
+  "combat.actor_choices": null,
+  "combat.command": null,
+  "combat.exit_confirm": null,
+  "combat.exit_prompt": null,
   "explore.cast": { payload: { skill_key: T_AREA, target_ids: [7] }, display: { skillLabel: T_AREA_LABEL, targetLabels: ["吟遊詩人"] } },
   "creation.activate": { payload: {}, display: { presetKey: "elf_mage" } },
   "creation.concept": { payload: { concept: "流浪學者" }, display: {} },

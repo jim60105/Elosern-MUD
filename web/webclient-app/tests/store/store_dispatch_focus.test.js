@@ -194,7 +194,7 @@ describe("store dispatch + focus", () => {
       // plays beat by beat": the command panel stays locked in addition to
       // the declared-revision lock, and unlocks when both have cleared.
       openSession();
-      const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
+      const requestId = store.dispatchAction("combat.command", ATTACK_KEY);
       store.appendText("out", "你擲出了骰子。");
       store.appendText("out", "你擊中了灰袍盜賊。");
       store.receive(
@@ -247,12 +247,12 @@ describe("store dispatch + focus", () => {
       // The revision is accepted, so only the playback lock holds.
       expect(store.view.dispatch.inFlight).toBe(null);
       expect(store.view.dispatch.beatLocked).toBe(true);
-      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe(null);
+      expect(store.dispatchAction("combat.command", ATTACK_KEY)).toBe(null);
       expect(sender.sent.actions.length).toBe(1);
 
       store.skipBeats();
       expect(store.view.dispatch.beatLocked).toBe(false);
-      expect(store.dispatchAction("combat.cast", ATTACK_KEY)).toBe("session:2");
+      expect(store.dispatchAction("combat.command", ATTACK_KEY)).toBe("session:2");
    });
   });
 
@@ -545,7 +545,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusPress("Enter")).toBe(true);
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].action_id).toBe("combat.cast");
+      expect(sender.sent.actions[0].action_id).toBe("combat.command");
       expect(sender.sent.actions[0].payload.skill_key).toBe(T_ATTACK_KEY);
       expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
     });
@@ -601,7 +601,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusItemByKey("target-7")).toBe(true);
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].action_id).toBe("combat.cast");
+      expect(sender.sent.actions[0].action_id).toBe("combat.command");
       expect(sender.sent.actions[0].payload.skill_key).toBe(T_ATTACK_KEY);
       expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
       expect(store.view.lastTarget).toBe("7");

@@ -124,7 +124,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
   // The wire order: the round's lines, then the publication carrying its
   // panel, then the result.
-  function settleRound({ panel = beatPanel(), revision = 2, action = "combat.cast", result = true } = {}) {
+  function settleRound({ panel = beatPanel(), revision = 2, action = "combat.command", result = true } = {}) {
     const requestId = store.dispatchAction(action, ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
@@ -213,21 +213,21 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     // revision lock is already clear; the playback lock is not.
     expect(store.view.dispatch.inFlight).toBeNull();
     expect(store.view.dispatch.beatLocked).toBe(true);
-    expect(store.dispatchAction("combat.cast", {})).toBeNull();
+    expect(store.dispatchAction("combat.command", {})).toBeNull();
     expect(sender.sent.actions).toHaveLength(1);
     // The router is gated on the same pair.
     expect(store.view.dispatch.beatLocked).toBe(true);
 
     store.skipBeats();
     expect(store.view.dispatch.beatLocked).toBe(false);
-    expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
+    expect(store.dispatchAction("combat.command", {})).toBe("session:2");
   });
 
   it("keeps the revision lock while the round plays, and both locks clear together", () => {
     openCombat();
     // The panel publication alone (before the result) binds the round and
     // leaves the revision lock held.
-    const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
+    const requestId = store.dispatchAction("combat.command", ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
     }
@@ -239,14 +239,14 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     );
     expect(store.view.dispatch.inFlight).toEqual({ requestId, presentationRevision: null });
     expect(store.view.dispatch.beatLocked).toBe(true);
-    expect(store.dispatchAction("combat.cast", {})).toBeNull();
+    expect(store.dispatchAction("combat.command", {})).toBeNull();
 
     // The result declares the revision: the revision lock releases, the
     // playback lock still holds.
     store.receive(1, "ui_action_result", [fx.actionResult({ request_id: requestId, presentation_revision: 2 })], {});
     expect(store.view.dispatch.inFlight).toBeNull();
     expect(store.view.dispatch.beatLocked).toBe(true);
-    expect(store.dispatchAction("combat.cast", {})).toBeNull();
+    expect(store.dispatchAction("combat.command", {})).toBeNull();
 
     // The round ends by itself and the dock accepts again.
     store.beatShown(0);
@@ -255,7 +255,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     vi.advanceTimersByTime(BEAT_MS);
     expect(playback().phase).toBe("done");
     expect(store.view.dispatch.beatLocked).toBe(false);
-    expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
+    expect(store.dispatchAction("combat.command", {})).toBe("session:2");
   });
 
   it("waits the beat pause read from the motion token between beats", () => {
@@ -336,7 +336,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     expect(playback().auto).toBe(false);
     expect(playback().phase).toBe("done");
     expect(store.view.dispatch.beatLocked).toBe(false);
-    expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
+    expect(store.dispatchAction("combat.command", {})).toBe("session:2");
   });
 
   it("never holds the lock when the token is unset (the reader's 0ms)", () => {
@@ -389,7 +389,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
     // A second action whose publication carries the SAME round id never
     // replays it (a retained panel included).
-    store.dispatchAction("combat.cast", ATTACK_KEY);
+    store.dispatchAction("combat.command", ATTACK_KEY);
     store.appendText("out", "你擲出了骰子。");
     store.receive(
       1,
@@ -429,7 +429,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
   it("binds nothing for the unavailable panel form", () => {
     openCombat();
-    store.dispatchAction("combat.cast", ATTACK_KEY);
+    store.dispatchAction("combat.command", ATTACK_KEY);
     store.appendText("out", "你等待了一陣。");
     store.receive(
       1,
@@ -456,7 +456,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
 
   it("binds a terminal snapshot's round from the pre-round roster and status", () => {
     openCombat();
-    const requestId = store.dispatchAction("combat.cast", ATTACK_KEY);
+    const requestId = store.dispatchAction("combat.command", ATTACK_KEY);
     for (const line of ROUND_LINES) {
       store.appendText("out", line);
     }
@@ -520,7 +520,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     // and the round keeps playing in the meantime.
     expect(store.view.dispatch.inFlight).toEqual({ requestId: "session:1", presentationRevision: 3 });
     expect(store.view.dispatch.beatLocked).toBe(true);
-    expect(store.dispatchAction("combat.cast", {})).toBeNull();
+    expect(store.dispatchAction("combat.command", {})).toBeNull();
     // The recovery publication carries the unavailable form; it cannot
     // unbind the round, and the round still ends on its own.
     store.receive(
@@ -548,7 +548,7 @@ describe("store combat beat playback (webclient-combat-beat-queue)", () => {
     store.beatShown(1);
     vi.advanceTimersByTime(BEAT_MS);
     expect(playback().phase).toBe("done");
-    expect(store.dispatchAction("combat.cast", {})).toBe("session:2");
+    expect(store.dispatchAction("combat.command", {})).toBe("session:2");
   });
 
   it("resets without playing on a new transport generation", () => {

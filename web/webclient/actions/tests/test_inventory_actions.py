@@ -233,92 +233,32 @@ class InventoryUseAdapterTests(InventoryActionBase):
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
         "inventory-item-actions::inventory-actions-publish-all-affected-canonical-panels",
     )
-    @covers_requirement("webclient-combat-beats::the-beats-panel-is-published-only-with-the-combat-action-that-produced-it")
-    def test_in_combat_use_occupies_the_round_and_publishes_full_snapshot(self):
-        self._hurt(20)
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_in_combat_use_is_rejected_before_any_resolution(self):
+        # A party session's items are actor-scoped draft entries, so the
+        # exploration adapter rejects unconditionally — before target
+        # resolution, before the rulebook's own outcome checks (a full-health
+        # actor is rejected too), and without consuming, mutating or advancing
+        # anything. The guarded combat.command path owns in-combat item
+        # selections.
         self.player.db.inventory = [_T_POTION.key]
         engage(self.player, self._monster())
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
-            patch("world.rules.combat.damage.roll_d100", return_value=1),
-            patch("world.rules.combat.rounds.roll_d100", return_value=1),
-            patch("world.rules.action.gates.roll_d100", return_value=1),
-        ):
-            result = _inventory_use_adapter(
-                self.player, {"item_key": _T_POTION.key}
-            )
-        self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "round")
-        self.assertEqual(result["affected_panels"], ())
-        self.assertEqual(list_items(self.player), [])
         record = read_session(self.player)
-        self.assertIsNotNone(record)
-        self.assertEqual(record.rounds_elapsed, 1)
-        # The completing publication's read context carries this round's frozen
-        # record, so the same full snapshot ships the available beats panel.
-        round_record = result["combat_round"]
-        self.assertIsInstance(round_record, RoundRecord)
-        self.assertEqual(round_record.round_id, f"{record.session_id}/1")
-        payload = build_production_registry().render(
-            "combat_beats",
-            PresentationContext(
-                actor=self.player,
-                protocol_version=1,
-                combat_round=round_record,
-            ),
-        )
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["round"], f"{record.session_id}/1")
-
-    @covers_requirement("webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp")
-    def test_in_combat_heal_and_foe_damage_make_the_round_unavailable(self):
-        # The item heals the actor while the foe damages it in the same round:
-        # the round has an HP change with no damage entry, so the projection
-        # cannot be checked against the recorded HP and the panel is
-        # unavailable (design D7) while the text output stays authoritative.
-        self._hurt(20)
-        self.player.db.inventory = [_T_POTION.key]
-        engage(self.player, self._monster())
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
-            patch("world.rules.combat.damage.roll_d100", return_value=100),
-            patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.action.gates.roll_d100", return_value=1),
+        for payload in (
+            {"item_key": _T_POTION.key},
+            {"item_key": _T_POTION.key, "target_key": "no_such_ally"},
+            {"item_key": _T_POTION.key, "target_key": "all-allies"},
         ):
-            result = _inventory_use_adapter(
-                self.player, {"item_key": _T_POTION.key}
-            )
-        self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "round")
-        round_record = result["combat_round"]
-        self.assertIsInstance(round_record, RoundRecord)
-        with patch(
-            "web.webclient.presentation.combat_beats.log_warn"
-        ) as warn:
-            payload = build_production_registry().render(
-                "combat_beats",
-                PresentationContext(
-                    actor=self.player,
-                    protocol_version=1,
-                    combat_round=round_record,
-                ),
-            )
-        self.assertFalse(payload["available"])
-        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
-        self.assertNotIn("beats", payload)
-        # The heal is the unmodeled HP mover: the bounded reason is the HP
-        # mismatch, never a bound.
-        self.assertEqual(warn.call_args.kwargs["context"]["reason"], "hp_mismatch")
-
-    def test_in_combat_full_hp_rejection_carries_stable_code(self):
-        self.player.db.inventory = [_T_POTION.key]
-        engage(self.player, self._monster())
-        result = _inventory_use_adapter(
-            self.player, {"item_key": _T_POTION.key}
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "hp_full")
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+            with self.subTest(payload=payload):
+                result = _inventory_use_adapter(self.player, payload)
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], "combat_item_command_required")
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
+        after = read_session(self.player)
+        self.assertEqual(after.rounds_elapsed, record.rounds_elapsed)
+        self.assertEqual(after.draft_version, record.draft_version)
 
 
 class InventoryUseTargetingTests(InventoryActionBase):
@@ -401,13 +341,11 @@ class InventoryUseTargetingTests(InventoryActionBase):
         self.assertEqual(list_items(self.player), [_T_POTION.key])
         self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max) - 20)
 
-    def test_moved_session_actor_target_submission_rejects_stably(self):
-        # A session record whose battlefield no longer reconstructs (the
-        # actor moved while engaged) must render the stable session
-        # rejection even when the payload carries a target: the roster
-        # reconstruction inside target resolution swallows its own
-        # CombatSessionError, and the submission's session validation owns
-        # the rejection — no exception may escape the adapter.
+    def test_moved_in_combat_actor_still_rejects_through_the_combat_guard(self):
+        # The in-combat guard precedes target resolution, so a moved actor's
+        # request rejects with the same bounded reason instead of reaching a
+        # roster reconstruction that can no longer name the session's
+        # battlefield; no exception may escape the adapter either way.
         self.player.db.inventory = [_T_POTION.key]
         engage(self.player, self._monster())
         elsewhere = create_object(Room, key="t_spray_elsewhere")
@@ -417,7 +355,7 @@ class InventoryUseTargetingTests(InventoryActionBase):
             {"item_key": _T_POTION.key, "target_key": self.ally.key},
         )
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "moved")
+        self.assertEqual(result["code"], "combat_item_command_required")
         self.assertEqual(list_items(self.player), [_T_POTION.key])
 
 

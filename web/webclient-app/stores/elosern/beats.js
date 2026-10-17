@@ -24,8 +24,12 @@ import {
 } from "../../lib/beat_queue.js";
 import { readMotionMs } from "../../lib/motion_tokens.js";
 
-// The player's own actions a completed round can belong to (C12 D3).
-const BEAT_ACTIONS = new Set(["combat.cast", "combat.flee", "inventory.use"]);
+// The player's own actions a completed round can belong to: the party
+// command's completing confirmation and the confirmed party exit are the only
+// two routes whose publication may commit a round this client may present as
+// beats (party-combat-command-transport; the retired combat.cast/combat.flee/
+// inventory.use routes no longer commit a player round).
+const BEAT_ACTIONS = new Set(["combat.command", "combat.exit_confirm"]);
 
 export function applyBeats(ctx) {
   // The live playback: null, or `beatReducer`'s {plan, index, phase}.

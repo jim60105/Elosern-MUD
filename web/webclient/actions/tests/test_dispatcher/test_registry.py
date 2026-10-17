@@ -52,9 +52,10 @@ class RegistryTests(unittest.TestCase):
                 {
                     "account.character.create",
                     "account.character.switch",
-                    "combat.cast",
-                    "combat.flee",
-                    "combat.forfeit",
+                    "combat.actor_choices",
+                    "combat.command",
+                    "combat.exit_confirm",
+                    "combat.exit_prompt",
                     "guild.register",
                     "guild.quest_accept",
                     "guild.quest_abandon",

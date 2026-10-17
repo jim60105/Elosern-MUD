@@ -1513,23 +1513,52 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         coordinator = __import__(
             "web.webclient.presentation.coordinator", fromlist=["attach_coordinator"]
         ).attach_coordinator(self.ws_session, build_production_registry())
-        # The dock's one confirming terminal route: the flee row only reaches
-        # the party exit's confirmation boundary and rejects until the
-        # confirmation window ships (webclient-party-exit-confirmation), while
-        # Forfeit requests and confirms its surrender in one dispatch.
-        action = {
+        # The party exit's only route to a terminal settlement: an operation
+        # prompt carries the commander/session/round-bound confirmation token,
+        # and the confirmation itself settles exactly once.
+        record = read_session(self.char1)
+        operation = {
+            "session_id": record.session_id,
+            "round_revision": record.round_revision,
+            "operation": "surrender",
+        }
+        prompt_action = {
             "protocol_version": 1,
             "presentation_epoch": envelope["presentation_epoch"],
             "request_id": "combat:1",
             "base_revision": envelope["revision"],
-            "action_id": "combat.forfeit",
-            "payload": {"session_id": read_session(self.char1).session_id},
+            "action_id": "combat.exit_prompt",
+            "payload": dict(operation),
         }
         self.sessionhandler.data_out.reset_mock()
         handle_ui_action(
             self.ws_session,
             self.char1,
-            action,
+            prompt_action,
+            build_production_action_registry(),
+            build_production_registry(),
+        )
+        prompt = [
+            call.kwargs["ui_action_result"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_action_result" in call.kwargs
+        ][-1]
+        self.assertEqual(prompt["code"], "party_exit_prompt", prompt)
+        confirm_action = {
+            "protocol_version": 1,
+            "presentation_epoch": prompt["presentation_epoch"],
+            "request_id": "combat:2",
+            "base_revision": prompt["presentation_revision"],
+            "action_id": "combat.exit_confirm",
+            "payload": {
+                **operation,
+                "confirmation_token": prompt["data"]["confirmation_token"],
+            },
+        }
+        handle_ui_action(
+            self.ws_session,
+            self.char1,
+            confirm_action,
             build_production_action_registry(),
             build_production_registry(),
         )

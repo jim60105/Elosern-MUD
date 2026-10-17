@@ -76,8 +76,9 @@ def build_production_action_registry() -> ActionRegistry:
     """Return the production action registry with the combat, service, creation,
     exploration, and account adapters.
 
-    The registry contains exactly the three combat adapters (``combat.cast``,
-    ``combat.flee``, ``combat.forfeit``), the eight service adapters
+    The registry contains exactly the four combat adapters
+    (``combat.actor_choices``, ``combat.command``, ``combat.exit_prompt``,
+    ``combat.exit_confirm``), the eight service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.quest_track``, ``guild.exam_request``,
     ``shop.buy``, ``shop.sell``),
@@ -99,12 +100,14 @@ def build_production_action_registry() -> ActionRegistry:
     action routes through the text parser.
     """
     from web.webclient.actions.combat_actions import (
-        _cast_adapter,
-        _flee_adapter,
-        _forfeit_adapter,
-        validate_cast_payload,
-        validate_flee_payload,
-        validate_forfeit_payload,
+        _actor_choices_adapter,
+        _command_adapter,
+        _exit_confirm_adapter,
+        _exit_prompt_adapter,
+        validate_actor_choices_payload,
+        validate_command_payload,
+        validate_exit_confirm_payload,
+        validate_exit_prompt_payload,
     )
     from web.webclient.actions.account_actions import (
         _account_character_create_adapter,
@@ -232,26 +235,45 @@ def build_production_action_registry() -> ActionRegistry:
     registry = ActionRegistry("elosern")
     registry.register(
         ActionSpec(
-            action_id="combat.cast",
-            validate_payload=validate_cast_payload,
-            adapter=_cast_adapter,
-            affected_panels=("status", "context_actions", "art", "party"),
+            action_id="combat.actor_choices",
+            validate_payload=validate_actor_choices_payload,
+            adapter=_actor_choices_adapter,
+            # The actor query republishes only the combat menu: it changes the
+            # requested member's catalog and nothing else.
+            affected_panels=("context_actions",),
         )
     )
     registry.register(
         ActionSpec(
-            action_id="combat.flee",
-            validate_payload=validate_flee_payload,
-            adapter=_flee_adapter,
-            affected_panels=("status", "context_actions", "art", "party"),
+            action_id="combat.command",
+            validate_payload=validate_command_payload,
+            adapter=_command_adapter,
+            # The adapter's own result declares the exact panels per variant:
+            # a draft edit republishes the combat menu, a committed round the
+            # full settlement set, and a terminal settlement every
+            # mode-dependent panel (the dispatcher reads ``affected_panels``
+            # from the result).
+            affected_panels=("context_actions",),
         )
     )
     registry.register(
         ActionSpec(
-            action_id="combat.forfeit",
-            validate_payload=validate_forfeit_payload,
-            adapter=_forfeit_adapter,
-            affected_panels=("status", "context_actions", "art", "party"),
+            action_id="combat.exit_prompt",
+            validate_payload=validate_exit_prompt_payload,
+            adapter=_exit_prompt_adapter,
+            # A prompt changes no panel; the empty set publishes the full
+            # canonical snapshot at the new revision.
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="combat.exit_confirm",
+            validate_payload=validate_exit_confirm_payload,
+            adapter=_exit_confirm_adapter,
+            # A confirmed exit commits a round or settles the session; the
+            # result's own affected-panel set decides the publication.
+            affected_panels=(),
         )
     )
     registry.register(

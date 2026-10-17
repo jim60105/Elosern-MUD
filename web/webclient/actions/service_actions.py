@@ -25,13 +25,9 @@ from world.quests.runtime import (
     QuestTransitionError,
     set_quest_tracked,
 )
-from world.rules.combat_result import emit_settlement, settle_to_oob_result
 from world.rules.combat_session import (
-    CombatSessionError,
+    SessionReason,
     is_in_active_session,
-    read_session,
-    reconstruct_battlefield,
-    submit_player_item_use,
 )
 from world.rules.economy import TradeError, buy, sell
 from world.rules.equipment import registry_key_for_object, toggle_equipment
@@ -527,30 +523,16 @@ def _item_display_name(item_key: str) -> str:
 def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
     """Resolve one ``target_key`` to a present entity for item targeting.
 
-    Inside an active session the battlefield roster is the world view;
-    outside one, the actor's current location's contents are. An
-    unresolvable token — an unknown key or a group shorthand — travels on
-    as the raw string, where the deterministic preflight's fail-closed
-    target guard rejects it with the stable invalid-target reason: the
-    client can never select a reach the rulebook did not grant.
+    Only the exploration path reaches this helper: during an active combat
+    session ``inventory.use`` rejects before any resolution, because a party
+    session's item selections are actor-scoped draft entries saved through the
+    guarded ``combat.command`` path. The actor's current location's contents
+    are the world view. An unresolvable token — an unknown key or a group
+    shorthand — travels on as the raw string, where the deterministic
+    preflight's fail-closed target guard rejects it with the stable
+    invalid-target reason: the client can never select a reach the rulebook
+    did not grant.
     """
-    if is_in_active_session(actor):
-        record = read_session(actor)
-        if record is not None:
-            try:
-                roster = reconstruct_battlefield(actor, record).roster
-            except CombatSessionError:
-                # A session record whose battlefield no longer reconstructs
-                # (the actor moved while engaged) cannot name a roster
-                # entity; the raw token travels on and the submission's own
-                # session validation renders the stable rejection — never
-                # an exception escaping the adapter.
-                roster = None
-            if roster is not None:
-                entity = roster.get(target_key)
-                if entity is not None:
-                    return entity
-        return target_key
     location = getattr(actor, "location", None)
     if location is not None:
         for obj in location.contents:
@@ -562,33 +544,28 @@ def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
 def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Resolve actor mode and delegate one item use to its deterministic facade.
 
-    In an active combat session the request occupies one initiative-ordered
-    round through ``submit_player_item_use``; out of combat it settles with
-    its canonical six-second world cost through ``use_item``. Success always
-    publishes a full snapshot (empty affected-panel set).
+    During an active combat session the request rejects before any target
+    resolution: a party session's items are actor-scoped draft entries, so only
+    the guarded ``combat.command`` path may save one member's item selection.
+    In exploration the request settles with its canonical six-second world cost
+    through ``use_item``. Success always publishes a full snapshot (empty
+    affected-panel set).
 
     An optional ``target_key`` names whom a single-scope effect reaches; it
     never changes what the item does, and a self-scoped item ignores it
     exactly as the rulebook's scopes dictate.
     """
     del session
+    if is_in_active_session(actor):
+        # Deliberately before target resolution: an in-combat request must not
+        # resolve, consume, mutate or advance anything.
+        return _session_rejected(SessionReason.COMBAT_ITEM_COMMAND_REQUIRED)
     item_key = payload["item_key"]
     target = (
         _resolve_inventory_target(actor, payload["target_key"])
         if "target_key" in payload
         else None
     )
-    if is_in_active_session(actor):
-        try:
-            result = submit_player_item_use(actor, item_key, target=target)
-        except CombatSessionError as error:
-            return _session_rejected(error.args[0])
-        if result["outcome"] == "rejected":
-            return _rejected(result.get("reason"))
-        emit_settlement(actor, result)
-        settled = settle_to_oob_result(result)
-        settled["affected_panels"] = ()
-        return settled
     settlement = use_item(actor, item_key, target=target)
     result = settlement.result
     if result.outcome != "success":

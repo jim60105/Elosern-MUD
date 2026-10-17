@@ -1277,11 +1277,36 @@ def _exploration_payload(context: PresentationContext) -> dict[str, Any]:
     return validate_context_actions(payload)
 
 
+def _combat_view_for(context: PresentationContext) -> Any | None:
+    """Return the active combat view, or ``None`` when there is none.
+
+    A requested actor recorded by ``combat.actor_choices`` builds the view for
+    that member; when the selection no longer resolves (the member left the
+    party, was removed from the roster, or is no longer commandable) the view
+    falls back to the panel's own default actor instead of failing, so a stale
+    selection can never blank the combat panel. ``None`` means the actor has no
+    active session, which renders the exploration form.
+    """
+    actor = context.actor
+    if context.party_actor is not None:
+        from evennia.objects.models import ObjectDB
+
+        requested = ObjectDB.objects.filter(id=context.party_actor).first()
+        if requested is not None:
+            try:
+                return build_combat_view(actor, for_actor=requested)
+            except CombatViewError:
+                pass
+    try:
+        return build_combat_view(actor)
+    except CombatViewError:
+        return None
+
+
 def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
     actor = context.actor
-    try:
-        view = build_combat_view(actor)
-    except CombatViewError:
+    view = _combat_view_for(context)
+    if view is None:
         return _exploration_payload(context)
 
     if view.recovery:

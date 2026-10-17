@@ -1,446 +1,1021 @@
-"""Combat action validator and adapter integration tests (tasks 3.3-3.5)."""
+"""Party-combat command transport validators, adapters and result variants.
+
+Each closed payload shape is checked at the validator level, and every adapter
+is driven against a real synthetic combat session: the authorized commander
+acts through the adapter, the rules boundary is the only writer, and the exact
+result variant (draft progress, round, terminal, retry, stale, rejection) is
+asserted together with the state it did or did not change.
+"""
 
 import unittest
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
-from dataclasses import replace
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+
 from web.webclient.actions.combat_actions import (
-    validate_cast_payload,
-    validate_flee_payload,
-    validate_forfeit_payload,
-    _cast_adapter,
-    _flee_adapter,
-    _forfeit_adapter,
+    AFFECTED_PANELS,
+    CODE_ACTOR_CHOICES,
+    CODE_ALREADY_COMMITTED,
+    CODE_COMBAT_TERMINAL,
+    CODE_DRAFT_SAVED,
+    CODE_NEEDS_SELECTION,
+    CODE_PARTY_EXIT_PROMPT,
+    CODE_ROUND_COMMITTED,
+    CODE_STALE_COMMAND,
+    CombatActionError,
+    _actor_choices_adapter,
+    _command_adapter,
+    _exit_confirm_adapter,
+    _exit_prompt_adapter,
+    validate_actor_choices_payload,
+    validate_command_payload,
+    validate_exit_confirm_payload,
+    validate_exit_prompt_payload,
+    validate_party_exit_prompt_data,
 )
-from world.rules.combat_session import engage, read_session
-from world.rules.progression import (
-    FREEFORM_SCALE_LADDER,
-    scaled_mp_cost,
+from web.webclient.presentation.ingress import build_presentation_context
+from web.webclient.presentation.coordinator import attach_coordinator
+from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.registry import build_production_registry
+from world.rules.combat_beats import RoundRecord
+from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
+    PARTY_EXIT_RETREAT,
+    PARTY_EXIT_SURRENDER,
+    engage,
+    read_session,
 )
+from world.rules.party import join_party
 from world.rules.tests._combat_session_helpers import (
-    SYNTH_SEAM_AREA_SKILL,
+    _monster,
+    _player,
     open_synthetic_scope,
     synth_innate_overlay,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
-from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import SYNTH_SKILLS
 
-# File-local cast rows built from the kit templates (skills scope; the borrowed
-# shipped element stays live because the scope never patches the element
-# registry): a single elemental spell fills every old shipped-spell role —
-# _T_SINGLE the affordable SINGLE cast, _T_AREA the AREA/shorthand cast.
-# Which shipped spell those roles once used is irrelevant to the adapters.
-_T_SINGLE = SYNTH_SKILLS["t_ember_burst"]
-_T_AREA = SYNTH_SEAM_AREA_SKILL
-_T_ELEMENT = _T_SINGLE.element.key
+# Kit rows: one per TargetSpec the command union must discriminate.
+_T_SINGLE = SYNTH_SKILLS["t_ember_burst"].key
+_T_SELF = SYNTH_SKILLS["t_moss_veil"].key
+_T_NONE = SYNTH_SKILLS["t_cinder_breath"].key
+_T_AREA = SYNTH_SKILLS["t_glowmire_bloom"].key
+
+_ALL_SKILLS = (_T_SINGLE, _T_SELF, _T_NONE, _T_AREA)
 
 
-def _mastery_key() -> str:
-    """The element-mastery passive key the production entitlement derives.
-
-    ``progression.freeform_mastery_entitled`` hardcodes ``f"{element}_mastery"``
-    — a production vocabulary (the ``synth_innate_overlay`` precedent), so the
-    row lives under the runtime-derived key and no shipped identifier is named.
-    """
-    return f"{_T_ELEMENT}_mastery"
-
-
-def _mastery_row():
-    return replace(
-        SYNTH_SKILLS["t_steady_stride"],
-        key=_mastery_key(),
-        label="合成元素精通",
-        description="對該元素達到最高造詣的合成被動。",
-        effects=["passive_trait:element_mastery"],
-        category=SkillCategory.ELEMENTAL_MAGIC,
-        group=_T_ELEMENT,
-    )
-
-
-# The scale rung this file exercises is a production-vocabulary member of the
-# closed freeform table; its proficiency gate is looked up in the ladder table
-# at runtime, never hardcoded.
-_T_SCALE = 2.0
-_T_SCALE_LEVEL = next(
-    min_level for scale, min_level in FREEFORM_SCALE_LADDER if scale == _T_SCALE
-)
-
-_SCOPE_EXTRA = {
-    "skills": {
-        **synth_innate_overlay()["skills"],
-        _T_SINGLE.key: _T_SINGLE,
-        _T_AREA.key: _T_AREA,
-        _mastery_row().key: _mastery_row(),
+def _command(**overrides):
+    value = {
+        "session_id": "hostile:1:0",
+        "round_revision": 1,
+        "draft_version": 0,
+        "actor_id": 2,
+        "command": {"kind": "tactic", "payload": {"key": "defend"}},
     }
-}
-
-# A zero-cost SELF passive: the "skill-only payload" fixture (the old
-# body-enhancement/concentration role — the validator checks target shape
-# against the TargetSpec, not the effects).
-_T_SELF = SYNTH_SKILLS["t_steady_stride"]
+    value.update(overrides)
+    return value
 
 
-def _player(key="adapter player"):
-    player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
-    player.apply_race_baseline()
-    return player
+class CombatPayloadValidationTests(EvenniaTestCase):
+    """Exact closed payload shapes, resolved through the scoped skill registry."""
 
-
-def _monster(key="adapter goblin", hp=100):
-    monster = create_object(Monster, key=key)
-    monster.threat_tier = "low"
-    monster.apply_monster_tier("floor")
-    monster.traits.hp.base = hp
-    monster.traits.hp.current = hp
-    return monster
-
-
-class CastPayloadValidationTests(unittest.TestCase):
     def setUp(self):
-        open_synthetic_scope(self, "skills", extra=_SCOPE_EXTRA)
+        # The skill command's TargetSpec comes from the registry, so the kit
+        # scope must cover the validator as well as the adapters.
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "sexual_acts",
+            "items",
+            extra=synth_innate_overlay(),
+        )
         super().setUp()
 
-    def test_none_and_self_accept_skill_only(self):
-        validated = validate_cast_payload({"skill_key": _T_SELF.key})
-        self.assertEqual(validated["target_ids"], ())
-        self.assertIsNone(validated["target_shorthand"])
-        self.assertEqual(validated["skill_key"], _T_SELF.key)
+    def test_actor_choices_payload_is_exact(self):
+        validated = validate_actor_choices_payload(
+            {"session_id": "hostile:1:0", "round_revision": 1, "actor_id": 7}
+        )
+        self.assertEqual(
+            validated, {"session_id": "hostile:1:0", "round_revision": 1, "actor_id": 7}
+        )
+        bad = (
+            {"session_id": "x", "round_revision": 1},
+            {"session_id": "x", "round_revision": 1, "actor_id": 7, "extra": 1},
+            {"session_id": "x", "round_revision": -1, "actor_id": 7},
+            {"session_id": "x", "round_revision": True, "actor_id": 7},
+            {"session_id": "x", "round_revision": 1, "actor_id": 0},
+            {"session_id": "", "round_revision": 1, "actor_id": 7},
+            {"session_id": "x" * 129, "round_revision": 1, "actor_id": 7},
+            {"session_id": "x", "round_revision": 1, "actor_id": "7"},
+        )
+        for payload in bad:
+            with self.subTest(payload=payload):
+                with self.assertRaises(CombatActionError):
+                    validate_actor_choices_payload(payload)
+        # A first round's revision is zero, so it stays a legal reference.
+        self.assertEqual(
+            validate_actor_choices_payload(
+                {"session_id": "x", "round_revision": 0, "actor_id": 7}
+            )["round_revision"],
+            0,
+        )
 
-    def test_single_requires_exactly_one_target(self):
-        validated = validate_cast_payload(
-            {"skill_key": _T_SINGLE.key, "target_ids": [3]}
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
+    def test_command_payload_is_exact(self):
+        validated = validate_command_payload(_command())
+        self.assertEqual(validated["actor_id"], 2)
+        self.assertEqual(validated["command"]["kind"], "tactic")
+        bad = (
+            {k: v for k, v in _command().items() if k != "draft_version"},
+            {**_command(), "base_revision": 3},
+            {**_command(), "round_revision": -1},
+            {**_command(), "draft_version": True},
+            {**_command(), "actor_id": None},
         )
-        self.assertEqual(validated["target_ids"], (3,))
-        for ids in ([], [1, 2]):
-            with self.assertRaises(Exception):
-                validate_cast_payload(
-                    {"skill_key": _T_SINGLE.key, "target_ids": ids}
-                )
+        for payload in bad:
+            with self.subTest(payload=payload):
+                with self.assertRaises(CombatActionError):
+                    validate_command_payload(payload)
 
-    def test_area_accepts_list_or_shorthand_never_both(self):
-        validated = validate_cast_payload(
-            {"skill_key": _T_AREA.key, "target_ids": [3, 4]}
-        )
-        self.assertEqual(validated["target_ids"], (3, 4))
-        validated = validate_cast_payload(
-            {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
-        )
-        self.assertEqual(validated["target_shorthand"], "all-enemies")
-        with self.assertRaises(Exception):
-            validate_cast_payload(
+    def test_skill_command_preserves_every_targetspec_shape(self):
+        forms = (
+            # NONE and SELF carry no target field at all.
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {"skill_key": _T_NONE, "target_ids": (), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SELF}},
+                {"skill_key": _T_SELF, "target_ids": (), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SINGLE, "target_ids": [3]}},
+                {"skill_key": _T_SINGLE, "target_ids": (3,), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_AREA, "target_ids": [3, 4]}},
+                {"skill_key": _T_AREA, "target_ids": (3, 4), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
                 {
-                    "skill_key": _T_AREA.key,
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "skill_key": _T_AREA,
+                    "target_ids": (),
+                    "target_shorthand": "all-enemies",
+                    "scale": 1.0,
+                },
+            ),
+        )
+        for form, expected in forms:
+            with self.subTest(form=form):
+                normalized = validate_command_payload(_command(command=form))
+                self.assertEqual(normalized["command"], {"kind": "skill", "payload": expected})
+
+    def test_skill_command_rejects_mismatched_and_reserved_shapes(self):
+        bad = (
+            # Reserved flee never travels as a skill command.
+            {"kind": "skill", "payload": {"skill_key": "flee"}},
+            {"kind": "skill", "payload": {"skill_key": "t_never_registered"}},
+            # NONE/SELF accept no target field; SINGLE requires exactly one.
+            {"kind": "skill", "payload": {"skill_key": _T_NONE, "target_ids": [3]}},
+            {"kind": "skill", "payload": {"skill_key": _T_SELF, "target_ids": [3]}},
+            {"kind": "skill", "payload": {"skill_key": _T_SINGLE, "target_ids": [3, 4]}},
+            {"kind": "skill", "payload": {"skill_key": _T_SINGLE}},
+            # Both target fields, empty lists, duplicates and bad shorthands.
+            {
+                "kind": "skill",
+                "payload": {
+                    "skill_key": _T_AREA,
                     "target_ids": [3],
                     "target_shorthand": "all",
-                }
-            )
-
-    def test_rejects_reserved_flee_key(self):
-        with self.assertRaises(Exception) as caught:
-            validate_cast_payload({"skill_key": "flee"})
-        self.assertIn("reserved flee", str(caught.exception))
-
-    def test_rejects_unknown_fields_and_bad_values(self):
-        with self.assertRaises(Exception):
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_ids": [True]}
-            )
-        with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": _T_SINGLE.key, "target_ids": [0]})
-        with self.assertRaises(Exception):
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_ids": [1, 1]}
-            )
-        with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": _T_SINGLE.key, "bogus": 1})
-        with self.assertRaises(Exception):
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_shorthand": "all"}
-            )
-
-    def test_flee_and_forfeit_exact_payloads(self):
-        self.assertEqual(validate_flee_payload({}), {})
-        with self.assertRaises(Exception):
-            validate_flee_payload({"skill_key": "flee"})
-        validated = validate_forfeit_payload({"session_id": "hostile:1:0"})
-        self.assertEqual(validated["session_id"], "hostile:1:0")
-        with self.assertRaises(Exception):
-            validate_forfeit_payload({})
-        with self.assertRaises(Exception):
-            validate_forfeit_payload({"session_id": "hostile:1:0", "extra": 1})
-
-    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
-    def test_member_scale_is_accepted_on_every_target_form(self):
-        validated = validate_cast_payload(
-            {"skill_key": _T_AREA.key, "target_ids": [3, 4], "scale": _T_SCALE}
-        )
-        self.assertEqual(validated["scale"], _T_SCALE)
-        validated = validate_cast_payload(
+                },
+            },
+            {"kind": "skill", "payload": {"skill_key": _T_AREA, "target_ids": []}},
+            {"kind": "skill", "payload": {"skill_key": _T_AREA, "target_ids": [3, 3]}},
+            {"kind": "skill", "payload": {"skill_key": _T_AREA, "target_ids": [0]}},
             {
-                "skill_key": _T_AREA.key,
-                "target_shorthand": "all-enemies",
-                "scale": 0.5,
-            }
+                "kind": "skill",
+                "payload": {"skill_key": _T_SINGLE, "target_shorthand": "all"},
+            },
+            {
+                "kind": "skill",
+                "payload": {"skill_key": _T_AREA, "target_shorthand": "all-foes"},
+            },
+            # Unknown fields, present-null optionals.
+            {"kind": "skill", "payload": {"skill_key": _T_SINGLE, "target_id": 3}},
+            {"kind": "skill", "payload": {"skill_key": _T_SINGLE, "target_ids": None}},
+            {"kind": "skill", "payload": {"skill_key": _T_NONE, "scale": None}},
         )
-        self.assertEqual(validated["scale"], 0.5)
-        validated = validate_cast_payload({"skill_key": _T_SELF.key, "scale": 4.0})
-        self.assertEqual(validated["scale"], 4.0)
-        validated = validate_cast_payload({"skill_key": _T_SELF.key, "scale": 1.0})
-        self.assertEqual(validated["scale"], 1.0)
+        for command in bad:
+            with self.subTest(command=command):
+                with self.assertRaises(CombatActionError):
+                    validate_command_payload(_command(command=command))
 
-    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
-    def test_non_member_scale_is_rejected_as_malformed(self):
-        for bad_scale in (3.0, "2", True, None):
-            with self.subTest(scale=bad_scale):
-                with self.assertRaises(Exception):
-                    validate_cast_payload(
-                        {
-                            "skill_key": _T_AREA.key,
-                            "target_ids": [3],
-                            "scale": bad_scale,
+    @covers_requirement(
+        "webclient-action-dispatch::guarded-party-skill-commands-retain-exact-scale-validation"
+    )
+    def test_skill_scale_stays_a_closed_bounded_set(self):
+        for scale in (0.25, 0.5, 1, 2, 4):
+            with self.subTest(scale=scale):
+                normalized = validate_command_payload(
+                    _command(
+                        command={
+                            "kind": "skill",
+                            "payload": {
+                                "skill_key": _T_AREA,
+                                "target_shorthand": "all-enemies",
+                                "scale": scale,
+                            },
                         }
                     )
-
-    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
-    def test_absent_scale_defaults_to_one(self):
-        validated = validate_cast_payload(
-            {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
+                )
+                self.assertEqual(normalized["command"]["payload"]["scale"], float(scale))
+        # An absent scale is exactly 1, and every non-member is malformed.
+        self.assertEqual(
+            validate_command_payload(
+                _command(command={"kind": "skill", "payload": {"skill_key": _T_SELF}})
+            )["command"]["payload"]["scale"],
+            1.0,
         )
-        self.assertEqual(validated["scale"], 1.0)
+        for bad in (3.0, 0, "2", True, None):
+            with self.subTest(scale=bad):
+                with self.assertRaises(CombatActionError):
+                    validate_command_payload(
+                        _command(
+                            command={
+                                "kind": "skill",
+                                "payload": {"skill_key": _T_SELF, "scale": bad},
+                            }
+                        )
+                    )
+
+    def test_item_and_tactic_commands_are_closed(self):
+        validate_command_payload(
+            _command(command={"kind": "item", "payload": {"item_key": "t_ember_spray"}})
+        )
+        validate_command_payload(
+            _command(
+                command={
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": 3},
+                }
+            )
+        )
+        validate_command_payload(
+            _command(
+                command={"kind": "tactic", "payload": {"key": "taunt", "target_id": 3}}
+            )
+        )
+        bad = (
+            {"kind": "item", "payload": {}},
+            {"kind": "item", "payload": {"item_key": ""}},
+            {"kind": "item", "payload": {"item_key": "two words"}},
+            {"kind": "item", "payload": {"item_key": "x", "target_id": 0}},
+            {"kind": "item", "payload": {"item_key": "x", "target_id": None}},
+            {"kind": "item", "payload": {"item_key": "x", "quantity": 2}},
+            {"kind": "tactic", "payload": {}},
+            {"kind": "tactic", "payload": {"key": "block"}},
+            {"kind": "tactic", "payload": {"key": "defend", "target_id": 3}},
+            {"kind": "tactic", "payload": {"key": "dodge", "target_id": 3}},
+            {"kind": "tactic", "payload": {"key": "taunt"}},
+            {"kind": "tactic", "payload": {"key": "taunt", "target_id": None}},
+            # The internal draft spelling is not the action's wire spelling.
+            {"kind": "tactical", "payload": {"tactical_key": "defend"}},
+            {"kind": "surrender", "payload": {}},
+        )
+        for command in bad:
+            with self.subTest(command=command):
+                with self.assertRaises(CombatActionError):
+                    validate_command_payload(_command(command=command))
+
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
+    def test_exit_payloads_are_exact(self):
+        prompt = validate_exit_prompt_payload(
+            {"session_id": "hostile:1:0", "round_revision": 1, "operation": "surrender"}
+        )
+        self.assertEqual(prompt["operation"], "surrender")
+        confirmed = validate_exit_confirm_payload(
+            {
+                "session_id": "hostile:1:0",
+                "round_revision": 1,
+                "operation": "retreat",
+                "confirmation_token": "R-1-abcDEF0123",
+            }
+        )
+        self.assertEqual(confirmed["confirmation_token"], "R-1-abcDEF0123")
+        bad = (
+            {"session_id": "x", "round_revision": 1},
+            {"session_id": "x", "round_revision": 1, "operation": "charge"},
+            {"session_id": "x", "round_revision": 1, "operation": "surrender", "extra": 1},
+            {"session_id": "x", "round_revision": 1, "operation": "surrender", "confirmation_token": "a b"},
+            {"session_id": "x", "round_revision": 1, "operation": "surrender", "confirmation_token": ""},
+            {"session_id": "x", "round_revision": 1, "operation": "surrender", "confirmation_token": "a" * 129},
+        )
+        for payload in bad:
+            with self.subTest(payload=payload):
+                with self.assertRaises(CombatActionError):
+                    validate_exit_confirm_payload(payload)
+
+    @covers_requirement(
+        "webclient-combat-menu::exit-prompt-result-data-is-exact-and-ordinary-results-use-canonical-panels"
+    )
+    def test_party_exit_prompt_data_is_exactly_bounded(self):
+        good = {
+            "operation": "surrender",
+            "confirmation_token": "S-1-abcdef",
+            "scope": "party",
+            "consequence": "整隊退出戰鬥。",
+        }
+        self.assertEqual(validate_party_exit_prompt_data(good), good)
+        bad = (
+            {k: v for k, v in good.items() if k != "consequence"},
+            {**good, "session_id": "hostile:1:0"},
+            {**good, "round_revision": 1},
+            {**good, "scope": "self"},
+            {**good, "operation": "charge"},
+            {**good, "consequence": ""},
+            {**good, "consequence": "字" * 513},
+            {**good, "confirmation_token": "a b"},
+        )
+        for payload in bad:
+            with self.subTest(payload=payload):
+                with self.assertRaises(CombatActionError):
+                    validate_party_exit_prompt_data(payload)
 
 
-class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
+class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
+    """Real-session adapter behavior for the four guarded combat actions."""
+
     def setUp(self):
-        # Round paths resolve the forced innate keys and this file's cast rows
-        # through the scoped skill registry.
-        open_synthetic_scope(self, "skills", extra=_SCOPE_EXTRA)
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "sexual_acts",
+            "items",
+            extra=synth_innate_overlay(),
+        )
         super().setUp()
-        self.room = create_object(Room, key="adapter arena")
-        self.player = _player()
+        self.room = create_object(Room, key="transport arena")
+        self.player = _player("transport player")
         self.player.location = self.room
-        grant_lineage(self.player, [_T_SINGLE.key])
-        self.monster = _monster()
+        self.monster = _monster("transport goblin")
         self.monster.location = self.room
+        grant_lineage(self.player, list(_ALL_SKILLS))
 
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_no_session_rejects(self):
-        result = _cast_adapter(
-            self.player,
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
-            ),
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_active_session")
+    # -- helpers ---------------------------------------------------------
 
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_tampered_remote_target_rejects(self):
+    def _companion(self, key="transport companion"):
+        companion = create_object(NPC, key=key, location=self.room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        companion.traits.hp.base = 100
+        companion.traits.hp.current = 100
+        join_party(companion, self.player)
+        return companion
+
+    def _record(self):
+        return read_session(self.player)
+
+    def _engage(self):
         engage(self.player, self.monster)
-        other_room = create_object(Room, key="elsewhere")
-        other = _monster("intruder")
-        other.location = other_room
-        result = _cast_adapter(
-            self.player,
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_ids": [other.pk]}
-            ),
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "unknown_session_id")
-        self.assertEqual(self.monster.traits.hp.current, 100)
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        return self._record()
 
-    def test_successful_cast_updates_session(self):
-        engage(self.player, self.monster)
-        from unittest.mock import Mock, patch
+    def _command_payload(self, command, actor=None):
+        record = self._record()
+        return {
+            "session_id": record.session_id,
+            "round_revision": record.round_revision,
+            "draft_version": record.draft_version,
+            "actor_id": (actor or self.player).pk,
+            "command": command,
+        }
 
-        self.player.msg = Mock()
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = _cast_adapter(
+    # -- command variants ------------------------------------------------
+
+    @covers_requirement(
+        "webclient-combat-menu::exit-prompt-result-data-is-exact-and-ordinary-results-use-canonical-panels"
+    )
+    def test_solo_command_commits_a_round_and_reports_round_committed(self):
+        self._engage()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _command_adapter(
                 self.player,
-                validate_cast_payload(
-                    {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
-                ),
-            )
-        self.assertIn(result["outcome"], ("success", "rejected"))
-        if result["outcome"] == "success":
-            self.assertIn(result["code"], ("round", "victory", "defeat"))
-            self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
-            self.assertGreaterEqual(
-                len(self.player.msg.call_args_list),
-                1,
-                "adapter must emit committed EventLog narrative via text output",
-            )
-            narrative = "\n".join(
-                call.args[0] for call in self.player.msg.call_args_list
-            )
-            self.assertNotIn("ui_action_result", narrative)
-            self.assertTrue(narrative.strip())
-
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_flee_reaches_the_party_exit_boundary_and_never_escapes_alone(self):
-        # An allied personal flee no longer exists (§6): the row reaches the
-        # party-scoped confirmation boundary (whose dispatch lands with
-        # party-combat-retreat-resolution) and performs no individual escape,
-        # so the session is still exactly where it was.
-        engage(self.player, self.monster)
-        from unittest.mock import patch
-
-        with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = _flee_adapter(self.player, {})
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "party_exit_unavailable")
-        self.assertIsNotNone(self.player.db.active_combat)
-        # No individual escape was recorded either: the durable fled set is
-        # untouched and the session is still settled by nobody.
-        self.assertEqual(read_session(self.player).fled_ids, ())
-
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_stale_forfeit_rejects(self):
-        engage(self.player, self.monster)
-        result = _forfeit_adapter(
-            self.player, {"session_id": "hostile:999:0"}
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "unknown_session_id")
-        self.assertIsNotNone(self.player.db.active_combat)
-
-    def test_matching_forfeit_succeeds(self):
-        engage(self.player, self.monster)
-        session_id = read_session(self.player).session_id
-        result = _forfeit_adapter(self.player, {"session_id": session_id})
-        self.assertEqual(result["outcome"], "success")
-        self.assertIsNone(self.player.db.active_combat)
-
-    def test_matching_forfeit_emits_terminal_text_message(self):
-        engage(self.player, self.monster)
-        session_id = read_session(self.player).session_id
-        from unittest.mock import Mock
-
-        self.player.msg = Mock()
-        result = _forfeit_adapter(self.player, {"session_id": session_id})
-        self.assertEqual(result["outcome"], "success")
-        self.assertIn(result["code"], ("defeat", "exam_failed"))
-        narrative = "\n".join(
-            call.args[0] for call in self.player.msg.call_args_list
-        )
-        self.assertTrue(narrative.strip(), "forfeit must emit terminal text prose")
-        self.assertIn("你被擊敗了", narrative)
-
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_reserved_flee_rejected_before_submission(self):
-        engage(self.player, self.monster)
-        with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": "flee"})
-
-    def test_area_shorthand_adapter_path(self):
-        engage(self.player, self.monster)
-        self.player.db.skills = {"active": [_T_AREA.key], "passive": []}
-        from unittest.mock import patch
-
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = _cast_adapter(
-                self.player,
-                validate_cast_payload(
-                    {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
-                ),
-            )
-        self.assertIn(result["outcome"], ("success", "rejected"))
-        self.assertLessEqual(self.monster.traits.hp.current, 100)
-
-    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
-    def test_scaled_cast_adapter_path_deducts_scaled_mp(self):
-        engage(self.player, self.monster)
-        grant_lineage(
-            self.player,
-            [_T_AREA.key],
-            [_mastery_key()],
-            rungs={_T_AREA.key: _T_SCALE_LEVEL},
-        )
-        self.player.traits.mp.base = 500
-        self.player.traits.mp.current = 500
-        # A scaled crit must not end the round (a terminal settlement would
-        # regenerate MP through the clock), so the monster survives it.
-        self.monster.traits.hp.base = 500
-        self.monster.traits.hp.current = 500
-        mp_before = self.player.traits.mp.value
-        expected_cost = scaled_mp_cost(int(_T_AREA.cost["mp"]), _T_SCALE)
-        from unittest.mock import patch
-
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = _cast_adapter(
-                self.player,
-                validate_cast_payload(
+                self._command_payload(
                     {
-                        "skill_key": _T_AREA.key,
-                        "target_ids": [self.monster.pk],
-                        "scale": _T_SCALE,
+                        "kind": "skill",
+                        "payload": {"skill_key": _T_SINGLE, "target_ids": [self.monster.pk]},
                     }
                 ),
             )
-        self.assertIn(result["outcome"], ("success", "rejected"))
-        self.assertEqual(self.player.traits.mp.value, mp_before - expected_cost)
-        self.assertLess(self.monster.traits.hp.current, 500)
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED)
+        self.assertEqual(result["affected_panels"], AFFECTED_PANELS)
+        self.assertIsInstance(result["combat_round"], RoundRecord)
+        self.assertNotIn("data", result)
+        self.assertEqual(self._record().rounds_elapsed, 1)
 
-    @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
-    def test_scaled_cast_without_mastery_rejects_before_initiative(self):
-        engage(self.player, self.monster)
-        self.player.db.skills = {"active": [_T_AREA.key], "passive": []}
-        result = _cast_adapter(
+    def test_party_member_command_is_saved_without_a_round(self):
+        companion = self._companion()
+        self._engage()
+        before = self._record()
+        result = _command_adapter(
             self.player,
-            validate_cast_payload(
-                {
-                    "skill_key": _T_AREA.key,
-                    "target_ids": [self.monster.pk],
-                    "scale": _T_SCALE,
-                }
+            self._command_payload(
+                {"kind": "tactic", "payload": {"key": "defend"}},
             ),
         )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "scaled_cast_forbidden")
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], CODE_DRAFT_SAVED)
+        self.assertNotIn("combat_round", result)
+        after = self._record()
+        self.assertEqual(after.rounds_elapsed, 0)
+        self.assertEqual(after.draft_version, before.draft_version + 1)
+        self.assertEqual(int(self.player.pk) in (after.draft_entries or {}), True)
+        self.assertEqual(companion.pk in (after.draft_entries or {}), False)
 
-    def test_flee_adapter_rejects_without_session(self):
-        result = _flee_adapter(self.player, {})
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_active_session")
-
-    def test_forfeit_adapter_rejects_without_session(self):
-        result = _forfeit_adapter(self.player, {"session_id": "hostile:1:0"})
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "no_active_session")
-
-    def test_cast_adapter_rejects_unknown_skill(self):
-        engage(self.player, self.monster)
-        with self.assertRaises(Exception):
-            validate_cast_payload(
-                {"skill_key": "no_such_skill", "target_ids": [self.monster.pk]}
-            )
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
-
-    def test_cast_adapter_rejects_insufficient_resource(self):
-        engage(self.player, self.monster)
-        self.player.traits.mp.base = 0
+    def test_member_needing_reselection_reports_needs_selection(self):
+        companion = self._companion()
+        self._engage()
+        # The commander's own affordable selection is admitted first ...
+        self.assertEqual(
+            _command_adapter(
+                self.player,
+                self._command_payload(
+                    {
+                        "kind": "skill",
+                        "payload": {"skill_key": _T_SINGLE, "target_ids": [self.monster.pk]},
+                    }
+                ),
+            )["code"],
+            CODE_DRAFT_SAVED,
+        )
+        # ... then the commander can no longer pay for it, so the next member's
+        # confirmation must report the member-specific reselection.
         self.player.traits.mp.current = 0
-        result = _cast_adapter(
+        result = _command_adapter(
             self.player,
-            validate_cast_payload(
-                {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
+            self._command_payload(
+                {"kind": "tactic", "payload": {"key": "defend"}}, actor=companion
             ),
         )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "insufficient_resource")
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+        self.assertEqual(result["outcome"], "rejected", result)
+        self.assertEqual(result["code"], CODE_NEEDS_SELECTION)
+        self.assertNotIn("data", result)
+        self.assertEqual(self._record().rounds_elapsed, 0)
 
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
+    def test_forged_actor_reference_is_rejected_without_state_change(self):
+        self._engage()
+        before = self._record()
+        result = _command_adapter(
+            self.player,
+            self._command_payload(
+                {"kind": "tactic", "payload": {"key": "defend"}}, actor=self.monster
+            ),
+        )
+        self.assertEqual(result["outcome"], "rejected", result)
+        self.assertEqual(result["code"], "forbidden_actor")
+        after = self._record()
+        self.assertEqual(after.draft_version, before.draft_version)
+        self.assertEqual(after.rounds_elapsed, before.rounds_elapsed)
+
+    def test_absent_actor_reference_is_rejected(self):
+        self._engage()
+        record = self._record()
+        result = _command_adapter(
+            self.player,
+            {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "draft_version": record.draft_version,
+                "actor_id": self.monster.pk + 100_000,
+                "command": {"kind": "tactic", "payload": {"key": "defend"}},
+            },
+        )
+        self.assertEqual(result["code"], "forbidden_actor")
+
+    def test_stale_session_revision_and_draft_version_are_stale_command(self):
+        self._engage()
+        record = self._record()
+        base = self._command_payload({"kind": "tactic", "payload": {"key": "defend"}})
+        for overrides in (
+            {"round_revision": record.round_revision + 1},
+            {"draft_version": record.draft_version + 1},
+            {"session_id": "hostile:999:0"},
+        ):
+            with self.subTest(overrides=overrides):
+                result = _command_adapter(self.player, {**base, **overrides})
+                self.assertEqual(result["outcome"], "stale", result)
+                self.assertEqual(result["code"], CODE_STALE_COMMAND)
+        self.assertEqual(self._record().draft_version, record.draft_version)
+
+    def test_committed_round_retry_reports_already_committed(self):
+        self._engage()
+        self.monster.traits.hp.current = 1
+        payload = self._command_payload(
+            {
+                "kind": "skill",
+                "payload": {"skill_key": BASIC_ATTACK_KEY, "target_ids": [self.monster.pk]},
+            }
+        )
+
+        # A single-member party commits on the first confirmation, and the
+        # resolved round defeats the one-hit-point foe, so the settlement is
+        # terminal and the active record is cleared.
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=100),
+        ):
+            first = _command_adapter(self.player, payload)
+        self.assertEqual(first["outcome"], "success", first)
+        self.assertEqual(first["code"], CODE_COMBAT_TERMINAL)
+        self.assertIsNone(self._record())
+        # The durable receipt still names this session and revision, so the
+        # retried confirmation is the accepted operation retry, not a
+        # rejection and never a second round.
+        retry = _command_adapter(self.player, payload)
+        self.assertEqual(retry["outcome"], "success", retry)
+        self.assertEqual(retry["code"], CODE_ALREADY_COMMITTED)
+        self.assertNotIn("combat_round", retry)
+
+    def test_no_active_session_rejects(self):
+        result = _command_adapter(
+            self.player,
+            {
+                "session_id": "hostile:1:0",
+                "round_revision": 1,
+                "draft_version": 0,
+                "actor_id": self.player.pk,
+                "command": {"kind": "tactic", "payload": {"key": "defend"}},
+            },
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_active_session")
+
+    def test_item_command_saves_an_actor_scoped_draft_entry(self):
+        companion = self._companion()
+        self.player.traits.hp.current = 50
+        self.player.db.inventory = ["t_ember_spray"]
+        self._engage()
+        result = _command_adapter(
+            self.player,
+            self._command_payload(
+                {"kind": "item", "payload": {"item_key": "t_ember_spray"}}
+            ),
+        )
+        self.assertEqual(result["code"], CODE_DRAFT_SAVED, result)
+        # The selection is a draft entry; nothing was consumed yet.
+        self.assertEqual(self.player.db.inventory, ["t_ember_spray"])
+        self.assertTrue(companion.pk not in (self._record().draft_entries or {}))
+
+    # -- actor choices ---------------------------------------------------
+
+    def test_rules_translation_of_every_wire_command_shape(self):
+        # The exact command value handed to the rules admission: NONE/SELF
+        # carry the empty target list the persisted draft uses, an AREA
+        # shorthand travels as its string, item and tactic targets keep their
+        # identity, and every tactic takes the internal `tactical` spelling.
+        from web.webclient.actions import combat_actions
+
+        cases = (
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_NONE,
+                        "targets_or_shorthand": [],
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SELF}},
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SELF,
+                        "targets_or_shorthand": [],
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SINGLE,
+                        "target_ids": [7],
+                        "scale": 2,
+                    },
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SINGLE,
+                        "targets_or_shorthand": [7],
+                        "scale": 2.0,
+                    },
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_AREA,
+                        "targets_or_shorthand": "all-enemies",
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {"kind": "item", "payload": {"item_key": "t_ember_spray"}},
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": None},
+                },
+            ),
+            (
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": 7},
+                },
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": 7},
+                },
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "defend"}},
+                {"kind": "tactical", "payload": {"tactical_key": "defend", "target_id": None}},
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "dodge"}},
+                {"kind": "tactical", "payload": {"tactical_key": "dodge", "target_id": None}},
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "taunt", "target_id": 7}},
+                {"kind": "tactical", "payload": {"tactical_key": "taunt", "target_id": 7}},
+            ),
+        )
+        self._companion()
+        self._engage()
+        for command, expected in cases:
+            with self.subTest(command=command):
+                record = self._record()
+                payload = {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "actor_id": self.player.pk,
+                    "command": command,
+                }
+                with patch.object(
+                    combat_actions,
+                    "confirm_actor_command",
+                    return_value={
+                        "ok": True,
+                        "is_complete": False,
+                        "outcome": "draft",
+                        "reselection_reasons": {},
+                    },
+                ) as confirm:
+                    result = combat_actions._command_adapter(self.player, payload)
+                self.assertEqual(confirm.call_args.args[5], expected)
+                self.assertEqual(result["code"], CODE_DRAFT_SAVED, result)
+
+    def test_none_and_area_shorthand_admissions_reach_the_durable_draft(self):
+        # Real rules-backed admissions: the translated command is what the
+        # admitted draft entry holds and what the panel publishes back, so a
+        # dropped target or a list-ified shorthand cannot pass unnoticed.
+        from world.rules.combat_view import _wire_draft_command
+
+        self._companion()
+        self._engage()
+        admitted = (
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_NONE, "scale": 1.0},
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_AREA,
+                        "target_shorthand": "all-enemies",
+                        "scale": 1.0,
+                    },
+                },
+            ),
+        )
+        for command, wire in admitted:
+            with self.subTest(command=command):
+                result = _command_adapter(self.player, self._command_payload(command))
+                self.assertEqual(result["code"], CODE_DRAFT_SAVED, result)
+                entry = self._record().draft_entries[self.player.pk]
+                self.assertEqual(_wire_draft_command(entry), wire)
+
+    def test_item_command_commits_the_round_and_consumes_once(self):
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 20
+        self.player.db.inventory = ["t_ember_spray"]
+        self._engage()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _command_adapter(
+                self.player,
+                self._command_payload(
+                    {"kind": "item", "payload": {"item_key": "t_ember_spray"}}
+                ),
+            )
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED, result)
+        self.assertEqual(self.player.db.inventory, [])
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        self.assertEqual(
+            round_record.round_id, f"{self._record().session_id}/1"
+        )
+
+    @covers_requirement(
+        "webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp"
+    )
+    def test_item_heal_with_foe_damage_makes_the_round_beats_unavailable(self):
+        # The item heals the actor while the foe damages it in the same round:
+        # the round has an HP change with no damage entry, so the projection
+        # cannot be checked against the recorded HP and the panel is
+        # unavailable while the text output stays authoritative.
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 20
+        self.player.db.inventory = ["t_ember_spray"]
+        self._engage()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _command_adapter(
+                self.player,
+                self._command_payload(
+                    {"kind": "item", "payload": {"item_key": "t_ember_spray"}}
+                ),
+            )
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED, result)
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        with patch("web.webclient.presentation.combat_beats.log_warn") as warn:
+            payload = build_production_registry().render(
+                "combat_beats",
+                PresentationContext(
+                    actor=self.player,
+                    protocol_version=1,
+                    combat_round=round_record,
+                ),
+            )
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
+        self.assertNotIn("beats", payload)
+        # The heal is the unmodeled HP mover: the bounded reason is the HP
+        # mismatch, never a bound.
+        self.assertEqual(warn.call_args.kwargs["context"]["reason"], "hp_mismatch")
+
+    def _session(self):
+        from types import SimpleNamespace
+
+        session = SimpleNamespace(
+            puppet=self.player, sent=[], ndb=SimpleNamespace(), sessid=1
+        )
+        session.protocol_key = "websocket"
+        session.msg = lambda **kwargs: session.sent.append(kwargs)
+        attach_coordinator(session, build_production_registry())
+        return session
+
+    def test_actor_query_selects_the_authorized_companion_only(self):
+        companion = self._companion()
+        self._engage()
+        record = self._record()
+        session = self._session()
+        result = _actor_choices_adapter(
+            self.player,
+            {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "actor_id": companion.pk,
+            },
+            session,
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], CODE_ACTOR_CHOICES)
+        self.assertNotIn("data", result)
+        # The selection is transport-owned and read back through the context.
+        context = build_presentation_context(session, self.player)
+        self.assertEqual(context.party_actor, companion.pk)
+        # A read-only query never mutates the session or the draft.
+        after = self._record()
+        self.assertEqual(after.draft_version, record.draft_version)
+        self.assertEqual(after.round_revision, record.round_revision)
+        self.assertEqual(after.rounds_elapsed, record.rounds_elapsed)
+
+    def test_actor_query_rejects_a_foe_and_a_stale_revision(self):
+        self._engage()
+        record = self._record()
+        session = self._session()
+        for payload, expected in (
+            (
+                {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "actor_id": self.monster.pk,
+                },
+                "forbidden_actor",
+            ),
+            (
+                {
+                    "session_id": "hostile:999:0",
+                    "round_revision": record.round_revision,
+                    "actor_id": self.player.pk,
+                },
+                CODE_STALE_COMMAND,
+            ),
+            (
+                {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision + 1,
+                    "actor_id": self.player.pk,
+                },
+                CODE_STALE_COMMAND,
+            ),
+        ):
+            with self.subTest(payload=payload):
+                result = _actor_choices_adapter(self.player, payload, session)
+                self.assertEqual(result["code"], expected)
+                self.assertNotIn("data", result)
+        self.assertEqual(build_presentation_context(session, self.player).party_actor, None)
+
+    # -- party exit ------------------------------------------------------
+
+    def test_exit_prompt_returns_exactly_the_bounded_data(self):
+        record = self._engage()
+        for operation in (PARTY_EXIT_SURRENDER, PARTY_EXIT_RETREAT):
+            with self.subTest(operation=operation):
+                result = _exit_prompt_adapter(
+                    self.player,
+                    {
+                        "session_id": record.session_id,
+                        "round_revision": record.round_revision,
+                        "operation": operation,
+                    },
+                )
+                self.assertEqual(result["outcome"], "success", result)
+                self.assertEqual(result["code"], CODE_PARTY_EXIT_PROMPT)
+                self.assertEqual(
+                    set(result["data"]),
+                    {"operation", "confirmation_token", "scope", "consequence"},
+                )
+                self.assertEqual(result["data"]["operation"], operation)
+                self.assertEqual(result["data"]["scope"], "party")
+                self.assertTrue(result["data"]["consequence"])
+                self.assertLessEqual(len(result["data"]["consequence"]), 512)
+                self.assertEqual(result["affected_panels"], ())
+        # A prompt changes nothing.
+        after = self._record()
+        self.assertEqual(after.round_revision, record.round_revision)
+        self.assertEqual(after.draft_version, record.draft_version)
+
+    def test_exit_prompt_rejects_a_foreign_session_as_stale(self):
+        record = self._engage()
+        result = _exit_prompt_adapter(
+            self.player,
+            {
+                "session_id": "hostile:999:0",
+                "round_revision": record.round_revision,
+                "operation": PARTY_EXIT_SURRENDER,
+            },
+        )
+        self.assertEqual(result["outcome"], "stale")
+        self.assertEqual(result["code"], CODE_STALE_COMMAND)
+
+    def test_exit_confirm_settles_once_and_replays_as_already_committed(self):
+        record = self._engage()
+        prompt = _exit_prompt_adapter(
+            self.player,
+            {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "operation": PARTY_EXIT_SURRENDER,
+            },
+        )
+        payload = {
+            "session_id": record.session_id,
+            "round_revision": record.round_revision,
+            "operation": PARTY_EXIT_SURRENDER,
+            "confirmation_token": prompt["data"]["confirmation_token"],
+        }
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _exit_confirm_adapter(self.player, payload)
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], CODE_COMBAT_TERMINAL)
+        self.assertNotIn("data", result)
+        # The session is gone; the replayed confirmation is the boundary's own
+        # recorded settlement, never a second settlement.
+        replay = _exit_confirm_adapter(self.player, payload)
+        self.assertEqual(replay["outcome"], "success")
+        self.assertEqual(replay["code"], CODE_ALREADY_COMMITTED)
+
+    def test_exit_confirm_rejects_a_forged_token(self):
+        record = self._engage()
+        result = _exit_confirm_adapter(
+            self.player,
+            {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "operation": PARTY_EXIT_SURRENDER,
+                "confirmation_token": "S-1-0000000000000000",
+            },
+        )
+        self.assertEqual(result["outcome"], "rejected", result)
+        self.assertEqual(result["code"], "invalid_confirmation_token")
+        self.assertEqual(self._record().round_revision, record.round_revision)
+
+    def test_settlement_narrative_is_emitted_only_for_a_committed_round(self):
+        companion = self._companion()
+        record = self._engage()
+        with patch.object(self.player, "msg") as emit:
+            _command_adapter(
+                self.player,
+                {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "actor_id": self.player.pk,
+                    "command": {"kind": "tactic", "payload": {"key": "defend"}},
+                },
+            )
+            self.assertEqual(emit.call_count, 0)
+        self.assertIsNotNone(companion)
+        record = self._record()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+            patch.object(self.player, "msg") as emit,
+        ):
+            result = _command_adapter(
+                self.player,
+                {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "actor_id": companion.pk,
+                    "command": {"kind": "tactic", "payload": {"key": "defend"}},
+                },
+            )
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED, result)
+        self.assertGreater(emit.call_count, 0)
+        self.assertIsInstance(result["combat_round"], RoundRecord)
 
 if __name__ == "__main__":
     unittest.main()

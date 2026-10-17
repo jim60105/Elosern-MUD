@@ -18,7 +18,7 @@ from world.rules.progression import FREEFORM_SCALE_VALUES
 MAX_SKILL_KEY_CODE_POINTS = 64
 MAX_TARGET_IDS = 64
 
-# The reserved skill that keeps its own graphical route (combat.flee).
+# The reserved skill that keeps its own route (the guarded party combat exit).
 RESERVED_FLEE_KEY = "flee"
 
 # Panels: the preview publishes the one panel it changes; a cast changes

@@ -10,10 +10,10 @@
  *
  * The catalog is pure client presentation: it never submits, never replays,
  * never alters dispatch payloads, and never touches the transport. Command
- * spellings are pinned against `commands/*.py` by the Node suite; the three
- * actions without a typed command (`combat.flee`, exit traversal,
- * `creation.reset`) emit a bounded action label of the activating control as
- * an action description (the server exit label where the panel carries one,
+ * spellings are pinned against `commands/*.py` by the Node suite; the actions
+ * without a typed command (exit traversal, `creation.reset`, and the guarded
+ * party combat actions) emit a bounded action label of the activating control
+ * as an action description (the server exit label where the panel carries one,
  * a verbatim-pinned client-owned control label otherwise) and never invent a
  * command. Declared silent presentation controls (`options.dismiss`) return
  * `null` by declaration.
@@ -106,6 +106,16 @@
     "account.character.create",
     "account.character.switch",
     "creation.roll_name",
+    // The guarded party combat actions have no client producer yet: the
+    // combat dock still dispatches the retired combat.cast/combat.flee/
+    // combat.forfeit IDs, and the typed combat command surface plus its own
+    // echo spellings belong to the party-combat-text-commands slice of the
+    // same batch. Declaring them silent keeps the catalog honest (no
+    // fabricated command line) until that slice ships its resolvers.
+    "combat.actor_choices",
+    "combat.command",
+    "combat.exit_prompt",
+    "combat.exit_confirm",
     // explore.dialogue_leave has no typed equivalent (the `talk` command
     // requires a keyword; no farewell stop exists): the server's deterministic
     // success line is the player-facing outcome, delivered as narrative by the
@@ -137,6 +147,36 @@
 
   function isSilentPresentationControl(actionId) {
     return SILENT_PRESENTATION_CONTROLS.indexOf(actionId) !== -1;
+  }
+
+  // The canonical `cast <skill>[=<target>]` composition: the skill label is
+  // required (no echo without one), the target comes from the payload's own
+  // AREA shorthand or the server-authored target labels of the chosen
+  // candidates, and the chosen freeform magnitude rides as a display-only
+  // suffix (e.g. 「施展 風刃術（威力×2）」) composed from the canonical scale
+  // label the menu descriptor carries. Shared by the SkillBook field cast.
+  function castLine(payload, display) {
+    var skill = label(display && display.skillLabel);
+    if (skill === null) {
+      return null;
+    }
+    var target = null;
+    if (isNonEmpty(display && display.targetLabel)) {
+      target = display.targetLabel;
+    } else if (Array.isArray(display && display.targetLabels)) {
+      // D3b: explicit multi-target payloads echo every selected participant
+      // label in payload order (bounded, joined with 、).
+      var names = display.targetLabels.map(label).filter(isNonEmpty);
+      if (names.length > 0) {
+        target = names.join("、");
+      }
+    }
+    var scaleSuffix = label(display && display.scaleLabel);
+    var skillPart =
+      scaleSuffix === null ? skill : skill + "（威力×" + scaleSuffix + "）";
+    return target === null
+      ? join(["cast", skillPart])
+      : join(["cast", skillPart + "=" + target]);
   }
 
   // Resolver table: actionId -> (payload, display) => string | null. Every
@@ -260,55 +300,16 @@
     "explore.move": function (payload, display) {
       return label(display && display.exitLabel);
     },
-    "combat.cast": function (payload, display) {
-      var skill = label(display && display.skillLabel);
-      if (skill === null) {
-        return null;
-      }
-      var target = null;
-      if (isNonEmpty(payload && payload.target_shorthand)) {
-        target = payload.target_shorthand;
-      } else if (isNonEmpty(display && display.targetLabel)) {
-        target = display.targetLabel;
-      } else if (Array.isArray(display && display.targetLabels)) {
-        // D3b: explicit multi-target AREA payloads echo every selected
-        // participant label in payload order (bounded, joined with 、).
-        var names = display.targetLabels
-          .map(label)
-          .filter(isNonEmpty);
-        if (names.length > 0) {
-          target = names.join("、");
-        }
-      }
-      // The chosen freeform magnitude is echoed as a display-only suffix
-      // (e.g. 「施展 風刃術（威力×2）」), composed from the server-authored
-      // canonical scale label carried by the menu descriptor.
-      var scaleSuffix = label(display && display.scaleLabel);
-      var skillPart = scaleSuffix === null
-        ? skill
-        : skill + "（威力×" + scaleSuffix + "）";
-      return target === null
-        ? join(["cast", skillPart])
-        : join(["cast", skillPart + "=" + target]);
-    },
-    // The SkillBook field cast echoes the equivalent typed `cast` line with
-    // the same skill/target/scale composition as the combat dock's cast; a
-    // monster opening names the anchor through its server-authored label.
+    // The SkillBook field cast echoes the canonical typed `cast
+    // <skill>[=<target>]` line; a monster opening names the anchor through
+    // its server-authored label instead.
     "explore.cast": function (payload, display) {
       // A monster opening echoes the server-authored opening label (which
       // names the anchor and discloses the fight), never a guessed name.
       if (payload && payload.opening_target_id !== undefined) {
         return label(display && display.actionLabel);
       }
-      return RESOLVERS["combat.cast"](payload, display);
-    },
-    "combat.forfeit": function () {
-      return "combat forfeit";
-    },
-    // No typed flee command exists; the server-authored button label is the
-    // action description (design decision, pinned by the Node suite).
-    "combat.flee": function (payload, display) {
-      return label(display && display.actionLabel);
+      return castLine(payload, display);
     },
     "guild.register": function () {
       return "guild register";

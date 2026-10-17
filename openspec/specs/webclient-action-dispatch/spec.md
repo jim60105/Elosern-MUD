@@ -20,15 +20,19 @@ Exact bounded UI action validation, allowlisted adapters, session identity, stal
 - **THEN** request ID SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; action ID SHALL be 1..64 lowercase dotted identifier characters; and base revision SHALL be a non-negative JavaScript-safe integer excluding booleans
 
 ### Requirement: Action identity comes only from the authenticated session
-The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only `session.puppet` as the actor. The action payload SHALL NOT accept an actor, account, session, or puppet identifier, and no error response SHALL disclose another actor's state.
+The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only session.puppet as the commander. Only the exact guarded combat schemas SHALL accept subordinate actor_id and active session_id references, reauthorized through the deterministic party boundary; they SHALL NOT select account, puppet or transport identity. All other unknown identity fields SHALL reject, and no error response SHALL disclose another actor's state.
 
 #### Scenario: Payload cannot select a different actor
-- **WHEN** a client includes an actor-like unknown field in the envelope or action payload
+- **WHEN** a client includes an actor-like unknown field in the envelope or outside an exact guarded combat payload
 - **THEN** exact-schema validation rejects the request without adapter invocation
 
 #### Scenario: Unpuppeted action is rejected
 - **WHEN** an anonymous or logged-in but unpuppeted session submits `ui_action`
 - **THEN** no adapter runs and no character state is returned
+
+#### Scenario: Guarded party actor reference is subordinate authorization
+- **WHEN** combat.command names an actor_id and active session_id under the authenticated commander
+- **THEN** the dispatcher passes only the puppet commander and rules reauthorize the referenced allied actor; enemies/other sessions reject without leaking state
 
 ### Requirement: Action registries are allowlisted and duplicate-safe
 
@@ -52,7 +56,7 @@ The action registry SHALL bind each stable action ID to one exact payload valida
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
 
 - **WHEN** the production registry is loaded after the practice-webclient, gallery management, personal official-art preference, correspondence, NPC author-editor, dream-sleep-surface and SkillBook casting changes
-- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, `explore.cast`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `npc.persona.read`, `npc.persona.update`,
+- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.actor_choices`, `combat.command`, `combat.exit_prompt`, `combat.exit_confirm`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, `explore.cast`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `npc.persona.read`, `npc.persona.update`,
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, `gallery.stage.update`,
 `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, `gallery.official.geometry.clear`,
 `letters.list`, `letters.collect`, `letters.read`, `letters.send`, `dream.say`,
@@ -72,7 +76,7 @@ validator and deterministic adapter
 #### Scenario: Production registry composition is fixed
 
 - **WHEN** the production registry is built
-- **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the three combat adapters `combat.cast`, `combat.flee`, and `combat.forfeit`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, and the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`
+- **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the four combat adapters `combat.actor_choices`, `combat.command`, `combat.exit_prompt`, and `combat.exit_confirm`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, and the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`
 
 #### Scenario: Skill preview and cast bypass the text parser
 
@@ -256,31 +260,6 @@ The action dispatcher SHALL return a bounded rejection (stable code, no characte
 - **WHEN** `ui_action` is dispatched while `session.puppet` is None
 - **THEN** the client receives a rejection with a stable code and no character state
 
-### Requirement: combat.cast payload carries an optional bounded scale
-The `combat.cast` payload validator SHALL accept an optional `scale` field alongside `skill_key`, `target_ids`, and `target_shorthand`. The value SHALL be a JSON number exactly equal to one member of the `freeform_cast_scales` table (`0.25`, `0.5`, `1.0`, `2.0`, `4.0`); an absent field SHALL default to `1.0`. A boolean, a non-number, or a non-member number SHALL be rejected as `malformed_payload` without adapter invocation.
-
-#### Scenario: A member scale is accepted on every target form
-- **WHEN** a client submits `combat.cast` with `scale: 2.0` together with an explicit SINGLE
-  `target_ids` list, and separately with an AREA `target_shorthand`
-- **THEN** both payloads pass validation and the adapter revalidates and resolves the cast at
-  `scale == 2.0`
-
-#### Scenario: A non-member scale is rejected as malformed
-- **WHEN** a client submits `scale: 3.0`, `scale: "2"`, or `scale: true`
-- **THEN** the payload is rejected with `malformed_payload` and no adapter runs
-
-#### Scenario: An absent scale defaults to one
-- **WHEN** a client submits a valid `combat.cast` without a `scale` field
-- **THEN** the adapter behaves exactly as before this change (`scale == 1.0`)
-
-#### Scenario: Scale accompanies every target form
-- **WHEN** a `combat.cast` payload carries `scale` with any target form
-- **THEN** the field MAY accompany every target form (NONE, SELF, SINGLE, and AREA, including shorthands)
-
-#### Scenario: Deterministic gate rejects forbidden scales before initiative
-- **WHEN** the adapter processes a validated scale
-- **THEN** it SHALL thread the validated scale into `revalidate_submission` and `submit_player_action`, so a scale the deterministic gate forbids is rejected before initiative with the stable `SCALED_CAST_FORBIDDEN` code
-
 ### Requirement: A non-success action result surfaces its message exactly once
 
 When the client recognizes a matching non-success `ui_action_result` — outcome `rejected`, `stale`, or `error`, carrying the same request id and epoch as its in-flight dispatch — and the creation overlay is not the presenting surface, it SHALL make the envelope's server-authored message visible to the player exactly once per recognized result, rendered as one narrative error line carrying that message verbatim through the bounded narrative path.
@@ -330,3 +309,10 @@ When the client recognizes a matching non-success `ui_action_result` — outcome
 
 - **WHEN** a non-success result message is surfaced
 - **THEN** surfacing SHALL NOT alter the in-flight lock, the revision-gated release (including the `stale` rule that holds the lock until the recovery snapshot commits), the uncertain-result notice, or the no-automatic-resubmit rule
+
+### Requirement: Guarded party skill commands retain exact scale validation
+The skill payload inside combat.command SHALL accept optional scale exactly0.25,0.5,1,2,4 with absent default1 for every existing target form. Boolean, nonnumeric and nonmember scales SHALL reject malformed_payload. Current actor mastery/capability SHALL revalidate before any complete round starts.
+
+#### Scenario: Scale parity and forbidden capability
+- **WHEN** a companion submits scale2 on SINGLE or AREA and a different actor lacks the mastery
+- **THEN** valid shapes preserve scale2 in the draft while the unauthorized scale rejects before initiative without resource/time change

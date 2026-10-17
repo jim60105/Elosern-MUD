@@ -309,7 +309,6 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
 
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
     def test_flee_flow_submits_empty_payload(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

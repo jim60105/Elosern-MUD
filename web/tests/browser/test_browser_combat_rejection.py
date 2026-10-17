@@ -117,7 +117,6 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]
 
-    @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
     def test_stale_forfeit_rejects(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
