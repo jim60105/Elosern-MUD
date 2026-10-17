@@ -138,6 +138,8 @@ describe("stage target step (store)", () => {
       context_actions: fx.combatActions({
         skills: skills(options),
         participants: options.participants || roster(options),
+        // The commanded actor is the player, as the v7 default actor is.
+        choices: { actor_id: PLAYER },
       }),
       local_map: fx.localMapPanel(),
     };
@@ -191,7 +193,7 @@ describe("stage target step (store)", () => {
     open();
     store.focusItemByKey(key);
     store.focusConfirm("keyboard");
-    const payload = sender.sent.actions.at(-1).payload;
+    const payload = sender.sent.actions.at(-1).payload.command.payload;
     store = mainStore;
     sender = mainSender;
     return payload;
@@ -235,7 +237,7 @@ describe("stage target step (store)", () => {
     expect(store.focusPress("Enter")).toBe(true);
     expect(sender.sent.actions).toHaveLength(before + 1);
     expect(sender.sent.actions.at(-1).action_id).toBe("combat.command");
-    expect(JSON.stringify(sender.sent.actions.at(-1).payload)).toBe(JSON.stringify(expected));
+    expect(JSON.stringify(sender.sent.actions.at(-1).payload.command.payload)).toBe(JSON.stringify(expected));
     expect(expected).toEqual({ skill_key: ATTACK, target_ids: [FOE_B] });
   });
 
@@ -248,7 +250,7 @@ describe("stage target step (store)", () => {
     expect(store.stageTargetPointer("attack", "activate")).toBe(false);
     expect(store.stageTargetPointer(`target-${FOE_C}`, "activate")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: ATTACK, target_ids: [FOE_C] });
+    expect(sender.sent.actions[0].payload.command.payload).toEqual({ skill_key: ATTACK, target_ids: [FOE_C] });
   });
 
   it("a digit still picks the server's N-th item", () => {
@@ -256,7 +258,7 @@ describe("stage target step (store)", () => {
     openAttack();
     expect(store.focusPress("1")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: ATTACK, target_ids: [ALLY] });
+    expect(sender.sent.actions[0].payload.command.payload).toEqual({ skill_key: ATTACK, target_ids: [ALLY] });
   });
 
   it("SELF is one position on the controlled figure; arrows keep it; no target field", () => {
@@ -275,7 +277,7 @@ describe("stage target step (store)", () => {
     expect(s.lit).toEqual([String(PLAYER)]);
     store.focusPress("Enter");
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: "t_guard" });
+    expect(sender.sent.actions[0].payload.command.payload).toEqual({ skill_key: "t_guard" });
   });
 
   it("AREA: members, then groups, then confirm; Space toggles; groups light their side", () => {
@@ -314,7 +316,7 @@ describe("stage target step (store)", () => {
     expect(step().announce).toBe("施展：全體我方，共 1 名");
     store.focusPress("Enter");
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: "t_storm", target_shorthand: "all-allies" });
+    expect(sender.sent.actions[0].payload.command.payload).toEqual({ skill_key: "t_storm", target_shorthand: "all-allies" });
   });
 
   it("AREA explicit confirm sends presenter order; nothing chosen announces so", () => {
@@ -329,7 +331,7 @@ describe("stage target step (store)", () => {
     store.focusPress(" ");
     store.focusItemByKey("area-confirm");
     store.focusPress("Enter");
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: "t_storm", target_ids: [FOE_A, FOE_C] });
+    expect(sender.sent.actions[0].payload.command.payload).toEqual({ skill_key: "t_storm", target_ids: [FOE_A, FOE_C] });
   });
 
   it("NONE, a disabled skill, a zero-candidate frame and the scale-free lists start no step", () => {
@@ -408,7 +410,7 @@ describe("stage target step (store)", () => {
     expect(step().scaleLabel).toBe("威力 ×2");
     expect(keys()).toEqual([`target-${FOE_B}`, `target-${FOE_A}`]);
     store.focusPress("Enter");
-    expect(sender.sent.actions.at(-1).payload).toMatchObject({ skill_key: "t_bolt", scale: 2 });
+    expect(sender.sent.actions.at(-1).payload.command.payload).toMatchObject({ skill_key: "t_bolt", scale: 2 });
   });
 
   it("a group counts and lights only the candidates standing on the stage", () => {

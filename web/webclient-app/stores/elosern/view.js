@@ -8,6 +8,7 @@
 import { computed } from "vue";
 import OptionCards from "../../lib/option_cards.js";
 import LocalMap from "../../lib/local_map.js";
+import CombatMenu from "../../lib/combat_menu.js";
 import { gaugeRatio, isLowHp, isVitalsVisible } from "../../components/vitals.js";
 import {
   NAVIGATION_ITEM_KEYS,
@@ -63,14 +64,18 @@ export function applyView(ctx) {
       return null;
     }
     const item = ctx.router.currentItem();
-    const status = rs.panels.status;
     return stageTargetModel({
       source: descriptor.source,
       menu: ctx.router.currentMenu(),
       skill: combat.skillByKey[skillKey],
       participants: Array.isArray(panel.participants) ? panel.participants : [],
       formationOrder: ctx.formationOrder,
-      controlledIdentity: status && status.actor ? status.actor.identity : null,
+      // The commanded actor (webclient-party-command-selection): a SELF step
+      // stands on the actor that will cast, never on the controlled portrait.
+      actorIdentity:
+        panel.choices && panel.choices.actor_id !== null && panel.choices.actor_id !== undefined
+          ? panel.choices.actor_id
+          : null,
       focusKey: item ? (item.key !== undefined ? item.key : item.label) : null,
       locked: ctx.beatLocked(),
     });
@@ -359,6 +364,10 @@ export function applyView(ctx) {
             skillKey: ctx.crossSideConfirm.skillKey,
           }
         : null,
+      // The compact commanded-actor/draft-progress line the card chrome
+      // renders (webclient-party-command-selection): null outside a ready
+      // combat panel; the counts are the authoritative committed draft.
+      combatProgress: combatNow ? CombatMenu.progressLine(panel) : null,
       // H3 (task 6.5): the focused skill model for the master-detail pane —
       // the `SkillDetailPane` renders this committed model, never inventing
       // a `戰鬥外` badge (design D14).
@@ -452,6 +461,7 @@ export function applyView(ctx) {
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
     ctx.settleCrossSide(rs);
+    ctx.settleCombatActorSelection(rs);
     ctx.settlePresence(rs);
     ctx.settleRoomCard(rs);
     ctx.syncHudDrawer(prev, rs);
@@ -466,6 +476,10 @@ export function applyView(ctx) {
       ctx.freeformTarget = null;
     }
     ctx.view.value = ctx.buildView(prev, rs);
+    // The read-only actor navigation runs AFTER the publication: its
+    // `combat.actor_choices` envelope reads the freshly published
+    // epoch/revision, never the previous one.
+    ctx.autoAdvanceCombatActor(rs);
   };
 
   const partyAvailable = computed(() => !!ctx.view.value.partyAvailable);

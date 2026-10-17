@@ -365,6 +365,12 @@ describe("the plates layer in the client", () => {
   const foeRow = (identity, token, name, hp) => ({
     identity, token, display_name: name, team: "foes", state: "active", hp_current: hp, hp_maximum: 24, portrait_ref: null, conditions: [],
   });
+  // The v7 combat panel must present the commanded ally; the controlled
+  // figure is the status fixture's actor (42) and carries no plate.
+  const playerRow = () => ({
+    identity: 42, token: "a1", display_name: "影行者", team: "party", state: "active",
+    hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [],
+  });
 
   it("gives every drawn figure but the controlled one its plate at its slot, with tokens only for repeated names", async () => {
     const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 2);
@@ -427,7 +433,7 @@ describe("the plates layer in the client", () => {
       key: CombatMenu.BASIC_ATTACK_KEY, label: "普通攻擊", description: "合成描述。", cost: {}, target_spec: "single", element: null,
       enabled: true, disabled_reason: null, targets: [201, 202, 203], shorthands: [], hostile: true, beneficial: false,
     };
-    const participants = [foeRow(201, "e1", "哥布林", 24), foeRow(202, "e2", "狼", 20), foeRow(203, "e3", "蝙蝠", 12), foeRow(204, "e4", "史萊姆", 8)];
+    const participants = [playerRow(), foeRow(201, "e1", "哥布林", 24), foeRow(202, "e2", "狼", 20), foeRow(203, "e3", "蝙蝠", 12), foeRow(204, "e4", "史萊姆", 8)];
     store.receive(1, "ui_snapshot", [fx.snapshot({
       presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
       panels: {
@@ -468,6 +474,7 @@ describe("the plates layer in the client", () => {
 
   it("passes each participant's conditions and stage x to its plate, and closes a plate tooltip when a round starts", async () => {
     const participants = [
+      playerRow(),
       { ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] },
       foeRow(202, "e2", "狼", 4),
     ];
@@ -494,7 +501,7 @@ describe("the plates layer in the client", () => {
   });
 
   it("closes a plate tooltip when combat ends, even while the plate fades out", async () => {
-    const participants = [{ ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] }];
+    const participants = [playerRow(), { ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] }];
     store.receive(1, "ui_snapshot", [fx.snapshot({
       presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
       panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.combatActions({ participants }), art: ART_PANEL_SAMPLE },

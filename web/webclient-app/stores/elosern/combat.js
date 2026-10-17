@@ -60,7 +60,7 @@ export function applyCombat(ctx) {
     return names;
   }
 
-  // The echo descriptor for one combat.cast submit (D3): the row descriptor
+  // The echo descriptor for one combat.command submit (D3): the row descriptor
   // plus the chosen NON-DEFAULT freeform magnitude label and — for payloads
   // with explicit selected targets — the payload-ordered target labels
   // (D3b). Display-only: the payload is never touched here.
@@ -205,9 +205,12 @@ export function applyCombat(ctx) {
           filled.targetLabel = name;
         }
       }
-    } else if (actionId === "combat.cast") {
+    } else if (actionId === "combat.command") {
+      // The guarded v7 envelope nests the inner command payload.
+      const inner =
+        payload && payload.command && payload.command.payload ? payload.command.payload : {};
       if (!has("skillLabel")) {
-        const label = combatSkillLabel(payload.skill_key);
+        const label = combatSkillLabel(inner.skill_key);
         if (label !== null) {
           filled.skillLabel = label;
         }
@@ -215,11 +218,11 @@ export function applyCombat(ctx) {
       if (
         !has("targetLabel") &&
         !has("targetLabels") &&
-        Array.isArray(payload.target_ids) &&
-        payload.target_ids.length > 0 &&
-        !payload.target_shorthand
+        Array.isArray(inner.target_ids) &&
+        inner.target_ids.length > 0 &&
+        !inner.target_shorthand
       ) {
-        const names = participantNamesByIdentity(payload.target_ids);
+        const names = participantNamesByIdentity(inner.target_ids);
         if (names !== null) {
           filled.targetLabels = names;
         }

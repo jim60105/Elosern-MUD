@@ -164,7 +164,7 @@ describe("cross-side predicate (pure)", () => {
   });
 
   it("reads the facts from the committed descriptor", () => {
-    const panel = { skills: skills() };
+    const panel = { choices: { skills: skills() } };
     expect(skillFacts(panel, ATTACK)).toMatchObject(HARM);
     expect(skillFacts(panel, "x_tide")).toMatchObject(BOTH);
     expect(skillFacts(panel, "missing")).toMatchObject(NEITHER);
@@ -198,7 +198,9 @@ describe("cross-side question (store flow)", () => {
     }
     return {
       status: fx.statusPanel(),
-      context_actions: fx.combatActions({ skills: list, participants }),
+      // The commanded actor is the player (the v7 default actor), so a party
+      // member other than the actor is the "友方" side.
+      context_actions: fx.combatActions({ skills: list, participants, choices: { actor_id: PLAYER } }),
       local_map: fx.localMapPanel(),
     };
   }
@@ -270,7 +272,7 @@ describe("cross-side question (store flow)", () => {
     const focusRequests = store.view.dockFocusRequest;
     const envelope = heldPayload();
     expect(envelope.action_id).toBe("combat.command");
-    expect(JSON.stringify(envelope.payload)).toBe(JSON.stringify({ skill_key: ATTACK, target_ids: [ALLY] }));
+    expect(JSON.stringify(envelope.payload.command.payload)).toBe(JSON.stringify({ skill_key: ATTACK, target_ids: [ALLY] }));
     expect(question()).toBeNull();
     expect(store.view.dockFocusRequest).toBe(focusRequests + 1);
   });
@@ -334,7 +336,7 @@ describe("cross-side question (store flow)", () => {
     store.focusPress("Enter");
     expect(question()).toBe("確定要對自己使用〈自縛〉？");
     const envelope = heldPayload();
-    expect(envelope.payload).toEqual({ skill_key: "x_curse" });
+    expect(envelope.payload.command.payload).toEqual({ skill_key: "x_curse" });
     enterCombat();
     openSkill("x_drain");
     store.focusItemByKey(`target-${PLAYER}`);
@@ -369,7 +371,7 @@ describe("cross-side question (store flow)", () => {
     expect(focus()).toBe("area-confirm");
     store.focusPress("Enter");
     const envelope = heldPayload();
-    expect(envelope.payload).toEqual({ skill_key: "x_storm", target_ids: [ALLY, FOE_A] });
+    expect(envelope.payload.command.payload).toEqual({ skill_key: "x_storm", target_ids: [ALLY, FOE_A] });
   });
 
   it("shorthands: `all` asks, `all-enemies` and a beneficial `all-allies` send at once", () => {
@@ -386,7 +388,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey("area-confirm");
     store.focusPress("Enter");
     expect(question()).toBeNull();
-    expect(sent().at(-1).payload).toEqual({ skill_key: "x_storm", target_shorthand: "all-enemies" });
+    expect(sent().at(-1).payload.command.payload).toEqual({ skill_key: "x_storm", target_shorthand: "all-enemies" });
 
     enterCombat();
     openSkill("x_bloom");
@@ -395,7 +397,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey("area-confirm");
     store.focusPress("Enter");
     expect(question()).toBeNull();
-    expect(sent().at(-1).payload).toEqual({ skill_key: "x_bloom", target_shorthand: "all-allies" });
+    expect(sent().at(-1).payload.command.payload).toEqual({ skill_key: "x_bloom", target_shorthand: "all-allies" });
   });
 
   it("a both-facts skill names each side, and both with `all`", () => {
@@ -422,19 +424,32 @@ describe("cross-side question (store flow)", () => {
     expect(question()).toBe("確定要對友方使用〈潮汐逆轉〉？");
   });
 
-  it("an unresolvable target fails closed with 友方與敵方", () => {
-    // The protocol rejects a candidate with no participant row, so the one
-    // reachable unresolvable target is a SELF cast whose actor no committed
-    // row carries.
+  it("an unresolvable actor cannot reach a held command from a committed panel", () => {
+    // The v7 mirror requires the requested actor to be a presented ally, so a
+    // SELF cast whose actor has no participant row is rejected before it can
+    // be held; the predicate's own fail-closed wording is unit-tested above.
     const noActor = ROSTER.filter((p) => p.identity !== PLAYER);
-    enterCombat({
+    gen += 1;
+    store.beginTransport(gen);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    const panel = fx.combatActions({
+      skills: skills(),
       participants: noActor,
-      attackTargets: [ALLY, FOE_A, FOE_B],
+      actors: [{ identity: PLAYER, commandable: true, reason: null }],
+      choices: { actor_id: PLAYER },
     });
-    openSkill("x_curse");
-    store.focusPress("Enter");
+    const result = store.receive(
+      gen,
+      "ui_snapshot",
+      [fx.snapshot({ mode: "combat", panels: { status: fx.statusPanel(), context_actions: panel } })],
+      {},
+    );
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe("invalid");
+    expect(store.view.mode).not.toBe("combat");
+    expect(question()).toBeNull();
     expect(sent()).toHaveLength(0);
-    expect(question()).toBe("確定要對友方與敵方使用〈自縛〉？");
   });
 
   it("same-side use sends at once", () => {
@@ -443,7 +458,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey(`target-${FOE_A}`);
     store.focusPress("Enter");
     expect(question()).toBeNull();
-    expect(sent().at(-1).payload).toEqual({ skill_key: ATTACK, target_ids: [FOE_A] });
+    expect(sent().at(-1).payload.command.payload).toEqual({ skill_key: ATTACK, target_ids: [FOE_A] });
     const cases = [
       ["x_heal", `target-${ALLY}`],
       ["x_ward", `target-${ALLY}`],
@@ -457,7 +472,7 @@ describe("cross-side question (store flow)", () => {
       store.focusItemByKey(row);
       store.focusPress("Enter");
       expect(question(), key).toBeNull();
-      expect(sent().at(-1).payload.skill_key, key).toBe(key);
+      expect(sent().at(-1).payload.command.payload.skill_key, key).toBe(key);
     }
     // Flee and the Forfeit confirmation are untouched.
     enterCombat();
@@ -491,13 +506,13 @@ describe("cross-side question (store flow)", () => {
     // The label changes: the question follows it.
     revision += 1;
     let next = panels();
-    next.context_actions.skills[0].groups[0].skills[0].label = "合成重擊";
+    next.context_actions.choices.skills[0].groups[0].skills[0].label = "合成重擊";
     store.receive(gen, "ui_update", [fx.update({ revision, mode: "combat", panels: next })], {});
     expect(question()).toBe("確定要對友方使用〈合成重擊〉？");
     // The fact flips: the cast no longer crosses sides, so the question closes.
     revision += 1;
     next = panels();
-    Object.assign(next.context_actions.skills[0].groups[0].skills[0], { hostile: false });
+    Object.assign(next.context_actions.choices.skills[0].groups[0].skills[0], { hostile: false });
     store.receive(gen, "ui_update", [fx.update({ revision, mode: "combat", panels: next })], {});
     expect(question()).toBeNull();
     expect(sent()).toHaveLength(0);
@@ -520,7 +535,7 @@ describe("cross-side question (store flow)", () => {
     expect(question()).not.toBeNull();
     revision += 1;
     const next = panels();
-    next.context_actions.skills[0].groups[0].skills.find((s) => s.key === "x_storm").shorthands = ["all-enemies"];
+    next.context_actions.choices.skills[0].groups[0].skills.find((s) => s.key === "x_storm").shorthands = ["all-enemies"];
     store.receive(gen, "ui_update", [fx.update({ revision, mode: "combat", panels: next })], {});
     expect(question()).toBeNull();
     expect(sent()).toHaveLength(0);

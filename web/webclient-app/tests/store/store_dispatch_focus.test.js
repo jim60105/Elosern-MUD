@@ -602,8 +602,8 @@ describe("store dispatch + focus", () => {
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
       expect(sender.sent.actions[0].action_id).toBe("combat.command");
-      expect(sender.sent.actions[0].payload.skill_key).toBe(T_ATTACK_KEY);
-      expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
+      expect(sender.sent.actions[0].payload.command.payload.skill_key).toBe(T_ATTACK_KEY);
+      expect(sender.sent.actions[0].payload.command.payload.target_ids).toEqual([7]);
       expect(store.view.lastTarget).toBe("7");
     });
 

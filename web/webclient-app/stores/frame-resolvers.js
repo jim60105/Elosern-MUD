@@ -318,6 +318,15 @@ export function createFrameResolver(deps) {
     return combat;
   }
 
+  // Drop the held combat model outright (webclient-party-command-selection):
+  // a commanded-actor switch discards every unconfirmed client-local skill,
+  // scale and target selection, so the next build starts from the new actor's
+  // canonical choices. Confirmed server draft entries are never touched here.
+  function resetCombatSelection() {
+    combat = null;
+    combatPanelSig = null;
+  }
+
   function indexParam(params, name) {
     const value = params && params[name];
     return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : -1;
@@ -394,6 +403,12 @@ export function createFrameResolver(deps) {
     "combat.categories": () => {
       const combat = combatModel();
       return combat ? isolate(combat.menus.categories) : marker(null);
+    },
+    // The actor selector frame (webclient-party-command-selection): one row
+    // per committed allied actor with its authoritative draft status.
+    "combat.actor": () => {
+      const combat = combatModel();
+      return combat ? isolate(combat.menus.actor) : marker(null);
     },
     "combat.forfeit": () => {
       const combat = combatModel();
@@ -542,6 +557,9 @@ export function createFrameResolver(deps) {
     // panel form; a non-combat committed state clears it (duck round-2:
     // leaving combat can never hand stale selection to a re-adoption).
     combatModel,
+    // Drop the held combat model (the commanded-actor switch): the store's
+    // selection home is the registry's, so only the registry can clear it.
+    resetCombatSelection,
     // The SkillBook use model accessor (the second declared selection home):
     // the store's AREA toggle and confirm read this one instance. Null unless
     // an exploration `skill_use` preview for `skillKey` is committed.
