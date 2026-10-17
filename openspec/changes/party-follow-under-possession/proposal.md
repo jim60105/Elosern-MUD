@@ -8,7 +8,7 @@ User decision (2026-10-18, follow-up to the party member management batch for `d
 
 - **Amendment of a previous non-goal.** The 2026-10-18 design listed "no change to possession entry or exit rules"; this change deliberately amends possession *movement*: a possessed traversal now brings the commander's body and every other present effective companion along. Entry and exit (possess / 歸位) rules are unchanged.
 - `follow_companions(traversing_object, ...)`: the follower set is derived from effective membership via `resolve_commander` (`party-member-authority`) instead of requiring the traverser to be the player: the commander's body (when the traverser is a possessed companion) plus every effective companion other than the traverser that is co-located in the source room (room or wilderness registration).
-- The owner body moves with quiet `move_to` / the wilderness provider API, is never puppeted, keeps its possession mirror and entranced line, and its map knowledge records the destination; the quest arrival re-observation runs for the commander.
+- The owner body passes the destination's receive gate explicitly, then moves with `move_to(..., quiet=True, move_hooks=False)` / the wilderness provider API so no player-arrival side effects fire for it, is never puppeted, keeps its possession mirror and entranced line, and its map knowledge records the destination; the quest arrival re-observation runs for the commander.
 - `movement_settlement.py` snapshots and compensates every follower, including the owner body, for a possessed traversal.
 - The one 跟丟了 notification goes to the acting session (the possessed puppet).
 - `companion-possession-transition`'s remote-companion release scenario now describes the only remaining separation: a failed follow.
@@ -33,11 +33,11 @@ None.
 
 ## Effort
 
-**6 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
+**7 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
 
 ## Batch: party member management
 
-Declared implementation order: **2 of 32**.
+Declared implementation order: **2 of 33**.
 
 - depends-on: party-member-authority
 

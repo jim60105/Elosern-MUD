@@ -72,7 +72,15 @@ The follow function in the party module SHALL resolve the commander from the tra
 
 #### Scenario: The owner body follows quietly and stays entranced
 - **WHEN** the player's own body follows a possessed traversal
-- **THEN** it moves with a quiet `move_to` (or the wilderness provider API), records the destination in the commander's map knowledge, keeps its entranced presentation and its possession mirror, and is never puppeted by the move
+- **THEN** the destination's `at_pre_object_receive` gate is run for the body first, the body then moves with `move_to(..., quiet=True, move_hooks=False)` (or the wilderness provider API), so no `PlayerCharacter.at_post_move` side effect (action options, arrival lore, encounter activation) is attributed to it, the commander's map knowledge records the destination once, the body keeps its entranced presentation and possession mirror, and it is never puppeted by the move
+
+#### Scenario: A destination that refuses the body leaves it behind
+- **WHEN** the destination's receive gate refuses the player's body during a possessed traversal
+- **THEN** the body stays in the source room, the other members still follow, and the acting session receives the one 跟丟了 notification naming the body
+
+#### Scenario: A body left in a recycled wilderness room is still found
+- **WHEN** a failed wilderness follow leaves the unpuppeted body registered at the source coordinates after the contrib recycled its room
+- **THEN** a later possessed traversal from those coordinates still treats the body as co-located through the wilderness registration predicate and it follows
 
 #### Scenario: Party members stay together under possession
 - **WHEN** the player, while possessing a companion, traverses several exits in a row with every follow succeeding

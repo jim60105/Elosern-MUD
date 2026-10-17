@@ -1,10 +1,10 @@
 # Tasks
 
-Total estimate: **6 hours**, including implementation, focused verification, documentation and integration.
+Total estimate: **7 hours**, including implementation, focused verification, documentation and integration.
 
-## 1. Follower set under possession (2.5h)
+## 1. Follower set under possession (3.5h)
 
-- [ ] 1.1 Derive followers from `resolve_commander(traverser)` and effective membership in `follow_companions`, move the owner body quietly, record its arrival once and re-observe quest arrival for the commander; verify in `world/rules/tests/test_party_follow_possession.py` grid, wilderness entry, step and return traversals, a failed follow with one notice to the puppet session, a stale possession flag following nobody, unchanged player traversal, and no action-options/dialogue/encounter side effects attributed to the body.
+- [ ] 1.1 Derive followers from `resolve_commander(traverser)` and effective membership in `follow_companions`, move the owner body quietly, record its arrival once and re-observe quest arrival for the commander; verify in `world/rules/tests/test_party_follow_possession.py` grid, wilderness entry, step and return traversals, a failed follow with one notice to the puppet session, a stale possession flag following nobody, a destination receive gate refusing the body (left behind with the notice), a body in a recycled wilderness room rejoining through the registration predicate, `move_hooks=False` for the body only, unchanged player traversal, and no action-options/dialogue/encounter side effects attributed to the body.
 
 ## 2. Settlement compensation (2h)
 
