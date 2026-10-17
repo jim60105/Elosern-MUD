@@ -19,6 +19,7 @@ None.
 
 ### Modified Capabilities
 
+- `webclient-contextual-hud`: lineage row identity uses graph roots and owned/total instead of the chain meter.
 - `skill-lineage-panel`: read model, panel contract, command and window requirements move to graphs.
 - `game-command-docs`: the lineage command entry documents the member argument and the `系譜` alias.
 
@@ -33,7 +34,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **20 of 30**.
+Declared implementation order: **20 of 31**.
 
 - depends-on: party-panel-v3-view-member
 - depends-on: member-info-text-commands
