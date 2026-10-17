@@ -98,7 +98,7 @@ non-local network requests blocked.
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 
 The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `ExitCompass`, `ExplorationReadout`,
-`RestForm`) SHALL present the `context_actions` v6 menus and, in exploration, the exit compass beside
+`RestForm`) SHALL present the `context_actions` v7 menus and, in exploration, the exit compass beside
 the 建議 pill sharing one readout, with the mode's guidance line, focused/disabled states, and the
 exact server-authored suggestion card shape on the centred suggestions card.
 

@@ -18,7 +18,7 @@ from ._support import (
 class SuggestionsEnvelopeTests(unittest.TestCase):
     """Per-status suggestions schema tests (tasks 1.3-1.4)."""
 
-    @covers_requirement("webclient-context-actions-suggestions::the-context-actions-panel-carries-a-suggestions-envelope-at-version-6")
+    @covers_requirement("webclient-context-actions-suggestions::the-context-actions-panel-carries-a-suggestions-envelope-at-version-7")
     def test_generating_and_unavailable_carry_only_status(self):
         for status in ("generating", "unavailable"):
             with self.subTest(status=status):

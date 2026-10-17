@@ -88,11 +88,17 @@ class ContextActionsSchemaTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_context_actions(panel)
 
+    @covers_requirement(
+        "webclient-combat-menu::version-7-root-keys-and-recovery-choices-are-exact"
+    )
     def test_valid_recovery_panel_passes(self):
         normalized = validate_context_actions(_recovery_panel())
         self.assertEqual(normalized["session"]["state"], _T_RECOVERY_STATE)
         self.assertEqual(normalized["secondary_actions"], ["surrender"])
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_rejects_unknown_fields_and_missing_fields(self):
         payload = _valid_panel()
         payload["bogus"] = 1
@@ -228,6 +234,9 @@ class ContextActionsSchemaTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
+    @covers_requirement(
+        "webclient-combat-menu::version-7-root-keys-and-recovery-choices-are-exact"
+    )
     def test_recovery_rejects_root_actions(self):
         panel = _recovery_panel()
         panel["root_actions"] = ["attack"]
@@ -485,6 +494,9 @@ class ContextActionsSchemaTests(unittest.TestCase):
             self.assertLessEqual(len(group["skills"]), MAX_LIST_ITEMS)
         self.assertLessEqual(json_byte_size(panel), MAX_CANONICAL_JSON_BYTES)
 
+    @covers_requirement(
+        "webclient-combat-menu::version-7-root-keys-and-recovery-choices-are-exact"
+    )
     def test_actions_key_bounds_reject(self):
         panel = _valid_panel()
         panel["root_actions"].append("extra")

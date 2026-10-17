@@ -12,7 +12,7 @@ from ._support import _exploration_panel, _valid_category_group, _valid_panel, _
 
 
 class ContextActionsExplorationFormTests(unittest.TestCase):
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-7-panel")
     def test_valid_exploration_form_passes(self):
         normalized = validate_context_actions(_exploration_panel())
         self.assertEqual(normalized["schema_version"], CONTEXT_ACTIONS_SCHEMA_VERSION)

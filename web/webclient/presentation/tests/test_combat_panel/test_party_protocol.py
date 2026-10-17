@@ -8,6 +8,8 @@ item rows and tactics.
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.rooms import Room
@@ -71,6 +73,9 @@ class PartyProtocolSchemaTests(unittest.TestCase):
     def _panel(self, **choices_overrides):
         return _valid_panel(choices=_valid_choices(**choices_overrides))
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_valid_party_panel_round_trips(self):
         payload = _valid_panel(
             choices=_valid_choices(items=[_valid_item()], **{_TACTICS: [_valid_tactic()]})
@@ -95,12 +100,19 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 _valid_panel(actors=[_valid_actor(), _valid_actor()])
             )
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_choices_must_reference_an_actor_summary(self):
         with self.assertRaises(Exception):
             validate_context_actions(self._panel(actor_id=99))
         with self.assertRaises(Exception):
             validate_context_actions(_valid_panel(actors=[]))
 
+    @covers_requirement(
+        "webclient-combat-menu::actor-item-summaries-and-reselection-reasons-"
+        "are-explicit-bounded-facts"
+    )
     def test_item_rows_are_exact_and_bounded(self):
         good = _valid_item()
         normalized = validate_context_actions(self._panel(items=[good]))
@@ -119,6 +131,10 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_context_actions(self._panel(items=[bad]))
 
+    @covers_requirement(
+        "webclient-combat-menu::actor-item-summaries-and-reselection-reasons-"
+        "are-explicit-bounded-facts"
+    )
     def test_item_catalog_fails_closed_above_the_bound(self):
         # 128 distinct usable keys pass; 129 fail closed rather than truncate.
         ok = self._panel(items=[_valid_item(item_key=f"item_{index}") for index in range(128)])
@@ -155,6 +171,10 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "webclient-combat-menu::actor-item-summaries-and-reselection-reasons-"
+        "are-explicit-bounded-facts"
+    )
     def test_draft_entries_must_join_required_actors(self):
         with self.assertRaises(Exception):
             validate_context_actions(
@@ -170,6 +190,10 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "webclient-combat-menu::actor-item-summaries-and-reselection-reasons-"
+        "are-explicit-bounded-facts"
+    )
     def test_reselection_reasons_join_needs_selection_ids(self):
         panel = _valid_panel(
             draft=_valid_draft(
@@ -200,6 +224,9 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_draft_revisions_are_safe_integers_and_match_the_session(self):
         panel = _valid_panel(
             draft=_valid_draft(round_revision=True, needs_selection_ids=[2])
@@ -302,6 +329,9 @@ class PartyProtocolSchemaTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_actor_and_required_identities_must_be_presented_allies(self):
         # The actor summary and the draft's required actors must join party
         # participants, never a foe.
@@ -335,6 +365,9 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "webclient-combat-menu::version-7-root-keys-and-recovery-choices-are-exact"
+    )
     def test_recovery_has_no_personal_choices(self):
         with self.assertRaises(Exception):
             validate_context_actions(_recovery_panel(choices=_valid_choices()))
@@ -372,6 +405,9 @@ class PartyProtocolPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=actor or self.player, protocol_version=1),
         )
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_ready_panel_publishes_actors_choices_items_and_tactics(self):
         self.player.db.inventory = ["t_ember_spray"]
         engage(self.player, self.monster)
@@ -396,6 +432,9 @@ class PartyProtocolPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn(self.monster.pk, tactics["taunt"]["targets"])
         self.assertEqual(list(payload["draft"]["required_actor_ids"]), [self.player.pk])
 
+    @covers_requirement(
+        "webclient-combat-menu::party-protocol-publishes-bounded-actor-choices-and-durable-progress"
+    )
     def test_partial_party_draft_carries_the_closed_wire_command(self):
         from typeclasses.npcs import NPC
         from world.rules.combat_session import submit_player_action
