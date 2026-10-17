@@ -118,6 +118,23 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(is_in_active_session(self.player))
 
     @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    def test_either_exit_command_confirms_the_operation_a_token_binds(self):
+        from world.rules.combat_session import engage
+
+        # A retreat prompt from the cast alias is confirmable at the forfeit
+        # entry point: the token's own operation executes, so the party
+        # retreats instead of surrendering.
+        self.player.traits.agility.base = 200
+        self.monster.traits.agility.base = 0
+        engage(self.player, self.monster)
+        prompt = self._run(CmdCast, "flee")
+        token = _TOKEN_PATTERN.search(prompt).group(1)
+        self.assertIn(PARTY_EXIT_RETREAT, prompt)
+        settled = self._run(CmdCombatForfeit, f"confirm {token}")
+        self.assertTrue(settled.strip())
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
     def test_combat_retreat_prompts_and_its_token_confirms_the_retreat(self):
         from world.rules.combat_session import (
             engage,

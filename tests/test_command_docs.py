@@ -862,6 +862,24 @@ class CommandDocsContractTests(unittest.TestCase):
         ):
             self.assertIn(f"## {category}", self.overview)
 
+    @covers_requirement("game-command-docs::complete-command-reference")
+    @covers_requirement("game-command-docs::accurate-command-details")
+    def test_overview_documents_party_command_syntax_and_no_possession(self):
+        # Both player documents carry the actor-scoped party syntax and the
+        # explicit exit confirmation, and both state that commanding a member
+        # needs no possession of it.
+        for document in (self.overview, self.reference):
+            for token in (
+                "combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]",
+                "combat command <actor-token> item <item_key>[=<target-token>]",
+                "combat command <actor-token> defend/dodge/taunt[=<enemy-token>]",
+                "combat retreat confirm <token>",
+                "combat actions [<actor-token>]",
+            ):
+                self.assertIn(token, document, f"{token!r} is undocumented")
+        self.assertIn("不需要附身", self.overview)
+        self.assertIn("不需要附身", self.reference)
+
     @covers_requirement("game-command-docs::docsify-navigation", "game-command-docs::drift-contract-test")
     def test_sidebar_links_both_pages(self):
         self.assertIn("](/game/commands)", self.sidebar)

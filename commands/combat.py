@@ -44,12 +44,14 @@ from world.rules.guild_exams import GuildExamError
 from world.rules.items import ItemUseReason
 from world.rules.event_log import render_plain_text
 from world.rules.player_messages import (
+    SESSION_REASON_MESSAGES,
     party_exit_prompt_lines,
     rejection_message as action_rejection_message,
     session_reason_message,
 )
 from world.rules.progression import scale_for_label
 from world.rules.service_messages import (
+    SERVICE_REASON_MESSAGES,
     exam_schedule_message,
     exam_started_message,
     rejection_message as service_rejection_message,
@@ -141,14 +143,41 @@ def _reason_code(raw: Any) -> Any:
     return raw
 
 
-def _draft_reason_text(reason: Any) -> str:
-    """Render one draft-admission rejection through the shared reason surface."""
+def _stable_reason_message(code: str) -> str:
+    """Resolve one stable code through every shared player-facing table.
+
+    The admission returns its own string codes, while the skill preflight's
+    ``RejectReason`` values and the item preflight's ``ItemUseReason`` values
+    arrive as plain code strings. Each domain keeps the exact prose its own
+    transport publishes instead of degrading to one generic fallback.
+    """
+    if code in SESSION_REASON_MESSAGES:
+        return SESSION_REASON_MESSAGES[code]
+    if code in _DRAFT_REASON_MESSAGES:
+        return _DRAFT_REASON_MESSAGES[code]
+    if code in SERVICE_REASON_MESSAGES:
+        return SERVICE_REASON_MESSAGES[code]
+    try:
+        return action_rejection_message(RejectReason(code))
+    except ValueError:
+        return session_reason_message(code)
+
+
+def _draft_reason_text(reason: Any, *, item_domain: bool = False) -> str:
+    """Render one draft-admission rejection through the shared reason surface.
+
+    ``item_domain`` lets an item command keep the exact item/equipment prose
+    the browser's inventory surface publishes for the same stable code, where
+    the shared tables overlap with the admission's own shape codes.
+    """
     if isinstance(reason, RejectReason):
         return action_rejection_message(reason)
     if isinstance(reason, ItemUseReason):
         return service_rejection_message(reason)
     code = str(reason)
-    return _DRAFT_REASON_MESSAGES.get(code) or session_reason_message(code)
+    if item_domain and code in SERVICE_REASON_MESSAGES:
+        return SERVICE_REASON_MESSAGES[code]
+    return _stable_reason_message(code)
 
 
 def _token_of(tokens: dict[int, str], identity: Any) -> str:
@@ -558,7 +587,12 @@ class CmdCombatCommand(Command):
             return
         outcome = result.get("outcome")
         if outcome == "rejected":
-            self.caller.msg(_draft_reason_text(result.get("reason")))
+            self.caller.msg(
+                _draft_reason_text(
+                    result.get("reason"),
+                    item_domain=command.get("kind") == "item",
+                )
+            )
             return
         if outcome == "draft":
             # The shared settlement renderer owns the admitted-draft prose.
@@ -729,7 +763,7 @@ class CmdCombatActions(Command):
         lines.append(_COMBAT_COMMAND_USAGE)
         lines.append(
             "最後一位成員確認後會自動執行本回合；"
-            "cast <技能>[=<代號>]、使用 <道具>[=<代號>] 亦可確認自己的指令。"
+            "cast <技能>[=<代號>] 與使用 <道具> [目標] 亦可確認你自己的指令。"
         )
         return lines
 
@@ -765,7 +799,7 @@ class CmdCombatActions(Command):
         for reselection in draft.reselection_reasons:
             lines.append(
                 f"  {_token_of(tokens, reselection.actor_id)} 需要重新選擇："
-                f"{reselection.reason[1]}"
+                f"{_stable_reason_message(reselection.reason[0])}"
             )
         return lines
 

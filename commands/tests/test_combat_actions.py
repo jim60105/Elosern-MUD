@@ -682,6 +682,89 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
             ),
         )
 
+    @covers_requirement("player-combat-session::telnet-combat-discovery-and-target-tokens-have-rule-parity")
+    def test_self_and_none_skills_ignore_supplied_target_tokens(self):
+        heal = SYNTH_SKILLS["t_moss_veil"]
+        breath = SYNTH_SKILLS["t_cinder_breath"]
+        grant_lineage(self.companion, [heal.key, breath.key])
+        engage(self.char1, self.monster)
+        # A SELF skill named for a2 binds a2 inside the rules layer and a NONE
+        # skill takes no target at all: a supplied foe token is ignored, never
+        # forwarded as a target.
+        for skill_key in (heal.key, breath.key):
+            with self.subTest(skill_key=skill_key):
+                self._run(CmdCombatCommand, f"a2 skill {skill_key}=e1")
+                entry = read_session(self.char1).draft_entries[self.companion.pk]
+                self.assertEqual(entry["payload"]["targets_or_shorthand"], [])
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
+        self.assertLess(self.companion.traits.mp.current, 50)
+
+    @covers_requirement("player-combat-session::all-personal-skill-choices-and-costs-are-actor-scoped")
+    def test_valid_scale_admits_the_actors_own_cost(self):
+        mastery = SYNTH_SKILLS["t_glowmire_mastery"]
+        grant_lineage(
+            self.companion,
+            [_TIDE_ARC.key],
+            [mastery.key],
+            rungs={_TIDE_ARC.key: 1},
+        )
+        engage(self.char1, self.monster)
+        self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}@1/2=e1")
+        entry = read_session(self.char1).draft_entries[self.companion.pk]
+        self.assertEqual(entry["payload"]["scale"], 0.5)
+        self.assertEqual(entry["payload"]["targets_or_shorthand"], [self.monster.pk])
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        # Half of the companion's own 10 MP cost, charged to the companion.
+        self.assertEqual(self.companion.traits.mp.current, 45)
+
+    @covers_requirement("inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations")
+    def test_item_rejections_keep_the_item_reason_prose(self):
+        from world.rules.service_messages import rejection_message as item_message
+
+        engage(self.char1, self.monster)
+        before = read_session(self.char1)
+        self.assertEqual(
+            self._run(CmdCombatCommand, "a1 item t_ember_spray"),
+            item_message("item_not_held"),
+        )
+        self.companion.traits.hp.current = self.companion.traits.hp.base
+        self.assertEqual(
+            self._run(CmdCombatCommand, "a2 item t_ember_spray"),
+            item_message("hp_full"),
+        )
+        self.assertEqual(read_session(self.char1), before)
+
+    @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    def test_draft_progress_names_the_member_specific_reason(self):
+        from world.rules.action import RejectReason
+
+        engage(self.char1, self.monster)
+        self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1")
+        # The companion's own resources change before the leader confirms, so
+        # its admitted entry is no longer valid and the reason is reported
+        # with the member it belongs to.
+        self.companion.traits.mp.current = 0
+        text = self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        self.assertIn("指令已確認，等待其他成員。", text)
+        self.assertIn("a2 需要重新選擇", text)
+        self.assertIn(rejection_message(RejectReason.INSUFFICIENT_RESOURCE), text)
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 0)
+
+    @covers_requirement("player-combat-session::telnet-combat-discovery-and-target-tokens-have-rule-parity")
+    def test_default_listing_stays_on_the_commander_after_a_saved_entry(self):
+        engage(self.char1, self.monster)
+        self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1")
+        text = self._run(CmdCombatActions, "")
+        self.assertIn("a1＝", text)
+        self.assertIn(_SPELL, text)
+        self.assertIn(f"a2 已選：技能 {_TIDE_ARC.key}=e1", text)
+        # The default listing is the commander's own menu, even while the
+        # companion is the member still to choose.
+        self.assertNotIn(_TIDE_ARC.key, text[: text.index("目標代號：")])
+
 
 class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
     """One real text path through skill, item, revision and confirmed exit."""
