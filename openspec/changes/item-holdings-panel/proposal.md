@@ -32,7 +32,7 @@ Design §3.3, §6.2 and §7 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 ## Batch: party member management
 
-Declared implementation order: **20 of 32**.
+Declared implementation order: **21 of 33**.
 
 - depends-on: party-inventory-panel
 
