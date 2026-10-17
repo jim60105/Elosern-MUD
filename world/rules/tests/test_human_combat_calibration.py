@@ -598,7 +598,9 @@ class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
         )
 
     @covers_requirement(
-        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
+        "human-combat-calibration::equipment-growth-evidence-uses-real-construction-and-committed-reload",
+        "equipment-effects::shipped-weapons-have-authored-selected-values-backed-by-real-growth-evidence",
     )
     def test_real_weapon_upgrade_growth_survives_a_committed_reload(self):
         attacker = self._actor("growth attacker")
@@ -650,7 +652,8 @@ class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
         self.assertEqual(self._invariants(again), before)
 
     @covers_requirement(
-        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
+        "human-combat-calibration::equipment-growth-evidence-uses-real-construction-and-committed-reload",
     )
     def test_real_armor_and_control_schools_stay_invariant_to_the_weapon_factor(self):
         attacker = self._actor("control attacker")

@@ -1197,6 +1197,7 @@ class ShippedWeaponFactorContractTests(unittest.TestCase):
     @covers_requirement(
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value",
         "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
+        "equipment-effects::shipped-weapons-have-authored-selected-values-backed-by-real-growth-evidence",
     )
     def test_every_shipped_weapon_declares_a_budgeted_factor(self):
         weapons = list(self._weapon_entries())
@@ -1220,7 +1221,8 @@ class ShippedWeaponFactorContractTests(unittest.TestCase):
                 self.assertEqual(factor > 1.0, physical)
 
     @covers_requirement(
-        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration"
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
+        "equipment-effects::shipped-weapons-have-authored-selected-values-backed-by-real-growth-evidence",
     )
     def test_shipped_physical_weapons_author_a_tiered_progression(self):
         # The authored roster is not a dormant all-1.0 field: physical weapons

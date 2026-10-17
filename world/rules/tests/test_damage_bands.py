@@ -333,7 +333,8 @@ class DamageBandTests(unittest.TestCase):
                     validate_combat_rulebook(bad)
 
     @covers_requirement(
-        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor"
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
+        "human-combat-calibration::equipment-growth-evidence-uses-real-construction-and-committed-reload",
     )
     def test_weapon_factor_defend_and_below_threshold_arithmetic(self):
         # Independent literal arithmetic for the equipment-growth evidence
