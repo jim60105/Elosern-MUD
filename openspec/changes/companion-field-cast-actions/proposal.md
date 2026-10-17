@@ -8,7 +8,7 @@ Design §5 (action identifiers) and §6.4 of `docs/superpowers/specs/2026-10-18-
 
 - **BREAKING (pre-release)** `explore.skill_preview` payload becomes `{actor_id, skill_key[, scale]}`; the session selection stores the caster with the skill and scale.
 - **BREAKING (pre-release)** `explore.cast` payload adds required `actor_id`; the adapter calls `cast_as_member`.
-- **BREAKING (pre-release)** `skill_use` panel v1 → v2 adds `actor_id`; costs, targets, openings and availability are computed for that caster; a companion caster gets no openings. Python validator, JS mirror (`web/static/webclient/js/elosern/protocol/panels/`), parity contract and fixtures move together.
+- **BREAKING (pre-release)** `skill_use` panel v1 → v2 adds `actor_id`; costs, targets, openings and availability are computed for that caster; a companion caster gets the same monster openings and the same caster-bound 開戰並施放 confirmation as the commander (user decision of 2026-10-18). Python validator, JS mirror (`web/static/webclient/js/elosern/protocol/panels/`), parity contract and fixtures move together.
 - The current SkillBook / SkillUseDock sends the controlled figure's id until the 技能 tab lands.
 
 ## Capabilities
@@ -29,11 +29,11 @@ None.
 
 ## Effort
 
-**5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
+**5.5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
 
 ## Batch: party member management
 
-Declared implementation order: **8 of 31**.
+Declared implementation order: **9 of 32**.
 
 - depends-on: companion-field-cast-rule
 

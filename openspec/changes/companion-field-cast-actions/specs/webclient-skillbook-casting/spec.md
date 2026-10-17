@@ -48,7 +48,7 @@ The production OOB registry SHALL expose `skill_use` at schema version 2. Its av
 
 #### Scenario: A companion preview is computed for the companion
 - **WHEN** the selection names companion 艾拉 and 治癒之光
-- **THEN** `actor_id` is 艾拉's id, `cost` reflects 艾拉's adjusted cost, `enabled` reflects 艾拉's MP, the candidates include 艾拉 herself, and `openings` is empty because a companion cannot open combat
+- **THEN** `actor_id` is 艾拉's id, `cost` reflects 艾拉's adjusted cost, `enabled` reflects 艾拉's MP, the candidates include 艾拉 herself, and `openings` lists the co-located monster openings validated for 艾拉 as initiator under the commander's party
 
 ### Requirement: Preview selection is session-scoped and never executes gameplay
 
@@ -134,6 +134,23 @@ The production OOB registry SHALL expose `skill_use` at schema version 2. Its av
 - **WHEN** the browser submits casting traffic
 - **THEN** it sends allowlisted OOB actions only and never synthesizes or executes a text cast command
 
-#### Scenario: A companion opening anchor is refused by the rules
+#### Scenario: A companion opening anchor opens the commander's encounter
 - **WHEN** `explore.cast` names companion 艾拉 as caster with an `opening_target_id`
-- **THEN** the rules reject it with `companion_cannot_open`, no session is created and no state changes
+- **THEN** the dispatcher passes only the authenticated puppet, the rules reauthorize 艾拉, and one commander-owned session opens with 艾拉's opening draft entry
+
+## ADDED Requirements
+
+### Requirement: A companion's monster opening uses the same caster-bound confirmation
+A preview whose caster is a companion SHALL present its monster openings as the same separate opening rows with the same explicit final opening confirmation the commander's cast uses (開戰並施放), bound to the previewed caster; confirming SHALL send exactly one `explore.cast` carrying that caster's `actor_id` and the `opening_target_id`.
+
+#### Scenario: Confirming opens combat for the caster
+- **WHEN** 艾拉 is the previewed caster of 冰錐術 and the player confirms 開戰並施放 on a monster opening
+- **THEN** exactly one `explore.cast {actor_id: 艾拉, skill_key, opening_target_id}` is sent, the commander stays the authenticated puppet, and combat opens with 艾拉's cost and practice accounted once when her entry resolves
+
+#### Scenario: Cancelling changes nothing
+- **WHEN** the player cancels or presses Escape at the opening confirmation
+- **THEN** no action is sent and no session, resource, practice or clock state changes
+
+#### Scenario: A forged or stale caster is refused
+- **WHEN** a confirmation arrives naming a caster that is no longer a present party member, or a forged id
+- **THEN** it is rejected with `member_not_present` or `not_party_member`, no session opens, and the commander is not used in its place

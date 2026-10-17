@@ -8,12 +8,12 @@ See proposal.md. `explore.skill_preview` stores `(skill_key, scale)` on the pres
 
 **Goals:** carry the caster end to end with exact schemas and no compatibility layer; recompute permission on every publication.
 
-**Non-Goals:** the 技能 tab UI (later), companion combat openings (refused by the rule).
+**Non-Goals:** the 技能 tab UI (later), new confirmation UI (the existing opening rows and 開戰並施放 confirmation are reused, bound to the caster).
 
 ## Decisions
 
 - **Selection triple** `(actor_id, skill_key, scale)` is copied into the read context; the presenter re-authorizes the caster on every publication and falls back to the unavailable form with reason `member_not_present` / `not_party_member` / `member_cannot_act` instead of silently switching to the commander.
-- **Caster-relative preview.** `preview_field_skill` takes the caster; `field_candidate_entities(caster)` keeps the caster first; `field_opening_anchors` is empty for a non-commander caster so the client never offers an opening the rule refuses.
+- **Caster-relative preview.** `preview_field_skill` takes the caster; `field_candidate_entities(caster)` keeps the caster first; `field_opening_anchors` and the initiation preflight run with the caster as initiator under the commander's party, so a companion's openings are exactly those the rule would accept.
 - **Version bump** `SKILL_USE_SCHEMA_VERSION = 2`; the registry-version gate, JS mirror and fixtures change together; old v1 payloads are rejected.
 - **Transitional client** sends `store` controlled figure id; the selection persists across possession because it is keyed by caster, not by puppet.
 
@@ -27,4 +27,4 @@ Pre-release clean cutover; revert the implementation commit.
 
 ## Verification and documentation ownership
 
-Python: schema tests (missing/forged `actor_id`), presenter for commander and companion (cost, enabled, candidates, empty openings), re-authorization on republication. JS: mirror parity, Node gate and Vitest for the skill-use store payload. No text command changes. Shard contract (if modules move), `tools.contract_gate`.
+Python: schema tests (missing/forged `actor_id`), presenter for commander and companion (cost, enabled, candidates, companion openings), caster-bound opening confirmation (confirm sends one cast with the caster's id, cancel sends nothing, forged/stale caster rejected), re-authorization on republication. JS: mirror parity, Node gate and Vitest for the skill-use store payload. No text command changes. Shard contract (if modules move), `tools.contract_gate`.
