@@ -33,7 +33,7 @@ Design §4.3 and §7 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 ## Batch: party member management
 
-Declared implementation order: **29 of 31**.
+Declared implementation order: **30 of 32**.
 
 - depends-on: webclient-party-lineage-tab
 - depends-on: services-shop-structured-rows
