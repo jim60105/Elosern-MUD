@@ -8,7 +8,7 @@ See proposal.md. `HelpOverlay.vue` renders authored help sections; the deletion 
 
 **Goals:** help content for every rule text removed from the windows; zero residue; recorded assembled evidence across rules, protocol and client.
 
-**Non-Goals:** new behaviour; fixing defects inside this change (they go back to the owning change).
+**Non-Goals:** new behaviour; fixing defects inside this change (they become follow-up changes outside its budget).
 
 ## Decisions
 

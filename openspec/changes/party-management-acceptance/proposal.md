@@ -9,7 +9,7 @@ Design §3.4, §9 and §11 of `docs/superpowers/specs/2026-10-18-party-member-ma
 - Help overlay (`HelpOverlay.vue` content source) gains the party section: follow rules, transfer rules, combat restrictions, the 系譜 legend, the one-price shop convention and the hotkeys.
 - Residual sweep: no remaining references, stories, manifest titles, CSS or `.elosern-root` duplicate rules for `InventoryPanel`, `EquipmentDoll`, `CharacterStatusDrawer`, `SkillBook`, `LineagePanel`, `PartyDrawer`, `ShopPanel`; the manifest is re-frozen at the complete set.
 - Assembled acceptance evidence recorded in this change's tasks: the agent-browser journey above and an exercised text path for `給`, `取回`, `裝備 … = 成員`, `買`/`賣 … = 成員`, `使用 … = 成員`, `cast … 由 成員`, `修煉 … = 成員`, `狀態`, `技能`, `系譜`.
-- No new rule, protocol or schema. Any defect found is fixed in its owning change before this one is archived.
+- No new rule, protocol or schema. A defect found by the journey is recorded and fixed by a follow-up change outside this change's budget; this change's acceptance stays open until those follow-ups land.
 
 ## Capabilities
 
@@ -31,7 +31,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **30 of 30**. Assembled acceptance of the batch is accepted only after this change.
+Declared implementation order: **31 of 31**. Assembled acceptance of the batch is accepted only after this change.
 
 - depends-on: webclient-main-navigation-hotkeys
 
