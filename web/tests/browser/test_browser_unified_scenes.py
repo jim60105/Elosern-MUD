@@ -23,12 +23,18 @@ mutates the browser store to claim a server fact.
 
 from __future__ import annotations
 
+import re
 import time
 
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import open_command_line, store_state, wait_for_store_state
+from .browser_helpers import (
+    narrative_log_text,
+    open_command_line,
+    store_state,
+    wait_for_store_state,
+)
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
 
@@ -185,6 +191,22 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             f"{store_state(page)['mode']!r} and the narrative reads "
             f"{self._narrative(page)!r}"
         )
+
+    def _wait_surrender_token(self, page, timeout: int = 30000) -> str:
+        """Return the confirmation token the party-surrender prompt prints.
+
+        The prompt binds the session and the round revision and states the
+        exact confirmation syntax, so the journey reads the token the server
+        itself issued rather than inventing one.
+        """
+        pattern = re.compile(r"combat forfeit confirm (\S+)")
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            found = pattern.search(narrative_log_text(page))
+            if found is not None:
+                return found.group(1)
+            page.wait_for_timeout(100)
+        raise AssertionError("the forfeit prompt never printed a confirmation token")
 
     def _narrative(self, page) -> list[str]:
         """The narrative rows the committed store carries (diagnostics)."""
@@ -419,9 +441,16 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # (7) Re-entering the place the character left commits that EXISTING
         # logical identity again: whatever is on screen belongs to its own
         # descriptor, and the identity is the one the browser left. A live
-        # engagement forbids movement, so the fight is forfeited first through
-        # the production command.
+        # engagement forbids movement, so the fight is surrendered first
+        # through the production commands: a bare forfeit only returns the
+        # party-scope prompt (§6 — nothing mutates without the confirmation),
+        # and the token that prompt carries is what settles the session.
         page.evaluate("() => Evennia.msg('text', ['combat forfeit'], {})")
+        token = self._wait_surrender_token(page)
+        page.evaluate(
+            "([token]) => Evennia.msg('text', [`combat forfeit confirm ${token}`], {})",
+            [token],
+        )
         self._wait_mode(page, "exploration")
         self._transition(page, "reuse_place")
         deadline = time.monotonic() + 30
