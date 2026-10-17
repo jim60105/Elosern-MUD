@@ -247,6 +247,12 @@ export const useElosernStore = defineStore("elosern", () => {
     // target step.
     confirmCrossSide: ctx.confirmCrossSide,
     cancelCrossSide: ctx.cancelCrossSide,
+    // The party-scope exit confirmation (webclient-party-exit-confirmation):
+    // the card's Yes sends the one held confirmation; No / ✕ / Escape
+    // discard only the local prompt. The request itself rides the dock's
+    // root row activation.
+    confirmPartyExit: ctx.confirmPartyExit,
+    cancelPartyExit: ctx.cancelPartyExit,
     setStageFormation: ctx.setStageFormation,
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
@@ -255,7 +261,8 @@ export const useElosernStore = defineStore("elosern", () => {
     // open; the public entry publishes that at once (the internal reset runs
     // inside the publish window and must not publish itself).
     resetFramesToRoot: () => {
-      const hadCard = ctx.centredCardOpen() || ctx.crossSideConfirm !== null;
+      const hadCard =
+        ctx.centredCardOpen() || ctx.crossSideConfirm !== null || ctx.partyExitPrompt !== null;
       ctx.resetFramesToRoot();
       if (hadCard) {
         ctx.publishView();

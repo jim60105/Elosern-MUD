@@ -39,6 +39,11 @@ const props = defineProps({
   tone: { type: String, default: "default" },
   // A short decorative caption above the question (caution tone).
   caption: { type: String, default: null },
+  // The server-authored consequence text of a deliberate operation
+  // (webclient-party-exit-confirmation): rendered under the question,
+  // verbatim and with its authored line breaks, and part of the card's
+  // accessible description.
+  detail: { type: String, default: null },
 });
 
 const emit = defineEmits(["yes", "no", "close"]);
@@ -48,9 +53,12 @@ const yesRef = ref(null);
 const noRef = ref(null);
 const titleId = useId();
 const reasonId = useId();
+const detailId = useId();
 const still = !props.entrance;
 
 const shownReason = computed(() => (props.locked && props.reason ? props.reason : null));
+const shownDetail = computed(() => (typeof props.detail === "string" && props.detail !== "" ? props.detail : null));
+const describedBy = computed(() => [shownDetail.value ? detailId : null, shownReason.value ? reasonId : null].filter(Boolean).join(" ") || null);
 
 function controls() {
   return Array.from(rootRef.value?.querySelectorAll("button:not([disabled])") || []);
@@ -131,7 +139,7 @@ defineExpose({ focus: focusFirst });
     role="dialog"
     aria-modal="true"
     :aria-labelledby="titleId"
-    :aria-describedby="shownReason ? reasonId : null"
+    :aria-describedby="describedBy"
     tabindex="-1"
     :data-testid="testId"
     @keydown="onKeydown"
@@ -157,6 +165,12 @@ defineExpose({ focus: focusFirst });
     </div>
     <p v-if="caption" class="question-card__caption" aria-hidden="true">{{ caption }}</p>
     <p :id="titleId" class="question-card__question" data-testid="question-card-question">{{ question }}</p>
+    <p
+      v-if="shownDetail"
+      :id="detailId"
+      class="question-card__detail"
+      data-testid="question-card-detail"
+    >{{ shownDetail }}</p>
     <p
       v-if="shownReason"
       :id="reasonId"
@@ -215,6 +229,16 @@ defineExpose({ focus: focusFirst });
   text-align: center;
   font: var(--text-sm)/1.45 var(--f-sans);
   color: var(--paper-400);
+}
+
+/* The server-authored consequence: its own line breaks are meaningful (the
+   operation's scope and what it costs), so it keeps them. */
+.question-card__detail {
+  margin: 0;
+  text-align: center;
+  white-space: pre-line;
+  font: var(--text-sm)/1.5 var(--f-sans);
+  color: var(--paper-300);
 }
 
 .question-card__answers {

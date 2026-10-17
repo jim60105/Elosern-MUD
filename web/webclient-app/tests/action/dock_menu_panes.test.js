@@ -54,9 +54,13 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "scale-1", label: "1 倍", enabled: true, action_id: "choose-scale", scaleChoice: true, description: "MP 10" },
     { key: "scale-2", label: "2 倍", enabled: true, action_id: "choose-scale", scaleChoice: true, description: "MP 16" },
   ];
+  // The creation confirm frame's own rows (creation_menu.js `confirmMenu`):
+  // the only live confirm/*-cancel* producer since the combat party-scope
+  // exit became the shared question card's (webclient-party-exit-
+  // confirmation).
   const confirmItems = [
-    { key: "confirm-forfeit", label: "確認投降", enabled: true, action_id: "combat.forfeit" },
-    { key: "cancel-forfeit", label: "取消", enabled: true, navigation: true, surface: "cancel-forfeit" },
+    { key: "confirm-creation.activate", label: "確認", enabled: true, action_id: "creation.activate" },
+    { key: "cancel-creation.activate", label: "取消", enabled: true, navigation: true, surface: "cancel" },
   ];
   // The character panel's read-only rows: focusable navigation cells that
   // submit nothing — the `plain` pane's production shape.

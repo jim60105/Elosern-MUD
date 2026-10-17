@@ -397,14 +397,6 @@ body {
   font-family: var(--f-sans);
   font-weight: 700;
 }
-.action-dock.action-dock--card .dock-menu__confirm-buttons {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.action-dock.action-dock--card .dock-menu__confirm-btn {
-  min-width: 0;
-  padding-inline: calc(8px * var(--ui-scale));
-}
 /* The command-line row sits on the message region's top edge (design D3):
    a tab-like strip that reads as part of the band beneath it — rounded top
    corners, a hairline gold top edge, and no seam against the band. */

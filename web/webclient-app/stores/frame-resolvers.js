@@ -410,10 +410,7 @@ export function createFrameResolver(deps) {
       const combat = combatModel();
       return combat ? isolate(combat.menus.actor) : marker(null);
     },
-    "combat.forfeit": () => {
-      const combat = combatModel();
-      return combat ? isolate(combat.menus.forfeit) : marker(null);
-    },
+
     // The commanded actor's own usable stock (webclient-party-items-tactics):
     // one row per committed item choice.
     "combat.items": () => {

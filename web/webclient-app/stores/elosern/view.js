@@ -386,6 +386,18 @@ export function applyView(ctx) {
             key: ctx.crossSideConfirm.subjectKey,
           }
         : null,
+      // The party-scope exit confirmation (webclient-party-exit-
+      // confirmation): null, or the held prompt's operation, label, question
+      // and the server-authored consequence. The dock behind it stays the
+      // frame it was — no level was pushed — so cancel restores it verbatim.
+      partyExitConfirm: ctx.partyExitPrompt
+        ? {
+            operation: ctx.partyExitPrompt.operation,
+            label: ctx.partyExitPrompt.label,
+            question: ctx.partyExitPrompt.question,
+            consequence: ctx.partyExitPrompt.consequence,
+          }
+        : null,
       // The compact commanded-actor/draft-progress line the card chrome
       // renders (webclient-party-command-selection): null outside a ready
       // combat panel; the counts are the authoritative committed draft.
@@ -483,6 +495,7 @@ export function applyView(ctx) {
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
     ctx.settleCrossSide(rs);
+    ctx.settlePartyExit(rs);
     ctx.settleCombatActorSelection(rs);
     ctx.settlePresence(rs);
     ctx.settleRoomCard(rs);

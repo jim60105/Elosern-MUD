@@ -659,7 +659,11 @@ describe("frame resolver — the combat family (declared model-state exception)"
     const model = CombatMenu.buildMenus(panel, {});
     expect(resolver.resolve({ source: "combat.root" })).toEqual(model.menus.root);
     expect(resolver.resolve({ source: "combat.categories" })).toEqual(model.menus.categories);
-    expect(resolver.resolve({ source: "combat.forfeit" })).toEqual(model.menus.forfeit);
+    // The retired client-local forfeit frame has no resolver entry
+    // (webclient-party-exit-confirmation): its source is unregistered, so a
+    // stray descriptor degrades to the shared marker and pops instead of
+    // resurrecting the dead menu.
+    expect(resolver.resolve({ source: "combat.forfeit" })).toEqual({ unresolvable: true, reason: null });
     expect(resolver.resolve({ source: "combat.category", params: { categoryIndex: 0 } })).toEqual(
       CombatMenu.openCategory(model, 0)
     );
