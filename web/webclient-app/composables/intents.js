@@ -42,7 +42,13 @@ export function useIntentHandlers(store, dispatchIntent) {
   // commander's own equipment toggles stay free and unchanged.
   function onInventoryItemAction(intent) {
     if (intent.action_id === "inventory.use" && store.view.mode === "combat") {
-      store.useCombatItem(intent.payload && intent.payload.item_key);
+      // The bag shows the controlled player's own items, which diverge from
+      // the commanded member's server stock whenever a companion is
+      // commanded; a refusal is a deliberate activation that reached nothing,
+      // so it gets the same visible feedback the busy-drop contract gives.
+      if (!store.useCombatItem(intent.payload && intent.payload.item_key)) {
+        store.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
+      }
       return;
     }
     dispatchIntent(intent.action_id, intent.payload);

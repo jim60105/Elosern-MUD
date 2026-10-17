@@ -207,7 +207,8 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
   不可指揮的成員保留自身原因並停用。
 - **進度列**：卡片外框內的單行 `combat-actor-line`（`store.view.combatProgress`），
   顯示受指揮成員與已確認／需求數量；其 `變更成員` 按鈕是卡片層級的控制項，
-  **不是**新的根清單列（根清單仍恰為 attack／skills／items／bag／defend／flee／forfeit）。
+  **不是**新的根清單列（根清單恰為 attack／skills／items／bag／defend／dodge／taunt／
+  flee／forfeit；後三者見下一節，Retreat／Surrender 屬 webclient-party-exit-confirmation）。
   開啟成員框架時會把 DOM 焦點交還 dock，按鈕本身於框架掛載後消失。
 - **守門信封**：`combat.command` 的 `session_id`／`round_revision`／`draft_version`／
   `actor_id` 在送出當下由已提交面板讀取（絕不沿用舊版本），技能本體維持原本
@@ -230,3 +231,39 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 
 相關閘門：`pnpm test`（`tests/store/party_command_selection.test.js` 等）、Node 閘門的
 `combat_menu.test.js`，以及受管理的 `test_actor_selector_chrome_returns_to_root_without_a_command`。
+
+## 同伴道具與基本戰術（webclient-party-items-tactics）
+
+道具與 Defend／Dodge／Taunt 都只讀受指揮成員自己已提交的 `choices`；全域背包、
+共享隊伍背包與玩家彼端身上的物品都不參與選單內容。
+
+- **`combat.items`（`menus.items`）**：一列一件該成員的可使用庫存，標籤為
+  `<名稱> ×<數量>`，說明欄是伺服器撰寫的效果摘要，不可用的一列帶著自己已提交的
+  `reason`（焦點可及、說明可讀、絕不送出）。根目錄的 `道具` 列僅在該成員確實持有
+  庫存時啟用，否則停用並附本機能力原因（`no_usable_item`）。
+- **`combat.item`（`openItem`）**：單件道具的檢視／目標框架。`target_spec` 為
+  `none`／`self` 時是一列確認（`none-confirm`／`self-confirm`，不帶目標欄位，伺服器
+  綁定受指揮成員）；`single` 時沿用舞台單體目標步驟（`combat.item` 屬
+  `STAGE_TARGET_SOURCES`），每列酬載為 `{item_key, target_id}`。玩家端送出的命令是
+  封閉 v7 線路聯集 `{kind: "item", payload: {...}}`；面板回顯的草稿條目另有自己的
+  `tactical`／`tactical_key` 拼法，兩者不可互換。
+- **`combat.tactic`（`tacticMenu`）**：Defend／Dodge 是一列 `確認<名稱>`，送出
+  `{kind: "tactic", payload: {key}}`（零資源、送出當下不施加任何效果）；Taunt 是
+  伺服器列出的存活敵軍單體目標步驟，酬載 `{key: "taunt", target_id}`。線路種類字面
+  是 `tactic`（`web/webclient/actions/combat_actions.py` 的 `COMMAND_KINDS`）。
+- **跨陣營警告**：`askCrossSide(kind, form, focusKey, command, display)` 依命令種類
+  取用技能或道具已提交的 `hostile`／`beneficial` 與目標集合；蓄意傷害友方或增益敵方
+  的道具與技能一樣先問一次。持有中的問題綁定成員、session／round／draft 版本與框架
+  主體，任何一項變動（含道具消失或停用、裝備變更導致重新提交）都直接取消且不送出。
+  基本戰術無極性事實，永不觸發此問題。
+- **戰鬥中的背包**：`InventoryPanel` 的 `combat` 屬性為真時，啟用中的 `inventory.use`
+  立刻發出意圖、不開本機確認視窗；`composables/intents.js` 把它轉成
+  `store.useCombatItem(item_key)`，也就是與 `道具` 列相同的檢視／目標／送出流程，
+  因此戰鬥中永不送出無成員的 `inventory.use`。該成員沒有這件物品時只留一則可見提示。
+  檢視與本人裝備切換維持免費、原樣。
+- **重新驗證**：框架內容在每次讀取時由已提交面板重解；道具消失或停用時解析為
+  `unresolvable` 標記並彈回上一層，裝備變更後不需要任何客戶端補救。
+
+相關閘門：`tests/store/party_items_tactics.test.js`、`tests/world/inventory_panel.test.js`、
+Node 閘門的 `combat_menu.test.js`，以及受管理的
+`test_item_and_tactic_choices_send_the_actor_command`。

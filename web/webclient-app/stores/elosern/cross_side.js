@@ -85,8 +85,14 @@ export function factsFor(panel, kind, key) {
 }
 
 // The committed raw descriptor of one submitted command's subject (a skill or
-// an item choice), or null. The command's own kind selects the source.
+// an item choice), or null. The command's own kind selects the source. A basic
+// action has no polar fact (factsFor), so the question can never be opened for
+// one and no tactic subject resolves here: the null is the invariant, not a
+// missing lookup.
 export function committedSubject(panel, kind, key) {
+  if (kind === "tactic") {
+    return null;
+  }
   return kind === "item" ? committedItem(panel, key) : committedSkill(panel, key);
 }
 

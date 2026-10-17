@@ -350,10 +350,10 @@ describe("party items and tactics (store)", () => {
     store.openHudDrawer("inventory");
     handlers.onInventoryItemAction({
       action_id: "inventory.toggle_equip",
-      payload: { item_key: "plain_sword" },
+      payload: { item_key: "synth_sword" },
     });
     expect(sent("inventory.toggle_equip")).toHaveLength(1);
-    expect(sent("inventory.toggle_equip")[0].payload).toEqual({ item_key: "plain_sword" });
+    expect(sent("inventory.toggle_equip")[0].payload).toEqual({ item_key: "synth_sword" });
   });
 
   it("useCombatItem refuses an item outside the committed stock and pushes nothing", () => {
@@ -395,6 +395,39 @@ describe("party items and tactics (store)", () => {
     commit({ items: [item({ item_key: "t_bomb", label: "合成炸彈", target_spec: "single", targets: [ALLY], hostile: true, beneficial: false, enabled: false, reason: { code: "hp_full", message: "體力已滿。" } })] });
     expect(store.view.crossSideConfirm).toBeNull();
     expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("an actor switch drops an open item frame and the commanded member's stock replaces it", () => {
+    enterCombat({ items: [item()] });
+    openItems();
+    openItemRow("t_tonic");
+    expect(store.router.currentDescriptor().source).toBe("combat.item");
+
+    // The commanded member changes (the actor's own earlier browse of the
+    // bag is never handed to the new member): one read-only query, then the
+    // ally's canonical stock, back at exactly one root.
+    expect(store.openCombatActor()).toBe(true);
+    store.focusItemByKey(`actor-${ALLY}`);
+    expect(store.focusPress("Enter")).toBe(true);
+    const query = sender.sent.actions.at(-1);
+    expect(query.action_id).toBe("combat.actor_choices");
+    expect(query.payload).toEqual({ session_id: "s-1", round_revision: 0, actor_id: ALLY });
+
+    const rev = commit({ actorId: ALLY, items: [item({ item_key: "t_ember_spray", label: "餘燼噴霧", quantity: 1 })] });
+    store.receive(
+      gen,
+      "ui_action_result",
+      [fx.actionResult({ request_id: query.request_id, code: "actor_choices", presentation_revision: rev })],
+      {},
+    );
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(store.view.stageTarget).toBeNull();
+    expect(store.resolveFrame({ source: "combat.items", params: {} }).items.map((row) => row.key)).toEqual([
+      "item-t_ember_spray",
+    ]);
+    expect(store.useCombatItem("t_tonic")).toBe(false);
+    expect(sender.sent.actions).toHaveLength(1);
   });
 
 });

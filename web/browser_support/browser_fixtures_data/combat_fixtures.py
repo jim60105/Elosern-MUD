@@ -151,3 +151,52 @@ SHIPPED_COMBAT_SPELL_KEY = "fire_ball"
 SHIPPED_COMBAT_SPELL_PREREQ_KEY = "fire_arrow"
 SHIPPED_COMBAT_NONE_SKILL = "concentration"
 SHIPPED_COMBAT_DISABLED_SKILL = "status_disguise"
+
+
+def actor_command_choices(foe_id: int) -> dict:
+    """The committed ``choices`` fragment the party-items journey injects.
+
+    The live engagement's grant set carries no items, so the journey commits
+    a schema-valid panel fragment carrying the commanded actor's own stock and
+    the closed basic-action vocabulary (webclient-party-items-tactics): one
+    SELF item, one item with its committed no-effect reason, and Defend /
+    Dodge / Taunt with 挑釁 over the presented enemy. The two item keys are
+    synthetic: the journey asserts the client's rendered rows and the one
+    guarded command it sends, never a shipped item's consumption.
+    """
+    return {
+        "items": [
+            {
+                "item_key": "trial_salve",
+                "label": "試作藥膏",
+                "summary": "恢復少量體力。",
+                "quantity": 2,
+                "enabled": True,
+                "reason": None,
+                "target_spec": "self",
+                "targets": [],
+                "hostile": False,
+                "beneficial": True,
+            },
+            {
+                "item_key": "trial_vial",
+                "label": "空試管",
+                "summary": "目前沒有任何效果。",
+                "quantity": 1,
+                "enabled": False,
+                "reason": {
+                    "code": "no_effect",
+                    "message": "這件物品目前沒有可用的效果。",
+                },
+                "target_spec": "none",
+                "targets": [],
+                "hostile": False,
+                "beneficial": False,
+            },
+        ],
+        "tactics": [
+            {"key": "defend", "label": "防禦", "enabled": True, "reason": None, "targets": []},
+            {"key": "dodge", "label": "閃避", "enabled": True, "reason": None, "targets": []},
+            {"key": "taunt", "label": "挑釁", "enabled": True, "reason": None, "targets": [foe_id]},
+        ],
+    }

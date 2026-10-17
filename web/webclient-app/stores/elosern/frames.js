@@ -897,7 +897,14 @@ export function applyFrames(ctx) {
     }
     const descriptor = router.depth() > 0 ? router.currentDescriptor() : null;
     const params = (descriptor && descriptor.params) || {};
-    const frameKey = params.skillKey !== undefined ? params.skillKey : params.itemKey;
+    // The frame's own subject parameter: a skill frame names `skillKey`, an
+    // item frame `itemKey`, a basic-action frame `key`.
+    const frameKey =
+      params.skillKey !== undefined
+        ? params.skillKey
+        : params.itemKey !== undefined
+          ? params.itemKey
+          : params.key;
     if (!descriptor || descriptor.source !== pending.frameSource || frameKey !== pending.subjectKey) {
       drop(true);
       return;
