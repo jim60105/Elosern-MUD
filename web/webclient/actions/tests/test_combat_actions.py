@@ -146,25 +146,39 @@ class CombatPayloadValidationTests(EvenniaTestCase):
     def test_skill_command_preserves_every_targetspec_shape(self):
         forms = (
             # NONE and SELF carry no target field at all.
-            {"kind": "skill", "payload": {"skill_key": _T_NONE}},
-            {"kind": "skill", "payload": {"skill_key": _T_SELF}},
-            {
-                "kind": "skill",
-                "payload": {"skill_key": _T_SINGLE, "target_ids": [3]},
-            },
-            {
-                "kind": "skill",
-                "payload": {"skill_key": _T_AREA, "target_ids": [3, 4]},
-            },
-            {
-                "kind": "skill",
-                "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
-            },
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {"skill_key": _T_NONE, "target_ids": (), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SELF}},
+                {"skill_key": _T_SELF, "target_ids": (), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SINGLE, "target_ids": [3]}},
+                {"skill_key": _T_SINGLE, "target_ids": (3,), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_AREA, "target_ids": [3, 4]}},
+                {"skill_key": _T_AREA, "target_ids": (3, 4), "target_shorthand": None, "scale": 1.0},
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "skill_key": _T_AREA,
+                    "target_ids": (),
+                    "target_shorthand": "all-enemies",
+                    "scale": 1.0,
+                },
+            ),
         )
-        for form in forms:
+        for form, expected in forms:
             with self.subTest(form=form):
                 normalized = validate_command_payload(_command(command=form))
-                self.assertEqual(normalized["command"]["kind"], "skill")
+                self.assertEqual(normalized["command"], {"kind": "skill", "payload": expected})
 
     def test_skill_command_rejects_mismatched_and_reserved_shapes(self):
         bad = (
@@ -567,6 +581,162 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(companion.pk not in (self._record().draft_entries or {}))
 
     # -- actor choices ---------------------------------------------------
+
+    def test_rules_translation_of_every_wire_command_shape(self):
+        # The exact command value handed to the rules admission: NONE/SELF
+        # carry the empty target list the persisted draft uses, an AREA
+        # shorthand travels as its string, item and tactic targets keep their
+        # identity, and every tactic takes the internal `tactical` spelling.
+        from web.webclient.actions import combat_actions
+
+        cases = (
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_NONE,
+                        "targets_or_shorthand": [],
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_SELF}},
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SELF,
+                        "targets_or_shorthand": [],
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SINGLE,
+                        "target_ids": [7],
+                        "scale": 2,
+                    },
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_SINGLE,
+                        "targets_or_shorthand": [7],
+                        "scale": 2.0,
+                    },
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_AREA,
+                        "targets_or_shorthand": "all-enemies",
+                        "scale": 1.0,
+                    },
+                },
+            ),
+            (
+                {"kind": "item", "payload": {"item_key": "t_ember_spray"}},
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": None},
+                },
+            ),
+            (
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": 7},
+                },
+                {
+                    "kind": "item",
+                    "payload": {"item_key": "t_ember_spray", "target_id": 7},
+                },
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "defend"}},
+                {"kind": "tactical", "payload": {"tactical_key": "defend", "target_id": None}},
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "dodge"}},
+                {"kind": "tactical", "payload": {"tactical_key": "dodge", "target_id": None}},
+            ),
+            (
+                {"kind": "tactic", "payload": {"key": "taunt", "target_id": 7}},
+                {"kind": "tactical", "payload": {"tactical_key": "taunt", "target_id": 7}},
+            ),
+        )
+        self._companion()
+        self._engage()
+        for command, expected in cases:
+            with self.subTest(command=command):
+                record = self._record()
+                payload = {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "actor_id": self.player.pk,
+                    "command": command,
+                }
+                with patch.object(
+                    combat_actions,
+                    "confirm_actor_command",
+                    return_value={
+                        "ok": True,
+                        "is_complete": False,
+                        "outcome": "draft",
+                        "reselection_reasons": {},
+                    },
+                ) as confirm:
+                    result = combat_actions._command_adapter(self.player, payload)
+                self.assertEqual(confirm.call_args.args[5], expected)
+                self.assertEqual(result["code"], CODE_DRAFT_SAVED, result)
+
+    def test_none_and_area_shorthand_admissions_reach_the_durable_draft(self):
+        # Real rules-backed admissions: the translated command is what the
+        # admitted draft entry holds and what the panel publishes back, so a
+        # dropped target or a list-ified shorthand cannot pass unnoticed.
+        from world.rules.combat_view import _wire_draft_command
+
+        self._companion()
+        self._engage()
+        admitted = (
+            (
+                {"kind": "skill", "payload": {"skill_key": _T_NONE}},
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_NONE, "scale": 1.0},
+                },
+            ),
+            (
+                {
+                    "kind": "skill",
+                    "payload": {"skill_key": _T_AREA, "target_shorthand": "all-enemies"},
+                },
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_AREA,
+                        "target_shorthand": "all-enemies",
+                        "scale": 1.0,
+                    },
+                },
+            ),
+        )
+        for command, wire in admitted:
+            with self.subTest(command=command):
+                result = _command_adapter(self.player, self._command_payload(command))
+                self.assertEqual(result["code"], CODE_DRAFT_SAVED, result)
+                entry = self._record().draft_entries[self.player.pk]
+                self.assertEqual(_wire_draft_command(entry), wire)
 
     def test_item_command_commits_the_round_and_consumes_once(self):
         self.player.traits.hp.current = int(self.player.traits.hp.max) - 20

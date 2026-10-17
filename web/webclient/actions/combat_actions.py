@@ -465,6 +465,9 @@ def _rules_command(command: dict[str, Any]) -> dict[str, Any]:
             "payload": {
                 "skill_key": payload["skill_key"],
                 "targets_or_shorthand": targets,
+                # The persisted draft stores the magnitude explicitly: its own
+                # entry validator requires exactly these three fields, so an
+                # absent wire scale is materialized as the default 1.0.
                 "scale": float(payload.get("scale", 1.0)),
             },
         }
