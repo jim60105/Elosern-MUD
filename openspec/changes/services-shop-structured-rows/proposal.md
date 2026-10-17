@@ -32,7 +32,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **26 of 32**.
+Declared implementation order: **27 of 33**.
 
 - depends-on: webclient-party-bag-retire
 - depends-on: item-holdings-panel
