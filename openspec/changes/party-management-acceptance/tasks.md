@@ -1,6 +1,6 @@
 # Tasks
 
-Total estimate: **7 hours**, including implementation, focused verification, documentation and integration.
+Total estimate: **7.5 hours**, including implementation, focused verification, documentation and integration.
 
 ## 1. Help content (1.5h)
 
@@ -10,9 +10,9 @@ Total estimate: **7 hours**, including implementation, focused verification, doc
 
 - [ ] 2.1 Search for any remaining reference to the seven deleted components (code, stories, CSS, `.elosern-root` duplicates, tests, specs, manifest) and remove it in its owning change if found; verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `tests.test_webclient_frozen_contract`.
 
-## 3. Assembled acceptance (3.5h)
+## 3. Assembled acceptance (4h)
 
-- [ ] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, possess 艾拉 and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
+- [ ] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, have 艾拉 open combat on a monster through the 開戰並施放 confirmation (cancel once, then confirm) and finish the encounter, possess 艾拉 and walk her through an exit confirming the player's body and 卡恩 follow, and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
 - [ ] 3.2 Exercise each text command once in a live session (`給`, `取回`, `裝備 = 成員`, `買`/`賣 = 成員`, `使用 = 成員`, `cast 由 成員`, `修煉 = 成員`, `狀態`, `技能`, `系譜`) and record the transcript lines.
 
 ## 4. Integration (1h)

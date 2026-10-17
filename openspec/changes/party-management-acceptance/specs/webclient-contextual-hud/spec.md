@@ -9,6 +9,10 @@ The help overlay SHALL carry the rule explanations the party and shop windows om
 - **WHEN** the player opens 說明 and the party window's 背包 tab in turn
 - **THEN** the help overlay explains the transfer rules while the bag shows only counts, controls and committed disabled reasons
 
+#### Scenario: Help explains following under possession
+- **WHEN** the help overlay's party section renders
+- **THEN** its follow rules state that the whole party, the player's own body included, follows a possessed companion through exits
+
 #### Scenario: The lineage legend is in help
 - **WHEN** the help overlay's party section renders
 - **THEN** it explains the three node diamond states and 可解鎖 with shape and text, never colour alone

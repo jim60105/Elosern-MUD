@@ -2,7 +2,7 @@
 
 ## Why
 
-Design §3.4, §9 and §11 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-design.md`: rule text removed from the windows moves to the help overlay, the replaced components must leave nothing behind, and the batch needs assembled runtime evidence: an `agent-browser` journey (buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, possess 艾拉 and confirm the windows are unchanged, and in combat re-equip a companion and observe transfer disabled) and an exercised path for each text command.
+Design §3.4, §9 and §11 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-design.md`: rule text removed from the windows moves to the help overlay, the replaced components must leave nothing behind, and the batch needs assembled runtime evidence: an `agent-browser` journey (buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, let 艾拉 open combat through the confirmation, possess 艾拉, walk her through an exit with the whole party following, and confirm the windows are unchanged, and in combat re-equip a companion and observe transfer disabled) and an exercised path for each text command.
 
 ## What Changes
 
@@ -27,11 +27,11 @@ None.
 
 ## Effort
 
-**7 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
+**7.5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
 
 ## Batch: party member management
 
-Declared implementation order: **31 of 31**. Assembled acceptance of the batch is accepted only after this change.
+Declared implementation order: **32 of 32**. Assembled acceptance of the batch is accepted only after this change.
 
 - depends-on: webclient-main-navigation-hotkeys
 
