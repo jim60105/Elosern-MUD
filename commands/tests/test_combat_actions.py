@@ -518,6 +518,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement("player-combat-session::confirmed-round-selections-persist-as-one-editable-session-draft")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_replacing_an_earlier_choice_keeps_one_entry(self):
         engage(self.char1, self.monster)
         self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1")
@@ -532,6 +533,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     @covers_requirement("inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_no_cost_before_the_complete_round_and_local_item_consumption(self):
         engage(self.char1, self.monster)
         # Fault isolation: the enemy deals no damage, so only the companion's
@@ -550,6 +552,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
         self.assertGreater(self.companion.traits.hp.current, 50)
 
     @covers_requirement("player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_tactics_are_actor_scoped_draft_entries(self):
         engage(self.char1, self.monster)
         self._run(CmdCombatCommand, "a2 defend")
@@ -580,6 +583,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
 
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_commander_cast_and_use_confirm_only_the_commander_entry(self):
         engage(self.char1, self.monster)
         cast_text = self._run(CmdCast, f"{_SPELL}=e1")
@@ -620,6 +624,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement("inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations")
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_text_payloads_match_the_guarded_wire_translation(self):
         from web.webclient.actions.combat_actions import (
             _rules_command,
@@ -738,6 +743,7 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(read_session(self.char1), before)
 
     @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_draft_progress_names_the_member_specific_reason(self):
         from world.rules.action import RejectReason
 
@@ -811,6 +817,7 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     def test_multi_actor_text_rounds_then_confirmed_exit(self):
         from commands.combat import CmdCombatRetreat
 
