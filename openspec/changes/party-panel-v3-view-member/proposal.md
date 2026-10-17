@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **13 of 30**.
+Declared implementation order: **13 of 31**.
 
 - depends-on: party-unlock-notices
 - depends-on: party-item-transfer
