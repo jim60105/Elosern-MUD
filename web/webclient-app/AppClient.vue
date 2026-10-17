@@ -476,7 +476,17 @@ function onTargetPosition(key, action) {
 let hoverHeld = false;
 function releaseHover() {
   hoverHeld = false;
+  if (typeof window !== "undefined") {
+    window.removeEventListener("pointermove", releaseHover, { capture: true });
+    window.removeEventListener("keydown", releaseHover, { capture: true });
+  }
 }
+// A key press or leaving combat also ends the hold, so it never outlives the
+// moment it guards.
+watch(
+  () => store.view.mode,
+  () => releaseHover(),
+);
 
 // The cross-side question (webclient-combat-cross-side-confirm D2/D3): a
 // held cast's yes/no card over the stage target step. 是 waits for the same
@@ -504,6 +514,7 @@ watch(crossSideOpen, async (open, was) => {
   if (typeof window !== "undefined") {
     hoverHeld = true;
     window.addEventListener("pointermove", releaseHover, { once: true, capture: true });
+    window.addEventListener("keydown", releaseHover, { once: true, capture: true });
   }
   await nextTick();
   await nextTick();

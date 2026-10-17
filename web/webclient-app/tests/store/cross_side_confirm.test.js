@@ -483,6 +483,26 @@ describe("cross-side question (store flow)", () => {
     expect(store.view.dockFocusRequest).toBe(focusRequests + 1);
   });
 
+  it("a replacement re-reads the facts and the label", () => {
+    enterCombat();
+    openAttack();
+    store.focusItemByKey(`target-${ALLY}`);
+    store.focusPress("Enter");
+    // The label changes: the question follows it.
+    revision += 1;
+    let next = panels();
+    next.context_actions.skills[0].groups[0].skills[0].label = "合成重擊";
+    store.receive(gen, "ui_update", [fx.update({ revision, mode: "combat", panels: next })], {});
+    expect(question()).toBe("確定要對友方使用〈合成重擊〉？");
+    // The fact flips: the cast no longer crosses sides, so the question closes.
+    revision += 1;
+    next = panels();
+    Object.assign(next.context_actions.skills[0].groups[0].skills[0], { hostile: false });
+    store.receive(gen, "ui_update", [fx.update({ revision, mode: "combat", panels: next })], {});
+    expect(question()).toBeNull();
+    expect(sent()).toHaveLength(0);
+  });
+
   it("a disabled skill or a dropped shorthand cancels", () => {
     enterCombat();
     openAttack();

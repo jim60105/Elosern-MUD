@@ -30,16 +30,25 @@ export function crossSideQuestion(sides, label) {
 // descriptor (category → groups → skills). A missing descriptor or field
 // counts as false.
 export function skillFacts(panel, skillKey) {
+  const skill = committedSkill(panel, skillKey);
+  return skill
+    ? { hostile: skill.hostile === true, beneficial: skill.beneficial === true, label: skill.label || "" }
+    : { hostile: false, beneficial: false, label: "" };
+}
+
+// The committed combat panel's raw descriptor for one skill key (the first
+// match, category → groups → skills), or null.
+export function committedSkill(panel, skillKey) {
   for (const category of (panel && panel.skills) || []) {
     for (const group of (category && category.groups) || []) {
       for (const skill of (group && group.skills) || []) {
         if (skill && skill.key === skillKey) {
-          return { hostile: skill.hostile === true, beneficial: skill.beneficial === true, label: skill.label || "" };
+          return skill;
         }
       }
     }
   }
-  return { hostile: false, beneficial: false, label: "" };
+  return null;
 }
 
 // The identities a submission reaches (spec "The target set of each form"):

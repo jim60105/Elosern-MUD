@@ -16,7 +16,7 @@
 import KeyboardRouter from "../../lib/keyboard_router.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import { actionIntentForItem } from "../../components/dock-items.js";
-import { crossSide, crossSideQuestion, skillFacts, targetSetFor } from "./cross_side.js";
+import { committedSkill, crossSide, crossSideQuestion, skillFacts, targetSetFor } from "./cross_side.js";
 
 // The committed exploration room identity (webclient-scene-overview-swap D2):
 // the exploration panel's own stable movement key — `look.room.identity`. It
@@ -495,26 +495,36 @@ export function applyFrames(ctx) {
 
   // Called at each target-step submission with the payload exactly as it
   // would be sent. Returns true when the cast is held for the question.
-  ctx.askCrossSide = function askCrossSide(form, focusKey, actionId, payload, display) {
-    const rs = ctx.reducer.getState();
+  // The predicate over the committed state for one held (or about to be
+  // held) payload: null, or `{ sides, question }`.
+  function evaluateCrossSide(rs, form, payload) {
     const panel = committedCombat(rs);
-    const combat = ctx.frameResolver.combatModel();
     const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
-    if (!panel || !combat || skillKey === null) {
-      return false;
+    if (!panel || skillKey === null) {
+      return null;
     }
     const facts = skillFacts(panel, skillKey);
-    const skill = Object.hasOwn(combat.skillByKey, skillKey) ? combat.skillByKey[skillKey] : null;
+    const raw = committedSkill(panel, skillKey);
     const participants = Array.isArray(panel.participants) ? panel.participants : [];
     const actor = actorIdentityOf(rs);
     const targets = targetSetFor({
       form,
       payload,
-      candidates: skill ? skill.targets : [],
+      candidates: raw && Array.isArray(raw.targets) ? raw.targets : [],
       participants,
       actorIdentity: actor,
     });
     const outcome = crossSide(facts, targets, participants, actor);
+    return outcome ? { sides: outcome.sides, question: crossSideQuestion(outcome.sides, facts.label) } : null;
+  }
+
+  ctx.askCrossSide = function askCrossSide(form, focusKey, actionId, payload, display) {
+    const rs = ctx.reducer.getState();
+    const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
+    if (!committedCombat(rs) || !ctx.frameResolver.combatModel() || skillKey === null) {
+      return false;
+    }
+    const outcome = evaluateCrossSide(rs, form, payload);
     if (!outcome) {
       return false;
     }
@@ -523,7 +533,7 @@ export function applyFrames(ctx) {
       actionId,
       payload,
       display,
-      question: crossSideQuestion(outcome.sides, (skill && skill.label) || facts.label),
+      question: outcome.question,
       sides: outcome.sides,
       skillKey,
       form,
@@ -599,14 +609,7 @@ export function applyFrames(ctx) {
       drop(true);
       return;
     }
-    let raw = null;
-    for (const category of panel.skills || []) {
-      for (const group of (category && category.groups) || []) {
-        for (const skill of (group && group.skills) || []) {
-          if (skill && skill.key === pending.skillKey) raw = skill;
-        }
-      }
-    }
+    const raw = committedSkill(panel, pending.skillKey);
     if (!raw || !raw.enabled) {
       drop(true);
       return;
@@ -626,6 +629,17 @@ export function applyFrames(ctx) {
     const params = (descriptor && descriptor.params) || {};
     if (!descriptor || descriptor.source !== pending.frameSource || params.skillKey !== pending.skillKey) {
       drop(true);
+      return;
     }
+    // The question re-reads the committed facts, teams and label: a cast
+    // that no longer crosses sides needs no question, and one that crosses
+    // differently is worded for what 是 would now send.
+    const outcome = evaluateCrossSide(rs, pending.form, pending.payload);
+    if (!outcome) {
+      drop(true);
+      return;
+    }
+    pending.sides = outcome.sides;
+    pending.question = outcome.question;
   };
 }
