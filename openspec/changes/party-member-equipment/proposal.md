@@ -35,7 +35,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **7 of 32**.
+Declared implementation order: **7 of 33**.
 
 - depends-on: party-member-authority
 - depends-on: party-transfer-text-commands
