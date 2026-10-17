@@ -230,7 +230,10 @@ test("combat menus carry fixed breadcrumb titles", () => {
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   assert.equal(combat.menus.root.title, "戰鬥");
   assert.equal(combat.menus.categories.title, "技能");
-  assert.equal(combat.menus.forfeit.title, "投降");
+  // The client-local party-exit confirmation frame is retired
+  // (webclient-party-exit-confirmation): Retreat and Surrender are root rows
+  // whose one question card is the shared, server-bound confirmation.
+  assert.equal(combat.menus.forfeit, undefined);
   const category = CombatMenu.openCategory(combat, 0);
   // Two groups: the category opens the group frame.
   assert.equal(category.title, "元素魔法");
@@ -341,7 +344,7 @@ test("root geometry: the combat root, categories, and groups are one column", ()
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   const combatRoot = combat.menus.root;
   assert.equal(combatRoot.gridCols, 1);
-  // Attack, Skills, Items, Bag, Defend, Dodge, Taunt, Flee, Forfeit
+  // Attack, Skills, Items, Bag, Defend, Dodge, Taunt, Retreat, Surrender
   // (webclient-party-items-tactics adds the two basic actions).
   assert.equal(combatRoot.items.length, 9);
   assert.ok(combatRoot.items.every((item) => item.command === true));
