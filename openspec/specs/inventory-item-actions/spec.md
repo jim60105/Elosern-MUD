@@ -9,11 +9,11 @@ The production UI action registry SHALL register `inventory.use` and `inventory.
 `inventory.toggle_equip` SHALL accept exactly `{item_key}`. `inventory.use` SHALL accept exactly
 `{item_key}` or `{item_key, target_key}`, where each key is a bounded non-empty string containing
 no whitespace. A supplied `target_key` SHALL name **whom** an effect reaches and SHALL NOT
-influence **what** the item does. The authenticated session SHALL be the only actor source.
+influence **what** the item does. The authenticated session SHALL be the only exploration actor source.
 
 #### Scenario: Item use delegates once
-- **WHEN** an authenticated actor submits `inventory.use` with one held usable item key
-- **THEN** the adapter revalidates current state and invokes the correct exploration or active-combat deterministic facade exactly once
+- **WHEN** an authenticated actor in exploration submits `inventory.use` with one held usable item key
+- **THEN** the adapter revalidates current state and invokes the exploration deterministic facade exactly once
 
 #### Scenario: Client cannot choose an effect or slot
 - **WHEN** an inventory payload includes an `effect`, `slot`, or other extra field
@@ -59,6 +59,10 @@ influence **what** the item does. The authenticated session SHALL be the only ac
 - **THEN** it re-resolves current canonical state and calls only the public deterministic
   item-use, combat-session, or equipment-toggle APIs, and it never assigns persistent state
   directly or routes through the text parser
+
+#### Scenario: Active combat cannot use actorless inventory adapter
+- **WHEN** inventory.use is submitted during a party combat session
+- **THEN** it rejects without mutation; only guarded combat.command may save an actor item selection
 
 ### Requirement: Inventory tiles confirm use and directly toggle equipment
 The combat dock root SHALL add one client-local `背包` row that opens the frameless inventory

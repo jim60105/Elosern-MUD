@@ -127,6 +127,9 @@ class CombatPayloadValidationTests(EvenniaTestCase):
             0,
         )
 
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
     def test_command_payload_is_exact(self):
         validated = validate_command_payload(_command())
         self.assertEqual(validated["actor_id"], 2)
@@ -221,7 +224,7 @@ class CombatPayloadValidationTests(EvenniaTestCase):
                     validate_command_payload(_command(command=command))
 
     @covers_requirement(
-        "webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale"
+        "webclient-action-dispatch::guarded-party-skill-commands-retain-exact-scale-validation"
     )
     def test_skill_scale_stays_a_closed_bounded_set(self):
         for scale in (0.25, 0.5, 1, 2, 4):
@@ -297,6 +300,9 @@ class CombatPayloadValidationTests(EvenniaTestCase):
                 with self.assertRaises(CombatActionError):
                     validate_command_payload(_command(command=command))
 
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
     def test_exit_payloads_are_exact(self):
         prompt = validate_exit_prompt_payload(
             {"session_id": "hostile:1:0", "round_revision": 1, "operation": "surrender"}
@@ -324,6 +330,9 @@ class CombatPayloadValidationTests(EvenniaTestCase):
                 with self.assertRaises(CombatActionError):
                     validate_exit_confirm_payload(payload)
 
+    @covers_requirement(
+        "webclient-combat-menu::exit-prompt-result-data-is-exact-and-ordinary-results-use-canonical-panels"
+    )
     def test_party_exit_prompt_data_is_exactly_bounded(self):
         good = {
             "operation": "surrender",
@@ -399,7 +408,7 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # -- command variants ------------------------------------------------
 
     @covers_requirement(
-        "webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale"
+        "webclient-combat-menu::exit-prompt-result-data-is-exact-and-ordinary-results-use-canonical-panels"
     )
     def test_solo_command_commits_a_round_and_reports_round_committed(self):
         self._engage()
@@ -474,6 +483,9 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("data", result)
         self.assertEqual(self._record().rounds_elapsed, 0)
 
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
     def test_forged_actor_reference_is_rejected_without_state_change(self):
         self._engage()
         before = self._record()

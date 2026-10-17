@@ -236,6 +236,9 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(after.round_revision, record.round_revision)
         self.assertEqual(after.draft_version, record.draft_version)
 
+    @covers_requirement(
+        "webclient-combat-menu::exit-prompt-result-data-is-exact-and-ordinary-results-use-canonical-panels"
+    )
     def test_exit_prompt_result_carries_the_exact_bounded_data(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
