@@ -838,15 +838,132 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(record.rounds_elapsed, 2)
         self.assertEqual(record.draft_entries, {})
         self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 0)
-        # The confirmed exit is the party-scoped retreat prompt's own token;
-        # the party is faster than its pursuer, so the contest succeeds.
+        # The confirmed exit is the party-scoped retreat prompt's own token.
+        # The contest compares the SLOWEST able ally's adjusted agility, so the
+        # companion's own value is what decides it; the roll is pinned exactly
+        # like the sibling retreat tests so the outcome is deterministic.
         self.char1.traits.agility.base = 500
+        self.companion.traits.agility.base = 500
         self.monster.traits.agility.base = 0
         prompt = self._run(CmdCombatRetreat, "")
         self.assertIn("combat retreat confirm", prompt)
         token = re.search(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})", prompt).group(1)
-        self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
+        from unittest.mock import patch
+
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
         self.assertIsNone(self.char1.db.active_combat)
+
+    @covers_requirement(
+        "webclient-browser-verification::actual-party-exit-acceptance-covers-cancellation-committed-outcomes-and-text-parity"
+    )
+    @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    def test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft(self):
+        """The assembled text transcript: actor menu/target parity, then a
+        failed retreat that runs one enemy round and discards the saved draft.
+
+        The listing for the companion is the same actor-local menu the browser
+        card renders (its own skill and item, never the commander's spell),
+        the enemy target token reaches the same candidate, and the confirmed
+        retreat prompt's token is what settles. A failing contest keeps the
+        whole party together, consumes exactly one round and leaves the
+        discarded command unexecuted and its resources unspent.
+        """
+        from commands.combat import CmdCombatRetreat
+        from world.rules.combat_session import engage, resolve_target_token
+        from world.rules.party import party_ids
+
+        engage(self.char1, self.monster)
+        panel = self._panel_for_actor(self.companion)
+        listing = self._run(CmdCombatActions, "a2")
+        for skill in (
+            skill
+            for category in panel["choices"]["skills"]
+            for group in category.get("groups") or []
+            for skill in group.get("skills") or []
+        ):
+            self.assertIn(skill["key"], listing, "the text menu names the same skill rows")
+        for item in panel["choices"]["items"]:
+            self.assertIn(item["key"], listing, "the text menu names the same item rows")
+        self.assertNotIn(_SPELL, listing, "the commander's own spell is never offered")
+
+        # The panel's own candidate token reaches the enemy the command names.
+        foe = next(
+            participant["identity"]
+            for participant in panel["participants"]
+            if participant["team"] == "foes"
+        )
+        self.assertEqual(getattr(resolve_target_token(self.char1, "e1"), "pk", None), foe)
+        confirmed = self._run(
+            CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1"
+        )
+        self.assertIn("指令已確認", confirmed)
+        record = read_session(self.char1)
+        self.assertEqual(list(record.draft_entries), [self.companion.pk])
+        mp_before = self.companion.traits.mp.current
+
+        # The pursuer is far faster: the contested retreat fails
+        # deterministically, running the ordinary enemy round once. The
+        # enemy's own attack is set above zero so that round's one execution
+        # is observable as damage, never inferred from the round counter.
+        self.char1.traits.agility.base = 0
+        self.monster.traits.agility.base = 500
+        self.monster.traits.atk_phys.base = 50
+        party_hp_before = self.char1.traits.hp.current + self.companion.traits.hp.current
+        prompt = self._run(CmdCombatRetreat, "")
+        self.assertIn("撤退", prompt)
+        token = re.search(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})", prompt).group(1)
+        with _deterministic_round():
+            settled = self._run(CmdCombatRetreat, f"confirm {token}")
+        self.assertTrue(settled.strip())
+        current = read_session(self.char1)
+        self.assertTrue(current.session_id)
+        self.assertEqual((current.rounds_elapsed, current.round_revision), (1, 1))
+        self.assertEqual(current.draft_entries, {}, "the whole saved draft was discarded")
+        self.assertLess(
+            self.char1.traits.hp.current + self.companion.traits.hp.current,
+            party_hp_before,
+            "the failed retreat ran exactly one enemy round with its own upkeep",
+        )
+        # The discarded command never executed: no item, no MP spent.
+        self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 1)
+        self.assertEqual(self.companion.traits.mp.current, mp_before)
+        self.assertEqual(
+            party_ids(self.char1),
+            [self.companion.pk],
+            "a failed retreat carries no member out of the party",
+        )
+
+    def _panel_for_actor(self, actor):
+        from world.rules.combat_view import build_combat_view
+
+        view = build_combat_view(self.char1, for_actor=actor)
+        return {
+            "choices": {
+                "skills": [
+                    {
+                        "label": category.label,
+                        "key": category.category,
+                        "groups": [
+                            {
+                                "skills": [
+                                    {"key": skill.key}
+                                    for skill in group.skills
+                                ]
+                            }
+                            for group in category.groups
+                        ],
+                    }
+                    for category in view.choices.skills
+                ],
+                "items": [{"key": item.item_key} for item in view.choices.items],
+            },
+            "participants": [
+                {"identity": participant.identity, "team": participant.team}
+                for participant in view.participants
+            ],
+        }
 
 
 class CastCommandSettlementSurfaceTests(unittest.TestCase):

@@ -342,6 +342,33 @@ def main() -> None:
             else {SHIPPED_COMBAT_LADDER_SKILL: SHIPPED_COMBAT_LADDER_LEVEL}
         ),
     )
+    if synth and os.environ.get("ELOSERN_BROWSER_PARTY_ACCEPTANCE") == "1":
+        # Assembled party acceptance (party-combat-runtime-acceptance): the
+        # kit companion's own card starts with a material (no effect
+        # profile), so give the bound companion one real usable consumable to
+        # command in its own round. The item still belongs to the companion's
+        # own inventory, exactly as the preset builder would have written it.
+        from evennia.objects.models import ObjectDB
+
+        from world.rules.party import party_ids
+
+        for companion_id in party_ids(character)[:1]:
+            companion = ObjectDB.objects.filter(pk=companion_id).first()
+            if companion is None:
+                continue
+            stock = list(companion.db.inventory or [])
+            stock.append("t_ember_spray")
+            companion.db.inventory = stock
+            # The kit's only real consumable restores HP, so the companion
+            # starts the engagement slightly wounded: its own item is a legal
+            # choice (the preflight refuses a full-HP heal).
+            companion.traits.hp.current = max(1, int(companion.traits.hp.max) - 40)
+            companion.save()
+            # The kit companion's own active is a SINGLE-shape row; the
+            # assembled SELF journey needs one actor-local SELF skill of the
+            # companion's own, so grant the kit's SELF buff through the same
+            # lineage gate activation uses.
+            grant_lineage(companion, ["t_moss_veil"])
     if synth and os.environ.get("ELOSERN_BROWSER_COMBAT_SEAL") == "1":
         # Disabled-row journey seed: persist a synthetic examination seal
         # that excludes exactly the identity-ELIGIBLE martial combat-panel

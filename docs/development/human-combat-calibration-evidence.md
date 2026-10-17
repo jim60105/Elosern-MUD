@@ -364,3 +364,74 @@ They carry the change's own canonical annotation once the delta spec is synced i
 they carry the existing `human-combat-calibration` requirement IDs they also establish.
 Shard ownership is unchanged: the module keeps its single existing entry in
 `.github/evennia-shards.json`, and no test module was added, moved or renamed.
+
+## Assembled party-combat runtime acceptance
+
+`party-combat-runtime-acceptance` is the batch's assembled gate: it exercises the
+real managed runtime rather than a chosen constant or a mocked client. The evidence
+below is the acceptance record for the whole batch; it adds no authored value and
+re-measures nothing.
+
+### Exercised assembled paths
+
+- `PartyAcceptanceBrowserTest.test_member_journey_commands_a_companion_skill_and_item_and_revises_a_choice`
+  (`web/tests/browser/test_browser_party_acceptance.py`): one real two-actor
+  engagement. The commanded-member switch proves the actor-local choices belong to
+  the selected companion, the companion's SELF skill review stands on the
+  companion's figure (never the controlled portrait), an earlier confirmed skill is
+  replaced by the companion's own item before completion, the final confirmation
+  alone resolves the round (the companion's stock is consumed there), and round two
+  executes the companion's SELF skill. The centred card, single-column root and the
+  safe-default party warning are asserted again at the second accepted desktop
+  viewport.
+- `PartyAcceptanceBrowserTest.test_unfinished_draft_survives_reconnect_without_replaying_intent`:
+  a non-empty persistent draft survives an abnormal transport close with its exact
+  entries, draft version and round revision, and reconnect re-sends no command.
+- `PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once`:
+  cancelling the retreat prompt preserves the whole saved draft, the round revision
+  and the clock; the confirmed surrender emits exactly one `combat.exit_confirm`
+  and settles once. Replaying the accepted token through the real transport is
+  answered as an idempotent `already_committed` success (no error), which settles
+  nothing a second time — the clock and the settled session are unchanged.
+- `FullTextPartyRoundTests.test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft`
+  (`commands/tests/test_combat_actions.py`): the text transcript proves the
+  companion's menu/target parity with the committed panel (its own skill and item,
+  the same enemy token), then a deterministically failing retreat consumes exactly
+  one round, keeps the whole party together and discards the saved command without
+  executing it or spending its resources.
+- `FullTextPartyRoundTests.test_multi_actor_text_rounds_then_confirmed_exit` and
+  `commands/tests/test_combat_exit_commands.py` cover the multi-actor text round,
+  revision and confirmed exit, the prompt/token boundary, stale and replayed tokens.
+
+### Batch evidence owned elsewhere
+
+- Failed-retreat enemy action and upkeep at the assembled command layer:
+  `FullTextPartyRoundTests.test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft`
+  (above) asserts the one enemy round's own damage; the durable branch semantics
+  (no-able-ally defeat, terminal time settling once) are
+  `world.rules.tests.test_combat_party`
+  (`test_a_failed_retreat_consumes_every_opportunity_and_runs_one_enemy_round`,
+  `test_a_failed_retreat_the_enemy_round_decides_settles_terminal_once`,
+  `test_no_able_allied_member_takes_the_ordinary_defeat_path`) and
+  `world.rules.tests.test_confirmed_surrender`.
+- A carried downed companion on a successful retreat:
+  `world.rules.tests.test_combat_party.test_a_success_carries_the_knocked_out_companion_and_settles_one_round_once`.
+- Hostile and examination consequences of a party exit: the examination
+  sessions' own settlement suites (`world.rules.tests.test_church_combat_ministry`
+  and the defeat-aftermath suites); a guild-examination retreat is recorded as a
+  FAIL by that owner, and this change adds no second policy.
+- Hostile/exam consequences and aftermath: the defeat-aftermath and exam-restriction
+  suites referenced by the encounter calibration section above.
+- Selected real weapon factors and encounter cells: the equipment-growth and
+  encounter-calibration sections of this document; no value is re-measured here.
+- Node protocol reducer and Vitest client suites, the top-level regression suite and
+  the complete traceability evidence run: CI-owned.
+
+### Local versus CI-owned execution
+
+The selected bounded methods above were run locally against the managed localhost
+runtime; the full managed browser matrix and
+`tools.spec_traceability verify --evidence` remain CI-owned. Until the change's delta
+specs are synced into `openspec/specs/`, the local `tools.spec_traceability check`
+cannot resolve the two added requirement identifiers, so the assembled annotations
+resolve on the first post-sync gate; every other contract gate is local.

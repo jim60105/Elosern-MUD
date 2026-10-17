@@ -155,7 +155,7 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.locator(engage_row).click()
         self._wait_mode(page, "combat")
 
-        # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
+        # The root combat menu (attack/skills/items/bag/defend/dodge/taunt/retreat/surrender) has no
         # target rows; opening the basic-attack skill renders the participant
         # target frame. Pointer activation uses the same router submit path as
         # keyboard confirmation: touching the target figure emits exactly one
