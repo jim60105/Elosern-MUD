@@ -148,44 +148,93 @@ def _valid_participant(**overrides):
     return value
 
 
+def _valid_actor(**overrides):
+    value = {"identity": 2, "commandable": True, "reason": None}
+    value.update(overrides)
+    return value
+
+
+def _valid_choices(**overrides):
+    value = {
+        "actor_id": 2,
+        "skills": [_valid_category_group()],
+        "items": [],
+        "tactics": [],
+    }
+    value.update(overrides)
+    return value
+
+
+def _valid_draft(**overrides):
+    value = {
+        "round_revision": 0,
+        "draft_version": 0,
+        "required_actor_ids": [2],
+        "entries": [],
+        "needs_selection_ids": [2],
+        "reselection_reasons": [],
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "combat",
         "session": {
             "session_id": "hostile:1:0",
             "mode": "hostile",
             "round": 0,
+            "round_revision": 0,
             "state": "ready",
             "reason": None,
         },
         "participants": [_valid_participant()],
-        "root_actions": ["attack", "skills", "items", "defend", "flee"],
-        "secondary_actions": ["forfeit"],
-        "skills": [_valid_category_group()],
+        "root_actions": [
+            "attack",
+            "skills",
+            "items",
+            "defend",
+            "dodge",
+            "taunt",
+            "retreat",
+        ],
+        "secondary_actions": ["surrender"],
+        "actors": [_valid_actor()],
+        "choices": _valid_choices(),
+        "draft": _valid_draft(),
         "suggestions": {"status": "unavailable"},
     }
+    # Tests name the requested actor's skill catalog directly; route it into
+    # the v7 choices object.
+    skills = overrides.pop("skills", None)
+    if skills is not None:
+        value["choices"] = _valid_choices(skills=skills)
     value.update(overrides)
     return value
 
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "combat",
         "session": {
             "session_id": "hostile:1:0",
             "mode": "hostile",
             "round": 2,
+            "round_revision": 3,
             "state": _T_RECOVERY_STATE,
             "reason": {"code": "missing_participant", "message": "戰鬥成員已無法確認。"},
         },
         "participants": [],
         "root_actions": [],
-        "secondary_actions": ["forfeit"],
-        "skills": [],
+        "secondary_actions": ["surrender"],
+        "actors": [],
+        "choices": None,
+        "draft": None,
         "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
@@ -201,7 +250,7 @@ def _player(key="panel player"):
 
 def _exploration_panel(**overrides):
     value = {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "exploration",
         "affordances": [

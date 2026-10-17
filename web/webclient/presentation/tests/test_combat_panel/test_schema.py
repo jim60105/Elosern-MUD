@@ -63,7 +63,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
             ]
         )
         normalized = validate_context_actions(panel)
-        groups = normalized["skills"][0]["groups"]
+        groups = normalized["choices"]["skills"][0]["groups"]
         self.assertEqual([group["group"] for group in groups], ["獨處", "戰鬥"])
 
     def test_skill_group_key_rejects_empty_or_whitespace_strings(self):
@@ -91,7 +91,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
     def test_valid_recovery_panel_passes(self):
         normalized = validate_context_actions(_recovery_panel())
         self.assertEqual(normalized["session"]["state"], _T_RECOVERY_STATE)
-        self.assertEqual(normalized["secondary_actions"], ["forfeit"])
+        self.assertEqual(normalized["secondary_actions"], ["surrender"])
 
     def test_rejects_unknown_fields_and_missing_fields(self):
         payload = _valid_panel()
@@ -100,7 +100,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
             validate_context_actions(payload)
 
         payload = _valid_panel()
-        del payload["skills"]
+        del payload["choices"]
         with self.assertRaises(Exception):
             validate_context_actions(payload)
 
@@ -195,7 +195,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         normalized = validate_context_actions(
             _valid_panel(skills=self._nested_skills(_valid_skill(hostile=True, beneficial=True)))
         )
-        skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        skill = normalized["choices"]["skills"][0]["groups"][0]["skills"][0]
         self.assertEqual((skill["hostile"], skill["beneficial"]), (True, True))
 
     def test_rejects_skill_shorthand_on_single(self):
@@ -481,7 +481,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         # real client applies before panel validation: every array stays
         # within MAX_LIST_ITEMS and the canonical JSON fits the byte bound.
         check_envelope(panel)
-        for group in panel["skills"][0]["groups"]:
+        for group in panel["choices"]["skills"][0]["groups"]:
             self.assertLessEqual(len(group["skills"]), MAX_LIST_ITEMS)
         self.assertLessEqual(json_byte_size(panel), MAX_CANONICAL_JSON_BYTES)
 
@@ -495,7 +495,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_context_actions(panel)
         panel = _valid_panel()
-        panel["secondary_actions"] = ["forfeit", "forfeit"]
+        panel["secondary_actions"] = ["surrender", "surrender"]
         with self.assertRaises(Exception):
             validate_context_actions(panel)
 
@@ -504,7 +504,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         # Absent field is accepted (the server omits it for non-masters).
         payload = _valid_panel()
         normalized = validate_context_actions(payload)
-        normalized_skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        normalized_skill = normalized["choices"]["skills"][0]["groups"][0]["skills"][0]
         self.assertNotIn("freeform_scales", normalized_skill)
 
         payload = _valid_panel(
@@ -521,7 +521,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
             )
         )
         normalized = validate_context_actions(payload)
-        normalized_skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        normalized_skill = normalized["choices"]["skills"][0]["groups"][0]["skills"][0]
         self.assertEqual(
             normalized_skill["freeform_scales"][0]["mp_cost"],
             5,

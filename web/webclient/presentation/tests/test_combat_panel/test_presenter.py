@@ -64,7 +64,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         """Flatten the nested category groups back into one skill list."""
         return [
             skill
-            for category in payload["skills"]
+            for category in payload["choices"]["skills"]
             for sub_group in category["groups"]
             for skill in sub_group["skills"]
         ]
@@ -81,8 +81,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(payload["session"]["mode"], "hostile")
         self.assertEqual(payload["session"]["round"], 0)
         self.assertEqual(payload["session"]["state"], "ready")
-        self.assertEqual(payload["root_actions"], ["attack", "skills", "items", "defend", "flee"])
-        self.assertEqual(payload["secondary_actions"], ["forfeit"])
+        self.assertEqual(
+            payload["root_actions"],
+            ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
+        )
+        self.assertEqual(payload["secondary_actions"], ["surrender"])
         self.assertEqual(
             [p["identity"] for p in payload["participants"]],
             [self.player.pk, self.monster.pk],
@@ -131,10 +134,10 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.combat_session import BASIC_ATTACK_KEY
 
         self.assertEqual(
-            [category["category"] for category in payload["skills"]],
+            [category["category"] for category in payload["choices"]["skills"]],
             ["elemental_magic", "martial_arts", "sexual_act"],
         )
-        elemental = payload["skills"][0]
+        elemental = payload["choices"]["skills"][0]
         self.assertEqual(
             [sub_group["group"] for sub_group in elemental["groups"]],
             [SYNTH_SKILLS["t_ember_burst"].element.key],
@@ -144,14 +147,14 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             [skill["key"] for skill in elemental["groups"][0]["skills"]],
             [T_EMBER],
         )
-        martial = payload["skills"][1]
+        martial = payload["choices"]["skills"][1]
         self.assertEqual(martial["label"], "武技")
         self.assertEqual(len(martial["groups"]), 1)
         self.assertIsNone(martial["groups"][0]["group"])
         self.assertIsNone(martial["groups"][0]["label"])
         # The kit act joins the sexual_act category under its invented line
         # name; seed acts the handler still unlocks ride below it.
-        sexual = payload["skills"][2]
+        sexual = payload["choices"]["skills"][2]
         self.assertEqual(sexual["label"], "性愛行為")
         self.assertEqual(
             [sub_group["group"] for sub_group in sexual["groups"]][0],
@@ -179,10 +182,10 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertEqual(
-            [category["category"] for category in payload["skills"]],
+            [category["category"] for category in payload["choices"]["skills"]],
             ["martial_arts", "sexual_act", "holy_rite"],
         )
-        holy_rite = payload["skills"][-1]
+        holy_rite = payload["choices"]["skills"][-1]
         self.assertEqual(holy_rite["category"], "holy_rite")
         self.assertEqual(holy_rite["label"], "神聖聖儀")
         self.assertEqual(len(holy_rite["groups"]), 1)
@@ -193,7 +196,9 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             [_T_COMBAT_RITE_A],
         )
         normalized = validate_context_actions(payload)
-        self.assertEqual(normalized["skills"], payload["skills"])
+        self.assertEqual(
+            normalized["choices"]["skills"], payload["choices"]["skills"]
+        )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_holy_rite_sub_groups_follow_fixed_null_then_rite_order(self):
@@ -206,7 +211,9 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        holy_rite = next(c for c in payload["skills"] if c["category"] == "holy_rite")
+        holy_rite = next(
+            c for c in payload["choices"]["skills"] if c["category"] == "holy_rite"
+        )
         self.assertEqual(
             [sub_group["group"] for sub_group in holy_rite["groups"]],
             [None, "聖禮"],
@@ -232,7 +239,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "exploration")
-        self.assertEqual(payload["schema_version"], 6)
+        self.assertEqual(payload["schema_version"], 7)
         self.assertNotIn("session", payload)
         self.assertNotIn("participants", payload)
         self.assertNotIn("root_actions", payload)
@@ -390,7 +397,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         for skill in self._flatten_skills(payload):
             self.assertNotIn("freeform_scales", skill)
-        self.assertNotIn("威力", repr(payload["skills"]))
+        self.assertNotIn("威力", repr(payload["choices"]["skills"]))
 
     def test_presenter_isolation_on_missing_session(self):
         # Outside combat the exploration form is available; only a
@@ -661,7 +668,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
-    def test_creation_pending_renders_the_version_six_unavailable_form(self):
+    def test_creation_pending_renders_the_version_seven_unavailable_form(self):
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
@@ -674,7 +681,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
-        self.assertEqual(payload["schema_version"], 6)
+        self.assertEqual(payload["schema_version"], 7)
         self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
         self.assertNotIn("affordances", payload)
         self.assertNotIn("suggestions", payload)
