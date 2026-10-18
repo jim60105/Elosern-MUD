@@ -94,8 +94,8 @@ def build_production_action_registry() -> ActionRegistry:
     (``explore.skill_preview``, ``explore.cast``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), the two
-    NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), and the
-    ``options.dismiss`` action. Each action
+    NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
+    ``party.transfer`` adapter, and the ``options.dismiss`` action. Each action
     binds one exact payload validator and one narrow deterministic adapter; no
     action routes through the text parser.
     """
@@ -175,6 +175,10 @@ def build_production_action_registry() -> ActionRegistry:
     from web.webclient.actions.options import (
         _dismiss_adapter,
         validate_options_dismiss_payload,
+    )
+    from web.webclient.actions.party_actions import (
+        _party_transfer_adapter,
+        validate_party_transfer_payload,
     )
     from web.webclient.actions.gallery_actions import (
         _gallery_subject_select_adapter,
@@ -491,6 +495,16 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="explore.party_leave",
             validate_payload=validate_party_leave_payload,
             adapter=_party_leave_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="party.transfer",
+            validate_payload=validate_party_transfer_payload,
+            adapter=_party_transfer_adapter,
+            # A transfer rewrites both bags and their contained mirrors: the
+            # empty set publishes a full canonical snapshot.
             affected_panels=(),
         )
     )

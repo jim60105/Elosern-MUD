@@ -88,6 +88,7 @@ class RegistryTests(unittest.TestCase):
                     "explore.deliver",
                     "explore.skill_preview",
                     "explore.cast",
+                    "party.transfer",
                     "options.dismiss",
                     "title.accept",
                     "title.decline",
