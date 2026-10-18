@@ -1,5 +1,6 @@
 """Player-facing command for out-of-combat and active-session skill use."""
 
+import re
 from typing import Any
 
 from commands.command import Command
@@ -8,7 +9,8 @@ from world.rules.action import RejectReason
 from world.rules.combat import BattlefieldActionContext
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import render_plain_text
-from world.rules.field_cast import cast_in_field
+from world.rules.field_cast import cast_as_member, cast_in_field
+from world.rules.party_scope import PartyScopeError, resolve_member_token
 from world.rules.player_messages import (
     CONTINUE_COMBAT_MESSAGE,
     rejection_message,
@@ -17,6 +19,11 @@ from world.rules.player_messages import (
 )
 from world.rules.progression import scale_for_label
 from world.rules.targeting import RoomActionContext
+
+#: The final ``由 <成員>`` pair names the caster. The greedy prefix makes the
+#: LAST eligible pair win, so a ``由`` inside an earlier target name is kept
+#: as part of the ordinary argument.
+_MEMBER_SUFFIX = re.compile(r"^(?P<argument>.*)\s+由\s+(?P<member>\S.*)$")
 
 
 class CmdCast(Command):
@@ -39,11 +46,27 @@ class CmdCast(Command):
         except Exception:
             return None
 
+    def _split_member_suffix(self, args: str) -> tuple[str, str | None]:
+        """Split the final ``由 <成員>`` pair off one cast argument string.
+
+        The suffix is reserved syntax, so the greedy prefix keeps any earlier
+        ``由`` text (for example inside a target name) in the ordinary
+        argument. A trailing bare ``由`` is not a suffix and falls through to
+        the ordinary parse, which rejects it as an unknown skill or target.
+        """
+        match = _MEMBER_SUFFIX.match(args)
+        if match is None:
+            return args, None
+        return match.group("argument"), match.group("member").strip()
+
     def func(self) -> None:
-        raw_skill, separator, target_key = self.args.partition("=")
+        argument, member_token = self._split_member_suffix(self.args)
+        raw_skill, separator, target_key = argument.partition("=")
         skill_key, at, scale_token = raw_skill.strip().partition("@")
         if not skill_key:
-            self.caller.msg("用法：cast <skill_key>[@<scale>][=<target_key>]")
+            self.caller.msg(
+                "用法：cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]"
+            )
             return
         scale = 1.0
         if at:
@@ -55,11 +78,18 @@ class CmdCast(Command):
                     rejection_message(RejectReason.SCALED_CAST_FORBIDDEN)
                 )
                 return
+        member = None
+        if member_token is not None:
+            try:
+                member = resolve_member_token(self.caller, member_token)
+            except PartyScopeError as error:
+                self.caller.msg(error.message)
+                return
         session = self._active_session()
         if session is not None:
-            self._cast_in_session(session, skill_key, target_key, scale)
+            self._cast_in_session(session, skill_key, target_key, scale, member)
             return
-        self._cast_out_of_combat(skill_key, target_key, scale)
+        self._cast_out_of_combat(skill_key, target_key, scale, member)
 
     def _cast_in_session(
         self,
@@ -67,6 +97,7 @@ class CmdCast(Command):
         skill_key: str,
         target_key: str,
         scale: float = 1.0,
+        member: Any = None,
     ) -> None:
         """Delegate an active-session cast to combat-session orchestration.
 
@@ -80,6 +111,12 @@ class CmdCast(Command):
         ``flee`` is not a personal action inside a session (§6): the allied
         escape is the confirmed party retreat, so this route only returns the
         party-scoped confirmation prompt and selects nothing.
+
+        A ``由 <成員>`` suffix selects for that member exactly what ``combat
+        command <actor-token> skill ...`` selects for it: the same internal
+        draft command through the same admission facade, replacing any earlier
+        entry and resolving the round only when the final required member
+        confirms. It never casts for the caller and never advances time.
         """
         from world.rules.combat_session import (
             CombatSessionError,
@@ -87,6 +124,14 @@ class CmdCast(Command):
             submit_player_action,
         )
 
+        if member is not None:
+            from commands.combat import build_skill_command, submit_actor_command
+
+            command = build_skill_command(self.caller, skill_key, scale, target_key)
+            if command is None:
+                return
+            submit_actor_command(self.caller, session, member, command)
+            return
         if skill_key == FLEE_SKILL_KEY:
             self._request_party_flee(session)
             return
@@ -158,6 +203,7 @@ class CmdCast(Command):
         skill_key: str,
         target_key: str,
         scale: float = 1.0,
+        member: Any = None,
     ) -> None:
         targets = []
         if target_key.strip():
@@ -165,6 +211,30 @@ class CmdCast(Command):
             if target is None:
                 return
             targets.append(target)
+        if member is not None:
+            from world.rules.combat_session import CombatSessionError
+
+            try:
+                outcome = cast_as_member(
+                    self.caller,
+                    int(member.pk),
+                    skill_key,
+                    targets=targets,
+                    scale=scale,
+                )
+            except PartyScopeError as error:
+                self.caller.msg(error.message)
+                return
+            except CombatSessionError as error:
+                # A companion's monster target reaches the initiation seam;
+                # its commander-keyed opening support lands in
+                # ``companion-field-combat-opening``. Until then the seam
+                # reports its existing stable rejection and nothing changes.
+                reason = error.args[0] if error.args else "malformed_session"
+                self.caller.msg(session_reason_message(str(reason)))
+                return
+            self._render_field_outcome(outcome)
+            return
         # Field routing lives in ONE deterministic entry shared with the
         # WebClient ``explore.cast`` adapter (field-combat-initiation D-1/D-6,
         # skillbook-authoritative-casting D3): a living co-located hostile
@@ -190,6 +260,10 @@ class CmdCast(Command):
             scale=scale,
             context=context,
         )
+        self._render_field_outcome(outcome)
+
+    def _render_field_outcome(self, outcome) -> None:
+        """Render one routed field cast through the shared message surfaces."""
         if outcome.route == "rejected":
             self.caller.msg(rejection_message(outcome.reason))
             return

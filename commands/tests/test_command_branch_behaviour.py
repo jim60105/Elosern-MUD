@@ -566,7 +566,9 @@ class ActionCommandBranchTests(TestCase):
     def test_cast_validates_skill_and_missing_target(self):
         command = _command(CmdCast, "   ")
         command.func()
-        command.caller.msg.assert_called_with("用法：cast <skill_key>[@<scale>][=<target_key>]")
+        command.caller.msg.assert_called_with(
+            "用法：cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]"
+        )
 
         command = _command(CmdCast, "skill=missing")
         command._active_session = Mock(return_value=None)
