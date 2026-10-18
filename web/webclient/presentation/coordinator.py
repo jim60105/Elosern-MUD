@@ -147,9 +147,11 @@ class PresentationCoordinator:
         actor = context.actor
         if bool(getattr(actor, "creation_pending", False)):
             return "creation"
-        from world.rules.combat_session import is_in_active_session
+        from world.rules.combat_session import is_in_active_session, session_owner
 
-        if is_in_active_session(actor):
+        # A possessed puppet operates its commander's session, so the combat
+        # mode follows the session owner rather than the puppet.
+        if is_in_active_session(session_owner(actor)):
             return "combat"
         from world.rules.dialogue import live_dialogue_session
 

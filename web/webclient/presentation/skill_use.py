@@ -246,6 +246,17 @@ def _reason(choice: Any, cost: dict[str, int]) -> dict[str, str] | None:
     """The bounded ``{code, message}`` of one disabled preview choice."""
     if choice.enabled:
         return None
+    if getattr(choice, "party_reason", None) is not None:
+        # The caster itself is not an authorized acting party member; the
+        # party boundary owns the stable code and its player-facing line.
+        from world.rules.party_scope import PARTY_SCOPE_MESSAGES
+
+        return {
+            "code": choice.party_reason,
+            "message": PARTY_SCOPE_MESSAGES.get(
+                choice.party_reason, "目前無法施放。"
+            ),
+        }
     if choice.session_reason is not None:
         return {
             "code": choice.session_reason,

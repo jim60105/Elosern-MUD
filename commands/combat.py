@@ -30,6 +30,7 @@ from world.rules.combat_session import (
     read_session,
     request_party_exit,
     resolve_target_token,
+    session_owner,
 )
 from world.rules.combat_view import (
     CombatViewError,
@@ -89,29 +90,40 @@ _ITEM_TARGET_SPEC_TEXTS = {
 _NO_TARGET_TEXT = "目前無有效目標"
 
 
-def _session_or_none(caller: Any) -> Any:
-    """Return the caller's parsed session record, or ``None`` after messaging."""
+def _session_or_none(caller: Any) -> tuple[Any, Any] | None:
+    """Return ``(commander, record)``, or ``None`` after messaging.
+
+    ``commander`` owns the session: the caller itself, or the commander a
+    possessed caller operates (a companion's field cast opens that commander's
+    encounter, so the puppet's session is its commander's). Every rules call is
+    keyed on the commander; feedback stays with the caller.
+    """
     try:
-        record = read_session(caller)
+        commander = session_owner(caller)
+        record = read_session(commander)
     except CombatSessionError as error:
         caller.msg(session_reason_message(str(error.args[0])))
         return None
     if record is None:
         caller.msg(session_reason_message(str(SessionReason.NO_ACTIVE_SESSION)))
         return None
-    return record
+    return commander, record
 
 
-def _ally_actor(caller: Any, record: Any, token: str) -> Any:
+def _ally_actor(
+    caller: Any, record: Any, token: str, *, commander: Any = None
+) -> Any:
     """Resolve one actor token to a persisted party member, or ``None``.
 
     Actor tokens are the same stable ``aN`` aliases target tokens use, but an
     actor always names a party member: a foe token, an absent participant or a
     member the commander may not command reports the shared ``forbidden_actor``
-    reason and selects nothing.
+    reason and selects nothing. ``commander`` owns the session the token is
+    bound to (default: the caller), while feedback goes to the caller.
     """
+    commander = caller if commander is None else commander
     try:
-        entity = resolve_target_token(caller, token)
+        entity = resolve_target_token(commander, token)
     except CombatSessionError as error:
         caller.msg(session_reason_message(str(error.args[0])))
         return None
@@ -322,12 +334,13 @@ class _PartyExitCommand(Command):
 
     def _request(self) -> None:
         """Return the party-scope confirmation prompt without mutating anything."""
-        record = _session_or_none(self.caller)
-        if record is None:
+        scope = _session_or_none(self.caller)
+        if scope is None:
             return
+        commander, record = scope
         try:
             prompt = request_party_exit(
-                self.caller,
+                commander,
                 record.session_id,
                 record.round_revision,
                 self.operation,
@@ -354,9 +367,10 @@ class _PartyExitCommand(Command):
             )
             return
         operation = party_exit_operation_of_token(confirmation_token)
-        record = _session_or_none(self.caller)
-        if record is None:
+        scope = _session_or_none(self.caller)
+        if scope is None:
             return
+        commander, record = scope
         if operation is None:
             self.caller.msg(
                 session_reason_message(str(SessionReason.INVALID_CONFIRMATION_TOKEN))
@@ -364,7 +378,7 @@ class _PartyExitCommand(Command):
             return
         try:
             result = confirm_party_exit(
-                self.caller,
+                commander,
                 record.session_id,
                 record.round_revision,
                 operation,
@@ -406,11 +420,19 @@ def _search_target(caller: Any, name: str) -> Any | None:
     return matches[0] if len(matches) == 1 else None
 
 
-def _parse_actor_targets(caller: Any, target_value: str) -> list[int] | str | None:
-    """Parse one target value into the facade's explicit token list."""
+def _parse_actor_targets(
+    caller: Any, target_value: str, *, commander: Any = None
+) -> list[int] | str | None:
+    """Parse one target value into the facade's explicit token list.
+
+    Tokens are bound to the session owner's record, so ``commander`` (default:
+    the caller) resolves them; a name search still uses the caller's own
+    surroundings.
+    """
+    commander = caller if commander is None else commander
     try:
         parsed = parse_session_targets(
-            caller, target_value, search=lambda name: _search_target(caller, name)
+            commander, target_value, search=lambda name: _search_target(caller, name)
         )
     except CombatSessionError as error:
         caller.msg(session_reason_message(str(error.args[0])))
@@ -421,7 +443,12 @@ def _parse_actor_targets(caller: Any, target_value: str) -> list[int] | str | No
 
 
 def build_skill_command(
-    caller: Any, skill_key: str, scale: float, target_value: str
+    caller: Any,
+    skill_key: str,
+    scale: float,
+    target_value: str,
+    *,
+    commander: Any = None,
 ) -> dict[str, Any] | None:
     """Build one actor's internal draft skill command.
 
@@ -435,7 +462,9 @@ def build_skill_command(
     if skill is not None and skill.target_spec in (TargetSpec.NONE, TargetSpec.SELF):
         targets: Any = []
     else:
-        parsed_targets = _parse_actor_targets(caller, target_value)
+        parsed_targets = _parse_actor_targets(
+            caller, target_value, commander=commander
+        )
         if parsed_targets is None:
             return None
         targets = parsed_targets
@@ -450,12 +479,23 @@ def build_skill_command(
 
 
 def submit_actor_command(
-    caller: Any, record: Any, actor: Any, command: dict[str, Any]
+    caller: Any,
+    record: Any,
+    actor: Any,
+    command: dict[str, Any],
+    *,
+    commander: Any = None,
 ) -> None:
-    """Admit one command through the shared facade and render its result."""
+    """Admit one command through the shared facade and render its result.
+
+    ``caller`` receives every message; ``commander`` owns the session the
+    admission is keyed on (default: the caller). A possessed caller operates
+    its commander's session while still reading its own feedback.
+    """
+    commander = caller if commander is None else commander
     try:
         result = confirm_actor_command(
-            caller,
+            commander,
             record.session_id,
             record.round_revision,
             record.draft_version,
@@ -478,7 +518,7 @@ def submit_actor_command(
         # The shared settlement renderer owns the admitted-draft prose.
         _draft_lines, message = settle_to_messages(result)
         caller.msg(message)
-        for line in _draft_progress_lines(caller, result):
+        for line in _draft_progress_lines(commander, result):
             caller.msg(line)
         return
     lines, message = settle_to_messages(result)
@@ -510,36 +550,49 @@ class CmdCombatCommand(Command):
         if not actor_token or not remainder:
             self.caller.msg(_COMBAT_COMMAND_USAGE)
             return
-        record = _session_or_none(self.caller)
-        if record is None:
+        scope = _session_or_none(self.caller)
+        if scope is None:
             return
-        actor = _ally_actor(self.caller, record, actor_token)
+        commander, record = scope
+        actor = _ally_actor(self.caller, record, actor_token, commander=commander)
         if actor is None:
             return
         head, _, target_value = remainder.partition("=")
         verb, _, kind_argument = head.partition(" ")
         command = self._command_for(
-            verb.strip().lower(), kind_argument.strip(), target_value.strip()
+            verb.strip().lower(),
+            kind_argument.strip(),
+            target_value.strip(),
+            commander,
         )
         if command is None:
             return
-        self._submit(record, actor, command)
+        self._submit(record, actor, command, commander)
 
     def _command_for(
-        self, verb: str, kind_argument: str, target_value: str
+        self,
+        verb: str,
+        kind_argument: str,
+        target_value: str,
+        commander: Any = None,
     ) -> dict[str, Any] | None:
         """Build one internal draft command from the typed text, or ``None``."""
         if verb == "skill":
-            return self._skill_command(kind_argument, target_value)
+            return self._skill_command(kind_argument, target_value, commander)
         if verb == "item":
-            return self._item_command(kind_argument, target_value)
+            return self._item_command(kind_argument, target_value, commander)
         if verb in _TACTIC_KEYS:
-            return self._tactic_command(verb, kind_argument, target_value)
+            return self._tactic_command(
+                verb, kind_argument, target_value, commander
+            )
         self.caller.msg(_COMBAT_COMMAND_USAGE)
         return None
 
     def _skill_command(
-        self, skill_argument: str, target_value: str
+        self,
+        skill_argument: str,
+        target_value: str,
+        commander: Any = None,
     ) -> dict[str, Any] | None:
         skill_key, at, scale_token = skill_argument.partition("@")
         skill_key = skill_key.strip()
@@ -558,13 +611,21 @@ class CmdCombatCommand(Command):
                 )
                 return None
             scale = parsed_scale
-        return build_skill_command(self.caller, skill_key, scale, target_value)
+        return build_skill_command(
+            self.caller, skill_key, scale, target_value, commander=commander
+        )
 
-    def _targets(self, target_value: str) -> list[int] | str | None:
+    def _targets(
+        self, target_value: str, commander: Any = None
+    ) -> list[int] | str | None:
         """Parse one target value into the facade's explicit token list."""
-        return _parse_actor_targets(self.caller, target_value)
+        return _parse_actor_targets(
+            self.caller, target_value, commander=commander
+        )
 
-    def _one_target(self, target_value: str) -> int | None | str:
+    def _one_target(
+        self, target_value: str, commander: Any = None
+    ) -> int | None | str:
         """Resolve at most one explicit target identity for an item/tactic.
 
         Returns the target dbref, ``None`` when no target was given, or the
@@ -573,7 +634,7 @@ class CmdCombatCommand(Command):
         """
         if not target_value:
             return None
-        parsed = self._targets(target_value)
+        parsed = self._targets(target_value, commander)
         if parsed is None:
             return "invalid"
         if isinstance(parsed, str) or len(parsed) != 1:
@@ -581,12 +642,15 @@ class CmdCombatCommand(Command):
         return parsed[0]
 
     def _item_command(
-        self, item_argument: str, target_value: str
+        self,
+        item_argument: str,
+        target_value: str,
+        commander: Any = None,
     ) -> dict[str, Any] | None:
         if not item_argument:
             self.caller.msg(_COMBAT_COMMAND_USAGE)
             return None
-        target_id = self._one_target(target_value)
+        target_id = self._one_target(target_value, commander)
         if target_id == "invalid":
             return self._invalid_target()
         return {
@@ -595,7 +659,11 @@ class CmdCombatCommand(Command):
         }
 
     def _tactic_command(
-        self, verb: str, kind_argument: str, target_value: str
+        self,
+        verb: str,
+        kind_argument: str,
+        target_value: str,
+        commander: Any = None,
     ) -> dict[str, Any] | None:
         if kind_argument:
             self.caller.msg(_COMBAT_COMMAND_USAGE)
@@ -607,7 +675,7 @@ class CmdCombatCommand(Command):
                 "kind": "tactical",
                 "payload": {"tactical_key": verb, "target_id": None},
             }
-        target_id = self._one_target(target_value)
+        target_id = self._one_target(target_value, commander)
         if target_id == "invalid":
             return self._invalid_target()
         if target_id is None:
@@ -626,14 +694,22 @@ class CmdCombatCommand(Command):
     def _search(self, name: str):
         return _search_target(self.caller, name)
 
-    def _submit(self, record: Any, actor: Any, command: dict[str, Any]) -> None:
+    def _submit(
+        self,
+        record: Any,
+        actor: Any,
+        command: dict[str, Any],
+        commander: Any = None,
+    ) -> None:
         """Admit one command through the shared facade and render its result."""
-        submit_actor_command(self.caller, record, actor, command)
+        submit_actor_command(
+            self.caller, record, actor, command, commander=commander
+        )
 
 
-def _draft_progress_lines(caller: Any, result: dict[str, Any]) -> tuple[str, ...]:
+def _draft_progress_lines(commander: Any, result: dict[str, Any]) -> tuple[str, ...]:
     """Render one admitted edit's remaining party progress."""
-    record = read_session(caller)
+    record = read_session(commander)
     tokens = _tokens_by_identity(record) if record is not None else {}
     lines = []
     admitted = result.get("draft_entries") or {}
@@ -666,14 +742,12 @@ class CmdCombatActions(Command):
     help_category = "Combat"
 
     def func(self) -> None:
-        if not is_in_active_session(self.caller):
-            self.caller.msg("目前沒有進行中的戰鬥。")
+        scope = _session_or_none(self.caller)
+        if scope is None:
             return
-        record = _session_or_none(self.caller)
-        if record is None:
-            return
+        commander, record = scope
         try:
-            view = build_combat_view(self.caller)
+            view = build_combat_view(commander)
         except CombatViewError:
             self.caller.msg("目前無法顯示戰鬥動作。")
             return
@@ -684,11 +758,13 @@ class CmdCombatActions(Command):
             return
         requested = self.args.strip().partition(" ")[0]
         if requested:
-            entity = _ally_actor(self.caller, record, requested)
+            entity = _ally_actor(
+                self.caller, record, requested, commander=commander
+            )
             if entity is None:
                 return
             try:
-                view = build_combat_view(self.caller, for_actor=entity)
+                view = build_combat_view(commander, for_actor=entity)
             except CombatViewError:
                 self.caller.msg(self._member_reason(view, int(entity.pk)))
                 return
@@ -696,7 +772,7 @@ class CmdCombatActions(Command):
             # The default actor is the commander; a commander who cannot act
             # right now still gets the canonical view rather than no listing.
             try:
-                view = build_combat_view(self.caller, for_actor=self.caller)
+                view = build_combat_view(commander, for_actor=commander)
             except CombatViewError:
                 pass
         self.caller.msg("\n".join(self._lines(view, record)))

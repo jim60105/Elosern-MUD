@@ -4,9 +4,11 @@ The four production gameplay actions registered by this delivery unit are
 ``combat.actor_choices``, ``combat.command``, ``combat.exit_prompt`` and
 ``combat.exit_confirm``. Each validator enforces one exact bounded payload
 shape; each adapter obtains the actor only from the authenticated session's
-puppet, re-reads the actor's current active session through the public rules
-boundary, reauthorizes every referenced subordinate actor through the shared
-``authorize_combat_actor`` seam, and calls only public combat-session APIs. No
+puppet, resolves the session owner behind it (the puppet itself, or the
+commander a possessed puppet operates), re-reads that owner's current active
+session through the public rules boundary, reauthorizes every referenced
+subordinate actor through the shared ``authorize_combat_actor`` seam, and
+calls only public combat-session APIs. No
 adapter assigns ``.db`` attributes, traits, buffs, sexual state, battlefield
 members, quests, location, wallet or inventory directly.
 
@@ -39,6 +41,7 @@ from world.rules.combat_session import (
     read_session,
     reconstruct_battlefield,
     request_party_exit,
+    session_owner,
 )
 from world.rules.player_messages import rejection_message, session_reason_message
 from world.rules.progression import FREEFORM_SCALE_VALUES
@@ -580,7 +583,8 @@ def _actor_choices_adapter(
     """
     from web.webclient.presentation.party_actor_selection import select_party_actor
 
-    record = read_session(actor)
+    commander = session_owner(actor)
+    record = read_session(commander)
     if record is None:
         return _reason_result(SessionReason.NO_ACTIVE_SESSION)
     if (
@@ -589,7 +593,7 @@ def _actor_choices_adapter(
     ):
         return _reason_result(SessionReason.STALE_ROUND_REVISION)
     try:
-        battlefield = reconstruct_battlefield(actor, record)
+        battlefield = reconstruct_battlefield(commander, record)
     except CombatSessionError as error:
         return _reason_result(error.args[0])
     target = next(
@@ -603,7 +607,7 @@ def _actor_choices_adapter(
     if target is None:
         return _reason_result(SessionReason.FORBIDDEN_ACTOR)
     try:
-        authorize_combat_actor(actor, target, record, battlefield)
+        authorize_combat_actor(commander, target, record, battlefield)
     except CombatSessionError as error:
         return _reason_result(error.args[0])
     select_party_actor(
@@ -629,7 +633,7 @@ def _command_adapter(
     del session
     try:
         result = confirm_actor_command(
-            actor,
+            session_owner(actor),
             payload["session_id"],
             payload["round_revision"],
             payload["draft_version"],
@@ -670,7 +674,7 @@ def _exit_prompt_adapter(
     del session
     try:
         prompt = request_party_exit(
-            actor,
+            session_owner(actor),
             payload["session_id"],
             payload["round_revision"],
             payload["operation"],
@@ -709,7 +713,7 @@ def _exit_confirm_adapter(
     del session
     try:
         result = confirm_party_exit(
-            actor,
+            session_owner(actor),
             payload["session_id"],
             payload["round_revision"],
             payload["operation"],
