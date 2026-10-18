@@ -30,7 +30,7 @@ from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
 from world.quests.runtime import read_records
 from world.quests.tests._fixtures import (
-    QuestRegistryIsolation,
+    RegistryIsolationMixin,
     accept,
     deliver,
     quest,
@@ -41,6 +41,7 @@ from world.rules.combat_session import engage
 from world.rules.equipment import materialize_registry_object, toggle_equipment
 from world.rules.party import join_party
 from world.rules.party_inventory import (
+    REASON_INVALID_QUANTITY,
     REASON_ITEM_EQUIPPED,
     REASON_ITEM_LOCKED,
     REASON_ITEM_NOT_HELD,
@@ -182,6 +183,16 @@ class MemberGiveCommandTests(_TransferCommandBase):
         self.assertEqual(self.commander.db.inventory, [_POTION.key])
         self.assertEqual(self.aila.db.inventory, [_POTION.key])
 
+    def test_explicit_zero_or_over_limit_count_is_the_invalid_quantity_refusal(self):
+        self._hold(self.commander, _POTION.key)
+        before = self._bags(self.commander, self.aila)
+
+        for count in ("0", "0 個", "100"):
+            with self.subTest(count=count):
+                output = self._give(f"{count} {_POTION.key} = 艾拉")
+                self.assertIn(TRANSFER_MESSAGES[REASON_INVALID_QUANTITY], output)
+                self._assert_unchanged(before, self.commander, self.aila)
+
     def test_missing_item_reports_the_rule_refusal_and_writes_nothing(self):
         before = self._bags(self.commander, self.aila)
 
@@ -248,7 +259,7 @@ class MemberGiveCommandTests(_TransferCommandBase):
         self.assertEqual(other.db.inventory, [_POTION.key])
 
 
-class NonMemberDeliveryGiveTests(QuestRegistryIsolation, _TransferCommandBase):
+class NonMemberDeliveryGiveTests(RegistryIsolationMixin, _TransferCommandBase):
     """A quest-bound non-member recipient still advances the delivery."""
 
     def setUp(self):
@@ -306,6 +317,16 @@ class RetrieveCommandTests(_TransferCommandBase):
 
         self.assertIn(f"你從艾拉那裡取回了 2 個{_POTION.display_name_zh}。", output)
         self.assertEqual(self.commander.db.inventory, [_POTION.key, _POTION.key])
+
+    def test_explicit_zero_or_over_limit_count_is_the_invalid_quantity_refusal(self):
+        self._hold(self.aila, _POTION.key)
+        before = self._bags(self.commander, self.aila)
+
+        for count in ("0", "0 個", "100"):
+            with self.subTest(count=count):
+                output = self._retrieve(f"{count} {_POTION.key} = 艾拉")
+                self.assertIn(TRANSFER_MESSAGES[REASON_INVALID_QUANTITY], output)
+                self._assert_unchanged(before, self.commander, self.aila)
 
     @covers_requirement("party-item-transfer::transfers-happen-only-outside-combat")
     def test_retrieve_in_combat_is_refused(self):
