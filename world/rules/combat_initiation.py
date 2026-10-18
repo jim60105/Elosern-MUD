@@ -30,6 +30,7 @@ from world.rules.combat_session import (
     CombatSessionError,
     CombatSessionRecord,
     _context_for,
+    authorize_combat_actor,
     engage_group,
     reconstruct_battlefield,
     session_id_for,
@@ -72,7 +73,7 @@ def _room_monsters(actor: Any) -> list[Monster]:
 
 
 def _candidate_record(
-    actor: Any,
+    commander: Any,
     targets: list[Any],
     *,
     session_id: str | None = None,
@@ -86,15 +87,23 @@ def _candidate_record(
     A read-only preview passes its own ``session_id`` so building the
     candidate never creates the world-clock script (``session_id_for``
     reads the clock through the creating accessor).
+
+    ``commander`` is the session owner, never the caster: a companion's
+    opening is persisted under the commander's ``active_combat``, so the
+    candidate must describe that same party and room.
     """
     from world.rules.party import combat_companions
 
-    companions = [int(companion.pk) for companion in combat_companions(actor)]
+    companions = [int(companion.pk) for companion in combat_companions(commander)]
     return CombatSessionRecord(
-        session_id=session_id if session_id is not None else session_id_for(actor, "hostile"),
+        session_id=(
+            session_id
+            if session_id is not None
+            else session_id_for(commander, "hostile")
+        ),
         mode="hostile",
-        room_id=int(actor.location.pk),
-        player_ids=(int(actor.pk), *companions),
+        room_id=int(commander.location.pk),
+        player_ids=(int(commander.pk), *companions),
         enemy_ids=tuple(sorted(int(target.pk) for target in targets)),
         fled_ids=(),
         knocked_out_ids=(),
@@ -121,6 +130,9 @@ class FieldOpeningPreview:
         session_reason: The stable ``SessionReason`` value when the
             candidate battlefield itself could not be built (``reason`` is
             then ``None``), else ``None``.
+        party_reason: The stable party-scope rejection code when the caster
+            is not an authorized acting member of the commander's party
+            (``reason`` is then ``None``), else ``None``.
     """
 
     enabled: bool
@@ -130,18 +142,20 @@ class FieldOpeningPreview:
     battlefield: Any = None
     context: Any = None
     session_reason: str | None = None
+    party_reason: str | None = None
 
 
-def _opening_line_up(actor: Any, skill: Any, target: Any) -> list[Any]:
+def _opening_line_up(commander: Any, skill: Any, target: Any) -> list[Any]:
     """The enemy line-up an opening cast engages (field-combat-initiation D-5).
 
     AREA opens against the whole room as an explicit concrete list (never a
     shorthand — ``commanded_damage_reaches_enemy()`` reads concrete keys);
     anything else (SINGLE, and NONE/SELF which then reject on shape) opens
-    against the named monster alone.
+    against the named monster alone. The room is the session owner's: the
+    caster is authorized into that same room before the line-up is chosen.
     """
     if skill is not None and skill.target_spec is TargetSpec.AREA:
-        return _room_monsters(actor)
+        return _room_monsters(commander)
     return [target]
 
 
@@ -152,6 +166,7 @@ def _prepare_opening(
     scale: float = 1.0,
     *,
     session_id: str | None = None,
+    commander: Any | None = None,
 ) -> FieldOpeningPreview:
     """Run every pre-mutation initiation gate in the execution order.
 
@@ -160,7 +175,19 @@ def _prepare_opening(
     can never advertise an opening the initiation would refuse. Nothing here
     persists, registers, or advances anything: the candidate record is
     reconstructed, then dropped.
+
+    ``actor`` is the caster; ``commander`` is the authenticated session owner
+    (default: the commander behind ``actor``). The candidate battlefield, its
+    room and its player side belong to the commander, while every caster-side
+    gate — party membership, presence, eligibility, owned skill, resources and
+    preflight — runs against ``actor``. The caster is re-authorized here,
+    before any clock or candidate work, so a forged, absent, knocked-out or
+    stale caster is refused without touching the clock, a session or a roll.
     """
+    if commander is None:
+        from world.rules.party_scope import resolve_commander
+
+        commander = resolve_commander(actor)
     # The initiation API enforces its own target contract: an AREA skill's
     # line-up is chosen from the room, so without this check a direct caller
     # could open a fight and fire the room-wide action while nominally
@@ -168,12 +195,12 @@ def _prepare_opening(
     # (D-5) applies only once a legitimate field-combat target anchors the
     # initiation. (Aim decides the fight; damage decides the settlement —
     # the reason names the mistake a caller of THIS entry can make.)
-    if field_combat_target(actor, target) is None:
+    if field_combat_target(commander, target) is None:
         return FieldOpeningPreview(
             False, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, str(skill_key), ()
         )
     skill = SKILL_REGISTRY.get(skill_key)
-    targets = _opening_line_up(actor, skill, target)
+    targets = _opening_line_up(commander, skill, target)
     # Explicit gate, first (D-4): validation deliberately supplies a
     # battlefield, so world/rules/action.py's own usable_out_of_combat gate
     # would pass. Checking here is what keeps the skill-field-availability
@@ -186,19 +213,30 @@ def _prepare_opening(
             skill_key,
             tuple(targets),
         )
-    record = _candidate_record(actor, targets, session_id=session_id)
-    battlefield = reconstruct_battlefield(actor, record)
-    context = _context_for(battlefield, record)
-    preview = revalidate_submission(
-        actor, skill_key, context, targets, scale=scale
+    # Party authority before any clock or candidate work: the caster must be
+    # the commander or an effective companion present in the commander's room,
+    # and (for a companion) able to act. Raises the shared ``PartyScopeError``
+    # codes instead of spending a session or a roll on a forged identity.
+    from world.rules.party_scope import PURPOSE_ACT, authorize_member
+
+    caster = authorize_member(
+        commander, getattr(actor, "pk", None), PURPOSE_ACT, anchor=actor
     )
+    record = _candidate_record(commander, targets, session_id=session_id)
+    battlefield = reconstruct_battlefield(commander, record)
+    # The candidate already lists the commander's player side; this re-checks
+    # the caster against it with the same guard the persisted submission uses,
+    # so the preview and the initiation can never disagree about the caster.
+    authorize_combat_actor(commander, caster, record, battlefield)
+    context = _context_for(battlefield, record)
+    preview = revalidate_submission(caster, skill_key, context, targets, scale=scale)
     if not preview.enabled:
         return FieldOpeningPreview(
             False, preview.reason, preview.detail, tuple(targets), battlefield, context
         )
     preflight = ActionResolver.preflight(
         ActionRequest(
-            actor=actor,
+            actor=caster,
             skill_key=skill_key,
             targets=targets,
             context=context,
@@ -222,6 +260,8 @@ def preview_field_opening(
     skill_key: str,
     target: Any,
     scale: float = 1.0,
+    *,
+    commander: Any | None = None,
 ) -> FieldOpeningPreview:
     """Read-only availability of opening combat against ``target``.
 
@@ -233,19 +273,46 @@ def preview_field_opening(
     line-up participants sharing one key) reports a disabled opening with a
     stable reason instead of raising, so one awkward room never blanks a
     whole preview.
+
+    ``actor`` is the caster and ``commander`` the authenticated session owner
+    (default: the commander behind ``actor``). A caster that party authority
+    refuses reports a disabled opening carrying the stable party reason
+    (``party_reason``) instead of raising, exactly as the candidate-battlefield
+    failures do; the real initiation path still raises that same rejection.
     """
     from world.rules.combat_session.records import format_session_id
+    from world.rules.party_scope import PartyScopeError, resolve_commander
 
+    if commander is None:
+        try:
+            commander = resolve_commander(actor)
+        except PartyScopeError as error:  # observability: ignore R2: the party refusal is the reported disabled verdict, not a swallowed failure
+            return FieldOpeningPreview(
+                False, None, None, (target,), party_reason=error.reason
+            )
     clock = read_world_clock()
-    session_id = format_session_id(actor, "hostile", clock.tick if clock is not None else 0)
+    session_id = format_session_id(
+        commander, "hostile", clock.tick if clock is not None else 0
+    )
     try:
         return _prepare_opening(
-            actor, skill_key, target, scale=scale, session_id=session_id
+            actor,
+            skill_key,
+            target,
+            scale=scale,
+            session_id=session_id,
+            commander=commander,
+        )
+    except PartyScopeError as error:  # observability: ignore R2: the party refusal is the reported disabled verdict, not a swallowed failure
+        # Party authority is a pre-mutation verdict like the candidate build:
+        # report it as a disabled opening rather than blanking the preview.
+        return FieldOpeningPreview(
+            False, None, None, (target,), party_reason=error.reason
         )
     except CombatSessionError as error:  # observability: ignore R2: a candidate battlefield that cannot be built is a read-only disabled verdict carrying the stable session reason; the preview surface reports it, and the real initiation path still raises
         skill = SKILL_REGISTRY.get(skill_key)
         try:
-            line_up = tuple(_opening_line_up(actor, skill, target))
+            line_up = tuple(_opening_line_up(commander, skill, target))
         except Exception:  # observability: ignore R2: the line-up only decorates an already-disabled verdict; the CombatSessionError is the reported reason
             line_up = (target,)
         session_reason = str(error.args[0]) if error.args else "malformed_session"
@@ -259,6 +326,8 @@ def initiate_field_combat(
     skill_key: str,
     target: Any,
     scale: float = 1.0,
+    *,
+    commander: Any | None = None,
 ) -> dict[str, Any]:
     """Open combat with one skill as the player's opening draft selection.
 
@@ -274,8 +343,23 @@ def initiate_field_combat(
     required actor has confirmed, and never a compressed settlement. A
     rejection at any gate costs nothing: no session, no resource, no roll,
     no world time.
+
+    ``actor`` is the caster and ``commander`` the authenticated session owner
+    (default: the commander behind ``actor``, which is the actor itself for the
+    commander). A companion's opening is the commander's encounter: the
+    session, its active-session check, its room and its rollback snapshots are
+    keyed on the commander, while the opening draft entry is seeded for the
+    caster and the caster acts first. ``commander`` is trusted internal
+    context threaded from the party boundary (``cast_as_member``), never a
+    caller-supplied identity.
     """
-    preview = _prepare_opening(actor, skill_key, target, scale=scale)
+    if commander is None:
+        from world.rules.party_scope import resolve_commander
+
+        commander = resolve_commander(actor)
+    preview = _prepare_opening(
+        actor, skill_key, target, scale=scale, commander=commander
+    )
     if not preview.enabled:
         return {
             "outcome": "rejected",
@@ -285,8 +369,9 @@ def initiate_field_combat(
     targets = list(preview.targets)
     clock = read_world_clock()
     boundary = {
-        "char": str(actor.pk),
-        "room": str(actor.location.pk),
+        "char": str(commander.pk),
+        "caster": str(actor.pk),
+        "room": str(commander.location.pk),
         "tick": clock.tick if clock is not None else None,
         "skill": skill_key,
         "enemy_count": len(targets),
@@ -301,9 +386,14 @@ def initiate_field_combat(
     # flow is already AFTER engage_group() wrote the engaged record, so
     # restoring from it would reinstate the engaged session instead of the
     # pre-engagement absence. Both attributes are snapshotted here, before
-    # engagement (D-7).
-    active_combat_before = _attribute_snapshot(actor, "active_combat")
-    dialogue_before = _attribute_snapshot(actor, "dialogue_session")
+    # engagement (D-7). The session lives on the commander; a distinct caster
+    # only ever loses dialogue state to the engagement, so that is the one
+    # extra surface snapshotted for it.
+    active_combat_before = _attribute_snapshot(commander, "active_combat")
+    dialogue_before = _attribute_snapshot(commander, "dialogue_session")
+    caster_dialogue_before: tuple[bool, Any] | None = None
+    if actor is not commander:
+        caster_dialogue_before = _attribute_snapshot(actor, "dialogue_session")
     engaged_record: CombatSessionRecord | None = None
     rejection: dict[str, Any] | None = None
     try:
@@ -317,14 +407,25 @@ def initiate_field_combat(
             # the session, so the initiating actor keeps the first action of
             # the first complete round while companions still have to choose.
             engaged = engage_group(
-                actor, targets, opening_first_actor=str(actor.key)
+                commander, targets, opening_first_actor=str(actor.key)
             )
             engaged_record = engaged["record"]
+            if actor is not commander:
+                # Hostility ends a conversation for every participant, not
+                # only for the session owner (webclient-align-07).
+                from world.rules.dialogue import clear_dialogue_session
+
+                clear_dialogue_session(actor)
             # ``nested=True``: this outer ``transaction.atomic()`` owns the
             # whole unit, so the seed's own durable boundary degrades to a
             # savepoint of it instead of raising (writer.durable_combat_atomic).
             result = submit_opening_action(
-                actor, skill_key, targets, scale=scale, nested=True
+                commander,
+                skill_key,
+                targets,
+                scale=scale,
+                nested=True,
+                commanded_actor=actor,
             )
             if result.get("outcome") == "rejected":
                 # Candidate/persisted divergence: roll the session back
@@ -355,7 +456,12 @@ def initiate_field_combat(
         # cast_settlement precedent's order (never write inside the
         # transaction being unwound).
         _restore_initiation_state(
-            actor, engaged_record, active_combat_before, dialogue_before
+            commander,
+            actor,
+            engaged_record,
+            active_combat_before,
+            dialogue_before,
+            caster_dialogue_before,
         )
         raise
     if rejection is not None:
@@ -363,17 +469,24 @@ def initiate_field_combat(
         # now, after the rollback, matching the cast_settlement precedent's
         # order (DB rollback first, then idmapper restoration).
         _restore_initiation_state(
-            actor, engaged_record, active_combat_before, dialogue_before
+            commander,
+            actor,
+            engaged_record,
+            active_combat_before,
+            dialogue_before,
+            caster_dialogue_before,
         )
         return rejection
     return result
 
 
 def _restore_initiation_state(
-    actor: Any,
+    commander: Any,
+    caster: Any,
     engaged_record: CombatSessionRecord | None,
     active_combat_before: tuple[bool, Any],
     dialogue_before: tuple[bool, Any],
+    caster_dialogue_before: tuple[bool, Any] | None = None,
 ) -> None:
     """Undo everything ``engage_group()`` left outside the rollback's reach.
 
@@ -382,9 +495,13 @@ def _restore_initiation_state(
     both attribute surfaces are restored to their pre-engagement values
     and the participants are unregistered (D-7; the idmapper reason
     ``cast_settlement._restore_settlement_state`` and
-    ``combat_session._restore_round_touched`` exist for).
+    ``combat_session._restore_round_touched`` exist for). The session
+    attribute belongs to the commander; a distinct caster only carries the
+    dialogue snapshot the engagement cleared.
     """
-    _restore_attribute(actor, "active_combat", active_combat_before)
-    _restore_attribute(actor, "dialogue_session", dialogue_before)
+    _restore_attribute(commander, "active_combat", active_combat_before)
+    _restore_attribute(commander, "dialogue_session", dialogue_before)
+    if caster_dialogue_before is not None:
+        _restore_attribute(caster, "dialogue_session", caster_dialogue_before)
     if engaged_record is not None:
         unregister_participants((*engaged_record.player_ids, *engaged_record.enemy_ids))

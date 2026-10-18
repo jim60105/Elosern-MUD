@@ -3,8 +3,8 @@
 Covers ``world/rules/field_cast.py::cast_as_member``: the acting-purpose member
 boundary, the unchanged field routing with the member as actor (costs, SELF
 binding, practice award, time cost), the present-party settlement scope, the
-stable refusals, and the forward-declared companion monster opening seam that
-``companion-field-combat-opening`` owns.
+stable refusals, and the companion monster opening the commander's encounter
+(``companion-field-combat-opening``).
 
 The ``companion-field-actions`` requirements this module establishes are
 annotated with their canonical IDs on the substantive tests below.
@@ -24,7 +24,7 @@ from typeclasses.rooms import Room
 from world.rules.action import DEFAULT_CAST_SECONDS, RejectReason
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat_session import CombatSessionError, SessionReason, read_session
+from world.rules.combat_session import read_session
 from world.rules.field_cast import cast_as_member
 from world.rules.party import join_party
 from world.rules.party_scope import (
@@ -303,17 +303,23 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertFalse(self.kahn.db.skill_proficiency)
         self.assertEqual(self.clock.tick, 0)
 
-    def test_a_companion_monster_target_reaches_the_initiation_seam(self):
+    def test_a_companion_monster_target_opens_the_commander_s_encounter(self):
         wolf = self._wolf()
         aila_mp = self.aila.traits.mp.current
-        with self.assertRaises(CombatSessionError) as caught:
-            self._cast(self.aila, _HEAL.key, targets=[wolf])
-        # Forward-declared seam: the companion-initiator support lands in
-        # ``companion-field-combat-opening``; until then initiation reports
-        # its existing stable rejection and persists nothing.
-        self.assertEqual(caught.exception.args[0], SessionReason.NOT_A_PLAYER)
-        self.assertIsNone(read_session(self.commander))
+        outcome = self._cast(self.aila, _HEAL.key, targets=[wolf])
+        # The member's cast is the opening selection of the commander's
+        # encounter, so the session lives on the commander alone and nothing
+        # is spent or rolled before the remaining members choose.
+        self.assertEqual(outcome.route, "initiation")
+        self.assertEqual(outcome.combat_result["outcome"], "draft")
+        record = read_session(self.commander)
+        self.assertIsNotNone(record)
         self.assertIsNone(read_session(self.aila))
+        self.assertEqual(record.opening_first_actor, str(self.aila.key))
+        self.assertEqual(
+            record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"],
+            _HEAL.key,
+        )
         self.assertEqual(self.aila.traits.mp.current, aila_mp)
         self.assertEqual(int(wolf.traits.hp.current), 2000)
         self.assertEqual(self.clock.tick, 0)

@@ -259,6 +259,7 @@ def submit_opening_action(
     scale: float = 1.0,
     *,
     nested: bool = False,
+    commanded_actor: Any | None = None,
 ) -> dict[str, Any]:
     """Seed the exploration opening's selection as the initiating draft entry.
 
@@ -274,6 +275,12 @@ def submit_opening_action(
     ``opening_first_actor`` is already durable on the session (written by
     ``engage_group()``), so the initiating actor keeps the first action of
     that first complete round without any caller-supplied override.
+
+    ``actor`` is the authenticated commander. ``commanded_actor`` is the
+    authorized caster (defaulting to ``actor``): a companion's opening seeds
+    that member's entry, so the member's own capability, cost and practice
+    apply when the entry resolves, while the session and every revision token
+    stay the commander's.
 
     Skills only -- no item request may reach this entry. Only a concrete
     list of participant objects is accepted: the AREA line-up is expanded by
@@ -293,16 +300,22 @@ def submit_opening_action(
             f"shorthand {targets!r} cannot seed an opening entry"
         )
     record, battlefield, request, rejection = _preflight_skill_submission(
-        submit_opening_action, actor, skill_key, targets, scale=scale
+        submit_opening_action,
+        actor,
+        skill_key,
+        targets,
+        scale=scale,
+        commanded_actor=commanded_actor,
     )
     if rejection is not None:
         return rejection
+    effective_actor = actor if commanded_actor is None else commanded_actor
     return confirm_actor_command(
         actor,
         record.session_id,
         record.round_revision,
         record.draft_version,
-        int(actor.pk),
+        int(effective_actor.pk),
         {"kind": "skill", "payload": {
             "skill_key": skill_key,
             "targets_or_shorthand": [int(target.pk) for target in targets],
