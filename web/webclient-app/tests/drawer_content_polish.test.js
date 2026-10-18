@@ -140,37 +140,38 @@ describe("the character-status hero", () => {
 });
 
 describe("lineage identity", () => {
-  const node = (key, name) => ({ skill_key: key, display_name_zh: name, owned: true, usable: true, level: 1, xp_into_level: 1, xp_to_next_level: 9, capped: false, prereq_text_zh: "" });
-  const chain = (key, label, meter, nodes) => ({ root_skill_key: key, element_or_style_zh: label, consumed: false, meter, nodes });
+  const node = (key, name) => ({ skill_key: key, display_name_zh: name, owned: true, usable: true, ready: false, level: 1, xp_into_level: 1, xp_to_next_level: 9, capped: false, prereq_text_zh: "", depth: 0 });
+  const graph = (key, label, owned, total, nodes) => ({ graph_id: key, group_label_zh: label, root_keys: [key], owned_count: owned, total_count: total, consumed: false, nodes, edges: [] });
 
-  it("shows each same-label chain's supplied root name beside its own progress", () => {
+  it("shows each same-label graph's supplied root name beside its own count", () => {
     // File-local synthetic lineage rows (test-data-independence): invented
     // element prose outside the shipped lore universe, mirroring
     // overlays/lineage_panel.test.js.
     const w = mount(LineagePanel, {
       props: {
         lineage: {
-          schema_version: 1, available: true, kind: "lineage", completed_count: 0, total_count: 4,
-          chains: [
-            chain("a_root", "焰流", 0.4, [node("a_root", "焰羽箭")]),
-            chain("b_root", "焰流", 0.8, [node("b_root", "焰潮波")]),
-            chain("c_root", "馜流", 0.1, [node("c_root", "馜流")]),
-            chain("d_root", "潮流", 0.2, []),
+          schema_version: 2, available: true, kind: "lineage", completed_count: 0, total_count: 4,
+          graphs: [
+            graph("a_root", "焰流", 1, 2, [node("a_root", "焰羽箭")]),
+            graph("b_root", "焰流", 2, 3, [node("b_root", "焰潮波")]),
+            graph("c_root", "馜流", 1, 1, [node("c_root", "馜流")]),
+            graph("d_root", "潮流", 1, 1, []),
           ],
         },
       },
     });
-    for (const [key, name, pct] of [["a_root", "焰羽箭", "40%"], ["b_root", "焰潮波", "80%"]]) {
-      const head = w.get(`[data-testid="lineage-chain-toggle-${key}"]`);
-      expect(head.get(`[data-testid="lineage-chain-root-${key}"]`).text()).toBe(name);
-      // Order inside the row: identity, then the meter, then the figure.
+    for (const [key, name, count] of [["a_root", "焰羽箭", "1/2"], ["b_root", "焰潮波", "2/3"]]) {
+      const head = w.get(`[data-testid="lineage-graph-toggle-${key}"]`);
+      expect(head.get(`[data-testid="lineage-graph-root-${key}"]`).text()).toBe(name);
+      // Order inside the row: identity, then the owned/total count; no meter.
       const parts = [...head.element.children].map((el) => el.className.baseVal ?? el.className);
-      expect(parts.slice(1)).toEqual(["lineage-chain__identity", "lineage-chain__meter", "lineage-chain__percent"]);
-      expect(head.get(".lineage-chain__percent").text()).toBe(pct);
+      expect(parts.slice(1)).toEqual(["lineage-graph__identity", "lineage-graph__count"]);
+      expect(head.get(".lineage-graph__count").text()).toBe(count);
     }
     // A root name equal to the label, or no node at all, adds no subtitle.
-    expect(w.find('[data-testid="lineage-chain-root-c_root"]').exists()).toBe(false);
-    expect(w.find('[data-testid="lineage-chain-root-d_root"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lineage-graph-root-c_root"]').exists()).toBe(false);
+    expect(w.find('[data-testid="lineage-graph-root-d_root"]').exists()).toBe(false);
+    expect(w.find(".lineage-chain__meter").exists()).toBe(false);
   });
 });
 

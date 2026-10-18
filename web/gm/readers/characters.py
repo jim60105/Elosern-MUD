@@ -288,7 +288,7 @@ def lineage_section(entity: Any) -> dict[str, Any]:
 
     view = build_lineage_view(entity)
     items = []
-    for chain in view.chains:
+    for graph in view.graphs:
         rows = [
             row(
                 node.display_name_zh,
@@ -297,14 +297,14 @@ def lineage_section(entity: Any) -> dict[str, Any]:
                 mono=True,
                 tone="ok" if node.owned else None,
             )
-            for node in chain.nodes
+            for node in graph.nodes
         ]
         items.append(
             group(
-                chain.element_or_style_zh,
+                graph.group_label_zh,
                 rows,
-                key=chain.root_skill_key,
-                note=("已消耗" if chain.consumed else "") or None,
+                key=graph.graph_id,
+                note=("已消耗" if graph.consumed else "") or None,
             )
         )
     if not items:

@@ -322,11 +322,16 @@ class IdentityRuntimeTests(EvenniaTestCase):
         self.assertNotIn(PASSIVE.key, passive)
         self.assertIn(RACIAL_ROOT.key, active)
         view = build_lineage_view(self.player)
-        keys = {node.skill_key for chain in view.chains for node in chain.nodes}
+        keys = {node.skill_key for graph in view.graphs for node in graph.nodes}
         self.assertNotIn(ROOT.key, keys)
         self.assertNotIn(CHILD.key, keys)
         self.assertIn(RACIAL_CHILD.key, keys)
-        child = next(node for chain in view.chains for node in chain.nodes if node.skill_key == RACIAL_CHILD.key)
+        child = next(
+            node
+            for graph in view.graphs
+            for node in graph.nodes
+            if node.skill_key == RACIAL_CHILD.key
+        )
         self.assertFalse(child.owned)
         self.assertFalse(child.usable)
         self.assertEqual(build_lineage_view(self.player), view)

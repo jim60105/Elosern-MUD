@@ -396,14 +396,15 @@ and non-empty Traditional Chinese descriptions.
 
 ### Requirement: The command reference documents the lineage command
 `docs/game/command-reference.md` SHALL carry a canonical entry for `lineage`
-(no aliases) with syntax `lineage`, availability context in and out of combat,
+(alias `系譜`) with syntax `lineage [<成員>]`, availability context in and out of combat,
 and a non-empty Traditional Chinese description stating that the command prints
-the character's skill lineages with per-node proficiency, 見頂 saturation marks,
-and the prerequisite of each locked node.
+the named party member's (default: the commander's) skill graphs with per-node
+proficiency, prerequisite edges with their minimum levels, 見頂 saturation marks,
+可解鎖 marks, and the prerequisite of each locked node.
 
 #### Scenario: The lineage entry satisfies the drift contract
 - **WHEN** the drift contract test runs after the command is mounted
-- **THEN** the `lineage` canonical entry's key, absent aliases, syntax row, and context row match the command class and the curated manifest
+- **THEN** the `lineage` canonical entry's key, its `系譜` alias, syntax row, and context row match the command class and the curated manifest
 
 #### Scenario: The overview links the lineage row
 - **WHEN** a player opens `docs/game/commands.md`

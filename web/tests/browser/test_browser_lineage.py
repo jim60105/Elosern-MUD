@@ -22,10 +22,12 @@ def _lineage_node(
     *,
     owned: bool,
     usable: bool,
+    ready: bool,
     level: int,
     xp_into_level: float,
     xp_to_next_level: float,
     capped: bool,
+    depth: int,
     prereq_text_zh: str = "",
 ) -> dict:
     """One schema-valid lineage node (exact field set of the panel contract)."""
@@ -34,18 +36,20 @@ def _lineage_node(
         "display_name_zh": display_name_zh,
         "owned": owned,
         "usable": usable,
+        "ready": ready,
         "level": level,
         "xp_into_level": xp_into_level,
         "xp_to_next_level": xp_to_next_level,
         "capped": capped,
         "prereq_text_zh": prereq_text_zh,
+        "depth": depth,
     }
 
 
 def _available_lineage_panel() -> dict:
-    """A schema-valid available lineage payload: one chain, three nodes.
+    """A schema-valid available lineage payload: one graph, three nodes.
 
-    The whole chain is locally authored payload data — the client renders it
+    The whole graph is locally authored payload data — the client renders it
     verbatim and never resolves these keys against a registry — so its
     identifiers and displays are fixture-authored ``t_`` values, not shipped
     catalog rows.
@@ -54,56 +58,76 @@ def _available_lineage_panel() -> dict:
     mid_key, mid_name = CHAIN_MID
     leaf_key, leaf_name = CHAIN_LEAF
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "lineage",
         "completed_count": 0,
         "total_count": 1,
-        "chains": [
+        "graphs": [
             {
-                "root_skill_key": root_key,
-                "element_or_style_zh": "燼",
+                "graph_id": root_key,
+                "group_label_zh": "燼",
+                "root_keys": [root_key],
+                "owned_count": 2,
+                "total_count": 3,
                 "consumed": False,
-                "meter": 0.3,
                 "nodes": [
                     _lineage_node(
                         root_key,
                         root_name,
                         owned=True,
                         usable=True,
+                        ready=False,
                         level=1,
                         xp_into_level=23.0,
                         xp_to_next_level=27.0,
                         capped=False,
+                        depth=0,
                     ),
                     _lineage_node(
                         mid_key,
                         mid_name,
                         owned=True,
                         usable=True,
+                        ready=False,
                         level=3,
                         xp_into_level=0.0,
                         xp_to_next_level=0.0,
                         capped=True,
+                        depth=1,
                     ),
                     _lineage_node(
                         leaf_key,
                         leaf_name,
                         owned=False,
                         usable=False,
+                        ready=False,
                         level=0,
                         xp_into_level=0.0,
                         xp_to_next_level=50.0,
                         capped=False,
+                        depth=2,
                         prereq_text_zh=f"需「{mid_name} Lv.3」",
                     ),
+                ],
+                "edges": [
+                    {
+                        "from_key": root_key,
+                        "to_key": mid_key,
+                        "min_level": 1,
+                    },
+                    {
+                        "from_key": mid_key,
+                        "to_key": leaf_key,
+                        "min_level": 3,
+                    },
                 ],
             }
         ],
     }
 
 
-#: Authored chain-node identities (key, display) for the injected payload.
+#: Authored graph-node identities (key, display) for the injected payload.
 CHAIN_ROOT = ("t_lineage_root_arrow", "燼影箭")
 CHAIN_MID = ("t_lineage_mid_burst", "燼心爆")
 CHAIN_LEAF = ("t_lineage_leaf_wave", "燼浪濤")
@@ -112,7 +136,7 @@ CHAIN_LEAF = ("t_lineage_leaf_wave", "燼浪濤")
 def _unavailable_lineage_panel() -> dict:
     """A schema-valid unavailable lineage payload (common unavailable form)."""
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": False,
         "reason": {
             "code": "lineage_unavailable",
@@ -126,7 +150,7 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement("skill-lineage-panel::the-webclient-renders-the-lineage-window-from-the-view-alone")
     def test_lineage_window_renders_the_committed_ledger_verbatim(self):
-        """Icon opens the window; collapsed meter and expanded rows match the payload."""
+        """Icon opens the window; collapsed count and expanded rows match the payload."""
         page = self.logged_in_page()
         _inject_snapshot(page, {"lineage": _available_lineage_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
@@ -141,25 +165,23 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
             "已完成 0 / 1 樹",
         )
 
-        # Collapsed by default: the chain head shows its aggregate meter only.
+        # Collapsed by default: the graph head shows its owned/total count only.
         root_key = CHAIN_ROOT[0]
         mid_key = CHAIN_MID[0]
         leaf_key = CHAIN_LEAF[0]
-        toggle = page.locator(f'[data-testid="lineage-chain-toggle-{root_key}"]')
+        toggle = page.locator(f'[data-testid="lineage-graph-toggle-{root_key}"]')
         self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertEqual(
-            page.locator(f'[data-testid="lineage-chain-meter-{root_key}"]').get_attribute(
-                "aria-label"
-            ),
-            "進度 30%",
+            page.locator(f'[data-testid="lineage-graph-count-{root_key}"]').inner_text(),
+            "2/3",
         )
         self.assertEqual(
-            page.locator(f'[data-testid="lineage-chain-nodes-{root_key}"]').count(), 0
+            page.locator(f'[data-testid="lineage-graph-nodes-{root_key}"]').count(), 0
         )
 
         # Expanding renders the per-node rows with payload-owned values.
         toggle.click()
-        page.wait_for_selector(f'[data-testid="lineage-chain-nodes-{root_key}"]', timeout=15000)
+        page.wait_for_selector(f'[data-testid="lineage-graph-nodes-{root_key}"]', timeout=15000)
         self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
         self.assertEqual(
             page.locator(f'[data-testid="lineage-node-meter-{root_key}"]').inner_text(),
@@ -200,8 +222,8 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
             "技能系譜目前無法顯示",
         )
         self.assertEqual(
-            page.locator('[data-testid^="lineage-chain-"]').count(),
+            page.locator('[data-testid^="lineage-graph-"]').count(),
             0,
-            "the client invents no placeholder chain",
+            "the client invents no placeholder graph",
         )
         self.assertEqual(page.locator('[data-testid="lineage-panel-header"]').count(), 0)
