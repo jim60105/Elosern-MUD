@@ -400,6 +400,93 @@ class CmdCombatRetreat(_PartyExitCommand):
     operation = PARTY_EXIT_RETREAT
 
 
+def _search_target(caller: Any, name: str) -> Any | None:
+    """Resolve one name to its single local match, never an ambiguous list."""
+    matches = caller.search(name, quiet=True)
+    return matches[0] if len(matches) == 1 else None
+
+
+def _parse_actor_targets(caller: Any, target_value: str) -> list[int] | str | None:
+    """Parse one target value into the facade's explicit token list."""
+    try:
+        parsed = parse_session_targets(
+            caller, target_value, search=lambda name: _search_target(caller, name)
+        )
+    except CombatSessionError as error:
+        caller.msg(session_reason_message(str(error.args[0])))
+        return None
+    if isinstance(parsed, str):
+        return parsed
+    return [int(target.pk) for target in parsed]
+
+
+def build_skill_command(
+    caller: Any, skill_key: str, scale: float, target_value: str
+) -> dict[str, Any] | None:
+    """Build one actor's internal draft skill command.
+
+    Shared by ``combat command <actor-token> skill ...`` and the ``cast``
+    member suffix, so both text routes admit the exact same payload through
+    ``confirm_actor_command``: NONE/SELF skills carry no target and bind the
+    selected actor inside the rules layer, while every other skill parses the
+    supplied target tokens (or one approved AREA shorthand).
+    """
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is not None and skill.target_spec in (TargetSpec.NONE, TargetSpec.SELF):
+        targets: Any = []
+    else:
+        parsed_targets = _parse_actor_targets(caller, target_value)
+        if parsed_targets is None:
+            return None
+        targets = parsed_targets
+    return {
+        "kind": "skill",
+        "payload": {
+            "skill_key": skill_key,
+            "targets_or_shorthand": targets,
+            "scale": scale,
+        },
+    }
+
+
+def submit_actor_command(
+    caller: Any, record: Any, actor: Any, command: dict[str, Any]
+) -> None:
+    """Admit one command through the shared facade and render its result."""
+    try:
+        result = confirm_actor_command(
+            caller,
+            record.session_id,
+            record.round_revision,
+            record.draft_version,
+            int(actor.pk),
+            command,
+        )
+    except CombatSessionError as error:
+        caller.msg(session_reason_message(str(error.args[0])))
+        return
+    outcome = result.get("outcome")
+    if outcome == "rejected":
+        caller.msg(
+            _draft_reason_text(
+                result.get("reason"),
+                item_domain=command.get("kind") == "item",
+            )
+        )
+        return
+    if outcome == "draft":
+        # The shared settlement renderer owns the admitted-draft prose.
+        _draft_lines, message = settle_to_messages(result)
+        caller.msg(message)
+        for line in _draft_progress_lines(caller, result):
+            caller.msg(line)
+        return
+    lines, message = settle_to_messages(result)
+    for line in lines:
+        caller.msg(line)
+    caller.msg(message)
+
+
 class CmdCombatCommand(Command):
     """Confirm one party member's command through the shared draft facade.
 
@@ -471,42 +558,11 @@ class CmdCombatCommand(Command):
                 )
                 return None
             scale = parsed_scale
-        skill = SKILL_REGISTRY.get(skill_key)
-        if skill is not None and skill.target_spec in (
-            TargetSpec.NONE,
-            TargetSpec.SELF,
-        ):
-            # NONE carries no target and SELF binds the selected actor inside
-            # the rules layer, so supplied target tokens are ignored exactly
-            # like the shared facade's empty-target input: a SELF skill named
-            # for a2 always acts on a2.
-            targets: Any = []
-        else:
-            parsed_targets = self._targets(target_value)
-            if parsed_targets is None:
-                return None
-            targets = parsed_targets
-        return {
-            "kind": "skill",
-            "payload": {
-                "skill_key": skill_key,
-                "targets_or_shorthand": targets,
-                "scale": scale,
-            },
-        }
+        return build_skill_command(self.caller, skill_key, scale, target_value)
 
     def _targets(self, target_value: str) -> list[int] | str | None:
         """Parse one target value into the facade's explicit token list."""
-        try:
-            parsed = parse_session_targets(
-                self.caller, target_value, search=self._search
-            )
-        except CombatSessionError as error:
-            self.caller.msg(session_reason_message(str(error.args[0])))
-            return None
-        if isinstance(parsed, str):
-            return parsed
-        return [int(target.pk) for target in parsed]
+        return _parse_actor_targets(self.caller, target_value)
 
     def _one_target(self, target_value: str) -> int | None | str:
         """Resolve at most one explicit target identity for an item/tactic.
@@ -568,43 +624,11 @@ class CmdCombatCommand(Command):
         return None
 
     def _search(self, name: str):
-        matches = self.caller.search(name, quiet=True)
-        return matches[0] if len(matches) == 1 else None
+        return _search_target(self.caller, name)
 
     def _submit(self, record: Any, actor: Any, command: dict[str, Any]) -> None:
         """Admit one command through the shared facade and render its result."""
-        try:
-            result = confirm_actor_command(
-                self.caller,
-                record.session_id,
-                record.round_revision,
-                record.draft_version,
-                int(actor.pk),
-                command,
-            )
-        except CombatSessionError as error:
-            self.caller.msg(session_reason_message(str(error.args[0])))
-            return
-        outcome = result.get("outcome")
-        if outcome == "rejected":
-            self.caller.msg(
-                _draft_reason_text(
-                    result.get("reason"),
-                    item_domain=command.get("kind") == "item",
-                )
-            )
-            return
-        if outcome == "draft":
-            # The shared settlement renderer owns the admitted-draft prose.
-            _draft_lines, message = settle_to_messages(result)
-            self.caller.msg(message)
-            for line in _draft_progress_lines(self.caller, result):
-                self.caller.msg(line)
-            return
-        lines, message = settle_to_messages(result)
-        for line in lines:
-            self.caller.msg(line)
-        self.caller.msg(message)
+        submit_actor_command(self.caller, record, actor, command)
 
 
 def _draft_progress_lines(caller: Any, result: dict[str, Any]) -> tuple[str, ...]:
