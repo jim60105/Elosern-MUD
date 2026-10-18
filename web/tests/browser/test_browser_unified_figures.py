@@ -310,7 +310,7 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         "webclient-character-roster::roster-portraits-resolve-through-the-named-portrait-subject-mechanism"
     )
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_exploration_dialogue_combat_and_drawer_share_descriptor(self):
         """One descriptor, every surface: the player's roster figure, the

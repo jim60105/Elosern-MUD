@@ -1,13 +1,4 @@
-"""Tests for the party actions (party-item-transfer, party-panel-v3-view-member).
-
-Intended requirement IDs for the added ``webclient-party-panel`` requirements,
-recorded here until they are synced into ``openspec/specs/`` (the
-``covers_requirement`` decorators are added at the archive step, per the
-``party-item-transfer`` precedent):
-
-- ``webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session``
-- ``webclient-party-panel::opening-a-member-s-skills-clears-that-member-s-unread-mark``
-"""
+"""Tests for the party actions (party-item-transfer, party-panel-v3-view-member)."""
 
 from types import SimpleNamespace
 import unittest
@@ -187,6 +178,9 @@ class PartyTransferAdapterTests(EvenniaTestCase):
 class PartyViewMemberPayloadTests(unittest.TestCase):
     """The ``party.view_member`` schema is exact and bounded."""
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_exact_payload_is_normalized(self):
         self.assertEqual(
             validate_party_view_member_payload({"member_id": 7, "tab": "member"}),
@@ -198,6 +192,9 @@ class PartyViewMemberPayloadTests(unittest.TestCase):
                 tab,
             )
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_each_malformed_payload_rejects(self):
         cases = (
             ("not an object", []),
@@ -261,6 +258,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
             self.session, actor or self.commander
         ).party_view
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_success_records_the_selection_and_republishes_party(self):
         self.assertEqual(
             self._select(self.aila.pk),
@@ -276,6 +276,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
             PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "member"),
         )
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_forged_member_is_refused_without_substitution(self):
         self._select(self.aila.pk)
         outsider = create_object(NPC, key="陌客", location=self.room)
@@ -290,6 +293,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                 # The previous selection stays exactly as it was.
                 self.assertEqual(self._selection().member_id, int(self.aila.pk))
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_absent_but_effective_member_is_accepted(self):
         self.aila.location = self.other_room
         result = self._select(self.aila.pk, "bag")
@@ -299,6 +305,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
             PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "bag"),
         )
 
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
     def test_selection_survives_the_possession_transition(self):
         self._select(self.kahn.pk, "status")
         # Possession puppets the companion; the party-panel owner stays the
@@ -309,6 +318,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
             PartyViewSelection(int(self.commander.pk), int(self.kahn.pk), "status"),
         )
 
+    @covers_requirement(
+        "webclient-party-panel::opening-a-member-s-skills-clears-that-member-s-unread-mark"
+    )
     def test_skills_tab_clears_only_that_members_unread_mark(self):
         self.session.ndb.party_unlocks = {
             int(self.aila.pk): MemberUnlocks(True, frozenset({"t_group_heal"})),
@@ -323,7 +335,8 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         self.assertIs(flags[int(self.kahn.pk)].unread, True)
 
     @covers_requirement(
-        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe",
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session",
     )
     def test_registered_with_the_party_panel_affected_set(self):
         registry = build_production_action_registry()

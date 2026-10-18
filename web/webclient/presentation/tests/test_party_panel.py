@@ -1,12 +1,10 @@
-"""Tests for the version-2 ``party`` presentation panel.
+"""Tests for the version-3 ``party`` presentation panel.
 
 Presenter shape (party-list order, exact row vocabulary, canonical bond-stage
 names only, true-trait HP), empty-party availability, stale-dbid omission,
 unavailable forms, read-only rendering, the pure validator's drift rejections,
 the connected leave/purge push seams, and the identity-join contract against
-the combat participant rows. ``covers_requirement`` annotations for the new
-``webclient-party-panel`` IDs landed at the change's archive/sync commit (the
-checker resolves IDs only from ``openspec/specs/``).
+the combat participant rows.
 """
 
 from contextlib import ExitStack, contextmanager
@@ -464,7 +462,7 @@ class PartyPresenterTests(EvenniaTest):
         }
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_default_gallery_ref_resolves_in_same_snapshot_and_reads_only(self):
         first = _companion("測試同行甲", self.room)
@@ -558,7 +556,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(self.registry.render("party", context), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_two_companion_rows_follow_party_order_and_exact_vocabulary(self):
         first = _companion("薇拉", self.room, hp_current=60, hp_maximum=120)
@@ -660,7 +658,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertNotIn(affinity_value, row.values())
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_gauge_fields_come_from_the_true_traits_under_disguise(self):
         companion = _companion("卡恩", self.room, hp_current=60, hp_maximum=120)
@@ -677,7 +675,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertEqual((row["sp_current"], row["sp_maximum"]), (5, 30))
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_fractional_stored_hp_stays_alive_above_the_floor(self):
         # The knockout predicate compares the unrounded stored value (exactly
@@ -693,7 +691,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertIs(row["knocked_out"], False)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_knocked_out_and_unread_flags_are_truthful(self):
         kahn = _companion("卡恩", self.room, hp_current=1, hp_maximum=120)
@@ -725,7 +723,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertIs(rows[int(self.player.pk)]["knocked_out"], False)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_viewed_member_falls_back_to_the_commander_after_leave_or_delete(self):
         first = _companion("薇拉", self.room)
@@ -760,7 +758,8 @@ class PartyPresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel",
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session",
     )
     def test_possession_keeps_the_viewed_member_selection(self):
         first = _companion("薇拉", self.room)
@@ -777,7 +776,7 @@ class PartyPresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_empty_party_is_available_with_only_the_commander_row(self):
         payload = self._render()
@@ -790,7 +789,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertNotIn("reason", payload)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_stale_membership_dbid_is_omitted_without_error(self):
         companion = _companion("薇拉", self.room)
@@ -804,21 +803,21 @@ class PartyPresenterTests(EvenniaTest):
         validate_party(payload)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_creation_pending_puppet_sees_the_shared_unavailable_form(self):
         self.player.creation_pending = True
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_no_location_puppet_sees_the_shared_unavailable_form(self):
         self.player.location = None
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_full_general_party_renders_and_presenting_twice_is_read_only(self):
         companions = [
@@ -850,7 +849,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertEqual(dict(witness.traits.trait_data), before["traits"])
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_official_selection_presents_without_runtime_cards(self):
         with _official_art_scope() as art:
@@ -883,7 +882,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_mounted_official_default_presents_without_a_gallery_record(self):
         with _official_art_scope() as art:
@@ -909,7 +908,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertIsNone(record_for(subject, create=False))
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_equipment_bound_runtime_card_outranks_the_official_selection(self):
         with _official_art_scope() as art:
@@ -949,7 +948,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_record_default_card_outranks_the_mounted_official_default(self):
         with _official_art_scope() as art:
@@ -983,7 +982,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_personal_selection_outranks_a_coexisting_record_default_card(self):
         with _official_art_scope() as art:
@@ -1028,7 +1027,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_classic_runtime_asset_outranks_the_mounted_official_default(self):
         with _official_art_scope() as art:
@@ -1060,7 +1059,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_admitted_portraitless_companion_keeps_its_reference(self):
         with _official_art_scope():
@@ -1084,7 +1083,7 @@ class PartyPresenterTests(EvenniaTest):
             )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_companion_without_a_named_subject_keeps_its_reference(self):
         with _official_art_scope() as art:
@@ -1104,7 +1103,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_unresolved_retained_selection_falls_through_and_stays_stored(self):
         with _official_art_scope() as art:
@@ -1128,7 +1127,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_repeated_official_presentation_writes_nothing(self):
         with _official_art_scope() as art:
@@ -1143,7 +1142,7 @@ class PartyPresenterTests(EvenniaTest):
             )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_repeated_runtime_default_presentation_writes_nothing(self):
         with _official_art_scope() as art:
@@ -1174,7 +1173,7 @@ class PartyPresenterTests(EvenniaTest):
             )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_repeated_mounted_default_presentation_creates_no_record(self):
         with _official_art_scope() as art:
@@ -1213,7 +1212,7 @@ class PartyValidatorTests(unittest.TestCase):
         }
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_valid_forms_normalize_identically(self):
         # The commander row alone is the available empty party.
@@ -1234,7 +1233,7 @@ class PartyValidatorTests(unittest.TestCase):
             self.assertEqual(validate_party(panel)["slots"][1]["portrait_ref"], ref)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_bounds_only_hp_semantics(self):
         # Zero is legal and no current/maximum cross assertion exists — traits
@@ -1253,7 +1252,7 @@ class PartyValidatorTests(unittest.TestCase):
         ]))
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_extended_shape_accepts_membership_and_beyond_quota_rows(self):
         payload = self._panel([
@@ -1599,7 +1598,8 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes",
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session",
     )
     def test_party_view_member_publishes_one_party_update_before_the_result(self):
         companion = _companion("薇拉", self.room)
