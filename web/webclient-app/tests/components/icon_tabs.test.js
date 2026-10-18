@@ -62,6 +62,19 @@ describe("IconTabs (quest-drawer-ui-primitives)", () => {
     expect(tab("completed").attributes("aria-selected")).toBe("false");
   });
 
+  // webclient-party-window-member-tab: the window frame's labelled variant
+  // draws each label under its icon without changing the accessible name.
+  it("draws visible labels only when asked, keeping the accessible name", () => {
+    mountTabs({ orientation: "horizontal" });
+    expect(wrapper.find(".icon-tabs__label").exists()).toBe(false);
+    wrapper.unmount();
+    mountTabs({ orientation: "horizontal", showLabels: true });
+    expect(wrapper.get('[role="tablist"]').classes()).toContain("icon-tabs--labelled");
+    expect(wrapper.findAll(".icon-tabs__label").map((n) => n.text())).toEqual(["進行中", "已完成", "失敗"]);
+    expect(tab("in_progress").attributes("aria-label")).toBe("進行中（3）");
+    expect(wrapper.get(".icon-tabs__label").attributes("aria-hidden")).toBe("true");
+  });
+
   it("keeps exactly one roving tab stop, on the selected tab", () => {
     mountTabs({ modelValue: "completed" });
     expect(tabindexes()).toEqual(["-1", "0", "-1"]);

@@ -24,6 +24,10 @@ const props = defineProps({
     validator: (value) => ["horizontal", "vertical"].includes(value),
   },
   ariaLabel: { type: String, default: null },
+  // Draw each tab's label under its icon (the party member management
+  // prototype's `.pm-top__label`; webclient-party-window-member-tab). The
+  // label is visible text only: the accessible name stays the tab's own.
+  showLabels: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -135,7 +139,7 @@ function onFocusin(event) {
 <template>
   <div
     class="icon-tabs"
-    :class="`icon-tabs--${orientation}`"
+    :class="[`icon-tabs--${orientation}`, { 'icon-tabs--labelled': showLabels }]"
     role="tablist"
     :aria-label="ariaLabel || undefined"
     :aria-orientation="orientation"
@@ -176,6 +180,7 @@ function onFocusin(event) {
           </svg>
         </slot>
       </span>
+      <span v-if="showLabels" class="icon-tabs__label" aria-hidden="true">{{ tab.label }}</span>
       <span
         v-if="hasCount(tab) && tab.count > 0"
         class="icon-tabs__count"
@@ -270,6 +275,23 @@ function onFocusin(event) {
 .icon-tabs--horizontal .icon-tabs__icon :deep(svg) {
   width: calc(28px * var(--ui-scale));
   height: calc(28px * var(--ui-scale));
+}
+
+/* The labelled variant (prototype `.pm-top__tab`): icon over a small
+   letter-spaced label, the icon a touch smaller to keep the row height. */
+.icon-tabs--labelled .icon-tabs__tab {
+  gap: calc(2px * var(--ui-scale));
+}
+
+.icon-tabs--labelled.icon-tabs--horizontal .icon-tabs__icon :deep(svg) {
+  width: calc(26px * var(--ui-scale));
+  height: calc(26px * var(--ui-scale));
+}
+
+.icon-tabs__label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 .icon-tabs--horizontal .icon-tabs__tab::before {

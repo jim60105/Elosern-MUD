@@ -264,3 +264,21 @@ describe("CompanionLineup in the stage target step", () => {
     wrapper.unmount();
   });
 });
+
+// webclient-party-window-member-tab (design §8): a listed companion figure
+// opens the party window's 成員 tab with that companion; the commander's own
+// figure and every figure during the stage target step carry no such hit.
+describe("CompanionLineup member activation", () => {
+  it("offers a hit only on the listed companions and only outside the target step", async () => {
+    const wrapper = mount(CompanionLineup, { props: { slots: figures(), motionLevel: "off", activatableIds: [2, 3, 4, 5] } });
+    const hits = () => wrapper.findAll('[data-testid="companion-member-hit"]').map((node) => Number(node.attributes("data-identity")));
+    expect(hits()).toEqual([2, 3, 4, 5]);
+    await wrapper.get('[data-testid="companion-member-hit"][data-identity="3"]').trigger("click");
+    expect(wrapper.emitted("activate-member")).toEqual([[3]]);
+    await wrapper.setProps({ targeting: { lit: new Set(["2"]), selectable: new Set(["2"]), selected: new Set() } });
+    expect(hits()).toEqual([]);
+    await wrapper.setProps({ targeting: null, activatableIds: [] });
+    expect(hits()).toEqual([]);
+    wrapper.unmount();
+  });
+});

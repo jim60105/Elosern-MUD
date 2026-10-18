@@ -16,7 +16,7 @@ import EmptyState from "../components/EmptyState.vue";
 import InventoryPanel from "../components/InventoryPanel.vue";
 import LineagePanel from "../components/LineagePanel.vue";
 import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
-import PartyDrawer from "../components/PartyDrawer.vue";
+import PartyWindow from "../components/PartyWindow.vue";
 import QuestDrawer from "../components/QuestDrawer.vue";
 import { glyphPath } from "../components/dock-icons.js";
 import { useElosernStore } from "../stores/elosern.js";
@@ -25,6 +25,7 @@ import {
   LORE_CODEX_PANEL_EMPTY_SAMPLE,
   LORE_CODEX_PANEL_UNAVAILABLE_SAMPLE,
   PARTY_INTERACT_TARGETS_SAMPLE,
+  PARTY_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
   SERVICES_PANEL_PRESENTATION_SAMPLE,
@@ -85,19 +86,30 @@ describe("available-empty versus unavailable drawer lists", () => {
     expect(unavailable.find('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
   });
 
-  it("adds the party's empty guidance above the unchanged 空位 row with its invite control", () => {
-    const w = mount(PartyDrawer, {
-      props: { slots: [], combatParticipants: [], interactTargets: PARTY_INTERACT_TARGETS_SAMPLE, mode: "exploration" },
+  // webclient-party-window-member-tab: the party window replaced the party
+  // drawer. An available, empty party is the commander plus the 空位 entry,
+  // whose invite control is the only call to action; no guidance prose.
+  it("presents an empty party as the commander and the 空位 invite, without guidance prose", async () => {
+    const w = mount(PartyWindow, {
+      attachTo: document.body,
+      props: { party: PARTY_PANEL_EMPTY_SAMPLE, interactTargets: PARTY_INTERACT_TARGETS_SAMPLE, memoryScope: "polish" },
     });
-    const empty = w.get('[data-testid="party-drawer__empty"]');
-    expect(empty.find("button").exists()).toBe(false);
-    const row = w.get('[data-testid="party-drawer__empty-row"]');
-    expect(row.find('[data-testid="party-drawer__invite-btn"]').exists()).toBe(true);
-    expect(empty.element.compareDocumentPosition(row.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    const unavailable = mount(PartyDrawer, { props: { slots: [], available: false, reason: "隊伍資訊目前無法顯示" } });
+    expect(w.findAll('[data-testid^="member-rail__entry--"]').map((n) => n.attributes("data-testid"))).toEqual([
+      "member-rail__entry--42",
+      "member-rail__entry--empty",
+    ]);
+    expect(w.find(".empty-state").exists()).toBe(false);
+    await w.get('[data-testid="member-rail__entry--empty"]').trigger("click");
+    expect(w.get('[data-testid="action-bar__btn--invite"]').attributes("aria-disabled")).toBeUndefined();
+    w.unmount();
+    const unavailable = mount(PartyWindow, {
+      attachTo: document.body,
+      props: { party: { schema_version: 3, available: false, reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" } }, memoryScope: "polish" },
+    });
     expect(unavailable.find(".empty-state").exists()).toBe(false);
-    expect(unavailable.get('[data-testid="party-drawer__unavailable"]').text()).toBe("隊伍資訊目前無法顯示");
+    expect(unavailable.get('[data-testid="party-window__unavailable"]').text()).toBe("隊伍資訊目前無法顯示");
+    unavailable.unmount();
+    document.body.replaceChildren();
   });
 });
 
@@ -226,8 +238,10 @@ describe("drawer art in the client", () => {
     }
     expect(seen.status).toBe(true);
     expect(seen.quest).toBe(false);
+    // The party window (webclient-party-window-member-tab) carries the
+    // viewed member's portrait in its 成員 nameplate, not a drawer column.
     for (const [name, hasArt] of Object.entries(seen)) {
-      expect(hasArt, name).toBe(["status", "inventory", "party"].includes(name));
+      expect(hasArt, name).toBe(["status", "inventory"].includes(name));
     }
   });
 });

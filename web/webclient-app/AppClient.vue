@@ -43,7 +43,8 @@ import ToastQueue from "./components/ToastQueue.vue";
 import CompanionLineup from "./components/CompanionLineup.vue";
 import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./components/companion-lineup.js";
 import { companionRows, portraitFor } from "./components/party-helpers.js";
-import PartyDrawer from "./components/PartyDrawer.vue";
+import PartyWindow from "./components/PartyWindow.vue";
+import { usePartyWindow } from "./composables/use-party-window.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
@@ -81,13 +82,13 @@ const {
   panel, panelAvailable, dispatchIntent, modeChange, modeHydrating,
   dialogueVM, onDialoguePick, onDialogueFreeform, onDialogueLeave,
   onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
-  completionCandidates, possessionBanner, contextAffordances, releaseAffordance,
+  completionCandidates, possessionBanner,
   titleBallotPanel, titleBallotCandidates, onMapMove, showObjectiveTracker,
   skipDisabled, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  controlledActorId, controlledCharacterPanel, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
+  controlledActorId, controlledCharacterPanel, inventoryWalletCopper, inventoryWalletSubtitle, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -110,6 +111,18 @@ const {
   onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
+// The party window (webclient-party-window-member-tab): its openers, the one
+// `party.view_member` per rail selection and the pending entry.
+const { memoryScope: partyWindowScope, pendingMemberId: partyPendingMemberId, onViewMember, openPartyWindow } =
+  usePartyWindow(store, dispatchIntent, { panel });
+// A companion figure on the stage lineup opens 成員 with that companion
+// (design §8): exploration only, outside the stage target step, and never
+// the commander's own figure.
+const lineupActivatableIds = computed(() =>
+  store.view.mode === "exploration" && store.partyAvailable
+    ? companionRows(store.partySlots).map((row) => row.identity)
+    : [],
+);
 // The dialogue host's standing figure (webclient-dialogue-stage-actors D2):
 // the canonical descriptor the committed `dialogue` panel's
 // `host.portrait_ref` names in the committed `art` panel's catalog — so a
@@ -714,7 +727,9 @@ const rootStyle = computed(() => {
             :fallen="fallenMap"
             :fall-instant="modeHydrating"
             :targeting="targeting"
+            :activatable-ids="lineupActivatableIds"
             @target-pointer="onTargetFigure"
+            @activate-member="openPartyWindow"
           />
         </template>
         <!-- The opposite side of the stage (webclient-dialogue-stage-actors
@@ -1182,11 +1197,30 @@ const rootStyle = computed(() => {
       @retry="npcPersonaRetry"
       @close="npcPersonaClose"
     />
+    <!-- The party window (webclient-party-window-member-tab) owns its
+         WindowFrame chrome under the `party` drawer key. -->
+    <PartyWindow
+      v-if="store.view.hudDrawer === 'party'"
+      :party="panel('party')"
+      :party-member="panel('party_member')"
+      :party-inventory="panel('party_inventory')"
+      :character="panel('character')"
+      :lineage="panel('lineage')"
+      :art-panel="panel('art')"
+      :interact-targets="store.explorationInteract"
+      :pending-member-id="partyPendingMemberId"
+      :memory-scope="partyWindowScope"
+      @view-member="onViewMember"
+      @action="onAction"
+      @open-npc-persona="(npcId) => store.openNpcPersonaEditor(npcId)"
+      @persona-edit="onPersonaEdit"
+      @close="onHudDrawerClose"
+    />
     <HudDrawer
-      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona'"
+      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party'"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${companionRows(store.partySlots).length} / 4` : ''))"
+      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : '')"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       :body-flush="store.view.hudDrawer === 'quest'"
@@ -1252,23 +1286,8 @@ const rootStyle = computed(() => {
         :low-hp="store.view.vitals.lowHp"
         :party-available="store.partyAvailable"
         :possessing="isControllingCompanion"
-        @open-party="() => store.openHudDrawer('party')"
+        @open-party="() => openPartyWindow()"
         @open-skill="() => store.openHudDrawer('skill')"
-        @persona-edit="onPersonaEdit"
-      />
-      <PartyDrawer
-        v-else-if="store.view.hudDrawer === 'party'"
-        :slots="store.partySlots"
-        :combat-participants="store.combatParticipants"
-        :art-panel="panel('art')"
-        :interact-targets="store.explorationInteract"
-        :mode="store.view.mode || 'exploration'"
-        :available="store.partyAvailable"
-        :reason="partyReason"
-        :release-affordance="releaseAffordance"
-        :affordances="contextAffordances"
-        @action="onAction"
-        @close="onHudDrawerClose"
       />
       <!-- The book's keyboard guidance is skill-drawer-only: a conditional
            named slot, so the other drawers provide no `foot` slot and render

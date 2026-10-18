@@ -451,100 +451,11 @@ describe("CharacterStatusDrawer full-title line", () => {
     expect(sparse.html()).not.toContain("social_connection");
   });
 
-  it("opens one inline editor and submits exactly one persona-edit intent", async () => {
+  it("shows the persona prose read-only: the editor lives in the party window's 成員 tab", () => {
     const w = mountDrawer();
-    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
-    // The editor textarea is seeded with the committed value.
-    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
-    expect(input.element.value).toBe(
-      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.habit
-    );
-    await input.setValue("  我改過的習慣  ");
-    await w.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
-    // Exactly one intent, trimmed, for the edited field.
-    const events = w.emitted("persona-edit");
-    expect(events).toHaveLength(1);
-    expect(events[0][0]).toEqual({ field: "habit", text: "我改過的習慣" });
-    // The editor closes after submitting.
-    expect(w.find('[data-testid="character-status-drawer__persona-input--habit"]').exists()).toBe(false);
-  });
-
-  it("submits null when the draft is blank and closes on cancel", async () => {
-    const w = mountDrawer();
-    await w.get('[data-testid="character-status-drawer__persona-edit--background"]').trigger("click");
-    await w.get('[data-testid="character-status-drawer__persona-input--background"]').setValue("   ");
-    await w.get('[data-testid="character-status-drawer__persona-submit--background"]').trigger("click");
-    const events = w.emitted("persona-edit");
-    expect(events).toHaveLength(1);
-    expect(events[0][0]).toEqual({ field: "background", text: null });
-    // Cancel path: reopening then cancelling emits nothing.
-    await w.get('[data-testid="character-status-drawer__persona-edit--personality"]').trigger("click");
-    await w.get('[data-testid="character-status-drawer__persona-cancel--personality"]').trigger("click");
-    expect(w.emitted("persona-edit")).toHaveLength(1);
-    expect(w.find('[data-testid="character-status-drawer__persona-input--personality"]').exists()).toBe(false);
-  });
-
-  it("bounds the draft at 600 code points, counting astral characters as one", async () => {
-    const w = mountDrawer();
-    await w.get('[data-testid="character-status-drawer__persona-edit--personality"]').trigger("click");
-    const input = w.get('[data-testid="character-status-drawer__persona-input--personality"]');
-    // 601 astral code points (each 2 UTF-16 units): the code-point bound
-    // truncates to 600 code points, where a UTF-16-unit maxlength would
-    // have cut at 300.
-    await input.setValue("😀".repeat(601));
-    const kept = Array.from(input.element.value).length;
-    expect(kept).toBe(600);
-    await w.get('[data-testid="character-status-drawer__persona-submit--personality"]').trigger("click");
-    const events = w.emitted("persona-edit");
-    expect(events).toHaveLength(1);
-    expect(Array.from(events[0][0].text).length).toBe(600);
-  });
-
-  it("re-seeds an open editor when a refresh changes the edited field", async () => {
-    const w = mountDrawer();
-    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
-    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
-    await input.setValue("我還沒提交的草稿");
-    // A completion publication refreshes habit from elsewhere (e.g. Telnet).
-    await w.setProps({
-      partyMember: {
-        ...PARTY_MEMBER_PANEL_SAMPLE,
-        commander: {
-          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
-          persona: {
-            ...PARTY_MEMBER_PANEL_SAMPLE.commander.persona,
-            habit: "遠端改過的習慣",
-          },
-        },
-      },
-    });
-    // The newer committed value wins over the stale draft.
-    expect(input.element.value).toBe("遠端改過的習慣");
-    await w.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
-    const events = w.emitted("persona-edit");
-    expect(events).toHaveLength(1);
-    expect(events[0][0]).toEqual({ field: "habit", text: "遠端改過的習慣" });
-  });
-
-  it("keeps an untouched open editor stable when other fields refresh", async () => {
-    const w = mountDrawer();
-    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
-    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
-    await input.setValue("我的草稿");
-    await w.setProps({
-      partyMember: {
-        ...PARTY_MEMBER_PANEL_SAMPLE,
-        commander: {
-          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
-          persona: {
-            ...PARTY_MEMBER_PANEL_SAMPLE.commander.persona,
-            personality: "遠端改的個性",
-          },
-        },
-      },
-    });
-    // Only the edited field participates in the refresh check.
-    expect(input.element.value).toBe("我的草稿");
+    expect(w.findAll('[data-testid^="character-status-drawer__persona-edit--"]')).toHaveLength(0);
+    expect(w.find("textarea").exists()).toBe(false);
+    expect(w.findAll('[data-testid^="character-status-drawer__persona-value--"]')).toHaveLength(4);
   });
 
   it("offers no persona edit affordance when party_member is unavailable", () => {

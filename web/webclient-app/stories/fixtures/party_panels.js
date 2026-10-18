@@ -271,3 +271,180 @@ export const PARTY_MEMBER_PANEL_SAMPLE = {
     ],
   },
 };
+// ---------------------------------------------------------------------------
+// webclient-party-window-member-tab: the party window's 成員 tab fixtures.
+// ---------------------------------------------------------------------------
+// A party of the commander, one general companion (蕾娜), one knocked-out
+// general companion (幽) and one temporary escort (蓋文, outside the general
+// quota). The general quota still has room, so the rail ends in 空位.
+export const PARTY_WINDOW_PANEL_SAMPLE = {
+  schema_version: 3,
+  available: true,
+  general_quota: { used: 2, limit: 4 },
+  viewed_member_id: 101,
+  slots: [
+    COMMANDER_ROW,
+    companion({
+      identity: 101,
+      display_name: "蕾娜",
+      portrait_ref: "101",
+      hp_current: 180,
+      hp_maximum: 220,
+      mp_current: 60,
+      mp_maximum: 80,
+      sp_current: 24,
+      sp_maximum: 40,
+      bond_stage: "親睦",
+    }),
+    companion({
+      identity: 102,
+      display_name: "幽",
+      portrait_ref: null,
+      hp_current: 0,
+      hp_maximum: 160,
+      mp_current: 90,
+      mp_maximum: 120,
+      sp_current: 10,
+      sp_maximum: 30,
+      bond_stage: "信賴",
+      knocked_out: true,
+      unread: true,
+    }),
+    companion({
+      identity: 103,
+      display_name: "蓋文",
+      portrait_ref: null,
+      hp_current: 120,
+      hp_maximum: 120,
+      mp_current: 20,
+      mp_maximum: 20,
+      sp_current: 30,
+      sp_maximum: 30,
+      bond_stage: "初識",
+      membership: {
+        general: false,
+        temporary_commissions: [{ quest_id: "escort_caravan", role_id: "guard", label: "護送商隊 ‧ 護衛" }],
+      },
+    }),
+  ],
+};
+
+const descriptor = (action_id, npc_id, reason = null) => ({
+  action_id,
+  params: npc_id === null ? {} : { npc_id },
+  enabled: reason === null,
+  reason,
+});
+
+const NO_INTIMATE = null;
+
+// The viewed companion 蕾娜: every action enabled.
+export const PARTY_MEMBER_COMPANION_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_member",
+  member_id: 101,
+  role: "companion",
+  commander: null,
+  companion: {
+    bond: { stage: "親睦", step: 3, steps: 7 },
+    membership: { general: true, temporary_commissions: [] },
+    intimate: {
+      arousal: "平靜",
+      wetness: "乾燥",
+      shame: "輕微",
+      exposure: "極低",
+      climax_phase: "未達",
+      climax_today: 0,
+    },
+    actions: [
+      descriptor("explore.possess", 101),
+      descriptor("explore.party_leave", 101),
+      descriptor("npc.persona.read", 101),
+    ],
+  },
+};
+
+// 蕾娜 while the player possesses her: the possession slot is the release.
+export const PARTY_MEMBER_POSSESSED_SAMPLE = {
+  ...PARTY_MEMBER_COMPANION_SAMPLE,
+  companion: {
+    ...PARTY_MEMBER_COMPANION_SAMPLE.companion,
+    actions: [
+      descriptor("explore.possess_release", 101),
+      descriptor("explore.party_leave", 101, "請先解除附身，再請同伴離隊。"),
+      descriptor("npc.persona.read", 101, "附身期間無法這麼做。"),
+    ],
+  },
+};
+
+// The knocked-out companion 幽: possession gated with its committed reason.
+export const PARTY_MEMBER_KNOCKED_OUT_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_member",
+  member_id: 102,
+  role: "companion",
+  commander: null,
+  companion: {
+    bond: { stage: "信賴", step: 4, steps: 7 },
+    membership: { general: true, temporary_commissions: [] },
+    intimate: NO_INTIMATE,
+    actions: [
+      descriptor("explore.possess", 102, "對方已失去意識，無法附身。"),
+      descriptor("explore.party_leave", 102),
+      descriptor("npc.persona.read", 102),
+    ],
+  },
+};
+
+// The temporary escort 蓋文: the leave descriptor carries the escort reason.
+export const PARTY_MEMBER_ESCORT_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_member",
+  member_id: 103,
+  role: "companion",
+  commander: null,
+  companion: {
+    bond: { stage: "初識", step: 1, steps: 7 },
+    membership: {
+      general: false,
+      temporary_commissions: [{ quest_id: "escort_caravan", role_id: "guard", label: "護送商隊 ‧ 護衛" }],
+    },
+    intimate: NO_INTIMATE,
+    actions: [
+      descriptor("explore.possess", 103),
+      descriptor("explore.party_leave", 103, "此同伴受委託護送中（escort_caravan），無法請其離隊。"),
+      descriptor("npc.persona.read", 103),
+    ],
+  },
+};
+
+// The party purse (`party_inventory` v1 with an empty bag, for the header).
+export const PARTY_INVENTORY_PURSE_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_inventory",
+  member_id: 42,
+  purse: 1240,
+  equipment: { weapon_main: null, weapon_off: null, armor: null, accessories: [], accessory_limit: 5 },
+  rows: [],
+};
+
+// The 空位's committed invite affordances: an innkeeper whose invite is gated.
+export const PARTY_WINDOW_INVITE_DISABLED_TARGETS = [
+  {
+    identity: 301,
+    display_name: "旅店老闆娘",
+    affordances: [
+      {
+        kind: "action",
+        action_id: "explore.party_invite",
+        label: "邀請",
+        enabled: false,
+        disabled_reason: { code: "bond_too_low", message: "羈絆不足，對方不願同行。" },
+      },
+    ],
+  },
+];

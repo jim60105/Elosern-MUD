@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
-const PRIMITIVES = ["WindowFrame", "MemberRail", "ListDetail", "ActionBar", "HoldingsStrip"];
+// The party window and its 成員 tab (webclient-party-window-member-tab) are
+// held to the same sizing and motion rules as the primitives they compose.
+const PRIMITIVES = ["WindowFrame", "MemberRail", "ListDetail", "ActionBar", "HoldingsStrip", "PartyWindow", "PartyMemberTab"];
 
 function source(name) {
   return readFileSync(join(APP_ROOT, `components/${name}.vue`), "utf8");
