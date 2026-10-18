@@ -16,7 +16,7 @@ order, so a branch-or-merge content drop upgrades every renderer without a
 contract change (design §9.1).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import isfinite
 from typing import Any
@@ -28,7 +28,11 @@ from world.rules.progression import (
     missing_prerequisite,
     proficiency_cap,
 )
-from world.skills.registry import SKILL_REGISTRY, prerequisite_consumers
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    declared_prerequisites,
+    prerequisite_consumers,
+)
 from world.skills.eligibility import skill_identity_eligible
 
 # Wire bound for every rendered lineage text (design DD1): mirrors the panel
@@ -40,6 +44,11 @@ from world.skills.eligibility import skill_identity_eligible
 # label can never fail the panel closed for every player. The panel mirror
 # pins this constant's value against its own cap.
 LINEAGE_TEXT_WIRE_MAX = 128
+
+#: The read model's bound on each side of a lineage position (the selected
+#: skill's prerequisites and its immediate consumers). The wire validator in
+#: ``web/webclient/presentation/character.py`` pins the same value.
+MAX_LINEAGE_POSITION_ROWS = 8
 
 
 def _fit_wire_text(label: str, threshold: int) -> str:
@@ -109,6 +118,42 @@ class LineageView:
     total_count: int
 
 
+@dataclass(frozen=True)
+class ProficiencyProgress:
+    """One skill's derived proficiency state (the panel's compact growth facts).
+
+    ``xp_into_level`` and ``xp_to_next_level`` are the same band values the
+    lineage node reports, so the proficiency meter and the 系譜 tab can never
+    disagree. A capped skill reports ``xp_to_next_level`` zero.
+    """
+
+    level: int
+    xp_into_level: float
+    xp_to_next_level: float
+    capped: bool
+
+
+@dataclass(frozen=True)
+class LineagePositionEdge:
+    """One lineage edge at the selected skill's position: key, label, level."""
+
+    skill_key: str
+    display_name_zh: str
+    level: int
+
+
+@dataclass(frozen=True)
+class LineagePositionView:
+    """The selected skill's declared prerequisites and its next unlocks.
+
+    Each side is bounded to :data:`MAX_LINEAGE_POSITION_ROWS`; ``next`` keeps
+    only consumers the entity's stored identity may ever own.
+    """
+
+    prerequisites: tuple[LineagePositionEdge, ...]
+    next: tuple[LineagePositionEdge, ...]
+
+
 def _proficiency_map(entity: Any) -> dict[str, float]:
     """Return the validated stored proficiency map, failing closed on junk.
 
@@ -136,6 +181,45 @@ def _proficiency_map(entity: Any) -> dict[str, float]:
             raise LineageQueryError(f"proficiency entry {key!r} is not valid")
         validated[key] = number
     return validated
+
+
+def _progress_from_stored(stored: float, skill_key: str) -> ProficiencyProgress:
+    """Derive one skill's proficiency progress from its stored XP.
+
+    The single computation both the lineage node and the character panel's
+    growth facts read, so the proficiency meter and the 系譜 tab agree. The
+    level is whole levels of ``SKILL_PROFICIENCY_XP_PER_LEVEL``; ``capped`` is
+    the derived tip cap being reached.
+    """
+    level = int(stored // SKILL_PROFICIENCY_XP_PER_LEVEL)
+    capped = level >= proficiency_cap(skill_key)
+    xp_into_level = stored - level * SKILL_PROFICIENCY_XP_PER_LEVEL
+    return ProficiencyProgress(
+        level=level,
+        xp_into_level=xp_into_level,
+        xp_to_next_level=(
+            0.0 if capped else SKILL_PROFICIENCY_XP_PER_LEVEL - xp_into_level
+        ),
+        capped=capped,
+    )
+
+
+def proficiency_progress_for_keys(
+    entity: Any, keys: Sequence[str]
+) -> dict[str, ProficiencyProgress]:
+    """Return the progress of each requested registry key in one read.
+
+    The stored proficiency record is validated once (the same fail-closed read
+    every lineage view uses) and each requested key is derived from it. Keys
+    absent from the registry are not returned: no proficiency band exists for a
+    row the registry cannot resolve. Never writes entity state.
+    """
+    xp = _proficiency_map(entity)
+    return {
+        key: _progress_from_stored(xp.get(key, 0.0), key)
+        for key in keys
+        if key in SKILL_REGISTRY
+    }
 
 
 def _chain_root_keys() -> tuple[str, ...]:
@@ -200,11 +284,7 @@ def _chain_label(root_key: str) -> str:
 
 def _node_view(entity: Any, skill_key: str, owned: set, xp: dict[str, float]) -> LineageNodeView:
     skill = SKILL_REGISTRY[skill_key]
-    stored = xp.get(skill_key, 0.0)
-    level = int(stored // SKILL_PROFICIENCY_XP_PER_LEVEL)
-    cap = proficiency_cap(skill_key)
-    capped = level >= cap
-    xp_into_level = stored - level * SKILL_PROFICIENCY_XP_PER_LEVEL
+    progress = _progress_from_stored(xp.get(skill_key, 0.0), skill_key)
     prereq = missing_prerequisite(entity, skill)
     prereq_text = ""
     if prereq is not None:
@@ -215,10 +295,10 @@ def _node_view(entity: Any, skill_key: str, owned: set, xp: dict[str, float]) ->
         display_name_zh=skill.label,
         owned=skill_key in owned,
         usable=can_use_skill(entity, skill),
-        level=level,
-        xp_into_level=xp_into_level,
-        xp_to_next_level=0.0 if capped else SKILL_PROFICIENCY_XP_PER_LEVEL - xp_into_level,
-        capped=capped,
+        level=progress.level,
+        xp_into_level=progress.xp_into_level,
+        xp_to_next_level=progress.xp_to_next_level,
+        capped=progress.capped,
         prereq_text_zh=prereq_text,
     )
 
@@ -274,4 +354,45 @@ def build_lineage_view(entity: Any) -> LineageView:
         chains=tuple(chains),
         completed_count=sum(1 for chain in chains if chain.consumed),
         total_count=len(chains),
+    )
+
+
+def lineage_position_for(entity: Any, skill_key: str) -> LineagePositionView:
+    """Return one skill's lineage position: prerequisites and next unlocks.
+
+    ``prerequisites`` are the skill's declared edges in registry order, each
+    naming the prerequisite's label and the proficiency level it demands.
+    ``next`` are the reverse-edge consumers, ascending by threshold, filtered
+    to the consumers this entity's stored identity may ever own (the same
+    identity eligibility every lineage read applies) — an unownable row is not
+    an unlock the member could reach. Both sides are bounded to
+    :data:`MAX_LINEAGE_POSITION_ROWS`. An unknown key raises
+    :class:`LineageQueryError`; the function never writes entity state.
+    """
+    if skill_key not in SKILL_REGISTRY:
+        raise LineageQueryError(f"unknown skill {skill_key!r}")
+    prerequisites = tuple(
+        LineagePositionEdge(
+            skill_key=edge.skill_key,
+            display_name_zh=SKILL_REGISTRY[edge.skill_key].label,
+            level=edge.min_proficiency,
+        )
+        for edge in declared_prerequisites(skill_key)[:MAX_LINEAGE_POSITION_ROWS]
+    )
+    next_rows: list[LineagePositionEdge] = []
+    for consumer_key, min_level in prerequisite_consumers(skill_key):
+        consumer = SKILL_REGISTRY.get(consumer_key)
+        if consumer is None or not skill_identity_eligible(entity, consumer):
+            continue
+        next_rows.append(
+            LineagePositionEdge(
+                skill_key=consumer_key,
+                display_name_zh=consumer.label,
+                level=min_level,
+            )
+        )
+        if len(next_rows) == MAX_LINEAGE_POSITION_ROWS:
+            break
+    return LineagePositionView(
+        prerequisites=prerequisites, next=tuple(next_rows)
     )

@@ -8,7 +8,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The character panel is an exact read-only version-9 panel
-The production presentation registry SHALL register panel name `character` at schema version 9 with `available` true and `kind` `character`, built for the session's viewed party member (falling back to the commander) in exploration and combat, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `member_id`, `traits`, `conditions`, `actives`, `passives`, `equipment`, `disguise`, `guild`, and `wallet`, plus the optional `full_title`. Persona prose and intimate state SHALL NOT appear; `party_member` publishes them.
+The production presentation registry SHALL register panel name `character` at schema version 9 with `available` true and `kind` `character`, built for the session's viewed party member (falling back to the commander) in exploration and combat, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `member_id`, `traits`, `conditions`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, and `selected_skill`, plus the optional `full_title`. Persona prose and intimate state SHALL NOT appear; `party_member` publishes them.
 
 #### Scenario: Expanded state shows true values and an honest disguise
 - **WHEN** an elf with active disguise opens the Character root
@@ -112,18 +112,22 @@ The production presentation registry SHALL register panel name `character` at sc
 ## ADDED Requirements
 
 ### Requirement: Character active skill rows carry compact growth facts
-Each active skill row of the version-9 `character` panel SHALL add only the member's proficiency `level`, `xp_into_level`, `xp_to_next_level`, `capped`, the session `fresh` flag (skill in the member's recent-unlock set) and the `booked` flag (the member's standing practice booking); a maximal payload (every row at its cap with every other section at its cap) SHALL stay within the canonical byte bound.
+Each active skill row of the version-9 `character` panel SHALL carry exactly the member's proficiency `level`, `xp_into_level`, `xp_to_next_level`, `capped`, the session `fresh` flag (skill in the member's recent-unlock set) and the `booked` flag (the member's standing practice booking); no other growth field is added.
 
 #### Scenario: A newly unlocked skill is fresh
 - **WHEN** 艾拉 unlocked 群體治癒 this session and the viewed member is 艾拉
-- **THEN** the 群體治癒 row has `fresh: true` and level 1, and after a reconnect it has `fresh: false`
+- **THEN** the 群體治癒 row has `fresh: true` and level 0 (the unlock made it usable; it holds no own practice XP yet), and after a reconnect it has `fresh: false`
 
 #### Scenario: A booked skill is flagged
 - **WHEN** the viewed member has a standing booking for 冰錐術
 - **THEN** only the 冰錐術 row has `booked: true`
 
+#### Scenario: An unregistered key reports zero-valued growth facts
+- **WHEN** an owned active key has no skill-registry row
+- **THEN** its row carries `level: 0`, `xp_into_level: 0`, `xp_to_next_level: 0`, `capped: false`, and the member's own `fresh` and `booked` facts, and no registry-backed detail field
+
 #### Scenario: The maximal payload fits
-- **WHEN** a fixture fills every row and section to its cap
+- **WHEN** a fixture fills every section with every row count at its cap and a full `selected_skill`
 - **THEN** the serialized `character` payload is at most 65,536 bytes
 
 ### Requirement: The selected skill carries lineage position and the freeform ladder
@@ -137,8 +141,12 @@ The version-9 `character` panel SHALL carry `selected_skill`: null unless the se
 `selected_skill.freeform_ladder` SHALL be present only when the viewed member owns the element's mastery and the skill is freeform-eligible, and SHALL list all five canonical rungs (1/4, 1/2, 1, 2, 4), each carrying either its server-computed MP cost (unlocked) or the proficiency level that unlocks it (locked), never both.
 
 #### Scenario: A master sees locked rungs with their level
-- **WHEN** 艾拉 owns ice mastery, the selected skill is 冰錐術 at level 2 and rung 2 unlocks at level 6
+- **WHEN** 艾拉 owns ice mastery, the selected skill is 冰錐術 at level 3 and rung 2 unlocks at level 6
 - **THEN** rungs 1/4, 1/2 and 1 carry MP costs and rungs 2 and 4 carry their unlock levels
+
+#### Scenario: A capped skill keeps its unreachable rungs locked
+- **WHEN** the selected skill's derived tip cap sits below a canonical rung's unlock level
+- **THEN** that rung still appears in `freeform_ladder` carrying its canonical unlock level and never an MP cost, so the advertised unlocked set stays exactly the resolver's
 
 #### Scenario: A non-master sees no ladder
 - **WHEN** the viewed member does not own the element's mastery

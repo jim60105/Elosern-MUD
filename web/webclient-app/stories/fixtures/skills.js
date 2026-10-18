@@ -4,14 +4,13 @@
 // payload's actives/passives grouping, with the rows the C1 getter backs from
 // the character presenter's registry enrichment — `cost` (a bounded object,
 // the empty object being the free form), `target_spec`, the
-// `usable_out_of_combat` boolean, and the optional `freeform_scales` array
-// (the exact optional fields the character row validator accepts). Rows the
-// getter has no descriptor for stay the
-// character payload's own `{key, label}` shape: `flee` shows the free-cost
-// form, and the unregistered-key `legacy_stance` row (the character payload's
-// own unknown-key degradation) proves detail cells render only when the
-// backing data provides the field.
-export const SKILLS_SLICE_SAMPLE = {
+// `usable_out_of_combat` boolean, plus the six v9 growth facts every active
+// row carries. Rows the getter has no descriptor for stay the character
+// payload's own identity shape with zero-valued growth facts: `flee` shows the
+// free-cost form, and the unregistered-key `legacy_stance` row (the character
+// payload's own unknown-key degradation) proves detail cells render only when
+// the backing data provides the field.
+const SKILLS_SLICE_BASE = {
   actives: [
     {
       category: "elemental_magic",
@@ -34,13 +33,6 @@ export const SKILLS_SLICE_SAMPLE = {
               cost: { mp: 14 },
               target_spec: "single",
               usable_out_of_combat: false,
-              freeform_scales: [
-                { scale: 0.25, label: "1/4", mp_cost: 4 },
-                { scale: 0.5, label: "1/2", mp_cost: 7 },
-                { scale: 1, label: "1", mp_cost: 14 },
-                { scale: 2, label: "2", mp_cost: 28 },
-                { scale: 4, label: "4", mp_cost: 56 },
-              ],
             },
             {
               key: "firestorm",
@@ -167,4 +159,58 @@ export const SKILLS_SLICE_SAMPLE = {
       ],
     },
   ],
+};
+
+// One v9 active row: the six growth facts are required on every row, so the
+// fixture's registry-resolvable rows carry a plausible band and the
+// unregistered `legacy_stance` row carries the required zero baseline.
+function withGrowthFacts(row) {
+  if (!("cost" in row)) {
+    return {
+      ...row,
+      level: 0,
+      xp_into_level: 0,
+      xp_to_next_level: 0,
+      capped: false,
+      fresh: false,
+      booked: false,
+    };
+  }
+  return {
+    ...row,
+    level: 1,
+    xp_into_level: 10,
+    xp_to_next_level: 40,
+    capped: false,
+    fresh: false,
+    booked: false,
+  };
+}
+
+export const SKILLS_SLICE_SAMPLE = {
+  ...SKILLS_SLICE_BASE,
+  // The panel's viewed member: the book names it in practice bookings and in
+  // the 技能-tab selection request.
+  member_id: 42,
+  // The one server-selected skill (chosen through `party.view_member`): its
+  // lineage position and ladder ride here, never on the rows. Rungs above the
+  // member's proficiency carry their unlock level instead of a cost.
+  selected_skill: {
+    key: "fireball",
+    lineage: { prerequisites: [], next: [] },
+    freeform_ladder: [
+      { scale: 0.25, label: "1/4", mp_cost: 4 },
+      { scale: 0.5, label: "1/2", mp_cost: 7 },
+      { scale: 1, label: "1", mp_cost: 14 },
+      { scale: 2, label: "2", unlock_level: 6 },
+      { scale: 4, label: "4", unlock_level: 10 },
+    ],
+  },
+  actives: SKILLS_SLICE_BASE.actives.map((category) => ({
+    ...category,
+    groups: category.groups.map((group) => ({
+      ...group,
+      skills: group.skills.map(withGrowthFacts),
+    })),
+  })),
 };

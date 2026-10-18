@@ -421,7 +421,7 @@ function validCharacterTraitRow(overrides) {
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "character",
       member_id: 101,
@@ -460,7 +460,22 @@ function validCharacterPanel(overrides) {
           category: "elemental_magic",
           label: "元素魔法",
           groups: [
-            { group: "fire", label: T_FIRE_LABEL, skills: [{ key: T_SKILL, label: T_SKILL_LABEL }] },
+            {
+              group: "fire",
+              label: T_FIRE_LABEL,
+              skills: [
+                {
+                  key: T_SKILL,
+                  label: T_SKILL_LABEL,
+                  level: 2,
+                  xp_into_level: 10,
+                  xp_to_next_level: 40,
+                  capped: false,
+                  fresh: false,
+                  booked: false,
+                },
+              ],
+            },
           ],
         },
       ],
@@ -483,6 +498,7 @@ function validCharacterPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
+      selected_skill: null,
     },
     overrides || {}
   );

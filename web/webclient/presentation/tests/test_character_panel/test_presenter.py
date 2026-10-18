@@ -14,6 +14,7 @@ from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.party import join_party
 from world.rules.status_query import StatusQueryError
+from world.rules.unlock_notices import MemberUnlocks
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from ._support import (
     BRANCH,
@@ -75,17 +76,21 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return build_production_registry()
 
 
-    def _render(self, *, actor=None, member=None):
+    def _render(self, *, actor=None, member=None, unlocks=None, skill_key=None, tab="status"):
         """Render the panel for ``member`` as the session's viewed member."""
+        viewed = member or self.player
         selection = (
             None
-            if member is None
-            else PartyViewSelection(int(self.player.pk), int(member.pk), "status")
+            if member is None and skill_key is None
+            else PartyViewSelection(
+                int(self.player.pk), int(viewed.pk), tab, skill_key
+            )
         )
         context = PresentationContext(
             actor=actor or self.player,
             protocol_version=1,
             party_view=selection,
+            unlocks=unlocks or {},
         )
         return self._registry().render("character", context)
 
@@ -110,7 +115,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             self.assertNotIn(T_STEADY, _flattened_keys(payload["passives"]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -210,8 +215,151 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             ],
         )
 
+    def _active_row(self, payload, key):
+        return next(
+            row
+            for category in payload["actives"]
+            for group in category["groups"]
+            for row in group["skills"]
+            if row["key"] == key
+        )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    def test_active_rows_carry_the_member_proficiency_band(self):
+        self.player.db.skill_proficiency = {T_EMBER: 60.0}
+        payload = self._render()
+        row = self._active_row(payload, T_EMBER)
+        self.assertEqual(row["level"], 1)
+        self.assertEqual(row["xp_into_level"], 10.0)
+        self.assertEqual(row["xp_to_next_level"], 40.0)
+        self.assertIs(row["capped"], False)
+        # The band is derived from the stored proficiency exactly as the
+        # lineage read does (the rules test pins that single computation).
+        self.assertEqual(row["xp_into_level"] + row["xp_to_next_level"], 50.0)
+
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    def test_a_capped_row_reports_a_zero_next_level_band(self):
+        self.player.db.skill_proficiency = {T_EMBER: 500.0}
+        row = self._active_row(self._render(), T_EMBER)
+        self.assertEqual(row["level"], 10)
+        self.assertIs(row["capped"], True)
+        self.assertEqual(row["xp_to_next_level"], 0)
+
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    def test_a_newly_unlocked_skill_is_fresh_only_in_that_session(self):
+        member_id = int(self.player.pk)
+        fresh = self._render(
+            unlocks={member_id: MemberUnlocks(True, frozenset({T_EMBER}))}
+        )
+        fresh_row = self._active_row(fresh, T_EMBER)
+        self.assertIs(fresh_row["fresh"], True)
+        # The unlock made the skill usable; it holds no own practice XP yet.
+        self.assertEqual(fresh_row["level"], 0)
+        other_active = _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY")
+        self.assertIs(self._active_row(fresh, other_active)["fresh"], False)
+        # A reconnect starts a new session: the copied unlock snapshot is empty.
+        self.assertIs(self._active_row(self._render(unlocks={}), T_EMBER)["fresh"], False)
+
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    def test_only_the_booked_skill_is_flagged(self):
+        self.player.db.practice_booking = T_EMBER
+        payload = self._render()
+        self.assertIs(self._active_row(payload, T_EMBER)["booked"], True)
+        for key in _flattened_keys(payload["actives"]):
+            if key != T_EMBER:
+                self.assertIs(self._active_row(payload, key)["booked"], False, key)
+
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    def test_an_unregistered_active_key_reports_zero_growth_facts(self):
+        skills = dict(self.player.db.skills)
+        skills["active"] = [*skills.get("active", []), "t_unknown_active"]
+        self.player.db.skills = skills
+        payload = self._render()
+        row = self._active_row(payload, "t_unknown_active")
+        self.assertEqual(
+            {key: row[key] for key in ("level", "xp_into_level", "xp_to_next_level", "capped")},
+            {"level": 0, "xp_into_level": 0, "xp_to_next_level": 0, "capped": False},
+        )
+        self.assertNotIn("cost", row)
+        self.assertNotIn("target_spec", row)
+        self.assertNotIn("usable_out_of_combat", row)
+
+    def test_growth_facts_never_write_proficiency(self):
+        self.player.db.skill_proficiency = {T_EMBER: 60.0}
+        before = dict(self.player.db.skill_proficiency)
+        payload = self._render()
+        self.assertIs(payload["available"], True)
+        self.assertEqual(dict(self.player.db.skill_proficiency), before)
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_the_selected_skill_carries_its_lineage_position(self):
+        selected = self._render(skill_key=T_EMBER, tab="skills")["selected_skill"]
+        self.assertEqual(selected["key"], T_EMBER)
+        self.assertEqual(selected["lineage"], {"prerequisites": [], "next": []})
+        # A non-master sees no ladder at all (the field is omitted).
+        self.assertNotIn("freeform_ladder", selected)
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
+    def test_a_mastery_owner_sees_the_full_ladder_with_locked_rungs(self):
+        grant_lineage(
+            self.player,
+            [T_EMBER],
+            [T_STEADY, _element_mastery_key()],
+            rungs={T_EMBER: 3},
+        )
+        ladder = self._render(skill_key=T_EMBER)["selected_skill"]["freeform_ladder"]
+        self.assertEqual(
+            [rung["scale"] for rung in ladder], [0.25, 0.5, 1.0, 2.0, 4.0]
+        )
+        # The kit burst's Lv.3 ceiling unlocks 0.25/0.5/1.0 only; each rung
+        # scales the actor's effective cost (12 MP minus the kit dagger's 5%).
+        self.assertEqual([rung["mp_cost"] for rung in ladder[:3]], [3, 6, 11])
+        self.assertEqual([rung["unlock_level"] for rung in ladder[3:]], [6, 10])
+        for rung in ladder:
+            self.assertNotEqual("mp_cost" in rung, "unlock_level" in rung)
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_an_unowned_or_unknown_selection_reports_null(self):
+        # A passive, an unowned active key and an unregistered key all publish
+        # no detail (the panel never invents one for another member's skill).
+        for key in (T_STEADY, "no_such_skill"):
+            with self.subTest(key=key):
+                self.assertIsNone(self._render(skill_key=key)["selected_skill"])
+
+    def test_a_departed_members_selection_never_follows_the_commander(self):
+        companion = self._companion()
+        companion.db.skills = {"active": [T_EMBER], "passive": []}
+        selected = self._render(member=companion, skill_key=T_EMBER)["selected_skill"]
+        self.assertEqual(selected["key"], T_EMBER)
+        from world.rules.party import leave_party
+
+        leave_party(companion, self.player, "dismissal")
+        fallback = self._render(member=companion, skill_key=T_EMBER)
+        self.assertEqual(fallback["member_id"], int(self.player.pk))
+        # The commander owns the same key, but the selection named the
+        # departed member: the detail must not attach to the fallback member.
+        self.assertIsNone(fallback["selected_skill"])
+
+    def test_possession_keeps_the_selected_skill(self):
+        from world.rules.possession import enter_possession, release_possession
+
+        companion = self._companion()
+        companion.db.skills = {"active": [T_EMBER], "passive": []}
+        before = self._render(member=companion, skill_key=T_EMBER)
+        possessor = self._companion("卡恩")
+        self.player.location = self.room1
+        enter_possession(self.player, possessor)
+        try:
+            while_possessing = self._render(
+                actor=possessor, member=companion, skill_key=T_EMBER
+            )
+        finally:
+            release_possession(self.player)
+        self.assertEqual(while_possessing, before)
+
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -228,7 +376,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(atk["current"], atk["effective"])
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -253,7 +401,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["merit"], 60)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()
@@ -268,7 +416,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_persona_record_never_leaks_into_the_payload(self):
         self.player.db.persona = {
             "identity": {"public_view": {"name": "甲"}},
@@ -305,7 +453,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return companion
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_the_panel_follows_the_viewed_companion(self):
         companion = self._companion()
         payload = self._render(member=companion)
@@ -325,7 +473,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(fallback["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_the_payload_is_identical_with_and_without_possession(self):
         from world.rules.possession import enter_possession, release_possession
 
@@ -341,7 +489,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(while_possessing, before)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_combat_keeps_the_panel_available(self):
         from typeclasses.monsters import Monster
 
@@ -358,7 +506,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_conditions_carry_buff_and_indefinite_rule_rows(self):
         from types import SimpleNamespace
 
@@ -479,46 +627,22 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
                     self.assertEqual(set(r), {"key", "label"})
 
 
-    def test_freeform_scales_populated_for_mastery_holder(self):
-        # The kit burst's derived tip cap is Lv.3 (the file-local mastery
-        # passive's consuming edge), so the ladder can never unlock above
-        # the 1.0 rung for it (use-driven-skill-lineage D6: a ceiling is
-        # the max consuming edge). Entitlement is the registry-idiom
-        # element-mastery passive ownership (direct, never conferred); the
-        # entitlement query never resolves the row through the catalog, and
-        # the ladder's mp_costs scale the burst's own registered cost.
-        grant_lineage(
-            self.player,
-            [T_EMBER],
-            [T_STEADY, _element_mastery_key()],
-            rungs={T_EMBER: 3},
-        )
-        payload = self._render()
-        row = next(
-            r
-            for c in payload["actives"]
-            for g in c["groups"]
-            for r in g["skills"]
-            if r["key"] == T_EMBER
-        )
-        # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0. Each rung
-        # scales the actor's EFFECTIVE cost: the kit burst declares 12 MP and
-        # the equipped kit dagger adjusts it by −5%, so the base the rungs
-        # scale is 11 and the rounded rungs are 3, 6 and 11.
-        self.assertEqual(row["cost"], {"mp": 11})
-        self.assertEqual(
-            [entry["mp_cost"] for entry in row["freeform_scales"]],
-            [3, 6, 11],
-        )
-
-
     def test_unregistered_active_key_stays_bare_in_presenter(self):
         self.player.db.skills = {"active": ["no_such_skill"], "passive": []}
         payload = self._render()
         fallback = next(c for c in payload["actives"] if c["category"] == "unknown")
         self.assertEqual(
             fallback["groups"][0]["skills"][0],
-            {"key": "no_such_skill", "label": "no_such_skill"},
+            {
+                "key": "no_such_skill",
+                "label": "no_such_skill",
+                "level": 0,
+                "xp_into_level": 0,
+                "xp_to_next_level": 0,
+                "capped": False,
+                "fresh": False,
+                "booked": False,
+            },
         )
 
 
@@ -555,7 +679,19 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             set(row),
-            {"key", "label", "cost", "target_spec", "usable_out_of_combat"},
+            {
+                "key",
+                "label",
+                "level",
+                "xp_into_level",
+                "xp_to_next_level",
+                "capped",
+                "fresh",
+                "booked",
+                "cost",
+                "target_spec",
+                "usable_out_of_combat",
+            },
         )
         # The declared 12 MP carries the equipped kit dagger's −5% adjustment
         # like every other presented row.

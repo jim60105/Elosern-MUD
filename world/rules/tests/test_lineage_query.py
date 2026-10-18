@@ -8,6 +8,7 @@ before and after every build.
 """
 
 import copy
+import dataclasses
 import unittest
 from types import SimpleNamespace
 
@@ -15,8 +16,11 @@ from tools.spec_traceability import covers_requirement
 
 
 from world.rules.lineage_query import (
+    MAX_LINEAGE_POSITION_ROWS,
     LineageQueryError,
     build_lineage_view,
+    lineage_position_for,
+    proficiency_progress_for_keys,
 )
 from world.rules.progression import (
     PROFICIENCY_TIP_CAP,
@@ -26,6 +30,7 @@ from world.rules.progression import (
 from world.skills.registry import (
     SkillCategory,
     SkillDef,
+    SkillEligibility,
     SkillKind,
     SkillPrerequisite,
     TargetSpec,
@@ -400,3 +405,99 @@ class InjectedGraphTests(_TreeScopeMixin, unittest.TestCase):
         self.assertIn("duck_b", by_root)
         self.assertEqual(by_root["duck_a"].nodes[-1].skill_key, "duck_c")
         self.assertEqual(by_root["duck_b"].nodes[-1].skill_key, "duck_c")
+
+
+class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
+    """The selected skill's prerequisite and next-unlock position."""
+
+    def _merge_registry(self):
+        """a -> c <- b, with c's thresholds distinct so order is observable."""
+        extras = {
+            "duck_a": _fake_skill("duck_a"),
+            "duck_b": _fake_skill("duck_b"),
+            "duck_c": _fake_skill(
+                "duck_c",
+                (SkillPrerequisite("duck_a", 1), SkillPrerequisite("duck_b", 4)),
+            ),
+        }
+        live_skill_registry().update(extras)
+        _revalidate_live()
+        return extras
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_merge_node_reports_both_prerequisites_and_no_next_unlock(self):
+        extras = self._merge_registry()
+        position = lineage_position_for(_entity(), "duck_c")
+        self.assertEqual(
+            [(edge.skill_key, edge.display_name_zh, edge.level) for edge in position.prerequisites],
+            [
+                ("duck_a", extras["duck_a"].label, 1),
+                ("duck_b", extras["duck_b"].label, 4),
+            ],
+        )
+        self.assertEqual(position.next, ())
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_root_reports_its_consumers_as_next_unlocks(self):
+        extras = self._merge_registry()
+        position = lineage_position_for(_entity(), "duck_a")
+        self.assertEqual(position.prerequisites, ())
+        self.assertEqual(
+            [(edge.skill_key, edge.display_name_zh, edge.level) for edge in position.next],
+            [("duck_c", extras["duck_c"].label, 1)],
+        )
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_identity_ineligible_consumers_are_not_advertised(self):
+        registry_extras = {
+            "duck_a": _fake_skill("duck_a"),
+            "duck_monster": dataclasses.replace(
+                _fake_skill("duck_monster", (SkillPrerequisite("duck_a", 2),)),
+                eligibility=SkillEligibility(allowed_actor_kinds=("monster",)),
+            ),
+        }
+        live_skill_registry().update(registry_extras)
+        _revalidate_live()
+        # The stub entity has no actor kind, so a monster-only row is unownable
+        # and never appears as a next unlock.
+        self.assertEqual(lineage_position_for(_entity(), "duck_a").next, ())
+
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    def test_each_side_is_bounded_to_the_position_rows(self):
+        extras = {"duck_a": _fake_skill("duck_a")}
+        for index in range(MAX_LINEAGE_POSITION_ROWS + 2):
+            extras[f"duck_fan_{index}"] = _fake_skill(
+                f"duck_fan_{index}", (SkillPrerequisite("duck_a", index + 1),)
+            )
+        live_skill_registry().update(extras)
+        _revalidate_live()
+        position = lineage_position_for(_entity(), "duck_a")
+        self.assertEqual(len(position.next), MAX_LINEAGE_POSITION_ROWS)
+        # Ascending thresholds: the first rows are the reachable low ones.
+        self.assertEqual([edge.level for edge in position.next], list(range(1, 9)))
+
+    def test_unknown_key_fails_closed(self):
+        with self.assertRaises(LineageQueryError):
+            lineage_position_for(_entity(), "no_such_lineage_skill")
+
+    def test_progress_matches_the_lineage_node_band(self):
+        proficiency = {"t_tree_branch": _level_xp(4, 23.0)}
+        progress = proficiency_progress_for_keys(
+            _entity(TREE_CLOSURE, proficiency), ["t_tree_branch"]
+        )
+        node = next(
+            node
+            for chain in build_lineage_view(_entity(TREE_CLOSURE, proficiency)).chains
+            for node in chain.nodes
+            if node.skill_key == "t_tree_branch"
+        )
+        row = progress["t_tree_branch"]
+        self.assertEqual(
+            (row.level, row.xp_into_level, row.xp_to_next_level, row.capped),
+            (node.level, node.xp_into_level, node.xp_to_next_level, node.capped),
+        )
+        # A registry-unresolvable key has no proficiency band at all.
+        self.assertNotIn(
+            "no_such_lineage_skill",
+            proficiency_progress_for_keys(_entity(), ["no_such_lineage_skill"]),
+        )

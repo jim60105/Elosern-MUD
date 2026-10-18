@@ -72,13 +72,21 @@ const stripCost = computed(() => {
   if (entry && entry.mp_cost != null) {
     return `MP ${entry.mp_cost}`;
   }
+  // A locked rung (the character panel's ladder) names the proficiency level
+  // that unlocks it instead of a cost it cannot pay yet.
+  if (entry && entry.unlock_level != null) {
+    return `熟練度 Lv.${entry.unlock_level}`;
+  }
   return costText.value;
 });
-// Every scale's cost, for the strip's full text (the step's rows show them).
+// Every scale's cost (or lock level), for the strip's full text.
 const scalesText = computed(() =>
   props.scales
-    .filter((entry) => entry.mp_cost != null)
-    .map((entry) => `威力×${entry.label || entry.scale} MP ${entry.mp_cost}`)
+    .map((entry) =>
+      entry.mp_cost != null
+        ? `威力×${entry.label || entry.scale} MP ${entry.mp_cost}`
+        : `威力×${entry.label || entry.scale} 熟練度 Lv.${entry.unlock_level}`,
+    )
     .join("、"),
 );
 const stripTitle = computed(() =>

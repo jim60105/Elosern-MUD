@@ -1,4 +1,4 @@
-"""Exact schema-version-8 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-9 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
@@ -33,9 +33,16 @@ Version 8 (character-panel-v8-viewed-member) makes the panel the session's
 viewed party member (falling back to the commander) in exploration and combat,
 adds ``member_id`` and the ordered ``conditions`` rows (code, label, severity,
 nullable remaining seconds, modifiers, bounded origin label), and removes the
-``persona`` and ``intimate`` sections: ``party_member`` publishes them. Version
-8 is the only accepted schema version: the validator accepts v8 exactly and
-rejects every other version.
+``persona`` and ``intimate`` sections: ``party_member`` publishes them.
+Version 9 (character-skill-growth-fields) adds the six compact growth facts to
+every active row (the proficiency band from the same computation the 系譜 tab
+uses, the session ``fresh`` mark, and the member's standing practice
+``booked`` flag), drops the per-row ``freeform_scales``, and adds the required
+``selected_skill`` section: the one skill selected through ``party.view_member``
+carries its lineage position and — for a mastery owner — the full freeform
+ladder, so the 96-row payload stays inside the OOB bound. Version 9 is the only
+accepted schema version: the validator accepts v9 exactly and rejects every
+other version.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -48,7 +55,6 @@ from typing import Any
 from web.webclient.presentation.combat_panel import (
     MAX_COST_KEYS,
     TARGET_SPECS,
-    validate_freeform_scales,
 )
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
@@ -62,12 +68,20 @@ from web.webclient.presentation.protocol import (
     _validate_identifier,
     json_byte_size,
 )
-from web.webclient.presentation.party_view_selection import resolve_viewed_member
+from web.webclient.presentation.party_view_selection import (
+    resolve_viewed_member,
+    selected_skill_key_for,
+)
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.action_preview import adjusted_cost
-from world.rules.progression import freeform_scale_entries_for
+from world.rules.lineage_query import (
+    LineageQueryError,
+    lineage_position_for,
+    proficiency_progress_for_keys,
+)
+from world.rules.progression import FREEFORM_CAST_SCALES, freeform_ladder_for
 from world.rules.status_display import CONDITION_SEVERITIES
 from world.rules.status_query import (
     CONDITION_SOURCE_LABELS,
@@ -78,9 +92,9 @@ from world.rules.status_query import (
     group_skill_keys,
 )
 from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS
-from world.skills.registry import SKILL_REGISTRY, SkillCategory
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 
-CHARACTER_SCHEMA_VERSION = 8
+CHARACTER_SCHEMA_VERSION = 9
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -109,6 +123,13 @@ MAX_SLOT_CODE_POINTS = 32
 # The equipment adjustment summary bound (P3 formatter output; 「｜」-joined
 # segments of the fixed vocabulary).
 MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
+# The selected skill's lineage lists (prerequisites and next unlocks) and the
+# freeform ladder's rung count. The read model bounds each lineage side to the
+# same eight rows (``lineage_query.MAX_LINEAGE_POSITION_ROWS``); the rung count
+# is the closed canonical scale table's (the ladder validator iterates that
+# table, so a table change that no longer matches fails closed).
+MAX_SELECTED_LINEAGE_ROWS = 8
+MAX_FREEFORM_LADDER_RUNGS = 5
 # The condition-row bounds mirror the ``status`` panel's own condition
 # contract: at most 32 ordered rows, a 128-code-point label, at most 16
 # modifier pairs, and a bounded origin label. ``remaining_seconds`` is null
@@ -253,31 +274,55 @@ def _validate_passive_row(value: Any) -> dict[str, Any]:
 def _validate_active_skill_row(value: Any) -> dict[str, Any]:
     """Validate one active skill row of the ``character`` payload.
 
-    The row is the display subset of the ``context_actions`` v6 skill
-    descriptor: the required ``key``/``label`` plus the optional, omittable
-    ``cost`` (a bounded resource-key mapping, validated with the same
-    bounded-identifier-key and non-negative-int checks the combat panel uses),
-    ``target_spec`` (validated against the combat panel's stable values),
-    ``usable_out_of_combat`` (a boolean the character panel serves for the
-    first time), and ``freeform_scales`` (validated by the combat panel's
-    shared ``validate_freeform_scales``). A skill without an ``mp`` cost can
-    never carry ``freeform_scales``.
+    The required ``key``/``label`` carry the row identity; the six growth
+    facts (``level``, ``xp_into_level``, ``xp_to_next_level``, ``capped``,
+    ``fresh``, ``booked``) are required on every row, and the optional
+    registry-backed ``cost`` (a bounded resource-key mapping, validated with
+    the same bounded-identifier-key and non-negative-int checks the combat
+    panel uses), ``target_spec`` (validated against the combat panel's stable
+    values) and ``usable_out_of_combat`` stay omittable for a key the registry
+    cannot resolve. A capped row's ``xp_to_next_level`` is zero; the freeform
+    ladder moved to ``selected_skill``, so a row never carries
+    ``freeform_scales``.
     """
     _require_exact_fields(
         value,
         "active skill row",
-        {"key", "label"},
+        {
+            "key",
+            "label",
+            "level",
+            "xp_into_level",
+            "xp_to_next_level",
+            "capped",
+            "fresh",
+            "booked",
+        },
         {
             "cost": "optional",
             "target_spec": "optional",
             "usable_out_of_combat": "optional",
-            "freeform_scales": "optional",
         },
     )
     key = _validate_key(value["key"], "active key")
     label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
     if not label.strip():
         raise ProtocolValidationError("active skill label must be non-empty")
+    level = _require_int(value, "level", minimum=0, maximum=MAX_SAFE_INTEGER)
+    xp_into_level = _require_number(
+        value["xp_into_level"], "xp_into_level", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    xp_to_next_level = _require_number(
+        value["xp_to_next_level"],
+        "xp_to_next_level",
+        minimum=0,
+        maximum=MAX_SAFE_INTEGER,
+    )
+    capped = _require_bool(value, "capped")
+    if capped and xp_to_next_level != 0:
+        raise CharacterPanelError("a capped skill's xp_to_next_level must be zero")
+    fresh = _require_bool(value, "fresh")
+    booked = _require_bool(value, "booked")
     cost = value.get("cost")
     if "cost" in value and cost is None:
         raise ProtocolValidationError("skill cost must be a bounded object")
@@ -300,18 +345,22 @@ def _validate_active_skill_row(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("skill usable_out_of_combat must be a boolean")
     if usable_out_of_combat is not None and not isinstance(usable_out_of_combat, bool):
         raise ProtocolValidationError("skill usable_out_of_combat must be a boolean")
-    raw_mp = cost.get("mp") if isinstance(cost, dict) else None
-    base_mp = raw_mp if isinstance(raw_mp, int) and not isinstance(raw_mp, bool) else None
-    scales = validate_freeform_scales(value.get("freeform_scales"), base_mp)
-    row = {"key": key, "label": label}
+    row = {
+        "key": key,
+        "label": label,
+        "level": level,
+        "xp_into_level": xp_into_level,
+        "xp_to_next_level": xp_to_next_level,
+        "capped": capped,
+        "fresh": fresh,
+        "booked": booked,
+    }
     if cost is not None:
         row["cost"] = dict(cost)
     if target_spec is not None:
         row["target_spec"] = target_spec
     if usable_out_of_combat is not None:
         row["usable_out_of_combat"] = usable_out_of_combat
-    if scales:
-        row["freeform_scales"] = scales
     return row
 
 
@@ -517,8 +566,111 @@ def _validate_full_title(payload: dict[str, Any]) -> str | None:
     return text
 
 
+def _validate_lineage_edge(value: Any, level_field: str) -> dict[str, Any]:
+    """Validate one exact ``{key, label, level}`` / ``{..., min_level}`` edge."""
+    _require_exact_fields(value, "lineage edge", {"key", "label", level_field}, {})
+    key = _validate_key(value["key"], "lineage key")
+    label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise CharacterPanelError("lineage edge label must be non-empty")
+    level = _require_int(value, level_field, minimum=1, maximum=MAX_SAFE_INTEGER)
+    return {"key": key, "label": label, level_field: level}
+
+
+def _validate_lineage_position(value: Any) -> dict[str, Any]:
+    """Validate one exact ``{prerequisites, next}`` lineage position."""
+    _require_exact_fields(value, "lineage", {"prerequisites", "next"}, {})
+    result: dict[str, Any] = {}
+    for field, level_field in (("prerequisites", "level"), ("next", "min_level")):
+        rows = value[field]
+        if not isinstance(rows, list) or len(rows) > MAX_SELECTED_LINEAGE_ROWS:
+            raise CharacterPanelError(
+                f"{field} must be a list of at most {MAX_SELECTED_LINEAGE_ROWS} edges"
+            )
+        result[field] = [_validate_lineage_edge(row, level_field) for row in rows]
+    return result
+
+
+def _validate_freeform_ladder(value: Any) -> list[dict[str, Any]]:
+    """Validate the canonical five-rung ladder (cost xor unlock level).
+
+    Rungs are the closed canonical table in ascending order, each carrying
+    either its server-computed ``mp_cost`` (unlocked) or the canonical
+    ``unlock_level`` that unlocks it (locked) — never both, never neither. A
+    locked rung's level is at least 1: the entry rung unlocks at level 0, so an
+    entitled skill's first rung always carries a cost.
+    """
+    if not isinstance(value, list) or len(value) != MAX_FREEFORM_LADDER_RUNGS:
+        raise CharacterPanelError(
+            f"freeform_ladder must carry exactly {MAX_FREEFORM_LADDER_RUNGS} rungs"
+        )
+    rungs: list[dict[str, Any]] = []
+    for index, (scale, label) in enumerate(FREEFORM_CAST_SCALES):
+        entry = value[index]
+        if not isinstance(entry, dict):
+            raise CharacterPanelError("freeform_ladder rung must be an object")
+        has_cost = "mp_cost" in entry
+        has_level = "unlock_level" in entry
+        if has_cost == has_level:
+            raise CharacterPanelError(
+                "a freeform_ladder rung carries exactly one of mp_cost and unlock_level"
+            )
+        level_field = "mp_cost" if has_cost else "unlock_level"
+        _require_exact_fields(entry, "freeform_ladder rung", {"scale", "label", level_field}, {})
+        scale_value = entry["scale"]
+        # A boolean is an int in Python but never a scale; the JS mirror's
+        # strict comparison rejects it too.
+        if (
+            isinstance(scale_value, bool)
+            or not isinstance(scale_value, (int, float))
+            or scale_value != scale
+        ):
+            raise CharacterPanelError(
+                "freeform_ladder must be in canonical ascending scale order"
+            )
+        if entry["label"] != label:
+            raise CharacterPanelError(
+                "freeform_ladder label must be the canonical label of its scale"
+            )
+        rung = {"scale": scale, "label": label}
+        if has_cost:
+            rung["mp_cost"] = _require_int(
+                entry, "mp_cost", minimum=0, maximum=MAX_SAFE_INTEGER
+            )
+        else:
+            rung["unlock_level"] = _require_int(
+                entry, "unlock_level", minimum=1, maximum=MAX_SAFE_INTEGER
+            )
+        rungs.append(rung)
+    return rungs
+
+
+def _validate_selected_skill(value: Any) -> dict[str, Any] | None:
+    """Validate the required, nullable ``selected_skill`` section.
+
+    ``None`` means the session names no active skill the viewed member owns.
+    Otherwise the section carries exactly the key, the lineage position and
+    (for a mastery owner) the freeform ladder.
+    """
+    if value is None:
+        return None
+    _require_exact_fields(
+        value,
+        "selected skill",
+        {"key", "lineage"},
+        {"freeform_ladder": "optional"},
+    )
+    result: dict[str, Any] = {
+        "key": _validate_key(value["key"], "selected skill key"),
+        "lineage": _validate_lineage_position(value["lineage"]),
+    }
+    if "freeform_ladder" in value:
+        result["freeform_ladder"] = _validate_freeform_ladder(value["freeform_ladder"])
+    return result
+
+
 def _validate_available(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-8 character payload."""
+    """Validate one exact available version-9 character payload."""
     _require_exact_fields(
         payload,
         "character panel",
@@ -535,6 +687,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
             "disguise",
             "guild",
             "wallet",
+            "selected_skill",
         },
         {"full_title": "optional"},
     )
@@ -550,6 +703,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
     member_id = _require_int(
         payload, "member_id", minimum=1, maximum=MAX_SAFE_INTEGER
     )
+    selected_skill = _validate_selected_skill(payload["selected_skill"])
 
     traits = payload["traits"]
     if not isinstance(traits, list) or len(traits) > MAX_TRAIT_ROWS:
@@ -616,6 +770,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
         "disguise": disguise,
         "guild": guild,
         "wallet": wallet,
+        "selected_skill": selected_skill,
     }
     full_title = _validate_full_title(payload)
     if full_title is not None:
@@ -628,7 +783,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
 
 
 def validate_character(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-8 ``character`` payload.
+    """Validate one exact available version-9 ``character`` payload.
 
     Returns a normalized payload or raises :class:`CharacterPanelError`. The
     common unavailable form is NOT accepted here; the registry handles it.
@@ -681,37 +836,130 @@ def _serialize_passive_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any
     ]
 
 
-def _active_skill_row(row: Any, actor: Any) -> dict[str, Any]:
-    """Build one active skill row, enriching registry-resolvable keys.
+def _growth_facts(progress: Any) -> dict[str, Any]:
+    """The six growth facts of one row, zero-valued for an unregistered key.
 
-    A key the ``SKILL_REGISTRY`` cannot resolve keeps the bare ``{key,
-    label}`` shape (the unregistered-key fallback); a resolvable key gains
-    the registry-backed ``cost``, ``target_spec``, ``usable_out_of_combat``,
-    and — for a freeform-eligible skill the actor has mastery to scale —
-    ``freeform_scales``.
+    A key the registry cannot resolve has no proficiency band at all (the
+    lineage read derives one only for registry rows), so its row reports the
+    honest zero baseline rather than omitting the required fields.
+    """
+    if progress is None:
+        return {
+            "level": 0,
+            "xp_into_level": 0,
+            "xp_to_next_level": 0,
+            "capped": False,
+        }
+    return {
+        "level": progress.level,
+        "xp_into_level": progress.xp_into_level,
+        "xp_to_next_level": progress.xp_to_next_level,
+        "capped": progress.capped,
+    }
+
+
+def _selected_skill(
+    model: CharacterReadModel, member: Any, context: PresentationContext
+) -> dict[str, Any] | None:
+    """Build the selected skill's detail, or ``None`` when nothing qualifies.
+
+    The session selection supplies the key; the panel publishes it only while
+    it names an ACTIVE skill the viewed member owns (the read model's own
+    active keys). The lineage position and — for a mastery owner of the
+    skill's element — the full freeform ladder ride here, so no per-row detail
+    is needed for 96 rows.
+    """
+    key = selected_skill_key_for(context, member)
+    if key is None or key not in model.active_keys:
+        return None
+    skill = SKILL_REGISTRY.get(key)
+    if skill is None or skill.kind is not SkillKind.ACTIVE:
+        return None
+    position = lineage_position_for(member, key)
+    entry: dict[str, Any] = {
+        "key": key,
+        "lineage": {
+            "prerequisites": [
+                {
+                    "key": edge.skill_key,
+                    "label": edge.display_name_zh,
+                    "level": edge.level,
+                }
+                for edge in position.prerequisites
+            ],
+            "next": [
+                {
+                    "key": edge.skill_key,
+                    "label": edge.display_name_zh,
+                    "min_level": edge.level,
+                }
+                for edge in position.next
+            ],
+        },
+    }
+    ladder = freeform_ladder_for(member, skill)
+    if ladder:
+        entry["freeform_ladder"] = [
+            (
+                {"scale": rung.scale, "label": rung.label, "mp_cost": rung.mp_cost}
+                if rung.mp_cost is not None
+                else {
+                    "scale": rung.scale,
+                    "label": rung.label,
+                    "unlock_level": rung.unlock_level,
+                }
+            )
+            for rung in ladder
+        ]
+    return entry
+
+
+def _active_skill_row(
+    row: Any,
+    actor: Any,
+    growth: dict[str, Any],
+    recent: frozenset[str],
+    booking: Any,
+) -> dict[str, Any]:
+    """Build one active skill row: identity, growth facts, registry detail.
+
+    Every row carries the six growth facts. A key the ``SKILL_REGISTRY``
+    cannot resolve stops there (the unregistered-key fallback: no invented
+    cost, target, or capability); a resolvable key additionally gains the
+    registry-backed ``cost``, ``target_spec`` and ``usable_out_of_combat``.
 
     The ``cost`` is the actor's OWN adjusted cost (equipment and condition
     percentage modifiers applied), the same amount the resolver checks and
-    deducts and the same base the ``freeform_scales`` entries scale, so the
-    advertised rungs can never contradict the advertised cost.
+    deducts. ``fresh`` marks a skill in the member's session recent-unlock set
+    and ``booked`` marks the member's one standing practice booking.
     """
     skill = SKILL_REGISTRY.get(row.key)
-    entry = {"key": row.key, "label": row.label}
+    entry = {
+        "key": row.key,
+        "label": row.label,
+        "level": growth["level"],
+        "xp_into_level": growth["xp_into_level"],
+        "xp_to_next_level": growth["xp_to_next_level"],
+        "capped": growth["capped"],
+        "fresh": row.key in recent,
+        "booked": booking == row.key,
+    }
     if skill is None:
         return entry
     entry["cost"] = adjusted_cost(actor, skill)
     entry["target_spec"] = skill.target_spec.value
     entry["usable_out_of_combat"] = skill.usable_out_of_combat
-    scales = freeform_scale_entries_for(actor, skill)
-    if scales:
-        entry["freeform_scales"] = [
-            {"scale": s, "label": l, "mp_cost": c} for s, l, c in scales
-        ]
     return entry
 
 
-def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[dict[str, Any]]:
-    """Serialize grouped active skill keys, enriched per row via the registry."""
+def _serialize_active_skill_groups(
+    keys: tuple[str, ...],
+    actor: Any,
+    progress: dict[str, Any],
+    recent: frozenset[str],
+    booking: Any,
+) -> list[dict[str, Any]]:
+    """Serialize grouped active skill keys with their growth facts."""
     return [
         {
             "category": category.category,
@@ -721,7 +969,13 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
                     "group": group.group,
                     "label": group.label,
                     "skills": [
-                        _active_skill_row(row, actor)
+                        _active_skill_row(
+                            row,
+                            actor,
+                            _growth_facts(progress.get(row.key)),
+                            recent,
+                            booking,
+                        )
                         for row in group.skills
                     ],
                 }
@@ -732,21 +986,31 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
     ]
 
 
-def _serialize(model: CharacterReadModel, member: Any) -> dict[str, Any]:
-    """Serialize the frozen read model into the v8 available payload.
+def _serialize(
+    model: CharacterReadModel, member: Any, context: PresentationContext
+) -> dict[str, Any]:
+    """Serialize the frozen read model into the v9 available payload.
 
     Trait rows come from ``model.breakdown`` (the single assembly the whole
     read shares); labels stay the shared ``TRAIT_LABELS`` map; equipment rows
     gain the P3 adjustment summary; condition rows are the shared ordered
-    projection. Persona prose and intimate state are not part of this payload:
-    ``party_member`` publishes them.
+    projection. Active rows carry the member's growth facts, the session's
+    recent-unlock marks (``fresh``) and its one standing practice booking
+    (``booked``); ``selected_skill`` carries the one 技能-tab selection's
+    lineage position and freeform ladder. Persona prose and intimate state are
+    not part of this payload: ``party_member`` publishes them.
     """
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
+    member_id = int(member.pk)
+    unlock_state = context.unlocks.get(member_id)
+    recent = unlock_state.recent if unlock_state is not None else frozenset()
+    booking = getattr(member.db, "practice_booking", None)
+    progress = proficiency_progress_for_keys(member, model.active_keys)
     payload: dict[str, Any] = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
-        "member_id": int(member.pk),
+        "member_id": member_id,
         "traits": [
             {
                 "key": row.key,
@@ -778,7 +1042,9 @@ def _serialize(model: CharacterReadModel, member: Any) -> dict[str, Any]:
             }
             for row in model.conditions
         ],
-        "actives": _serialize_active_skill_groups(model.active_keys, member),
+        "actives": _serialize_active_skill_groups(
+            model.active_keys, member, progress, recent, booking
+        ),
         "passives": _serialize_passive_skill_groups(model.passive_keys),
         "equipment": [
             {
@@ -799,6 +1065,7 @@ def _serialize(model: CharacterReadModel, member: Any) -> dict[str, Any]:
         },
         "guild": {"rank": model.guild_rank, "merit": model.guild_merit},
         "wallet": model.wallet,
+        "selected_skill": _selected_skill(model, member, context),
     }
     # The composed live full title; omitted when empty so pre-creation
     # characters keep the payload shape identical.
@@ -813,7 +1080,9 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
     The subject is the session's viewed party member (the commander when no
     effective selection exists), in exploration and combat alike. The read
     model mutates nothing, so no mode gate is needed; a member whose canonical
-    records cannot be read gets the common unavailable form.
+    records cannot be read gets the common unavailable form, and so does a
+    member whose stored proficiency record is structurally invalid (the same
+    fail-closed rule every lineage read applies).
     """
     actor = context.actor
     if bool(getattr(actor, "creation_pending", False)):
@@ -823,9 +1092,9 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         raise PanelUnavailableError
     try:
         model = build_character_read_model(member)
-    except StatusQueryError:
+        return validate_character(_serialize(model, member, context))
+    except (StatusQueryError, LineageQueryError):
         raise PanelUnavailableError
-    return validate_character(_serialize(model, member))
 
 
 __all__ = [
@@ -838,6 +1107,7 @@ __all__ = [
     "MAX_CONDITION_SOURCE_CODE_POINTS",
     "MAX_DISPLAYED_ROWS",
     "MAX_EQUIPMENT_ROWS",
+    "MAX_FREEFORM_LADDER_RUNGS",
     "MAX_FULL_TITLE_CODE_POINTS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_LAYERS_PER_STAT",
@@ -845,6 +1115,7 @@ __all__ = [
     "MAX_MODIFIER_KEYS",
     "MAX_MODIFIER_TEXT_CODE_POINTS",
     "MAX_PASSIVE_ROWS",
+    "MAX_SELECTED_LINEAGE_ROWS",
     "MAX_SLOT_CODE_POINTS",
     "MAX_TRAIT_ROWS",
     "TRAIT_LABELS",

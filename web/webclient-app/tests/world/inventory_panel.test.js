@@ -30,7 +30,7 @@ const RARE_ROW = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows.find(
 const POTION_KEY = RARE_ROW.item_key;
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 7,
+  schema_version: 9,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },

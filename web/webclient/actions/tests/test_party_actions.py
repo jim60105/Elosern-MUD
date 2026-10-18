@@ -183,12 +183,22 @@ class PartyViewMemberPayloadTests(unittest.TestCase):
     )
     def test_exact_payload_is_normalized(self):
         self.assertEqual(
-            validate_party_view_member_payload({"member_id": 7, "tab": "member"}),
-            {"member_id": 7, "tab": "member"},
+            validate_party_view_member_payload(
+                {"member_id": 7, "tab": "member", "skill_key": None}
+            ),
+            {"member_id": 7, "tab": "member", "skill_key": None},
+        )
+        self.assertEqual(
+            validate_party_view_member_payload(
+                {"member_id": 7, "tab": "skills", "skill_key": "t_ember_burst"}
+            )["skill_key"],
+            "t_ember_burst",
         )
         for tab in ("member", "bag", "status", "skills", "lineage", "shop"):
             self.assertEqual(
-                validate_party_view_member_payload({"member_id": 1, "tab": tab})["tab"],
+                validate_party_view_member_payload(
+                    {"member_id": 1, "tab": tab, "skill_key": None}
+                )["tab"],
                 tab,
             )
 
@@ -198,18 +208,33 @@ class PartyViewMemberPayloadTests(unittest.TestCase):
     def test_each_malformed_payload_rejects(self):
         cases = (
             ("not an object", []),
-            ("missing tab", {"member_id": 1}),
-            ("extra key", {"member_id": 1, "tab": "member", "x": 1}),
-            ("unknown tab", {"member_id": 1, "tab": "detail"}),
-            ("non-string tab", {"member_id": 1, "tab": 3}),
-            ("zero member", {"member_id": 0, "tab": "member"}),
-            ("negative member", {"member_id": -1, "tab": "member"}),
-            ("bool member", {"member_id": True, "tab": "member"}),
-            ("string member", {"member_id": "7", "tab": "member"}),
-            ("float member", {"member_id": 7.0, "tab": "member"}),
+            ("missing tab", {"member_id": 1, "skill_key": None}),
+            ("missing skill key", {"member_id": 1, "tab": "member"}),
+            (
+                "extra key",
+                {"member_id": 1, "tab": "member", "skill_key": None, "x": 1},
+            ),
+            ("unknown tab", {"member_id": 1, "tab": "detail", "skill_key": None}),
+            ("non-string tab", {"member_id": 1, "tab": 3, "skill_key": None}),
+            ("zero member", {"member_id": 0, "tab": "member", "skill_key": None}),
+            ("negative member", {"member_id": -1, "tab": "member", "skill_key": None}),
+            ("bool member", {"member_id": True, "tab": "member", "skill_key": None}),
+            ("string member", {"member_id": "7", "tab": "member", "skill_key": None}),
+            ("float member", {"member_id": 7.0, "tab": "member", "skill_key": None}),
             (
                 "over safe integer",
-                {"member_id": MAX_SAFE_INTEGER + 1, "tab": "member"},
+                {
+                    "member_id": MAX_SAFE_INTEGER + 1,
+                    "tab": "member",
+                    "skill_key": None,
+                },
+            ),
+            ("non-string skill", {"member_id": 1, "tab": "skills", "skill_key": 3}),
+            ("blank skill", {"member_id": 1, "tab": "skills", "skill_key": "  "}),
+            ("empty skill", {"member_id": 1, "tab": "skills", "skill_key": ""}),
+            (
+                "over-bound skill",
+                {"member_id": 1, "tab": "skills", "skill_key": "k" * 65},
             ),
         )
         for label, payload in cases:
@@ -248,9 +273,11 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         join_party(npc, self.commander)
         return npc
 
-    def _select(self, member_id, tab="member"):
+    def _select(self, member_id, tab="member", skill_key=None):
         return _party_view_member_adapter(
-            self.commander, {"member_id": member_id, "tab": tab}, self.session
+            self.commander,
+            {"member_id": member_id, "tab": tab, "skill_key": skill_key},
+            self.session,
         )
 
     def _selection(self, actor=None):
@@ -273,8 +300,25 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         )
         self.assertEqual(
             self._selection(),
-            PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "member"),
+            PartyViewSelection(
+                int(self.commander.pk), int(self.aila.pk), "member", None
+            ),
         )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_the_selected_skill_is_stored_with_the_selection(self):
+        self._select(self.aila.pk, "skills", "t_group_heal")
+        self.assertEqual(
+            self._selection(),
+            PartyViewSelection(
+                int(self.commander.pk), int(self.aila.pk), "skills", "t_group_heal"
+            ),
+        )
+        # A later selection without a skill clears it.
+        self._select(self.aila.pk, "member")
+        self.assertIsNone(self._selection().skill_key)
 
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
@@ -302,7 +346,7 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(
             self._selection(),
-            PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "bag"),
+            PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "bag", None),
         )
 
     @covers_requirement(
@@ -315,7 +359,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         self.session.puppet = self.kahn
         self.assertEqual(
             self._selection(self.kahn),
-            PartyViewSelection(int(self.commander.pk), int(self.kahn.pk), "status"),
+            PartyViewSelection(
+                int(self.commander.pk), int(self.kahn.pk), "status", None
+            ),
         )
 
     @covers_requirement(

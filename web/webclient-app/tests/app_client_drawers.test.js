@@ -192,7 +192,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(null);
   });
 
-  // The character panel is an exact-schema v8 payload: the
+  // The character panel is an exact-schema v9 payload: the
   // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
   // character-panel active-row schema does not register, so it is stripped
   // before committing. The other exact fields (member_id, traits, conditions,
@@ -200,7 +200,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "character",
       member_id: CHARACTER_PANEL_SAMPLE.member_id,
@@ -221,6 +221,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       disguise: CHARACTER_PANEL_SAMPLE.disguise,
       guild: CHARACTER_PANEL_SAMPLE.guild,
       wallet: CHARACTER_PANEL_SAMPLE.wallet,
+      selected_skill: SKILLS_SLICE_SAMPLE.selected_skill,
     };
   }
 
@@ -299,7 +300,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 7,
+              schema_version: 9,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },
@@ -318,6 +319,40 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(true);
   });
 
+  it("asks the server for the selected skill's detail when the book opens", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            character: characterPanelWithSkillSlice(),
+            services: SERVICES_PANEL_SAMPLE,
+            party: PARTY_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    const requests = () =>
+      sender.sent.actions.filter((envelope) => envelope.action_id === "party.view_member");
+    // The book's initial row is not the committed selection: one request.
+    expect(requests()).toHaveLength(1);
+    expect(requests()[0].payload).toEqual({
+      member_id: SKILLS_SLICE_SAMPLE.member_id,
+      tab: "skills",
+      skill_key: "firebolt",
+    });
+  });
+
   it("leaves the inventory drawer subtitle blank when the character panel is unavailable", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
@@ -332,7 +367,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 7,
+              schema_version: 9,
               available: false,
               reason: { code: "no_puppet", message: "你已離開角色" },
             },

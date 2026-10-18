@@ -5,7 +5,6 @@ var core = require("../core.js");
 var skillDescriptor = require("./skill_descriptor.js");
 
 var requireNumber = skillDescriptor.requireNumber;
-var validateFreeformScales = skillDescriptor.validateFreeformScales;
 var isPlainObject = core.isPlainObject;
 var codePoints = core.codePoints;
 var jsonByteSize = core.jsonByteSize;
@@ -22,6 +21,8 @@ var MAX_FULL_TITLE_CODE_POINTS = C.MAX_FULL_TITLE_CODE_POINTS;
 var MAX_COST_KEYS = C.MAX_COST_KEYS;
 var TARGET_SPECS = C.TARGET_SPECS;
 var SEVERITIES = C.SEVERITIES;
+var FREEFORM_SCALES_ALLOWED = C.FREEFORM_SCALES_ALLOWED;
+var FREEFORM_LABELS_ALLOWED = C.FREEFORM_LABELS_ALLOWED;
 
 // ---------------------------------------------------------------------------
 // character panel v1 validators (mirror of
@@ -63,6 +64,10 @@ var CHARACTER_MAX_CONDITION_SOURCE = 32;
 var CHARACTER_MAX_MODIFIER_TEXT = 16;
 // The closed origin vocabulary (mirror of CONDITION_SOURCE_LABELS).
 var CHARACTER_CONDITION_SOURCES = ["裝備", "狀態", "裝備、狀態", "未知"];
+// v9 selected-skill bounds (mirror of web.webclient.presentation.character):
+// each lineage side is bounded, and the ladder is the closed canonical table.
+var CHARACTER_MAX_SELECTED_LINEAGE_ROWS = 8;
+var CHARACTER_MAX_FREEFORM_LADDER_RUNGS = 5;
 
 function validateCharacterKey(value, field) {
   var key = validateIdentifier(value, field);
@@ -156,14 +161,32 @@ function validateCharacterActiveSkillRow(value) {
   requireExactFields(
     value,
     "active skill row",
-    ["key", "label"],
-    ["cost", "target_spec", "usable_out_of_combat", "freeform_scales"]
+    [
+      "key",
+      "label",
+      "level",
+      "xp_into_level",
+      "xp_to_next_level",
+      "capped",
+      "fresh",
+      "booked",
+    ],
+    ["cost", "target_spec", "usable_out_of_combat"]
   );
   validateCharacterKey(value.key, "active key");
   var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
   if (!label.trim()) {
     throw new Error("active skill label must be non-empty");
   }
+  requireInt(value.level, "level", 0, MAX_SAFE_INTEGER);
+  requireNumber(value.xp_into_level, "xp_into_level", 0, MAX_SAFE_INTEGER);
+  requireNumber(value.xp_to_next_level, "xp_to_next_level", 0, MAX_SAFE_INTEGER);
+  var capped = requireBool(value.capped, "capped");
+  if (capped && value.xp_to_next_level !== 0) {
+    throw new Error("a capped skill's xp_to_next_level must be zero");
+  }
+  requireBool(value.fresh, "fresh");
+  requireBool(value.booked, "booked");
   var cost = value.cost;
   if (cost !== undefined) {
     if (!isPlainObject(cost) || Object.keys(cost).length > MAX_COST_KEYS) {
@@ -180,17 +203,102 @@ function validateCharacterActiveSkillRow(value) {
   if (value.usable_out_of_combat !== undefined && typeof value.usable_out_of_combat !== "boolean") {
     throw new Error("skill usable_out_of_combat must be a boolean");
   }
-  var baseMp =
-    isPlainObject(cost) && Number.isInteger(cost.mp) && cost.mp > 0 ? cost.mp : null;
-  if (value.freeform_scales !== undefined) {
-    validateFreeformScales(value.freeform_scales, baseMp);
+  return value;
+}
+
+function validateCharacterLineageEdge(value, levelField) {
+  requireExactFields(value, "lineage edge", ["key", "label", levelField], []);
+  validateCharacterKey(value.key, "lineage key");
+  var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+  if (!label.trim()) {
+    throw new Error("lineage edge label must be non-empty");
   }
-  // Python omits the field when it is null; normalize identically.
-  if (value.freeform_scales === null) {
-    delete value.freeform_scales;
+  requireInt(value[levelField], levelField, 1, MAX_SAFE_INTEGER);
+  return value;
+}
+
+function validateCharacterLineage(value) {
+  requireExactFields(value, "lineage", ["prerequisites", "next"], []);
+  [
+    ["prerequisites", "level"],
+    ["next", "min_level"],
+  ].forEach(function (pair) {
+    var rows = value[pair[0]];
+    if (!Array.isArray(rows) || rows.length > CHARACTER_MAX_SELECTED_LINEAGE_ROWS) {
+      throw new Error(
+        pair[0] +
+          " must be a list of at most " +
+          CHARACTER_MAX_SELECTED_LINEAGE_ROWS +
+          " edges"
+      );
+    }
+    rows.forEach(function (row) {
+      validateCharacterLineageEdge(row, pair[1]);
+    });
+  });
+  return value;
+}
+
+function validateCharacterFreeformLadder(value) {
+  if (
+    !Array.isArray(value) ||
+    value.length !== CHARACTER_MAX_FREEFORM_LADDER_RUNGS
+  ) {
+    throw new Error(
+      "freeform_ladder must carry exactly " +
+        CHARACTER_MAX_FREEFORM_LADDER_RUNGS +
+        " rungs"
+    );
+  }
+  value.forEach(function (entry, index) {
+    if (!isPlainObject(entry)) {
+      throw new Error("freeform_ladder rung must be an object");
+    }
+    var hasCost = Object.prototype.hasOwnProperty.call(entry, "mp_cost");
+    var hasLevel = Object.prototype.hasOwnProperty.call(entry, "unlock_level");
+    if (hasCost === hasLevel) {
+      throw new Error(
+        "a freeform_ladder rung carries exactly one of mp_cost and unlock_level"
+      );
+    }
+    var levelField = hasCost ? "mp_cost" : "unlock_level";
+    requireExactFields(entry, "freeform_ladder rung", ["scale", "label", levelField], []);
+    if (entry.scale !== FREEFORM_SCALES_ALLOWED[index]) {
+      throw new Error("freeform_ladder must be in canonical ascending scale order");
+    }
+    if (entry.label !== FREEFORM_LABELS_ALLOWED[index]) {
+      throw new Error(
+        "freeform_ladder label must be the canonical label of its scale"
+      );
+    }
+    if (hasCost) {
+      requireInt(entry.mp_cost, "mp_cost", 0, MAX_SAFE_INTEGER);
+    } else {
+      // The entry rung unlocks at level 0, so a locked rung's level is >= 1.
+      requireInt(entry.unlock_level, "unlock_level", 1, MAX_SAFE_INTEGER);
+    }
+  });
+  return value;
+}
+
+function validateCharacterSelectedSkill(value) {
+  if (value === null) {
+    return null;
+  }
+  requireExactFields(
+    value,
+    "selected skill",
+    ["key", "lineage"],
+    ["freeform_ladder"]
+  );
+  validateCharacterKey(value.key, "selected skill key");
+  validateCharacterLineage(value.lineage);
+  if (Object.prototype.hasOwnProperty.call(value, "freeform_ladder")) {
+    validateCharacterFreeformLadder(value.freeform_ladder);
   }
   return value;
 }
+
 
 function validateCharacterSkillGroup(value, rowValidator) {
   requireExactFields(value, "skill group", ["group", "label", "skills"], []);
@@ -364,10 +472,12 @@ function validateCharacterConditionRow(value) {
   return value;
 }
 
-// Exact available character panel v8 schema (design D10). v8 builds the
-// panel for the viewed party member, adds `member_id` and the ordered
-// `conditions` rows, and removes `persona`/`intimate` (party_member owns
-// them). Shared bounds are guarded by a dual-direction parity test.
+// Exact available character panel v9 schema (design D10). v8 builds the panel
+// for the viewed party member with `member_id` and the ordered `conditions`
+// rows (persona/intimate belong to party_member). v9 requires the six growth
+// facts on every active row and drops the per-row `freeform_scales`; the one
+// selected skill's lineage position and ladder ride `selected_skill`. Shared
+// bounds are guarded by a dual-direction parity test.
 function validateCharacterAvailablePanel(payload) {
   requireExactFields(
     payload,
@@ -385,6 +495,7 @@ function validateCharacterAvailablePanel(payload) {
       "disguise",
       "guild",
       "wallet",
+      "selected_skill",
     ],
     ["full_title"]
   );
@@ -399,13 +510,14 @@ function validateCharacterAvailablePanel(payload) {
       throw new Error("full_title must be non-empty when present");
     }
   }
-  if (payload.schema_version !== 8) {
+  if (payload.schema_version !== 9) {
     throw new Error("unsupported character schema_version");
   }
   if (payload.available !== true || payload.kind !== "character") {
     throw new Error("character panel must be available with kind character");
   }
   requireInt(payload.member_id, "member_id", 1, MAX_SAFE_INTEGER);
+  validateCharacterSelectedSkill(payload.selected_skill);
   if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
     throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
   }
@@ -458,7 +570,7 @@ function validateCharacterAvailablePanel(payload) {
   requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
 
   var result = {
-    schema_version: 8,
+    schema_version: 9,
     available: true,
     kind: "character",
     member_id: payload.member_id,
@@ -470,6 +582,7 @@ function validateCharacterAvailablePanel(payload) {
     disguise: payload.disguise,
     guild: payload.guild,
     wallet: payload.wallet,
+    selected_skill: payload.selected_skill,
   };
   if (fullTitle !== null) {
     result.full_title = fullTitle;
@@ -482,10 +595,10 @@ function validateCharacterAvailablePanel(payload) {
 }
 
 function validateCharacterPanel(payload) {
-  // Version gate (mirror of the server validator): 8 is the only accepted
-  // schema version (viewed-member panel with condition rows).
+  // Version gate (mirror of the server validator): 9 is the only accepted
+  // schema version (growth rows; the selected skill's lineage and ladder).
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 8) {
+  if (payload.schema_version !== 9) {
     throw new Error("unsupported character schema_version");
   }
   return validateCharacterAvailablePanel(payload);
@@ -508,10 +621,13 @@ module.exports = {
   CHARACTER_MAX_CONDITION_SOURCE: CHARACTER_MAX_CONDITION_SOURCE,
   CHARACTER_MAX_MODIFIER_TEXT: CHARACTER_MAX_MODIFIER_TEXT,
   CHARACTER_CONDITION_SOURCES: CHARACTER_CONDITION_SOURCES,
+  CHARACTER_MAX_SELECTED_LINEAGE_ROWS: CHARACTER_MAX_SELECTED_LINEAGE_ROWS,
+  CHARACTER_MAX_FREEFORM_LADDER_RUNGS: CHARACTER_MAX_FREEFORM_LADDER_RUNGS,
   validateCharacterPanel: validateCharacterPanel,
   validateCharacterTraitRow: validateCharacterTraitRow,
   validateCharacterConditionRow: validateCharacterConditionRow,
   validateCharacterEquipmentRow: validateCharacterEquipmentRow,
   validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
   validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
+  validateCharacterSelectedSkill: validateCharacterSelectedSkill,
 };
