@@ -83,11 +83,11 @@ const {
   onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
   completionCandidates, possessionBanner, contextAffordances, releaseAffordance,
   titleBallotPanel, titleBallotCandidates, onMapMove, showObjectiveTracker,
-  skipDisabled, practiceOpen, practiceFeedback, onPractice,
+  skipDisabled, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  inventoryActorId, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
+  controlledActorId, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -1183,7 +1183,7 @@ const rootStyle = computed(() => {
     <HudDrawer
       v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona'"
       :open="true"
-      :title="practiceOpen && store.view.hudDrawer === 'skill' ? '修煉' : drawerTitle"
+      :title="drawerTitle"
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
@@ -1206,6 +1206,7 @@ const rootStyle = computed(() => {
       <SkillBook
         v-else-if="store.view.hudDrawer === 'skill'"
         :skills="panel('character') || {}"
+        :actor-id="controlledActorId"
         :practice-disabled="skipDisabled"
         :practice-feedback="practiceFeedback"
         :mode="store.view.mode || 'exploration'"
@@ -1214,7 +1215,6 @@ const rootStyle = computed(() => {
         :use-notice="store.view.skillUseNotice"
         :return-target="store.view.bookReturn"
         @practice="onPractice"
-        @practice-view="(open) => practiceOpen = open"
         @use="onSkillUse"
       />
       <InventoryPanel
@@ -1222,7 +1222,7 @@ const rootStyle = computed(() => {
         :services="panel('services') || {}"
         :character="panel('character')"
         :wallet="inventoryWalletCopper"
-        :actor-id="inventoryActorId"
+        :actor-id="controlledActorId"
         :combat="store.view.mode === 'combat'"
         @use="onInventoryItemAction"
         @toggle-equip="onInventoryItemAction"
@@ -1265,10 +1265,10 @@ const rootStyle = computed(() => {
         @action="onAction"
         @close="onHudDrawerClose"
       />
-      <!-- The book's keyboard guidance is skill-drawer-only and absent while
-           the practice sub-screen replaces the book: a conditional named slot,
-           so the other drawers provide no `foot` slot and render no footer. -->
-      <template v-if="store.view.hudDrawer === 'skill' && !practiceOpen" #foot>
+      <!-- The book's keyboard guidance is skill-drawer-only: a conditional
+           named slot, so the other drawers provide no `foot` slot and render
+           no footer. Booking opens no sub-screen, so it never hides. -->
+      <template v-if="store.view.hudDrawer === 'skill'" #foot>
         <p class="hud-drawer__key-hint" data-testid="skill-book-key-hint">{{ SKILL_BOOK_KEY_HINT }}</p>
       </template>
     </HudDrawer>

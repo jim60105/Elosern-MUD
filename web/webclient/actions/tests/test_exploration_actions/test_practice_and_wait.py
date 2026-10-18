@@ -115,77 +115,106 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # ------------------------------------------------------------------
     # explore.wait
     # ------------------------------------------------------------------
-    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
-    def test_practice_grows_only_the_declared_skill_and_plain_rest_grows_nothing(self):
+    @covers_requirement("webclient-exploration-menu::explore-practice-books-one-declared-skill-for-a-member")
+    def test_practice_books_the_member_without_advancing_and_the_next_skip_settles_it(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
-        from world.rules.progression import practice_xp_amount
-        from world.skills.registry import SKILL_REGISTRY
+        from world.rules.progression import (
+            PRACTICE_XP_PER_STUDY_HOUR,
+            practice_xp_amount,
+        )
 
         self.player.db.skills = {"active": [_T_SKILL], "passive": []}
         self.player.db.skill_proficiency = {_T_SKILL: 20.0}
         before = get_world_clock().tick
-        gain = 10 * practice_xp_amount(
+        gain = PRACTICE_XP_PER_STUDY_HOUR * practice_xp_amount(
             self.player, _live("world.skills.registry", "SKILL" + "_REGISTRY")[_T_SKILL]
         )
-        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
+
+        result = _practice_adapter(self.player, {"actor_id": self.player.pk, "skill": _T_SKILL})
+
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(get_world_clock().tick, before + 3600)
-        self.assertAlmostEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0 + gain)
-        self.assertIsNone(self.player.db.practice_booking)
+        self.assertEqual(result["code"], "booked")
+        self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(self.player.db.practice_booking, _T_SKILL)
+        self.assertEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0)
+        # The next SKIP advance that settles the member grows the booked skill
+        # for its whole hour and consumes the booking.
         _wait_adapter(self.player, {"seconds": 3600})
         self.assertAlmostEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0 + gain)
+        self.assertIsNone(self.player.db.practice_booking)
 
 
-    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
-    def test_practice_rejects_unknown_capped_and_unsafe_without_advancing(self):
+    @covers_requirement("webclient-exploration-menu::explore-practice-books-one-declared-skill-for-a-member")
+    def test_practice_rejects_unknown_capped_and_combat_without_changing_the_booking(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
         from world.rules.progression import proficiency_cap
 
         self.player.db.skills = {"active": [_T_SKILL], "passive": []}
+        self.player.db.practice_booking = _T_SKILL
         before = get_world_clock().tick
-        result = _practice_adapter(self.player, {"skill": "unknown", "seconds": 3600})
+        result = _practice_adapter(self.player, {"actor_id": self.player.pk, "skill": "unknown"})
         self.assertEqual(result["code"], "PRACTICE_SKILL_UNKNOWN")
         self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(self.player.db.practice_booking, _T_SKILL)
         self.player.db.skill_proficiency = {_T_SKILL: proficiency_cap(_T_SKILL) * 50.0}
-        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
+        result = _practice_adapter(self.player, {"actor_id": self.player.pk, "skill": _T_SKILL})
         self.assertEqual(result["code"], "PRACTICE_SKILL_CAPPED")
         self.assertEqual(get_world_clock().tick, before)
-        monster = create_object(Monster, key="修煉阻擋者", location=self.room1)
-        monster.threat_tier = "low"
-        monster.apply_monster_tier("floor")
-        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
-        self.assertEqual(result["code"], "unsafe_skip")
+        self.assertEqual(self.player.db.practice_booking, _T_SKILL)
+        with patch("world.rules.combat_session.is_in_active_session", return_value=True):
+            result = _practice_adapter(self.player, {"actor_id": self.player.pk, "skill": _T_SKILL})
+        self.assertEqual(result["code"], "booking_in_combat")
+        self.assertIn("戰鬥中無法排入修煉", result["message"])
         self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(self.player.db.practice_booking, _T_SKILL)
 
 
-    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
+    @covers_requirement("webclient-exploration-menu::explore-practice-books-one-declared-skill-for-a-member")
     def test_practice_payload_rejects_ambiguous_or_unbounded_requests(self):
         from web.webclient.actions.exploration_actions import validate_practice_payload
 
         for payload in (
-            {"skill": _T_SKILL, "seconds": True},
-            {"skill": _T_SKILL, "seconds": 43201},
-            {"skill": _T_SKILL, "seconds": 0},
-            {"skill": _T_SKILL, "seconds": 1, "sleep": True},
-            {"skill": "fire arrow", "seconds": 1},
+            {"skill": _T_SKILL},
+            {"actor_id": self.player.pk},
+            {"actor_id": self.player.pk, "skill": _T_SKILL, "seconds": 3600},
+            {"actor_id": True, "skill": _T_SKILL},
+            {"actor_id": 0, "skill": _T_SKILL},
+            {"actor_id": "1", "skill": _T_SKILL},
+            {"actor_id": self.player.pk, "skill": "fire arrow"},
+            {"actor_id": self.player.pk, "skill": "x" * 65},
         ):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 validate_practice_payload(payload)
 
 
-    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
-    def test_failed_practice_rolls_back_clock_growth_and_new_booking(self):
+    @covers_requirement("webclient-exploration-menu::explore-practice-books-one-declared-skill-for-a-member")
+    def test_a_failed_settling_advance_restores_the_booking(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
 
         self.player.db.skills = {"active": [_T_SKILL], "passive": []}
         self.player.db.skill_proficiency = {_T_SKILL: 20.0}
+        _practice_adapter(self.player, {"actor_id": self.player.pk, "skill": _T_SKILL})
         before = get_world_clock().tick
         with patch("world.rules.clock._settle_boundary_stages", side_effect=RuntimeError("settlement failed")):
-            result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 28800})
+            result = _wait_adapter(self.player, {"seconds": 28800})
         self.assertEqual(result["code"], "skip_failed")
         self.assertEqual(get_world_clock().tick, before)
         self.assertEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0)
+        # The standing booking is restored, not cleared: it can settle later.
+        self.assertEqual(self.player.db.practice_booking, _T_SKILL)
+
+
+    @covers_requirement("webclient-exploration-menu::explore-practice-books-one-declared-skill-for-a-member")
+    def test_a_forged_member_is_refused_and_never_replaced_by_the_commander(self):
+        from web.webclient.actions.exploration_actions import _practice_adapter
+
+        self.player.db.skills = {"active": [_T_SKILL], "passive": []}
+        stranger = create_object(Monster, key="路人", location=self.room1)
+        result = _practice_adapter(self.player, {"actor_id": stranger.pk, "skill": _T_SKILL})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "not_party_member")
         self.assertIsNone(self.player.db.practice_booking)
+        self.assertIsNone(stranger.db.practice_booking)
 
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")

@@ -59,8 +59,9 @@ from world.rules.player_messages import (
 from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
+    PracticeReject,
     advance_skip,
-    preflight_practice_booking,
+    book_member_practice,
     render_skip_summary,
     seconds_to_full_regen,
     unsafe_rejection,
@@ -271,15 +272,18 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
 
 
 def validate_practice_payload(payload: Any) -> dict[str, Any]:
-    """Validate a declared skill and the existing bounded seconds contract."""
-    if not isinstance(payload, dict) or set(payload) != {"skill", "seconds"}:
-        raise ExplorationActionError("explore.practice requires exactly skill and seconds")
+    """Validate the exact ``explore.practice`` booking payload."""
+    if not isinstance(payload, dict) or set(payload) != {"actor_id", "skill"}:
+        raise ExplorationActionError("explore.practice requires exactly actor_id and skill")
     skill = payload["skill"]
     if not isinstance(skill, str) or not skill or len(skill) > MAX_ITEM_KEY_CHARS or any(
         character.isspace() for character in skill
     ):
         raise ExplorationActionError("explore.practice skill must be a bounded key")
-    return {"skill": skill, **validate_wait_payload({"seconds": payload["seconds"]})}
+    return {
+        "actor_id": _require_positive_int(payload["actor_id"], "actor_id"),
+        "skill": skill,
+    }
 
 
 def validate_possess_payload(payload: Any) -> dict[str, Any]:
@@ -839,23 +843,40 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
 
 
 def _practice_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Use the guarded skip workflow with an explicit practice declaration."""
-    return _wait_adapter(actor, payload, session, practice_skill=payload["skill"])
+    """Book one present member's standing practice; advance no time.
+
+    The member is reauthorized through the party boundary for the acting
+    purpose, so a forged, absent, or knocked-out id is refused and the
+    authenticated puppet is never substituted for it. An active combat
+    session refuses with ``booking_in_combat``, then the skill is preflighted
+    against that member. The only write is the member's booking; the clock's
+    whole-hour practice stage stays the sole progression writer.
+    """
+    from world.rules.party_scope import PARTY_SCOPE_MESSAGES, PartyScopeError
+
+    del session
+    try:
+        booking = book_member_practice(
+            actor, payload["actor_id"], payload["skill"]
+        )
+    except PartyScopeError as error:  # observability: ignore R2: the stable party refusal IS the action result, not a swallowed failure
+        return _rejected(
+            error.reason, PARTY_SCOPE_MESSAGES.get(error.reason, "目前無法排入修煉。")
+        )
+    if isinstance(booking, PracticeReject):
+        return _rejected(booking.reason, booking.message)
+    actor.msg(booking.message)
+    return _success("booked", booking.message, AFFECTED_FULL)
 
 
 def _wait_adapter(
     actor: Any, payload: dict[str, Any], session: Any = None,
-    *, practice_skill: str | None = None,
 ) -> dict[str, Any]:
     """Recheck safety and advance the clock through the shared skip helper."""
     del session
     rejection = unsafe_rejection(actor)
     if rejection is not None:
         return _rejected("unsafe_skip", rejection)
-    if practice_skill is not None:
-        reject = preflight_practice_booking(actor, practice_skill)
-        if reject is not None:
-            return _rejected(reject.reason, reject.message)
     if "daypart" in payload:
         daypart = payload["daypart"]
         try:
@@ -871,15 +892,12 @@ def _wait_adapter(
     dream_clock = get_world_clock() if payload.get("dream") else None
     tick_from = int(dream_clock.tick) if dream_clock is not None else None
     try:
-        events = (
-            advance_skip(actor, seconds, practice_skill=practice_skill)
-            if practice_skill is not None else advance_skip(actor, seconds)
-        )
+        events = advance_skip(actor, seconds)
     except Exception as exc:
-        log_error("skip_failed", context={"char": actor.pk, "skill": practice_skill, "seconds": seconds}, exc=exc)
+        log_error("skip_failed", context={"char": actor.pk, "seconds": seconds}, exc=exc)
         return _rejected("skip_failed", "無法跳過時間。")
     settled_seconds = int(dream_clock.tick) - tick_from if dream_clock is not None else seconds
-    message = ("修煉結束。" if practice_skill is not None else "") + render_skip_summary(settled_seconds, events)
+    message = render_skip_summary(settled_seconds, events)
     actor.msg(message)
     # Rest-point nomination trigger (title-system D4 §7.1, change G): the
     # service helper gates on a day-boundary event and never raises. The

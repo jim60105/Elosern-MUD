@@ -1,12 +1,11 @@
-// The rest/wait support (C4): the skip lock the wait card and the practice
-// view share, and the skill-practice feedback. The wait card itself, its
-// dream question, and its rest form live in use-room-actions.js
+// The rest/wait support (C4): the skip lock the wait card and the SkillBook
+// booking control share, and the skill-practice feedback. The wait card
+// itself, its dream question, and its rest form live in use-room-actions.js
 // (exploration-room-actions); no part of this group follows the router.
 import { computed, ref, watch } from "vue";
 
 export function useRestWait(store, { dispatchIntent }) {
   const practiceRequest = ref(null);
-  const practiceOpen = ref(false);
   watch([() => store.view.epoch, () => store.view.generation], () => {
     practiceRequest.value = null;
   });
@@ -25,7 +24,6 @@ export function useRestWait(store, { dispatchIntent }) {
 
   return {
     onPractice,
-    practiceOpen,
     practiceFeedback,
     skipDisabled,
   };

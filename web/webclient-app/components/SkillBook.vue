@@ -6,7 +6,8 @@
 // column is a sticky detail card for the selected row — target shape, cost,
 // the advertised 威力 rungs, the truthful field capability, and the two
 // actions: 施放 (hand the cast to the dock through the authoritative server
-// preview) and 修煉 (the bounded declared-practice sub-screen).
+// preview) and 修煉 (one standing practice booking for the book's member,
+// which opens no sub-screen and advances no time).
 //
 // Nothing here decides availability. The capability line restates the
 // static `usable_out_of_combat` flag only; whether a cast is possible right
@@ -15,7 +16,6 @@
 // without detail and offers no 施放, so nothing is invented. Tab, search,
 // expansion and selection are view-local UI state.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import RestForm from "./RestForm.vue";
 import { targetSpecLabel } from "../lib/skill_labels.js";
 
 const props = defineProps({
@@ -25,6 +25,11 @@ const props = defineProps({
   // Showcase/mount conveniences.
   initialTab: { type: String, default: "active" },
   initialQuery: { type: String, default: "" },
+  // The controlled figure's identity (a positive safe integer) from the
+  // committed `status` panel: the member every booking names. Null while
+  // that panel is missing, so 修煉 stays unavailable instead of inventing
+  // or substituting a member.
+  actorId: { type: Number, default: null },
   practiceDisabled: { type: Boolean, default: false },
   practiceFeedback: { type: String, default: "" },
   // The committed presentation mode ("exploration" | "combat" | "dialogue"
@@ -40,25 +45,18 @@ const props = defineProps({
   // row and focus its 施放.
   returnTarget: { type: Object, default: null },
 });
-const emit = defineEmits(["practice", "practice-view", "use"]);
+const emit = defineEmits(["practice", "use"]);
 
 // ---------------------------------------------------------------- practice
-const practice = ref(null);
-watch(practice, (value) => emit("practice-view", value !== null));
-onBeforeUnmount(() => emit("practice-view", false));
-const practiceSkills = computed(() => (props.skills.actives ?? []).flatMap(
-  (category) => (category.groups ?? []).flatMap((group) => group.skills ?? []),
-));
-const practiceSkill = computed(() => practiceSkills.value.find((row) => row.key === practice.value));
-function openPractice(key) {
-  practice.value = key;
-}
-function closePractice() {
-  const key = practice.value;
-  practice.value = null;
-  if (key) {
-    nextTick(() => focusAction(key, "practice"));
-  }
+const actorReady = computed(
+  () => Number.isSafeInteger(props.actorId) && props.actorId > 0,
+);
+// One booking control: the server reauthorizes the member, so the browser
+// sends the controlled figure's id and the row's skill and computes nothing
+// about eligibility, duration, or progression.
+function bookPractice(key) {
+  if (!actorReady.value || props.practiceDisabled) return;
+  emit("practice", { actor_id: props.actorId, skill: key });
 }
 
 // ---------------------------------------------------------------- browsing
@@ -350,7 +348,7 @@ function onSearchKeydown(event) {
 const bookEl = ref(null);
 let drawerEl = null;
 function onBookKeydown(event) {
-  if (event.key !== "/" || practice.value !== null) return;
+  if (event.key !== "/") return;
   const target = event.target;
   if (target === searchEl.value || (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA"))) return;
   event.preventDefault();
@@ -386,28 +384,7 @@ watch(() => props.returnTarget?.seq, () => applyReturn(props.returnTarget));
 </script>
 
 <template>
-  <section
-    v-if="practice !== null"
-    class="practice-screen"
-    data-testid="practice-screen"
-    @keydown.stop
-    @keydown.esc.prevent="closePractice"
-  >
-    <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm practice-screen__back" @click="closePractice">‹ 返回技能書</button>
-    <h2>專注修煉</h2>
-    <p>選擇一項已學會的主動技能，投入時間磨練熟練度。</p>
-    <label>修煉技能
-      <select v-model="practice" :disabled="practiceDisabled" aria-label="修煉技能">
-        <option v-for="row in practiceSkills" :key="row.key" :value="row.key">{{ row.label }}</option>
-      </select>
-    </label>
-    <p>技能達上限、戰鬥中或附近有敵人時，伺服器會拒絕修煉，不推進時間。</p>
-    <p>修煉依完整小時結算；不足一小時不增加熟練度。普通休息與睡眠不增加熟練度。</p>
-    <RestForm :disabled="practiceDisabled || !practiceSkill" label="開始修煉" @close="closePractice" @submit="(seconds) => emit('practice', { skill: practice, seconds })" />
-    <p v-if="practiceFeedback" role="status">{{ practiceFeedback }}</p>
-  </section>
-
-  <section v-else ref="bookEl" class="skill-book" :class="{ 'skill-book--bare': unavailableReason }" data-testid="skill-book">
+  <section ref="bookEl" class="skill-book" :class="{ 'skill-book--bare': unavailableReason }" data-testid="skill-book">
     <div class="skill-book__toolbar">
       <div class="ui-tabs skill-book__tabs" role="tablist" aria-label="技能種類" data-testid="skill-book__tabs">
         <button
@@ -617,12 +594,13 @@ watch(() => props.returnTarget?.seq, () => applyReturn(props.returnTarget));
               type="button"
               class="ui-btn skill-book__practice"
               data-testid="skill-book__practice"
-              :disabled="practiceDisabled"
+              :disabled="practiceDisabled || !actorReady"
               :aria-label="`修煉${selected.row.label}`"
-              @click="openPractice(selected.row.key)"
+              @click="bookPractice(selected.row.key)"
               @keydown="onActionKeydown"
             >修煉</button>
           </div>
+          <p v-if="practiceFeedback" class="skill-book__status" role="status" data-testid="skill-book__practice-feedback">{{ practiceFeedback }}</p>
           <p v-if="notice" class="skill-book__alert" role="alert" data-testid="skill-book__notice">無法施放：{{ notice }}</p>
           <p v-else-if="useAction?.note" class="skill-book__status" role="status" data-testid="skill-book__use-note">{{ useAction.note }}</p>
         </template>

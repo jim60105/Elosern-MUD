@@ -156,27 +156,23 @@ test("explore.wait sleep resolves to sleep", () => {
   assert.strictEqual(Echo.commandLine("explore.wait", { sleep: true }, {}), "sleep");
 });
 
-test("explore.practice resolves to rest <n>s practice <skill>", () => {
+test("explore.practice resolves to the typed 修煉 <skill> booking line", () => {
   assert.strictEqual(
-    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: 3600 }, {}),
-    "rest 3600s practice firebolt"
+    Echo.commandLine("explore.practice", { actor_id: 42, skill: "firebolt" }, {}),
+    "修煉 firebolt"
   );
 });
 
 test("explore.practice stays silent on malformed local payloads", () => {
-  // A malformed payload must never echo a non-replayable line: the skill key
-  // is whitespace-free and the duration is a whole number of seconds.
-  assert.strictEqual(Echo.commandLine("explore.practice", { seconds: 3600 }, {}), null);
+  // A malformed payload must never echo an invented line: the skill key is a
+  // non-empty whitespace-free identifier.
+  assert.strictEqual(Echo.commandLine("explore.practice", { actor_id: 42 }, {}), null);
   assert.strictEqual(
-    Echo.commandLine("explore.practice", { skill: "wind lance", seconds: 3600 }, {}),
+    Echo.commandLine("explore.practice", { actor_id: 42, skill: "wind lance" }, {}),
     null
   );
   assert.strictEqual(
-    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: 3.5 }, {}),
-    null
-  );
-  assert.strictEqual(
-    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: -1 }, {}),
+    Echo.commandLine("explore.practice", { actor_id: 42, skill: "" }, {}),
     null
   );
 });
@@ -682,7 +678,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.party_leave": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
   "explore.possess": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
   "explore.possess_release": { payload: { npc_id: "bard" }, display: {} },
-  "explore.practice": { payload: { skill: "firebolt", seconds: 3600 }, display: {} },
+  "explore.practice": { payload: { actor_id: 42, skill: "firebolt" }, display: {} },
   "explore.skill_preview": null,
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },

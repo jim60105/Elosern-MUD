@@ -839,7 +839,9 @@ export const DialogueHostPending = { render: renderPlayer, args: { dialogue: "pe
 // The host is not in the catalog: the name's initial and the name.
 export const DialogueHostMissing = { render: renderPlayer, args: { dialogue: "missing" } };
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
-export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
+// 修煉 books the controlled figure's practice in place: one dispatch from the
+// detail card, no duration sub-screen, and the drawer keeps its own head.
+export const PracticeBooking = { render: renderPlayer, args: { practice: true } };
 // The island anchors populated (webclient-avg-stage-hud-anchors): vitals,
 // a harmful condition, and the standing party at the left; the place
 // card, the minimap, and the one-line objective at the top-right.
