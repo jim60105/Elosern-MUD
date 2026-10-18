@@ -81,6 +81,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "unpossess": {"syntax": "unpossess", "context": "附身中"},
     "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
     "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
+    "修煉": {"syntax": "修煉 <技能> [= <成員>]", "context": "一般（戰鬥中拒絕）"},
     "sleep": {"syntax": "sleep [dream]", "context": "一般"},
     "dream": {
         "syntax": "dream、dream say <文字>、dream draft [故事方向]、dream confirm [故事方向]、dream awaken",
@@ -754,11 +755,13 @@ class CommandDocsContractTests(unittest.TestCase):
         )
         self.assertEqual(entry["語法"], EXPECTED_COMMANDS["rest"]["syntax"])
         description = entry["說明"]
-        # Declared practice settles hourly proficiency, and a clause-less
-        # rest is explicitly zero-growth (the delta scenario's two claims).
+        # Declared practice settles hourly proficiency; a clause-less rest
+        # records no new booking, settles standing ones, and only grows
+        # nothing when no member has one (party-practice-booking).
         self.assertIn("practice <技能>", description)
         self.assertIn("每整小時", description)
-        self.assertIn("不帶來任何成長", description)
+        self.assertIn("先前排入的修煉", description)
+        self.assertIn("未排入任何修煉時不帶來任何成長", description)
         overview_row = next(
             line
             for line in self.overview.splitlines()
@@ -766,6 +769,25 @@ class CommandDocsContractTests(unittest.TestCase):
         )
         self.assertIn("`practice <技能>`", overview_row)
         self.assertIn("熟練度", overview_row)
+
+    @covers_requirement("game-command-docs::accurate-command-details")
+    def test_practice_entry_documents_the_standing_booking(self):
+        entry = self.entries["修煉"]
+        self.assertEqual(entry["指令"], "修煉")
+        self.assertEqual(parse_aliases(entry["別名"]), {"practice"})
+        self.assertEqual(entry["語法"], EXPECTED_COMMANDS["修煉"]["syntax"])
+        self.assertEqual(entry["情境"], EXPECTED_COMMANDS["修煉"]["context"])
+        # Booking advances no time, settles by whole hours, and refuses in
+        # combat; the member clause is optional and defaults to the caller.
+        for token in ("= <成員>", "不推進時間", "完整小時", "戰鬥中"):
+            self.assertIn(token, entry["說明"])
+        overview_row = next(
+            line
+            for line in self.overview.splitlines()
+            if line.startswith("| [`修煉`](")
+        )
+        self.assertIn("= <成員>", overview_row)
+        self.assertIn("排入", overview_row)
 
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_admin_marking_matches_class_locks(self):
