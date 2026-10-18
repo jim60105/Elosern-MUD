@@ -468,6 +468,9 @@ class MemberUseCommandTests(_ItemsCommandBase):
     @covers_requirement(
         "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
     )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
+    )
     def test_text_use_names_a_companion_and_matches_the_action(self):
         # Delta: "Text use names a companion" — 艾拉 drinks her own potion with
         # the same outcome and message as `inventory.use` naming her, and the
@@ -674,6 +677,9 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement(
         "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    @covers_requirement(
+        "companion-field-actions::combat-item-use-stays-on-the-actor-command-flow"
     )
     def test_combat_member_use_saves_the_same_draft_entry_as_the_actor_command(self):
         # Delta: "Text use names a companion" — the member suffix saves that

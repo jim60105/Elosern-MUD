@@ -493,6 +493,9 @@ class InventoryMemberUseAdapterTests(InventoryActionBase):
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions",
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
     )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
+    )
     def test_a_companion_uses_her_own_potion_and_the_commander_holds_none(self):
         # Delta: "A companion uses her own potion" — the named member's bag is
         # consumed and her gauge rises; the same payload naming the commander
@@ -589,6 +592,9 @@ class InventoryMemberUseAdapterTests(InventoryActionBase):
 
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    @covers_requirement(
+        "companion-field-actions::combat-item-use-stays-on-the-actor-command-flow"
     )
     def test_in_session_member_use_is_rejected_before_resolution(self):
         companion = self._companion_holding()

@@ -143,6 +143,9 @@ class CompanionItemUseRuleTests(_CompanionItemUseCase):
     @covers_requirement(
         "party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party"
     )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
+    )
     def test_a_companion_drinks_her_own_potion(self):
         self.aila.db.inventory = [_KEY]
         commander_mp = int(self.commander.traits.mp.current)
@@ -172,6 +175,9 @@ class CompanionItemUseRuleTests(_CompanionItemUseCase):
     @covers_requirement(
         "party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party"
     )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
+    )
     def test_self_effects_bind_to_the_user_only(self):
         self.aila.db.inventory = [_KEY]
         self.kahn.db.inventory = [_KEY]
@@ -183,6 +189,9 @@ class CompanionItemUseRuleTests(_CompanionItemUseCase):
 
     @covers_requirement(
         "party-member-authority::acting-purposes-exclude-knocked-out-members"
+    )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
     )
     def test_a_knocked_out_member_is_refused_without_consuming(self):
         self.kahn.db.inventory = [_KEY]
@@ -219,6 +228,9 @@ class CompanionItemUseRuleTests(_CompanionItemUseCase):
         self.assertEqual(list_items(self.commander), [_KEY])
         self.assertEqual(self.clock.tick, 0)
 
+    @covers_requirement(
+        "companion-field-actions::combat-item-use-stays-on-the-actor-command-flow"
+    )
     def test_a_party_session_refuses_the_field_path(self):
         # The member carries no session of her own: only the party-wide check
         # keeps the field path off the commander's encounter.
