@@ -383,6 +383,34 @@ class PartyInventoryWireTests(unittest.TestCase):
             "lone surrogate display name",
             lambda p: p["rows"][0].update(display_name="\ud800"),
         )
+        # The closed ASCII blank vocabulary is identical on both sides: these
+        # Unicode-whitespace-only values are non-blank in both validators.
+        add(
+            "display name unicode whitespace",
+            lambda p: p["rows"][0].update(display_name="\u0085"),
+            True,
+        )
+        add(
+            "display name byte-order mark",
+            lambda p: p["rows"][0].update(display_name="\ufeff"),
+            True,
+        )
+        add(
+            "reason unicode whitespace",
+            lambda p: p["rows"][0].update(
+                use={
+                    "route": "field_use",
+                    "enabled": False,
+                    "reason": "\u0085",
+                }
+            ),
+            True,
+        )
+        add(
+            "item key unicode whitespace",
+            lambda p: p["rows"][0].update(item_key="\u0085"),
+            True,
+        )
         add(
             "maximal bounded rows",
             lambda p: p.update(rows=_maximal_rows()),
@@ -669,6 +697,28 @@ class PartyInventoryPresenterTests(BattlefieldIsolation, EvenniaTest):
             row["give"]["reason"], TRANSFER_MESSAGES["transfer_in_combat"]
         )
         self.assertTrue(row["toggle"]["enabled"])
+
+    @covers_requirement(
+        "webclient-party-inventory-panel::bag-rows-carry-presentation-and-server-authored-descriptors"
+    )
+    def test_a_malformed_combat_record_disables_field_use(self):
+        from world.rules.player_messages import session_reason_message
+
+        self.companion.traits.hp.current = 50
+        self._hold(self.companion, _TONIC_KEY)
+        # ``party_in_combat`` reads an unreadable record as "no session"; the
+        # panel must still route the use descriptor to the combat draft and
+        # publish the session's own refusal instead of field eligibility.
+        self.player.db.active_combat = {"not": "a session"}
+
+        payload = self._render(member=self.companion)
+
+        use = payload["rows"][0]["use"]
+        self.assertEqual(use["route"], "combat_draft")
+        self.assertFalse(use["enabled"])
+        self.assertEqual(
+            use["reason"], session_reason_message("malformed_session")
+        )
 
     @covers_requirement(
         "webclient-party-inventory-panel::the-party-inventory-panel-is-an-exact-read-only-version-1-panel"

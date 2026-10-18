@@ -369,6 +369,15 @@ class PartyInventoryViewTests(BattlefieldIsolation, EvenniaTestCase):
         ).use
         self.assertFalse(malformed.enabled)
         self.assertEqual(malformed.reason, session_reason_message("malformed_session"))
+        # A present record wins over a false caller hint: field use is never
+        # advertised while the session is unreadable.
+        routed = self._row(
+            inventory_view(self.aila, in_combat=False), _TONIC_KEY
+        ).use
+        self.assertEqual(routed.route, ROUTE_COMBAT_DRAFT)
+        self.assertEqual(
+            routed.reason, session_reason_message("malformed_session")
+        )
 
     @covers_requirement(
         "webclient-party-inventory-panel::bag-rows-carry-presentation-and-server-authored-descriptors"

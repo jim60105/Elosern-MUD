@@ -67,6 +67,16 @@ class PartyInventoryPanelError(ProtocolValidationError):
     """The available ``party_inventory`` payload violates its exact schema."""
 
 
+#: The explicit blank-string vocabulary shared with the JS mirror. Python's
+#: ``str.strip`` and JavaScript's ``String.trim`` disagree on Unicode
+#: whitespace (U+0085, U+FEFF), so both validators use this closed ASCII set.
+_BLANK_CHARS = " \t\n\r\v\f"
+
+
+def _is_blank(value: str) -> bool:
+    return not value.strip(_BLANK_CHARS)
+
+
 def _presentation_key(value: Any, field: str) -> str:
     if (
         not isinstance(value, str)
@@ -110,7 +120,7 @@ def _validate_reason(value: dict[str, Any], name: str) -> str | None:
     if reason is None:
         return None
     reason = _require_str(value, "reason", maximum=MAX_REASON_CODE_POINTS)
-    if not reason.strip():
+    if _is_blank(reason):
         raise PartyInventoryPanelError(f"{name} reason must be non-empty")
     if any(0xD800 <= ord(ch) <= 0xDFFF for ch in reason):
         raise PartyInventoryPanelError(
@@ -164,7 +174,7 @@ def _validate_slot_key(value: Any, field: str) -> str | None:
         raise PartyInventoryPanelError(
             f"{field} must be 1..{MAX_KEY_CODE_POINTS} characters"
         )
-    if not value.strip():
+    if _is_blank(value):
         raise PartyInventoryPanelError(f"{field} must be non-empty")
     if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
         raise PartyInventoryPanelError(f"{field} must not carry lone surrogates")
@@ -178,7 +188,7 @@ def _validate_display_name(value: Any) -> str:
         raise PartyInventoryPanelError(
             f"display_name must be 1..{MAX_DISPLAY_NAME_CODE_POINTS} characters"
         )
-    if not value.strip():
+    if _is_blank(value):
         raise PartyInventoryPanelError("display_name must be non-empty")
     if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
         raise PartyInventoryPanelError(

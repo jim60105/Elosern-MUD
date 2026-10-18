@@ -33,6 +33,13 @@ var USE_ROUTES = ["field_use", "combat_draft"];
 var TOGGLE_ROUTES = ["toggle"];
 var SLOT_NAMES = ["weapon_main", "weapon_off", "armor", "accessory"];
 
+// The explicit blank-string vocabulary shared with the server validator:
+// Python's str.strip and JavaScript's String.trim disagree on Unicode
+// whitespace (U+0085, U+FEFF), so both use this closed ASCII set.
+function isBlank(value) {
+  return value.replace(/[ \t\n\r\v\f]/g, "").length === 0;
+}
+
 function requirePresentationKey(value, field) {
   if (
     typeof value !== "string" ||
@@ -91,7 +98,7 @@ function validateReason(value, name) {
     return null;
   }
   reason = requireString(reason, "reason", PARTY_INVENTORY_MAX_REASON);
-  if (reason.trim().length === 0 || hasLoneSurrogate(reason)) {
+  if (isBlank(reason) || hasLoneSurrogate(reason)) {
     throw new Error(name + " reason must be a non-empty bounded string");
   }
   return reason;
@@ -137,7 +144,7 @@ function validateSlotKey(value, field) {
     return null;
   }
   requireString(value, field, PARTY_INVENTORY_MAX_KEY);
-  if (codePoints(value) < 1 || value.trim().length === 0) {
+  if (codePoints(value) < 1 || isBlank(value)) {
     throw new Error(field + " must be a non-empty string or null");
   }
   if (hasLoneSurrogate(value)) {
@@ -160,7 +167,7 @@ function validateDisplayName(value) {
         " characters"
     );
   }
-  if (value.trim().length === 0) {
+  if (isBlank(value)) {
     throw new Error("display_name must be non-empty");
   }
   if (hasLoneSurrogate(value)) {

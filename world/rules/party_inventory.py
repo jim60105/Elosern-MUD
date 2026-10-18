@@ -813,6 +813,11 @@ def inventory_view(member: Any, *, in_combat: bool) -> MemberInventoryView:
     commander = _commander_of(member)
     if commander is None:
         raise PartyInventoryViewError(REASON_NOT_PARTY_MEMBER)
+    # A present combat record always wins over the caller's mode hint: the
+    # session predicate treats an unreadable record as "no session", so field
+    # eligibility must never be advertised while one exists. The combat path
+    # then reports the record's own stable malformed-session refusal.
+    in_combat = in_combat or commander.db.active_combat is not None
     try:
         purse = read_wallet(commander, PartyInventoryViewError)
     except ValueError as error:
