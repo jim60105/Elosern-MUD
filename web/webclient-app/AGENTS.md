@@ -98,3 +98,40 @@ component `<style>` blocks, and Storybook does not render under `.elosern-root`.
 When restyling a component, grep app-shell.css for its class names and remove or
 update the `.elosern-root` duplicates, and verify geometry with a live-client
 browser test, not only Storybook.
+
+## Shared window primitives
+
+The party window and the shop compose the quest drawer frame through five
+primitives (webclient-window-primitives; design §9 of
+`docs/superpowers/specs/2026-10-18-party-member-management-ui-design.md`).
+Reuse them for any new window instead of copying markup:
+
+- `WindowFrame` — a `HudDrawer` (seal glyph, title, close, focus trap,
+  Escape, motion unchanged) with the quest drawer's head row under it: the
+  first-level `IconTabs` (`v-model`) and an `extras` slot (purse, quota).
+  The body is one tabpanel; mount the frame only while the window is open.
+  The dialog is named by its title, and the frame re-exposes HudDrawer's
+  `forceClose()` for a host's confirmed discard past `closeGuard`.
+  The prototype draws one header row; the frame keeps HudDrawer's header and
+  puts the tabs and extras in the second row, as the quest drawer does.
+- `MemberRail` — plain props (`members[]` with `id`, `name`, `portrait`
+  URL, `knockedOut`, `unread`; `selected`; `emptySlot`), emits
+  `select(id)`; the 空位 entry emits `select(EMPTY_SLOT)` (exported
+  `"empty"`). Roving focus like `IconTabs`; selection only on Enter, Space
+  or click; the selected entry has `aria-current`.
+- `ListDetail` — `rail`, `list`, `detail` and `actions` slots; the list and
+  the detail scroll independently and the actions stay pinned under the
+  detail. `variant="portrait"` narrows the list column.
+- `ActionBar` — `actions[]` (`key`, `label`, `enabled`, `reason`, `tone`,
+  `glyph`) and an optional committed `reason`; the left slot shows only
+  committed reasons (no rule text), disabled controls stay focusable with
+  `aria-disabled` and emit nothing.
+- `HoldingsStrip` — `item_holdings` v1 `rows` verbatim plus `members` for
+  names, `giverId` and `combat`; emits `give(memberId)` only for an enabled
+  receive fact. It computes no count or delta; in combat it shows counts
+  only (the owner's cell keeps its 持有者 text).
+
+Every primitive size is `calc(<n>px * var(--ui-scale))` or a token, text
+uses `--text-*` tokens (never below `--text-xs`), and durations use
+`--motion-*` (pinned by `tests/components/window_primitives_styles.test.js`).
+The prototype's new glyphs live in `components/dock-icons.js`.

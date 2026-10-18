@@ -604,6 +604,10 @@ or by a committed action-result read model.
 - **THEN** the manifest is re-frozen at the complete set then current, and each later growth
   re-freezes it at its new complete set
 
+#### Scenario: The party member management series is a governed add-and-delete wave
+- **WHEN** a change in the party member management series (`docs/superpowers/specs/2026-10-18-party-member-management-ui-design.md`) names a component addition or deletion as part of its own scope
+- **THEN** it grows or shrinks the frozen set under the governed wave route, adding `Core/WindowFrame`, `Core/MemberRail`, `Core/ListDetail`, `Core/ActionBar` and `Data/HoldingsStrip` and the party window and shop window components with their stories, and deleting `InventoryPanel`, `EquipmentDoll`, `CharacterStatusDrawer`, `SkillBook`, `LineagePanel`, `PartyDrawer` and `ShopPanel` in lockstep with their stories, manifest titles, spec references and `.elosern-root` duplicate rules
+
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 
 Storybook SHALL provide breakdown-state stories for the character drawer,
