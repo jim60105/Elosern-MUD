@@ -94,6 +94,8 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（戰鬥內外皆可施放技能）",
     },
     "lineage": {"syntax": "lineage", "context": "一般（戰鬥內外皆可用）"},
+    "狀態": {"syntax": "狀態 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
+    "技能": {"syntax": "技能 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
     "engage": {"syntax": "engage <target>", "context": "戰鬥（需有敵對魔物）"},
     "combat forfeit": {
         "syntax": "combat forfeit、combat forfeit confirm <token>",
