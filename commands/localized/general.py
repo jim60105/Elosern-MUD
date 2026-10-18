@@ -38,6 +38,14 @@ from world.rules.equipment import (
     plan_inventory_delta,
     registry_key_for_object,
 )
+from world.rules.npc_identity import npc_display_name
+from world.rules.party_inventory import (
+    PartyTransferError,
+    resolve_item_token,
+    transfer_item,
+)
+from world.rules.party_scope import PartyScopeError, resolve_member_token
+from world.rules.quest_delivery import item_display_name
 
 
 class NumberedTargetCommand(_NumberedTargetCommand):
@@ -49,7 +57,18 @@ class NumberedTargetCommand(_NumberedTargetCommand):
     """
 
     def parse(self):
+        # ``super().parse`` folds an omitted count and an explicitly typed
+        # ``0`` into the same ``self.number == 0``, so the raw left-hand side
+        # is captured first: a typed count (even zero) must reach the transfer
+        # rule's invalid-quantity refusal instead of defaulting to one copy.
+        lhs = self.args or ""
+        for delimiter in getattr(self, "rhs_split", None) or ():
+            if delimiter in lhs:
+                lhs = lhs.split(delimiter, 1)[0]
+                break
         super().parse()
+        head, _, rest = lhs.strip().partition(" ")
+        self.count_given = bool(rest) and head.isdecimal()
         if self.number and self.args.startswith("個"):
             self.args = self.args[1:].lstrip()
         if self.number and self.lhs.startswith("個"):
@@ -409,9 +428,11 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
     """把物品交給別人
 
     用法：
-      給 <背包中的物品> = <目標>
+      給 [數量] <背包中的物品> = <目標>
 
     把你背包中的物品交給另一個人，放進對方的背包。登錄物品的背包清單記錄會同步轉移。
+    目標是隊伍成員時改由隊伍物品轉移規則處理：免費、不推進時間、不改變好感度，
+    戰鬥中會以固定語句拒絕；其他目標維持原本的給予行為。
     """
 
     key = "給"
@@ -422,7 +443,9 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         """執行交付。"""
         caller = self.caller
         if not self.args or not self.rhs:
-            caller.msg("用法：給 <背包中的物品> = <目標>")
+            caller.msg("用法：給 [數量] <背包中的物品> = <目標>")
+            return
+        if self._give_to_member():
             return
         key = self.lhs
         fallback_key = (
@@ -574,6 +597,39 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         obj_name = to_give[0].get_numbered_name(len(moved), caller, return_string=True)
         caller.msg(f"你把{obj_name}交給了 {target.get_display_name(caller)}。")
         target.msg(f"{caller.get_display_name(target)} 把{obj_name}交給了你。")
+
+    def _give_to_member(self) -> bool:
+        """Route a member target through the party item transfer rule.
+
+        Returns ``True`` when the request was handled (accepted or refused) and
+        ``False`` when the token names no party member, so NPCs, other players
+        and quest recipients keep the legacy give path -- including quest
+        delivery advancement. The item token resolves against the caller's
+        canonical bag only, and every refusal is the rule's fixed message, so
+        the text surface and ``party.transfer`` never drift.
+        """
+        caller = self.caller
+        try:
+            member = resolve_member_token(caller, self.rhs)
+        except PartyScopeError:  # observability: ignore R2: a token that names no member is not a refusal; the legacy give path handles it
+            return False
+        item_key = resolve_item_token(caller, self.lhs)
+        try:
+            outcome = transfer_item(
+                caller,
+                caller.pk,
+                member.pk,
+                item_key,
+                self.number if self.count_given else 1,
+            )
+        except PartyTransferError as error:  # observability: ignore R2: player-facing refusal; the rule's fixed message is the report
+            caller.msg(error.message)
+            return True
+        caller.msg(
+            f"你把 {outcome.quantity} 個{item_display_name(outcome.item_key)}"
+            f"交給了{npc_display_name(outcome.receiver)}。"
+        )
+        return True
 
 
 class CmdHome(_CmdHome):

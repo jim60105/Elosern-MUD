@@ -52,7 +52,7 @@ from commands.church import (
     CmdChurchRedeem,
 )
 from commands.economy import CmdBuy, CmdInventory, CmdSell, CmdShopStock
-from commands.items import CmdToggleEquip, CmdUseItem
+from commands.items import CmdRetrieve, CmdToggleEquip, CmdUseItem
 from commands.guild import (
     CmdGuildAbandon,
     CmdGuildAccept,
@@ -235,6 +235,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdLetters)
         self.add(CmdUseItem)
         self.add(CmdToggleEquip)
+        self.add(CmdRetrieve)
         self.add(CmdDeliver)
         self.add(CmdsTalk)
         self.add(CmdInvite)

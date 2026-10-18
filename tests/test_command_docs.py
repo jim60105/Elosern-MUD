@@ -208,8 +208,15 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "動作": {"syntax": "動作 <動作描述>", "context": "一般"},
     "拿": {"syntax": "拿 <物品>", "context": "一般"},
     "丟": {"syntax": "丟 <物品>", "context": "一般"},
-    "給": {"syntax": "給 <物品> = <對象>", "context": "一般"},
+    "給": {
+        "syntax": "給 [數量] <物品> = <對象>",
+        "context": "一般（對隊伍成員轉移時戰鬥中拒絕）",
+    },
     "交付": {"syntax": "交付 <對象> <物品>", "context": "一般（探索中可用；戰鬥中拒絕）"},
+    "取回": {
+        "syntax": "取回 [數量] <物品> = <成員>",
+        "context": "一般（探索中可用；戰鬥中拒絕）",
+    },
     "回家": {"syntax": "回家", "context": "一般（需 home 權限或建造者權限）"},
     "耳語": {"syntax": "耳語 <角色> = <訊息>", "context": "一般"},
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
@@ -633,6 +640,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
     @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
             entry = self.entries[key]
@@ -837,6 +847,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::drift-contract-test")
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)
         self.assertCountEqual(links.keys(), self.entries.keys())
