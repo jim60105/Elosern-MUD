@@ -78,6 +78,7 @@ describe("SkillBook use hand-over", () => {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 0,
+      selected_skill: null,
     };
   }
 

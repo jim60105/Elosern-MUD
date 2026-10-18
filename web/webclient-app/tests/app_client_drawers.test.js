@@ -221,6 +221,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       disguise: CHARACTER_PANEL_SAMPLE.disguise,
       guild: CHARACTER_PANEL_SAMPLE.guild,
       wallet: CHARACTER_PANEL_SAMPLE.wallet,
+      selected_skill: SKILLS_SLICE_SAMPLE.selected_skill,
     };
   }
 

@@ -3,7 +3,6 @@ synthetic mastery/skill lookups they drive.
 """
 from tools.spec_traceability import covers_requirement
 from dataclasses import replace
-import importlib
 from unittest.mock import patch
 import unittest
 from evennia.utils.create import create_object
@@ -42,6 +41,7 @@ from .._combat_session_helpers import (
     _monster_tier_key,
     _race_key,
     _behaviour_archetype_key,
+    live_skill_registry,
     open_synthetic_scope,
 )
 from ..combat_fixtures import BattlefieldIsolation, grant_lineage
@@ -324,14 +324,11 @@ class FreeformScaleEntriesForTests(EvenniaTestCase):
 _SYNTHETIC_LADDER = ((0.25, 0), (0.5, 1), (1.0, 2), (2.0, 4), (4.0, 6))
 
 
-def _live_registry():
-    """The CURRENT registry binding (the synthetic scope rebinds the name)."""
-    return importlib.import_module("world.skills.registry").SKILL_REGISTRY
-
-
 def _revalidate_live() -> None:
-    registry = importlib.import_module("world.skills.registry")
-    registry.validate_prerequisite_graph(registry.SKILL_REGISTRY)
+    """Rebuild the load-time caches against whichever registry is live."""
+    from world.skills.registry import validate_prerequisite_graph
+
+    validate_prerequisite_graph(live_skill_registry())
 
 
 def _ceiling_row():
@@ -441,7 +438,7 @@ class FreeformLadderForTests(EvenniaTestCase):
     )
     def test_rungs_above_the_derived_tip_cap_stay_locked(self):
         consumer = _ceiling_row()
-        registry = _live_registry()
+        registry = live_skill_registry()
         registry[consumer.key] = consumer
         _revalidate_live()
         # Inflated XP cannot unlock past the cap: the unlocked set is the

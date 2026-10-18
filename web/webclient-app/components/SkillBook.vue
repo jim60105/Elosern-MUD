@@ -40,7 +40,7 @@ const props = defineProps({
   // row and focus its 施放.
   returnTarget: { type: Object, default: null },
 });
-const emit = defineEmits(["practice", "use"]);
+const emit = defineEmits(["practice", "use", "select-skill"]);
 
 // ---------------------------------------------------------------- practice
 // The book's skills belong to the character panel's viewed member, so every
@@ -181,11 +181,47 @@ watch(query, () => {
   }
 });
 const selected = computed(() => visibleSkills.value.find((entry) => entry.row.key === selectedKey.value) ?? null);
+const isActiveTab = computed(() => tab.value === "active");
+
+// v9 carries the ladder once, on the panel's `selected_skill` (the skill
+// chosen through `party.view_member`), never per row. The table renders only
+// while that server selection names the row on screen.
+const serverSelected = computed(() => {
+  const committed = props.skills?.selected_skill;
+  if (!committed || !selected.value || committed.key !== selected.value.row.key) {
+    return null;
+  }
+  return committed;
+});
+const ladder = computed(() =>
+  Array.isArray(serverSelected.value?.freeform_ladder)
+    ? serverSelected.value.freeform_ladder
+    : []
+);
+const unlockedRungs = computed(() => ladder.value.filter((entry) => entry.mp_cost != null));
+
+// The 技能 tab's selection rides `party.view_member`: the server stores it and
+// republishes this panel with that skill's lineage and ladder. A local
+// selection change requests it once; the committed key guard keeps the
+// response from echoing a second request, and an unregistered row (no `cost`)
+// is never requested because the server would answer null.
+function requestSelectedSkill() {
+  const entry = selected.value;
+  if (!isActiveTab.value || !entry || memberId.value === null) return;
+  if (!("cost" in entry.row)) return;
+  if (entry.row.key === (props.skills?.selected_skill?.key ?? null)) return;
+  emit("select-skill", { member_id: memberId.value, skill_key: entry.row.key });
+}
+watch(
+  [selectedKey, isActiveTab, () => props.skills?.selected_skill?.key],
+  requestSelectedSkill,
+  { flush: "post", immediate: true }
+);
 
 // ------------------------------------------------------------ presentation
 function costText(row) {
   if (!("cost" in row)) return null;
-  const scales = Array.isArray(row.freeform_scales) ? row.freeform_scales : [];
+  const scales = row.key === selectedKey.value ? unlockedRungs.value : [];
   if (scales.length > 0) {
     const costs = scales.map((entry) => entry.mp_cost);
     const low = Math.min(...costs);
@@ -210,8 +246,6 @@ function detailCost(row) {
 function targetText(row) {
   return row.target_spec ? targetSpecLabel(row.target_spec) : null;
 }
-
-const isActiveTab = computed(() => tab.value === "active");
 
 // What 施放 does in the current mode (never a legality verdict).
 const useAction = computed(() => {
@@ -559,17 +593,20 @@ watch(() => props.returnTarget?.seq, () => applyReturn(props.returnTarget));
               <dt>目標</dt><dd>{{ targetText(selected.row) }}</dd>
             </template>
             <template v-if="'cost' in selected.row">
-              <dt>消耗</dt><dd>{{ detailCost(selected.row) }}<span v-if="selected.row.freeform_scales?.length" class="skill-book__muted">（威力 ×1）</span></dd>
+              <dt>消耗</dt><dd>{{ detailCost(selected.row) }}<span v-if="ladder.length" class="skill-book__muted">（威力 ×1）</span></dd>
             </template>
           </dl>
 
-          <table v-if="selected.row.freeform_scales?.length" class="skill-book__scales" data-testid="skill-book__scales">
+          <table v-if="ladder.length" class="skill-book__scales" data-testid="skill-book__scales">
             <caption>威力與消耗</caption>
             <thead>
-              <tr><th v-for="entry in selected.row.freeform_scales" :key="entry.scale" scope="col" :class="{ 'is-standard': entry.scale === 1 }">×{{ entry.label }}</th></tr>
+              <tr><th v-for="entry in ladder" :key="entry.scale" scope="col" :class="{ 'is-standard': entry.scale === 1, 'is-locked': entry.unlock_level != null }">×{{ entry.label }}</th></tr>
             </thead>
             <tbody>
-              <tr><td v-for="entry in selected.row.freeform_scales" :key="entry.scale" :class="{ 'is-standard': entry.scale === 1 }">MP {{ entry.mp_cost }}</td></tr>
+              <tr><td v-for="entry in ladder" :key="entry.scale" :class="{ 'is-standard': entry.scale === 1, 'is-locked': entry.unlock_level != null }">
+                <template v-if="entry.mp_cost != null">MP {{ entry.mp_cost }}</template>
+                <template v-else>熟練度 Lv.{{ entry.unlock_level }}</template>
+              </td></tr>
             </tbody>
           </table>
 
@@ -953,6 +990,9 @@ watch(() => props.returnTarget?.seq, () => applyReturn(props.returnTarget));
 }
 .skill-book__scales .is-standard {
   color: var(--gold-400);
+}
+.skill-book__scales .is-locked {
+  color: var(--paper-500);
 }
 .skill-book__capability {
   display: flex;

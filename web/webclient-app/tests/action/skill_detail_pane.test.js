@@ -114,4 +114,15 @@ describe("SkillDetailPane strip variant", () => {
       expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗MP 6");
     });
   });
+
+  it("states a locked rung's unlock level instead of a cost it cannot pay", () => {
+    const scales = [{ scale: 2, label: "2", unlock_level: 6 }];
+    wrapper = mount(SkillDetailPane, {
+      props: { skill: skill({ costText: "MP 14" }), variant: "strip", scales, scale: 2 },
+    });
+    const strip = wrapper.get('[data-testid="combat-detail"]');
+    expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗熟練度 Lv.6");
+    expect(strip.text()).toContain("威力×2 熟練度 Lv.6");
+    expect(strip.text()).not.toContain("MP 6");
+  });
 });

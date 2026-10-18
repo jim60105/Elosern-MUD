@@ -189,6 +189,23 @@ function withGrowthFacts(row) {
 
 export const SKILLS_SLICE_SAMPLE = {
   ...SKILLS_SLICE_BASE,
+  // The panel's viewed member: the book names it in practice bookings and in
+  // the 技能-tab selection request.
+  member_id: 42,
+  // The one server-selected skill (chosen through `party.view_member`): its
+  // lineage position and ladder ride here, never on the rows. Rungs above the
+  // member's proficiency carry their unlock level instead of a cost.
+  selected_skill: {
+    key: "fireball",
+    lineage: { prerequisites: [], next: [] },
+    freeform_ladder: [
+      { scale: 0.25, label: "1/4", mp_cost: 4 },
+      { scale: 0.5, label: "1/2", mp_cost: 7 },
+      { scale: 1, label: "1", mp_cost: 14 },
+      { scale: 2, label: "2", unlock_level: 6 },
+      { scale: 4, label: "4", unlock_level: 10 },
+    ],
+  },
   actives: SKILLS_SLICE_BASE.actives.map((category) => ({
     ...category,
     groups: category.groups.map((group) => ({

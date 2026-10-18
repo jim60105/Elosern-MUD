@@ -1217,6 +1217,7 @@ const rootStyle = computed(() => {
         :return-target="store.view.bookReturn"
         @practice="onPractice"
         @use="onSkillUse"
+        @select-skill="onViewSkill"
       />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"

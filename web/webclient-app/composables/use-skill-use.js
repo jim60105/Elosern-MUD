@@ -18,6 +18,21 @@ export function useSkillUse(store) {
     }
   }
 
+  // The 技能 tab's selection rides `party.view_member` (the one selection
+  // action): the server stores it for the viewed member and republishes the
+  // character panel with that skill's lineage and ladder. The book never
+  // computes detail itself.
+  function onViewSkill(payload) {
+    if (!payload || !Number.isSafeInteger(payload.member_id) || !payload.skill_key) {
+      return;
+    }
+    store.dispatchAction("party.view_member", {
+      member_id: payload.member_id,
+      tab: "skills",
+      skill_key: payload.skill_key,
+    });
+  }
+
   // The dock flow (or the combat 技能 entry) takes DOM focus after the book's
   // drawer has unmounted, so focus never lands on <body> or behind a trap.
   watch(
@@ -34,5 +49,5 @@ export function useSkillUse(store) {
 
   const skillUseDockShown = computed(() => !!store.view.skillUse);
 
-  return { onSkillUse, skillUseDockShown, skillUseLocked };
+  return { onSkillUse, onViewSkill, skillUseDockShown, skillUseLocked };
 }

@@ -59,12 +59,12 @@ describe("SkillBook (skillbook-authoritative-casting master–detail book)", () 
   });
 
   it("keeps the booking control unavailable without a member and while locked", async () => {
-    const w = mountBook();
+    const w = mountBook({ skills: { ...SKILLS_SLICE_SAMPLE, member_id: undefined } });
     const control = () => w.get('[data-testid="skill-book__practice"]');
     expect(control().attributes("disabled")).toBeDefined();
     await control().trigger("click");
     expect(w.emitted("practice")).toBeUndefined();
-    await w.setProps({ actorId: 42, practiceDisabled: true });
+    await w.setProps({ skills: SKILLS_SLICE_SAMPLE, practiceDisabled: true });
     expect(control().attributes("disabled")).toBeDefined();
     await control().trigger("click");
     expect(w.emitted("practice")).toBeUndefined();
@@ -155,10 +155,17 @@ describe("SkillBook (skillbook-authoritative-casting master–detail book)", () 
     expect(w.text()).not.toMatch(/\bcombat\b/);
   });
 
-  it("states costs with a resource prefix and a range for advertised rungs", () => {
+  it("states costs with a resource prefix and the unlocked rung range", async () => {
     const w = mountBook();
     expect(row(w, FIREBOLT.key).get('[data-testid="skill-book__cost"]').text()).toBe(`MP${FIREBOLT.cost.mp}`);
-    expect(row(w, FIREBALL.key).get('[data-testid="skill-book__cost"]').text()).toBe("MP4–56");
+    // Only the server-selected skill carries a ladder, and its range covers
+    // the unlocked rungs (a locked rung has no cost to advertise).
+    await select(w, FIREBALL.key);
+    const unlocked = SKILLS_SLICE_SAMPLE.selected_skill.freeform_ladder
+      .filter((entry) => entry.mp_cost != null)
+      .map((entry) => entry.mp_cost);
+    expect(row(w, FIREBALL.key).get('[data-testid="skill-book__cost"]').text())
+      .toBe(`MP${Math.min(...unlocked)}–${Math.max(...unlocked)}`);
     expect(row(w, FIREBALL.key).get('[data-testid="skill-book__cost"]').classes()).toContain("mp");
   });
 
@@ -186,12 +193,39 @@ describe("SkillBook (skillbook-authoritative-casting master–detail book)", () 
     expect(w.get('[data-testid="skill-book__use-note"]').text()).toContain("僅能在戰鬥中使用");
   });
 
-  it("shows the advertised 威力 rungs as a read-only table", async () => {
+  it("shows the selected skill's 威力 ladder, locked rungs at their level", async () => {
     const w = mountBook();
     await select(w, FIREBALL.key);
     const table = w.get('[data-testid="skill-book__scales"]');
-    expect(table.findAll("th").map((th) => th.text())).toEqual(FIREBALL.freeform_scales.map((e) => `×${e.label}`));
+    const ladder = SKILLS_SLICE_SAMPLE.selected_skill.freeform_ladder;
+    expect(table.findAll("th").map((th) => th.text())).toEqual(ladder.map((e) => `×${e.label}`));
+    expect(table.findAll("tbody td").map((td) => td.text())).toEqual(
+      ladder.map((e) => (e.mp_cost != null ? `MP ${e.mp_cost}` : `熟練度 Lv.${e.unlock_level}`)),
+    );
     expect(table.find("button").exists()).toBe(false);
+  });
+
+  it("renders no ladder for a row the server selection does not name", async () => {
+    const w = mountBook();
+    await select(w, FIREBOLT.key);
+    expect(w.find('[data-testid="skill-book__scales"]').exists()).toBe(false);
+    // A row the registry cannot resolve is never requested from the server.
+    await select(w, LEGACY.key);
+    expect(w.find('[data-testid="skill-book__scales"]').exists()).toBe(false);
+  });
+
+  it("asks the server for the selected skill's detail through the selection action", async () => {
+    const w = mountBook();
+    const requests = () => w.emitted("select-skill") || [];
+    expect(requests().at(-1)).toEqual([
+      { member_id: SKILLS_SLICE_SAMPLE.member_id, skill_key: FIREBOLT.key },
+    ]);
+    await select(w, FIRESTORM.key);
+    expect(requests().at(-1)).toEqual([
+      { member_id: SKILLS_SLICE_SAMPLE.member_id, skill_key: FIRESTORM.key },
+    ]);
+    await select(w, LEGACY.key);
+    expect(requests().at(-1)[0].skill_key).toBe(FIRESTORM.key);
   });
 
   it("emits one use intent for an exploration field skill and nothing while locked", async () => {
