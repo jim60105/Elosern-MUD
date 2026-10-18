@@ -27,6 +27,19 @@ var ITEM_HOLDINGS_MAX_KEY = C.ITEM_HOLDINGS_MAX_KEY;
 var ITEM_HOLDINGS_MAX_LABEL = C.ITEM_HOLDINGS_MAX_LABEL;
 var ITEM_HOLDINGS_MAX_REASON = C.ITEM_HOLDINGS_MAX_REASON;
 
+// The character panel's canonical breakdown row order. Delta changes are a
+// subsequence of it, so the client never re-sorts server arithmetic.
+var TRAIT_ORDER = [
+  "hp",
+  "mp",
+  "sp",
+  "atk_phys",
+  "agility",
+  "defense",
+  "magic_power",
+  "guild_merit",
+];
+
 // The explicit blank-string vocabulary shared with the server validator:
 // Python's str.strip and JavaScript's String.trim disagree on Unicode
 // whitespace (U+0085, U+FEFF), so both use this closed ASCII set.
@@ -100,9 +113,12 @@ function validateDelta(value, name) {
     }
     return {
       equippable: true,
-      changes: value.changes.map(function (change, index) {
-        return validateChange(change, name + ".changes[" + index + "]");
-      }),
+      changes: validatedChanges(
+        value.changes.map(function (change, index) {
+          return validateChange(change, name + ".changes[" + index + "]");
+        }),
+        name
+      ),
     };
   }
   requireExactFields(value, name, ["equippable", "reason"], []);
@@ -110,6 +126,26 @@ function validateDelta(value, name) {
     equippable: false,
     reason: boundedText(value.reason, name + ".reason", ITEM_HOLDINGS_MAX_REASON),
   };
+}
+
+function validatedChanges(changes, name) {
+  var indexes = changes.map(function (change) {
+    var index = TRAIT_ORDER.indexOf(change.key);
+    if (index === -1) {
+      throw new Error(
+        name + ".changes key '" + change.key + "' is not a canonical trait"
+      );
+    }
+    return index;
+  });
+  for (var index = 0; index < indexes.length; index += 1) {
+    if (index > 0 && indexes[index] <= indexes[index - 1]) {
+      throw new Error(
+        name + ".changes must name unique traits in canonical order"
+      );
+    }
+  }
+  return changes;
 }
 
 function validateReceive(value, name, ownRow) {
@@ -207,6 +243,25 @@ function validateItemHoldingsPanel(payload) {
   if (rows.length > 0 && !seen[giverId]) {
     throw new Error("rows must include the viewed member");
   }
+  var deltaNullable = Object.create(null);
+  rows.forEach(function (row) {
+    deltaNullable[row.delta === null] = true;
+  });
+  if (Object.keys(deltaNullable).length > 1) {
+    throw new Error("delta must be null for every row or for none");
+  }
+  rows.forEach(function (row) {
+    if (!row.equipped) {
+      return;
+    }
+    if (
+      row.delta === null ||
+      !row.delta.equippable ||
+      row.delta.changes.length > 0
+    ) {
+      throw new Error("an equipped row carries an equippable empty delta");
+    }
+  });
   var result = {
     schema_version: ITEM_HOLDINGS_SCHEMA_VERSION,
     available: true,

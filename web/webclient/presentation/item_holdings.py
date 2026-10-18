@@ -58,6 +58,19 @@ MAX_KEY_CODE_POINTS = 64
 MAX_LABEL_CODE_POINTS = 32
 MAX_REASON_CODE_POINTS = MAX_MESSAGE_CODE_POINTS
 
+#: The character panel's canonical breakdown row order. Delta changes are a
+#: subsequence of it, so the client never re-sorts server arithmetic.
+TRAIT_ORDER = (
+    "hp",
+    "mp",
+    "sp",
+    "atk_phys",
+    "agility",
+    "defense",
+    "magic_power",
+    "guild_merit",
+)
+
 
 class ItemHoldingsPanelError(ProtocolValidationError):
     """The available ``item_holdings`` payload violates its exact schema."""
@@ -139,10 +152,13 @@ def _validate_delta(value: Any, name: str) -> dict[str, Any] | None:
             )
         return {
             "equippable": True,
-            "changes": [
-                _validate_change(change, f"{name}.changes[{index}]")
-                for index, change in enumerate(changes)
-            ],
+            "changes": _validated_changes(
+                [
+                    _validate_change(change, f"{name}.changes[{index}]")
+                    for index, change in enumerate(changes)
+                ],
+                name,
+            ),
         }
     _require_exact_fields(value, name, {"equippable", "reason"}, {})
     return {
@@ -151,6 +167,25 @@ def _validate_delta(value: Any, name: str) -> dict[str, Any] | None:
             value["reason"], f"{name}.reason", MAX_REASON_CODE_POINTS
         ),
     }
+
+
+def _validated_changes(
+    changes: list[dict[str, Any]], name: str
+) -> list[dict[str, Any]]:
+    """Enforce unique, canonically ordered trait keys on one delta."""
+    indexes: list[int] = []
+    for change in changes:
+        try:
+            indexes.append(TRAIT_ORDER.index(change["key"]))
+        except ValueError:
+            raise ItemHoldingsPanelError(
+                f"{name}.changes key {change['key']!r} is not a canonical trait"
+            ) from None
+    if indexes != sorted(set(indexes)):
+        raise ItemHoldingsPanelError(
+            f"{name}.changes must name unique traits in canonical order"
+        )
+    return changes
 
 
 def _validate_receive(
@@ -229,6 +264,23 @@ def validate_item_holdings(payload: Any) -> dict[str, Any]:
         )
     if normalized_rows and giver_id not in seen:
         raise ItemHoldingsPanelError("rows must include the viewed member")
+    delta_nullable = {row["delta"] is None for row in normalized_rows}
+    if len(delta_nullable) > 1:
+        raise ItemHoldingsPanelError(
+            "delta must be null for every row or for none"
+        )
+    for row in normalized_rows:
+        if not row["equipped"]:
+            continue
+        delta = row["delta"]
+        if (
+            delta is None
+            or not delta["equippable"]
+            or delta["changes"]
+        ):
+            raise ItemHoldingsPanelError(
+                "an equipped row carries an equippable empty delta"
+            )
     result = {
         "schema_version": ITEM_HOLDINGS_SCHEMA_VERSION,
         "available": True,

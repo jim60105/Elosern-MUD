@@ -65,25 +65,51 @@ def _hypothetical_gauges(
     multiplier has no attributable layer and stays rejected here, exactly as
     the gauge breakdown rejects it.
     """
+    from world.rules.equipment import normalized_equipment
     from world.rules.equipment_effects import equipment_gauge_caps_for
     from world.skills.restrictions import exam_restriction
 
     caps = equipment_gauge_caps_for(equipment_mapping)
+    canonical_mapping = normalized_equipment(entity)
+    if canonical_mapping is None:
+        canonical_mapping = {
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+    canonical_caps = equipment_gauge_caps_for(canonical_mapping)
     record = exam_restriction(entity)
     gauges: dict[str, GaugeValue] = {}
     records: dict[str, tuple[Any, Any]] = {}
     for key in _GAUGE_KEYS:
-        gauge, _mod, mult = _require_gauge_record(traits_data, key)
+        gauge, mod, mult = _require_gauge_record(traits_data, key)
         if mult != 1:
             raise StatusQueryError(
                 f"gauge {key!r} multiplier is not attributable to any named layer"
             )
         base = traits_data[key]["base"]
+        # The hypothetical read must not launder unexplained canonical
+        # accounting: the stored modifier has to be attributable to canonical
+        # equipment first, exactly as the canonical breakdown requires.
+        canonical_total = int(canonical_caps.get(key, 0))
+        if record is not None and key in record["ceilings"]:
+            canonical_total = min(base + canonical_total, record["ceilings"][key]) - base
+        if canonical_total != mod:
+            raise StatusQueryError(
+                f"gauge {key!r} stored modifier is not explained by worn equipment caps"
+            )
         total = int(caps.get(key, 0))
         if record is not None and key in record["ceilings"]:
             total = min(base + total, record["ceilings"][key]) - base
         maximum = int(round((base + total) * mult))
-        gauges[key] = GaugeValue(current=min(gauge.current, maximum), maximum=maximum)
+        if traits_data[key].get("current") is None:
+            # An unset current defaults to the NEW maximum after settlement,
+            # not to the canonical maximum the reader substituted.
+            current = maximum
+        else:
+            current = min(gauge.current, maximum)
+        gauges[key] = GaugeValue(current=current, maximum=maximum)
         records[key] = (total, mult)
     return gauges, records
 

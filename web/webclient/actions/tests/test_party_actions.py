@@ -485,3 +485,25 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                 "item_holdings",
             ),
         )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_every_holding_mutation_republishes_the_holdings_panel(self):
+        # Selection and every partial-publication mutation that can change a
+        # member's held count or the combat transfer bar names the panel;
+        # transfers, item use and equipment toggles publish full snapshots.
+        registry = build_production_action_registry()
+        for action_id in (
+            "party.view_member",
+            "shop.buy",
+            "shop.sell",
+            "guild.quest_turnin",
+            "guild.exam_request",
+            "explore.engage",
+        ):
+            with self.subTest(action=action_id):
+                self.assertIn(
+                    "item_holdings",
+                    registry.spec(action_id).affected_panels,
+                )

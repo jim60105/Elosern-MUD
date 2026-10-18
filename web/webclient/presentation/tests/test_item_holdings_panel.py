@@ -177,17 +177,29 @@ def _payload(overrides=None):
 
 
 def _maximal_rows():
+    # The breakdown publishes eight canonical traits, so the eight-change row
+    # is the largest reachable row even though the wire ceiling is sixteen.
+    traits = (
+        "hp",
+        "mp",
+        "sp",
+        "atk_phys",
+        "agility",
+        "defense",
+        "magic_power",
+        "guild_merit",
+    )
     rows = []
     for index in range(MAX_ROWS):
         changes = [
             _change(
                 {
-                    "key": f"k{change_index}".ljust(MAX_KEY_CODE_POINTS, "x"),
+                    "key": key,
                     "label": "名" * MAX_LABEL_CODE_POINTS,
                     "amount": 999,
                 }
             )
-            for change_index in range(MAX_CHANGES)
+            for key in traits
         ]
         rows.append(
             _row(
@@ -217,6 +229,7 @@ class ItemHoldingsWireTests(unittest.TestCase):
                 "rows": [
                     _row({
                         "member_id": 7,
+                        "delta": {"equippable": False, "reason": "accessory_slots_full"},
                         "receive": _receive({"enabled": False, "reason": None}),
                     }),
                     _row({
@@ -323,6 +336,54 @@ class ItemHoldingsWireTests(unittest.TestCase):
                         "receive": _receive({"enabled": False, "reason": None}),
                     }),
                     _row(),
+                ],
+            }), False),
+            ("mixed delta nullability", _payload({
+                "rows": [
+                    _row({
+                        "member_id": 7,
+                        "receive": _receive({"enabled": False, "reason": None}),
+                    }),
+                    _row({"delta": _delta()}),
+                ],
+            }), False),
+            ("equipped with changes", _payload({
+                "rows": [
+                    _row({
+                        "member_id": 7,
+                        "receive": _receive({"enabled": False, "reason": None}),
+                    }),
+                    _row({"equipped": True, "delta": _delta()}),
+                ],
+            }), False),
+            ("duplicate change keys", _payload({
+                "rows": [
+                    _row({
+                        "member_id": 7,
+                        "receive": _receive({"enabled": False, "reason": None}),
+                    }),
+                    _row({"delta": _delta({"changes": [_change(), _change()]})}),
+                ],
+            }), False),
+            ("unordered change keys", _payload({
+                "rows": [
+                    _row({
+                        "member_id": 7,
+                        "receive": _receive({"enabled": False, "reason": None}),
+                    }),
+                    _row({"delta": _delta({"changes": [
+                        _change({"key": "defense", "label": "防禦"}),
+                        _change({"key": "atk_phys", "label": "攻擊"}),
+                    ]})}),
+                ],
+            }), False),
+            ("non-canonical change key", _payload({
+                "rows": [
+                    _row({
+                        "member_id": 7,
+                        "receive": _receive({"enabled": False, "reason": None}),
+                    }),
+                    _row({"delta": _delta({"changes": [_change({"key": "luck"})]})}),
                 ],
             }), False),
             ("astral key at the bound", _payload({
@@ -609,7 +670,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         before = {
             "inventory": list(self.companion.db.inventory),
             "equipment": deepcopy(self.companion.db.equipment),
-            "traits": deepcopy(self.companion.db.traits),
+            "traits": deepcopy(
+                self.companion.attributes.get("traits", category="traits")
+            ),
             "party": deepcopy(self.player.db.party),
         }
 
@@ -619,7 +682,10 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(first, second)
         self.assertEqual(list(self.companion.db.inventory), before["inventory"])
         self.assertEqual(self.companion.db.equipment, before["equipment"])
-        self.assertEqual(self.companion.db.traits, before["traits"])
+        self.assertEqual(
+            self.companion.attributes.get("traits", category="traits"),
+            before["traits"],
+        )
         self.assertEqual(self.player.db.party, before["party"])
 
     def test_registry_registers_the_panel(self):

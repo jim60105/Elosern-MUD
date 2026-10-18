@@ -372,7 +372,7 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_injected_breakdown_decomposes_under_an_exam_ceiling(self):
         self.aila.traits.hp.base = 100
-        self.aila.traits.hp.mod = 20
+        self.aila.traits.hp.mod = 10
         self.aila.traits.hp.current = 110
         self._wear(self.aila, armor=_CAP_ARMOR.key)
         self.aila.db.guild_exam_restriction = {
@@ -397,6 +397,34 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
 
         self.assertEqual(rows["hp"].effective, 110)
         self.assertEqual(rows["hp"].current, 110)
+
+    def test_injected_read_rejects_unexplained_canonical_modifiers(self):
+        self.aila.traits.hp.base = 100
+        self.aila.traits.hp.mod = 7
+        self.aila.traits.hp.current = 50
+
+        with self.assertRaises(StatusQueryError):
+            build_stat_breakdown(
+                self.aila, equipment=normalize_equipment_mapping(_EMPTY)
+            )
+
+    def test_projected_gauge_defaults_an_unset_current_to_the_new_maximum(self):
+        traits = dict(self.aila.attributes.get("traits", category="traits"))
+        traits["hp"] = {"base": 100, "mod": 0, "mult": 1}
+        self.aila.attributes.add("traits", traits, category="traits")
+
+        rows = {
+            row.key: row
+            for row in build_stat_breakdown(
+                self.aila,
+                equipment=normalize_equipment_mapping(
+                    {**_EMPTY, "armor": _CAP_ARMOR.key}
+                ),
+            )
+        }
+
+        self.assertEqual(rows["hp"].effective, 120)
+        self.assertEqual(rows["hp"].current, 120)
 
     def test_non_unit_gauge_multiplier_is_rejected_by_the_injected_read(self):
         self.aila.traits.hp.mult = 2
@@ -561,7 +589,10 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         before = {
             "inventories": [list(member.db.inventory) for member in members],
             "equipment": [deepcopy(member.db.equipment) for member in members],
-            "traits": [deepcopy(member.db.traits) for member in members],
+            "traits": [
+                deepcopy(member.attributes.get("traits", category="traits"))
+                for member in members
+            ],
             "buffs": [deepcopy(member.db.buffs) for member in members],
             "party": deepcopy(self.commander.db.party),
         }
@@ -581,7 +612,13 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(
             [member.db.equipment for member in members], before["equipment"]
         )
-        self.assertEqual([member.db.traits for member in members], before["traits"])
+        self.assertEqual(
+            [
+                member.attributes.get("traits", category="traits")
+                for member in members
+            ],
+            before["traits"],
+        )
         self.assertEqual([member.db.buffs for member in members], before["buffs"])
         self.assertEqual(self.commander.db.party, before["party"])
 

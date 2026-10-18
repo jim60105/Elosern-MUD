@@ -46,6 +46,7 @@ test("item_holdings carries counts, deltas and transfer verdicts", () => {
       row({
         member_id: 7,
         held: 2,
+        delta: { equippable: false, reason: "accessory_slots_full" },
         receive: fx.validItemHoldingsReceive({ enabled: false, reason: null }),
       }),
       row({
@@ -64,6 +65,7 @@ test("item_holdings accepts the refused delta form", () => {
     rows: [
       row({
         member_id: 7,
+        delta: { equippable: false, reason: "accessory_slots_full" },
         receive: fx.validItemHoldingsReceive({ enabled: false, reason: null }),
       }),
       row({
@@ -363,6 +365,89 @@ test("item_holdings rejects shape drift", () => {
           row({ member_id: 41 }),
         ],
       })],
+    ["mixed delta nullability", () =>
+      panel({
+        rows: [
+          row({
+            member_id: 7,
+            receive: fx.validItemHoldingsReceive({
+              enabled: false,
+              reason: null,
+            }),
+          }),
+          row({ member_id: 41, delta: fx.validItemHoldingsDelta() }),
+        ],
+      })],
+    ["equipped with changes", () =>
+      panel({
+        rows: [
+          row({
+            member_id: 7,
+            receive: fx.validItemHoldingsReceive({
+              enabled: false,
+              reason: null,
+            }),
+          }),
+          row({ member_id: 41, equipped: true, delta: fx.validItemHoldingsDelta() }),
+        ],
+      })],
+    ["duplicate change keys", () =>
+      panel({
+        rows: [
+          row({
+            member_id: 7,
+            receive: fx.validItemHoldingsReceive({
+              enabled: false,
+              reason: null,
+            }),
+          }),
+          row({
+            member_id: 41,
+            delta: fx.validItemHoldingsDelta({
+              changes: [change(), change()],
+            }),
+          }),
+        ],
+      })],
+    ["unordered change keys", () =>
+      panel({
+        rows: [
+          row({
+            member_id: 7,
+            receive: fx.validItemHoldingsReceive({
+              enabled: false,
+              reason: null,
+            }),
+          }),
+          row({
+            member_id: 41,
+            delta: fx.validItemHoldingsDelta({
+              changes: [
+                change({ key: "defense", label: "防禦" }),
+                change({ key: "atk_phys", label: "攻擊" }),
+              ],
+            }),
+          }),
+        ],
+      })],
+    ["non-canonical change key", () =>
+      panel({
+        rows: [
+          row({
+            member_id: 7,
+            receive: fx.validItemHoldingsReceive({
+              enabled: false,
+              reason: null,
+            }),
+          }),
+          row({
+            member_id: 41,
+            delta: fx.validItemHoldingsDelta({
+              changes: [change({ key: "luck" })],
+            }),
+          }),
+        ],
+      })],
     ["too many rows", () => {
       const rows = [];
       for (let index = 0; index < Protocol.ITEM_HOLDINGS_MAX_ROWS + 1; index += 1) {
@@ -392,22 +477,27 @@ test("item_holdings rejects shape drift", () => {
 });
 
 test("item_holdings accepts its maximal bounded form", () => {
+  // The breakdown publishes eight canonical traits, so the eight-change row
+  // is the largest reachable row even though the wire ceiling is sixteen.
+  const traits = [
+    "hp",
+    "mp",
+    "sp",
+    "atk_phys",
+    "agility",
+    "defense",
+    "magic_power",
+    "guild_merit",
+  ];
   const rows = [];
   for (let index = 0; index < Protocol.ITEM_HOLDINGS_MAX_ROWS; index += 1) {
-    const changes = [];
-    for (
-      let changeIndex = 0;
-      changeIndex < Protocol.ITEM_HOLDINGS_MAX_CHANGES;
-      changeIndex += 1
-    ) {
-      changes.push(
-        change({
-          key: ("k" + changeIndex).padEnd(Protocol.ITEM_HOLDINGS_MAX_KEY, "x"),
-          label: "名".repeat(Protocol.ITEM_HOLDINGS_MAX_LABEL),
-          amount: 999,
-        })
-      );
-    }
+    const changes = traits.map((key) =>
+      change({
+        key,
+        label: "名".repeat(Protocol.ITEM_HOLDINGS_MAX_LABEL),
+        amount: 999,
+      })
+    );
     rows.push(
       row({
         member_id: index + 1,
