@@ -5,83 +5,140 @@ import { fixtureDigest } from "./art_panels.js";
 // ---------------------------------------------------------------------------
 // webclient-align-05-party-hud: party panel fixtures.
 // ---------------------------------------------------------------------------
-// Every fixture companion is a general member; membership metadata and the
-// separate general quota are part of the extended version-2 party payload.
-const withMembership = (rows) =>
-  rows.map((row) => ({
-    ...row,
-    membership: row.membership ?? { general: true, temporary_commissions: [] },
-  }));
+// Version-3 rows: row 0 is the commander (the player's own row, with no bond
+// stage or membership), then one row per companion. Every fixture companion is
+// a general member; membership metadata and the separate general quota are part
+// of the extended payload.
+const companion = (row) => ({
+  role: "companion",
+  mp_current: 0,
+  mp_maximum: 0,
+  sp_current: 0,
+  sp_maximum: 0,
+  knocked_out: false,
+  unread: false,
+  ...row,
+  membership: row.membership ?? { general: true, temporary_commissions: [] },
+});
+const commander = (row) => ({
+  role: "commander",
+  portrait_ref: null,
+  knocked_out: false,
+  unread: false,
+  bond_stage: null,
+  membership: null,
+  ...row,
+});
+const COMMANDER_ROW = commander({
+  identity: 42,
+  display_name: "影行者",
+  hp_current: 80,
+  hp_maximum: 100,
+  mp_current: 30,
+  mp_maximum: 50,
+  sp_current: 12,
+  sp_maximum: 40,
+});
 
 export const PARTY_PANEL_EMPTY_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   general_quota: { used: 0, limit: 4 },
-  slots: [],
+  viewed_member_id: COMMANDER_ROW.identity,
+  slots: [COMMANDER_ROW],
 };
 
 export const PARTY_PANEL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   general_quota: { used: 2, limit: 4 },
-  slots: withMembership([
-    {
+  viewed_member_id: 101,
+  slots: [
+    COMMANDER_ROW,
+    companion({
       identity: 101,
       display_name: "蕾娜",
       portrait_ref: "101",
       hp_current: 180,
       hp_maximum: 220,
+      mp_current: 60,
+      mp_maximum: 80,
+      sp_current: 24,
+      sp_maximum: 40,
       bond_stage: "親睦",
-    },
-    {
+    }),
+    companion({
       identity: 102,
       display_name: "幽",
       portrait_ref: null,
       hp_current: 144,
       hp_maximum: 160,
+      mp_current: 90,
+      mp_maximum: 120,
+      sp_current: 10,
+      sp_maximum: 30,
       bond_stage: "信賴",
-    },
-  ]),
+    }),
+  ],
 };
 
 export const PARTY_PANEL_FULL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   general_quota: { used: 4, limit: 4 },
-  slots: withMembership([
-    {
+  viewed_member_id: 102,
+  slots: [
+    COMMANDER_ROW,
+    companion({
       identity: 101,
       display_name: "蕾娜",
       portrait_ref: "101",
       hp_current: 180,
       hp_maximum: 220,
+      mp_current: 60,
+      mp_maximum: 80,
+      sp_current: 24,
+      sp_maximum: 40,
       bond_stage: "親睦",
-    },
-    {
+    }),
+    companion({
       identity: 102,
       display_name: "幽",
       portrait_ref: null,
       hp_current: 144,
       hp_maximum: 160,
+      mp_current: 90,
+      mp_maximum: 120,
+      sp_current: 10,
+      sp_maximum: 30,
       bond_stage: "信賴",
-    },
-    {
+      unread: true,
+    }),
+    companion({
       identity: 103,
       display_name: "艾德蒙",
       portrait_ref: null,
       hp_current: 250,
       hp_maximum: 250,
+      mp_current: 40,
+      mp_maximum: 60,
+      sp_current: 30,
+      sp_maximum: 50,
       bond_stage: "熟稔",
-    },
-    {
+    }),
+    companion({
       identity: 104,
       display_name: "雪莉",
       portrait_ref: null,
       hp_current: 95,
       hp_maximum: 110,
+      mp_current: 70,
+      mp_maximum: 100,
+      sp_current: 18,
+      sp_maximum: 30,
       bond_stage: "初識",
-    },
-  ]),
+    }),
+  ],
 };
 
 // Existing bundled fixture art only; production never constructs these refs.
@@ -89,8 +146,13 @@ export const PARTY_PANEL_FULL_SAMPLE = {
 // descriptor plus its bounded display context — and the descriptor carries the
 // committed built-in silhouette as its own alpha terminal
 // (builtin-silhouette-stage-fallback).
+// The companion rows alone: row 0 is the commander's own row and is never a
+// lineup figure, drawer companion or catalog subject.
+export const PARTY_COMPANION_ROWS = PARTY_PANEL_FULL_SAMPLE.slots.filter(
+  (row) => row.role === "companion",
+);
 export const COMPANION_PORTRAIT_CATALOG = Object.fromEntries(
-  PARTY_PANEL_FULL_SAMPLE.slots.map((row, index) => {
+  PARTY_COMPANION_ROWS.map((row, index) => {
     const key = ["woman", "elder", "man", "girl"][index];
     return [String(row.identity), {
       artwork: {

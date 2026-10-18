@@ -115,6 +115,26 @@ describe("companion standing lineup", () => {
     expect(displayedLineup(wide)).toHaveLength(5);
     expect(lineupSlotByIdentity(wide, 99)).toBeNull();
   });
+  it("skips a version-3 commander row and keeps role-less display figures", () => {
+    const wireRows = [
+      { identity: 1, role: "commander" },
+      { identity: 2, role: "companion" },
+    ];
+    expect(displayedLineup(wireRows)).toEqual([wireRows[1]]);
+    // A transformed figure carries no role; it is never dropped as if it were
+    // the commander.
+    expect(displayedLineup([{ identity: 3 }])).toEqual([{ identity: 3 }]);
+    expect(
+      companionFigures({
+        player,
+        companions: wireRows,
+        actorIdentity: "1",
+        possessing: false,
+        artPanel,
+        portraitFor,
+      }).map((figure) => figure.identity),
+    ).toEqual([1, 2]);
+  });
   it("renders decorative figures and forwards the controlled beat only", async () => {
     const wrapper = mount(CompanionLineup, { props: { slots: figures(), dimmed: true, gesture: "hit", gestureKey: "r:1", floatAmount: 8, motionLevel: "off" } });
     expect(wrapper.attributes("aria-hidden")).toBe("true");

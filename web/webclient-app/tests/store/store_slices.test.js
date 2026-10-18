@@ -557,16 +557,40 @@ describe("store view slices", () => {
 
     // Commit party panel with slots
     const partyData = {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       general_quota: { used: 1, limit: 4 },
+      viewed_member_id: 101,
       slots: [
+        {
+          identity: 1,
+          display_name: "影行者",
+          portrait_ref: null,
+          hp_current: 80,
+          hp_maximum: 100,
+          mp_current: 30,
+          mp_maximum: 50,
+          sp_current: 12,
+          sp_maximum: 40,
+          role: "commander",
+          knocked_out: false,
+          unread: false,
+          bond_stage: null,
+          membership: null,
+        },
         {
           identity: 101,
           display_name: "蕾娜",
           portrait_ref: null,
           hp_current: 180,
           hp_maximum: 220,
+          mp_current: 60,
+          mp_maximum: 80,
+          sp_current: 24,
+          sp_maximum: 40,
+          role: "companion",
+          knocked_out: false,
+          unread: false,
           bond_stage: "親睦",
           membership: { general: true, temporary_commissions: [] },
         },
@@ -581,8 +605,8 @@ describe("store view slices", () => {
     expect(r1.accepted).toBe(true);
     expect(store.view.partyAvailable).toBe(true);
     expect(store.partyAvailable).toBe(true);
-    expect(store.view.partySlots).toHaveLength(1);
-    expect(store.partySlots[0].display_name).toBe("蕾娜");
+    expect(store.view.partySlots).toHaveLength(2);
+    expect(store.partySlots[1].display_name).toBe("蕾娜");
 
     // Commit unavailable party panel
     const r2 = store.receive(
@@ -593,7 +617,7 @@ describe("store view slices", () => {
           revision: 3,
           panels: {
             party: {
-              schema_version: 2,
+              schema_version: 3,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },

@@ -149,12 +149,13 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
 
     def test_party_row_and_display_bounds_are_pinned(self):
         # The general-quota limit mirrors the rules companion bound and the
-        # ordered-roster envelope bound mirrors the UMD envelope, while the
+        # ordered-roster envelope bounds mirror the UMD envelope, while the
         # display-name ceiling is shared across both (review round: the
         # presenter's "fails loudly" claim needs an executed guard). The old
         # four-row cap is gone: temporary members sit beyond the general quota,
-        # so the panel renders every effective row and the only remaining row
-        # bound is the envelope safety bound.
+        # so the panel renders every effective row. Version 3 adds the
+        # commander row, so the whole-list bound is the companion bound plus
+        # one, and both halves are pinned here.
         party_source = (
             REPO_ROOT / "web/webclient/presentation/party.py"
         ).read_text(encoding="utf-8")
@@ -175,8 +176,14 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "party.PARTY_MAX_SLOTS": re.search(
                 r"^PARTY_MAX_SLOTS\s*=\s*(\d+)", party_source, re.MULTILINE
             ),
+            "party.PARTY_MAX_ROWS": re.search(
+                r"^PARTY_MAX_ROWS\s*=\s*(\d+)", party_source, re.MULTILINE
+            ),
             "js PARTY_MAX_SLOTS": re.search(
                 r"^var PARTY_MAX_SLOTS\s*=\s*(\d+);", js_source, re.MULTILINE
+            ),
+            "js PARTY_MAX_ROWS": re.search(
+                r"^var PARTY_MAX_ROWS\s*=\s*(\d+);", js_source, re.MULTILINE
             ),
             "affordances MAX_DISPLAY_NAME_CODE_POINTS": re.search(
                 r"^MAX_DISPLAY_NAME_CODE_POINTS\s*=\s*(\d+)",
@@ -206,6 +213,20 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "js PARTY_MAX_SLOTS",
         )}
         self.assertEqual(len(slots), 1, f"party roster envelope drifted: {extracted}")
+        rows = {extracted[key] for key in (
+            "party.PARTY_MAX_ROWS",
+            "js PARTY_MAX_ROWS",
+        )}
+        self.assertEqual(len(rows), 1, f"party row envelope drifted: {extracted}")
+        self.assertRegex(
+            party_source,
+            r"(?m)^PARTY_MAX_ROWS\s*=\s*PARTY_MAX_SLOTS\s*\+\s*1\s*$",
+        )
+        self.assertEqual(
+            int(extracted["party.PARTY_MAX_ROWS"]),
+            int(extracted["party.PARTY_MAX_SLOTS"]) + 1,
+            f"the row envelope must be the commander plus every companion: {extracted}",
+        )
         names = {extracted[key] for key in (
             "affordances MAX_DISPLAY_NAME_CODE_POINTS",
             "js PARTY_MAX_DISPLAY_NAME",

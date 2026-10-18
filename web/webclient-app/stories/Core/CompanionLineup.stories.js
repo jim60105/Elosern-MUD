@@ -11,7 +11,10 @@ import HudFrame from "../../components/HudFrame.vue";
 import { companionFigures } from "../../components/companion-lineup.js";
 import { combatFormation } from "../../components/combat-formation.js";
 import { portraitFor } from "../../components/party-helpers.js";
-import { COMPANION_PORTRAIT_CATALOG, PARTY_PANEL_FULL_SAMPLE } from "../fixtures/party_panels.js";
+import {
+  COMPANION_PORTRAIT_CATALOG,
+  PARTY_COMPANION_ROWS,
+} from "../fixtures/party_panels.js";
 
 export default {
   title: "Core/CompanionLineup", component: CompanionLineup,
@@ -57,7 +60,7 @@ const renderLineup = (args) => ({
     );
     const slots = computed(() => companionFigures({
       player: args.placeholders ? { ...player, artwork: null, hasReference: false } : player,
-      companions: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, args.companions).map((row) => ({
+      companions: PARTY_COMPANION_ROWS.slice(0, args.companions).map((row) => ({
         ...row, portrait_ref: args.placeholders ? null : String(row.identity),
       })),
       actorIdentity: possessing.value ? "102" : "1", possessing: possessing.value,

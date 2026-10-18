@@ -143,6 +143,13 @@
     "npc.persona.read",
     "npc.persona.update",
     "options.dismiss",
+    // The two party actions have no client producer yet (the party window's
+    // member rail and inventory panel land later in the batch), so neither
+    // fabricates a line: `party.view_member` is a pure presentation selection
+    // with no typed equivalent, and `party.transfer`'s typed echo belongs to
+    // the producer that dispatches it.
+    "party.transfer",
+    "party.view_member",
   ];
 
   function isSilentPresentationControl(actionId) {

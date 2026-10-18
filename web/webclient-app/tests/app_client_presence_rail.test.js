@@ -659,22 +659,46 @@ function focusMember(identity) {
     portrait_ref: null,
     hp_current: 120,
     hp_maximum: 160,
+    mp_current: 40,
+    mp_maximum: 60,
+    sp_current: 10,
+    sp_maximum: 30,
+    role: "companion",
+    knocked_out: false,
+    unread: false,
     bond_stage: "親睦",
     membership: { general: true, temporary_commissions: [] },
   };
 }
+const FOCUS_COMMANDER = {
+  identity: 1,
+  display_name: "艾莉亞",
+  portrait_ref: null,
+  hp_current: 100,
+  hp_maximum: 100,
+  mp_current: 20,
+  mp_maximum: 20,
+  sp_current: 10,
+  sp_maximum: 10,
+  role: "commander",
+  knocked_out: false,
+  unread: false,
+  bond_stage: null,
+  membership: null,
+};
 function focusParty(...identities) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     // The general quota is a separate bound from the rendered row: the
     // truncated-row case carries more rows than the quota allows.
     general_quota: { used: Math.min(identities.length, 4), limit: 4 },
-    slots: identities.map(focusMember),
+    viewed_member_id: identities.length ? identities[0] : FOCUS_COMMANDER.identity,
+    slots: [FOCUS_COMMANDER, ...identities.map(focusMember)],
   };
 }
 const FOCUS_PARTY_UNAVAILABLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: false,
   reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
 };

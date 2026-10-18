@@ -358,11 +358,13 @@ var MESSAGE_NAMES = {
 // webclient-align-04): the complete ordered effective roster reusing the NPC
 // display-name bound; bond_stage is a canonical stage NAME string. The old
 // four-row cap is removed (temporary members sit beyond the general quota);
-// PARTY_MAX_SLOTS is only an envelope safety bound, and PARTY_GENERAL_LIMIT is
-// the general quota the panel reports.
-var PARTY_SCHEMA_VERSION = 2;
+// PARTY_MAX_SLOTS bounds the companions and PARTY_MAX_ROWS the whole list
+// (the commander row plus every companion), and PARTY_GENERAL_LIMIT is the
+// general quota the panel reports.
+var PARTY_SCHEMA_VERSION = 3;
 var PARTY_GENERAL_LIMIT = 4;
 var PARTY_MAX_SLOTS = 16;
+var PARTY_MAX_ROWS = 17;
 var PARTY_MAX_COMMISSION_LABEL = 128;
 var PARTY_MAX_DISPLAY_NAME = 128;
 
@@ -451,7 +453,7 @@ var PANEL_ALLOWLIST = {
   status: 3,
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
-  party: 2,
+  party: PARTY_SCHEMA_VERSION,
   objectives: 1,
   services: 6,
   creation: 6,
@@ -662,6 +664,7 @@ module.exports = {
   PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
   PARTY_GENERAL_LIMIT: PARTY_GENERAL_LIMIT,
   PARTY_MAX_SLOTS: PARTY_MAX_SLOTS,
+  PARTY_MAX_ROWS: PARTY_MAX_ROWS,
   PARTY_MAX_COMMISSION_LABEL: PARTY_MAX_COMMISSION_LABEL,
   PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
   OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,

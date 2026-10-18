@@ -8,7 +8,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The party panel is an exact read-only version-3 presentation panel
-The party panel SHALL present the commander as row 0 followed by one ordered row per exact NPC in the canonical roster, including dual membership, at schema version 3. Each row SHALL carry identity, display name, portrait reference, true HP, MP and SP current/maximum, `role` (`commander` or `companion`), `knocked_out`, the session `unread` unlock flag, `bond_stage` and `membership` (both null on the commander row); the panel SHALL carry `general_quota` and the session `viewed_member_id`. Server and client validators SHALL change together with no version-2 compatibility.
+The party panel SHALL present the commander as row 0 followed by one ordered row per exact NPC in the canonical roster at schema version 3. Each row SHALL carry identity, display name, portrait ref, true HP/MP/SP current/maximum, `role` (`commander` or `companion`), `knocked_out`, `unread`, `bond_stage` and `membership` (both null on the commander row); the panel SHALL carry `general_quota` and `viewed_member_id`. Validators SHALL change together, with no version-2 compatibility.
 
 #### Scenario: Full general party plus escorts is complete
 - **WHEN** four general members and two temporary-only members are presented
@@ -144,7 +144,7 @@ The production registry SHALL register `party.view_member` accepting exactly `{m
 
 #### Scenario: Selecting a companion republishes the party panel
 - **WHEN** the player selects 艾拉 on the member rail
-- **THEN** one success result is followed by an update whose `party.viewed_member_id` is 艾拉's identity, and no gameplay state changes
+- **THEN** one party update at a new revision carrying 艾拉's identity as `party.viewed_member_id` is followed by one success result naming the same revision, and no gameplay state changes
 
 #### Scenario: A forged member is refused, not substituted
 - **WHEN** `party.view_member` names an NPC outside the party

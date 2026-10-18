@@ -153,9 +153,15 @@ class PossessionPresentationTests(EvenniaTest):
                 {key: value for key, value in old.items() if key != "portrait_ref"},
                 {key: value for key, value in new.items() if key != "portrait_ref"},
             )
-        self.assertEqual(after["slots"][0]["portrait_ref"], None)
-        self.assertIsNone(self.npc.location)
-        self.assertEqual(after["slots"][1]["portrait_ref"], str(other.pk))
+        # Row 0 is the commander's own row; the companions follow. Release
+        # leaves both companions in the owner's room, so each stays admitted to
+        # the current art view and keeps its own catalog key. (The assertions
+        # are joined by identity because the possession transition may rewrite
+        # the binding order.)
+        after_rows = {row["identity"]: row for row in after["slots"]}
+        self.assertEqual(after_rows[int(self.npc.pk)]["portrait_ref"], str(self.npc.pk))
+        self.assertEqual(after_rows[int(other.pk)]["portrait_ref"], str(other.pk))
+        self.assertEqual(self.npc.location, self.room1)
         self.assertEqual(other.location, self.room1)
         self.assertEqual(self.registry.render("roster", PresentationContext(self.player, 1)), roster_before)
 
@@ -515,24 +521,33 @@ class PossessionPresentationTests(EvenniaTest):
     )
     def test_party_panel_schema_untouched_and_companion_affordance_present(self):
         """party panel payload schema carries no possession field; vocabulary offers possess."""
-        # The party v2 shape carries no possession-specific field: the panel
-        # adds the general quota and each row adds its membership block.
+        # The party v3 shape carries no possession-specific field: the panel
+        # adds the general quota and the viewed member, and each row carries
+        # the version-3 vocabulary (the commander row included).
         ctx = PresentationContext(actor=self.player, protocol_version=1)
         panel = party_presenter(ctx)
-        self.assertEqual(panel["schema_version"], 2)
+        self.assertEqual(panel["schema_version"], 3)
         self.assertTrue(panel["available"])
         self.assertEqual(
             set(panel.keys()),
-            {"schema_version", "available", "general_quota", "slots"},
+            {
+                "schema_version",
+                "available",
+                "general_quota",
+                "slots",
+                "viewed_member_id",
+            },
         )
 
         for slot in panel["slots"]:
-            # Slot is the standard row contract plus the membership block.
+            # Slot is the exact version-3 row contract.
             self.assertEqual(
                 set(slot.keys()),
                 {
                     "identity", "display_name", "portrait_ref", "bond_stage",
-                    "hp_current", "hp_maximum", "membership",
+                    "hp_current", "hp_maximum",
+                    "mp_current", "mp_maximum", "sp_current", "sp_maximum",
+                    "role", "knocked_out", "unread", "membership",
                 },
             )
             self.assertNotIn("possessed", slot)

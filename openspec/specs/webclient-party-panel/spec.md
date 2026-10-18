@@ -7,12 +7,12 @@ presenter isolation) that the companion quickbar and party drawer consume.
 
 ## Requirements
 
-### Requirement: The party panel is an exact read-only version-2 presentation panel
-The party panel SHALL present one ordered row per exact NPC in the canonical roster, including dual membership. Existing version-2 identity/display/portrait/HP/bond-stage vocabulary, possession owner resolution, unavailable forms and read-only behavior SHALL remain; server/client validators SHALL extend the version-2 shape together. Each row SHALL add `membership` with boolean `general` and ordered `temporary_commissions`; the panel SHALL add `general_quota` with integer `used` and `limit`.
+### Requirement: The party panel is an exact read-only version-3 presentation panel
+The party panel SHALL present the commander as row 0 followed by one ordered row per exact NPC in the canonical roster at schema version 3. Each row SHALL carry identity, display name, portrait ref, true HP/MP/SP current/maximum, `role` (`commander` or `companion`), `knocked_out`, `unread`, `bond_stage` and `membership` (both null on the commander row); the panel SHALL carry `general_quota` and `viewed_member_id`. Validators SHALL change together, with no version-2 compatibility.
 
 #### Scenario: Full general party plus escorts is complete
 - **WHEN** four general members and two temporary-only members are presented
-- **THEN** six ordered rows appear, general usage is four of four, every temporary actor is reachable through existing controls and no quota-based truncation occurs
+- **THEN** seven ordered rows appear (the commander first), general usage is four of four, every temporary actor is reachable through existing controls and no quota-based truncation occurs
 
 #### Scenario: Dual member is one truthful row
 - **WHEN** a general member carries two escort reasons
@@ -23,12 +23,12 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 - **THEN** stale rows/reasons are filtered through canonical readers and invalid-owner presentation uses the shared unavailable form
 
 #### Scenario: Shape validators and clients change together
-- **WHEN** server, protocol mirror and Vue validators receive the extended panel or malformed metadata/quota
+- **WHEN** server, protocol mirror and Vue validators receive the version-3 panel or malformed metadata/quota
 - **THEN** all accept the same valid shape and reject malformed shapes while retaining existing portrait/HP/display bounds
 
 #### Scenario: A two-companion party serializes exactly the six-key bounded rows
-- **WHEN** two general members are presented through the extended version-2 panel
-- **THEN** each preserves the existing six NPC fields and adds validated membership metadata, while the panel separately reports general quota usage
+- **WHEN** two general members are presented through the version-3 panel
+- **THEN** the commander row comes first and each companion row carries the exact version-3 row fields with validated membership metadata, while the panel separately reports general quota usage
 
 #### Scenario: The raw affinity number never appears
 - **WHEN** any party payload is serialized
@@ -36,7 +36,7 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 
 #### Scenario: Possession keeps listing the owner's party
 - **WHEN** the player possesses one of her two companions and the next full snapshot arrives
-- **THEN** `party.slots` still carries both companions — the possessed NPC among them — with the owner-keyed bond stages, and a client can join the front figure to the banner by identity
+- **THEN** `party.slots` still carries the commander row first and both companions — the possessed NPC among them — with the owner-keyed bond stages, the payload is identical to the non-possessed payload for the same state, and a client can join the front figure to the banner by identity
 
 #### Scenario: A possessed stranger's party is unavailable, not empty
 - **WHEN** the session actor is an NPC whose `party_member` back-reference names no live player and a snapshot presents the party panel
@@ -44,7 +44,7 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 
 #### Scenario: An empty party is an available empty list
 - **WHEN** a puppeted explorer with no companions receives a full snapshot
-- **THEN** `party` is available with `slots` exactly `[]` and no unavailable reason
+- **THEN** `party` is available with `slots` holding exactly the commander row and no unavailable reason
 
 #### Scenario: Stale membership bindings never reach the wire
 - **WHEN** a player's stored party list contains a database identity whose NPC no longer exists
@@ -93,11 +93,11 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 
 #### Scenario: HP fields come from the true traits
 - **WHEN** a slot row is serialized
-- **THEN** `hp_current` and `hp_maximum` are non-negative integers from the companion's true traits
+- **THEN** `hp_current`, `hp_maximum`, `mp_current`, `mp_maximum`, `sp_current` and `sp_maximum` are non-negative integers from the member's true traits, never `disguised_stats`
 
 #### Scenario: bond_stage carries only the stage name
 - **WHEN** a slot row is serialized
-- **THEN** `bond_stage` is the canonical stage NAME string from the affinity rulebook's stage table
+- **THEN** `bond_stage` is the canonical stage NAME string from the affinity rulebook's stage table on a companion row and null on the commander row
 
 #### Scenario: The presenter is read-only and leak-free
 - **WHEN** the party presenter runs
@@ -113,8 +113,8 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 - **WHEN** the session actor is a possessed NPC
 - **THEN** the presenter resolves the party's bound OWNER — the player named by the NPC-side
   `party_member` back-reference — and serializes that player's live companions with their
-  owner-keyed bond stages, so the panel keeps listing the whole party, including the possessed
-  companion, instead of the NPC's own (empty) party binding
+  owner-keyed bond stages behind the owner's own commander row, so the panel keeps listing the whole
+  party, including the possessed companion, instead of the NPC's own (empty) party binding
 
 #### Scenario: A dangling owner back-reference raises unavailable
 - **WHEN** the `party_member` back-reference resolves to no live player
@@ -128,6 +128,14 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 #### Scenario: Unavailable data remains an availability fault
 - **WHEN** a party surface has an admitted subject but its image panel is unavailable
 - **THEN** gameplay stays usable with safe matching fallback and local availability indication, without invented pending generation
+
+#### Scenario: Knocked-out and unread flags are truthful
+- **WHEN** companion 卡恩 has stored HP 1 and companion 艾拉 unlocked a skill this session
+- **THEN** 卡恩's row has `knocked_out: true`, 艾拉's row has `unread: true`, and every other row has both false
+
+#### Scenario: The viewed member falls back to the commander
+- **WHEN** the session's viewed member leaves the party or is deleted
+- **THEN** the next party payload reports `viewed_member_id` equal to the commander's identity
 
 ### Requirement: Party presentation stays current across membership and combat changes
 Existing exploration/combat party push seams SHALL include temporary joins, per-source releases and general identity changes after commit. Existing combat HP/portrait refresh behavior SHALL remain. Related mission state/reason, phase and offer capabilities SHALL refresh after committed changes; stale choices SHALL refuse. Text clients SHALL retain equivalent interaction and explicit reasons. No new escort-control UI SHALL be added.
@@ -200,3 +208,25 @@ Existing party drawer controls SHALL render server-owned possess/release enablem
 #### Scenario: Possession state rides the vocabulary and banner only
 - **WHEN** possession control state is displayed on the extended party panel
 - **THEN** control permission still comes from the existing shared vocabulary/banner and rows add no duplicated possession state or combat token
+
+### Requirement: party.view_member selects the viewed member for the session
+The production registry SHALL register `party.view_member` accepting exactly `{member_id, tab}`, where `member_id` names the commander or an effective party member (presence not required) and `tab` is one of `member`, `bag`, `status`, `skills`, `lineage`, `shop`. The selection SHALL be stored per session, keyed to the commander, and SHALL never authorize a mutation.
+
+#### Scenario: Selecting a companion republishes the party panel
+- **WHEN** the player selects 艾拉 on the member rail
+- **THEN** one party update at a new revision carrying 艾拉's identity as `party.viewed_member_id` is followed by one success result naming the same revision, and no gameplay state changes
+
+#### Scenario: A forged member is refused, not substituted
+- **WHEN** `party.view_member` names an NPC outside the party
+- **THEN** it is rejected with `not_party_member` and the previous selection stays
+
+#### Scenario: Possession keeps the selection
+- **WHEN** the player selects 卡恩 and then possesses 艾拉
+- **THEN** the party payload after the possession transition still reports 卡恩 as viewed
+
+### Requirement: Opening a member's skills clears that member's unread mark
+A `party.view_member` request with `tab: skills` SHALL clear the named member's session unread mark after a successful selection, and SHALL NOT clear any other member's mark.
+
+#### Scenario: The unread dot clears on the skills tab
+- **WHEN** 艾拉 is unread and the player selects 艾拉 with `tab: skills`
+- **THEN** the next party payload reports `unread: false` for 艾拉 while 卡恩's unread mark is unchanged

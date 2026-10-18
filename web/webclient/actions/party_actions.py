@@ -1,4 +1,4 @@
-"""Exact party action payloads and adapters (party-item-transfer).
+"""Exact party action payloads and adapters.
 
 ``party.transfer`` moves held items between the authenticated commander and one
 authorized present party member through ``world.rules.party_inventory``. The
@@ -6,6 +6,13 @@ payload names member ids only: the dispatcher passes just the session puppet as
 the acting character and the rule re-derives every referenced member, so a
 rejected reference is never replaced by the commander. Success publishes the
 full canonical snapshot (empty affected-panel set).
+
+``party.view_member`` stores which party member this session's party window is
+looking at. It authorizes membership only (presence is not required, because
+the window must keep a member visible while a failed follow strands them), is
+keyed to the commander so possession keeps it, and never mutates gameplay
+state: the only writes are the session-scoped selection and, for the skills
+tab, that member's session unread dot.
 """
 
 from typing import Any
@@ -13,17 +20,28 @@ from typing import Any
 from web.webclient.actions.service_actions import (
     MAX_KEY_CODE_POINTS,
     ServiceActionError,
+    _success,
     _require_key_identifier,
 )
 from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+from web.webclient.presentation.party_view_selection import TABS, select_party_view
+from world.rules.party import live_companions
 from world.rules.party_inventory import (
     MAX_TRANSFER_QUANTITY,
     MIN_TRANSFER_QUANTITY,
     PartyTransferError,
     transfer_item,
 )
+from world.rules.party_scope import (
+    PARTY_SCOPE_MESSAGES,
+    REASON_NOT_PARTY_MEMBER,
+    PartyScopeError,
+    resolve_commander,
+)
+from world.rules.unlock_notices import mark_unlocks_seen
 
 _TRANSFER_FIELDS = frozenset({"giver_id", "receiver_id", "item_key", "quantity"})
+_VIEW_MEMBER_FIELDS = frozenset({"member_id", "tab"})
 
 
 class PartyActionError(ValueError):
@@ -102,3 +120,60 @@ def _party_transfer_adapter(
         "message": message,
         "affected_panels": (),
     }
+
+
+def validate_party_view_member_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``party.view_member`` payload."""
+    if not isinstance(payload, dict):
+        raise PartyActionError("party.view_member payload must be an object")
+    if set(payload) != _VIEW_MEMBER_FIELDS:
+        raise PartyActionError(
+            "party.view_member requires exactly member_id and tab"
+        )
+    tab = payload["tab"]
+    if not isinstance(tab, str) or tab not in TABS:
+        raise PartyActionError("party.view_member tab must be a known member tab")
+    return {
+        "member_id": _member_id(payload["member_id"], "member_id"),
+        "tab": tab,
+    }
+
+
+def _party_view_member_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Select one party member for this session's party window.
+
+    Membership is re-derived through the party authority boundary, so a forged
+    identity is refused with ``not_party_member`` and is never replaced by the
+    commander; presence is deliberately not required. The only writes are the
+    session-scoped selection and, on the skills tab, that member's unread dot.
+    """
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError as error:
+        return {"outcome": "rejected", "code": error.reason, "message": error.message}
+    member_id = payload["member_id"]
+    commander_id = int(commander.pk)
+    member = None
+    if member_id == commander_id:
+        member = commander
+    else:
+        member = next(
+            (
+                companion
+                for companion in live_companions(commander)
+                if int(companion.pk) == member_id
+            ),
+            None,
+        )
+    if member is None:
+        return {
+            "outcome": "rejected",
+            "code": REASON_NOT_PARTY_MEMBER,
+            "message": PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER],
+        }
+    select_party_view(session, commander_id, member_id, payload["tab"])
+    if payload["tab"] == "skills":
+        mark_unlocks_seen(session, member_id)
+    return _success("viewing_member", "已選擇檢視的隊伍成員。", ("party",))

@@ -25,7 +25,11 @@ import {
 import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
-import { PARTY_PANEL_FULL_SAMPLE } from "../stories/fixtures/party_panels.js";
+import {
+  PARTY_PANEL_EMPTY_SAMPLE,
+  PARTY_PANEL_FULL_SAMPLE,
+  PARTY_PANEL_SAMPLE,
+} from "../stories/fixtures/party_panels.js";
 
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
@@ -595,17 +599,46 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: { schema_version: 2, available: true, general_quota: { used: 1, limit: 4 }, slots: [
-              {
-                identity: 101,
-                display_name: "蕾娜",
-                portrait_ref: null,
-                hp_current: 180,
-                hp_maximum: 220,
-                bond_stage: "親睦",
-                membership: { general: true, temporary_commissions: [] },
-              },
-            ] },
+            party: {
+              schema_version: 3,
+              available: true,
+              general_quota: { used: 1, limit: 4 },
+              viewed_member_id: 101,
+              slots: [
+                {
+                  identity: 42,
+                  display_name: "影行者",
+                  portrait_ref: null,
+                  hp_current: 80,
+                  hp_maximum: 100,
+                  mp_current: 30,
+                  mp_maximum: 50,
+                  sp_current: 12,
+                  sp_maximum: 40,
+                  role: "commander",
+                  knocked_out: false,
+                  unread: false,
+                  bond_stage: null,
+                  membership: null,
+                },
+                {
+                  identity: 101,
+                  display_name: "蕾娜",
+                  portrait_ref: null,
+                  hp_current: 180,
+                  hp_maximum: 220,
+                  mp_current: 60,
+                  mp_maximum: 80,
+                  sp_current: 24,
+                  sp_maximum: 40,
+                  role: "companion",
+                  knocked_out: false,
+                  unread: false,
+                  bond_stage: "親睦",
+                  membership: { general: true, temporary_commissions: [] },
+                },
+              ],
+            },
           },
         }),
       ],
@@ -636,7 +669,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           panels: {
             status: fx.statusPanel(),
             party: {
-              schema_version: 2,
+              schema_version: 3,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },
@@ -656,7 +689,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 2,
           mode: "creation",
           panels: {
-            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
+            party: PARTY_PANEL_EMPTY_SAMPLE,
           },
         }),
       ],
@@ -679,17 +712,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: { schema_version: 2, available: true, general_quota: { used: 1, limit: 4 }, slots: [
-              {
-                identity: 101,
-                display_name: "蕾娜",
-                portrait_ref: null,
-                hp_current: 180,
-                hp_maximum: 220,
-                bond_stage: "親睦",
-                membership: { general: true, temporary_commissions: [] },
-              },
-            ] },
+            party: PARTY_PANEL_SAMPLE,
           },
         }),
       ],
@@ -711,7 +734,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 2,
           panels: {
             party: {
-              schema_version: 2,
+              schema_version: 3,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },
@@ -1025,7 +1048,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
+            party: PARTY_PANEL_EMPTY_SAMPLE,
             status: fx.statusPanel(),
           },
         }),
@@ -1053,7 +1076,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
+            party: PARTY_PANEL_EMPTY_SAMPLE,
             status: fx.statusPanel(),
             character: fx.characterPanel ? fx.characterPanel() : CHARACTER_PANEL_SAMPLE,
           },

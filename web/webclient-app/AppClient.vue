@@ -42,7 +42,7 @@ import DreamPanel from "./components/DreamPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import CompanionLineup from "./components/CompanionLineup.vue";
 import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./components/companion-lineup.js";
-import { portraitFor } from "./components/party-helpers.js";
+import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyDrawer from "./components/PartyDrawer.vue";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -218,7 +218,9 @@ const companionLineupSlots = computed(() => companionFigures({
     hasReference: true,
     displayName: currentCharacter.value?.name || panel("status")?.actor?.name || "",
   },
-  companions: store.partyAvailable ? store.partySlots : [],
+  // Version-3 party rows carry the commander as row 0; the lineup, the combat
+  // HUD join and the drawer count read the companions only.
+  companions: store.partyAvailable ? companionRows(store.partySlots) : [],
   actorIdentity: panel("status")?.actor?.identity,
   possessing: isControllingCompanion.value,
   controlledName: possessionBanner.value?.host_name || "",
@@ -1184,7 +1186,7 @@ const rootStyle = computed(() => {
       v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona'"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
+      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${companionRows(store.partySlots).length} / 4` : ''))"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       :body-flush="store.view.hudDrawer === 'quest'"

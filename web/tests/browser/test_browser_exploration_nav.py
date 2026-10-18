@@ -597,7 +597,7 @@ class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcc
         return {
             slot.get("identity")
             for slot in party.get("slots") or []
-            if slot.get("identity") is not None
+            if slot.get("role") == "companion" and slot.get("identity") is not None
         }
 
     def _loaded_image(self, page, selector, url, timeout=30000):

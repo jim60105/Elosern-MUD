@@ -3,6 +3,20 @@
 import { portraitGlyph } from "./character-identity.js";
 
 /**
+ * The companion rows of a committed party panel. Row 0 is the commander's own
+ * row (the player's figure) and no lineup, drawer or catalog consumer may draw
+ * it as a companion. Wire rows carry exactly `commander`/`companion`; a display
+ * figure built from a companion row carries no role, so this predicate excludes
+ * the commander row instead of requiring the companion literal — the protocol
+ * validator already guarantees the closed set.
+ */
+export function companionRows(slots) {
+  return (Array.isArray(slots) ? slots : []).filter(
+    (row) => row && row.role !== "commander",
+  );
+}
+
+/**
  * Display-only finite normalization helper for the HP hairline bar.
  * Returns an integer percentage clamped to [0, 100].
  * Returns 0 when maximum is not a positive finite number.

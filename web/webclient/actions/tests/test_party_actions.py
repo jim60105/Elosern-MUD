@@ -1,5 +1,7 @@
-"""Tests for the ``party.transfer`` action (party-item-transfer)."""
+"""Tests for the party actions (party-item-transfer, party-panel-v3-view-member)."""
 
+from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -12,13 +14,19 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.party_actions import (
     PartyActionError,
+    _party_view_member_adapter,
     _party_transfer_adapter,
     validate_party_transfer_payload,
+    validate_party_view_member_payload,
 )
 from web.webclient.actions.registry import build_production_action_registry
+from web.webclient.presentation.ingress import build_presentation_context
+from web.webclient.presentation.party_view_selection import PartyViewSelection
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.rules.party import join_party
 from world.rules.party_inventory import MAX_TRANSFER_QUANTITY
 from world.rules.tests._combat_session_helpers import _race_key
+from world.rules.unlock_notices import MemberUnlocks, unlock_flags
 from world.tests.synthetic_data import make_item, synthetic_registries
 
 _POTION = make_item("t_transfer_potion", display_name_zh="測試藥水", sellable=False)
@@ -165,3 +173,174 @@ class PartyTransferAdapterTests(EvenniaTestCase):
         self.assertIs(spec.validate_payload, validate_party_transfer_payload)
         self.assertIs(spec.adapter, _party_transfer_adapter)
         self.assertEqual(spec.affected_panels, ())
+
+
+class PartyViewMemberPayloadTests(unittest.TestCase):
+    """The ``party.view_member`` schema is exact and bounded."""
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_exact_payload_is_normalized(self):
+        self.assertEqual(
+            validate_party_view_member_payload({"member_id": 7, "tab": "member"}),
+            {"member_id": 7, "tab": "member"},
+        )
+        for tab in ("member", "bag", "status", "skills", "lineage", "shop"):
+            self.assertEqual(
+                validate_party_view_member_payload({"member_id": 1, "tab": tab})["tab"],
+                tab,
+            )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_each_malformed_payload_rejects(self):
+        cases = (
+            ("not an object", []),
+            ("missing tab", {"member_id": 1}),
+            ("extra key", {"member_id": 1, "tab": "member", "x": 1}),
+            ("unknown tab", {"member_id": 1, "tab": "detail"}),
+            ("non-string tab", {"member_id": 1, "tab": 3}),
+            ("zero member", {"member_id": 0, "tab": "member"}),
+            ("negative member", {"member_id": -1, "tab": "member"}),
+            ("bool member", {"member_id": True, "tab": "member"}),
+            ("string member", {"member_id": "7", "tab": "member"}),
+            ("float member", {"member_id": 7.0, "tab": "member"}),
+            (
+                "over safe integer",
+                {"member_id": MAX_SAFE_INTEGER + 1, "tab": "member"},
+            ),
+        )
+        for label, payload in cases:
+            with self.subTest(label=label):
+                with self.assertRaises(PartyActionError):
+                    validate_party_view_member_payload(payload)
+
+
+class PartyViewMemberAdapterTests(EvenniaTestCase):
+    """The adapter authorizes membership only and records a session selection."""
+
+    def setUp(self):
+        super().setUp()
+        scope = synthetic_registries("races", "static_tiers", "subraces", "items")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+        self.room = create_object(Room, key="隊伍房間")
+        self.other_room = create_object(Room, key="別處")
+        self.commander = create_object(
+            PlayerCharacter, key="指揮者", location=self.room
+        )
+        self.commander.race = _race_key()
+        self.commander.apply_race_baseline()
+        self.aila = self._companion("艾拉")
+        self.kahn = self._companion("卡恩")
+        self.session = SimpleNamespace(
+            ndb=SimpleNamespace(),
+            puppet=self.commander,
+            protocol_key="webclient/websocket",
+        )
+
+    def _companion(self, key):
+        npc = create_object(NPC, key=key, location=self.room, home=self.room)
+        npc.race = _race_key()
+        npc.apply_race_baseline()
+        join_party(npc, self.commander)
+        return npc
+
+    def _select(self, member_id, tab="member"):
+        return _party_view_member_adapter(
+            self.commander, {"member_id": member_id, "tab": tab}, self.session
+        )
+
+    def _selection(self, actor=None):
+        return build_presentation_context(
+            self.session, actor or self.commander
+        ).party_view
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_success_records_the_selection_and_republishes_party(self):
+        self.assertEqual(
+            self._select(self.aila.pk),
+            {
+                "outcome": "success",
+                "code": "viewing_member",
+                "message": "已選擇檢視的隊伍成員。",
+                "affected_panels": ("party",),
+            },
+        )
+        self.assertEqual(
+            self._selection(),
+            PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "member"),
+        )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_forged_member_is_refused_without_substitution(self):
+        self._select(self.aila.pk)
+        outsider = create_object(NPC, key="陌客", location=self.room)
+        outsider.race = _race_key()
+        outsider.apply_race_baseline()
+        for member_id in (outsider.pk, 999_999):
+            with self.subTest(member_id=member_id):
+                result = self._select(member_id)
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], "not_party_member")
+                self.assertNotIn("affected_panels", result)
+                # The previous selection stays exactly as it was.
+                self.assertEqual(self._selection().member_id, int(self.aila.pk))
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_absent_but_effective_member_is_accepted(self):
+        self.aila.location = self.other_room
+        result = self._select(self.aila.pk, "bag")
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(
+            self._selection(),
+            PartyViewSelection(int(self.commander.pk), int(self.aila.pk), "bag"),
+        )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_selection_survives_the_possession_transition(self):
+        self._select(self.kahn.pk, "status")
+        # Possession puppets the companion; the party-panel owner stays the
+        # commander through the companion's back-reference.
+        self.session.puppet = self.kahn
+        self.assertEqual(
+            self._selection(self.kahn),
+            PartyViewSelection(int(self.commander.pk), int(self.kahn.pk), "status"),
+        )
+
+    @covers_requirement(
+        "webclient-party-panel::opening-a-member-s-skills-clears-that-member-s-unread-mark"
+    )
+    def test_skills_tab_clears_only_that_members_unread_mark(self):
+        self.session.ndb.party_unlocks = {
+            int(self.aila.pk): MemberUnlocks(True, frozenset({"t_group_heal"})),
+            int(self.kahn.pk): MemberUnlocks(True, frozenset({"t_guard"})),
+        }
+        # A non-skills tab never clears a dot.
+        self._select(self.aila.pk, "member")
+        self.assertIs(unlock_flags(self.session)[int(self.aila.pk)].unread, True)
+        self._select(self.aila.pk, "skills")
+        flags = unlock_flags(self.session)
+        self.assertIs(flags[int(self.aila.pk)].unread, False)
+        self.assertIs(flags[int(self.kahn.pk)].unread, True)
+
+    @covers_requirement(
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe",
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session",
+    )
+    def test_registered_with_the_party_panel_affected_set(self):
+        registry = build_production_action_registry()
+        spec = registry.spec("party.view_member")
+        self.assertIs(spec.validate_payload, validate_party_view_member_payload)
+        self.assertIs(spec.adapter, _party_view_member_adapter)
+        self.assertEqual(spec.affected_panels, ("party",))

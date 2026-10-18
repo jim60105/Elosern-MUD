@@ -1,24 +1,34 @@
-"""Version-2 read-only ``party`` presentation panel.
+"""Version-3 read-only ``party`` presentation panel.
 
-The presenter serializes the player's live companions into the exact
-``{schema_version, available, slots}`` shape: row vocabulary is the existing
-NPC wire shape (``identity``, ``display_name``, ``portrait_ref``, flat
-``hp_current``/``hp_maximum``) shared with the exploration interact-target
-and combat participant rows, so the combat HUD can join the two panels by
-``identity``. Bond disclosure is the canonical stage NAME only — the raw
-affinity number never reaches the wire (design: 數值隱藏七階羈絆).
+The presenter serializes the commander as row 0 followed by the player's live
+companions into the exact
+``{schema_version, available, slots, general_quota, viewed_member_id}`` shape.
+Row vocabulary is the existing NPC wire shape (``identity``, ``display_name``,
+``portrait_ref``, flat gauge current/maximum pairs) shared with the
+exploration interact-target and combat participant rows, so the combat HUD can
+join the two panels by ``identity``. Each row adds the MP and SP gauge pairs,
+the ``role`` discriminator, the ``knocked_out`` flag and this session's
+``unread`` unlock flag; the commander row carries ``bond_stage: null`` and
+``membership: null`` because neither is a property of the player's own row.
+Bond disclosure is the canonical stage NAME only — the raw affinity number
+never reaches the wire (design: 數值隱藏七階羈絆).
 
 The payload is read-only by construction: membership comes from
 ``world.rules.party.live_companions`` (stale dbids, non-NPC entries, and
-backref mismatches are already filtered there), HP comes from the companion's
-TRUE stored traits through the shared ``stored_gauge_pair`` rules helper
-(never ``disguised_stats`` — display disguise must not leak into party
-truth), and the bond stage comes from the rulebook-backed
-``npc.relations.stage_for`` reader. An empty party is an available panel with
-``slots: []`` so the client renders the controlled figure alone instead of an
-unavailable branch. Creation-pending and no-location puppets raise
-:class:`PanelUnavailableError` and receive the registry-owned shared
-unavailable form.
+backref mismatches are already filtered there), the commander row comes from
+the same owner resolution, HP/MP/SP come from TRUE stored traits through the
+shared ``stored_gauge_pair`` rules helper (never ``disguised_stats`` — display
+disguise must not leak into party truth), the knockout flag reuses the
+``party-member-authority`` predicate, and the bond stage comes from the
+rulebook-backed ``npc.relations.stage_for`` reader. An empty party is an
+available panel whose ``slots`` hold exactly the commander row. Creation-
+pending and no-location puppets raise :class:`PanelUnavailableError` and
+receive the registry-owned shared unavailable form.
+
+``viewed_member_id`` is the session's copied selection resolved through
+``party_view_selection.resolve_viewed_member``: the named member while it is
+still an effective party member, else the commander. The payload therefore
+never names a member who left or was deleted.
 
 ``portrait_ref`` is the art catalog key of the companion while the current
 bounded art view ADMITS it (``world.rules.art_view.build_art_view`` — the one
@@ -32,10 +42,10 @@ catalog cap, or a session whose art view cannot be built — stays the truthful
 ``null``, and the client renders its own placeholder from the row it already
 carries. The client never builds a catalog key.
 
-Bounds note: both HP fields accept zero and no ``hp_current <= hp_maximum``
-cross-field rule is asserted — traits are truth, bounds only (the delta spec
-overrides the proposal's "positive" wording; the combat participant row keeps
-its own stricter cross assertion).
+Bounds note: every gauge field accepts zero and no
+``current <= maximum`` cross-field rule is asserted — traits are truth, bounds
+only (the delta spec overrides the proposal's "positive" wording; the combat
+participant row keeps its own stricter cross assertion).
 """
 
 import re
@@ -43,6 +53,7 @@ from typing import Any
 
 from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
 from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.party_view_selection import resolve_viewed_member
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -65,16 +76,25 @@ from world.rules.party import (
     party_size,
     reasons_for,
 )
+from world.rules.party_scope import is_knocked_out
 
-PARTY_SCHEMA_VERSION = 2
+PARTY_SCHEMA_VERSION = 3
 
 #: The general-quota limit the panel reports as ``general_quota.limit``;
 #: mirrors ``world.rules.party.PARTY_MAX_COMPANIONS`` so drift fails loudly.
 PARTY_GENERAL_LIMIT = PARTY_MAX_COMPANIONS
-#: Envelope safety bound on the ordered roster. The spec removes the old
-#: four-row cap: temporary members sit beyond the general quota, so the panel
-#: renders every effective row and never truncates on quota.
+#: Envelope safety bound on the ordered companion roster. The spec removes the
+#: old four-row cap: temporary members sit beyond the general quota, so the
+#: panel renders every effective row and never truncates on quota.
 PARTY_MAX_SLOTS = 16
+#: Envelope safety bound on the whole ordered row list: the commander row plus
+#: every companion. Kept separate from ``PARTY_MAX_SLOTS`` so the companion
+#: bound stays the value the client mirrors.
+PARTY_MAX_ROWS = PARTY_MAX_SLOTS + 1
+#: The closed role vocabulary of a row.
+PARTY_ROLE_COMMANDER = "commander"
+PARTY_ROLE_COMPANION = "companion"
+PARTY_ROLES = frozenset({PARTY_ROLE_COMMANDER, PARTY_ROLE_COMPANION})
 MAX_PARTY_PORTRAIT_REF = 32
 MAX_PARTY_COMMISSION_LABEL = MAX_DISPLAY_NAME_CODE_POINTS
 
@@ -145,6 +165,21 @@ def _validate_membership(value: Any) -> dict[str, Any]:
     return {"general": general, "temporary_commissions": commissions}
 
 
+def _validate_gauge_pair(value: dict[str, Any], key: str) -> tuple[int, int]:
+    """Validate one ``{key}_current``/``{key}_maximum`` pair.
+
+    Bounds only — zero is legal (a knocked-out companion's stored gauge) and
+    the current/maximum ordering is trait truth, never a validator rule.
+    """
+    current = _require_int(
+        value, f"{key}_current", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    maximum = _require_int(
+        value, f"{key}_maximum", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    return current, maximum
+
+
 def _validate_slot(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
@@ -155,6 +190,13 @@ def _validate_slot(value: Any) -> dict[str, Any]:
             "portrait_ref",
             "hp_current",
             "hp_maximum",
+            "mp_current",
+            "mp_maximum",
+            "sp_current",
+            "sp_maximum",
+            "role",
+            "knocked_out",
+            "unread",
             "bond_stage",
             "membership",
         },
@@ -174,25 +216,45 @@ def _validate_slot(value: Any) -> dict[str, Any]:
         or re.fullmatch(r"[0-9]+", portrait_ref) is None
     ):
         raise PartyPanelError("portrait_ref must be a bounded decimal string or null")
-    # Bounds only — zero HP is legal (a knocked-out companion's stored gauge)
-    # and the current/maximum ordering is trait truth, never a validator rule.
-    hp_current = _require_int(
-        value, "hp_current", minimum=0, maximum=MAX_SAFE_INTEGER
-    )
-    hp_maximum = _require_int(
-        value, "hp_maximum", minimum=0, maximum=MAX_SAFE_INTEGER
-    )
-    bond_stage = _bounded_name(
-        _require_str(value, "bond_stage", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
-        "slot bond_stage",
-    )
-    membership = _validate_membership(value["membership"])
+    hp_current, hp_maximum = _validate_gauge_pair(value, "hp")
+    mp_current, mp_maximum = _validate_gauge_pair(value, "mp")
+    sp_current, sp_maximum = _validate_gauge_pair(value, "sp")
+    role = value["role"]
+    if role not in PARTY_ROLES:
+        raise PartyPanelError("role must be commander or companion")
+    knocked_out = _require_bool(value, "knocked_out")
+    unread = _require_bool(value, "unread")
+    if role == PARTY_ROLE_COMMANDER:
+        # The commander row is the player's own: no bond stage, no party
+        # membership, and never knocked out (the authority predicate excludes
+        # the commander itself).
+        if value["bond_stage"] is not None:
+            raise PartyPanelError("the commander row carries no bond_stage")
+        if value["membership"] is not None:
+            raise PartyPanelError("the commander row carries no membership")
+        if knocked_out:
+            raise PartyPanelError("the commander row is never knocked out")
+        bond_stage = None
+        membership = None
+    else:
+        bond_stage = _bounded_name(
+            _require_str(value, "bond_stage", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
+            "slot bond_stage",
+        )
+        membership = _validate_membership(value["membership"])
     return {
         "identity": identity,
         "display_name": display_name,
         "portrait_ref": portrait_ref,
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
+        "mp_current": mp_current,
+        "mp_maximum": mp_maximum,
+        "sp_current": sp_current,
+        "sp_maximum": sp_maximum,
+        "role": role,
+        "knocked_out": knocked_out,
+        "unread": unread,
         "bond_stage": bond_stage,
         "membership": membership,
     }
@@ -207,7 +269,13 @@ def validate_party(payload: Any) -> dict[str, Any]:
     _require_exact_fields(
         payload,
         "party panel",
-        {"schema_version", "available", "slots", "general_quota"},
+        {
+            "schema_version",
+            "available",
+            "slots",
+            "general_quota",
+            "viewed_member_id",
+        },
         {},
     )
     if _require_int(
@@ -217,25 +285,40 @@ def validate_party(payload: Any) -> dict[str, Any]:
     if not _require_bool(payload, "available"):
         raise PartyPanelError("available must be true for the party form")
     slots = payload["slots"]
-    if not isinstance(slots, list) or len(slots) > PARTY_MAX_SLOTS:
+    if not isinstance(slots, list) or len(slots) > PARTY_MAX_ROWS:
         raise PartyPanelError(
-            f"slots must be a list of at most {PARTY_MAX_SLOTS} rows"
+            f"slots must be a list of at most {PARTY_MAX_ROWS} rows"
         )
     rows = [_validate_slot(row) for row in slots]
     identities = [row["identity"] for row in rows]
     if len(set(identities)) != len(identities):
         raise PartyPanelError("party slot identities must be unique")
+    commanders = [
+        index
+        for index, row in enumerate(rows)
+        if row["role"] == PARTY_ROLE_COMMANDER
+    ]
+    if commanders != [0]:
+        raise PartyPanelError(
+            "the party panel carries exactly one commander row, first"
+        )
     quota = payload["general_quota"]
     _require_exact_fields(quota, "general quota", {"used", "limit"}, {})
     used = _require_int(quota, "used", minimum=0, maximum=MAX_SAFE_INTEGER)
     limit = _require_int(quota, "limit", minimum=0, maximum=MAX_SAFE_INTEGER)
     if used > limit:
         raise PartyPanelError("general quota used exceeds the limit")
+    viewed_member_id = _require_int(
+        payload, "viewed_member_id", minimum=1, maximum=MAX_SAFE_INTEGER
+    )
+    if viewed_member_id not in identities:
+        raise PartyPanelError("viewed_member_id must name a presented row")
     result = {
         "schema_version": PARTY_SCHEMA_VERSION,
         "available": True,
         "general_quota": {"used": used, "limit": limit},
         "slots": rows,
+        "viewed_member_id": viewed_member_id,
     }
     # Envelope guarantee (the shared per-panel closing check): an over-limit
     # payload can only come from a producer bug and fails closed.
@@ -273,6 +356,16 @@ def _resolve_portrait_ref(npc: Any, members: frozenset[int] | None) -> str | Non
     return portrait_catalog_key(npc.pk)
 
 
+def _unread(context: PresentationContext, identity: int) -> bool:
+    """This session's unread unlock dot for one member, default false.
+
+    Read from the copied session snapshot only, so the presenter never touches
+    ``ndb`` and a reconnect starts with every dot cleared.
+    """
+    entry = context.unlocks.get(identity)
+    return bool(entry is not None and entry.unread)
+
+
 def party_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``party`` panel for the authenticated puppet."""
     actor = context.actor
@@ -302,14 +395,46 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
             else record.definition_key
         )[:MAX_PARTY_COMMISSION_LABEL]
 
-    slots: list[dict[str, Any]] = []
-    # The committed art view's admission set, resolved once for the whole
-    # roster: a companion the view does not admit is the truthful null.
+    # The committed art view's admission set for the companions, resolved once
+    # for the roster: a companion the view does not admit is the truthful null.
     members = _admitted_identities(actor)
+    # The commander's own row is judged by a view built for the commander, not
+    # for the puppet: the exploration view excludes its own actor, so judging
+    # row 0 from a possessed session would flip the reference merely because
+    # the controlled body changed. Possession-identical payloads depend on it.
+    commander_members = _admitted_identities(owner)
+    commander_id = int(owner.pk)
+    commander_hp_current, commander_hp_maximum = stored_gauge_pair(owner, "hp")
+    commander_mp_current, commander_mp_maximum = stored_gauge_pair(owner, "mp")
+    commander_sp_current, commander_sp_maximum = stored_gauge_pair(owner, "sp")
+    slots: list[dict[str, Any]] = [
+        {
+            "identity": commander_id,
+            "display_name": npc_display_name(owner)[
+                :MAX_DISPLAY_NAME_CODE_POINTS
+            ],
+            "portrait_ref": _resolve_portrait_ref(owner, commander_members),
+            "hp_current": commander_hp_current,
+            "hp_maximum": commander_hp_maximum,
+            "mp_current": commander_mp_current,
+            "mp_maximum": commander_mp_maximum,
+            "sp_current": commander_sp_current,
+            "sp_maximum": commander_sp_maximum,
+            "role": PARTY_ROLE_COMMANDER,
+            # The authority predicate excludes the commander itself; the row
+            # carries the constant rather than a second HP comparison.
+            "knocked_out": False,
+            "unread": _unread(context, commander_id),
+            "bond_stage": None,
+            "membership": None,
+        }
+    ]
     # The complete ordered effective roster: temporary members sit beyond the
     # general quota, so no four-row slice truncates a valid roster.
     for npc in live_companions(owner):
         hp_current, hp_maximum = stored_gauge_pair(npc, "hp")
+        mp_current, mp_maximum = stored_gauge_pair(npc, "mp")
+        sp_current, sp_maximum = stored_gauge_pair(npc, "sp")
         commissions = [
             {
                 "quest_id": quest_id,
@@ -327,6 +452,13 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "portrait_ref": _resolve_portrait_ref(npc, members),
                 "hp_current": hp_current,
                 "hp_maximum": hp_maximum,
+                "mp_current": mp_current,
+                "mp_maximum": mp_maximum,
+                "sp_current": sp_current,
+                "sp_maximum": sp_maximum,
+                "role": PARTY_ROLE_COMPANION,
+                "knocked_out": is_knocked_out(npc),
+                "unread": _unread(context, int(npc.pk)),
                 "bond_stage": npc.relations.stage_for(owner).name,
                 "membership": {
                     "general": has_general_membership(npc, owner),
@@ -334,6 +466,9 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 },
             }
         )
+    viewed_member = resolve_viewed_member(context)
+    if viewed_member is None:  # pragma: no cover - the owner resolved above
+        raise PanelUnavailableError
     return validate_party(
         {
             "schema_version": PARTY_SCHEMA_VERSION,
@@ -343,13 +478,18 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "limit": PARTY_GENERAL_LIMIT,
             },
             "slots": slots,
+            "viewed_member_id": int(viewed_member.pk),
         }
     )
 
 
 __all__ = [
     "PARTY_GENERAL_LIMIT",
+    "PARTY_MAX_ROWS",
     "PARTY_MAX_SLOTS",
+    "PARTY_ROLES",
+    "PARTY_ROLE_COMMANDER",
+    "PARTY_ROLE_COMPANION",
     "PARTY_SCHEMA_VERSION",
     "PartyPanelError",
     "party_presenter",
