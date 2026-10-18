@@ -421,9 +421,10 @@ function validCharacterTraitRow(overrides) {
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "character",
+      member_id: 101,
       traits: [
         validCharacterTraitRow(),
         validCharacterTraitRow({
@@ -435,6 +436,24 @@ function validCharacterPanel(overrides) {
           effective: 5,
           layers: [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
         }),
+      ],
+      conditions: [
+        {
+          code: "t_buff",
+          label: "合成增益",
+          severity: "beneficial",
+          remaining_seconds: 30,
+          modifiers: {},
+          source: "狀態",
+        },
+        {
+          code: "t_rule",
+          label: "合成警告",
+          severity: "warning",
+          remaining_seconds: null,
+          modifiers: { agility: "-10%", defense: -2 },
+          source: "裝備",
+        },
       ],
       actives: [
         {
@@ -464,8 +483,6 @@ function validCharacterPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
-      persona: { background: null, personality: null, life_story: null, habit: null },
-      intimate: null,
     },
     overrides || {}
   );

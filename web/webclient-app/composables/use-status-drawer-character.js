@@ -1,10 +1,13 @@
-// CharacterStatusDrawer character-panel read-model group: the `character` v5/v7
-// payload projections extracted verbatim from `CharacterStatusDrawer.vue` so
+// CharacterStatusDrawer read-model group: the `character` v8 payload
+// projections plus the `party_member` persona/intimate sections, extracted so
 // the SFC stays a thin, passive renderer. Owns availability/reason gating, the
 // true-trait rows and the 屬性 allowlist filter, the disguise comparison, the
 // guild counters, the persona section table and the intimate disclosure rows
-// (the hero's full title reads the `status` panel instead). Consumes the component props explicitly; the status
-// group consumes this group's `traits` for its gauge-layer guard.
+// (the hero's full title reads the `status` panel instead). Persona prose and
+// intimate state come from `party_member`: the commander section owns the
+// prose, and the viewed member's section owns the intimate rows. Consumes the
+// component props explicitly; the status group consumes this group's `traits`
+// and subject guard for its gauge-layer check.
 import { computed } from "vue";
 
 export function useStatusDrawerCharacter(props) {
@@ -58,13 +61,32 @@ export function useStatusDrawerCharacter(props) {
 
   const guild = computed(() => (characterAvailable.value ? (props.character?.guild ?? null) : null));
 
+  // The `party_member` panel is the source of the persona and intimate
+  // sections (character v8 dropped both). When it is unavailable the drawer
+  // marks the persona area with its registry-owned reason and invents nothing.
+  const partyMemberAvailable = computed(
+    () => props.partyMember?.available !== false
+  );
+  const partyMemberReason = computed(() =>
+    partyMemberAvailable.value ? null : (props.partyMember?.reason ?? null)
+  );
+  const commanderSection = computed(() =>
+    partyMemberAvailable.value ? (props.partyMember?.commander ?? null) : null
+  );
+  const memberSection = computed(() => {
+    if (!partyMemberAvailable.value) return null;
+    return commanderSection.value ?? props.partyMember?.companion ?? null;
+  });
+
   // The persona area (add-persona-edit-surface D4): the four editable prose
-  // sections in 個性／生平／習慣／背景 order. Each value is the committed
-  // panel's verbatim text or null; a null renders the localized 未設定
-  // placeholder (display copy only — the payload never carries placeholder
-  // text). The structural persona keys (identity, appearance,
-  // social_connection) are not part of the wire payload and are never
-  // rendered here.
+  // sections in 個性／生平／習慣／背景 order, from the commander section of
+  // `party_member`. Each value is the committed section's verbatim text or
+  // null; a null renders the localized 未設定 placeholder (display copy only —
+  // the payload never carries placeholder text). The structural persona keys
+  // (identity, appearance, social_connection) are not part of the wire payload
+  // and are never rendered here. The array stays an array (empty while the
+  // commander section is absent) so the inline editor's watcher never
+  // dereferences null; the template gates the whole area separately.
   const PERSONA_SECTIONS = [
     { key: "personality", label: "個性" },
     { key: "life_story", label: "生平" },
@@ -72,16 +94,33 @@ export function useStatusDrawerCharacter(props) {
     { key: "background", label: "背景" },
   ];
 
-  const personaSections = computed(() =>
-    PERSONA_SECTIONS.map((section) => ({
+  const personaSections = computed(() => {
+    const persona = commanderSection.value?.persona ?? null;
+    if (persona === null) return [];
+    return PERSONA_SECTIONS.map((section) => ({
       ...section,
-      value: characterAvailable.value
-        ? (props.character?.persona?.[section.key] ?? null)
-        : null,
-    }))
+      value: persona[section.key] ?? null,
+    }));
+  });
+  // The area renders while the commander section exists, and also while
+  // `party_member` is unavailable (so its registry-owned reason stays
+  // visible); it is absent while a companion is the viewed member.
+  const personaVisible = computed(
+    () => !partyMemberAvailable.value || commanderSection.value !== null
   );
 
-  const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
+  const intimate = computed(() => memberSection.value?.intimate ?? null);
+
+  // The character panel follows the viewed member while `status` describes
+  // the controlled figure; their trait/gauge facts may only be combined when
+  // both name the same member.
+  const characterSubjectMatches = computed(() => {
+    const memberId = props.character?.member_id;
+    const identity = props.status?.actor?.identity;
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) return false;
+    const subject = Number(identity);
+    return Number.isSafeInteger(subject) && subject === memberId;
+  });
 
   // The 親密狀態 (intimate status) section rows: the 設計稿's #dr-status stat
   // grid. The first five rows are level words from the fixed vocabulary, and
@@ -106,7 +145,11 @@ export function useStatusDrawerCharacter(props) {
     displayedRows,
     guild,
     personaSections,
+    personaVisible,
+    partyMemberAvailable,
+    partyMemberReason,
     intimate,
+    characterSubjectMatches,
     INTIMATE_ROWS,
   };
 }

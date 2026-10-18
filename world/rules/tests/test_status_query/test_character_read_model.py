@@ -23,6 +23,7 @@ from world.rules.status_query import (
     build_character_read_model,
     build_status_read_model,
     group_skill_keys,
+    read_intimate_view,
 )
 from world.skills.handler import INNATE_SKILL_ORDER
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
@@ -237,13 +238,15 @@ class CharacterReadModelTests(EvenniaTestCase):
 
     def test_intimate_view_builds_from_materialized_record(self):
         self._materialize_sexual_traits(self._materialized_sexual_traits())
-        model = self._model()
-        self.assertEqual(model.intimate.arousal, "中等")
-        self.assertEqual(model.intimate.wetness, "微濕")
-        self.assertEqual(model.intimate.shame, "輕微")
-        self.assertEqual(model.intimate.exposure, "低")
-        self.assertEqual(model.intimate.climax_phase, "未達")
-        self.assertEqual(model.intimate.climax_today, 2)
+        intimate = read_intimate_view(self.actor)
+        self.assertEqual(intimate.arousal, "中等")
+        self.assertEqual(intimate.wetness, "微濕")
+        self.assertEqual(intimate.shame, "輕微")
+        self.assertEqual(intimate.exposure, "低")
+        self.assertEqual(intimate.climax_phase, "未達")
+        self.assertEqual(intimate.climax_today, 2)
+        # The character read model no longer carries the intimate projection.
+        self.assertFalse(hasattr(self._model(), "intimate"))
 
     def test_intimate_view_resolves_from_baseline_only(self):
         self.actor.db.sexual = {
@@ -257,21 +260,35 @@ class CharacterReadModelTests(EvenniaTestCase):
             "sensitivity": {},
             "experience_types": frozenset(),
         }
-        model = self._model()
-        self.assertEqual(model.intimate.arousal, "中等")
-        self.assertEqual(model.intimate.climax_today, 2)
+        intimate = read_intimate_view(self.actor)
+        self.assertEqual(intimate.arousal, "中等")
+        self.assertEqual(intimate.climax_today, 2)
         self.assertIsNone(self.actor.attributes.get("sexual_traits", category="traits"))
 
     def test_intimate_view_is_none_without_any_record(self):
-        model = self._model()
-        self.assertIsNone(model.intimate)
+        self.assertIsNone(read_intimate_view(self.actor))
+        # The character panel stays available: it never reads this section.
+        self.assertTrue(self._model().traits)
+
+    def test_character_model_ignores_an_intimate_only_corruption(self):
+        # `party_member` owns the intimate projection, so a corruption confined
+        # to an intimate-only level field (wetness/shame) fails that reader but
+        # leaves the character model's mechanical reads untouched.
+        data = self._materialized_sexual_traits()
+        data["wetness"]["levels"] = list(WETNESS_LEVELS[:2])
+        data["wetness"]["max"] = 1
+        data["shame"]["levels"] = list(reversed(list(SHAME_LEVELS)))
+        self._materialize_sexual_traits(data)
+        with self.assertRaises(StatusQueryError):
+            read_intimate_view(self.actor)
+        self.assertTrue(self._model().traits)
 
     def test_partial_materialized_record_fails_closed(self):
         data = self._materialized_sexual_traits()
         del data["climax_today"]
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
     def test_malformed_materialized_level_entries_fail_closed(self):
         # A truncated `levels` list (still non-empty, so the trait
@@ -282,48 +299,48 @@ class CharacterReadModelTests(EvenniaTestCase):
         data["wetness"]["max"] = 1
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits()
         data["shame"]["levels"] = list(reversed(list(SHAME_LEVELS)))
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits()
         data["exposure"]["value"] = True
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits()
         data["climax_phase"]["value"] = 99
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
     def test_malformed_pleasure_counter_fails_closed(self):
         data = self._materialized_sexual_traits()
         data["pleasure"] = "junk"
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits()
         data["pleasure"]["base"] = True
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits(pleasure_base=101)
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
         data = self._materialized_sexual_traits(pleasure_base=-3)
         self._materialize_sexual_traits(data)
         with self.assertRaises(StatusQueryError):
-            self._model()
+            read_intimate_view(self.actor)
 
     def test_malformed_baseline_climax_today_fails_closed(self):
         baseline = {
@@ -339,7 +356,7 @@ class CharacterReadModelTests(EvenniaTestCase):
         for value in (True, -2, "2"):
             self.actor.db.sexual = {**baseline, "climax_today": value}
             with self.assertRaises(StatusQueryError):
-                self._model()
+                read_intimate_view(self.actor)
 
     def test_build_model_has_no_attribute_side_effects(self):
         # The no-create read model must not create, materialize, or rewrite

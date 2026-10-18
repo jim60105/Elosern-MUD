@@ -1,7 +1,7 @@
 """Character panel schema tests: byte-envelope, label/value bounds, and intimate-field validation."""
 from tools.spec_traceability import covers_requirement
 import unittest
-from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_LABEL_CODE_POINTS, MAX_PASSIVE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
+from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_CONDITION_ROWS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_LABEL_CODE_POINTS, MAX_MODIFIER_KEYS, MAX_PASSIVE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
 from ._support import _skill_categories, _trait, _valid_panel
 
@@ -213,53 +213,37 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
-    def test_intimate_field_validation(self):
-        # ``intimate: None`` is valid — the section is omitted when the actor has
-        # no sexual-state record.
-        normalized = validate_character(_valid_panel())
-        self.assertIsNone(normalized["intimate"])
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_maximal_condition_rows_fit_the_envelope(self):
+        # The newly added section's own maximal legal payload (32 rows, a
+        # 128-code-point label, 16 modifier pairs and a 32-code-point source)
+        # must still serialize inside the canonical byte bound.
+        conditions = [
+            {
+                "code": f"condition_{index}",
+                "label": "很長的狀態名稱" * 8,
+                "severity": "warning",
+                "remaining_seconds": 9999,
+                "modifiers": {
+                    f"modifier_{key}": "-10%" for key in range(MAX_MODIFIER_KEYS)
+                },
+                "source": "裝備、狀態",
+            }
+            for index in range(MAX_CONDITION_ROWS)
+        ]
+        normalized = validate_character(_valid_panel(conditions=conditions))
+        self.assertEqual(len(normalized["conditions"]), MAX_CONDITION_ROWS)
+        self.assertLessEqual(json_byte_size(normalized), MAX_CANONICAL_JSON_BYTES)
 
-        # A populated intimate section is validated against its fixed vocabulary.
-        intimate = {
-            "arousal": "中等",
-            "wetness": "微濕",
-            "shame": "輕微",
-            "exposure": "低",
-            "climax_phase": "未達",
-            "climax_today": 2,
-        }
-        normalized = validate_character(_valid_panel(intimate=intimate))
-        self.assertEqual(normalized["intimate"], intimate)
 
-        # Unknown fields are rejected.
-        with self.assertRaises(ProtocolValidationError):
-            validate_character(_valid_panel(intimate={**intimate, "bogus": 1}))
-
-        # Missing fields are rejected.
-        partial = dict(intimate)
-        del partial["climax_phase"]
-        with self.assertRaises(ProtocolValidationError):
-            validate_character(_valid_panel(intimate=partial))
-
-        # A level word that is not a member of the fixed vocabulary is rejected.
-        bad = dict(intimate)
-        bad["arousal"] = "很高"
-        with self.assertRaises(CharacterPanelError):
-            validate_character(_valid_panel(intimate=bad))
-
-        # Non-string level fields are rejected.
-        bad = dict(intimate)
-        bad["wetness"] = 1
-        with self.assertRaises(ProtocolValidationError):
-            validate_character(_valid_panel(intimate=bad))
-
-        # ``climax_today`` must be a non-negative integer.
-        for value in (True, -1, "2"):
-            bad = dict(intimate)
-            bad["climax_today"] = value
-            with self.assertRaises(ProtocolValidationError):
-                validate_character(_valid_panel(intimate=bad))
+    def test_persona_and_intimate_are_not_part_of_the_v8_shape(self):
+        for field, value in (
+            ("persona", {"background": None}),
+            ("intimate", None),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(_valid_panel(**{field: value}))
 
 
     def test_flattened_row_count_bound_applies_not_the_category_group_count(self):

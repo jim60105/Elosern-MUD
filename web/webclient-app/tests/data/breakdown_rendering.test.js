@@ -41,7 +41,16 @@ function characterWith(traits, equipment) {
 function mountDrawer(props = {}) {
   return mount(CharacterStatusDrawer, {
     props: {
-      status: STATUS_PANEL_SAMPLE,
+      // The gauge-layer guard only attaches the character breakdown when both
+      // panels name the same member, so this suite pins the status actor to
+      // the character fixture's member_id.
+      status: {
+        ...STATUS_PANEL_SAMPLE,
+        actor: {
+          ...STATUS_PANEL_SAMPLE.actor,
+          identity: String(CHARACTER_PANEL_SAMPLE.member_id),
+        },
+      },
       character: CHARACTER_PANEL_SAMPLE,
       lowHp: false,
       ...props,

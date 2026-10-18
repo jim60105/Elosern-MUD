@@ -29,8 +29,13 @@ import { useStatusDrawerPersona } from "../composables/use-status-drawer-persona
 const props = defineProps({
   // The committed `status` v1 panel payload (vitals + conditions).
   status: { type: Object, required: true },
-  // The committed `character` v5 panel payload (traits/equipment/disguise/...).
+  // The committed `character` v8 panel payload for the viewed member
+  // (traits/conditions/disguise/guild/...).
   character: { type: Object, required: true },
+  // The committed `party_member` v1 panel payload for the viewed member: the
+  // commander section owns the persona prose and the viewed member's section
+  // owns the intimate state.
+  partyMember: { type: Object, default: () => ({}) },
   // The derived low-HP presentation state (store view.vitals.lowHp).
   lowHp: { type: Boolean, default: false },
   // Whether the party panel is available in the store (webclient-retire-redundant-hud design D4).
@@ -47,8 +52,9 @@ const emit = defineEmits(["open-skill", "open-party", "persona-edit"]);
 // copy in lib/condition_label.js.
 const conditionName = conditionLabel;
 
-// The `character` v5/v7 read-model group (availability gating, traits and the
-// 屬性 allowlist, disguise, guild, persona table, intimate rows).
+// The `character` v8 + `party_member` read-model group (availability gating,
+// traits and the 屬性 allowlist, disguise, guild, persona table, intimate
+// rows, and the shared-subject guard).
 const {
   characterAvailable,
   characterReason,
@@ -60,7 +66,11 @@ const {
   displayedRows,
   guild,
   personaSections,
+  personaVisible,
+  partyMemberAvailable,
+  partyMemberReason,
   intimate,
+  characterSubjectMatches,
   INTIMATE_ROWS,
 } = useStatusDrawerCharacter(props);
 
@@ -78,7 +88,7 @@ const {
   VITALS,
   gaugeRatioPct,
   conditions,
-} = useStatusDrawerStatus(props, traits);
+} = useStatusDrawerStatus(props, traits, characterSubjectMatches);
 
 // The hero identity (webclient-drawer-content-polish): the committed actor
 // name and composed full title from the `status` panel (every mode), and the
@@ -422,16 +432,18 @@ const {
          verbatim text or the localized 未設定 placeholder, plus an inline
          edit affordance that submits exactly one persona-edit intent
          ({ field, text }; a blank draft submits null). When the
-         `character` panel is unavailable the area stays visible, is marked
-         with the registry-owned reason, and offers no edit controls. -->
-    <section class="character-status-drawer__section character-status-drawer__section--full character-status-drawer__persona" data-testid="character-status-drawer__persona" aria-label="設定">
+         `party_member` panel is unavailable the area stays visible, is marked
+         with the registry-owned reason, and offers no edit controls; while a
+         companion is the viewed member there is no commander section to show,
+         so the area is absent rather than borrowing another member's prose. -->
+    <section v-if="personaVisible" class="character-status-drawer__section character-status-drawer__section--full character-status-drawer__persona" data-testid="character-status-drawer__persona" aria-label="設定">
       <p
-        v-if="!characterAvailable"
+        v-if="!partyMemberAvailable"
         class="character-status-drawer__section-reason"
         data-testid="character-status-drawer__persona-unavailable"
-        :data-reason-code="characterReason?.code"
+        :data-reason-code="partyMemberReason?.code"
       >
-        {{ characterReason?.message }}
+        {{ partyMemberReason?.message }}
       </p>
       <template v-else>
         <div

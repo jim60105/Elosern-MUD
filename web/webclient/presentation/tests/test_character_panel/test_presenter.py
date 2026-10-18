@@ -1,14 +1,18 @@
-"""Character panel presenter tests: canonical envelope, roster, and disguise rendering."""
+"""Character panel presenter tests: viewed member, conditions, and disguise."""
 from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from typeclasses.characters import PlayerCharacter
-from web.webclient.presentation.character import CHARACTER_SCHEMA_VERSION, MAX_PERSONA_FIELD_CODE_POINTS
+from typeclasses.npcs import NPC
+from web.webclient.presentation.character import CHARACTER_SCHEMA_VERSION
+from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.party_view_selection import PartyViewSelection
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
+from world.rules.party import join_party
 from world.rules.status_query import StatusQueryError
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from ._support import (
@@ -71,8 +75,19 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return build_production_registry()
 
 
-    def _render(self):
-        return self._registry().render("character", _context(self.player))
+    def _render(self, *, actor=None, member=None):
+        """Render the panel for ``member`` as the session's viewed member."""
+        selection = (
+            None
+            if member is None
+            else PartyViewSelection(int(self.player.pk), int(member.pk), "status")
+        )
+        context = PresentationContext(
+            actor=actor or self.player,
+            protocol_version=1,
+            party_view=selection,
+        )
+        return self._registry().render("character", context)
 
     @covers_requirement(
         "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
@@ -95,7 +110,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             self.assertNotIn(T_STEADY, _flattened_keys(payload["passives"]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -104,6 +119,11 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "character")
         self.assertEqual(payload["schema_version"], CHARACTER_SCHEMA_VERSION)
+        self.assertEqual(payload["member_id"], int(self.player.pk))
+        self.assertIsInstance(payload["conditions"], list)
+        # Persona prose and intimate state belong to `party_member` now.
+        self.assertNotIn("persona", payload)
+        self.assertNotIn("intimate", payload)
         hp = next(row for row in payload["traits"] if row["key"] == "hp")
         self.assertEqual(hp["max"], self.player.traits.hp.max)
         self.assertEqual(hp["current"], self.player.traits.hp.current)
@@ -191,7 +211,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -208,7 +228,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(atk["current"], atk["effective"])
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -233,7 +253,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["merit"], 60)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()
@@ -248,75 +268,80 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
-    def test_persona_renders_four_keys_and_never_structural_keys(self):
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_persona_record_never_leaks_into_the_payload(self):
         self.player.db.persona = {
             "identity": {"public_view": {"name": "甲"}},
             "personality": "沉穩",
-            "life_story": "",
-            "habit": "  ",
+            "life_story": "來自邊境的小村",
+            "habit": "清晨練劍",
             "appearance": {},
             "social_connection": {},
             "background": "渡口成長的灰誓成員",
         }
         payload = self._render()
-        self.assertEqual(
-            payload["persona"],
-            {
-                "background": "渡口成長的灰誓成員",
-                "personality": "沉穩",
-                "life_story": None,
-                "habit": None,
-            },
-        )
-        self.assertNotIn("identity", payload["persona"])
-        self.assertNotIn("appearance", payload["persona"])
-        self.assertNotIn("social_connection", payload["persona"])
-        # No persona record at all renders all-null, never a placeholder.
-        self.player.attributes.remove("persona")
-        payload = self._render()
-        self.assertEqual(
-            payload["persona"],
-            {
-                "background": None,
-                "personality": None,
-                "life_story": None,
-                "habit": None,
-            },
-        )
+        self.assertTrue(payload["available"])
+        for key in (
+            "persona",
+            "intimate",
+            "identity",
+            "appearance",
+            "social_connection",
+            "background",
+            "personality",
+            "life_story",
+            "habit",
+        ):
+            with self.subTest(key=key):
+                self.assertNotIn(key, payload)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
-    def test_structural_or_non_string_persona_values_degrade_to_null(self):
-        self.player.db.persona = {
-            "identity": {},
-            "personality": 42,
-            "life_story": "",
-            "habit": "",
-            "appearance": {},
-            "social_connection": {},
-            "background": "",
-        }
-        payload = self._render()
-        self.assertEqual(payload["persona"]["personality"], None)
+    def _companion(self, key="艾拉"):
+        companion = create_object(NPC, key=key, location=self.room1)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        return companion
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
-    def test_over_bound_persona_text_fails_the_panel_closed(self):
-        self.player.db.persona = {
-            "identity": {},
-            "personality": "長" * (MAX_PERSONA_FIELD_CODE_POINTS + 1),
-            "life_story": "",
-            "habit": "",
-            "appearance": {},
-            "social_connection": {},
-            "background": "",
-        }
-        payload = self._render()
-        self.assertFalse(payload["available"])
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_the_panel_follows_the_viewed_companion(self):
+        companion = self._companion()
+        payload = self._render(member=companion)
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["member_id"], int(companion.pk))
+        # Every section is the companion's own: the commander's wallet and
+        # guild rank never substitute for it.
+        self.assertEqual(payload["wallet"], 0)
+        self.assertIsNone(payload["guild"]["rank"])
+        hp = next(row for row in payload["traits"] if row["key"] == "hp")
+        self.assertEqual(hp["current"], companion.traits.hp.current)
+        # The selection falls back to the commander once the member leaves.
+        from world.rules.party import leave_party
+
+        leave_party(companion, self.player)
+        fallback = self._render(member=companion)
+        self.assertEqual(fallback["member_id"], int(self.player.pk))
 
 
-    def test_combat_mode_renders_unavailable_form(self):
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_the_payload_is_identical_with_and_without_possession(self):
+        from world.rules.possession import enter_possession, release_possession
+
+        companion = self._companion()
+        before = self._render(member=companion)
+        possessor = self._companion("卡恩")
+        self.player.location = self.room1
+        enter_possession(self.player, possessor)
+        try:
+            while_possessing = self._render(actor=possessor, member=companion)
+        finally:
+            release_possession(self.player)
+        self.assertEqual(while_possessing, before)
+
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_combat_keeps_the_panel_available(self):
         from typeclasses.monsters import Monster
 
         monster = create_object(Monster, key="哥布林", location=self.room1)
@@ -327,8 +352,59 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.location = self.room1
         engage(self.player, monster)
         payload = self._render()
-        self.assertFalse(payload["available"])
-        self.assertNotIn("traits", payload)
+        self.assertTrue(payload["available"])
+        self.assertTrue(payload["traits"])
+        self.assertEqual(payload["member_id"], int(self.player.pk))
+
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_conditions_carry_buff_and_indefinite_rule_rows(self):
+        from types import SimpleNamespace
+
+        from world.rules.buffs import apply_buff
+        from world.rules.combat_modifiers import Rule
+        from world.rules.status_display import display_for
+
+        apply_buff(self.player, "water_film")
+        rules = [
+            Rule(
+                "t_fatigue",
+                {"buff_active": "water_film"},
+                {"agility": "-10%", "defense": -2},
+            )
+        ]
+
+        def fake_display(code):
+            if code == "t_fatigue":
+                return SimpleNamespace(label="合成疲勞", severity="warning")
+            return display_for(code)
+
+        with patch("world.rules.combat_modifiers._RULES", rules), patch(
+            "world.rules.status_query.conditions.display_for",
+            side_effect=fake_display,
+        ):
+            payload = self._render()
+        self.assertTrue(payload["available"])
+        rows = {row["code"]: row for row in payload["conditions"]}
+        # The buff row carries its registry label/severity, the definition's
+        # remaining duration, and its own-state origin.
+        buff = rows["water_film"]
+        self.assertEqual(buff["severity"], "beneficial")
+        self.assertEqual(buff["remaining_seconds"], 60)
+        self.assertEqual(buff["modifiers"], {})
+        self.assertEqual(buff["source"], "狀態")
+        # The rule row is indefinite and carries every canonical modifier
+        # value verbatim, including the authored percentage string.
+        rule = rows["t_fatigue"]
+        self.assertEqual(rule["severity"], "warning")
+        self.assertIsNone(rule["remaining_seconds"])
+        self.assertEqual(rule["modifiers"], {"agility": "-10%", "defense": -2})
+        self.assertEqual(rule["source"], "狀態")
+        # The status panel's deterministic order: buffs, then matched rules.
+        self.assertEqual(
+            [row["code"] for row in payload["conditions"]],
+            ["water_film", "t_fatigue"],
+        )
 
 
     def test_unknown_item_and_skill_degrade_to_their_keys(self):

@@ -87,7 +87,7 @@ const {
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  controlledActorId, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
+  controlledActorId, controlledCharacterPanel, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -1208,7 +1208,6 @@ const rootStyle = computed(() => {
       <SkillBook
         v-else-if="store.view.hudDrawer === 'skill'"
         :skills="panel('character') || {}"
-        :actor-id="controlledActorId"
         :practice-disabled="skipDisabled"
         :practice-feedback="practiceFeedback"
         :mode="store.view.mode || 'exploration'"
@@ -1222,7 +1221,7 @@ const rootStyle = computed(() => {
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
-        :character="panel('character')"
+        :character="controlledCharacterPanel"
         :wallet="inventoryWalletCopper"
         :actor-id="controlledActorId"
         :combat="store.view.mode === 'combat'"
@@ -1248,6 +1247,7 @@ const rootStyle = computed(() => {
         v-else-if="store.view.hudDrawer === 'status'"
         :status="panel('status') || {}"
         :character="panel('character') || {}"
+        :party-member="panel('party_member') || {}"
         :low-hp="store.view.vitals.lowHp"
         :party-available="store.partyAvailable"
         @open-party="() => store.openHudDrawer('party')"

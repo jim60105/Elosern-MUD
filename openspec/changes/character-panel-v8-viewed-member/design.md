@@ -13,7 +13,7 @@ See proposal.md. `character_presenter(context)` raises unavailable outside explo
 ## Decisions
 
 - **Subject** = `resolve_viewed_member(context)` (party v3 helper). The read model is the same `build_character_read_model(member)`, so true values and disguise comparison semantics are unchanged.
-- **Conditions** reuse the status read model's matched-modifier rows for the member and add `source` (the buff's registry source label, or the equipment/skill/state origin already known to the breakdown read model). `remaining_seconds` is null for indefinite conditions.
+- **Conditions** reuse the status read model's matched-modifier rows for the member, through one shared projection (`world.rules.status_query.conditions`), so severity, ordering and modifier scalars cannot diverge from `status`. They add `source`, a bounded origin label from the closed vocabulary `裝備` / `狀態` / `裝備、狀態` / `未知` derived from the row's provenance kind — the structured provenance stays on `status`, and the label invents no equipment name the read model did not classify. `remaining_seconds` is null for indefinite conditions.
 - **Combat availability**: the mode gate is removed; nothing in the read model mutates state, which the existing read-only test proves for both modes.
 - **Keep `equipment` and `wallet`** (not removed by the design text, still consumed by the transitional drawer); the final cleanup does not touch them.
 - **Bounds**: conditions ≤ 32 rows; `modifiers` and `source` bounded like existing labels; maximal fixture within the canonical byte bound.

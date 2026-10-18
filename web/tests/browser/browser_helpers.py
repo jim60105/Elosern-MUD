@@ -1343,24 +1343,24 @@ def valid_lore_codex_panel(**overrides) -> dict:
 
 
 def valid_character_panel(**overrides) -> dict:
-    """A schema-valid available character panel (schema version 7) for
+    """A schema-valid available character panel (schema version 8) for
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
     (``web/webclient/presentation/character.py``): a `magic_power` breakdown
     trait row (``base``/``current``/``max``/``effective``/``layers``; a
     static row's ``current`` equals its ``effective`` and ``max`` is null),
-    adjustment-bearing equipment rows, a guild rank/merit, and an integer-
-    copper wallet. The v7 exact-field set includes the nullable ``intimate``
-    section (webclient-intimate-status-section); a `None` value is schema-
-    valid, and ``persona`` carries exactly the four prose keys
-    (add-persona-edit-surface). ``overrides`` replace top-level fields for
-    variant cases (e.g. an active disguise).
+    the viewed member's ``member_id``, ordered condition rows, adjustment-
+    bearing equipment rows, a guild rank/merit, and an integer-copper wallet.
+    Persona prose and intimate state are published by ``party_member``, so the
+    v8 exact-field set carries neither. ``overrides`` replace top-level fields
+    for variant cases (e.g. an active disguise).
     """
     panel = {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "character",
+        "member_id": 101,
         "traits": [
             {
                 "key": "magic_power",
@@ -1372,14 +1372,22 @@ def valid_character_panel(**overrides) -> dict:
                 "layers": [],
             },
         ],
+        "conditions": [
+            {
+                "code": "regen",
+                "label": "再生",
+                "severity": "beneficial",
+                "remaining_seconds": 30,
+                "modifiers": {},
+                "source": "狀態",
+            },
+        ],
         "actives": [],
         "passives": [],
         "equipment": [],
         "disguise": {"active": False, "description": "", "displayed": []},
         "guild": {"rank": "銀牌", "merit": 120},
         "wallet": 3240,
-        "persona": {"background": None, "personality": None, "life_story": None, "habit": None},
-        "intimate": None,
     }
     panel.update(overrides)
     return panel

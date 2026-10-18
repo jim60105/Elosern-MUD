@@ -49,6 +49,19 @@ export function useStatusDrawerPersona(emit, personaSections) {
     }
   );
 
+  // The persona prose belongs to the commander section of `party_member`.
+  // When that section disappears (the viewed member becomes a companion, or
+  // the panel becomes unavailable) the editor is cancelled instead of keeping
+  // a hidden draft that would reappear after switching back.
+  watch(
+    () => personaSections.value.length,
+    (length) => {
+      if (length === 0) {
+        cancelPersonaEdit();
+      }
+    }
+  );
+
   function openPersonaEdit(section) {
     editingField.value = section.key;
     editDraft.value = section.value ?? "";

@@ -1,22 +1,20 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The committed `character` v7 payload for the same actor: all eight
+// The committed `character` v8 payload for the viewed member: all eight
 // breakdown trait rows — gauges carry a non-null max with `effective == max`
 // (the maximum the layers decompose), statics/counters carry a null max with
 // `current == effective` — each with its server-computed `layers` in payload
 // order; the adjustment-bearing equipment rows; an active disguise whose
-// displayed values differ from the true traits; guild rank/merit; wallet;
-// persona; and the populated intimate status. The exposure row carries the
-// EFFECTIVE ordinal 「中等」: the worn 修女聖袍 biases the stored base 「低」
-// upward, and the stored base is NEVER carried on the wire (P6 read-model
-// contract — the component test asserts the effective ordinal renders and
-// the stored-base word is absent). Values mirror the Python panel contract
-// test's serialized sample (web/webclient/presentation/tests/
-// test_character_panel.py); reviewers diff both when either changes.
+// displayed values differ from the true traits; guild rank/merit; wallet; and
+// the ordered condition rows. Persona prose and intimate state live on the
+// `party_member` panel (PARTY_MEMBER_PANEL_SAMPLE). Values mirror the Python
+// panel contract test's serialized sample (web/webclient/presentation/tests/
+// test_character_panel/); reviewers diff both when either changes.
 export const CHARACTER_PANEL_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: true,
   kind: "character",
+  member_id: 101,
   traits: [
     {
       key: "hp",
@@ -77,6 +75,24 @@ export const CHARACTER_PANEL_SAMPLE = {
     },
     { key: "magic_power", label: "魔力", base: 31, current: 31, max: null, effective: 31, layers: [] },
     { key: "guild_merit", label: "功績", base: 140, current: 140, max: null, effective: 140, layers: [] },
+  ],
+  conditions: [
+    {
+      code: "regen",
+      label: "再生",
+      severity: "beneficial",
+      remaining_seconds: 30,
+      modifiers: {},
+      source: "狀態",
+    },
+    {
+      code: "shame_exposure",
+      label: "羞慾外露",
+      severity: "warning",
+      remaining_seconds: null,
+      modifiers: { defense: -15, agility: "-10%" },
+      source: "裝備、狀態",
+    },
   ],
   actives: [
     {
@@ -147,25 +163,10 @@ export const CHARACTER_PANEL_SAMPLE = {
   },
    guild: { rank: "E", merit: 140 },
    wallet: 3240,
-   persona: {
-     background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
-     personality: "沉穩寡言，對生人保持距離。",
-     life_story: "在渡口碼頭長大，十六歲跟著商隊上了路。",
-     habit: "清晨練劍，黃昏沿著主街巡一圈。",
-   },
-   intimate: {
-     arousal: "中等",
-     wetness: "微濕",
-     shame: "輕微",
-    exposure: "中等",
-     climax_phase: "未達",
-     climax_today: 2,
-   },
  };
 
-// The same actor without a disguise, no guild, no persona background — the
-// honest empty-state story (displayed list must be empty, rank → 未加入公會,
-// persona renders nothing).
+// The same member without a disguise and without a guild — the honest
+// empty-state story (displayed list must be empty, rank → 未加入公會).
 export const CHARACTER_PANEL_TITLED_SAMPLE = {
   ...CHARACTER_PANEL_SAMPLE,
   full_title: "F級冒險者　苔徑新客",
@@ -181,6 +182,5 @@ export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   disguise: { active: false, description: "", displayed: [] },
   guild: { rank: null, merit: 0 },
   wallet: 0,
-  persona: { background: null, personality: null, life_story: null, habit: null },
-  intimate: null,
+  conditions: [],
 };

@@ -21,6 +21,7 @@ import {
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
   SKILLS_SLICE_SAMPLE,
+  PARTY_MEMBER_PANEL_SAMPLE,
 } from "../stories/fixtures.js";
 import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
@@ -190,18 +191,20 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(null);
   });
 
-  // The character panel is an exact-schema v5 payload: the
+  // The character panel is an exact-schema v8 payload: the
   // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
   // character-panel active-row schema does not register, so it is stripped
-  // before committing. The other exact fields (traits, equipment, disguise,
-  // guild, wallet, persona, intimate) come from the already-valid
+  // before committing. The other exact fields (member_id, traits, conditions,
+  // equipment, disguise, guild, wallet) come from the already-valid
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "character",
+      member_id: CHARACTER_PANEL_SAMPLE.member_id,
       traits: CHARACTER_PANEL_SAMPLE.traits,
+      conditions: CHARACTER_PANEL_SAMPLE.conditions,
       actives: SKILLS_SLICE_SAMPLE.actives.map(
         (category) => ({
           ...category,
@@ -217,8 +220,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       disguise: CHARACTER_PANEL_SAMPLE.disguise,
       guild: CHARACTER_PANEL_SAMPLE.guild,
       wallet: CHARACTER_PANEL_SAMPLE.wallet,
-      persona: CHARACTER_PANEL_SAMPLE.persona,
-      intimate: CHARACTER_PANEL_SAMPLE.intimate,
     };
   }
 
@@ -431,6 +432,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
             exploration: fx.explorationPanel(),
             context_actions: fx.explorationActions(),
             character: CHARACTER_PANEL_SAMPLE,
+            party_member: PARTY_MEMBER_PANEL_SAMPLE,
           },
         }),
       ],
@@ -457,16 +459,23 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       {},
     );
     expect(result.accepted).toBe(true);
-    // The completion publication refreshes the character panel at the
-    // result's revision; the drawer reflects the new text with no reload.
+    // The completion publication refreshes the `party_member` panel at the
+    // result's revision (character v8 no longer carries persona); the drawer
+    // reflects the new text with no reload.
     const refreshed = {
-      ...CHARACTER_PANEL_SAMPLE,
-      persona: { ...CHARACTER_PANEL_SAMPLE.persona, life_story: "我在渡口寫下的新生平。" },
+      ...PARTY_MEMBER_PANEL_SAMPLE,
+      commander: {
+        ...PARTY_MEMBER_PANEL_SAMPLE.commander,
+        persona: {
+          ...PARTY_MEMBER_PANEL_SAMPLE.commander.persona,
+          life_story: "我在渡口寫下的新生平。",
+        },
+      },
     };
     const update = store.receive(
       1,
       "ui_update",
-      [fx.update({ revision: 2, panels: { character: refreshed } })],
+      [fx.update({ revision: 2, panels: { party_member: refreshed } })],
       {},
     );
     expect(update.accepted).toBe(true);

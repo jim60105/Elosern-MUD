@@ -469,7 +469,7 @@ var PANEL_ALLOWLIST = {
   services: 6,
   creation: 6,
   exploration: 4,
-  character: 7,
+  character: 8,
   lineage: 1,
   dialogue: 2,
   title_ballot: 1,

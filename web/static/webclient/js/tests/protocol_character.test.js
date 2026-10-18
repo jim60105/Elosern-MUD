@@ -33,17 +33,16 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
-  // The unavailable fixture carries the registered version (7), and the real
-  // validatePanel dispatch path is exercised. The transitional character v4
-  // tolerance is closed (render-equipment-breakdown-webclient): only the
-  // registered version 7 is accepted on both forms.
+  // The unavailable fixture carries the registered version (8), and the real
+  // validatePanel dispatch path is exercised. Only the registered version 8
+  // is accepted on both forms.
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
-      unavailableStatusPanel({ schema_version: 7 })
+      unavailableStatusPanel({ schema_version: 8 })
     ),
-    unavailableStatusPanel({ schema_version: 7 })
+    unavailableStatusPanel({ schema_version: 8 })
   );
   assert.throws(() =>
     Protocol.validatePanel(
@@ -70,14 +69,14 @@ test("validates the character panel available/unavailable discriminator", () => 
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
-      unavailableStatusPanel({ schema_version: 6 })
+      unavailableStatusPanel({ schema_version: 7 })
     )
   );
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
-  // The normalized result carries the registered version 7 (not a stale 6).
+  // The normalized result carries the registered version 8 (not a stale 7).
   assert.equal(
     Protocol.validateCharacterPanel(validCharacterPanel()).schema_version,
-    7
+    8
   );
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
@@ -87,6 +86,7 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 5 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 6 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 7 })));
   // A legacy v4 trait row smuggled under version 6 rejects on the exact
   // breakdown-shape rules.
   assert.throws(() =>
@@ -99,9 +99,9 @@ test("validates the character panel available/unavailable discriminator", () => 
   const missing = validCharacterPanel();
   delete missing.actives;
   assert.throws(() => Protocol.validateCharacterPanel(missing));
-  const missingIntimate = validCharacterPanel();
-  delete missingIntimate.intimate;
-  assert.throws(() => Protocol.validateCharacterPanel(missingIntimate));
+  const missingConditions = validCharacterPanel();
+  delete missingConditions.conditions;
+  assert.throws(() => Protocol.validateCharacterPanel(missingConditions));
   // The optional composed full-title row mirrors the status panel's contract.
   assert.doesNotThrow(() =>
     Protocol.validateCharacterPanel(validCharacterPanel({ full_title: "F級冒險者　苔徑新客" }))
@@ -123,7 +123,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
   const store = Protocol.createStore();
   store.beginTransport(1);
   const status = validStatusPanel();
-  const unavailable = unavailableStatusPanel({ schema_version: 7 });
+  const unavailable = unavailableStatusPanel({ schema_version: 8 });
   const accepted = snapshot({ panels: { status: status, character: unavailable } });
   const result = store.receive(1, "ui_snapshot", [accepted], {});
   assert.equal(result.accepted, true);
@@ -139,7 +139,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
     panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
   });
   assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
-  assert.equal(store.getState().phase, "active", "the version-7 state remains committed");
+  assert.equal(store.getState().phase, "active", "the version-8 state remains committed");
   assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
   assert.deepEqual(store.getState().panels.character, unavailable, "character panel untouched");
 });
@@ -305,52 +305,105 @@ test("v5 equipment rows require the adjustment summary", () => {
   );
 });
 
-test("character panel v5 validates the intimate status section", () => {
-  // A null intimate section (no sexual-state record) is valid.
-  assert.doesNotThrow(() =>
+test("character panel v8 validates the ordered condition rows", () => {
+  const rows = [
+    {
+      code: "t_buff",
+      label: "合成增益",
+      severity: "beneficial",
+      remaining_seconds: 30,
+      modifiers: {},
+      source: "狀態",
+    },
+    {
+      code: "t_rule",
+      label: "合成警告",
+      severity: "warning",
+      remaining_seconds: null,
+      modifiers: { agility: "-10%", defense: -2 },
+      source: "裝備",
+    },
+  ];
+  const normalized = Protocol.validateCharacterPanel(
+    validCharacterPanel({ conditions: rows })
+  );
+  assert.deepEqual(normalized.conditions, rows, "rows normalize to themselves");
+  // Exactly six fields per row; unknown and missing keys reject.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ conditions: [{ ...rows[0], extra: 1 }] })
+    )
+  );
+  const missing = { ...rows[0] };
+  delete missing.source;
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(validCharacterPanel({ conditions: [missing] }))
+  );
+  // Severity is the shared condition vocabulary, never a polarity word.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ conditions: [{ ...rows[0], severity: "buff" }] })
+    )
+  );
+  // remaining_seconds is null or a non-negative integer.
+  for (const bad of [-1, 1.5, "30", true]) {
+    assert.throws(() =>
+      Protocol.validateCharacterPanel(
+        validCharacterPanel({ conditions: [{ ...rows[0], remaining_seconds: bad }] })
+      )
+    );
+  }
+  // A modifier value is a finite number or a bounded percentage string.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ conditions: [{ ...rows[0], modifiers: { defense: true } }] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ conditions: [{ ...rows[0], modifiers: { defense: "  " } }] })
+    )
+  );
+  // The row and modifier-key counts are bounded.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        conditions: Array(Protocol.CHARACTER_MAX_CONDITIONS + 1).fill(rows[0]),
+      })
+    )
+  );
+  const wideModifiers = {};
+  for (let i = 0; i <= Protocol.CHARACTER_MAX_MODIFIER_KEYS; i += 1) {
+    wideModifiers["key_" + i] = 1;
+  }
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ conditions: [{ ...rows[0], modifiers: wideModifiers }] })
+    )
+  );
+});
+
+test("character panel v8 carries member_id and drops persona/intimate", () => {
+  assert.equal(
+    Protocol.validateCharacterPanel(validCharacterPanel()).member_id,
+    101
+  );
+  for (const bad of [0, -1, true, 1.5, "101", null]) {
+    assert.throws(() =>
+      Protocol.validateCharacterPanel(validCharacterPanel({ member_id: bad }))
+    );
+  }
+  // Persona prose and intimate state moved to `party_member`: the exact-field
+  // contract rejects both keys outright.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        persona: { background: null, personality: null, life_story: null, habit: null },
+      })
+    )
+  );
+  assert.throws(() =>
     Protocol.validateCharacterPanel(validCharacterPanel({ intimate: null }))
-  );
-  const intimate = {
-    arousal: "中等",
-    wetness: "濕潤",
-    shame: "輕微",
-    exposure: "低",
-    climax_phase: "未達",
-    climax_today: 0,
-  };
-  const normalized = Protocol.validateCharacterPanel(validCharacterPanel({ intimate }));
-  assert.deepEqual(normalized.intimate, intimate, "a valid intimate section normalizes to itself");
-  // A level outside its fixed vocabulary is rejected.
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({ intimate: { ...intimate, arousal: "極高" } })
-    )
-  );
-  // An over-long level string is rejected.
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({ intimate: { ...intimate, wetness: "a".repeat(129) } })
-    )
-  );
-  // climax_today must be a non-negative integer.
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({ intimate: { ...intimate, climax_today: -1 } })
-    )
-  );
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({ intimate: { ...intimate, climax_today: 1.5 } })
-    )
-  );
-  // A missing or unknown field in the intimate section is rejected.
-  const missingField = { ...intimate };
-  delete missingField.shame;
-  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ intimate: missingField })));
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({ intimate: { ...intimate, extra: 1 } })
-    )
   );
 });
 
@@ -440,67 +493,5 @@ test("character panel v3 validates the category-grouped skill shape", () => {
   );
 });
 
-test("character panel v7 persona round-trips the four bounded prose keys", () => {
-  const four = {
-    background: "  在公會登記的新人冒險者  ",
-    personality: "沉穩",
-    life_story: "來自邊境的小村",
-    habit: "清晨練劍",
-  };
-  const withPersona = Protocol.validateCharacterPanel(
-    validCharacterPanel({ persona: four })
-  );
-  assert.deepEqual(withPersona.persona, {
-    background: "在公會登記的新人冒險者",
-    personality: "沉穩",
-    life_story: "來自邊境的小村",
-    habit: "清晨練劍",
-  });
-  // Each key is independently nullable and whitespace-nulling.
-  const blank = Protocol.validateCharacterPanel(
-    validCharacterPanel({
-      persona: { background: "   ", personality: null, life_story: " 邊境 ", habit: null },
-    })
-  );
-  assert.deepEqual(blank.persona, {
-    background: null,
-    personality: null,
-    life_story: "邊境",
-    habit: null,
-  });
-  // The section is exactly the four keys: structural keys never render.
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({
-        persona: { background: null, personality: null, life_story: null, habit: null, identity: {} },
-      })
-    ),
-    /persona/
-  );
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({
-        persona: { background: null, personality: null, life_story: null },
-      })
-    ),
-    /persona/
-  );
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({
-        persona: { background: null, personality: null, life_story: null, habit: null, extra: 1 },
-      })
-    ),
-    /persona/
-  );
-  // Bound at the shared 600-code-point cap, per key.
-  assert.throws(() =>
-    Protocol.validateCharacterPanel(
-      validCharacterPanel({
-        persona: { background: null, personality: null, life_story: null, habit: "x".repeat(Protocol.CHARACTER_MAX_PERSONA + 1) },
-      })
-    ),
-    /exceeds/
-  );
-});
+
 
