@@ -197,11 +197,12 @@ def validate_sell_payload(payload: dict[str, Any]) -> dict[str, Any]:
 def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
     """Require a whitespace-free bounded key.
 
-    The typed `使用`/`use` and `裝備`/`equip` commands parse the key as their
-    first whitespace-delimited token, and the browser's input echo prints the
-    key verbatim — a whitespace-bearing key would echo a line whose keyboard
-    replay resolves a DIFFERENT key. Reject at the action boundary instead
-    (complete-ui-command-echo D1).
+    The typed `使用`/`use` command takes its key as the first
+    whitespace-delimited token and `裝備`/`equip` resolves its whole item
+    argument as a registry key or a held display name, while the browser's
+    input echo prints the key verbatim — a whitespace-bearing key would echo a
+    line whose keyboard replay resolves a DIFFERENT item. Reject at the action
+    boundary instead (complete-ui-command-echo D1).
     """
     text = _require_non_empty_string(value, field, maximum)
     if any(character.isspace() for character in text):

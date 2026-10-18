@@ -39,9 +39,9 @@ influence **what** the item does. The authenticated session SHALL be the only ex
 
 #### Scenario: Item keys stay byte-replayable in echoed input
 - **WHEN** the whitespace ban on item and target keys is examined
-- **THEN** it holds because the typed `use`/`equip` commands parse their arguments as
-  whitespace-delimited tokens and the browser input echo prints the line verbatim, so an echoed
-  line must stay byte-replayable
+- **THEN** it holds because the typed `use`/`equip` commands resolve the echoed token to exactly
+  that item (a registry key or a held display name) while the browser input echo prints the line
+  verbatim, so a whitespace-bearing key would replay as a different item
 
 #### Scenario: Effects and scopes come from the item-effect rulebook
 - **WHEN** an `inventory.use` settlement determines what an item does

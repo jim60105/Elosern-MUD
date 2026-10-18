@@ -107,10 +107,10 @@ class CmdToggleEquip(Command):
     用法：
       裝備 <物品> [= <成員>]
 
-    裝備或卸下自己或一名同行隊伍成員身上的裝備；指定成員時以「=」分隔。
-    成員可以是倒地的同伴，因為整理裝備不是行動。這是免費動作：探索與戰鬥中
-    都不消耗時間或回合。成員不在場或不屬於你的隊伍時以固定語句拒絕，且不會
-    改變任何人的裝備。
+    裝備或卸下自己或一名同行隊伍成員身上的裝備；物品可用登錄鍵或背包中顯示
+    的名稱指定，指定成員時以「=」分隔。成員可以是倒地的同伴，因為整理裝備
+    不是行動。這是免費動作：探索與戰鬥中都不消耗時間或回合。成員不在場或
+    不屬於你的隊伍時以固定語句拒絕，且不會改變任何人的裝備。
     """
 
     key = "裝備"
@@ -120,8 +120,7 @@ class CmdToggleEquip(Command):
 
     def func(self) -> None:
         item_part, separator, member_token = self.args.partition("=")
-        item_key = item_part.strip().partition(" ")[0]
-        if not item_key:
+        if not item_part.strip():
             self.caller.msg("用法：裝備 <物品> [= <成員>]")
             return
         member = self.caller
@@ -131,6 +130,12 @@ class CmdToggleEquip(Command):
             except PartyScopeError as error:
                 self.caller.msg(error.message)
                 return
+        # The item token is the registry key or the held display name,
+        # resolved against the selected member's own bag exactly like 給 and
+        # 取回, so a display name (spaces included) names the same item the
+        # action's `item_key` names. An unresolved token travels on unchanged
+        # and the toggle rule rejects it with its own stable code.
+        item_key = resolve_item_token(member, item_part)
         try:
             outcome = toggle_member_equipment(self.caller, member.pk, item_key)
         except PartyScopeError as error:

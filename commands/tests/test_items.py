@@ -54,6 +54,7 @@ from world.rules.tests._combat_session_helpers import (
     _player,
     _race_key,
     live_item_effect_profiles,
+    live_item_registry,
     open_synthetic_scope,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -383,6 +384,27 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
     @covers_requirement(
         "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
     )
+    def test_item_token_accepts_the_held_display_name(self):
+        # 裝備 names the item by registry key or by the held display name,
+        # resolved against the selected member's own bag. The ring fixture's
+        # display name carries a space, so the whole item argument is the
+        # token and nothing is truncated at the first space.
+        key = "t_test_ring_1"
+        display = live_item_registry()[key].display_name_zh
+        self.assertIn(" ", display)
+        companion = self._companion()
+        companion.db.inventory = [key]
+        self.call(
+            CmdToggleEquip(),
+            f"{display} = {companion.key}",
+            f"{companion.key}佩戴了 {display}（防禦 +6｜生命上限 +10）。",
+            caller=self.player,
+        )
+        self.assertEqual(companion.db.equipment["accessories"], [key])
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
     def test_text_and_action_member_toggle_produce_the_same_message(self):
         # Text/action parity: the same member and item render one sentence,
         # whichever transport settled the toggle.
@@ -494,7 +516,11 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
         join_party(companion, self.player)
         engage(self.player, self.monster)
         record = read_session(self.player)
-        messages = self._run(CmdToggleEquip(), f"{_BLADE.key} = {companion.key}")
+        # The delta's scenario names the item by its display name while the
+        # companion holds it, exactly as the action's item_key would.
+        messages = self._run(
+            CmdToggleEquip(), f"{_BLADE.display_name_zh} = {companion.key}"
+        )
         self.assertEqual(
             messages,
             [
