@@ -478,6 +478,50 @@ def build_skill_command(
     }
 
 
+def _one_actor_target(
+    caller: Any, target_value: str, *, commander: Any = None
+) -> int | None | str:
+    """Resolve at most one explicit target identity for an item or tactic.
+
+    Returns the target dbref, ``None`` when no target was given, or the
+    string ``"invalid"`` when the value names more than one participant (an
+    item use and a Taunt each take exactly one target).
+    """
+    if not target_value:
+        return None
+    parsed = _parse_actor_targets(caller, target_value, commander=commander)
+    if parsed is None:
+        return "invalid"
+    if isinstance(parsed, str) or len(parsed) != 1:
+        return "invalid"
+    return parsed[0]
+
+
+def build_item_command(
+    caller: Any,
+    item_key: str,
+    target_value: str,
+    *,
+    commander: Any = None,
+) -> dict[str, Any] | None:
+    """Build one actor's internal draft item command.
+
+    Shared by ``combat command <actor-token> item ...`` and the ``使用``
+    member suffix, so both text routes admit the exact same payload through
+    ``confirm_actor_command``: the item key plus at most one explicit target
+    identity (a session token, a name, or none), resolved against the
+    commander's session roster.
+    """
+    target_id = _one_actor_target(caller, target_value, commander=commander)
+    if target_id == "invalid":
+        caller.msg(_draft_reason_text("target_invalid"))
+        return None
+    return {
+        "kind": "item",
+        "payload": {"item_key": item_key, "target_id": target_id},
+    }
+
+
 def submit_actor_command(
     caller: Any,
     record: Any,
@@ -615,31 +659,13 @@ class CmdCombatCommand(Command):
             self.caller, skill_key, scale, target_value, commander=commander
         )
 
-    def _targets(
-        self, target_value: str, commander: Any = None
-    ) -> list[int] | str | None:
-        """Parse one target value into the facade's explicit token list."""
-        return _parse_actor_targets(
-            self.caller, target_value, commander=commander
-        )
-
     def _one_target(
         self, target_value: str, commander: Any = None
     ) -> int | None | str:
-        """Resolve at most one explicit target identity for an item/tactic.
-
-        Returns the target dbref, ``None`` when no target was given, or the
-        string ``"invalid"`` when the value names more than one participant
-        (an item use and a Taunt each take exactly one target).
-        """
-        if not target_value:
-            return None
-        parsed = self._targets(target_value, commander)
-        if parsed is None:
-            return "invalid"
-        if isinstance(parsed, str) or len(parsed) != 1:
-            return "invalid"
-        return parsed[0]
+        """Resolve at most one explicit target identity for an item/tactic."""
+        return _one_actor_target(
+            self.caller, target_value, commander=commander
+        )
 
     def _item_command(
         self,
@@ -650,13 +676,9 @@ class CmdCombatCommand(Command):
         if not item_argument:
             self.caller.msg(_COMBAT_COMMAND_USAGE)
             return None
-        target_id = self._one_target(target_value, commander)
-        if target_id == "invalid":
-            return self._invalid_target()
-        return {
-            "kind": "item",
-            "payload": {"item_key": item_argument, "target_id": target_id},
-        }
+        return build_item_command(
+            self.caller, item_argument, target_value, commander=commander
+        )
 
     def _tactic_command(
         self,
