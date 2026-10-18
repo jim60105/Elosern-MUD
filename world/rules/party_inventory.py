@@ -25,8 +25,16 @@ write: a plan's ACQUIRE replacement dispatches quest-completion observers, and
 their contract is to defer through ``transaction.on_commit``. Computing the
 plans outside the savepoint would let a rolled-back transfer publish a
 completion that never happened.
+
+:func:`inventory_view` is the read-only ``party_inventory`` input
+(party-inventory-panel): it groups one member's canonical bag into rows and
+derives the use, toggle, and give descriptors from the same side-effect-free
+preflights the settlement paths call. It never writes and never materializes
+a lazy handler.
 """
 
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,25 +46,31 @@ from world.rules.equipment import (
     apply_inventory_plan,
     equipped_removal_conflict,
     materialize_registry_object,
+    normalized_equipment,
     plan_inventory_delta,
+    preflight_equipment_toggle,
     registry_key_for_object,
     toggle_equipment,
 )
+from world.rules.party import bound_owner_of
 from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
     PURPOSE_ACT,
     PURPOSE_ORGANIZE,
+    REASON_NOT_PARTY_MEMBER,
     PartyScopeError,
     authorize_member,
     party_in_combat,
     resolve_commander,
 )
+from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.rules.surfaces import (
     restore_attributes,
     restore_traits,
     snapshot_attributes,
     snapshot_traits,
 )
+from world.rules.wallet import read_wallet
 from world.skills.restrictions import exam_restriction
 
 REASON_TRANSFER_IN_COMBAT = "transfer_in_combat"
@@ -131,6 +145,21 @@ class MemberItemUseOutcome:
     settlement: Any
 
 
+@dataclass(frozen=True)
+class TransferPreflight:
+    """One side-effect-free transfer eligibility verdict.
+
+    ``allowed`` is true exactly when the transfer rule would accept the
+    giver/item/quantity now. ``reason`` is the stable rejection code, or
+    ``None`` when allowed. Presentation derives its ``give`` descriptor from
+    this same function, so the panel and the settlement can never disagree
+    about item-level eligibility.
+    """
+
+    allowed: bool
+    reason: str | None = None
+
+
 def _live_entity(dbid: Any) -> Any | None:
     """Resolve one identity dbid for the combat read, without authorizing it."""
     if isinstance(dbid, bool) or not isinstance(dbid, int) or dbid < 1:
@@ -149,22 +178,45 @@ def _reject_quantity(quantity: Any) -> int:
     return quantity
 
 
-def _reject_item(giver: Any, receiver: Any, item_key: Any, quantity: int) -> str:
-    """Apply the item rejections in the design's order and return the key."""
+def preflight_transfer(
+    giver: Any,
+    item_key: Any,
+    quantity: int = MIN_TRANSFER_QUANTITY,
+    receiver: Any = None,
+) -> TransferPreflight:
+    """Apply the item rejections in the design's order, writing nothing.
+
+    Shared by :func:`transfer_item` (through :func:`_reject_item`) and the
+    ``party_inventory`` read model, so the panel's ``give`` descriptor is the
+    settlement rule's own verdict rather than a second copy of its checks.
+    ``receiver`` is optional because a bag row carries no chosen destination:
+    the receiver-specific exam-kit lock can only be judged once a destination
+    is named, and the settlement supplies it.
+    """
     definition = (
         ITEM_REGISTRY.get(item_key) if isinstance(item_key, str) and item_key else None
     )
     if definition is None:
-        raise PartyTransferError(REASON_ITEM_NOT_HELD)
+        return TransferPreflight(False, REASON_ITEM_NOT_HELD)
     if definition.guild_property:
-        raise PartyTransferError(REASON_ITEM_LOCKED)
-    if exam_restriction(giver) is not None or exam_restriction(receiver) is not None:
-        raise PartyTransferError(REASON_ITEM_LOCKED)
+        return TransferPreflight(False, REASON_ITEM_LOCKED)
+    if exam_restriction(giver) is not None:
+        return TransferPreflight(False, REASON_ITEM_LOCKED)
+    if receiver is not None and exam_restriction(receiver) is not None:
+        return TransferPreflight(False, REASON_ITEM_LOCKED)
     held = list(giver.db.inventory or [])
     if held.count(item_key) < quantity:
-        raise PartyTransferError(REASON_ITEM_NOT_HELD)
+        return TransferPreflight(False, REASON_ITEM_NOT_HELD)
     if equipped_removal_conflict(giver, (item_key,) * quantity) is not None:
-        raise PartyTransferError(REASON_ITEM_EQUIPPED)
+        return TransferPreflight(False, REASON_ITEM_EQUIPPED)
+    return TransferPreflight(True)
+
+
+def _reject_item(giver: Any, receiver: Any, item_key: Any, quantity: int) -> str:
+    """Raise the preflight's stable rejection, or return the accepted key."""
+    reason = preflight_transfer(giver, item_key, quantity, receiver=receiver).reason
+    if reason is not None:
+        raise PartyTransferError(reason)
     return item_key
 
 
@@ -461,4 +513,372 @@ def use_member_item(
         )
     return MemberItemUseOutcome(
         member=member, settlement=use_item(member, item_key, target=target)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Read-only member inventory view (party-inventory-panel).
+# ---------------------------------------------------------------------------
+
+#: The row ceiling the services inventory already enforces; the panel ships
+#: one bounded screen of aggregated rows.
+MAX_MEMBER_INVENTORY_ROWS = 32
+
+#: The closed descriptor routes the panel publishes.
+ROUTE_FIELD_USE = "field_use"
+ROUTE_COMBAT_DRAFT = "combat_draft"
+ROUTE_TOGGLE = "toggle"
+
+
+class PartyInventoryViewError(ValueError):
+    """The viewed member's canonical inventory cannot be read truthfully.
+
+    ``args[0]`` is one stable code: ``malformed_inventory``,
+    ``malformed_equipment``, ``wallet_unreadable``, or a party-scope code when
+    no commander resolves. The presenter turns any of them into the common
+    unavailable form rather than inventing rows, counts, or descriptors.
+    """
+
+
+@dataclass(frozen=True)
+class UseDescriptor:
+    """One row's use descriptor: field use out of combat, draft in combat."""
+
+    route: str
+    enabled: bool
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ToggleDescriptor:
+    """One equipment row's free toggle descriptor."""
+
+    route: str
+    enabled: bool
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class GiveDescriptor:
+    """One row's transfer descriptor.
+
+    ``max_quantity`` is the row's unequipped copy count (the delta's own
+    definition), independent of ``enabled``: a locked or combat-barred row can
+    still report how many copies are not worn.
+    """
+
+    enabled: bool
+    reason: str | None
+    max_quantity: int
+
+
+@dataclass(frozen=True)
+class MemberEquipmentView:
+    """The viewed member's normalized worn slots plus the rule's cap."""
+
+    weapon_main: str | None
+    weapon_off: str | None
+    armor: str | None
+    accessories: tuple[str, ...]
+    accessory_limit: int
+
+
+@dataclass(frozen=True)
+class MemberInventoryRow:
+    """One aggregated item key with its presentation and three descriptors."""
+
+    item_key: str
+    display_name: str
+    held: int
+    equipped_count: int
+    slot: str | None
+    presentation: Any | None
+    use: UseDescriptor | None
+    toggle: ToggleDescriptor | None
+    give: GiveDescriptor
+
+
+@dataclass(frozen=True)
+class MemberInventoryView:
+    """The frozen read-only inputs of the ``party_inventory`` panel."""
+
+    member: Any
+    purse: int
+    equipment: MemberEquipmentView
+    rows: tuple[MemberInventoryRow, ...]
+
+
+def _strict_inventory(member: Any) -> list[str]:
+    """Read the canonical flat inventory strictly, or fail closed."""
+    raw = member.db.inventory
+    if raw is None:
+        return []
+    if isinstance(raw, str) or not isinstance(raw, Sequence):
+        raise PartyInventoryViewError("malformed_inventory")
+    entries = list(raw)
+    if not all(isinstance(entry, str) for entry in entries):
+        raise PartyInventoryViewError("malformed_inventory")
+    return entries
+
+
+def _commander_of(member: Any) -> Any | None:
+    """The commander whose party purse the viewed member's panel reports."""
+    from typeclasses.characters import PlayerCharacter
+
+    if isinstance(member, PlayerCharacter):
+        return member
+    return bound_owner_of(member)
+
+
+def _scope_reason(commander: Any, member: Any, purpose: str) -> str | None:
+    """The member boundary's fixed refusal line, or ``None`` when admitted."""
+    try:
+        authorize_member(commander, int(member.pk), purpose)
+    except PartyScopeError as error:  # observability: ignore R2: the boundary verdict becomes the descriptor's fixed refusal line; no state or I/O is involved
+        return PARTY_SCOPE_MESSAGES[error.reason]
+    return None
+
+
+def _reason_message(code: str) -> str:
+    return SERVICE_REASON_MESSAGES.get(code, "此操作目前無法完成。")
+
+
+def _equipment_view(equipment: dict) -> MemberEquipmentView:
+    from world.skills.equipment import ACCESSORY_MAX_SLOTS
+
+    return MemberEquipmentView(
+        weapon_main=equipment["weapon_main"],
+        weapon_off=equipment["weapon_off"],
+        armor=equipment["armor"],
+        accessories=tuple(equipment["accessories"]),
+        accessory_limit=ACCESSORY_MAX_SLOTS,
+    )
+
+
+def _equipped_counts(equipment: dict) -> dict[str, int]:
+    """One equipped occurrence per worn key (normalization forbids repeats)."""
+    counts: dict[str, int] = {}
+    for key in (
+        equipment["weapon_main"],
+        equipment["weapon_off"],
+        equipment["armor"],
+    ):
+        if key is not None:
+            counts[key] = 1
+    for key in equipment["accessories"]:
+        counts[key] = 1
+    return counts
+
+
+def _field_use_descriptor(
+    member: Any, item_key: str, definition: Any, scope_reason: str | None
+) -> UseDescriptor | None:
+    """The exploration use descriptor, or ``None`` for a non-usable key."""
+    if definition is None or definition.use_mechanics is None:
+        return None
+    if scope_reason is not None:
+        return UseDescriptor(ROUTE_FIELD_USE, False, scope_reason)
+    from world.rules.items import ItemUseRequest, preflight_item_use
+    from world.rules.targeting import RoomActionContext
+
+    preflight = preflight_item_use(
+        ItemUseRequest(actor=member, item_key=item_key),
+        in_combat=False,
+        context=RoomActionContext(member.location),
+    )
+    if preflight.allowed:
+        return UseDescriptor(ROUTE_FIELD_USE, True, None)
+    code = "" if preflight.reason is None else str(preflight.reason.value)
+    return UseDescriptor(ROUTE_FIELD_USE, False, _reason_message(code))
+
+
+def _combat_item_choices(member: Any) -> tuple[dict[str, Any], str | None]:
+    """The member's combat item choices, or ``({}, reason)`` when unavailable."""
+    from world.rules.combat import BattlefieldActionContext
+    from world.rules.combat_session import (
+        CombatSessionError,
+        SessionReason,
+        authorize_combat_actor,
+        read_session,
+        reconstruct_battlefield,
+    )
+    from world.rules.items import enumerate_actor_item_choices
+    from world.rules.player_messages import session_reason_message
+
+    commander = _commander_of(member)
+    if commander is None:
+        return {}, session_reason_message(str(SessionReason.NO_ACTIVE_SESSION))
+    try:
+        record = read_session(commander)
+        if record is None:
+            return {}, session_reason_message(str(SessionReason.NO_ACTIVE_SESSION))
+        battlefield = reconstruct_battlefield(commander, record)
+        authorize_combat_actor(commander, member, record, battlefield)
+    except CombatSessionError as error:  # observability: ignore R2: an unreadable session degrades to a disabled descriptor carrying the session's own fixed message; the presenter publishes it
+        code = (
+            str(error.args[0])
+            if error.args
+            else str(SessionReason.FORBIDDEN_ACTOR)
+        )
+        return {}, session_reason_message(code)
+    context = BattlefieldActionContext(
+        battlefield, event_context={"battlefield": battlefield}
+    )
+    choices = enumerate_actor_item_choices(
+        member,
+        context,
+        candidate_entities=list(battlefield.roster.values()),
+        in_combat=True,
+    )
+    return {choice.item_key: choice for choice in choices}, None
+
+
+def _combat_use_descriptor(
+    item_key: str,
+    definition: Any,
+    choices: dict[str, Any],
+    unavailable_reason: str | None,
+) -> UseDescriptor | None:
+    """The combat-draft use descriptor, or ``None`` when the item is inapplicable."""
+    if definition is None or definition.use_mechanics is None:
+        return None
+    if unavailable_reason is not None:
+        return UseDescriptor(ROUTE_COMBAT_DRAFT, False, unavailable_reason)
+    choice = choices.get(item_key)
+    if choice is None:
+        return None
+    if choice.enabled:
+        return UseDescriptor(ROUTE_COMBAT_DRAFT, True, None)
+    code = "" if choice.reason is None else str(choice.reason.value)
+    return UseDescriptor(ROUTE_COMBAT_DRAFT, False, _reason_message(code))
+
+
+def _toggle_descriptor(
+    member: Any, item_key: str, definition: Any, scope_reason: str | None
+) -> ToggleDescriptor | None:
+    """The free toggle descriptor, or ``None`` for a non-equipment key."""
+    if definition is None or definition.equipment_slot is None:
+        return None
+    if scope_reason is not None:
+        return ToggleDescriptor(ROUTE_TOGGLE, False, scope_reason)
+    preflight = preflight_equipment_toggle(member, item_key)
+    if preflight.allowed:
+        return ToggleDescriptor(ROUTE_TOGGLE, True, None)
+    code = "" if preflight.reason is None else str(preflight.reason.value)
+    return ToggleDescriptor(ROUTE_TOGGLE, False, _reason_message(code))
+
+
+def _give_descriptor(
+    member: Any,
+    item_key: str,
+    *,
+    held: int,
+    equipped_count: int,
+    in_combat: bool,
+    scope_reason: str | None,
+) -> GiveDescriptor:
+    """The transfer descriptor from the shared preflight plus the row grouping."""
+    max_quantity = max(held - equipped_count, 0)
+    if in_combat:
+        return GiveDescriptor(
+            False, TRANSFER_MESSAGES[REASON_TRANSFER_IN_COMBAT], max_quantity
+        )
+    if scope_reason is not None:
+        return GiveDescriptor(False, scope_reason, max_quantity)
+    preflight = preflight_transfer(member, item_key)
+    if preflight.allowed:
+        return GiveDescriptor(True, None, max_quantity)
+    reason = preflight.reason or REASON_ITEM_NOT_HELD
+    return GiveDescriptor(False, TRANSFER_MESSAGES[reason], max_quantity)
+
+
+def inventory_view(member: Any, *, in_combat: bool) -> MemberInventoryView:
+    """Build the frozen read-only ``party_inventory`` inputs for one member.
+
+    Groups the member's canonical bag keys into rows (held count, equipped
+    count, registry slot), normalizes the member's worn slots, and derives the
+    three descriptors from the rules' own side-effect-free preflights: field
+    use or the combat draft, the free equipment toggle, and the transfer
+    preflight with the member as giver. The purse is the commander's wallet,
+    never the viewed companion's. Nothing is written and no lazy handler is
+    materialized.
+
+    Raises :class:`PartyInventoryViewError` with a stable code when canonical
+    inventory, equipment, or the commander wallet cannot be read truthfully.
+    """
+    inventory = _strict_inventory(member)
+    equipment = normalized_equipment(member)
+    if equipment is None:
+        raise PartyInventoryViewError("malformed_equipment")
+    commander = _commander_of(member)
+    if commander is None:
+        raise PartyInventoryViewError(REASON_NOT_PARTY_MEMBER)
+    # A present combat record always wins over the caller's mode hint: the
+    # session predicate treats an unreadable record as "no session", so field
+    # eligibility must never be advertised while one exists. The combat path
+    # then reports the record's own stable malformed-session refusal.
+    in_combat = in_combat or commander.db.active_combat is not None
+    try:
+        purse = read_wallet(commander, PartyInventoryViewError)
+    except ValueError as error:
+        raise PartyInventoryViewError("wallet_unreadable") from error
+
+    act_reason = None if in_combat else _scope_reason(commander, member, PURPOSE_ACT)
+    organize_reason = _scope_reason(commander, member, PURPOSE_ORGANIZE)
+    choices: dict[str, Any] = {}
+    draft_reason: str | None = None
+    if in_combat:
+        choices, draft_reason = _combat_item_choices(member)
+
+    equipped = _equipped_counts(equipment)
+    counts = Counter(inventory)
+    rows: list[MemberInventoryRow] = []
+    for item_key in sorted(counts):
+        definition = ITEM_REGISTRY.get(item_key)
+        held = counts[item_key]
+        equipped_count = equipped.get(item_key, 0)
+        slot = (
+            None
+            if definition is None or definition.equipment_slot is None
+            else definition.equipment_slot.value
+        )
+        rows.append(
+            MemberInventoryRow(
+                item_key=item_key,
+                display_name=(
+                    definition.display_name_zh
+                    if definition is not None
+                    else item_key
+                ),
+                held=held,
+                equipped_count=equipped_count,
+                slot=slot,
+                presentation=(
+                    definition.presentation if definition is not None else None
+                ),
+                use=(
+                    _combat_use_descriptor(item_key, definition, choices, draft_reason)
+                    if in_combat
+                    else _field_use_descriptor(member, item_key, definition, act_reason)
+                ),
+                toggle=_toggle_descriptor(
+                    member, item_key, definition, organize_reason
+                ),
+                give=_give_descriptor(
+                    member,
+                    item_key,
+                    held=held,
+                    equipped_count=equipped_count,
+                    in_combat=in_combat,
+                    scope_reason=organize_reason,
+                ),
+            )
+        )
+        if len(rows) >= MAX_MEMBER_INVENTORY_ROWS:
+            break
+    return MemberInventoryView(
+        member=member,
+        purse=purse,
+        equipment=_equipment_view(equipment),
+        rows=tuple(rows),
     )

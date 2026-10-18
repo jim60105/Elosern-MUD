@@ -849,15 +849,25 @@ def _serialize_shop(shop: ShopSectionView) -> dict[str, Any]:
     }
 
 
-def _serialize_presentation(row: InventoryRowView) -> dict[str, Any] | None:
-    if row.presentation is None:
+def serialize_item_presentation(presentation: Any) -> dict[str, Any] | None:
+    """Serialize one registry item presentation, or ``None`` for no identity.
+
+    Shared with the ``party_inventory`` panel so both wire surfaces publish
+    the same immutable visual identity (design: presentation reuses the
+    services serializer).
+    """
+    if presentation is None:
         return None
     return {
-        "kind": row.presentation.kind.value,
-        "icon_key": row.presentation.icon_key.value,
-        "rarity": row.presentation.rarity.value,
-        "summary": row.presentation.summary_zh,
+        "kind": presentation.kind.value,
+        "icon_key": presentation.icon_key.value,
+        "rarity": presentation.rarity.value,
+        "summary": presentation.summary_zh,
     }
+
+
+def _serialize_presentation(row: InventoryRowView) -> dict[str, Any] | None:
+    return serialize_item_presentation(row.presentation)
 
 
 def _serialize_inventory(inventory: InventorySectionView) -> dict[str, Any]:
@@ -968,5 +978,6 @@ __all__ = [
     "TRACK_ACTION",
     "TURNIN_ACTION",
     "services_presenter",
+    "serialize_item_presentation",
     "validate_services",
 ]

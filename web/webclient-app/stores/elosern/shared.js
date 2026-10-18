@@ -29,6 +29,7 @@ export const PANEL_ALLOWLIST = [
   "local_map",
   "party",
   "party_member",
+  "party_inventory",
   "objectives",
   "services",
   "creation",

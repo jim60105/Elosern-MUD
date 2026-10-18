@@ -45,6 +45,7 @@ _PANEL_MODULES = (
     ("local_map", "local_map/validate.py"),
     ("party", "party.py"),
     ("party_member", "party_member.py"),
+    ("party_inventory", "party_inventory.py"),
     ("objectives", "objectives.py"),
     ("services", "services.py"),
     ("creation", "creation.py"),
@@ -177,9 +178,6 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "party.PARTY_MAX_SLOTS": re.search(
                 r"^PARTY_MAX_SLOTS\s*=\s*(\d+)", party_source, re.MULTILINE
             ),
-            "party.PARTY_MAX_ROWS": re.search(
-                r"^PARTY_MAX_ROWS\s*=\s*(\d+)", party_source, re.MULTILINE
-            ),
             "js PARTY_MAX_SLOTS": re.search(
                 r"^var PARTY_MAX_SLOTS\s*=\s*(\d+);", js_source, re.MULTILINE
             ),
@@ -214,17 +212,14 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "js PARTY_MAX_SLOTS",
         )}
         self.assertEqual(len(slots), 1, f"party roster envelope drifted: {extracted}")
-        rows = {extracted[key] for key in (
-            "party.PARTY_MAX_ROWS",
-            "js PARTY_MAX_ROWS",
-        )}
+        rows = {extracted["js PARTY_MAX_ROWS"]}
         self.assertEqual(len(rows), 1, f"party row envelope drifted: {extracted}")
         self.assertRegex(
             party_source,
             r"(?m)^PARTY_MAX_ROWS\s*=\s*PARTY_MAX_SLOTS\s*\+\s*1\s*$",
         )
         self.assertEqual(
-            int(extracted["party.PARTY_MAX_ROWS"]),
+            int(extracted["js PARTY_MAX_ROWS"]),
             int(extracted["party.PARTY_MAX_SLOTS"]) + 1,
             f"the row envelope must be the commander plus every companion: {extracted}",
         )
@@ -296,6 +291,153 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
              extracted["js PARTY_MEMBER_MAX_BOND_STAGE"]},
             {"128"},
             f"bond-stage bound drifted: {extracted}",
+        )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_REASON_CODE_POINTS\s*=\s*MAX_MESSAGE_CODE_POINTS\s*$",
+        )
+
+    def test_party_inventory_bounds_are_pinned(self):
+        # party-inventory-panel: the row ceiling reuses the services inventory
+        # bound, the accessory cap is the equipment rule's five slots, and the
+        # presentation/reason bounds are shared with the services item
+        # presentation. The JS mirror declares the same numbers.
+        presenter_source = (
+            REPO_ROOT / "web/webclient/presentation/party_inventory.py"
+        ).read_text(encoding="utf-8")
+        rules_source = (
+            REPO_ROOT / "world/rules/party_inventory.py"
+        ).read_text(encoding="utf-8")
+        equipment_source = (
+            REPO_ROOT / "world/skills/equipment.py"
+        ).read_text(encoding="utf-8")
+        protocol_source = (
+            REPO_ROOT / "web/webclient/presentation/protocol.py"
+        ).read_text(encoding="utf-8")
+        js_source = protocol_client_source()
+        values = {
+            "rules MAX_MEMBER_INVENTORY_ROWS": re.search(
+                r"^MAX_MEMBER_INVENTORY_ROWS\s*=\s*(\d+)",
+                rules_source,
+                re.MULTILINE,
+            ),
+            "presenter PARTY_INVENTORY_ACCESSORY_LIMIT": re.search(
+                r"^PARTY_INVENTORY_ACCESSORY_LIMIT\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_KEY_CODE_POINTS": re.search(
+                r"^MAX_KEY_CODE_POINTS\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_DISPLAY_NAME_CODE_POINTS": re.search(
+                r"^MAX_DISPLAY_NAME_CODE_POINTS\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_PRESENTATION_KEY_CODE_POINTS": re.search(
+                r"^MAX_PRESENTATION_KEY_CODE_POINTS\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_PRESENTATION_SUMMARY_CODE_POINTS": re.search(
+                r"^MAX_PRESENTATION_SUMMARY_CODE_POINTS\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "equipment ACCESSORY_MAX_SLOTS": re.search(
+                r"^ACCESSORY_MAX_SLOTS\s*=\s*(\d+)",
+                equipment_source,
+                re.MULTILINE,
+            ),
+            "protocol MAX_MESSAGE_CODE_POINTS": re.search(
+                r"^MAX_MESSAGE_CODE_POINTS\s*=\s*(\d+)",
+                protocol_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_ROWS": re.search(
+                r"^var PARTY_INVENTORY_MAX_ROWS\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_KEY": re.search(
+                r"^var PARTY_INVENTORY_MAX_KEY\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_DISPLAY_NAME": re.search(
+                r"^var PARTY_INVENTORY_MAX_DISPLAY_NAME\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_PRESENTATION_KEY": re.search(
+                r"^var PARTY_INVENTORY_MAX_PRESENTATION_KEY\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_PRESENTATION_SUMMARY": re.search(
+                r"^var PARTY_INVENTORY_MAX_PRESENTATION_SUMMARY\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_MAX_REASON": re.search(
+                r"^var PARTY_INVENTORY_MAX_REASON\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_INVENTORY_ACCESSORY_LIMIT": re.search(
+                r"^var PARTY_INVENTORY_ACCESSORY_LIMIT\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+        }
+        missing = sorted(key for key, match in values.items() if match is None)
+        self.assertEqual(missing, [], f"pinned bound vanished: {missing}")
+        extracted = {key: match.group(1) for key, match in values.items()}
+        for python_key, js_key, expected in (
+            ("rules MAX_MEMBER_INVENTORY_ROWS", "js PARTY_INVENTORY_MAX_ROWS", "32"),
+            ("presenter MAX_KEY_CODE_POINTS", "js PARTY_INVENTORY_MAX_KEY", "64"),
+            (
+                "presenter MAX_DISPLAY_NAME_CODE_POINTS",
+                "js PARTY_INVENTORY_MAX_DISPLAY_NAME",
+                "128",
+            ),
+            (
+                "presenter MAX_PRESENTATION_KEY_CODE_POINTS",
+                "js PARTY_INVENTORY_MAX_PRESENTATION_KEY",
+                "32",
+            ),
+            (
+                "presenter MAX_PRESENTATION_SUMMARY_CODE_POINTS",
+                "js PARTY_INVENTORY_MAX_PRESENTATION_SUMMARY",
+                "240",
+            ),
+            (
+                "protocol MAX_MESSAGE_CODE_POINTS",
+                "js PARTY_INVENTORY_MAX_REASON",
+                "512",
+            ),
+            (
+                "presenter PARTY_INVENTORY_ACCESSORY_LIMIT",
+                "js PARTY_INVENTORY_ACCESSORY_LIMIT",
+                "5",
+            ),
+            (
+                "equipment ACCESSORY_MAX_SLOTS",
+                "js PARTY_INVENTORY_ACCESSORY_LIMIT",
+                "5",
+            ),
+        ):
+            with self.subTest(bound=python_key):
+                self.assertEqual(
+                    {extracted[python_key], extracted[js_key]},
+                    {expected},
+                    f"party_inventory bound drifted: {extracted}",
+                )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_ROWS\s*=\s*MAX_MEMBER_INVENTORY_ROWS\s*$",
         )
         self.assertRegex(
             presenter_source,

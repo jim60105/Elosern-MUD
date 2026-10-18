@@ -518,8 +518,14 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_party_view_member_payload,
             adapter=_party_view_member_adapter,
             # A selection republishes the roster and every viewed-member
-            # surface: the member-tab facts and the character panel.
-            affected_panels=("party", "party_member", "character"),
+            # surface: the member-tab facts, the character panel and the bag
+            # tab's inventory panel.
+            affected_panels=(
+                "party",
+                "party_member",
+                "character",
+                "party_inventory",
+            ),
         )
     )
     registry.register(

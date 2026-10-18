@@ -633,6 +633,70 @@ function validQuestLogPanel(rows) {
   return { schema_version: 2, available: true, rows: rows || [] };
 }
 
+function validPartyInventoryDescriptor(route, overrides) {
+  return deepMerge(
+    { route: route, enabled: true, reason: null },
+    overrides || {}
+  );
+}
+
+function validPartyInventoryGive(overrides) {
+  return deepMerge(
+    { enabled: true, reason: null, max_quantity: 2 },
+    overrides || {}
+  );
+}
+
+function validPartyInventoryRow(overrides) {
+  return deepMerge(
+    {
+      item_key: T_MEAL,
+      display_name: T_MEAL_LABEL,
+      held: 2,
+      equipped_count: 0,
+      slot: null,
+      presentation: {
+        kind: "food",
+        icon_key: "food",
+        rarity: "common",
+        summary: T_MEAL_SUMMARY,
+      },
+      use: validPartyInventoryDescriptor("field_use"),
+      toggle: null,
+      give: validPartyInventoryGive(),
+    },
+    overrides || {}
+  );
+}
+
+function validPartyInventoryEquipment(overrides) {
+  return deepMerge(
+    {
+      weapon_main: null,
+      weapon_off: null,
+      armor: null,
+      accessories: [],
+      accessory_limit: 5,
+    },
+    overrides || {}
+  );
+}
+
+function validPartyInventoryPanel(overrides) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "party_inventory",
+      member_id: 41,
+      purse: 1240,
+      equipment: validPartyInventoryEquipment(),
+      rows: [validPartyInventoryRow()],
+    },
+    overrides || {}
+  );
+}
+
 module.exports = {
   fixtureDigest,
   validArtworkResource,
@@ -640,6 +704,11 @@ module.exports = {
   validArtwork,
   validArtCatalogEntry,
   validQuestLogPanel,
+  validPartyInventoryDescriptor,
+  validPartyInventoryGive,
+  validPartyInventoryRow,
+  validPartyInventoryEquipment,
+  validPartyInventoryPanel,
   validCombatSkill,
   validSkillGroup,
   validCategoryGroup,
