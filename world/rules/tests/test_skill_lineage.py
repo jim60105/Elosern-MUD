@@ -17,6 +17,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from world.rules import progression
+from world.rules.unlock_notices import UnlockNotice
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     FREEFORM_SCALE_LADDER,
@@ -810,17 +811,21 @@ class DerivedUnlockSinkTests(_Scoped):
         "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_crossing_an_edge_appends_exactly_one_line(self):
         actor = self._near_edge()
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         self.assertTrue(
             progression.grant_skill_practice_xp(actor, "t_tree_sprout", unlocks_out=sink)
         )
-        self.assertEqual(sink, [f"新技能可用：{TREE['t_tree_branch'].label}"])
+        self.assertEqual(
+            [notice.line for notice in sink],
+            [f"新技能可用：{TREE['t_tree_branch'].label}"],
+        )
+        self.assertEqual([notice.skill_key for notice in sink], ["t_tree_branch"])
 
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
         "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_a_second_award_after_the_flip_appends_nothing(self):
         actor = self._near_edge()
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         progression.grant_skill_practice_xp(actor, "t_tree_sprout", unlocks_out=sink)
         self.assertEqual(len(sink), 1)
         # Same tick: the dedupe claim suppresses the award itself.
@@ -837,7 +842,7 @@ class DerivedUnlockSinkTests(_Scoped):
 
     def test_nonlethal_and_deduped_awards_touch_the_sink_not_at_all(self):
         actor = self._near_edge()
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         self.assertFalse(
             progression.grant_skill_practice_xp(
                 actor, "t_tree_sprout", nonlethal=True, unlocks_out=sink

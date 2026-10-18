@@ -307,8 +307,8 @@ class ClockTests(unittest.TestCase):
         clock = WorldClock()
         with patch("world.rules.clock._practice_settlement") as settle:
             clock.advance(10, AdvanceSource.SKIP, [entity])
-        settle.assert_called_once_with((entity,), 10, AdvanceSource.SKIP)
-        _practice_settlement((entity,), 3600, AdvanceSource.SKIP)
+        settle.assert_called_once_with((entity,), 10, AdvanceSource.SKIP, 10)
+        _practice_settlement((entity,), 3600, AdvanceSource.SKIP, 3600)
         self.assertFalse(hasattr(entity, "skill_proficiency"))
         self.assertFalse(hasattr(entity, "db"))
 
@@ -364,7 +364,7 @@ class DeclaredPracticeSettlementTests(unittest.TestCase):
             clock.advance(9000, AdvanceSource.SKIP, [entity])
         # 9000 seconds = 2 completed hours; the 300-second remainder is
         # ignored and the value is passed closed-form, never quantum-looped.
-        grant.assert_called_once_with(entity, "fire_arrow", 2)
+        grant.assert_called_once_with(entity, "fire_arrow", 2, unlocks_out=[])
         self.assertIsNone(entity.db.practice_booking)
 
     @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")

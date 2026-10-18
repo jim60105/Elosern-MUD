@@ -33,6 +33,7 @@ from world.rules.progression import (
     skill_proficiency_level,
 )
 from world.rules.targeting import RoomActionContext
+from world.rules.unlock_notices import UnlockNotice
 import world.rules.progression as progression
 from world.tests.synthetic_data import (
     SYNTH_GLOWMIRE_ELEMENT,
@@ -208,10 +209,10 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
 
     The per-use award and the booked-study settlement both evaluate the
     cross-lineage rulebook immediately after ``award_practice_xp``, so a
-    threshold crossed by EITHER path grants the same keys. Announcement lines
-    flow through the caller-owned sink the per-use path already carries; the
-    study path has no sink (the clock settlement discards lines), so its
-    grant is asserted directly. Read paths — querying owned skills and a
+    threshold crossed by EITHER path grants the same keys. Announcement
+    notices flow through the caller-owned sink both paths now carry (the
+    clock settlement turns the booked path's notices into post-commit
+    ``practice_unlock`` events). Read paths — querying owned skills and a
     frozen action preview — must stay side-effect-free.
 
     Everything here runs on synthetic rows: the award skill and the granted
@@ -259,16 +260,20 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
                 SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
             )
         }
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         self.assertTrue(
             grant_skill_practice_xp(actor, _T_DRILL.key, unlocks_out=sink)
         )
         self.assertEqual(skill_proficiency_level(actor, _T_DRILL.key), 1)
         self.assertEqual(actor.db.skills["passive"], [_T_GRANTED.key])
         self.assertEqual(actor.db.skills["active"], [_T_DRILL.key])
-        # One announcement line per newly granted skill, through the same sink
-        # that carries newly-usable-skill lines.
-        self.assertEqual(sink, [f"新技能可用：{_T_GRANTED.label}"])
+        # One announcement notice per newly granted skill, through the same
+        # sink that carries newly-usable-skill notices.
+        self.assertEqual(
+            [notice.line for notice in sink],
+            [f"新技能可用：{_T_GRANTED.label}"],
+        )
+        self.assertEqual([notice.skill_key for notice in sink], [_T_GRANTED.key])
 
     @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_award_already_owned_grant_stages_no_line_and_writes_nothing(self):
@@ -279,7 +284,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
                 SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
             )
         }
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         self.assertTrue(
             grant_skill_practice_xp(actor, _T_DRILL.key, unlocks_out=sink)
         )
@@ -292,9 +297,19 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
         # Five booked hours at 10.0 XP/hour (learning multiplier 1.0) land
         # exactly at the first proficiency level.
-        self.assertTrue(progression.grant_study_practice_xp(actor, _T_DRILL.key, hours=5))
+        sink: list[UnlockNotice] = []
+        self.assertTrue(
+            progression.grant_study_practice_xp(
+                actor, _T_DRILL.key, hours=5, unlocks_out=sink
+            )
+        )
         self.assertEqual(skill_proficiency_level(actor, _T_DRILL.key), 1)
         self.assertEqual(actor.db.skills["passive"], [_T_GRANTED.key])
+        # The booked path carries the same notice sink as the per-use path.
+        self.assertEqual(
+            [notice.line for notice in sink],
+            [f"新技能可用：{_T_GRANTED.label}"],
+        )
 
     @covers_requirement("cross-lineage-unlock::evaluation-runs-on-the-practice-award-path-and-nowhere-else")
     def test_failed_commit_restores_the_grant_with_the_award(self):
@@ -342,7 +357,7 @@ class CrossLineageUnlockWiringTests(EvenniaTestCase):
         actor = self._character("no-cross")
         actor.db.skills = {"active": [_T_DRILL.key], "passive": []}
         actor.db.skill_proficiency = {}
-        sink: list[str] = []
+        sink: list[UnlockNotice] = []
         self.assertTrue(
             grant_skill_practice_xp(actor, _T_DRILL.key, unlocks_out=sink)
         )

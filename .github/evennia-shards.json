@@ -255,6 +255,7 @@
         "world.rules.tests.test_titles",
         "world.rules.tests.test_to_hit_calibration",
         "world.rules.tests.test_traits",
+        "world.rules.tests.test_unlock_notices",
         "world.rules.tests.test_upkeep_settlement",
         "world.rules.tests.test_water_mana_tide",
         "world.rules.tests.test_divine_digestion_cadence"
