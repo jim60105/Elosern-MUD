@@ -25,6 +25,7 @@ from web.webclient.actions.service_actions import (
 )
 from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from web.webclient.presentation.party_view_selection import TABS, select_party_view
+from world.lore.items import ITEM_REGISTRY
 from world.rules.party import live_companions
 from world.rules.party_inventory import (
     MAX_TRANSFER_QUANTITY,
@@ -41,7 +42,7 @@ from world.rules.party_scope import (
 from world.rules.unlock_notices import mark_unlocks_seen
 
 _TRANSFER_FIELDS = frozenset({"giver_id", "receiver_id", "item_key", "quantity"})
-_VIEW_MEMBER_FIELDS = frozenset({"member_id", "tab", "skill_key"})
+_VIEW_MEMBER_FIELDS = frozenset({"member_id", "tab", "skill_key", "item_key"})
 
 
 class PartyActionError(ValueError):
@@ -75,6 +76,13 @@ def _skill_key(value: Any) -> str | None:
     if value is None:
         return None
     return _bounded_key(value, "skill_key")
+
+
+def _selected_item_key(value: Any) -> str | None:
+    """The selected holdings item key: a bounded key, or null for none."""
+    if value is None:
+        return None
+    return _bounded_key(value, "item_key")
 
 
 def _quantity(value: Any) -> int:
@@ -139,7 +147,7 @@ def validate_party_view_member_payload(payload: Any) -> dict[str, Any]:
         raise PartyActionError("party.view_member payload must be an object")
     if set(payload) != _VIEW_MEMBER_FIELDS:
         raise PartyActionError(
-            "party.view_member requires exactly member_id, tab and skill_key"
+            "party.view_member requires exactly member_id, tab, skill_key and item_key"
         )
     tab = payload["tab"]
     if not isinstance(tab, str) or tab not in TABS:
@@ -148,6 +156,7 @@ def validate_party_view_member_payload(payload: Any) -> dict[str, Any]:
         "member_id": _member_id(payload["member_id"], "member_id"),
         "tab": tab,
         "skill_key": _skill_key(payload["skill_key"]),
+        "item_key": _selected_item_key(payload["item_key"]),
     }
 
 
@@ -160,6 +169,8 @@ def _party_view_member_adapter(
     identity is refused with ``not_party_member`` and is never replaced by the
     commander; presence is deliberately not required. The only writes are the
     session-scoped selection and, on the skills tab, that member's unread dot.
+    An item key no registry entry defines stores ``None``, so the holdings
+    query reports no rows instead of an invented selection.
     """
     try:
         commander = resolve_commander(actor)
@@ -185,13 +196,21 @@ def _party_view_member_adapter(
             "code": REASON_NOT_PARTY_MEMBER,
             "message": PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER],
         }
+    item_key = payload["item_key"]
+    if item_key is not None and item_key not in ITEM_REGISTRY:
+        item_key = None
     select_party_view(
-        session, commander_id, member_id, payload["tab"], payload["skill_key"]
+        session,
+        commander_id,
+        member_id,
+        payload["tab"],
+        payload["skill_key"],
+        item_key,
     )
     if payload["tab"] == "skills":
         mark_unlocks_seen(session, member_id)
     return _success(
         "viewing_member",
         "已選擇檢視的隊伍成員。",
-        ("party", "party_member", "character", "party_inventory"),
+        ("party", "party_member", "character", "party_inventory", "item_holdings"),
     )

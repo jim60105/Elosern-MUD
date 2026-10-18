@@ -350,6 +350,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       member_id: SKILLS_SLICE_SAMPLE.member_id,
       tab: "skills",
       skill_key: "firebolt",
+      item_key: null,
     });
   });
 

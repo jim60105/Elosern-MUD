@@ -86,7 +86,9 @@ AFFECTED_EXAM = ("status", "services", "context_actions")
 # Planned attendance writes nothing; republishing the unchanged services
 # panel settles the request without a full snapshot.
 AFFECTED_EXAM_SCHEDULE = ("services",)
-AFFECTED_TRADE = ("status", "services", "objectives", "quest_log")
+# A trade rewrites a member's canonical bag, so the selected item's holdings
+# query must be republished beside the shop rows.
+AFFECTED_TRADE = ("status", "services", "objectives", "quest_log", "item_holdings")
 AFFECTED_TRACK = ("services", "objectives", "quest_log")
 
 

@@ -430,9 +430,25 @@ def evaluate_combat_modifiers(entity) -> dict[str, Any]:
     )
 
 
-def _restriction_aware_merge(entity, bundles: list[dict[str, Any]]) -> dict[str, Any]:
-    """Cap permitted positive effects before adding transient negative effects."""
-    bundles = [*bundles, equipment_adjustments(entity)]
+def _restriction_aware_merge(
+    entity,
+    bundles: list[dict[str, Any]],
+    *,
+    equipment_mapping: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Cap permitted positive effects before adding transient negative effects.
+
+    ``equipment_mapping`` is the item-holdings hypothetical seam: when given,
+    the gear bucket comes from that normalized mapping through the same
+    single-source accessor instead of canonical storage.
+    """
+    if equipment_mapping is None:
+        gear = equipment_adjustments(entity)
+    else:
+        from world.rules.equipment_effects import equipment_adjustments_for
+
+        gear = equipment_adjustments_for(equipment_mapping)
+    bundles = [*bundles, gear]
     result: dict[str, Any] = {}
     for adjustments in bundles:
         result = _merge_adjustments(result, adjustments)

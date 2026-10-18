@@ -46,6 +46,7 @@ _PANEL_MODULES = (
     ("party", "party.py"),
     ("party_member", "party_member.py"),
     ("party_inventory", "party_inventory.py"),
+    ("item_holdings", "item_holdings.py"),
     ("objectives", "objectives.py"),
     ("services", "services.py"),
     ("creation", "creation.py"),
@@ -438,6 +439,101 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         self.assertRegex(
             presenter_source,
             r"(?m)^MAX_ROWS\s*=\s*MAX_MEMBER_INVENTORY_ROWS\s*$",
+        )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_REASON_CODE_POINTS\s*=\s*MAX_MESSAGE_CODE_POINTS\s*$",
+        )
+
+    def test_item_holdings_bounds_are_pinned(self):
+        # item-holdings-panel: the row and change ceilings are the rules' own
+        # bounds, and the key/label/reason bounds are shared with the client
+        # mirror under the same dual-direction contract as every other panel.
+        rules_source = (
+            REPO_ROOT / "world/rules/party_inventory.py"
+        ).read_text(encoding="utf-8")
+        presenter_source = (
+            REPO_ROOT / "web/webclient/presentation/item_holdings.py"
+        ).read_text(encoding="utf-8")
+        js_source = protocol_client_source()
+        numbers = {
+            "rules MAX_ITEM_HOLDINGS_ROWS": re.search(
+                r"^MAX_ITEM_HOLDINGS_ROWS\s*=\s*([0-9_]+)",
+                rules_source,
+                re.MULTILINE,
+            ),
+            "rules MAX_EQUIPMENT_DELTA_CHANGES": re.search(
+                r"^MAX_EQUIPMENT_DELTA_CHANGES\s*=\s*([0-9_]+)",
+                rules_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_KEY_CODE_POINTS": re.search(
+                r"^MAX_KEY_CODE_POINTS\s*=\s*([0-9_]+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "presenter MAX_LABEL_CODE_POINTS": re.search(
+                r"^MAX_LABEL_CODE_POINTS\s*=\s*([0-9_]+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "js ITEM_HOLDINGS_MAX_ROWS": re.search(
+                r"^var ITEM_HOLDINGS_MAX_ROWS\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js ITEM_HOLDINGS_MAX_CHANGES": re.search(
+                r"^var ITEM_HOLDINGS_MAX_CHANGES\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js ITEM_HOLDINGS_MAX_KEY": re.search(
+                r"^var ITEM_HOLDINGS_MAX_KEY\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js ITEM_HOLDINGS_MAX_LABEL": re.search(
+                r"^var ITEM_HOLDINGS_MAX_LABEL\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js ITEM_HOLDINGS_MAX_REASON": re.search(
+                r"^var ITEM_HOLDINGS_MAX_REASON\s*=\s*([0-9_]+);",
+                js_source,
+                re.MULTILINE,
+            ),
+        }
+        missing = sorted(key for key, match in numbers.items() if match is None)
+        self.assertEqual(missing, [], f"pinned bound vanished: {missing}")
+        extracted = {key: match.group(1) for key, match in numbers.items()}
+        for python_key, js_key, expected in (
+            ("rules MAX_ITEM_HOLDINGS_ROWS", "js ITEM_HOLDINGS_MAX_ROWS", "17"),
+            (
+                "rules MAX_EQUIPMENT_DELTA_CHANGES",
+                "js ITEM_HOLDINGS_MAX_CHANGES",
+                "16",
+            ),
+            ("presenter MAX_KEY_CODE_POINTS", "js ITEM_HOLDINGS_MAX_KEY", "64"),
+            (
+                "presenter MAX_LABEL_CODE_POINTS",
+                "js ITEM_HOLDINGS_MAX_LABEL",
+                "32",
+            ),
+            ("js ITEM_HOLDINGS_MAX_REASON", "js ITEM_HOLDINGS_MAX_REASON", "512"),
+        ):
+            with self.subTest(bound=python_key):
+                self.assertEqual(
+                    {extracted[python_key], extracted[js_key]},
+                    {expected},
+                    f"item_holdings bound drifted: {extracted}",
+                )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_ROWS\s*=\s*MAX_ITEM_HOLDINGS_ROWS\s*$",
+        )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_CHANGES\s*=\s*MAX_EQUIPMENT_DELTA_CHANGES\s*$",
         )
         self.assertRegex(
             presenter_source,

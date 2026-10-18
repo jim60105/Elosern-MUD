@@ -290,17 +290,18 @@ _EMPTY_EQUIPMENT_STATE: dict = {
 _SINGLETON_SLOTS = ("weapon_main", "weapon_off", "armor")
 
 
-def _normalized_equipment(entity: Any) -> dict | None:
-    """Normalize stored equipment strictly, or fail closed with ``None``.
+def normalize_equipment_mapping(raw: Any) -> dict | None:
+    """Normalize one equipment record strictly, or fail closed with ``None``.
 
     Accepts ``None``/empty as the empty mapping. Every other record must
     carry exactly the three singleton keys (``None`` or a non-empty string)
     and an ``accessories`` sequence of non-empty strings with at most one
     occurrence per key; anything else is malformed and never auto-repaired.
+    Pure and read-only: the hypothetical equipment previews of the item
+    holdings query validate an in-memory mapping through this same function.
     """
     from world.skills.equipment import ACCESSORY_MAX_SLOTS
 
-    raw = entity.db.equipment
     if raw is None or raw == {} or raw == _EMPTY_EQUIPMENT_STATE:
         return {**_EMPTY_EQUIPMENT_STATE, "accessories": []}
     if not isinstance(raw, Mapping) or set(raw) != set(_EMPTY_EQUIPMENT_STATE):
@@ -360,6 +361,11 @@ def _normalized_equipment(entity: Any) -> dict | None:
         if definition is None or definition.equipment_slot is not EquipmentSlot.ACCESSORY:
             return None
     return normalized
+
+
+def _normalized_equipment(entity: Any) -> dict | None:
+    """Normalize one entity's stored equipment mapping strictly."""
+    return normalize_equipment_mapping(entity.db.equipment)
 
 
 def equipped_removal_conflict(entity: Any, removals: Sequence[str]) -> str | None:
@@ -423,7 +429,7 @@ def _equipped_singleton_key(equipment: Mapping, item_key: str) -> str | None:
 
 
 def preflight_equipment_toggle(
-    entity: Any, item_key: str
+    entity: Any, item_key: str, *, require_held: bool = True
 ) -> EquipmentTogglePreflight:
     """Compute one toggle's exact effect against current state, writing nothing.
 
@@ -431,6 +437,13 @@ def preflight_equipment_toggle(
     verifies canonical inventory ownership, normalizes stored equipment
     fail-closed, and returns the complete before/after plan with stable
     named reasons. Shared verbatim by presentation and settlement.
+
+    ``require_held=False`` is the item-holdings preview seam: it skips only
+    the canonical-inventory ownership rejection, so a member who does not hold
+    the item still gets the hypothetical after mapping. Every other guard —
+    registry membership, guild property, the exam-kit lock, non-equipment,
+    malformed storage, and the accessory cap — still applies, and settlement
+    keeps the default ``True``.
     """
     from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
 
@@ -454,23 +467,24 @@ def preflight_equipment_toggle(
         return EquipmentTogglePreflight(
             allowed=False, reason=EquipmentToggleReason.NOT_EQUIPMENT
         )
-    inventory = entity.db.inventory
-    if inventory is None:
-        held: list[str] = []
-    elif isinstance(inventory, str) or not isinstance(inventory, Sequence):
-        return EquipmentTogglePreflight(
-            allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
-        )
-    else:
-        if not all(isinstance(entry, str) for entry in inventory):
+    if require_held:
+        inventory = entity.db.inventory
+        if inventory is None:
+            held: list[str] = []
+        elif isinstance(inventory, str) or not isinstance(inventory, Sequence):
             return EquipmentTogglePreflight(
                 allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
             )
-        held = list(inventory)
-    if item_key not in held:
-        return EquipmentTogglePreflight(
-            allowed=False, reason=EquipmentToggleReason.ITEM_NOT_HELD
-        )
+        else:
+            if not all(isinstance(entry, str) for entry in inventory):
+                return EquipmentTogglePreflight(
+                    allowed=False, reason=EquipmentToggleReason.MALFORMED_STORAGE
+                )
+            held = list(inventory)
+        if item_key not in held:
+            return EquipmentTogglePreflight(
+                allowed=False, reason=EquipmentToggleReason.ITEM_NOT_HELD
+            )
     before = _normalized_equipment(entity)
     if before is None:
         return EquipmentTogglePreflight(

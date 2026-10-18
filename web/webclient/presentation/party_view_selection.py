@@ -42,6 +42,10 @@ class PartyViewSelection:
     #: resolves it here: the ``character`` panel publishes detail only for a
     #: key the viewed member actually owns.
     skill_key: str | None = None
+    #: The item selected in the bag or shop surface, or ``None``. The server
+    #: resolves it against the registry in the holdings presenter; an unknown
+    #: key is stored as ``None`` by the selection adapter.
+    item_key: str | None = None
 
 
 def select_party_view(
@@ -50,13 +54,16 @@ def select_party_view(
     member_id: int,
     tab: str,
     skill_key: str | None = None,
+    item_key: str | None = None,
 ) -> None:
     """Record one authorized selection for this session.
 
     The caller has already re-derived the commander and re-checked membership
     through the rules boundary; recording never authorizes anything by itself.
     ``skill_key`` is the already-validated bounded key of the skill selected in
-    the 技能 tab (or ``None``). A direct call without a session records nothing.
+    the 技能 tab (or ``None``); ``item_key`` is the already-validated bounded
+    registry key of the item selected for the holdings query (or ``None``).
+    A direct call without a session records nothing.
     """
     ndb = getattr(session, "ndb", None)
     if ndb is None:
@@ -66,6 +73,7 @@ def select_party_view(
         int(member_id),
         str(tab),
         None if skill_key is None else str(skill_key),
+        None if item_key is None else str(item_key),
     )
 
 
@@ -142,12 +150,33 @@ def selected_skill_key_for(context: Any, member: Any) -> str | None:
     return selection.skill_key
 
 
+def selected_item_key_for(context: Any, member: Any) -> str | None:
+    """The selected holdings item key when the selection names ``member``.
+
+    Both effectiveness checks apply exactly as for the selected skill: the
+    selection must be bound to the commander this session presents, and its
+    member must be the member the panel resolved. The returned key is still
+    unvalidated; the holdings presenter resolves it against the registry and
+    publishes no rows for an unknown key.
+    """
+    selection = getattr(context, "party_view", None)
+    if not isinstance(selection, PartyViewSelection) or member is None:
+        return None
+    commander = _commander(getattr(context, "actor", None))
+    if commander is None or selection.commander_id != int(commander.pk):
+        return None
+    if selection.member_id != int(member.pk):
+        return None
+    return selection.item_key
+
+
 __all__ = [
     "NDB_ATTRIBUTE",
     "TABS",
     "PartyViewSelection",
     "party_view_selection_snapshot",
     "resolve_viewed_member",
+    "selected_item_key_for",
     "selected_skill_key_for",
     "select_party_view",
 ]

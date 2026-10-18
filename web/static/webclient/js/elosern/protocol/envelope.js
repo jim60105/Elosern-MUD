@@ -69,6 +69,7 @@ var gallery = require("./panels/gallery.js");
 var titles = require("./panels/titles.js");
 var misc = require("./panels/misc.js");
 var partyInventory = require("./panels/party_inventory.js");
+var itemHoldings = require("./panels/item_holdings.js");
 var exotic = require("./panels/exotic.js");
 var combatBeats = require("./panels/combat_beats.js");
 var dream = require("./panels/dream.js");
@@ -86,6 +87,7 @@ var PANEL_VALIDATORS = {
   party: misc.validatePartyPanel,
   party_member: misc.validatePartyMemberPanel,
   party_inventory: partyInventory.validatePartyInventoryPanel,
+  item_holdings: itemHoldings.validateItemHoldingsPanel,
   objectives: misc.validateObjectivesPanel,
   quest_log: misc.validateQuestLogPanel,
   dialogue: misc.validateDialoguePanel,
