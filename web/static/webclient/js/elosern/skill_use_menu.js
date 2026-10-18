@@ -57,11 +57,13 @@
     return panel.scale === 1 ? "1" : String(panel.scale);
   }
 
-  // The cast payload base: the skill key plus the previewed scale, sent only
-  // for a skill whose panel advertises scale rungs (every other payload
-  // stays `{skill_key}` plus its target form).
+  // The cast payload base: the previewed caster's id, the skill key, plus the
+  // previewed scale when the panel advertises scale rungs. Every payload —
+  // NONE/SELF, ordinary rows, AREA confirm, and the opening confirmation — is
+  // bound to the caster the preview named, never to whatever figure the
+  // client currently controls.
   function payloadBase(panel) {
-    var payload = { skill_key: panel.skill.key };
+    var payload = { actor_id: panel.actor_id, skill_key: panel.skill.key };
     if (hasScales(panel.skill) || panel.scale !== 1) {
       payload.scale = panel.scale;
     }
@@ -76,7 +78,12 @@
   function createModel(panel, previous) {
     var skill = panel.skill;
     var selected = [];
-    if (previous && previous.skillKey === skill.key && skill.target_spec === "area") {
+    if (
+      previous &&
+      previous.skillKey === skill.key &&
+      previous.actorId === panel.actor_id &&
+      skill.target_spec === "area"
+    ) {
       // Reconcile against the newer panel: a vanished or now-disabled
       // candidate leaves the selection; nothing is ever added implicitly.
       var enabled = {};
@@ -89,7 +96,12 @@
         return enabled[identity] === true;
       });
     }
-    return { panel: panel, skillKey: skill.key, selected: selected };
+    return {
+      panel: panel,
+      skillKey: skill.key,
+      actorId: panel.actor_id,
+      selected: selected,
+    };
   }
 
   function toggle(model, identity) {

@@ -14,9 +14,10 @@ const Menu = require("../elosern/skill_use_menu.js");
 
 function panel(spec, overrides) {
   const base = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "skill_use",
+    actor_id: 3,
     scale: 1,
     skill: {
       key: "t_soft_mend",
@@ -56,7 +57,7 @@ test("NONE and SELF require one explicit confirmation carrying no target", () =>
     const menu = Menu.useMenu(Menu.createModel(panel(spec)));
     const confirm = menu.items.find((item) => item.kind === "confirm");
     assert.equal(confirm.actionId, "explore.cast");
-    assert.deepEqual(confirm.payload, { skill_key: "t_soft_mend" });
+    assert.deepEqual(confirm.payload, { actor_id: 3, skill_key: "t_soft_mend" });
     assert.ok(!("target_ids" in confirm.payload));
   }
 });
@@ -64,7 +65,11 @@ test("NONE and SELF require one explicit confirmation carrying no target", () =>
 test("SINGLE rows submit exactly one server identity and keep disabled reasons", () => {
   const menu = Menu.useMenu(Menu.createModel(panel("single")));
   const villager = menu.items.find((item) => item.key === "target-5");
-  assert.deepEqual(villager.payload, { skill_key: "t_soft_mend", target_ids: [5] });
+  assert.deepEqual(villager.payload, {
+    actor_id: 3,
+    skill_key: "t_soft_mend",
+    target_ids: [5],
+  });
   const dead = menu.items.find((item) => item.key === "target-6");
   assert.equal(dead.enabled, false);
   assert.equal(dead.actionId, null);
@@ -85,7 +90,11 @@ test("AREA selection toggles enabled rows only and submits in presenter order", 
   const menu = Menu.useMenu(model);
   const confirm = menu.items.find((item) => item.key === "area-confirm");
   assert.equal(confirm.enabled, true);
-  assert.deepEqual(confirm.payload, { skill_key: "t_soft_mend", target_ids: [3, 5] });
+  assert.deepEqual(confirm.payload, {
+    actor_id: 3,
+    skill_key: "t_soft_mend",
+    target_ids: [3, 5],
+  });
   assert.ok(!("opening_target_id" in confirm.payload));
   assert.equal(menu.items.find((item) => item.key === "area-5").selected, true);
   Menu.toggle(model, 5);
@@ -102,7 +111,11 @@ test("a monster opening needs a separate confirmation carrying the anchor only",
   const confirm = Menu.openingMenu(model, 12);
   const submit = confirm.items[0];
   assert.equal(submit.key, "confirm-opening");
-  assert.deepEqual(submit.payload, { skill_key: "t_soft_mend", opening_target_id: 12 });
+  assert.deepEqual(submit.payload, {
+    actor_id: 3,
+    skill_key: "t_soft_mend",
+    opening_target_id: 12,
+  });
   assert.deepEqual(submit.lineUp, [9, 12]);
   assert.equal(confirm.items[1].key, "cancel-opening");
   assert.equal(Menu.openingMenu(model, 99), null);
@@ -134,7 +147,11 @@ test("scale rungs re-preview and only advertised skills carry a scale", () => {
   const use = Menu.useMenu(model);
   assert.equal(use.items[0].key, "scale-open");
   assert.equal(use.items[0].label, "威力 ×1/2");
-  assert.deepEqual(use.items[1].payload, { skill_key: "t_soft_mend", scale: 0.5 });
+  assert.deepEqual(use.items[1].payload, {
+    actor_id: 3,
+    skill_key: "t_soft_mend",
+    scale: 0.5,
+  });
   const rungs = Menu.scaleMenu(model);
   assert.deepEqual(rungs.items.map((item) => item.payload.scale), [0.25, 0.5, 1]);
   assert.equal(rungs.focusKey, "scale-1/2");
@@ -166,4 +183,6 @@ test("a newer panel drops vanished or disabled selections", () => {
   assert.deepEqual(rebuilt.selected, []);
   const other = Menu.createModel(panel("area", (p) => { p.skill.key = "t_other"; }), model);
   assert.deepEqual(other.selected, []);
+  const recast = Menu.createModel(panel("area", (p) => { p.actor_id = 77; }), model);
+  assert.deepEqual(recast.selected, [], "a replacement caster never inherits the selection");
 });

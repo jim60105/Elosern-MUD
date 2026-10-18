@@ -1,11 +1,12 @@
 "use strict";
 
 // skill_use panel (mirror of web.webclient.presentation.skill_use,
-// skillbook-authoritative-casting D2): the on-demand SkillBook use preview of
-// one owned active skill at one selected scale. The browser re-checks the
-// exact version-1 form, unique bounded identities, the opening line-up cross
-// references, and the enabled/disabled_reason pairing before any renderer
-// observes it; a malformed panel never authorizes a cast.
+// skillbook-authoritative-casting D2; v2 adds the explicit caster): the
+// on-demand SkillBook use preview of one named party member's owned active
+// skill at one selected scale. The browser re-checks the exact version-2
+// form, the positive safe-integer caster, unique bounded identities, the
+// opening line-up cross references, and the enabled/disabled_reason pairing
+// before any renderer observes it; a malformed panel never authorizes a cast.
 
 var C = require("../constants.js");
 var core = require("../core.js");
@@ -17,7 +18,7 @@ var requireString = core.requireString;
 var validateIdentifier = core.validateIdentifier;
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 
-var SKILL_USE_SCHEMA_VERSION = 1;
+var SKILL_USE_SCHEMA_VERSION = 2;
 var SKILL_USE_MAX_CHOICES = 64;
 var SKILL_USE_MAX_LABEL = 128;
 var SKILL_USE_MAX_DESCRIPTION = 512;
@@ -118,13 +119,14 @@ function freeformScales(value) {
 }
 
 function validateSkillUsePanel(payload) {
-  requireExactFields(payload, "skill_use", ["schema_version", "available", "kind", "skill", "scale"], []);
-  if (payload.schema_version !== 1) {
+  requireExactFields(payload, "skill_use", ["schema_version", "available", "kind", "actor_id", "skill", "scale"], []);
+  if (payload.schema_version !== 2) {
     throw new Error("skill_use schema_version mismatch");
   }
   if (payload.available !== true || payload.kind !== "skill_use") {
     throw new Error("skill_use available form discriminator mismatch");
   }
+  requireInt(payload.actor_id, "skill_use actor_id", 1, MAX_SAFE_INTEGER);
   if (payload.scale !== 1 && C.FREEFORM_SCALES_ALLOWED.indexOf(payload.scale) === -1) {
     throw new Error("skill_use scale must be a member of the closed scale set");
   }

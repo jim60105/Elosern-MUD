@@ -14,9 +14,10 @@ const KEY = "t_soft_mend";
 
 function skillUsePanel(spec, overrides = {}) {
   const panel = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "skill_use",
+    actor_id: 42,
     scale: 1,
     skill: {
       key: KEY,
@@ -62,14 +63,18 @@ describe("SkillBook use hand-over", () => {
     revision = 1;
   });
 
-  function openExploration(mode = "exploration", contextActions = fx.explorationActions()) {
+  function openExploration(
+    mode = "exploration",
+    contextActions = fx.explorationActions(),
+    status = undefined,
+  ) {
     store.beginTransport(1);
     store.setConnected(true);
     store.receive(1, "ui_snapshot", [
       fx.snapshot({
         mode,
         panels: {
-          status: fx.statusPanel(),
+          status: fx.statusPanel(status),
           exploration: fx.explorationPanel(),
           context_actions: contextActions,
           local_map: fx.localMapPanel(),
@@ -91,13 +96,13 @@ describe("SkillBook use hand-over", () => {
     ], {});
   }
 
-  function beginPreview(spec, overrides) {
-    openExploration();
+  function beginPreview(spec, overrides, status) {
+    openExploration("exploration", fx.explorationActions(), status);
     store.openHudDrawer("skill");
     const outcome = store.beginSkillUse(KEY);
     expect(outcome.route).toBe("preview");
     expect(lastAction().action_id).toBe("explore.skill_preview");
-    expect(lastAction().payload).toEqual({ skill_key: KEY });
+    expect(lastAction().payload).toEqual({ actor_id: 42, skill_key: KEY });
     resolve({ skill_use: skillUsePanel(spec, overrides) });
   }
 
@@ -128,14 +133,18 @@ describe("SkillBook use hand-over", () => {
     store.focusItemByKey("target-52");
     store.focusConfirm("keyboard");
     expect(lastAction().action_id).toBe("explore.cast");
-    expect(lastAction().payload).toEqual({ skill_key: KEY, target_ids: [52] });
+    expect(lastAction().payload).toEqual({
+      actor_id: 42,
+      skill_key: KEY,
+      target_ids: [52],
+    });
   });
 
   it("requires an explicit confirmation for NONE and carries no target field", () => {
     beginPreview("none");
     expect(items()[0].key).toBe("cast-none");
     store.focusConfirm("keyboard");
-    expect(lastAction().payload).toEqual({ skill_key: KEY });
+    expect(lastAction().payload).toEqual({ actor_id: 42, skill_key: KEY });
   });
 
   it("toggles ordinary AREA candidates with Space and submits presenter order", () => {
@@ -148,7 +157,11 @@ describe("SkillBook use hand-over", () => {
     expect(confirm.label).toBe("確認施展（已選 2）");
     store.focusItemByKey("area-confirm");
     store.focusConfirm("keyboard");
-    expect(lastAction().payload).toEqual({ skill_key: KEY, target_ids: [42, 52] });
+    expect(lastAction().payload).toEqual({
+      actor_id: 42,
+      skill_key: KEY,
+      target_ids: [42, 52],
+    });
   });
 
   it("confirms a monster opening through its own frame with the anchor only", () => {
@@ -174,7 +187,11 @@ describe("SkillBook use hand-over", () => {
     store.focusConfirm("keyboard");
     store.focusItemByKey("confirm-opening");
     store.focusConfirm("keyboard");
-    expect(lastAction().payload).toEqual({ skill_key: KEY, opening_target_id: 12 });
+    expect(lastAction().payload).toEqual({
+      actor_id: 42,
+      skill_key: KEY,
+      opening_target_id: 12,
+    });
   });
 
   it("re-previews a chosen scale and casts at the committed scale", () => {
@@ -191,7 +208,11 @@ describe("SkillBook use hand-over", () => {
     store.focusItemByKey("scale-1/2");
     store.focusConfirm("keyboard");
     expect(lastAction().action_id).toBe("explore.skill_preview");
-    expect(lastAction().payload).toEqual({ skill_key: KEY, scale: 0.5 });
+    expect(lastAction().payload).toEqual({
+      actor_id: 42,
+      skill_key: KEY,
+      scale: 0.5,
+    });
     expect(source()).toBe("skilluse.root");
     // The pending preview locks confirmation: Enter sends nothing new.
     const pending = sender.sent.actions.length;
@@ -201,7 +222,11 @@ describe("SkillBook use hand-over", () => {
     resolve({ skill_use: skillUsePanel("none", { panel: { scale: 0.5 }, skill: { freeform_scales: rungs, cost: { mp: 6 } } }) });
     store.focusItemByKey("cast-none");
     store.focusConfirm("keyboard");
-    expect(lastAction().payload).toEqual({ skill_key: KEY, scale: 0.5 });
+    expect(lastAction().payload).toEqual({
+      actor_id: 42,
+      skill_key: KEY,
+      scale: 0.5,
+    });
   });
 
   it("Escape from the flow root returns to the book focused on the skill", () => {
@@ -216,7 +241,7 @@ describe("SkillBook use hand-over", () => {
   it("a committed cast retires the flow without reopening the book", () => {
     beginPreview("none");
     store.focusConfirm("keyboard");
-    resolve({ skill_use: { schema_version: 1, available: false, reason: { code: "skill_use_unavailable", message: "技能施放預覽目前無法顯示" } } });
+    resolve({ skill_use: { schema_version: 2, available: false, reason: { code: "skill_use_unavailable", message: "技能施放預覽目前無法顯示" } } });
     expect(source()).toBe("exploration.root");
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.skillUsePhase).toBe(null);
@@ -274,6 +299,82 @@ describe("SkillBook use hand-over", () => {
       fx.snapshot({ presentation_epoch: fx.EPOCH_B, panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.explorationActions() } }),
     ], {});
     expect(store.view.skillUsePhase).toBe(null);
+    expect(sender.sent.actions.filter((a) => a.action_id === "explore.cast")).toEqual([]);
+  });
+
+  it("refuses locally when no controlled figure is published", () => {
+    store.beginTransport(1);
+    store.setConnected(true);
+    const snap = fx.snapshot({
+      mode: "exploration",
+      panels: {
+        exploration: fx.explorationPanel(),
+        context_actions: fx.explorationActions(),
+        local_map: fx.localMapPanel(),
+      },
+    });
+    delete snap.panels.status;
+    store.receive(1, "ui_snapshot", [snap], {});
+    store.openHudDrawer("skill");
+    const outcome = store.beginSkillUse(KEY);
+    expect(outcome.route).toBe("refused");
+    expect(sender.sent.actions).toEqual([]);
+  });
+
+  it("a preview naming another caster never enters the dock", () => {
+    openExploration();
+    store.openHudDrawer("skill");
+    store.beginSkillUse(KEY);
+    resolve({ skill_use: skillUsePanel("single", { panel: { actor_id: 77 } }) });
+    expect(source()).toBe("exploration.root");
+    expect(store.view.skillUsePhase).toBe(null);
+    expect(sender.sent.actions.map((a) => a.action_id)).toEqual(["explore.skill_preview"]);
+  });
+
+  it("binds the opening confirmation to the previewed companion", () => {
+    openExploration("exploration", fx.explorationActions(), {
+      actor: { identity: "77" },
+    });
+    store.openHudDrawer("skill");
+    store.beginSkillUse(KEY);
+    expect(lastAction().payload).toEqual({ actor_id: 77, skill_key: KEY });
+    resolve({ skill_use: skillUsePanel("single", { panel: { actor_id: 77 } }) });
+    expect(source()).toBe("skilluse.root");
+    store.focusItemByKey("opening-9");
+    store.focusConfirm("keyboard");
+    expect(source()).toBe("skilluse.opening");
+    // Opening the confirmation sends nothing; cancelling still sends nothing.
+    expect(sender.sent.actions.filter((a) => a.action_id === "explore.cast")).toEqual([]);
+    store.focusItemByKey("cancel-opening");
+    store.focusConfirm("keyboard");
+    expect(source()).toBe("skilluse.root");
+    expect(sender.sent.actions.filter((a) => a.action_id === "explore.cast")).toEqual([]);
+    // Confirming sends exactly one cast naming that caster and the anchor.
+    store.focusItemByKey("opening-9");
+    store.focusConfirm("keyboard");
+    store.focusItemByKey("confirm-opening");
+    store.focusConfirm("keyboard");
+    const casts = sender.sent.actions.filter((a) => a.action_id === "explore.cast");
+    expect(casts).toHaveLength(1);
+    expect(casts[0].payload).toEqual({
+      actor_id: 77,
+      skill_key: KEY,
+      opening_target_id: 9,
+    });
+  });
+
+  it("a replacement preview for another caster retires the open confirmation", () => {
+    beginPreview("single");
+    store.focusItemByKey("opening-9");
+    store.focusConfirm("keyboard");
+    expect(source()).toBe("skilluse.opening");
+    const replacement = skillUsePanel("single", { panel: { actor_id: 77 } });
+    revision += 1;
+    store.receive(1, "ui_update", [
+      fx.update({ revision, panels: { skill_use: replacement } }),
+    ], {});
+    expect(store.view.skillUsePhase).toBe(null);
+    expect(source()).toBe("exploration.root");
     expect(sender.sent.actions.filter((a) => a.action_id === "explore.cast")).toEqual([]);
   });
 });

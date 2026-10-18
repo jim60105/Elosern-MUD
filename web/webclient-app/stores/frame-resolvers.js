@@ -337,6 +337,11 @@ export function createFrameResolver(deps) {
     return typeof value === "string" && value !== "" ? value : null;
   }
 
+  function actorIdParam(params) {
+    const value = params && params.actorId;
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+
   // --- skill-use family helpers -----------------------------------------------
 
   // The SkillBook use model (skillbook-authoritative-casting D6): the second
@@ -349,14 +354,15 @@ export function createFrameResolver(deps) {
   let skillUse = null;
   let skillUsePanelSig = null;
 
-  function skillUseModel(skillKey) {
+  function skillUseModel(skillKey, actorId) {
     const state = committed();
     const panel = (state.panels && state.panels.skill_use) || null;
     if (
       !panel ||
       panel.available !== true ||
       state.mode !== "exploration" ||
-      (skillKey !== undefined && skillKey !== null && panel.skill.key !== skillKey)
+      (skillKey !== undefined && skillKey !== null && panel.skill.key !== skillKey) ||
+      (actorId !== undefined && actorId !== null && panel.actor_id !== actorId)
     ) {
       skillUse = null;
       skillUsePanelSig = null;
@@ -482,18 +488,18 @@ export function createFrameResolver(deps) {
 
     // --- skill-use family ---------------------------------------------------
     // The book's hand-over frames. A preview that is unavailable, names
-    // another skill, or outlived exploration degrades them (pop).
+    // another caster or skill, or outlived exploration degrades them (pop).
     "skilluse.root": (params) => {
-      const model = skillUseModel(skillKeyParam(params));
+      const model = skillUseModel(skillKeyParam(params), actorIdParam(params));
       return model ? isolate(SkillUseMenu.useMenu(model)) : marker(null);
     },
     "skilluse.scale": (params) => {
-      const model = skillUseModel(skillKeyParam(params));
+      const model = skillUseModel(skillKeyParam(params), actorIdParam(params));
       if (!model || !(model.panel.skill.freeform_scales || []).length) return marker(null);
       return isolate(SkillUseMenu.scaleMenu(model));
     },
     "skilluse.opening": (params) => {
-      const model = skillUseModel(skillKeyParam(params));
+      const model = skillUseModel(skillKeyParam(params), actorIdParam(params));
       const identity = params && params.identity;
       if (!model || typeof identity !== "number") return marker(null);
       const menu = SkillUseMenu.openingMenu(model, identity);

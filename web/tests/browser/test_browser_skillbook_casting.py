@@ -215,10 +215,11 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         mp_before = store_state(page)["panels"]["status"]["resources"]["mp"]["current"]
         for payload in (
-            {"skill_key": UTILITY_SINGLE, "target_ids": [1], "opening_target_id": 2},
-            {"skill_key": UTILITY_SINGLE, "target_ids": [1, 1]},
-            {"skill_key": UTILITY_SINGLE, "target_shorthand": "all"},
-            {"skill_key": UTILITY_SINGLE, "actor_id": 1},
+            {"actor_id": 1, "skill_key": UTILITY_SINGLE, "target_ids": [1], "opening_target_id": 2},
+            {"actor_id": 1, "skill_key": UTILITY_SINGLE, "target_ids": [1, 1]},
+            {"actor_id": 1, "skill_key": UTILITY_SINGLE, "target_shorthand": "all"},
+            {"skill_key": UTILITY_SINGLE},
+            {"skill_key": UTILITY_SINGLE, "actor_id": "1"},
         ):
             with self.subTest(payload=payload):
                 self._wait_idle(page)
@@ -279,7 +280,10 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         self._press(page, "Enter")
         state = self._wait_cast_done(page, "the SELF cast")
         self.assertEqual(state["lastActionResult"]["outcome"], "success", state["lastActionResult"])
-        self.assertEqual(self._actions(page, "explore.cast")[-1]["payload"], {"skill_key": SELF_BUFF})
+        self.assertEqual(
+            self._actions(page, "explore.cast")[-1]["payload"],
+            {"actor_id": actor, "skill_key": SELF_BUFF},
+        )
         # The committed cast retires the flow without reopening the book.
         self.assertIsNone(state["hudDrawer"])
 
@@ -290,14 +294,17 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         self._wait_cast_done(page, "the SINGLE cast")
         self.assertEqual(
             self._actions(page, "explore.cast")[-1]["payload"],
-            {"skill_key": UTILITY_SINGLE, "target_ids": [actor]},
+            {"actor_id": actor, "skill_key": UTILITY_SINGLE, "target_ids": [actor]},
         )
 
         # NONE: one explicit confirmation carrying only the skill.
         self._cast_from_book(page, NONE_BREATH)
         self._press(page, "Enter")
         self._wait_cast_done(page, "the NONE cast")
-        self.assertEqual(self._actions(page, "explore.cast")[-1]["payload"], {"skill_key": NONE_BREATH})
+        self.assertEqual(
+            self._actions(page, "explore.cast")[-1]["payload"],
+            {"actor_id": actor, "skill_key": NONE_BREATH},
+        )
         self.assertEqual(store_state(page)["mode"], "exploration")
         self.assertEqual(len(self._actions(page, "explore.cast")), 3)
 
@@ -305,6 +312,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
     def test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        actor = int(store_state(page)["panels"]["status"]["actor"]["identity"])
         ladder = combat_journey_values()["ladder_key"]
         state = self._cast_from_book(page, ladder)
         monsters = sorted(row["identity"] for row in state["panels"]["skill_use"]["skill"]["openings"])
@@ -322,7 +330,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         )
         self.assertEqual(
             self._actions(page, "explore.skill_preview")[-1]["payload"],
-            {"skill_key": ladder, "scale": 0.5},
+            {"actor_id": actor, "skill_key": ladder, "scale": 0.5},
         )
         self._shot(page, "dock-scaled")
         # The opening asks once more before the fight starts.
@@ -343,7 +351,15 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         )
         cast = self._actions(page, "explore.cast")
         self.assertEqual(len(cast), 1)
-        self.assertEqual(cast[0]["payload"], {"skill_key": ladder, "scale": 0.5, "opening_target_id": anchor})
+        self.assertEqual(
+            cast[0]["payload"],
+            {
+                "actor_id": actor,
+                "skill_key": ladder,
+                "scale": 0.5,
+                "opening_target_id": anchor,
+            },
+        )
         foes = sorted(
             p["identity"] for p in state["panels"]["context_actions"]["participants"] if p["team"] == "foes"
         )
