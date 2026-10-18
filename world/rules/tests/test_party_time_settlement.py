@@ -1,11 +1,12 @@
-"""Party-wide SKIP and movement settlement (party-rest-move-settlement).
+"""Party-wide SKIP, movement, field-cast and item-use settlement.
 
 Pins the widened settlement scopes: a commander-initiated rest, sleep, wait,
 or movement advance settles the present party / travelling party, a member in
 another room is never settled, and a failed advance restores every settled
-member's gauges, buffs, and practice booking together with the tick. Church,
-GM-console, defeat-aftermath, and combat settlements keep their existing
-entity tuples.
+member's gauges, buffs, and practice booking together with the tick. An
+out-of-combat field cast or item use likewise settles the present party and
+rolls every member back on failure. Church, GM-console, defeat-aftermath, and
+combat settlements keep their existing entity tuples.
 
 Intended ``party-time-settlement`` requirement IDs (recorded here until the
 capability reaches ``openspec/specs/``, per the party-member-authority
@@ -15,8 +16,12 @@ precedent; the decorators are added by the archive/sync step):
 - ``party-time-settlement::movement-advances-settle-the-travelling-party``
 - ``party-time-settlement::other-advances-keep-their-scope``
 - ``party-time-settlement::a-failed-party-advance-restores-every-settled-member``
+- ``party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party``
+  (added by ``party-field-settlement-scope``; recorded here until the archive/
+  sync step, per the same precedent)
 """
 
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -31,15 +36,19 @@ from typeclasses.entities import LivingEntity
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
+from world.rules.action import ActionRequest
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules import church
 from world.rules.buffs import BUFF_DEFINITIONS, apply_buff, entity_active_buffs
 from world.rules.buffs.definitions import BuffDefinition
+from world.rules.cast_settlement import settle_out_of_combat_cast
 from world.rules.clock import (
     CLOCK_YAML,
     AdvanceSource,
+    EventSourceRegistration,
     WorldClock,
+    _EVENT_SOURCES,
     get_world_clock,
     settle_combat_result,
 )
@@ -49,11 +58,21 @@ from world.rules.defeat_aftermath.violation import (
     _violation_scope,
 )
 from world.rules.gm import advance_clock
+from world.rules.items import ItemUseReason, use_item
 from world.rules.movement import charge_movement
 from world.rules.party import join_party
 from world.rules.possession import enter_possession
+from world.rules.targeting import RoomActionContext
 from world.rules.time_skip import advance_skip
-from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
+from world.skills.registry import TargetSpec
+from world.tests.raw_attributes import raw_attribute_value
+from world.tests.synthetic_data import (
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
+)
+
+from .test_item_use import _support as item_support
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
@@ -65,6 +84,36 @@ _PROBE_BUFF = "t_party_probe_buff"
 #: File-local synthetic ACTIVE skill: a companion's own booking settles and
 #: rolls back against this row, never a shipped content key.
 _PROBE_SKILL = SYNTH_SKILLS["t_cinder_cleave"].key
+
+#: File-local synthetic ACTIVE skill: a zero-cost, effect-free self cast whose
+#: only settlement work is the command-time advance under test.
+_FIELD_CAST_SKILL = make_skill(
+    "t_party_field_probe",
+    effects=[],
+    target_spec=TargetSpec.SELF,
+    cost={},
+)
+
+
+def _raising_stage():
+    """A boundary-stage source that always fails after settlement starts."""
+    return EventSourceRegistration(
+        lambda start, end: (_ for _ in ()).throw(
+            RuntimeError("simulated clock boundary failure")
+        ),
+        None,
+    )
+
+
+def _field_item_scope():
+    """The synthetic healing potion and its effect profile for one test."""
+    return synthetic_registries(
+        "items",
+        extra={
+            "items": dict(item_support._SCOPE_ITEMS),
+            "item_effect_profiles": dict(item_support._SCOPE_PROFILES),
+        },
+    )
 
 
 def _gate_anchor_entry():
@@ -545,6 +594,306 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
             self.assertEqual(self._gauges(member), (19, 28, 37))
             self.assertEqual(script.db.itemcoordinates.get(member), target)
         self.assertEqual(get_world_clock().tick - before, WILDERNESS_MOVE)
+
+
+class FieldCastPartySettlementTests(_PartySettlementFixture, EvenniaTest):
+    """An out-of-combat field cast settles the caster's present party."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.room1.key = "Room1"
+        self.room1.save()
+        self.room2.key = "Room2"
+        self.room2.save()
+        self.ella = self._make_companion("艾拉")
+        self.kahn = self._make_companion("卡恩", location=self.room2)
+        self._register_probe_buff()
+        self.player.db.skills = {"active": [_FIELD_CAST_SKILL.key], "passive": []}
+
+    def _request(self):
+        return ActionRequest(
+            actor=self.player,
+            skill_key=_FIELD_CAST_SKILL.key,
+            targets=[],
+            context=RoomActionContext(self.player.location),
+        )
+
+    @synthetic_registries(
+        "skills", extra={"skills": {_FIELD_CAST_SKILL.key: _FIELD_CAST_SKILL}}
+    )
+    @covers_requirement(
+        "cast-settlement-atomicity::out-of-combat-casts-settle-resolution-and-"
+        "world-time-cost-in-one-outer-transaction"
+    )
+    def test_field_cast_settles_the_present_party_only(self):
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        self._set_gauges(self.kahn, (1.0, 1.0, 1.0))
+        apply_buff(self.ella, _PROBE_BUFF)
+        apply_buff(self.kahn, _PROBE_BUFF)
+        clock = WorldClock()
+
+        settlement = settle_out_of_combat_cast(self._request(), clock=clock)
+
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertEqual(clock.tick, 6)
+        # The commander and 艾拉 regenerate once each; a duplicated scope
+        # entry would double the regenerated gauges.
+        self.assertEqual(self._gauges(self.player), (16, 16, 16))
+        self.assertEqual(self._gauges(self.ella), (16, 16, 16))
+        self.assertEqual(self.ella.buffs.all[_PROBE_BUFF].remaining_seconds, 14)
+        # 卡恩 waits in another room: neither gauges nor buff state change.
+        self.assertEqual(self._gauges(self.kahn), (10, 10, 10))
+        self.assertEqual(self.kahn.buffs.all[_PROBE_BUFF].remaining_seconds, 20)
+
+    @synthetic_registries(
+        "skills", extra={"skills": {_FIELD_CAST_SKILL.key: _FIELD_CAST_SKILL}}
+    )
+    @covers_requirement(
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-"
+        "every-touched-evennia-cache-before-the-failure-surfaces"
+    )
+    def test_failed_field_cast_restores_every_settled_member(self):
+        import world.rules.clock as clock_module
+
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        apply_buff(self.player, _PROBE_BUFF)
+        apply_buff(self.ella, _PROBE_BUFF)
+        clock = WorldClock()
+        real_run_stages = clock_module._run_stages
+
+        def run_then_raise(clock_self, seconds, source, entities):
+            real_run_stages(clock_self, seconds, source, entities)
+            raise RuntimeError("post-settlement failure")
+
+        with patch("world.rules.clock._run_stages", side_effect=run_then_raise):
+            with self.assertRaises(RuntimeError):
+                settle_out_of_combat_cast(self._request(), clock=clock)
+
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(self._gauges(self.player), (10, 10, 10))
+        self.assertEqual(self._gauges(self.ella), (10, 10, 10))
+        self.assertEqual(self.player.buffs.all[_PROBE_BUFF].remaining_seconds, 20)
+        self.assertEqual(self.ella.buffs.all[_PROBE_BUFF].remaining_seconds, 20)
+
+    @synthetic_registries(
+        "skills", extra={"skills": {_FIELD_CAST_SKILL.key: _FIELD_CAST_SKILL}}
+    )
+    @covers_requirement(
+        "cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-"
+        "every-touched-evennia-cache-before-the-failure-surfaces"
+    )
+    def test_outer_failure_after_the_advance_restores_every_settled_member(self):
+        # The advance itself succeeds here; the failure lands after it returns,
+        # so only the cast settlement's OUTER snapshot can restore the party.
+        from world.rules.cast_settlement import _snapshot_settlement_state
+        from world.rules.party_scope import present_party_scope
+
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        apply_buff(self.player, _PROBE_BUFF)
+        apply_buff(self.ella, _PROBE_BUFF)
+        before_buffs = {
+            member.key: deepcopy(member.db.buffs)
+            for member in (self.player, self.ella)
+        }
+        clock = WorldClock()
+        snapshot = _snapshot_settlement_state(
+            self._request(), clock, present_party_scope(self.player)
+        )
+        # The widened merge marks every present member, not just the actor.
+        self.assertTrue(snapshot.objects[id(self.ella)].refresh_caches)
+        real_advance = WorldClock.advance
+
+        def advance_then_raise(clock_self, seconds, source, entities):
+            real_advance(clock_self, seconds, source, entities)
+            raise RuntimeError("post-advance failure")
+
+        with patch.object(WorldClock, "advance", advance_then_raise):
+            with self.assertRaises(RuntimeError):
+                settle_out_of_combat_cast(self._request(), clock=clock)
+
+        self.assertEqual(clock.tick, 0)
+        for member in (self.player, self.ella):
+            self.assertEqual(self._gauges(member), (10, 10, 10))
+            self.assertEqual(member.db.buffs, before_buffs[member.key])
+            self.assertEqual(
+                raw_attribute_value(member, "buffs"), before_buffs[member.key]
+            )
+            self.assertEqual(
+                raw_attribute_value(member, "traits")["hp"]["current"], 10
+            )
+
+    @synthetic_registries(
+        "skills", extra={"skills": {_FIELD_CAST_SKILL.key: _FIELD_CAST_SKILL}}
+    )
+    @covers_requirement(
+        "world-clock::clock-advance-and-restore-failures-emit-observability-events"
+    )
+    def test_field_cast_reports_the_party_scope(self):
+        with (
+            patch("world.rules.clock.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            settle_out_of_combat_cast(self._request(), clock=WorldClock())
+
+        info.assert_called_once()
+        (event,), kwargs = info.call_args
+        self.assertEqual(event, "clock_advance")
+        self.assertEqual(kwargs["context"]["scope"], 2)
+
+
+class FieldItemUsePartySettlementTests(_PartySettlementFixture, EvenniaTest):
+    """An out-of-combat item use settles the user's present party."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.room1.key = "Room1"
+        self.room1.save()
+        self.room2.key = "Room2"
+        self.room2.save()
+        self.ella = self._make_companion("艾拉")
+        self.kahn = self._make_companion("卡恩", location=self.room2)
+        self._sources = dict(_EVENT_SOURCES)
+
+        def restore_sources():
+            _EVENT_SOURCES.clear()
+            _EVENT_SOURCES.update(self._sources)
+
+        self.addCleanup(restore_sources)
+
+    def _use(self, clock):
+        self.player.db.inventory = [item_support._TONIC_KEY]
+        return use_item(self.player, item_support._TONIC_KEY, clock=clock)
+
+    @_field_item_scope()
+    @covers_requirement(
+        "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
+        "time-once"
+    )
+    def test_potion_use_settles_the_present_party_once(self):
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        self._set_gauges(self.kahn, (1.0, 1.0, 1.0))
+        clock = WorldClock()
+
+        settlement = self._use(clock)
+
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertEqual(clock.tick, item_support.ITEM_USE_SECONDS)
+        self.assertEqual(self.player.db.inventory, [])
+        # The commander and 艾拉 regenerate once each; a duplicated scope
+        # entry would double the regenerated gauges.
+        self.assertEqual(self.player.traits.mp.current, 16)
+        self.assertEqual(self.player.traits.sp.current, 16)
+        self.assertEqual(self.ella.traits.mp.current, 16)
+        self.assertEqual(self.ella.traits.sp.current, 16)
+        # 卡恩 waits in another room: his gauges are untouched.
+        self.assertEqual(self._gauges(self.kahn), (10, 10, 10))
+
+    @_field_item_scope()
+    @covers_requirement(
+        "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
+        "time-once"
+    )
+    def test_rejected_potion_use_settles_nobody(self):
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        self.player.traits.hp.current = self.player.traits.hp.max
+        clock = WorldClock()
+
+        settlement = self._use(clock)
+
+        self.assertEqual(settlement.result.outcome, "rejected")
+        self.assertIs(settlement.result.reason, ItemUseReason.HP_FULL)
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
+        self.assertEqual(self.player.traits.mp.current, 10)
+        self.assertEqual(self.player.traits.sp.current, 10)
+        self.assertEqual(self._gauges(self.ella), (10, 10, 10))
+        self.assertEqual(self.player.db.inventory, [item_support._TONIC_KEY])
+
+    @_field_item_scope()
+    @covers_requirement(
+        "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
+        "time-once"
+    )
+    def test_clock_callback_failure_restores_item_and_both_members(self):
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        _EVENT_SOURCES["shop_hours"] = _raising_stage()
+        clock = WorldClock()
+
+        with self.assertRaises(RuntimeError):
+            self._use(clock)
+
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(self.player.db.inventory, [item_support._TONIC_KEY])
+        self.assertEqual(self._gauges(self.player), (10, 10, 10))
+        self.assertEqual(self._gauges(self.ella), (10, 10, 10))
+
+    @_field_item_scope()
+    @covers_requirement(
+        "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
+        "time-once"
+    )
+    def test_outer_failure_after_the_advance_restores_item_and_both_members(self):
+        # The advance itself succeeds here; the failure lands after it returns,
+        # so only the item-use outer rollback can restore the party and item.
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        self._set_gauges(self.ella, (1.0, 1.0, 1.0))
+        before_buffs = {
+            member.key: deepcopy(member.db.buffs)
+            for member in (self.player, self.ella)
+        }
+        clock = WorldClock()
+        real_advance = WorldClock.advance
+
+        def advance_then_raise(clock_self, seconds, source, entities):
+            real_advance(clock_self, seconds, source, entities)
+            raise RuntimeError("post-advance failure")
+
+        with patch.object(WorldClock, "advance", advance_then_raise):
+            with self.assertRaises(RuntimeError):
+                self._use(clock)
+
+        self.assertEqual(clock.tick, 0)
+        self.assertEqual(self.player.db.inventory, [item_support._TONIC_KEY])
+        for member in (self.player, self.ella):
+            self.assertEqual(self._gauges(member), (10, 10, 10))
+            self.assertEqual(member.db.buffs, before_buffs[member.key])
+            self.assertEqual(
+                raw_attribute_value(member, "buffs"), before_buffs[member.key]
+            )
+            self.assertEqual(
+                raw_attribute_value(member, "traits")["hp"]["current"], 10
+            )
+
+    @_field_item_scope()
+    @covers_requirement(
+        "world-clock::clock-advance-and-restore-failures-emit-observability-events"
+    )
+    def test_item_use_reports_the_party_scope(self):
+        self._set_gauges(self.player, (1.0, 1.0, 1.0))
+        with (
+            patch("world.rules.clock.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._use(WorldClock())
+
+        info.assert_called_once()
+        (event,), kwargs = info.call_args
+        self.assertEqual(event, "clock_advance")
+        self.assertEqual(kwargs["context"]["scope"], 2)
 
 
 class UnchangedSettlementScopeTests(EvenniaTest):

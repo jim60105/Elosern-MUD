@@ -30,6 +30,7 @@ from world.rules.clock import (
     _EVENT_SOURCES,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.party_scope import present_party_scope
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.skill_effects import mundane_veil_values
 from world.rules.surfaces import attribute_snapshot
@@ -358,7 +359,9 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
             targets=[self.char2],
             context=BattlefieldActionContext(field),
         )
-        snapshot = _snapshot_settlement_state(request, clock)
+        snapshot = _snapshot_settlement_state(
+            request, clock, present_party_scope(request.actor)
+        )
         # Deliberately diverge the climax bookkeeping in process.
         self.char2.attributes.add("climax_turns", 9, category="sexual_state")
         self.char2.attributes.add(
@@ -401,7 +404,9 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
             targets=[self.char2],
             context=BattlefieldActionContext(field),
         )
-        snapshot = _snapshot_settlement_state(request, clock)
+        snapshot = _snapshot_settlement_state(
+            request, clock, present_party_scope(request.actor)
+        )
         before_atk = self.char1.traits.atk_phys.value
         # Deliberately diverge every snapshotted in-process surface.
         clock.tick = 3600
@@ -431,7 +436,9 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         """A failing registry-attribute restore logs the cast-side stage tag."""
         clock = WorldClock()
         self.char1.db.disguised_stats = {"atk_phys": 1}
-        snapshot = _snapshot_settlement_state(self._request(), clock)
+        snapshot = _snapshot_settlement_state(
+            self._request(), clock, present_party_scope(self.char1)
+        )
         # Diverge the surface so the restore must write the snapshot back,
         # where the injected write failure emits the cast-side tag.
         self.char1.db.disguised_stats = {"atk_phys": 99}
@@ -481,7 +488,12 @@ class CastSettlementCallbackOwnedCoverageTests(_CastSettlementTestCase):
         register_event_source("npc_schedules", raising_settle, contract)
         clock = WorldClock()
         # The settlement's own superset contains the contract-discovered object.
-        self.assertIn(id(npc), _snapshot_settlement_state(self._request(), clock).objects)
+        self.assertIn(
+            id(npc),
+            _snapshot_settlement_state(
+                self._request(), clock, present_party_scope(self.char1)
+            ).objects,
+        )
         with self.assertRaises(RuntimeError):
             settle_out_of_combat_cast(self._request(), clock=clock)
         self.assertEqual(npc.db.contract_mark, "pre-action")
