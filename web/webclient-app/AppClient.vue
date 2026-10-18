@@ -87,7 +87,7 @@ const {
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
+  inventoryActorId, inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -1222,6 +1222,7 @@ const rootStyle = computed(() => {
         :services="panel('services') || {}"
         :character="panel('character')"
         :wallet="inventoryWalletCopper"
+        :actor-id="inventoryActorId"
         :combat="store.view.mode === 'combat'"
         @use="onInventoryItemAction"
         @toggle-equip="onInventoryItemAction"

@@ -16,7 +16,7 @@ wallet field, and no action routes through the text command parser.
 from typing import Any
 
 from typeclasses.components import GuildStaff, Merchant
-from world.lore.items import ITEM_REGISTRY
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
@@ -30,8 +30,7 @@ from world.rules.combat_session import (
     is_in_active_session,
 )
 from world.rules.economy import TradeError, buy, sell
-from world.rules.equipment import registry_key_for_object, toggle_equipment
-from world.rules.equipment_effects import equipment_adjustment_text
+from world.rules.equipment_effects import toggle_equipment_message
 from world.rules.event_log import render_plain_text
 from world.rules.guild import (
     GuildDataError,
@@ -51,7 +50,9 @@ from world.rules.guild_offers import (
     abandon_guild_quest,
 )
 from world.rules.items import use_item
+from world.rules.npc_identity import npc_display_name
 from world.rules.npc_schedules import interaction_reason
+from world.rules.party_inventory import PartyScopeError, toggle_member_equipment
 from world.rules.player_messages import session_reason_message
 from world.rules.service_messages import (
     exam_schedule_message,
@@ -208,13 +209,6 @@ def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
     return text
 
 
-def _validate_inventory_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    body = _exact_single_field(payload, "item_key")
-    return {"item_key": _require_key_identifier(
-        body["item_key"], "item_key", MAX_KEY_CODE_POINTS
-    )}
-
-
 def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate the exact ``inventory.use`` payload (item key plus optional target).
 
@@ -244,8 +238,33 @@ def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_inventory_toggle_equip_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``inventory.toggle_equip`` payload (one item key)."""
-    return _validate_inventory_item_payload(payload)
+    """Validate the exact ``inventory.toggle_equip`` payload (member plus key).
+
+    ``actor_id`` names the member whose equipment toggles and is reauthorized
+    by the party member boundary in the adapter, never by the payload; the
+    client still chooses no slot, effect, or quantity.
+    """
+    if not isinstance(payload, dict):
+        raise ServiceActionError("payload must be an object")
+    unknown = set(payload) - {"actor_id", "item_key"}
+    if unknown:
+        raise ServiceActionError(f"payload has unknown fields {sorted(unknown)}")
+    missing = {"actor_id", "item_key"} - set(payload)
+    if missing:
+        raise ServiceActionError(f"payload requires {sorted(missing)}")
+    actor_id = payload["actor_id"]
+    if (
+        isinstance(actor_id, bool)
+        or not isinstance(actor_id, int)
+        or not 1 <= actor_id <= MAX_SAFE_INTEGER
+    ):
+        raise ServiceActionError("actor_id must be a positive safe integer")
+    return {
+        "actor_id": actor_id,
+        "item_key": _require_key_identifier(
+            payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -515,11 +534,6 @@ def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     return _success("sold", message, AFFECTED_TRADE)
 
 
-def _item_display_name(item_key: str) -> str:
-    definition = ITEM_REGISTRY.get(item_key)
-    return definition.display_name_zh if definition is not None else item_key
-
-
 def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
     """Resolve one ``target_key`` to a present entity for item targeting.
 
@@ -576,28 +590,29 @@ def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = N
 
 
 def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Delegate one ownership-aware equipment toggle (a free action)."""
+    """Delegate one member's ownership-aware equipment toggle (a free action).
+
+    ``actor_id`` is reauthorized by the party member boundary: a forged or
+    absent member reference rejects with the shared party code and the
+    commander is never toggled in its place. The toggle stays free in
+    exploration and in combat, and its existing draft-preview invalidation
+    applies to the re-equipped member.
+    """
     del session
     item_key = payload["item_key"]
-    result = toggle_equipment(actor, item_key)
+    try:
+        outcome = toggle_member_equipment(actor, payload["actor_id"], item_key)
+    except PartyScopeError as error:
+        return {
+            "outcome": "rejected",
+            "code": error.reason,
+            "message": error.message,
+        }
+    result = outcome.result
     if result.outcome != "success":
         return _rejected(result.reason)
-    display = _item_display_name(item_key)
-    prose = equipment_adjustment_text(item_key)
-    if result.action == "unequip-singleton":
-        message = f"你卸下了 {display}。"
-    elif result.action == "unequip-accessory":
-        message = f"你除下了 {display}。"
-    elif result.action == "equip-accessory":
-        message = f"你佩戴了 {display}" + (f"（{prose}）" if prose else "") + "。"
-    elif result.replaced_key is not None:
-        replaced = _item_display_name(result.replaced_key)
-        if prose:
-            message = f"你裝備了 {display}（{prose}），原本的 {replaced} 已收回背包。"
-        else:
-            message = f"你裝備了 {display}，原本的 {replaced} 已收回背包。"
-    else:
-        message = f"你裝備了 {display}" + (f"（{prose}）" if prose else "") + "。"
+    subject = "你" if outcome.member is actor else npc_display_name(outcome.member)
+    message = toggle_equipment_message(result, item_key, subject)
     actor.msg(message)
     return _success("equipment_toggled", message, ())
 

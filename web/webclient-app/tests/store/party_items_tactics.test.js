@@ -350,10 +350,14 @@ describe("party items and tactics (store)", () => {
     store.openHudDrawer("inventory");
     handlers.onInventoryItemAction({
       action_id: "inventory.toggle_equip",
-      payload: { item_key: "synth_sword" },
+      payload: { item_key: "synth_sword", actor_id: PLAYER },
     });
     expect(sent("inventory.toggle_equip")).toHaveLength(1);
-    expect(sent("inventory.toggle_equip")[0].payload).toEqual({ item_key: "synth_sword" });
+    // The member reference the drawer names survives the single dispatch seam.
+    expect(sent("inventory.toggle_equip")[0].payload).toEqual({
+      item_key: "synth_sword",
+      actor_id: PLAYER,
+    });
   });
 
   it("useCombatItem refuses an item outside the committed stock and pushes nothing", () => {

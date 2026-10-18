@@ -482,11 +482,14 @@ export const RowActionStates = {
                     services: args.services,
                     character: character,
                     wallet: walletCopper(args.services, character),
+                    // party-member-equipment: the toggle names the member
+                    // whose equipment changes (the controlled figure).
+                    actorId: 1,
                     onUse: (intent) => {
                       lastIntent.value = `use：${intent.payload.item_key}`;
                     },
                     onToggleEquip: (intent) => {
-                      lastIntent.value = `${intent.action_id}：${intent.payload.item_key}`;
+                      lastIntent.value = `${intent.action_id}：${intent.payload.item_key}（成員 ${intent.payload.actor_id}）`;
                     },
                   }),
               },

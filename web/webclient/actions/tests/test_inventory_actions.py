@@ -21,6 +21,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.dispatcher import handle_ui_action
 from web.webclient.actions.registry import build_production_action_registry
@@ -44,6 +45,11 @@ from world.rules.item_effects import (
 from world.rules.clock import get_world_clock
 from world.rules.combat_beats import RoundRecord
 from world.rules.combat_session import engage, read_session
+from world.rules.party import join_party
+from world.rules.party_scope import (
+    REASON_MEMBER_NOT_PRESENT,
+    REASON_NOT_PARTY_MEMBER,
+)
 from world.skills.equipment import EquipmentSlot, list_items
 from world.rules.tests._combat_session_helpers import (
     live_item_effect_profiles,
@@ -99,6 +105,15 @@ class InventoryActionBase(EvenniaTestCase):
         monster.location = self.room
         return monster
 
+    def _companion(self, key="艾拉"):
+        """One co-located effective party member holding nothing yet."""
+        npc = create_object(NPC, key=key, location=self.room, home=self.room)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        npc.db.inventory = []
+        join_party(npc, self.player)
+        return npc
+
     def _hurt(self, missing: int) -> int:
         maximum = int(self.player.traits.hp.max)
         self.player.traits.hp.current = maximum - missing
@@ -106,15 +121,25 @@ class InventoryActionBase(EvenniaTestCase):
 
 
 class InventoryPayloadValidatorTests(InventoryActionBase):
-    def test_validators_accept_one_item_key(self):
-        for validator in (
-            validate_inventory_use_payload,
-            validate_inventory_toggle_equip_payload,
-        ):
-            self.assertEqual(
-                validator({"item_key": _T_POTION.key}),
-                {"item_key": _T_POTION.key},
-            )
+    def test_use_accepts_one_item_key(self):
+        self.assertEqual(
+            validate_inventory_use_payload({"item_key": _T_POTION.key}),
+            {"item_key": _T_POTION.key},
+        )
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_toggle_accepts_exactly_the_member_and_item_key(self):
+        # party-member-equipment: the toggle names the member whose equipment
+        # toggles. The identity is reauthorized by the rules in the adapter;
+        # the payload itself carries no other field.
+        self.assertEqual(
+            validate_inventory_toggle_equip_payload(
+                {"actor_id": 7, "item_key": _T_BLADE.key}
+            ),
+            {"actor_id": 7, "item_key": _T_BLADE.key},
+        )
 
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
@@ -124,20 +149,22 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
         # and the input echo prints the key verbatim: a whitespace-bearing
         # key would echo a line whose keyboard replay targets a different
         # item, so the action boundary rejects it (complete-ui-command-echo D1).
-        for validator in (
-            validate_inventory_use_payload,
-            validate_inventory_toggle_equip_payload,
-        ):
-            for key in ("t_ember spray", "t_ember\tspray", " t_ember_spray", "t_ember_spray "):
-                with self.subTest(validator=validator.__name__, key=key):
-                    with self.assertRaises(ServiceActionError):
-                        validator({"item_key": key})
+        for key in ("t_ember spray", "t_ember\tspray", " t_ember_spray", "t_ember_spray "):
+            with self.subTest(key=key):
+                with self.assertRaises(ServiceActionError):
+                    validate_inventory_use_payload({"item_key": key})
+                # Every toggle case carries a valid member id, so only the key
+                # rule can be the rejection under test.
+                with self.assertRaises(ServiceActionError):
+                    validate_inventory_toggle_equip_payload(
+                        {"actor_id": 7, "item_key": key}
+                    )
 
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
     )
     def test_authority_like_fields_are_rejected(self):
-        cases = (
+        use_cases = (
             {},
             {"item_key": ""},
             {"item_key": "x" * 65},
@@ -148,12 +175,45 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
             {"item_key": _T_UNUSABLE.key, "consumable": True},
             _T_POTION.key,
         )
-        for payload in cases:
+        for payload in use_cases:
             with self.subTest(payload=payload):
                 with self.assertRaises(ServiceActionError):
                     validate_inventory_use_payload(payload)
+        # The toggle's own authority-like fields: a slot, effect, quantity,
+        # combat, or second member reference is rejected even beside the exact
+        # member id and key.
+        toggle_cases = (
+            {},
+            {"item_key": _T_BLADE.key},
+            {"actor_id": 7},
+            {"actor_id": 7, "item_key": ""},
+            {"actor_id": 7, "item_key": "x" * 65},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "quantity": 1},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "slot": "weapon_main"},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "effect_key": "self_heal"},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "actor": 7},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "member_id": 8},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "combat": True},
+            {"actor_id": 7, "item_key": _T_BLADE.key, "target_key": "t_somebody"},
+        )
+        for payload in toggle_cases:
+            with self.subTest(payload=payload):
                 with self.assertRaises(ServiceActionError):
                     validate_inventory_toggle_equip_payload(payload)
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_toggle_actor_id_is_one_positive_safe_integer(self):
+        # A bool is an int subclass, so it must be excluded explicitly; a
+        # string, float, zero, negative, or out-of-range identity never reaches
+        # the party boundary.
+        for actor_id in (None, True, False, "7", 7.0, 0, -1, 2**53):
+            with self.subTest(actor_id=actor_id):
+                with self.assertRaises(ServiceActionError):
+                    validate_inventory_toggle_equip_payload(
+                        {"actor_id": actor_id, "item_key": _T_BLADE.key}
+                    )
 
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
@@ -181,7 +241,7 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
                     validate_inventory_use_payload(payload)
         with self.assertRaises(ServiceActionError):
             validate_inventory_toggle_equip_payload(
-                {"item_key": _T_BLADE.key, "target_key": "t_somebody"}
+                {"actor_id": 7, "item_key": _T_BLADE.key, "target_key": "t_somebody"}
             )
 
 
@@ -366,7 +426,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
     def test_toggle_equips_and_unequips_with_chinese_messages(self):
         self.player.db.inventory = [_T_BLADE.key]
         equipped = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": _T_BLADE.key}
+            self.player, {"actor_id": self.player.pk, "item_key": _T_BLADE.key}
         )
         self.assertEqual(equipped["outcome"], "success")
         self.assertEqual(equipped["code"], "equipment_toggled")
@@ -375,10 +435,59 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         self.assertIn(_T_BLADE.key, list_items(self.player))
         self.assertEqual(self.player.db.equipment["weapon_main"], _T_BLADE.key)
         unequipped = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": _T_BLADE.key}
+            self.player, {"actor_id": self.player.pk, "item_key": _T_BLADE.key}
         )
         self.assertIn("你卸下了", unequipped["message"])
         self.assertIsNone(self.player.db.equipment["weapon_main"])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_companion_toggle_names_the_member_and_leaves_the_commander_alone(self):
+        companion = self._companion()
+        companion.db.inventory = [_T_BLADE.key]
+        self.player.db.inventory = [_T_BLADE.key]
+        result = _inventory_toggle_equip_adapter(
+            self.player, {"actor_id": companion.pk, "item_key": _T_BLADE.key}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn(f"{companion.key}裝備了", result["message"])
+        self.assertEqual(companion.db.equipment["weapon_main"], _T_BLADE.key)
+        self.assertIsNone(self.player.db.equipment)
+        # The unequip direction keeps the same member subject.
+        removed = _inventory_toggle_equip_adapter(
+            self.player, {"actor_id": companion.pk, "item_key": _T_BLADE.key}
+        )
+        self.assertIn(f"{companion.key}卸下了", removed["message"])
+        self.assertIsNone(companion.db.equipment["weapon_main"])
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+    )
+    def test_forged_or_absent_member_is_rejected_without_toggling_the_commander(self):
+        companion = self._companion()
+        outsider = create_object(NPC, key="路人", location=self.room)
+        outsider.race = "human"
+        outsider.apply_race_baseline()
+        self.player.db.inventory = [_T_BLADE.key]
+        companion.db.inventory = [_T_BLADE.key]
+        companion.location = create_object(Room, key="t_ember_far_room")
+
+        cases = (
+            (outsider.pk, REASON_NOT_PARTY_MEMBER),
+            (10**9, REASON_NOT_PARTY_MEMBER),
+            (companion.pk, REASON_MEMBER_NOT_PRESENT),
+        )
+        for actor_id, code in cases:
+            with self.subTest(actor_id=actor_id):
+                result = _inventory_toggle_equip_adapter(
+                    self.player, {"actor_id": actor_id, "item_key": _T_BLADE.key}
+                )
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], code)
+        self.assertIsNone(self.player.db.equipment)
+        self.assertIsNone(companion.db.equipment)
+        self.assertEqual(list_items(self.player), [_T_BLADE.key])
 
     def test_toggle_rejections_are_stable_and_unmutating(self):
         self.player.db.inventory = [_T_UNUSABLE.key]
@@ -391,7 +500,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         for item_key, code in cases:
             with self.subTest(item_key=item_key):
                 result = _inventory_toggle_equip_adapter(
-                    self.player, {"item_key": item_key}
+                    self.player, {"actor_id": self.player.pk, "item_key": item_key}
                 )
                 self.assertEqual(result["outcome"], "rejected")
                 self.assertEqual(result["code"], code)
@@ -404,11 +513,12 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         self.player.db.inventory = [f"t_ring_{index}" for index in range(6)]
         for index in range(5):
             result = _inventory_toggle_equip_adapter(
-                self.player, {"item_key": f"t_ring_{index}"}
+                self.player,
+                {"actor_id": self.player.pk, "item_key": f"t_ring_{index}"},
             )
             self.assertEqual(result["outcome"], "success")
         overflow = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "t_ring_5"}
+            self.player, {"actor_id": self.player.pk, "item_key": "t_ring_5"}
         )
         self.assertEqual(overflow["outcome"], "rejected")
         self.assertEqual(overflow["code"], "accessory_slots_full")
@@ -417,7 +527,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
             [f"t_ring_{index}" for index in range(5)],
         )
         removal = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "t_ring_2"}
+            self.player, {"actor_id": self.player.pk, "item_key": "t_ring_2"}
         )
         self.assertEqual(removal["outcome"], "success")
         self.assertEqual(

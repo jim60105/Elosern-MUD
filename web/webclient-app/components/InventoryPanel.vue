@@ -36,11 +36,25 @@ const props = defineProps({
   // so the tile emits at once and the card's own item review/target step is
   // the confirmation. Inspection and equipment toggles are unaffected.
   combat: { type: Boolean, required: false, default: false },
+  // The controlled figure's identity (the committed `status` panel's actor
+  // identity as a number), which the bag drawer's rows belong to. An
+  // equipment toggle names that member explicitly (party-member-equipment);
+  // absent (`null`) it stays unavailable rather than guessing an actor, so no
+  // request is ever sent with an invented or null member reference.
+  actorId: { type: Number, required: false, default: null },
 });
 
 // Row-action intents are published to the parent (AppClient), which owns the
 // single store dispatch path — the panel itself never touches the transport.
 const emit = defineEmits(["use", "toggle-equip"]);
+
+// The equipment toggle names the controlled figure explicitly, so it needs
+// that identity: the services panel can be available while the status panel
+// is not, and the exact payload schema rejects a missing member reference.
+// Inspection and item use stay available; only the toggle fails closed.
+const actorReady = computed(
+  () => Number.isSafeInteger(props.actorId) && props.actorId > 0,
+);
 
 // The registry-owned unavailable form (available: false) carries only the
 // reason — no rows, no default wallet value.
@@ -200,7 +214,8 @@ function onTileBlur(event) {
 // nothing; an enabled `inventory.use` opens the labelled confirmation — or,
 // in combat, emits at once so the commanded actor's own target/review step is
 // the confirmation (webclient-party-items-tactics); an enabled
-// `inventory.toggle_equip` dispatches immediately without one.
+// `inventory.toggle_equip` dispatches immediately without one, naming the
+// controlled figure as its member.
 function onTileActivate(event) {
   const key = event.currentTarget.dataset.key;
   selectedKey.value = key;
@@ -210,9 +225,12 @@ function onTileActivate(event) {
     return;
   }
   if (action.action_id === "inventory.toggle_equip") {
+    if (!actorReady.value) {
+      return;
+    }
     emit("toggle-equip", {
       action_id: "inventory.toggle_equip",
-      payload: { item_key: row.item_key },
+      payload: { item_key: row.item_key, actor_id: props.actorId },
     });
   } else if (action.action_id === "inventory.use") {
     if (props.combat) {
