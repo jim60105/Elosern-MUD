@@ -146,6 +146,9 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "party-member-authority::the-present-party-scope-is-ordered-and-room-bound"
     )
+    @covers_requirement(
+        "party-time-settlement::skip-advances-settle-the-present-party"
+    )
     def test_rest_settles_the_present_party_only(self):
         self._set_gauges(self.ella, (0.005, 0.01, 0.015))
         self._set_gauges(self.kahn, (0.005, 0.01, 0.015))
@@ -171,6 +174,9 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-"
         "capped-at-a-configured-maximum"
     )
+    @covers_requirement(
+        "party-time-settlement::skip-advances-settle-the-present-party"
+    )
     def test_sleep_derives_its_duration_from_the_caller_only(self):
         self._fill_gauges(self.player)
         self.player.traits.mp.rate = 1.0
@@ -193,6 +199,9 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "world-clock::a-rolled-back-advance-restores-every-callback-owned-"
         "surface-not-just-caller-entities"
+    )
+    @covers_requirement(
+        "party-time-settlement::a-failed-party-advance-restores-every-settled-member"
     )
     def test_failed_party_skip_restores_every_member(self):
         import world.rules.clock as clock_module
@@ -233,6 +242,9 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(event, "clock_advance")
         self.assertEqual(kwargs["context"]["scope"], 2)
 
+    @covers_requirement(
+        "party-time-settlement::skip-advances-settle-the-present-party"
+    )
     def test_possessed_rest_settles_the_whole_present_party_once(self):
         self.kahn.location = self.room1
         enter_possession(self.player, self.ella)
@@ -277,6 +289,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
     )
+    @covers_requirement(
+        "party-time-settlement::movement-advances-settle-the-travelling-party"
+    )
     def test_grid_traversal_settles_followers_not_a_companion_elsewhere(self):
         self._set_gauges(self.ella, (0.5, 1.0, 1.5))
         self._set_gauges(self.kahn, (0.5, 1.0, 1.5))
@@ -296,6 +311,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
+    )
+    @covers_requirement(
+        "party-time-settlement::movement-advances-settle-the-travelling-party"
     )
     def test_possessed_traversal_settles_the_whole_travelling_party(self):
         self.kahn.location = self.room1
@@ -331,6 +349,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-"
         "persisted-relocation-and-reconciles-every-evennia-cache-surface"
+    )
+    @covers_requirement(
+        "party-time-settlement::a-failed-party-advance-restores-every-settled-member"
     )
     def test_failed_party_movement_restores_every_member(self):
         self._set_gauges(self.player, (0.5, 1.0, 1.5))
@@ -393,6 +414,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
     )
+    @covers_requirement(
+        "party-time-settlement::movement-advances-settle-the-travelling-party"
+    )
     def test_gate_entry_settles_followers(self):
         self._set_gauges(self.ella, (0.001, 0.002, 0.003))
         self._set_gauges(self.kahn, (0.001, 0.002, 0.003))
@@ -411,6 +435,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
+    )
+    @covers_requirement(
+        "party-time-settlement::movement-advances-settle-the-travelling-party"
     )
     def test_step_excludes_a_destination_only_companion(self):
         self.gate.at_traverse(self.player, self.east_gate)
@@ -449,6 +476,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "movement-settlement-atomicity::a-failed-movement-compensates-the-"
         "persisted-relocation-and-reconciles-every-evennia-cache-surface"
     )
+    @covers_requirement(
+        "party-time-settlement::a-failed-party-advance-restores-every-settled-member"
+    )
     def test_failed_step_restores_every_member_and_excludes_the_destination(self):
         self.gate.at_traverse(self.player, self.east_gate)
         script = self._script()
@@ -484,6 +514,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertIn(_PROBE_BUFF, entity_active_buffs(self.kahn))
         self.assertEqual(script.db.itemcoordinates.get(self.kahn), target)
 
+    @covers_requirement(
+        "party-time-settlement::movement-advances-settle-the-travelling-party"
+    )
     def test_possessed_step_settles_the_registered_owner_body_and_companion(self):
         self.gate.at_traverse(self.player, self.east_gate)
         script = self._script()
@@ -531,6 +564,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
     @covers_requirement(
         "church-ordination::prayer-is-a-time-costed-capped-venue-bound-accrual"
     )
+    @covers_requirement(
+        "party-time-settlement::other-advances-keep-their-scope"
+    )
     def test_church_pray_advance_keeps_its_single_entity_scope(self):
         clock = WorldClock(tick=0)
         calls = []
@@ -553,6 +589,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
         "world-clock::advance-settles-exactly-the-entities-its-caller-supplies-"
         "never-a-global-registry"
     )
+    @covers_requirement(
+        "party-time-settlement::other-advances-keep-their-scope"
+    )
     def test_gm_console_advance_keeps_the_living_entity_tuple(self):
         clock = Mock()
         with (
@@ -572,6 +611,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
     @covers_requirement(
         "defeat-aftermath-violation-sequence::each-attempt-advances-the-world-"
         "clock-by-its-declared-duration"
+    )
+    @covers_requirement(
+        "party-time-settlement::other-advances-keep-their-scope"
     )
     def test_defeat_attempt_advance_keeps_its_scope(self):
         self.assertEqual(_violation_scope(self.char1), [])
@@ -593,6 +635,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
     @covers_requirement(
         "world-clock::settle-combat-result-is-the-sanctioned-call-site-for-"
         "combat-sourced-advances"
+    )
+    @covers_requirement(
+        "party-time-settlement::other-advances-keep-their-scope"
     )
     def test_settle_combat_result_keeps_its_entity_tuple(self):
         entities = [self.char1]

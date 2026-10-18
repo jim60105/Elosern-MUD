@@ -7,13 +7,14 @@ non-teleport exit lineage charges successful player movement through it via
 
 ## Requirements
 
-
 ### Requirement: charge_movement() is the single, shared movement-cost charging function
-`world/rules/movement.py` SHALL provide `charge_movement(traversing_object, cost_key: str) -> None`,
-resolving the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calling
-`world.rules.clock.get_world_clock().advance(cost, AdvanceSource.COMMAND, [traversing_object])` when
-`world.rules.player_control.is_player_driven(traversing_object)` is true, and doing nothing
-otherwise.
+`world/rules/movement.py` SHALL provide `charge_movement(traversing_object,
+cost_key: str, *, source_location, wilderness_source_coordinates=None) -> None`.
+It resolves the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calls
+`get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` when
+`is_player_driven(traversing_object)` is true, doing nothing otherwise.
+`entities` is the traverser followed by the followers the follow step moves
+from `source_location`.
 
 #### Scenario: charge_movement advances the clock by the resolved cost for a PlayerCharacter
 - **WHEN** `charge_movement(player_character, "move")` is called
@@ -28,7 +29,8 @@ otherwise.
 #### Scenario: A possessed NPC charges movement like a player
 - **WHEN** `charge_movement(npc, "move")` is called for an NPC that is possessed and puppeted
 - **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["move"]` with
-  `AdvanceSource.COMMAND` and the possessed NPC as the settled entity
+  `AdvanceSource.COMMAND`, settling the possessed NPC first and then the commander's body and
+  every companion co-located with it in the source room
 
 #### Scenario: charge_movement always uses AdvanceSource.COMMAND
 - **WHEN** `charge_movement()` is called with any registered `cost_key`
@@ -61,6 +63,11 @@ otherwise.
   and `"flight" in traversing_object.skills.owned_keys()`
 - **THEN** `charge_movement()` returns without advancing the clock, while every other `cost_key`
   charges normally regardless of owned skills
+
+#### Scenario: A player traversal settles its co-located companions
+- **WHEN** `charge_movement(player_character, "move", source_location=room)` runs while companion 艾拉
+  is in `room` and companion 卡恩 is elsewhere
+- **THEN** the single advance settles the player character and 艾拉, and 卡恩's state is unchanged
 
 ### Requirement: MovementCostMixin charges via at_post_traverse, not at_traverse's return value
 `typeclasses/exits.py` SHALL define `MovementCostMixin`, a plain mixin carrying a class attribute
@@ -207,7 +214,6 @@ specifically; the scenarios below are its continuation.
 #### Scenario: A possessed NPC traversing the same exit charges the clock
 - **WHEN** a possessed, puppeted NPC traverses a `MovementCostMixin` exit
 - **THEN** the traversal succeeds and the clock advances by the exit's resolved movement cost
-
 
 ### Requirement: Flight-required exits pass only for flight/flash_step owners
 `typeclasses/exits.py` SHALL support an opt-in `requires_flight: bool` class/instance attribute

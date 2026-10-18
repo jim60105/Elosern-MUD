@@ -81,7 +81,8 @@ scan, or `evennia`-wide object search to discover additional entities to settle.
 
 #### Scenario: The registered call sites pass their documented scopes
 - **WHEN** `CmdCast`'s integration and the skip commands call `advance()`
-- **THEN** each passes `entities=[caller]`; `settle_combat_result()` passes
+- **THEN** `CmdCast` passes `entities=[caller]`, the skip commands pass the caller's present party
+  scope, `charge_movement()` passes the travelling party, and `settle_combat_result()` passes
   `entities=battlefield.roster.values()`
 
 ### Requirement: gauge regen is a closed-form computation, never a per-second or per-quantum loop
