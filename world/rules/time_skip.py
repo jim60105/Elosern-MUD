@@ -20,13 +20,22 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from django.db import transaction
+
+from world.observability import log_info
 from world.rules.clock import (
     AdvanceSource,
     CLOCK_YAML,
     ScheduledEvent,
     get_world_clock,
 )
-from world.rules.party_scope import present_party_scope
+from world.rules.party_scope import (
+    PURPOSE_ACT,
+    authorize_member,
+    party_in_combat,
+    present_party_scope,
+    resolve_commander,
+)
 from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
 from world.rules.traits import GAUGE_KEYS
@@ -59,6 +68,7 @@ class PracticeRejectReason(StrEnum):
 
     SKILL_UNKNOWN = "PRACTICE_SKILL_UNKNOWN"
     SKILL_CAPPED = "PRACTICE_SKILL_CAPPED"
+    IN_COMBAT = "booking_in_combat"
 
 
 @dataclass(frozen=True)
@@ -67,6 +77,19 @@ class PracticeReject:
 
     reason: PracticeRejectReason
     message: str
+
+
+@dataclass(frozen=True)
+class PracticeBooking:
+    """One accepted standing practice booking: its member and confirmation."""
+
+    member: Any
+    skill_key: str
+    message: str
+
+
+BOOKING_IN_COMBAT_MESSAGE = "戰鬥中無法排入修煉。"
+_BOOKING_MESSAGE = "{member}將在下次休息時修煉「{skill}」。"
 
 
 def preflight_practice_booking(
@@ -99,6 +122,43 @@ def preflight_practice_booking(
     return None
 
 
+def book_member_practice(
+    acting: Any, member_id: Any, skill_key: str
+) -> PracticeBooking | PracticeReject:
+    """Book one present party member's standing practice; never advances time.
+
+    The named member is re-derived through the party boundary for the acting
+    purpose, so a forged, absent, or knocked-out id is refused (the exception
+    propagates and each transport renders it) and the authenticated puppet is
+    never substituted for it. An active combat session involving the acting
+    figure, its commander, or the member refuses with ``booking_in_combat``;
+    the skill then passes the same preflight the skip clause uses, against
+    that member. Only ``db.practice_booking`` is written: the clock's practice
+    stage stays the sole progression writer, and the standing booking is
+    settled by the next SKIP advance that covers the member.
+    """
+    member = authorize_member(
+        resolve_commander(acting), member_id, PURPOSE_ACT, anchor=acting
+    )
+    if party_in_combat(acting, member):
+        return PracticeReject(
+            PracticeRejectReason.IN_COMBAT, BOOKING_IN_COMBAT_MESSAGE
+        )
+    reject = preflight_practice_booking(member, skill_key)
+    if reject is not None:
+        return reject
+    member.db.practice_booking = skill_key
+    skill = SKILL_REGISTRY[skill_key]
+    message = _BOOKING_MESSAGE.format(member=member.key, skill=skill.label)
+    transaction.on_commit(
+        lambda: log_info(
+            "practice_booked",
+            context={"member": int(member.pk), "skill": skill_key},
+        )
+    )
+    return PracticeBooking(member, skill_key, message)
+
+
 def parse_duration(text: str) -> int:
     """Parse an explicit ``<number><s|m|h|d>`` rest duration into seconds.
 
@@ -108,13 +168,13 @@ def parse_duration(text: str) -> int:
     match = _DURATION_RE.fullmatch(text.strip())
     if match is None:
         raise DurationParseError("duration must use <number><s|m|h|d>")
-    try:
-        seconds = int(match["amount"]) * _UNIT_SECONDS[match["unit"]]
-    except ValueError:
-        # Absurdly long digit strings exceed Python's int-string limit; any
-        # such duration is astronomically over the cap, so clamp directly.
+    # Strip leading zeros before measuring the magnitude: Python refuses to
+    # convert an absurdly long digit string, and any twelve-digit amount
+    # already exceeds every configured cap in every unit, so the cap is exact.
+    digits = match["amount"].lstrip("0") or "0"
+    if len(digits) > 12:
         return MAX_SKIP_SECONDS
-    return min(seconds, MAX_SKIP_SECONDS)
+    return min(int(digits) * _UNIT_SECONDS[match["unit"]], MAX_SKIP_SECONDS)
 
 
 def seconds_to_full_regen(entity: Any) -> int:
@@ -168,30 +228,40 @@ def advance_skip(
     never settled. Scope resolution happens before any booking write, so an
     authority refusal cannot half-apply the declaration.
     A declared skill must pass ``preflight_practice_booking`` before entry.
-    Unlabeled skips clear stale bookings and carry zero growth. The clock's
-    practice settlement remains the sole progression writer.
+    A declared skill replaces the caller's standing booking before the
+    advance; an unlabeled skip writes no booking and leaves every member's
+    standing booking for the clock's practice settlement, which stays the
+    sole progression writer. A failed combined book-and-skip restores the
+    caller's previous booking, while a failed unlabeled skip is restored by
+    the clock's own snapshot.
     """
     entities = present_party_scope(actor)
-    previous_booking = actor.db.practice_booking if practice_skill is not None else None
-    actor.db.practice_booking = practice_skill
+    previous_booking = None
+    if practice_skill is not None:
+        previous_booking = actor.db.practice_booking
+        actor.db.practice_booking = practice_skill
     try:
         return get_world_clock().advance(seconds, AdvanceSource.SKIP, entities)
     except Exception:
-        # Clock rollback restores its entry snapshot, which already contains
-        # this declaration. A failed graphical action must not leave a new
-        # booking that a later, unrelated skip could consume.
-        actor.db.practice_booking = previous_booking
+        # Clock rollback already restored its entry snapshot, which contains
+        # this declaration; restoring the previous booking here keeps a failed
+        # combined book-and-skip from leaving a declaration behind.
+        if practice_skill is not None:
+            actor.db.practice_booking = previous_booking
         raise
 
 
 __all__ = [
+    "BOOKING_IN_COMBAT_MESSAGE",
     "DAYPARTS",
     "DurationParseError",
     "MAX_SKIP_SECONDS",
     "MAX_WEB_SKIP_SECONDS",
+    "PracticeBooking",
     "PracticeReject",
     "PracticeRejectReason",
     "advance_skip",
+    "book_member_practice",
     "parse_duration",
     "preflight_practice_booking",
     "rejection_message",

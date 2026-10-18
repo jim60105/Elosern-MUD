@@ -97,7 +97,7 @@ from commands.localized import (
 )
 from commands.lineage import CmdLineage
 from commands.scene import CmdEnterScene
-from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
+from commands.skip import CmdPractice, CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
 from commands.title import CmdTitle
 
@@ -204,6 +204,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdArtOptions)
         self.add(CmdArtHealth)
         self.add(CmdRest)
+        self.add(CmdPractice)
         self.add(CmdSleep)
         self.add(CmdDream)
         self.add(CmdWaitUntil)

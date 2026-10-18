@@ -331,11 +331,16 @@ class ClockTests(unittest.TestCase):
 class BookingEntity(Entity):
     """Fake settlement entity carrying one declared-practice booking."""
 
-    def __init__(self, booking: str | None = "fire_arrow"):
+    def __init__(
+        self,
+        booking: str | None = "fire_arrow",
+        owned: tuple[str, ...] = ("fire_arrow",),
+    ):
         super().__init__()
         self.db = SimpleNamespace(
             practice_booking=booking, skill_proficiency={}
         )
+        self.skills = SimpleNamespace(owned_keys=lambda: list(owned))
 
 
 class DeclaredPracticeSettlementTests(unittest.TestCase):
@@ -377,6 +382,16 @@ class DeclaredPracticeSettlementTests(unittest.TestCase):
             WorldClock().advance(28800, AdvanceSource.SKIP, [entity])
         grant.assert_not_called()
         self.assertEqual(entity.db.skill_proficiency, {})
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_a_booking_whose_skill_is_no_longer_owned_grows_nothing(self):
+        # Ownership is revalidated when the standing booking settles: a skill
+        # lost while the booking stood is consumed without progression.
+        entity = BookingEntity(owned=())
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            WorldClock().advance(28800, AdvanceSource.SKIP, [entity])
+        grant.assert_not_called()
+        self.assertIsNone(entity.db.practice_booking)
 
 
 class WorldClockPersistenceTests(EvenniaTestCase):
@@ -513,6 +528,7 @@ class WorldClockAtomicityTests(EvenniaTest):
         )
         from world.skills.registry import SKILL_REGISTRY
 
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
         self.player.db.skill_proficiency = {"fire_arrow": 20.0}
         self.player.db.practice_booking = "fire_arrow"
         clock = get_world_clock()
@@ -533,6 +549,7 @@ class WorldClockAtomicityTests(EvenniaTest):
     def test_failed_advance_restores_consumed_booking_and_awarded_proficiency(self):
         from world.rules.clock import get_world_clock
 
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
         self.player.db.skill_proficiency = {"fire_arrow": 20.0}
         self.player.db.practice_booking = "fire_arrow"
         clock = get_world_clock()
@@ -641,10 +658,16 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_advance_skip_after_rollback_grows_nothing(self):
+    def test_advance_skip_after_rollback_settles_the_restored_booking(self):
         from world.rules.clock import get_world_clock
+        from world.rules.progression import (
+            PRACTICE_XP_PER_STUDY_HOUR,
+            practice_xp_amount,
+        )
         from world.rules.time_skip import advance_skip
+        from world.skills.registry import SKILL_REGISTRY
 
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
         self.player.db.skill_proficiency = {"fire_arrow": 20.0}
         self.player.db.practice_booking = "fire_arrow"
         clock = get_world_clock()
@@ -659,10 +682,15 @@ class WorldClockAtomicityTests(EvenniaTest):
         # The rollback restored the declared intent...
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
         # ...and an accepted unlabeled skip (the explore.wait adapter path)
-        # clears it before advancing: zero growth, nothing survives.
+        # settles it for its two whole hours instead of clearing it.
+        gain = 2 * PRACTICE_XP_PER_STUDY_HOUR * practice_xp_amount(
+            self.player, SKILL_REGISTRY["fire_arrow"]
+        )
         advance_skip(self.player, 7200)
         self.assertIsNone(self.player.db.practice_booking)
-        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+        self.assertAlmostEqual(
+            self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain
+        )
 
 
 class _FakeAttributeStore:
