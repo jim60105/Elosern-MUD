@@ -73,7 +73,12 @@
     "World/DreamPanel",
     "Core/IconTabs",
     "World/GradeGem",
-    "World/GuildRankCard"
+    "World/GuildRankCard",
+    "Core/WindowFrame",
+    "Core/MemberRail",
+    "Core/ListDetail",
+    "Core/ActionBar",
+    "Data/HoldingsStrip"
   ],
   "frozen": true
 }
