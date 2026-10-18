@@ -58,10 +58,17 @@ from world.rules.surfaces import attribute_snapshot
 
 # Move-observable attribute surfaces the settlement can write on the traverser
 # or the commander behind a possessed traverser, snapshotted directly (the
-# advance registry covers the remainder). ``quest_log`` and the destination
-# room's pin/state surfaces use the quest module's own helpers so the two
-# writers never drift.
-_TRAVERSER_SURFACES: tuple[str, ...] = ("map_knowledge",)
+# advance registry covers the remainder). ``wallet``/``inventory``/
+# ``guild_reward_claims`` are the AUTO quest-settlement payout surfaces the
+# arrival observation can write; ``quest_log`` and the destination room's
+# pin/state surfaces use the quest module's own helpers so the two writers
+# never drift.
+_TRAVERSER_SURFACES: tuple[str, ...] = (
+    "map_knowledge",
+    "wallet",
+    "inventory",
+    "guild_reward_claims",
+)
 
 
 @dataclass
@@ -223,20 +230,50 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     from world.rules.surfaces import restore_attributes, snapshot_attributes
 
     source = entity.location
+    source_wilderness = getattr(source, "wilderness", None)
+    # Capture before the move: the contrib deletes a recycled source room's
+    # active coordinates, so reading them afterwards yields None.
+    source_coordinates = (
+        source.coordinates if source_wilderness is not None else None
+    )
     snapshot = _snapshot_movement_state(
         entity,
         source,
         destination=destination,
         wilderness_coordinates=None,
-        wilderness_source_coordinates=None,
+        wilderness_source_coordinates=source_coordinates,
     )
     attrs = snapshot_attributes(entity, ("dialogue_session",))
     try:
         with transaction.atomic():
-            if not entity.move_to(destination, quiet=True, move_type="teleport"):
+            destination_wilderness = getattr(destination, "wilderness", None)
+            if destination_wilderness is not None:
+                # A terrain room is a pooled view over coordinates: a plain
+                # move_to runs the contrib's receive hook without the extra
+                # move kwargs and leaves the entity registered at its old
+                # cell. Gate explicitly, then enter through the provider API.
+                if not destination.at_pre_object_receive(entity, source):
+                    raise ConsoleError("invalid_argument", "movement_refused")
+                from evennia.contrib.grid.wilderness.wilderness import (
+                    enter_wilderness,
+                )
+
+                moved = enter_wilderness(
+                    entity,
+                    coordinates=destination.coordinates,
+                    name=destination_wilderness.db_key or WILDERNESS_NAME,
+                )
+            else:
+                moved = entity.move_to(destination, quiet=True, move_type="teleport")
+            if not moved:
                 raise ConsoleError("invalid_argument", "movement_refused")
             record_arrival(entity)
-            follow_companions(entity, source, destination=destination)
+            follow_companions(
+                entity,
+                source,
+                destination=destination,
+                wilderness_source_coordinates=source_coordinates,
+            )
             observe_arrival_lore(entity, destination)
             reanchor_home_on_gate_arrival(entity, destination)
             if isinstance(entity, PlayerCharacter) and source is not destination:
@@ -393,6 +430,7 @@ def _compensate(snapshot: MovementSnapshot) -> None:
     _compensate_home(snapshot)
     _compensate_companions(snapshot)
     _restore_wilderness_bookkeeping(snapshot)
+    _restore_wilderness_rooms(snapshot)
     _restore_surfaces(snapshot)
 
 
@@ -543,6 +581,78 @@ def _restore_wilderness_bookkeeping(snapshot: MovementSnapshot) -> None:
                 "rollback_restore_failed",
                 exc=error,
                 context={"stage": "movement_wilderness", "obj": "wilderness", "key": key},
+            )
+
+
+def _restore_wilderness_rooms(snapshot: MovementSnapshot) -> None:
+    """Reconcile room allocation, active coordinates, and registered occupants.
+
+    Restoring the bookkeeping dicts alone is not coherent: compensation may
+    have re-used a pooled room for a different coordinate (``move_obj`` pops
+    ``unused_rooms``), so the restored ``rooms`` map can name one room while
+    the party sits in another that claims the same coordinate. Re-bind every
+    snapshotted room to its recorded coordinate (or recycled state), then put
+    every registered entity into the room the restored map names, so
+    ``rooms[coordinates] is member.location`` holds after a rollback. Runs
+    after the dict restore and before the attribute surfaces; best-effort per
+    room and per entity, never masking the original failure.
+    """
+    wilderness = snapshot.wilderness
+    if wilderness is None:
+        return
+    rooms = snapshot.wilderness_rooms or {}
+    for coordinates, room in rooms.items():
+        if room is None:
+            continue
+        try:
+            room.ndb.wildernessscript = wilderness
+            room.ndb.active_coordinates = coordinates
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "movement_wilderness_room",
+                    "obj": str(room),
+                    "key": "active_coordinates",
+                },
+            )
+    for room in snapshot.wilderness_unused_rooms or []:
+        if room is None:
+            continue
+        try:
+            room.ndb.wildernessscript = wilderness
+            if getattr(room.ndb, "active_coordinates", None) is not None:
+                del room.ndb.active_coordinates
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "movement_wilderness_room",
+                    "obj": str(room),
+                    "key": "unused_rooms",
+                },
+            )
+    for entity, coordinates in (snapshot.wilderness_itemcoordinates or {}).items():
+        if entity is None:
+            continue
+        room = rooms.get(coordinates)
+        if room is None:
+            continue
+        try:
+            if entity.location is not room:
+                entity.location = room
+            entity.ndb.wilderness = wilderness
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "movement_wilderness_occupant",
+                    "obj": str(entity),
+                    "key": "location",
+                },
             )
 
 

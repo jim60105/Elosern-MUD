@@ -514,20 +514,6 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
         synchronize_session,
     )
 
-    try:
-        # A failed wilderness follow can leave the owner body location-less but
-        # registered; materialize it before Evennia's repuppet location restore.
-        _materialize_wilderness_location(player)
-    except Exception as error:
-        log_warn(
-            "possession_location_restore_failed",
-            exc=error,
-            context={
-                "char": str(getattr(player, "pk", "?")),
-                "step": "possession_materialize",
-            },
-        )
-
     for session in sessions:
         send_unpuppet_transition(session)
         retire_sequence(session)
@@ -809,6 +795,19 @@ def release_possession(
 
     # Lock rows in deterministic ascending order before side effects
     ids_to_lock = sorted([player.pk, resolved_npc.pk])
+    if reason != "disconnect":
+        try:
+            # A failed wilderness follow can leave the owner body location-less
+            # but registered. Materialize it in this committed preparation
+            # boundary, before the release transaction opens, so Evennia's
+            # repuppet never restores the body from a stale logout target or
+            # ``home`` and a later rollback cannot strand a rolled-back room.
+            _materialize_wilderness_location(player)
+        except Exception as error:
+            raise PossessionWriteError(
+                REASON_WRITE_FAILED,
+                f"Could not materialize the owner body's wilderness location: {error}",
+            ) from error
     control_before = snapshot_party_control(player, resolved_npc)
 
     try:

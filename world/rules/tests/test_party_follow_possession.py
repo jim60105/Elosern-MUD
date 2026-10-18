@@ -30,7 +30,12 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.map_knowledge import parse_knowledge, record_arrival
 from world.rules.party import FOLLOW_LOST_MESSAGE, follow_companions, join_party, party_ids
-from world.rules.possession import enter_possession, release_possession
+from world.rules.possession import (
+    REASON_RELEASE_REFUSED,
+    PossessionWriteError,
+    enter_possession,
+    release_possession,
+)
 from world.quests.room_observation import observe_room_entry
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
@@ -362,6 +367,50 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertIsNone(self.char1.db.possession)
         self.assertIsNone(self.npc.db.possessed_by)
 
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-"
+        "companion-s-room-presence"
+    )
+    def test_refused_release_keeps_the_materialized_body_and_retry_succeeds(self):
+        self.gate.at_traverse(self.npc, self.east_gate)
+        target = (ENTRY_XY[0] + 1, ENTRY_XY[1])
+        target_room = self._script()._create_room(target, self.npc)
+        with patch.object(target_room, "at_pre_object_receive", return_value=False):
+            self._exit("east").at_traverse(self.npc, self.npc.location)
+        self.assertIsNone(self.char1.location)
+
+        account = self.account
+        real_puppet_object = account.puppet_object
+
+        def _silent_refuse_return(session, obj):
+            if obj is self.char1:
+                return
+            real_puppet_object(session, obj)
+
+        with patch.object(account, "puppet_object", side_effect=_silent_refuse_return):
+            with self.assertRaises(PossessionWriteError) as context:
+                release_possession(self.char1, npc=self.npc, reason="handback")
+        self.assertEqual(context.exception.reason, REASON_RELEASE_REFUSED)
+
+        # The committed preparation boundary materialized the body at its
+        # registered cell before the transaction; the failed release restored
+        # the companion's occupied room and kept the possession recoverable.
+        self.assertIsNotNone(self.char1.location)
+        self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
+        self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
+        self.assertIsNotNone(self.char1.db.possession)
+        self.assertEqual(int(self.npc.db.possessed_by), int(self.char1.pk))
+        self.assertEqual(self.npc.location.coordinates, target)
+        self.assertIs(self.session.puppet, self.npc)
+
+        release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self.assertIs(self.session.puppet, self.char1)
+        self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
+        self.assertEqual(self.npc.location.coordinates, target)
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+
 
 class PossessedSettlementTests(PossessedFollowTestCase):
     def setUp(self):
@@ -407,9 +456,17 @@ class PossessedSettlementTests(PossessedFollowTestCase):
         import world.rules.party as party_module
 
         real_follow = party_module.follow_companions
+        self.char1.db.wallet = 7
+        self.char1.db.inventory = [{"key": "before"}]
+        self.char1.db.guild_reward_claims = ["before"]
 
         def follow_then_raise(*args, **kwargs):
             real_follow(*args, **kwargs)
+            # Simulate an AUTO quest completion's payout writes, which the
+            # arrival observation performs inside the settlement transaction.
+            self.char1.db.wallet = 99
+            self.char1.db.inventory = [{"key": "after"}]
+            self.char1.db.guild_reward_claims = ["after"]
             raise RuntimeError("post-follow step failed")
 
         before = self._tick()
@@ -425,6 +482,9 @@ class PossessedSettlementTests(PossessedFollowTestCase):
         self.assertEqual(int(self.npc.db.possessed_by), int(self.char1.pk))
         self.assertIsNone(self.char1.attributes.get("map_knowledge"))
         self.assertEqual(self.char1.attributes.get("quest_log"), [])
+        self.assertEqual(self.char1.db.wallet, 7)
+        self.assertEqual(self.char1.db.inventory, [{"key": "before"}])
+        self.assertEqual(self.char1.db.guild_reward_claims, ["before"])
 
     @covers_requirement(
         "companion-possession-transition::normal-possession-release-preserves-the-"
@@ -482,10 +542,19 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
         current = self._script().itemcoordinates[self.npc]
         bookkeeping = self._bookkeeping()
         before = get_world_clock().tick
+        knowledge_before = {visit.node_id for visit in parse_knowledge(self.char1)}
         possession_before = deepcopy(self.char1.db.possession)
 
         def traverse():
+            from world.rules.map_knowledge import record_arrival
+            from world.rules.movement import charge_movement
+
             self.assertTrue(self.npc.move_to(self.east_gate, quiet=True))
+            # The real success bookkeeping runs before the falsy return, so
+            # compensation must undo its clock charge and the body's arrival
+            # knowledge as well as the relocation.
+            charge_movement(self.npc, "wilderness_move")
+            record_arrival(self.npc)
             follow_companions(
                 self.npc,
                 source_room,
@@ -512,14 +581,20 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
         self.assertEqual(restored_bookkeeping[0], bookkeeping[0])
         self.assertEqual(restored_bookkeeping[1], bookkeeping[1])
         self.assertEqual(restored_bookkeeping[2], bookkeeping[2])
-        visited = {visit.node_id for visit in parse_knowledge(self.char1)}
-        self.assertIn(f"wild:{WILDERNESS_NAME}:{current[0]}:{current[1]}", visited)
+        self.assertEqual(
+            {visit.node_id for visit in parse_knowledge(self.char1)}, knowledge_before
+        )
+        script = self._script()
+        for member in (self.npc, self.char1, self.other):
+            self.assertIs(script.db.rooms[current], member.location)
+        for coordinates, room in script.db.rooms.items():
+            self.assertEqual(room.ndb.active_coordinates, coordinates)
 
     @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-"
         "relocation-and-reconciles-every-evennia-cache-surface"
     )
-    def test_teleport_to_a_wilderness_room_registers_the_body(self):
+    def test_teleport_to_a_wilderness_room_registers_the_whole_party(self):
         from world.rules.movement_settlement import settle_relocation
 
         self.gate.at_traverse(self.npc, self.east_gate)
@@ -532,8 +607,19 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
         self.assertIs(self.npc.location, target_room)
         self.assertEqual(self.char1.location.coordinates, target)
         self.assertEqual(self.other.location.coordinates, target)
-        self.assertEqual(self._script().itemcoordinates.get(self.char1), target)
+        itemcoordinates = self._script().itemcoordinates
+        for member in (self.npc, self.char1, self.other):
+            self.assertEqual(itemcoordinates.get(member), target)
         self.assertEqual(self.char1.db.possession, possession_before)
+
+        # The registrations are real: the next wilderness step keeps the
+        # whole party together through the same provider bookkeeping.
+        next_cell = (target[0] + 1, target[1])
+        step = [exit_obj for exit_obj in target_room.exits if exit_obj.key == "east"][0]
+        step.at_traverse(self.npc, target_room)
+        for member in (self.npc, self.char1, self.other):
+            self.assertEqual(member.location.coordinates, next_cell)
+            self.assertEqual(self._script().itemcoordinates.get(member), next_cell)
 
     @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-"
@@ -561,12 +647,17 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
 
         for member in (self.npc, self.char1, self.other):
             self.assertEqual(member.location.coordinates, ENTRY_XY)
-        self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
+            self.assertEqual(self._script().itemcoordinates.get(member), ENTRY_XY)
         self.assertEqual(self.char1.db.possession, possession_before)
         restored = self._bookkeeping()
         self.assertEqual(restored[0], bookkeeping[0])
         self.assertEqual(restored[1], bookkeeping[1])
         self.assertEqual(restored[2], bookkeeping[2])
+        script = self._script()
+        for member in (self.npc, self.char1, self.other):
+            self.assertIs(script.db.rooms[ENTRY_XY], member.location)
+        for coordinates, room in script.db.rooms.items():
+            self.assertEqual(room.ndb.active_coordinates, coordinates)
 
 
 if __name__ == "__main__":

@@ -432,6 +432,9 @@ def follow_companions(
     destination_had_companion = destination is not None and any(
         member.location is destination for member in members
     )
+    destination_wilderness = (
+        getattr(destination, "wilderness", None) if destination is not None else None
+    )
     body_arrived = not possessed
     left_behind: list[Any] = []
     for member in followers:
@@ -445,6 +448,18 @@ def follow_companions(
                     wilderness_name=wilderness_name,
                 )
                 body_arrived = moved
+            elif destination_wilderness is not None:
+                # A non-exit relocation into a wilderness room: a plain
+                # move_to would run the terrain room's receive hook, which
+                # re-routes an already-registered member to its old
+                # coordinates. Use the provider's coordinate API instead.
+                from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+                moved = enter_wilderness(
+                    member,
+                    coordinates=destination.coordinates,
+                    name=destination_wilderness.db_key or wilderness_name,
+                )
             elif destination is not None:
                 moved = member.move_to(destination, quiet=True)
                 if moved and member.ndb.wilderness is not None:
