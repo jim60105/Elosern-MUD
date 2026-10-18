@@ -816,9 +816,9 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-skill-book-offers-a-bounded-declared-practice-sub-screen",
+        "webclient-contextual-hud::the-skill-book-offers-a-practice-booking-control",
     )
-    def test_practice_subscreen_vitest_evidence_passes(self):
+    def test_practice_booking_control_vitest_evidence_passes(self):
         result = subprocess.run(
             [
                 "npx",
@@ -835,7 +835,7 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "practice-sub-screen Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "practice-booking-control Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

@@ -109,8 +109,17 @@ and the syntax and context SHALL match the curated command manifest in `tests/te
 
 - **WHEN** the drift contract test inspects the `rest` canonical entry
 - **THEN** the syntax row equals the manifest's `rest <duration> [practice <skill>]` form, the
-  description mentions hourly declared-practice settlement and the zero-growth plain rest, and
+  description mentions hourly declared-practice settlement, that a clause-less rest settles the
+  present members' standing bookings, and that it grows nothing only when no member has one, and
   the overview's rest row agrees
+
+#### Scenario: The practice entry documents the standing booking
+
+- **WHEN** the drift contract test inspects the `修煉` canonical entry
+- **THEN** its key is `修煉`, its alias set is `practice`, its syntax row equals the manifest's
+  `修煉 <技能> [= <成員>]` form, its context row equals the manifest context, its description
+  states that booking advances no time, settles by whole hours and refuses in combat, and the
+  overview carries a linked row naming the member clause
 
 #### Scenario: Admin commands carry their permission requirement
 
@@ -129,8 +138,9 @@ and the syntax and context SHALL match the curated command manifest in `tests/te
 - **WHEN** the `rest` documentation is authored
 - **THEN** the entry's syntax SHALL document the optional declared-practice clause
   (`rest <duration> [practice <skill>]`) and its description SHALL state that a declared practice
-  settles hourly proficiency for the owned, uncapped skill while an unlabeled rest advances time
-  with no growth
+  settles hourly proficiency for the owned, uncapped skill, that an unlabeled rest declares no new
+  practice but still settles the present members' standing bookings, and that it advances time
+  with no growth only when none stands
 - **AND** the curated manifest and the `docs/game/commands.md` rest row SHALL carry the same clause
 
 ### Requirement: Docsify navigation

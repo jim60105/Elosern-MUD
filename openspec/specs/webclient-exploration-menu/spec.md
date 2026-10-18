@@ -879,40 +879,52 @@ The wait card, opened from the place card's 等待 button, SHALL offer exactly t
 - **WHEN** the waiting surface is scoped
 - **THEN** the server-side skip maximum is unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
 
-### Requirement: explore.practice advances the clock for one declared skill
-The production action registry SHALL register `explore.practice` with a payload of exactly `skill` (a bounded non-space key of at most 64 characters) and `seconds` (the same positive-integer bound as the `explore.wait` `seconds` payload). The adapter SHALL recheck `evaluate_skip_safety(actor)` against current canonical state and the declared skill through the rules' practice preflight before any advance, with zero clock advance and no surviving practice booking on rejection.
+### Requirement: explore.practice books one declared skill for a member
+The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (a positive safe-integer party member id) and `skill` (a bounded non-space key of at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject an active combat session with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next SKIP advance that settles the member grows the booked skill.
 
 #### Scenario: Declared practice grows only the booked skill
-- **WHEN** a safe actor who owns an uncapped active skill submits `explore.practice` with that `skill` and `seconds: 7200`
-- **THEN** the clock advances exactly 7200 seconds with `AdvanceSource.SKIP`, only that skill's proficiency grows under the whole-hour settlement rule, and the full snapshot arrives at exactly one newer revision
+- **WHEN** the commander books companion 艾拉's uncapped active `healing_light` through `explore.practice` and then waits 7200 seconds with 艾拉 present
+- **THEN** the booking itself advances no time, the later SKIP advance grows only 艾拉's `healing_light` under the whole-hour settlement rule, and each action publishes a full snapshot at exactly one newer revision
 
 #### Scenario: Unknown or capped practice skills advance nothing
-- **WHEN** the submitted `skill` is unknown to the actor or already capped
-- **THEN** the result carries the stable code `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED` with a Traditional Chinese message, the clock is unchanged, and no practice booking survives the rejection
+- **WHEN** the submitted `skill` is unknown to the named member or already capped for that member
+- **THEN** the result carries the stable code `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED` with a Traditional Chinese message, the clock is unchanged, and the member's previous booking is unchanged
 
 #### Scenario: An ambiguous practice payload rejects at the validator
-- **WHEN** an `explore.practice` payload omits `skill` or `seconds`, carries an extra field, or carries `seconds` outside the documented bound
+- **WHEN** an `explore.practice` payload omits `actor_id` or `skill`, carries `seconds` or another extra field, or carries a non-integer `actor_id`
 - **THEN** the dispatcher rejects it with outcome `rejected` and stable code `malformed_payload` without invoking the adapter
 
-#### Scenario: A failed advance rolls back clock and booking
-- **WHEN** the shared skip advance raises after the booking was recorded
-- **THEN** the clock growth and the booking are both restored, the rejection renders without a partial practice grant, and no skill progression is applied
+#### Scenario: Booking in combat is refused
+- **WHEN** `explore.practice` arrives while the commander is in an active combat session
+- **THEN** it is rejected with `booking_in_combat` and no booking changes
 
-#### Scenario: Skip safety and skill preflight carry the stable rejection codes
-- **WHEN** the practice preflight runs before any advance
-- **THEN** a combat, hostility, or unsafe-location context rejects with the shared skip-safety rejection, and an unknown or capped skill rejects with the stable codes `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED`
+#### Scenario: A forged member is never replaced by the commander
+- **WHEN** `explore.practice` names an NPC outside the party
+- **THEN** it is rejected with `not_party_member` and the commander's booking is unchanged
 
-#### Scenario: Ownership and cap are revalidated at commit time
-- **WHEN** the practice action reaches commit
-- **THEN** skill ownership and cap are revalidated against current canonical state
+#### Scenario: Rebooking replaces the member's booking
+- **WHEN** a member with a standing booking for `healing_light` is booked for `mass_heal`
+- **THEN** the member's single booking now names `mass_heal`
 
 #### Scenario: The whole-hour settlement stage stays the sole practice writer
-- **WHEN** a practice advance succeeds
-- **THEN** the adapter performs exactly one `AdvanceSource.SKIP` advance carrying the booking, so the clock's existing whole-hour practice settlement stage remains the sole writer of practice progression — plain rest, sleep, and unlabeled skips grant nothing
+- **WHEN** a booking is recorded
+- **THEN** the adapter writes only the member's booking; practice progression is written only by the clock's whole-hour practice settlement stage on a later SKIP advance
+
+#### Scenario: A failed advance rolls back clock and booking
+- **WHEN** the later SKIP advance that settles a booking raises after settlement started
+- **THEN** the clock growth and the booking are both restored, and no skill progression is applied
+
+#### Scenario: Skip safety and skill preflight carry the stable rejection codes
+- **WHEN** the booking preflight runs
+- **THEN** an active combat session rejects with `booking_in_combat`, and an unknown or capped skill rejects with the stable codes `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED`; skip safety applies later to the skip that settles the booking
+
+#### Scenario: Ownership and cap are revalidated at commit time
+- **WHEN** the booking action reaches its write, and again when the settling SKIP advance runs
+- **THEN** skill ownership and cap are revalidated against current canonical state for the named member
 
 #### Scenario: Rejections clear stale bookings and success publishes one newer snapshot
-- **WHEN** the practice action finishes
-- **THEN** rejection paths clear a stale booking, and success publishes a full snapshot at exactly one newer revision whose summary line (prefixed 修煉結束。) reaches the narrative through the escaped text path
+- **WHEN** the booking action finishes
+- **THEN** rejection paths leave the member's previous booking unchanged, and success publishes a full snapshot at exactly one newer revision whose summary line names the member and the booked skill
 
 ### Requirement: Interaction publication and shared local target resolution use visible candidates
 The interaction target list SHALL include only room-content targets visible to the actor under the existing room view/search policy, applied before deterministic ordering and list limits, and Id-based exploration actions using the shared local-presence policy SHALL re-resolve through that same current visible candidate set. A previously published id SHALL NOT serve as continuing authorization.
