@@ -451,6 +451,9 @@ class CommandDocsContractTests(unittest.TestCase):
         return "\n".join(body)
 
     @covers_requirement("game-command-docs::complete-command-reference", "game-command-docs::drift-contract-test")
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
+    )
     def test_every_mounted_project_command_is_documented(self):
         manifest_keys = set(EXPECTED_COMMANDS)
         self.assertCountEqual(
@@ -890,6 +893,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::drift-contract-test")
     @covers_requirement(
         "party-item-transfer::text-clients-move-items-between-members"
+    )
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
     )
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)

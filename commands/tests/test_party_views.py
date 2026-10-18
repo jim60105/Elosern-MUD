@@ -28,6 +28,7 @@ from commands.party_views import (
     member_status_text,
     skills_text,
 )
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.party_view_selection import PartyViewSelection
@@ -152,6 +153,7 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             for row in group["skills"]
         }
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
     def test_status_default_names_the_commander_and_shows_the_breakdown(self):
         output = self.call(CmdMemberStatus(), "")
         self.assertEqual(output, member_status_text(self.commander))
@@ -165,6 +167,7 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertIn(head, output)
             self.assertIn(f"基礎 {_g(row.base)}", output)
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
     def test_a_disguised_companion_keeps_true_traits_and_labels_the_display(self):
         self.companion.db.disguised_stats = {"atk_phys": 999, "agility": 888}
         output = self.call(CmdMemberStatus(), "艾拉")
@@ -180,6 +183,9 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("攻擊：999（基礎", output)
         self.assertNotIn("敏捷：888（基礎", output)
 
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
+    )
     def test_possession_does_not_change_the_view(self):
         before = self.call(CmdMemberStatus(), "")
         enter_possession(self.commander, self.companion)
@@ -188,6 +194,7 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         explicit = self.call(CmdMemberStatus(), "艾拉", caller=self.companion)
         self.assertEqual(explicit, self.call(CmdMemberStatus(), "艾拉"))
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
     def test_a_non_member_is_refused_with_only_the_shared_message(self):
         output = self.call(CmdMemberStatus(), "不存在的人")
         self.assertEqual(output, PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER])
@@ -197,6 +204,7 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdMemberStatus(), "艾拉")
         self.assertIn("狀態：艾拉", output)
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
     def test_conditions_carry_duration_modifiers_and_source(self):
         buff_key = next(iter(SYNTH_BUFFS))
         rule = Rule(
@@ -218,6 +226,9 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn(f"合成苔幕｜剩餘 {duration} 秒｜來源：狀態", output)
         self.assertIn("合成疲勞｜持續｜防禦 -2｜來源：狀態", output)
 
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
     def test_skill_rows_match_the_v9_presenter_facts(self):
         grant_lineage(
             self.commander,
@@ -276,6 +287,9 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             ]["next"]
         )
 
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
     def test_ladder_matches_the_v9_selected_skill(self):
         grant_lineage(
             self.companion,
@@ -295,6 +309,9 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                     f"{rung['label']} 需 Lv.{rung['unlock_level']}", output
                 )
 
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
     def test_member_view_keys_and_aliases_are_unique_in_the_character_cmdset(self):
         cmdset = CharacterCmdSet()
         for token, key in (
@@ -307,10 +324,17 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertEqual(len(owners), 1, f"{token!r} is not uniquely owned")
             self.assertEqual(owners[0].key, key)
 
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
     def test_skill_helper_equals_the_command_output(self):
         output = self.call(CmdMemberSkills(), "")
         self.assertEqual(output, skills_text(self.commander))
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
     def test_both_views_write_nothing(self):
         grant_lineage(
             self.companion,
@@ -325,6 +349,12 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(_attribute_state(self.companion), before)
         self.assertEqual(read_world_clock(), clock_before)
 
+    @covers_requirement(
+        "party-member-text-views::技能-shows-a-member-s-skills-and-growth"
+    )
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
+    )
     def test_skill_session_marks_survive_possession(self):
         grant_lineage(self.commander, [T_EMBER, T_HUSH])
         grant_lineage(
@@ -359,6 +389,7 @@ class MemberViewCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             companion_before,
         )
 
+    @covers_requirement("party-member-text-views::狀態-shows-a-member-s-true-status")
     def test_both_views_resolve_in_active_combat(self):
         from typeclasses.monsters import Monster
         from world.rules.combat_session import engage
