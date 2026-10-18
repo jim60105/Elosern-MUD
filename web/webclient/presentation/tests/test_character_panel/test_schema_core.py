@@ -22,7 +22,7 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertEqual(normalized["kind"], "character")
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_condition_rows_are_exact_and_bounded(self):
         # A buff row and an indefinite rule row round-trip verbatim, including
         # the rulebook's authored percentage-string adjustment.
@@ -84,7 +84,7 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_member_id_is_a_positive_safe_integer(self):
         for bad in (0, -1, True, 1.5, "7", None):
             with self.subTest(bad=bad):
@@ -92,7 +92,7 @@ class CharacterSchemaTests(unittest.TestCase):
                     validate_character(_valid_panel(member_id=bad))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_version_four_payloads_reject_everywhere(self):
         # The transitional v4 tolerance is closed (render-equipment-
         # breakdown-webclient): a v4 payload rejects on the version gate,
@@ -108,7 +108,7 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_v5_trait_layer_validation_is_exact(self):
         normalized = validate_character(
             _valid_panel(traits=[_trait(layers=[_layer()])])
@@ -165,7 +165,7 @@ class CharacterSchemaTests(unittest.TestCase):
                     validate_character(_valid_panel(traits=[contradiction]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_v5_equipment_rows_require_the_adjustment_summary(self):
         normalized = validate_character(
             _valid_panel(equipment=[_equipment_row(adjustment="攻擊 −2｜防禦 ＋8")])

@@ -1484,7 +1484,7 @@ The equipment presentation SHALL be built from the committed `character` panel's
 - **THEN** it shows its display name and its slot only, with no attack, defence, rarity, item icon, summary, or comparison value
 
 ### Requirement: The character-status drawer degrades section by section and never substitutes a disguise
-The character-status drawer SHALL present the committed `status` panel's resources and its complete condition roster in every mode, because that panel is available in every mode. It SHALL present the committed `character` panel's true traits, guild standing, and persona background, and SHALL mark each of those sections with the registry-owned reason when the `character` panel is unavailable — as it is outside exploration mode — rather than hiding the drawer or inventing a value.
+The character-status drawer SHALL present the committed `status` panel's resources and its complete condition roster in every mode, and the committed `character` panel's true traits and guild standing plus the committed `party_member` panel's persona prose and intimate state for the viewed member. Each section SHALL carry the registry-owned reason when its panel is unavailable rather than hiding the drawer or inventing a value.
 
 #### Scenario: Equipment and wallet belong to the inventory drawer
 - **WHEN** the character-status drawer renders
@@ -1499,7 +1499,7 @@ The character-status drawer SHALL present the committed `status` panel's resourc
 - **THEN** the drawer renders the displayed values beside the true trait rows they describe, distinctly labelled, together with the statement that a disguise affects display, registration and identification only and that combat always resolves against true values; a displayed value never replaces a true trait row
 
 #### Scenario: The 親密狀態 disclosure is preserved in place
-- **WHEN** the committed `character` panel's `intimate` field is present, and when it is `null` or the panel is unavailable
+- **WHEN** the committed `party_member` panel's intimate section is present, and when it is `null` or the panel is unavailable
 - **THEN** the drawer renders the collapsed-by-default 親密狀態 disclosure widget — added by the archived intimate-status change — immediately after the 偽裝 (disguise) section and before the 背景 (persona) section, and no change removes it, reorders it, or alters its disclosure widget, content, or collapsed default; like the persona area it spans the full row of the section grid; with `intimate` null or the panel unavailable the section is absent from the DOM, exactly as the merged main spec requires; this change removes only the equipment and wallet sections
 
 #### Scenario: Every section names itself in the shared treatment
@@ -1527,8 +1527,8 @@ The character-status drawer SHALL present the committed `status` panel's resourc
 - **THEN** it renders as a wrapped row of rounded pill badges, one per condition, each carrying that condition's label, its visible severity word, its non-colour severity glyph, and its duration/modifier text — the same content the roster shows today, none of it dropped — coloured per severity using the same severity-to-colour mapping the capped status-island condition chips use elsewhere in the HUD; these presentation rules apply identically whether a section is fully populated or marked with a registry-owned unavailable reason
 
 #### Scenario: The drawer is useful in combat
-- **WHEN** the committed mode is combat, so the `character` panel is unavailable
-- **THEN** the drawer opens and renders the `status` resources and the complete condition roster, and marks the trait, guild and persona sections with the registry-owned reason without a wallet or equipment placeholder
+- **WHEN** the committed mode is combat
+- **THEN** the drawer opens and renders the `status` resources, the complete condition roster, and the trait, guild and persona sections from the `character` and `party_member` panels, which stay available in combat, without a wallet or equipment placeholder
 
 #### Scenario: Conditions are never colour-only
 - **WHEN** the condition roster renders a committed condition
@@ -1539,7 +1539,7 @@ The character-status drawer SHALL present the committed `status` panel's resourc
 - **THEN** the drawer renders each displayed value beside the true trait row it describes with an explicit label, states that combat resolves against true values, and shows no true row replaced by a displayed one
 
 #### Scenario: The intimate section is preserved in place
-- **WHEN** the character-status drawer renders with the `character` panel available and its `intimate` field present
+- **WHEN** the character-status drawer renders with the `party_member` panel available and its intimate section present
 - **THEN** the drawer renders the 親密狀態 disclosure collapsed by default immediately after the 偽裝 section and before the 背景 section, and this change leaves it unchanged
 
 #### Scenario: Every section states what it is

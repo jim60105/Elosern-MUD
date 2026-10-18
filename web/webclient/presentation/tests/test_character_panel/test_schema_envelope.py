@@ -213,7 +213,7 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_maximal_condition_rows_fit_the_envelope(self):
         # The newly added section's own maximal legal payload (32 rows, a
         # 128-code-point label, 16 modifier pairs and a 32-code-point source)
