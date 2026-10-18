@@ -21,6 +21,8 @@ var MAX_FULL_TITLE_CODE_POINTS = C.MAX_FULL_TITLE_CODE_POINTS;
 var MAX_COST_KEYS = C.MAX_COST_KEYS;
 var TARGET_SPECS = C.TARGET_SPECS;
 var SEVERITIES = C.SEVERITIES;
+var FREEFORM_SCALES_ALLOWED = C.FREEFORM_SCALES_ALLOWED;
+var FREEFORM_LABELS_ALLOWED = C.FREEFORM_LABELS_ALLOWED;
 
 // ---------------------------------------------------------------------------
 // character panel v1 validators (mirror of
@@ -62,6 +64,10 @@ var CHARACTER_MAX_CONDITION_SOURCE = 32;
 var CHARACTER_MAX_MODIFIER_TEXT = 16;
 // The closed origin vocabulary (mirror of CONDITION_SOURCE_LABELS).
 var CHARACTER_CONDITION_SOURCES = ["裝備", "狀態", "裝備、狀態", "未知"];
+// v9 selected-skill bounds (mirror of web.webclient.presentation.character):
+// each lineage side is bounded, and the ladder is the closed canonical table.
+var CHARACTER_MAX_SELECTED_LINEAGE_ROWS = 8;
+var CHARACTER_MAX_FREEFORM_LADDER_RUNGS = 5;
 
 function validateCharacterKey(value, field) {
   var key = validateIdentifier(value, field);
@@ -199,6 +205,100 @@ function validateCharacterActiveSkillRow(value) {
   }
   return value;
 }
+
+function validateCharacterLineageEdge(value, levelField) {
+  requireExactFields(value, "lineage edge", ["key", "label", levelField], []);
+  validateCharacterKey(value.key, "lineage key");
+  var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+  if (!label.trim()) {
+    throw new Error("lineage edge label must be non-empty");
+  }
+  requireInt(value[levelField], levelField, 1, MAX_SAFE_INTEGER);
+  return value;
+}
+
+function validateCharacterLineage(value) {
+  requireExactFields(value, "lineage", ["prerequisites", "next"], []);
+  [
+    ["prerequisites", "level"],
+    ["next", "min_level"],
+  ].forEach(function (pair) {
+    var rows = value[pair[0]];
+    if (!Array.isArray(rows) || rows.length > CHARACTER_MAX_SELECTED_LINEAGE_ROWS) {
+      throw new Error(
+        pair[0] +
+          " must be a list of at most " +
+          CHARACTER_MAX_SELECTED_LINEAGE_ROWS +
+          " edges"
+      );
+    }
+    rows.forEach(function (row) {
+      validateCharacterLineageEdge(row, pair[1]);
+    });
+  });
+  return value;
+}
+
+function validateCharacterFreeformLadder(value) {
+  if (
+    !Array.isArray(value) ||
+    value.length !== CHARACTER_MAX_FREEFORM_LADDER_RUNGS
+  ) {
+    throw new Error(
+      "freeform_ladder must carry exactly " +
+        CHARACTER_MAX_FREEFORM_LADDER_RUNGS +
+        " rungs"
+    );
+  }
+  value.forEach(function (entry, index) {
+    if (!isPlainObject(entry)) {
+      throw new Error("freeform_ladder rung must be an object");
+    }
+    var hasCost = Object.prototype.hasOwnProperty.call(entry, "mp_cost");
+    var hasLevel = Object.prototype.hasOwnProperty.call(entry, "unlock_level");
+    if (hasCost === hasLevel) {
+      throw new Error(
+        "a freeform_ladder rung carries exactly one of mp_cost and unlock_level"
+      );
+    }
+    var levelField = hasCost ? "mp_cost" : "unlock_level";
+    requireExactFields(entry, "freeform_ladder rung", ["scale", "label", levelField], []);
+    if (entry.scale !== FREEFORM_SCALES_ALLOWED[index]) {
+      throw new Error("freeform_ladder must be in canonical ascending scale order");
+    }
+    if (entry.label !== FREEFORM_LABELS_ALLOWED[index]) {
+      throw new Error(
+        "freeform_ladder label must be the canonical label of its scale"
+      );
+    }
+    if (hasCost) {
+      requireInt(entry.mp_cost, "mp_cost", 0, MAX_SAFE_INTEGER);
+    } else {
+      // The entry rung unlocks at level 0, so a locked rung's level is >= 1.
+      requireInt(entry.unlock_level, "unlock_level", 1, MAX_SAFE_INTEGER);
+    }
+  });
+  return value;
+}
+
+function validateCharacterSelectedSkill(value) {
+  if (value === null) {
+    return null;
+  }
+  requireExactFields(
+    value,
+    "selected skill",
+    ["key", "lineage"],
+    ["freeform_ladder"]
+  );
+  validateCharacterKey(value.key, "selected skill key");
+  validateCharacterLineage(value.lineage);
+  if (Object.prototype.hasOwnProperty.call(value, "freeform_ladder")) {
+    validateCharacterFreeformLadder(value.freeform_ladder);
+  }
+  return value;
+}
+
 
 function validateCharacterSkillGroup(value, rowValidator) {
   requireExactFields(value, "skill group", ["group", "label", "skills"], []);
@@ -395,6 +495,7 @@ function validateCharacterAvailablePanel(payload) {
       "disguise",
       "guild",
       "wallet",
+      "selected_skill",
     ],
     ["full_title"]
   );
@@ -416,6 +517,7 @@ function validateCharacterAvailablePanel(payload) {
     throw new Error("character panel must be available with kind character");
   }
   requireInt(payload.member_id, "member_id", 1, MAX_SAFE_INTEGER);
+  validateCharacterSelectedSkill(payload.selected_skill);
   if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
     throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
   }
@@ -480,6 +582,7 @@ function validateCharacterAvailablePanel(payload) {
     disguise: payload.disguise,
     guild: payload.guild,
     wallet: payload.wallet,
+    selected_skill: payload.selected_skill,
   };
   if (fullTitle !== null) {
     result.full_title = fullTitle;
@@ -518,10 +621,13 @@ module.exports = {
   CHARACTER_MAX_CONDITION_SOURCE: CHARACTER_MAX_CONDITION_SOURCE,
   CHARACTER_MAX_MODIFIER_TEXT: CHARACTER_MAX_MODIFIER_TEXT,
   CHARACTER_CONDITION_SOURCES: CHARACTER_CONDITION_SOURCES,
+  CHARACTER_MAX_SELECTED_LINEAGE_ROWS: CHARACTER_MAX_SELECTED_LINEAGE_ROWS,
+  CHARACTER_MAX_FREEFORM_LADDER_RUNGS: CHARACTER_MAX_FREEFORM_LADDER_RUNGS,
   validateCharacterPanel: validateCharacterPanel,
   validateCharacterTraitRow: validateCharacterTraitRow,
   validateCharacterConditionRow: validateCharacterConditionRow,
   validateCharacterEquipmentRow: validateCharacterEquipmentRow,
   validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
   validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
+  validateCharacterSelectedSkill: validateCharacterSelectedSkill,
 };

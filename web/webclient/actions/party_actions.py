@@ -41,7 +41,7 @@ from world.rules.party_scope import (
 from world.rules.unlock_notices import mark_unlocks_seen
 
 _TRANSFER_FIELDS = frozenset({"giver_id", "receiver_id", "item_key", "quantity"})
-_VIEW_MEMBER_FIELDS = frozenset({"member_id", "tab"})
+_VIEW_MEMBER_FIELDS = frozenset({"member_id", "tab", "skill_key"})
 
 
 class PartyActionError(ValueError):
@@ -58,12 +58,23 @@ def _member_id(value: Any, field: str) -> int:
     return value
 
 
-def _item_key(value: Any) -> str:
+def _bounded_key(value: Any, field: str) -> str:
     """The shared whitespace-free bounded key, as a party-action rejection."""
     try:
-        return _require_key_identifier(value, "item_key", MAX_KEY_CODE_POINTS)
+        return _require_key_identifier(value, field, MAX_KEY_CODE_POINTS)
     except ServiceActionError as error:
         raise PartyActionError(str(error)) from error
+
+
+def _item_key(value: Any) -> str:
+    return _bounded_key(value, "item_key")
+
+
+def _skill_key(value: Any) -> str | None:
+    """The selected 技能-tab skill key: a bounded key, or null for none."""
+    if value is None:
+        return None
+    return _bounded_key(value, "skill_key")
 
 
 def _quantity(value: Any) -> int:
@@ -128,7 +139,7 @@ def validate_party_view_member_payload(payload: Any) -> dict[str, Any]:
         raise PartyActionError("party.view_member payload must be an object")
     if set(payload) != _VIEW_MEMBER_FIELDS:
         raise PartyActionError(
-            "party.view_member requires exactly member_id and tab"
+            "party.view_member requires exactly member_id, tab and skill_key"
         )
     tab = payload["tab"]
     if not isinstance(tab, str) or tab not in TABS:
@@ -136,6 +147,7 @@ def validate_party_view_member_payload(payload: Any) -> dict[str, Any]:
     return {
         "member_id": _member_id(payload["member_id"], "member_id"),
         "tab": tab,
+        "skill_key": _skill_key(payload["skill_key"]),
     }
 
 
@@ -173,7 +185,9 @@ def _party_view_member_adapter(
             "code": REASON_NOT_PARTY_MEMBER,
             "message": PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER],
         }
-    select_party_view(session, commander_id, member_id, payload["tab"])
+    select_party_view(
+        session, commander_id, member_id, payload["tab"], payload["skill_key"]
+    )
     if payload["tab"] == "skills":
         mark_unlocks_seen(session, member_id)
     return _success(

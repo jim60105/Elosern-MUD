@@ -177,6 +177,22 @@ export const CHARACTER_PANEL_SAMPLE = {
   },
    guild: { rank: "E", merit: 140 },
    wallet: 3240,
+  // The one 技能-tab selection: lineage position plus the full ladder (rungs
+  // above the member's proficiency carry their unlock level, never a cost).
+  selected_skill: {
+    key: "fireball",
+    lineage: {
+      prerequisites: [{ key: "firebolt", label: "火矢", level: 1 }],
+      next: [{ key: "firestorm", label: "火風暴", min_level: 3 }],
+    },
+    freeform_ladder: [
+      { scale: 0.25, label: "1/4", mp_cost: 4 },
+      { scale: 0.5, label: "1/2", mp_cost: 7 },
+      { scale: 1, label: "1", mp_cost: 14 },
+      { scale: 2, label: "2", unlock_level: 6 },
+      { scale: 4, label: "4", unlock_level: 10 },
+    ],
+  },
  };
 
 // The same member without a disguise and without a guild — the honest

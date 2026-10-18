@@ -498,6 +498,7 @@ function validCharacterPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
+      selected_skill: null,
     },
     overrides || {}
   );

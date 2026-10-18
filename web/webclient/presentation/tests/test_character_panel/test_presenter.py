@@ -76,12 +76,15 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return build_production_registry()
 
 
-    def _render(self, *, actor=None, member=None, unlocks=None):
+    def _render(self, *, actor=None, member=None, unlocks=None, skill_key=None, tab="status"):
         """Render the panel for ``member`` as the session's viewed member."""
+        viewed = member or self.player
         selection = (
             None
-            if member is None
-            else PartyViewSelection(int(self.player.pk), int(member.pk), "status")
+            if member is None and skill_key is None
+            else PartyViewSelection(
+                int(self.player.pk), int(viewed.pk), tab, skill_key
+            )
         )
         context = PresentationContext(
             actor=actor or self.player,
@@ -279,6 +282,69 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         payload = self._render()
         self.assertIs(payload["available"], True)
         self.assertEqual(dict(self.player.db.skill_proficiency), before)
+
+    def test_the_selected_skill_carries_its_lineage_position(self):
+        selected = self._render(skill_key=T_EMBER, tab="skills")["selected_skill"]
+        self.assertEqual(selected["key"], T_EMBER)
+        self.assertEqual(selected["lineage"], {"prerequisites": [], "next": []})
+        # A non-master sees no ladder at all (the field is omitted).
+        self.assertNotIn("freeform_ladder", selected)
+
+    def test_a_mastery_owner_sees_the_full_ladder_with_locked_rungs(self):
+        grant_lineage(
+            self.player,
+            [T_EMBER],
+            [T_STEADY, _element_mastery_key()],
+            rungs={T_EMBER: 3},
+        )
+        ladder = self._render(skill_key=T_EMBER)["selected_skill"]["freeform_ladder"]
+        self.assertEqual(
+            [rung["scale"] for rung in ladder], [0.25, 0.5, 1.0, 2.0, 4.0]
+        )
+        # The kit burst's Lv.3 ceiling unlocks 0.25/0.5/1.0 only; each rung
+        # scales the actor's effective cost (12 MP minus the kit dagger's 5%).
+        self.assertEqual([rung["mp_cost"] for rung in ladder[:3]], [3, 6, 11])
+        self.assertEqual([rung["unlock_level"] for rung in ladder[3:]], [6, 10])
+        for rung in ladder:
+            self.assertNotEqual("mp_cost" in rung, "unlock_level" in rung)
+
+    def test_an_unowned_or_unknown_selection_reports_null(self):
+        # A passive, an unowned active key and an unregistered key all publish
+        # no detail (the panel never invents one for another member's skill).
+        for key in (T_STEADY, "no_such_skill"):
+            with self.subTest(key=key):
+                self.assertIsNone(self._render(skill_key=key)["selected_skill"])
+
+    def test_a_departed_members_selection_never_follows_the_commander(self):
+        companion = self._companion()
+        companion.db.skills = {"active": [T_EMBER], "passive": []}
+        selected = self._render(member=companion, skill_key=T_EMBER)["selected_skill"]
+        self.assertEqual(selected["key"], T_EMBER)
+        from world.rules.party import leave_party
+
+        leave_party(companion, self.player, "dismissal")
+        fallback = self._render(member=companion, skill_key=T_EMBER)
+        self.assertEqual(fallback["member_id"], int(self.player.pk))
+        # The commander owns the same key, but the selection named the
+        # departed member: the detail must not attach to the fallback member.
+        self.assertIsNone(fallback["selected_skill"])
+
+    def test_possession_keeps_the_selected_skill(self):
+        from world.rules.possession import enter_possession, release_possession
+
+        companion = self._companion()
+        companion.db.skills = {"active": [T_EMBER], "passive": []}
+        before = self._render(member=companion, skill_key=T_EMBER)
+        possessor = self._companion("卡恩")
+        self.player.location = self.room1
+        enter_possession(self.player, possessor)
+        try:
+            while_possessing = self._render(
+                actor=possessor, member=companion, skill_key=T_EMBER
+            )
+        finally:
+            release_possession(self.player)
+        self.assertEqual(while_possessing, before)
 
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")

@@ -1622,7 +1622,11 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
             "request_id": "r1",
             "base_revision": coordinator.revision,
             "action_id": "party.view_member",
-            "payload": {"member_id": int(companion.pk), "tab": "skills"},
+            "payload": {
+                "member_id": int(companion.pk),
+                "tab": "skills",
+                "skill_key": None,
+            },
         }
 
         handle_ui_action(
@@ -1650,6 +1654,9 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         member_panel = last["panels"]["party_member"]
         self.assertEqual(member_panel["member_id"], int(companion.pk))
         self.assertEqual(member_panel["role"], "companion")
+        # The character panel is republished for the viewed member too.
+        self.assertEqual(last["panels"]["character"]["member_id"], int(companion.pk))
+        self.assertIsNone(last["panels"]["character"]["selected_skill"])
         # The dispatcher publishes presentation first and the result second, at
         # the same revision (action-dispatch's completion contract).
         self.assertEqual(results[-1]["presentation_revision"], last["revision"])

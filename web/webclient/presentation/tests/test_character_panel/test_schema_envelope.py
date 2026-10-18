@@ -1,7 +1,7 @@
 """Character panel schema tests: byte-envelope, label/value bounds, and intimate-field validation."""
 from tools.spec_traceability import covers_requirement
 import unittest
-from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_CONDITION_ROWS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_FULL_TITLE_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_MODIFIER_KEYS, MAX_PASSIVE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
+from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_CONDITION_ROWS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_FULL_TITLE_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_MODIFIER_KEYS, MAX_PASSIVE_ROWS, MAX_SELECTED_LINEAGE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
 from ._support import _active_row, _skill_categories, _trait, _valid_panel
 
@@ -10,15 +10,18 @@ class CharacterSchemaTests(unittest.TestCase):
 
     def test_maximal_payload_fits_the_envelope(self):
         # Every section is present with its row count at its cap, and every
-        # active row carries its growth facts plus the registry detail. The
-        # per-stat layer lists stay empty: the pre-existing D10 contract bounds
-        # the envelope by serialized size (a simultaneous maximum of 32 traits
-        # x 16 layers x 128-code-point names cannot conform at all), so this
-        # fixture pins the v9 additions at full row counts instead.
+        # active row carries its growth facts plus the registry detail; the
+        # selected skill carries both eight-edge lineage lists and the full
+        # ladder. Text uses long labels rather than the per-field maximum: the
+        # pre-existing D10 contract bounds the envelope by serialized size (a
+        # simultaneous maximum of 32 traits x 16 layers x 128-code-point names
+        # cannot conform at all), so this fixture pins the v9 additions at full
+        # row counts.
+        label = "很長的屬性名稱" * 2
         traits = [
             _trait(
                 key=f"trait_{i}",
-                label="很長的屬性名稱" * 3,
+                label=label,
                 current=1000,
                 effective=1000,
                 max=None if i % 2 else 1000,
@@ -28,7 +31,7 @@ class CharacterSchemaTests(unittest.TestCase):
         conditions = [
             {
                 "code": f"condition_{i}",
-                "label": "很長的狀態名稱" * 3,
+                "label": label,
                 "severity": "beneficial",
                 "remaining_seconds": 30,
                 "modifiers": {
@@ -41,15 +44,15 @@ class CharacterSchemaTests(unittest.TestCase):
         actives = [
             {
                 "category": f"cat_{c}",
-                "label": "很長的主動技能分類" * 3,
+                "label": label,
                 "groups": [
                     {
                         "group": f"group_{c}",
-                        "label": "很長的子分類名稱" * 3,
+                        "label": label,
                         "skills": [
                             _active_row(
                                 f"active_{i}",
-                                label="很長的主動技能名稱" * 3,
+                                label=label,
                                 level=9,
                                 xp_into_level=49,
                                 xp_to_next_level=1,
@@ -67,13 +70,13 @@ class CharacterSchemaTests(unittest.TestCase):
         passives = [
             {
                 "category": f"cat_{c}",
-                "label": "很長的被動技能分類" * 3,
+                "label": label,
                 "groups": [
                     {
                         "group": None,
                         "label": None,
                         "skills": [
-                            {"key": f"passive_{i}", "label": "很長的主動技能名稱" * 3}
+                            {"key": f"passive_{i}", "label": label}
                             for i in range(c, MAX_PASSIVE_ROWS, MAX_CATEGORY_GROUPS)
                         ],
                     }
@@ -85,13 +88,13 @@ class CharacterSchemaTests(unittest.TestCase):
             {
                 "slot": "weapon_main",
                 "item_key": f"item_{i}",
-                "display_name": "很長的裝備名稱" * 3,
+                "display_name": label,
                 "adjustment": "",
             }
             for i in range(MAX_EQUIPMENT_ROWS)
         ]
         displayed = [
-            {"key": f"stat_{i}", "label": "很長的顯示數值名稱" * 3, "value": 1000}
+            {"key": f"stat_{i}", "label": label, "value": 1000}
             for i in range(MAX_DISPLAYED_ROWS)
         ]
         payload = _valid_panel(
@@ -101,6 +104,34 @@ class CharacterSchemaTests(unittest.TestCase):
             passives=passives,
             equipment=equipment,
             full_title="長" * MAX_FULL_TITLE_CODE_POINTS,
+            selected_skill={
+                "key": "active_0",
+                "lineage": {
+                    "prerequisites": [
+                        {
+                            "key": f"parent_{i}",
+                            "label": "長" * (MAX_LABEL_CODE_POINTS // 2),
+                            "level": 1,
+                        }
+                        for i in range(MAX_SELECTED_LINEAGE_ROWS)
+                    ],
+                    "next": [
+                        {
+                            "key": f"child_{i}",
+                            "label": "長" * (MAX_LABEL_CODE_POINTS // 2),
+                            "min_level": 1,
+                        }
+                        for i in range(MAX_SELECTED_LINEAGE_ROWS)
+                    ],
+                },
+                "freeform_ladder": [
+                    {"scale": 0.25, "label": "1/4", "mp_cost": 3},
+                    {"scale": 0.5, "label": "1/2", "mp_cost": 6},
+                    {"scale": 1, "label": "1", "mp_cost": 11},
+                    {"scale": 2, "label": "2", "unlock_level": 6},
+                    {"scale": 4, "label": "4", "unlock_level": 10},
+                ],
+            },
             disguise={
                 "active": True,
                 "description": "偽裝中的描述文字" * 10,

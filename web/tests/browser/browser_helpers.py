@@ -1388,6 +1388,7 @@ def valid_character_panel(**overrides) -> dict:
         "disguise": {"active": False, "description": "", "displayed": []},
         "guild": {"rank": "銀牌", "merit": 120},
         "wallet": 3240,
+        "selected_skill": None,
     }
     panel.update(overrides)
     return panel

@@ -353,6 +353,7 @@ def _valid_panel(**overrides):
         },
         "guild": {"rank": None, "merit": 0},
         "wallet": 100,
+        "selected_skill": None,
     }
     value.update(overrides)
     return value

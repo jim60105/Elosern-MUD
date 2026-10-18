@@ -38,22 +38,34 @@ class PartyViewSelection:
     commander_id: int
     member_id: int
     tab: str
+    #: The skill selected in the 技能 tab, or ``None``. The server never
+    #: resolves it here: the ``character`` panel publishes detail only for a
+    #: key the viewed member actually owns.
+    skill_key: str | None = None
 
 
 def select_party_view(
-    session: Any, commander_id: int, member_id: int, tab: str
+    session: Any,
+    commander_id: int,
+    member_id: int,
+    tab: str,
+    skill_key: str | None = None,
 ) -> None:
     """Record one authorized selection for this session.
 
     The caller has already re-derived the commander and re-checked membership
     through the rules boundary; recording never authorizes anything by itself.
-    A direct call without a session records nothing.
+    ``skill_key`` is the already-validated bounded key of the skill selected in
+    the 技能 tab (or ``None``). A direct call without a session records nothing.
     """
     ndb = getattr(session, "ndb", None)
     if ndb is None:
         return
     ndb.party_view = PartyViewSelection(
-        int(commander_id), int(member_id), str(tab)
+        int(commander_id),
+        int(member_id),
+        str(tab),
+        None if skill_key is None else str(skill_key),
     )
 
 
@@ -108,11 +120,34 @@ def resolve_viewed_member(context: Any) -> Any | None:
     return commander
 
 
+def selected_skill_key_for(context: Any, member: Any) -> str | None:
+    """The selected 技能-tab skill key when the selection names ``member``.
+
+    Both effectiveness checks apply: the selection must be bound to the
+    commander this session presents (the same rule
+    :func:`resolve_viewed_member` applies), and its member must be the member
+    the panel resolved. A selection left over from a member who left the party
+    therefore never attaches its skill detail to the commander. The returned
+    key is still unvalidated: the panel publishes detail only for an active
+    skill the viewed member actually owns.
+    """
+    selection = getattr(context, "party_view", None)
+    if not isinstance(selection, PartyViewSelection) or member is None:
+        return None
+    commander = _commander(getattr(context, "actor", None))
+    if commander is None or selection.commander_id != int(commander.pk):
+        return None
+    if selection.member_id != int(member.pk):
+        return None
+    return selection.skill_key
+
+
 __all__ = [
     "NDB_ATTRIBUTE",
     "TABS",
     "PartyViewSelection",
     "party_view_selection_snapshot",
     "resolve_viewed_member",
+    "selected_skill_key_for",
     "select_party_view",
 ]
