@@ -217,8 +217,17 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(saved["outcome"], "draft")
         self.assertTrue(saved["ok"])
+        # Every other required actor is already selected, so the commander's
+        # later submission is the draft's own final confirmation and nothing
+        # else can explain an incomplete result.
+        ally_saved = submit_player_action(
+            self.commander, BASIC_ATTACK_KEY, [monster], commanded_actor=self.kahn
+        )
+        self.assertEqual(ally_saved["outcome"], "draft")
+        self.assertTrue(ally_saved["ok"])
         record = read_session(self.commander)
         self.assertIn(self.aila.pk, record.draft_entries)
+        self.assertIn(self.kahn.pk, record.draft_entries)
         tick_before = self.clock.tick
 
         # Equipping the probed immunity accessory invalidates the saved entry's
@@ -240,11 +249,14 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(submitted["outcome"], "draft")
         self.assertNotEqual(submitted.get("reason"), "stale_draft_version")
         self.assertFalse(submitted["is_complete"])
+        # The re-equipped member is the ONLY missing actor: the invalidation,
+        # not an unfilled draft, is what stops the round.
+        self.assertEqual(submitted["missing_actors"], (self.aila.pk,))
+        self.assertEqual(set(submitted["reselection_reasons"]), {self.aila.pk})
         self.assertEqual(
             submitted["reselection_reasons"][self.aila.pk]["reason"],
             "status_blocked",
         )
-        self.assertIn(self.aila.pk, submitted["missing_actors"])
 
         settled = read_session(self.commander)
         self.assertNotIn(self.aila.pk, settled.draft_entries)
