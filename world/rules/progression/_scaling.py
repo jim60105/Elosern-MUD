@@ -9,6 +9,7 @@ changes no import-time behavior).
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from math import floor, isfinite
 from typing import Any
 
@@ -217,6 +218,66 @@ def freeform_scale_entries_for(actor: Any, skill: Any) -> tuple[tuple[float, str
         for scale, label in FREEFORM_CAST_SCALES
         if scale in allowed
     )
+
+
+@dataclass(frozen=True, slots=True)
+class FreeformLadderRung:
+    """One advertised 威力 rung of the freeform ladder.
+
+    ``mp_cost`` is the server-computed cost a cast at this scale would charge,
+    and is ``None`` while the skill's own proficiency has not unlocked the
+    rung. ``unlock_level`` is the canonical proficiency level that unlocks it,
+    and is ``None`` for an unlocked rung: exactly one of the two is ever set.
+    """
+
+    scale: float
+    label: str
+    mp_cost: int | None
+    unlock_level: int | None
+
+
+def freeform_ladder_for(actor: Any, skill: Any) -> tuple[FreeformLadderRung, ...]:
+    """Return the canonical ladder rungs with their cost or locking level.
+
+    Empty for a non-elemental or ineligible skill and for an actor without
+    direct mastery ownership of the skill's element, so the freeform feature
+    stays invisible to non-masters. Every rung of the closed canonical table is
+    listed in ascending order: an unlocked rung carries the same
+    server-computed ``mp_cost`` :func:`freeform_scale_entries_for` advertises
+    (one cost path, so the advertised cost can never diverge), and a locked
+    rung carries its canonical ``unlock_level`` from the proficiency-anchored
+    ladder. The unlocked subset is exactly :func:`freeform_scales_for`'s set,
+    which is bounded by the skill's derived tip cap: a rung above that cap
+    stays locked at its canonical threshold and never advertises a cost the
+    resolver would reject. A ladder that does not cover every canonical scale
+    fails loudly instead of advertising a rung with no unlock level. Never
+    writes entity state.
+    """
+    if not is_freeform_eligible(skill) or skill.element is None:
+        return ()
+    if not freeform_mastery_entitled(actor, skill.element.key):
+        return ()
+    unlocked = {
+        scale: mp_cost
+        for scale, _label, mp_cost in freeform_scale_entries_for(actor, skill)
+    }
+    levels = dict(FREEFORM_SCALE_LADDER)
+    rungs: list[FreeformLadderRung] = []
+    for scale, label in FREEFORM_CAST_SCALES:
+        if scale not in levels:
+            raise ValueError(
+                f"freeform scale ladder does not cover canonical scale {scale:g}"
+            )
+        mp_cost = unlocked.get(scale)
+        rungs.append(
+            FreeformLadderRung(
+                scale=scale,
+                label=label,
+                mp_cost=mp_cost,
+                unlock_level=None if mp_cost is not None else levels[scale],
+            )
+        )
+    return tuple(rungs)
 
 
 def scale_label_for(scale: float) -> str | None:

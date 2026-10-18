@@ -4,7 +4,7 @@ Total estimate: **7 hours**, including implementation, focused verification, doc
 
 ## 1. Rules reads (2h)
 
-- [ ] 1.1 Add `freeform_ladder_for` and a lineage-position read; verify unit tests for a mastery owner with locked rungs (unlock levels from a synthetic anchored ladder), a non-master (no ladder), a zero adjusted cost, and prerequisite/next lists for a two-parent merge node.
+- [x] 1.1 Add `freeform_ladder_for` and a lineage-position read; verify unit tests for a mastery owner with locked rungs (unlock levels from a synthetic anchored ladder), a non-master (no ladder), a zero adjusted cost, and prerequisite/next lists for a two-parent merge node.
 
 ## 2. character v9 rows and selected skill (3.5h)
 

@@ -70,11 +70,13 @@ from world.rules.progression._scales import (  # noqa: F401
 from world.rules.npc_identity import npc_display_name
 from world.rules.unlock_notices import COMPANION_UNLOCK_LINE, UnlockNotice
 from world.rules.progression._scaling import (  # noqa: F401
+    FreeformLadderRung,
     MAGIC_TIER_THRESHOLDS,
     _affinity_elements,
     _validate_nonnegative_multiplier,
     _validate_scale_inputs,
     element_affinity_multiplier,
+    freeform_ladder_for,
     freeform_mastery_entitled,
     freeform_scale_entries_for,
     freeform_scales_for,

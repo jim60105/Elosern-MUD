@@ -3,6 +3,7 @@ synthetic mastery/skill lookups they drive.
 """
 from tools.spec_traceability import covers_requirement
 from dataclasses import replace
+import importlib
 from unittest.mock import patch
 import unittest
 from evennia.utils.create import create_object
@@ -24,6 +25,7 @@ from world.rules.progression import (
     FREEFORM_SCALE_LADDER,
     FREEFORM_SCALE_VALUES,
     _load_freeform_cast_scales,
+    freeform_ladder_for,
     freeform_mastery_entitled,
     freeform_scale_entries_for,
     freeform_scales_for,
@@ -34,7 +36,7 @@ from world.rules.progression import (
 )
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.handler import ConferredSkillGrant
-from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.skills.registry import SkillCategory, SkillKind, SkillPrerequisite, TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS
 from .._combat_session_helpers import (
     _monster_tier_key,
@@ -314,3 +316,148 @@ class FreeformScaleEntriesForTests(EvenniaTestCase):
             [c for _, _, c in entries],
             [scaled_mp_cost(base_mp, s) for s, _, _ in entries],
         )
+
+
+# A file-local five-rung anchored ladder: the shipped ladder is authored
+# progression data, so the numeric examples below run on these fixed rows
+# instead of approving the shipped thresholds.
+_SYNTHETIC_LADDER = ((0.25, 0), (0.5, 1), (1.0, 2), (2.0, 4), (4.0, 6))
+
+
+def _live_registry():
+    """The CURRENT registry binding (the synthetic scope rebinds the name)."""
+    return importlib.import_module("world.skills.registry").SKILL_REGISTRY
+
+
+def _revalidate_live() -> None:
+    registry = importlib.import_module("world.skills.registry")
+    registry.validate_prerequisite_graph(registry.SKILL_REGISTRY)
+
+
+def _ceiling_row():
+    """One file-local passive consuming the kit spell at Lv.3 (its tip cap)."""
+    return replace(
+        _mastery_row(),
+        key="t_ladder_ceiling",
+        label="合成階梯上限",
+        description="把合成火花的熟練度上限壓在第三級的合成被動。",
+        prerequisites=(SkillPrerequisite(_T_CAST.key, 3),),
+    )
+
+
+class FreeformLadderForTests(EvenniaTestCase):
+    """The advertised ladder lists every canonical rung, locked or priced."""
+
+    def setUp(self):
+        # Cleanup order is LIFO: register the revalidation BEFORE opening the
+        # scope so it runs after the scope restores the kit registry.
+        self.addCleanup(_revalidate_live)
+        _open_scope(self)
+        super().setUp()
+        self.entity = _player()
+        self.entity.db.skills = {"active": [], "passive": []}
+
+    def _entitled(self, level: int):
+        grant_lineage(
+            self.entity,
+            [_T_CAST.key],
+            [_mastery_key()],
+            rungs={_T_CAST.key: level},
+        )
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_master_sees_every_rung_with_a_cost_or_its_unlock_level(self):
+        self._entitled(3)
+        base_mp = int(_T_CAST.cost["mp"])
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
+        ):
+            rungs = freeform_ladder_for(self.entity, _T_CAST)
+        self.assertEqual(
+            [(rung.scale, rung.label) for rung in rungs],
+            list(FREEFORM_CAST_SCALES),
+        )
+        levels = dict(_SYNTHETIC_LADDER)
+        for rung in rungs:
+            with self.subTest(scale=rung.scale):
+                if levels[rung.scale] <= 3:
+                    self.assertEqual(rung.mp_cost, scaled_mp_cost(base_mp, rung.scale))
+                    self.assertIsNone(rung.unlock_level)
+                else:
+                    self.assertIsNone(rung.mp_cost)
+                    self.assertEqual(rung.unlock_level, levels[rung.scale])
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_without_mastery_or_eligibility_there_is_no_ladder(self):
+        self.entity.db.skills = _owned(_T_CAST)
+        self.assertEqual(freeform_ladder_for(self.entity, _T_CAST), ())
+        _granted_mastery_only(self.entity)
+        self.assertEqual(freeform_ladder_for(self.entity, _T_CAST), ())
+        # A mastery row is not freeform-eligible, so it advertises nothing.
+        self.entity.db.skills = _owned(_mastery_row())
+        self.assertEqual(freeform_ladder_for(self.entity, _mastery_row()), ())
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_zero_adjusted_cost_keeps_unlocked_rungs_free(self):
+        self._entitled(3)
+        with (
+            patch(
+                "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+                _SYNTHETIC_LADDER,
+            ),
+            patch(
+                "world.rules.progression._scaling.evaluate_combat_modifiers_no_create",
+                lambda actor: {"mp_cost": "-100%"},
+            ),
+        ):
+            rungs = freeform_ladder_for(self.entity, _T_CAST)
+        levels = dict(_SYNTHETIC_LADDER)
+        unlocked = [rung for rung in rungs if levels[rung.scale] <= 3]
+        locked = [rung for rung in rungs if levels[rung.scale] > 3]
+        self.assertEqual([rung.mp_cost for rung in unlocked], [0] * len(unlocked))
+        self.assertEqual([rung.unlock_level for rung in locked], [4, 6])
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_incomplete_anchored_ladder_fails_loud(self):
+        self._entitled(3)
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER[:3],
+        ):
+            with self.assertRaises(ValueError):
+                freeform_ladder_for(self.entity, _T_CAST)
+
+    @covers_requirement(
+        "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
+    )
+    def test_rungs_above_the_derived_tip_cap_stay_locked(self):
+        consumer = _ceiling_row()
+        registry = _live_registry()
+        registry[consumer.key] = consumer
+        _revalidate_live()
+        # Inflated XP cannot unlock past the cap: the unlocked set is the
+        # resolver's own set, bounded by the Lv.3 ceiling this row declares.
+        self._entitled(10)
+        base_mp = int(_T_CAST.cost["mp"])
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
+        ):
+            rungs = freeform_ladder_for(self.entity, _T_CAST)
+        levels = dict(_SYNTHETIC_LADDER)
+        for rung in rungs:
+            with self.subTest(scale=rung.scale):
+                if levels[rung.scale] <= 3:
+                    self.assertEqual(rung.mp_cost, scaled_mp_cost(base_mp, rung.scale))
+                else:
+                    self.assertIsNone(rung.mp_cost)
+                    self.assertEqual(rung.unlock_level, levels[rung.scale])
