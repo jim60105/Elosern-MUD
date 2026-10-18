@@ -228,6 +228,19 @@ describe("SkillBook (skillbook-authoritative-casting master–detail book)", () 
     expect(requests().at(-1)[0].skill_key).toBe(FIRESTORM.key);
   });
 
+  it("retries the selection once the shared dispatch gate opens", async () => {
+    // The live store refuses a dispatch while another action is in flight; the
+    // book re-asks when the gate clears instead of leaving the row without its
+    // ladder until another selection.
+    const w = mountBook({ useLocked: true });
+    expect(w.emitted("select-skill")).toHaveLength(1);
+    await w.setProps({ useLocked: false });
+    expect(w.emitted("select-skill")).toHaveLength(2);
+    expect(w.emitted("select-skill").at(-1)).toEqual([
+      { member_id: SKILLS_SLICE_SAMPLE.member_id, skill_key: FIREBOLT.key },
+    ]);
+  });
+
   it("emits one use intent for an exploration field skill and nothing while locked", async () => {
     const w = mountBook();
     await w.get('[data-testid="skill-book__use"]').trigger("click");

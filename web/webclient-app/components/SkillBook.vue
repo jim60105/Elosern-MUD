@@ -213,7 +213,15 @@ function requestSelectedSkill() {
   emit("select-skill", { member_id: memberId.value, skill_key: entry.row.key });
 }
 watch(
-  [selectedKey, isActiveTab, () => props.skills?.selected_skill?.key],
+  [
+    selectedKey,
+    isActiveTab,
+    () => props.skills?.selected_skill?.key,
+    // A request refused by the shared dispatch gate (another action in
+    // flight) is retried when the gate opens; the committed-key guard keeps
+    // an already-satisfied selection from resending.
+    () => props.useLocked,
+  ],
   requestSelectedSkill,
   { flush: "post", immediate: true }
 );

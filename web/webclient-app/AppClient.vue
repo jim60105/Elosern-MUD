@@ -98,7 +98,7 @@ const {
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
   npcPersonaRetry, npcPersonaClose,
-  onSkillUse, skillUseDockShown, skillUseLocked,
+  onSkillUse, onViewSkill, skillUseDockShown, skillUseLocked,
   compassRef, compassTargets, compassArrivalKey, compassBusy, compassActive,
   readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked, onRailHover,
   railRef, railMounted, railShown, presenceCardOpen, personFocus, focusTarget, focusPortrait,

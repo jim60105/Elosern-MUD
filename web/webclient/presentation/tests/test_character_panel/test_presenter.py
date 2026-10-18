@@ -248,7 +248,10 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         fresh = self._render(
             unlocks={member_id: MemberUnlocks(True, frozenset({T_EMBER}))}
         )
-        self.assertIs(self._active_row(fresh, T_EMBER)["fresh"], True)
+        fresh_row = self._active_row(fresh, T_EMBER)
+        self.assertIs(fresh_row["fresh"], True)
+        # The unlock made the skill usable; it holds no own practice XP yet.
+        self.assertEqual(fresh_row["level"], 0)
         other_active = _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY")
         self.assertIs(self._active_row(fresh, other_active)["fresh"], False)
         # A reconnect starts a new session: the copied unlock snapshot is empty.

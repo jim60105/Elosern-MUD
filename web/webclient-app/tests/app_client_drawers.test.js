@@ -319,6 +319,40 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(true);
   });
 
+  it("asks the server for the selected skill's detail when the book opens", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            character: characterPanelWithSkillSlice(),
+            services: SERVICES_PANEL_SAMPLE,
+            party: PARTY_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    const requests = () =>
+      sender.sent.actions.filter((envelope) => envelope.action_id === "party.view_member");
+    // The book's initial row is not the committed selection: one request.
+    expect(requests()).toHaveLength(1);
+    expect(requests()[0].payload).toEqual({
+      member_id: SKILLS_SLICE_SAMPLE.member_id,
+      tab: "skills",
+      skill_key: "firebolt",
+    });
+  });
+
   it("leaves the inventory drawer subtitle blank when the character panel is unavailable", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();

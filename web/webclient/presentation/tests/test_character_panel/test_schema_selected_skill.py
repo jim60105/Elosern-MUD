@@ -115,6 +115,13 @@ class SelectedSkillSchemaTests(unittest.TestCase):
             validate_character(
                 _valid_panel(selected_skill=_selected(freeform_ladder=relabelled))
             )
+        # A boolean is an int in Python but never a canonical scale.
+        boolean_scale = [dict(rung) for rung in _LADDER]
+        boolean_scale[2]["scale"] = True
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(selected_skill=_selected(freeform_ladder=boolean_scale))
+            )
 
     def test_each_rung_carries_exactly_one_of_cost_and_level(self):
         both = [dict(rung) for rung in _LADDER]

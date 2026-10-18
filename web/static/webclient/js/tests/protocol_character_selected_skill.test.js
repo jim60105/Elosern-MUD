@@ -124,6 +124,13 @@ test("the ladder is the canonical five rungs in order", () => {
   assert.throws(() =>
     Protocol.validateCharacterPanel(panel(selectedSkill({ freeform_ladder: relabelled })))
   );
+  const booleanScale = LADDER.map(function (rung) {
+    return Object.assign({}, rung);
+  });
+  booleanScale[2].scale = true;
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(panel(selectedSkill({ freeform_ladder: booleanScale })))
+  );
 });
 
 test("each rung carries exactly one of mp_cost and unlock_level", () => {

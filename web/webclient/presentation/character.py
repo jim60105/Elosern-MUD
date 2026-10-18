@@ -617,7 +617,14 @@ def _validate_freeform_ladder(value: Any) -> list[dict[str, Any]]:
             )
         level_field = "mp_cost" if has_cost else "unlock_level"
         _require_exact_fields(entry, "freeform_ladder rung", {"scale", "label", level_field}, {})
-        if entry["scale"] != scale:
+        scale_value = entry["scale"]
+        # A boolean is an int in Python but never a scale; the JS mirror's
+        # strict comparison rejects it too.
+        if (
+            isinstance(scale_value, bool)
+            or not isinstance(scale_value, (int, float))
+            or scale_value != scale
+        ):
             raise CharacterPanelError(
                 "freeform_ladder must be in canonical ascending scale order"
             )

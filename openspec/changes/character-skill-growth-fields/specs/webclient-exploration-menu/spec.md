@@ -116,7 +116,7 @@ Each active skill row of the version-9 `character` panel SHALL carry exactly the
 
 #### Scenario: A newly unlocked skill is fresh
 - **WHEN** 艾拉 unlocked 群體治癒 this session and the viewed member is 艾拉
-- **THEN** the 群體治癒 row has `fresh: true` and level 1, and after a reconnect it has `fresh: false`
+- **THEN** the 群體治癒 row has `fresh: true` and level 0 (the unlock made it usable; it holds no own practice XP yet), and after a reconnect it has `fresh: false`
 
 #### Scenario: A booked skill is flagged
 - **WHEN** the viewed member has a standing booking for 冰錐術
