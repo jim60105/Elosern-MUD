@@ -119,7 +119,7 @@ NPC 可選擇回信，送達不代表必定收到回覆。回信寄出後另需�
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包、背包與角色數值構成（與角色面板同源）。 |
-| [`使用`](/game/command-reference?id=使用) | 使用一件持有物品，可帶一個目標名稱；戰鬥中只確認你自己那筆指令，完整回合確認後才在結算時消耗道具與一個回合。同伴背包中的物品改用 `combat command <actor-token> item <item_key>`。 |
+| [`使用`](/game/command-reference?id=使用) | 使用一件持有物品，可帶一個目標名稱，並可用 `= <成員>` 指定同行的隊伍成員（物品從該成員自己的背包消耗、自身效果綁定該成員，倒地的同伴會被拒絕）；戰鬥中只存入該成員的那筆指令（未指定時是你自己的），完整回合確認後才在結算時消耗道具與一個回合。 |
 | [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備，物品可用登錄鍵或顯示名稱指定，並可用 `= <成員>` 指定同行的隊伍成員（倒地的同伴也可以）；免費動作，飾品上限 5 件。 |
 | [`拿`](/game/command-reference?id=拿) | 撿起地上的物品，登錄物品會同步計入背包清單。 |
 | [`丟`](/game/command-reference?id=丟) | 丟棄背包中的物品，登錄物品的背包清單記錄會同步移除。 |

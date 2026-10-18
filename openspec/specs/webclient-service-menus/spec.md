@@ -297,7 +297,7 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
   or drop action
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-The existing service action allowlist and exact bounded payloads SHALL remain. Party member references SHALL appear only in their owning capability's exact member field. guild.quest_abandon SHALL revalidate the authenticated owner and referenced record. Active private escort records MAY abandon without a guild host through the quest-owned compensated operation; ordinary guild counter actions retain existing host/eligibility gates. No other new action ID or host authority field SHALL be added.
+The existing service action allowlist and exact bounded payloads SHALL remain. A party member reference SHALL appear only in the exact member-scoped `actor_id` its owning capability defines, reauthorized by the rules and never replaced by the commander. `guild.quest_abandon` SHALL revalidate the authenticated owner and record; an active private escort MAY abandon without a guild host through the quest-owned compensated operation. No other action ID or authority field SHALL be added.
 
 #### Scenario: Existing registration reaches its deterministic API once
 - **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
@@ -328,13 +328,12 @@ The existing service action allowlist and exact bounded payloads SHALL remain. P
 - **THEN** the adapter re-resolves and rechecks the local merchant before calling deterministic economy settlement
 
 #### Scenario: Inventory use submits only item key
-- **WHEN** a client submits `inventory.use` with one item key
-- **THEN** the adapter resolves current actor mode and delegates to the matching deterministic item-use facade exactly once
+- **WHEN** a client submits `inventory.use` with one item key and the user's `actor_id`
+- **THEN** the adapter reauthorizes the member, resolves current mode and delegates to the matching deterministic item-use facade exactly once
 
 #### Scenario: Inventory toggle submits only item key
 - **WHEN** a client submits `inventory.toggle_equip` with one item key and the member's `actor_id`
-- **THEN** the adapter reauthorizes the member, never substitutes the commander, and delegates to
-  deterministic equipment toggle without accepting a client-selected slot
+- **THEN** the adapter reauthorizes the member and delegates to deterministic equipment toggle without accepting a client-selected slot
 
 #### Scenario: Authority-like fields can never be supplied
 - **WHEN** any service or inventory action contains an actor-like field outside its exact member reference, or a host, session, effect, or slot-like field
@@ -356,7 +355,7 @@ The existing service action allowlist and exact bounded payloads SHALL remain. P
 
 #### Scenario: Inventory actions carry only a bounded item key
 - **WHEN** an `inventory.use` or `inventory.toggle_equip` payload is validated
-- **THEN** its `item_key` is a 1..64-character non-empty string, `inventory.toggle_equip` accepts exactly `actor_id` and `item_key`, and `inventory.use` keeps its exact item and optional target fields
+- **THEN** its `item_key` is a 1..64-character non-empty string, `inventory.toggle_equip` accepts exactly `actor_id` and `item_key`, and `inventory.use` accepts exactly `actor_id`, `item_key` and an optional `target_key`
 
 #### Scenario: Adapters are session-scoped and re-resolve everything
 - **WHEN** a service adapter runs

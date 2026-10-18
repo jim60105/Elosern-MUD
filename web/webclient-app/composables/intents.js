@@ -38,10 +38,11 @@ export function useIntentHandlers(store, dispatchIntent) {
   // In combat the item use belongs to the commanded actor
   // (webclient-party-items-tactics): the drawer's activation enters the same
   // item review/target/combat.command flow the card's 道具 frame opens, so the
-  // actorless `inventory.use` is never dispatched there. Inspection and the
-  // drawer's equipment toggles stay free and unchanged; each toggle already
-  // carries the controlled figure's `actor_id` (party-member-equipment), which
-  // this seam forwards untouched for the server to reauthorize.
+  // `inventory.use` is never dispatched there. Inspection and the drawer's
+  // equipment toggles stay free and unchanged; both the use and the toggle
+  // carry the controlled figure's `actor_id` (companion-field-item-use,
+  // party-member-equipment), which this seam forwards untouched for the
+  // server to reauthorize.
   function onInventoryItemAction(intent) {
     if (intent.action_id === "inventory.use" && store.view.mode === "combat") {
       // The bag shows the controlled player's own items, which diverge from

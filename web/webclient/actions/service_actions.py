@@ -10,7 +10,10 @@ identity against current canonical state, calls only the listed public
 deterministic APIs, and never assigns ``.db`` attributes, traits, registration,
 rank, merit, quest log, wallet, inventory, merchant stock, or location
 directly. No payload accepts an actor, host, branch, session, price, stock, or
-wallet field, and no action routes through the text command parser.
+wallet field; a party member reference appears only in the exact member field
+its owning capability defines (``inventory.use`` and
+``inventory.toggle_equip`` ``actor_id``), and no action routes through the
+text command parser.
 """
 
 from typing import Any
@@ -25,10 +28,7 @@ from world.quests.runtime import (
     QuestTransitionError,
     set_quest_tracked,
 )
-from world.rules.combat_session import (
-    SessionReason,
-    is_in_active_session,
-)
+from world.rules.combat_session import SessionReason
 from world.rules.economy import TradeError, buy, sell
 from world.rules.equipment_effects import toggle_equipment_message
 from world.rules.event_log import render_plain_text
@@ -49,10 +49,19 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
-from world.rules.items import use_item
 from world.rules.npc_identity import npc_display_name
 from world.rules.npc_schedules import interaction_reason
-from world.rules.party_inventory import PartyScopeError, toggle_member_equipment
+from world.rules.party_inventory import (
+    PartyScopeError,
+    toggle_member_equipment,
+    use_member_item,
+)
+from world.rules.party_scope import (
+    PURPOSE_ACT,
+    authorize_member,
+    party_in_combat,
+    resolve_commander,
+)
 from world.rules.player_messages import session_reason_message
 from world.rules.service_messages import (
     exam_schedule_message,
@@ -210,10 +219,28 @@ def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
     return text
 
 
-def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``inventory.use`` payload (item key plus optional target).
+def _require_member_identifier(value: Any) -> int:
+    """Require one positive safe integer member identity.
 
-    Accepted forms are exactly ``{item_key}`` or ``{item_key, target_key}``.
+    A bool is an int subclass, so it is excluded explicitly; a string, float,
+    zero, negative, or out-of-range identity never reaches the party boundary.
+    """
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= MAX_SAFE_INTEGER
+    ):
+        raise ServiceActionError("actor_id must be a positive safe integer")
+    return value
+
+
+def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``inventory.use`` payload (member, key, target).
+
+    Accepted forms are exactly ``{actor_id, item_key}`` or
+    ``{actor_id, item_key, target_key}``. ``actor_id`` names the member who
+    uses the item from that member's own bag (reauthorized for the acting
+    purpose in the adapter) and is never replaced by the commander.
     ``target_key`` names *whom* an effect reaches and never *what* the item
     does (add-item-effect-targeting): it is consumed only by an effect the
     rulebook already scoped to a single entity, and a token the adapter
@@ -223,14 +250,18 @@ def validate_inventory_use_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """
     if not isinstance(payload, dict):
         raise ServiceActionError("payload must be an object")
-    unknown = set(payload) - {"item_key", "target_key"}
+    unknown = set(payload) - {"actor_id", "item_key", "target_key"}
     if unknown:
         raise ServiceActionError(f"payload has unknown fields {sorted(unknown)}")
-    if "item_key" not in payload:
-        raise ServiceActionError("payload requires item_key")
-    validated = {"item_key": _require_key_identifier(
-        payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
-    )}
+    missing = {"actor_id", "item_key"} - set(payload)
+    if missing:
+        raise ServiceActionError(f"payload requires {sorted(missing)}")
+    validated = {
+        "actor_id": _require_member_identifier(payload["actor_id"]),
+        "item_key": _require_key_identifier(
+            payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
+        ),
+    }
     if "target_key" in payload:
         validated["target_key"] = _require_key_identifier(
             payload["target_key"], "target_key", MAX_KEY_CODE_POINTS
@@ -253,15 +284,8 @@ def validate_inventory_toggle_equip_payload(payload: dict[str, Any]) -> dict[str
     missing = {"actor_id", "item_key"} - set(payload)
     if missing:
         raise ServiceActionError(f"payload requires {sorted(missing)}")
-    actor_id = payload["actor_id"]
-    if (
-        isinstance(actor_id, bool)
-        or not isinstance(actor_id, int)
-        or not 1 <= actor_id <= MAX_SAFE_INTEGER
-    ):
-        raise ServiceActionError("actor_id must be a positive safe integer")
     return {
-        "actor_id": actor_id,
+        "actor_id": _require_member_identifier(payload["actor_id"]),
         "item_key": _require_key_identifier(
             payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
         ),
@@ -541,12 +565,14 @@ def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
     Only the exploration path reaches this helper: during an active combat
     session ``inventory.use`` rejects before any resolution, because a party
     session's item selections are actor-scoped draft entries saved through the
-    guarded ``combat.command`` path. The actor's current location's contents
-    are the world view. An unresolvable token — an unknown key or a group
-    shorthand — travels on as the raw string, where the deterministic
-    preflight's fail-closed target guard rejects it with the stable
-    invalid-target reason: the client can never select a reach the rulebook
-    did not grant.
+    guarded ``combat.command`` path. ``actor`` is the member who uses the item
+    (never the commander behind it), so the world view is that member's
+    current location's contents — the same room the party boundary already
+    proved it shares with the commander. An unresolvable token — an unknown
+    key or a group shorthand — travels on as the raw string, where the
+    deterministic preflight's fail-closed target guard rejects it with the
+    stable invalid-target reason: the client can never select a reach the
+    rulebook did not grant.
     """
     location = getattr(actor, "location", None)
     if location is not None:
@@ -557,32 +583,50 @@ def _resolve_inventory_target(actor: Any, target_key: str) -> Any:
 
 
 def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Resolve actor mode and delegate one item use to its deterministic facade.
+    """Reauthorize one member and delegate its item use to the member rule.
 
-    During an active combat session the request rejects before any target
-    resolution: a party session's items are actor-scoped draft entries, so only
-    the guarded ``combat.command`` path may save one member's item selection.
-    In exploration the request settles with its canonical six-second world cost
-    through ``use_item``. Success always publishes a full snapshot (empty
-    affected-panel set).
+    During an active combat session the request rejects before any member or
+    target resolution: a party session's items are actor-scoped draft entries,
+    so only the guarded ``combat.command`` path may save one member's item
+    selection. In exploration ``actor_id`` is reauthorized for the acting
+    purpose, so a forged, absent, or knocked-out member rejects with the shared
+    party code and the authenticated actor is never used in its place; the item
+    is then consumed from that member's own bag, SELF effects bind to it, and
+    the canonical six-second cost settles the present party. Success always
+    publishes a full snapshot (empty affected-panel set).
 
-    An optional ``target_key`` names whom a single-scope effect reaches; it
-    never changes what the item does, and a self-scoped item ignores it
-    exactly as the rulebook's scopes dictate.
+    An optional ``target_key`` names whom a single-scope effect reaches; it is
+    resolved relative to the member's own room, never changes what the item
+    does, and a self-scoped item ignores it exactly as the rulebook's scopes
+    dictate.
     """
     del session
-    if is_in_active_session(actor):
+    if party_in_combat(actor):
         # Deliberately before target resolution: an in-combat request must not
-        # resolve, consume, mutate or advance anything.
+        # resolve, consume, mutate or advance anything. The party-wide check
+        # also covers a session persisted under the actor's commander.
         return _session_rejected(SessionReason.COMBAT_ITEM_COMMAND_REQUIRED)
     item_key = payload["item_key"]
-    target = (
-        _resolve_inventory_target(actor, payload["target_key"])
-        if "target_key" in payload
-        else None
-    )
-    settlement = use_item(actor, item_key, target=target)
-    result = settlement.result
+    try:
+        member = authorize_member(
+            resolve_commander(actor),
+            payload["actor_id"],
+            PURPOSE_ACT,
+            anchor=actor,
+        )
+        target = (
+            _resolve_inventory_target(member, payload["target_key"])
+            if "target_key" in payload
+            else None
+        )
+        outcome = use_member_item(actor, payload["actor_id"], item_key, target=target)
+    except PartyScopeError as error:
+        return {
+            "outcome": "rejected",
+            "code": error.reason,
+            "message": error.message,
+        }
+    result = outcome.settlement.result
     if result.outcome != "success":
         return _rejected(result.reason)
     message = render_plain_text(result.event_log)

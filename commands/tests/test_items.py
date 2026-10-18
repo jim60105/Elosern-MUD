@@ -21,6 +21,7 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
+from commands.combat import CmdCombatCommand
 from commands.items import CmdToggleEquip, CmdUseItem
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -39,6 +40,7 @@ from world.rules.items import ItemUseReason
 from world.rules.party import join_party
 from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
+    REASON_MEMBER_CANNOT_ACT,
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
 )
@@ -211,7 +213,11 @@ class _ItemsCommandBase(EvenniaCommandTest):
 
 class ExplorationUseTests(_ItemsCommandBase):
     def test_usage_hints_without_arguments(self):
-        self.call(CmdUseItem(), "", "用法：使用 <item_key>")
+        self.call(
+            CmdUseItem(),
+            "",
+            "用法：使用 <item_key> [target] [= <成員>]",
+        )
         self.call(CmdToggleEquip(), "", "用法：裝備 <物品> [= <成員>]")
 
     def test_exploration_use_heals_and_consumes_one_of_two(self):
@@ -435,6 +441,113 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
         self.assertEqual(sent, [expected])
 
 
+class MemberUseCommandTests(_ItemsCommandBase):
+    """`使用 <item> [target] = <成員>` names the member whose bag is used."""
+
+    def _companion(self, key="艾拉", *, missing: int = 20):
+        companion = create_object(
+            NPC, key=key, location=self.room1, home=self.room1
+        )
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        companion.db.inventory = []
+        companion.db.equipment = None
+        companion.traits.hp.current = int(companion.traits.hp.max) - missing
+        join_party(companion, self.player)
+        return companion
+
+    def _run(self, command, args: str) -> list[str]:
+        command.caller = self.player
+        command.args = args
+        command.cmdstring = command.key
+        messages: list[str] = []
+        with patch.object(self.player, "msg", side_effect=messages.append):
+            command.func()
+        return messages
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    @covers_requirement(
+        "companion-field-actions::a-field-item-use-names-its-user-explicitly"
+    )
+    def test_text_use_names_a_companion_and_matches_the_action(self):
+        # Delta: "Text use names a companion" — 艾拉 drinks her own potion with
+        # the same outcome and message as `inventory.use` naming her, and the
+        # commander's bag is untouched.
+        from web.webclient.actions.service_actions import _inventory_use_adapter
+
+        companion = self._companion()
+        companion.db.inventory = [_POTION]
+        maximum = int(companion.traits.hp.max)
+        messages = self._run(CmdUseItem(), f"{_POTION} = {companion.key}")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(int(companion.traits.hp.current), maximum)
+        self.assertEqual(list_items(companion), [])
+        self.assertEqual(list_items(self.player), [])
+        # Text/action parity on an identical fixture.
+        companion.db.inventory = [_POTION]
+        companion.traits.hp.current = maximum - 20
+        sent: list[str] = []
+        with patch.object(self.player, "msg", side_effect=sent.append):
+            result = _inventory_use_adapter(
+                self.player,
+                {"actor_id": companion.pk, "item_key": _POTION},
+            )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(sent, messages)
+        self.assertEqual(int(companion.traits.hp.current), maximum)
+        self.assertEqual(list_items(companion), [])
+
+    @covers_requirement(
+        "party-member-authority::acting-purposes-exclude-knocked-out-members"
+    )
+    def test_a_knocked_out_member_renders_the_shared_line(self):
+        companion = self._companion()
+        companion.db.inventory = [_POTION]
+        companion.traits.hp.current = 1
+        messages = self._run(CmdUseItem(), f"{_POTION} = {companion.key}")
+        self.assertEqual(
+            messages, [PARTY_SCOPE_MESSAGES[REASON_MEMBER_CANNOT_ACT]]
+        )
+        self.assertEqual(list_items(companion), [_POTION])
+
+    @covers_requirement(
+        "party-member-authority::member-presence-is-checked-against-the-commander-s-room"
+    )
+    def test_an_absent_member_renders_the_shared_line(self):
+        companion = self._companion()
+        companion.db.inventory = [_POTION]
+        companion.location = create_object(Room, key="t_use_command_elsewhere")
+        messages = self._run(CmdUseItem(), f"{_POTION} = {companion.key}")
+        self.assertEqual(
+            messages, [PARTY_SCOPE_MESSAGES[REASON_MEMBER_NOT_PRESENT]]
+        )
+        self.assertEqual(list_items(companion), [_POTION])
+
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
+    def test_an_unknown_member_token_renders_the_shared_line(self):
+        self.player.db.inventory = [_POTION]
+        messages = self._run(CmdUseItem(), f"{_POTION} = 路人")
+        self.assertEqual(
+            messages, [PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER]]
+        )
+        self.assertEqual(list_items(self.player), [_POTION])
+
+    def test_an_empty_member_suffix_never_defaults_to_the_caller(self):
+        # `使用 <item> =` is reserved syntax with an empty member: it is
+        # refused rather than silently using the caller's own bag.
+        self.hurt(20)
+        self.player.db.inventory = [_POTION]
+        messages = self._run(CmdUseItem(), f"{_POTION} =")
+        self.assertEqual(
+            messages, [PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER]]
+        )
+        self.assertEqual(list_items(self.player), [_POTION])
+
+
 class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
     """In-session routing: one round per accepted use, none per toggle."""
 
@@ -532,6 +645,95 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
         after = read_session(self.player)
         self.assertEqual(after.rounds_elapsed, record.rounds_elapsed)
         self.assertEqual(after.round_revision, record.round_revision)
+
+    def _companion(self, key="艾拉"):
+        companion = create_object(
+            NPC, key=key, location=self.room, home=self.room
+        )
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        companion.db.inventory = []
+        companion.db.equipment = None
+        join_party(companion, self.player)
+        return companion
+
+    def test_the_session_is_resolved_through_its_owner(self):
+        # A possessed puppet owns no session of its own; the routing reads the
+        # commander's through `session_owner`, exactly like `cast`, so an
+        # in-session use is never sent down the field path.
+        engage(self.player, self.monster)
+        command = CmdUseItem()
+        command.caller = self.player
+        commander, record = command._active_session()
+        self.assertIs(commander, self.player)
+        self.assertIsNotNone(record)
+        companion = self._companion()
+        command.caller = companion
+        self.assertIsNone(read_session(companion))
+        with patch("commands.items.session_owner", return_value=self.player):
+            commander, record = command._active_session()
+        self.assertIs(commander, self.player)
+        self.assertIsNotNone(record)
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    @covers_requirement(
+        "companion-field-actions::combat-item-use-stays-on-the-actor-command-flow"
+    )
+    def test_combat_member_use_saves_the_same_draft_entry_as_the_actor_command(self):
+        # Delta: "Text use names a companion" — the member suffix saves that
+        # member's item draft entry, exactly what `combat command` saves, and
+        # a nonfinal entry consumes nothing and resolves no round. The target
+        # token travels through the same session roster parser on both routes.
+        companion = self._companion()
+        companion.db.inventory = [_POTION]
+        maximum = int(companion.traits.hp.max)
+        companion.traits.hp.current = maximum - _HEAL_AMOUNT
+        engage(self.player, self.monster)
+        self._run(CmdCombatCommand(), f"a2 item {_POTION}=e1")
+        expected = read_session(self.player).draft_entries[companion.pk]
+        messages = self._run(
+            CmdUseItem(), f"{_POTION} e1 = {companion.key}"
+        )
+        record = read_session(self.player)
+        self.assertEqual(record.draft_entries[companion.pk], expected)
+        self.assertEqual(expected["payload"]["item_key"], _POTION)
+        self.assertEqual(expected["payload"]["target_id"], int(self.monster.pk))
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(record.round_revision, 0)
+        self.assertEqual(list_items(companion), [_POTION])
+        self.assertEqual(
+            int(companion.traits.hp.current), maximum - _HEAL_AMOUNT
+        )
+        self.assertTrue(messages)
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_combat_member_use_settles_once_when_the_draft_completes(self):
+        # The nonfinal member entry consumes nothing; the commander's own
+        # entry completes the draft and the round consumes each exactly once.
+        companion = self._companion()
+        companion.db.inventory = [_POTION]
+        companion_max = int(companion.traits.hp.max)
+        companion.traits.hp.current = companion_max - _HEAL_AMOUNT
+        player_max = int(self.player.traits.hp.max)
+        self.player.traits.hp.current = player_max - _HEAL_AMOUNT
+        self.player.db.inventory = [_POTION]
+        engage(self.player, self.monster)
+        self._run(CmdUseItem(), f"{_POTION} = {companion.key}")
+        draft = read_session(self.player)
+        self.assertIn(companion.pk, draft.draft_entries)
+        self.assertEqual(draft.rounds_elapsed, 0)
+        self.assertEqual(list_items(companion), [_POTION])
+        self._run(CmdUseItem(), _POTION)
+        after = read_session(self.player)
+        self.assertEqual(after.rounds_elapsed, 1)
+        self.assertEqual(list_items(companion), [])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(int(companion.traits.hp.current), companion_max)
+        self.assertEqual(int(self.player.traits.hp.current), player_max)
 
 
 class _TargetedUseBase(_ItemsCommandBase):

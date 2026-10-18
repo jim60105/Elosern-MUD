@@ -47,8 +47,10 @@ prototypes; the real app differs too much for a prototype to be useful).
   `tactic`; the panel echoes admitted entries back as `tactical`). A hostile
   item on an ally asks through the same actor-bound cross-side question. In
   combat the bag's 使用 routes to that same flow (`store.useCombatItem`) and
-  never dispatches the actorless `inventory.use`; inspection and the commander's
-  equipment toggles stay free, and there is no companion equipment surface.
+  never dispatches `inventory.use`; inspection and the commander's equipment
+  toggles stay free, and there is no companion equipment surface. Both the
+  exploration use and the toggle name the controlled figure's `actor_id`
+  (companion-field-item-use), which the server reauthorizes.
 - A cast across sides asks first (`stores/elosern/cross_side.js`, held in
   the store as `crossSideConfirm`, published as `view.crossSideConfirm`): a
   target-step submission whose skill is `hostile` and reaches a `party`

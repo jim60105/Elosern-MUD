@@ -486,7 +486,10 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     bodyByTestId("inventory-panel__confirm-ok").click();
     await nextTick();
     expect(w.emitted("use")).toEqual([
-      [{ action_id: "inventory.use", payload: { item_key: "potion_use" } }],
+      [{
+        action_id: "inventory.use",
+        payload: { item_key: "potion_use", actor_id: ACTOR_ID },
+      }],
     ]);
     expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
   });
@@ -499,7 +502,10 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     // One intent, no dialog: the commanded actor's own item review/target
     // step in the card is the confirmation.
     expect(w.emitted("use")).toEqual([
-      [{ action_id: "inventory.use", payload: { item_key: "potion_use" } }],
+      [{
+        action_id: "inventory.use",
+        payload: { item_key: "potion_use", actor_id: ACTOR_ID },
+      }],
     ]);
     expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
     // An equipped tile still toggles immediately and unchanged, and the
@@ -572,16 +578,38 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
   });
 
-  it("without a controlled-figure identity the toggle stays unavailable while use still works", async () => {
-    // The services panel can be available while the status panel is not; the
-    // exact payload requires a positive member id, so no request is sent with
-    // a null or invented actor (and item use stays unaffected).
+  it("without a controlled-figure identity both mutating actions stay unavailable", async () => {
+    // The services panel can be available while the status panel is not; both
+    // exact payloads require a positive member id (companion-field-item-use,
+    // party-member-equipment), so no request is sent with a null or invented
+    // actor and neither confirmation nor intent opens.
     const w = mountActions();
     await w.setProps({ actorId: null });
     await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
     expect(w.emitted("toggle-equip")).toBeUndefined();
     await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
+  });
+
+  it("a changed controlled-figure identity retires the open use confirmation", async () => {
+    // The confirmation binds the member it was opened for: losing or replacing
+    // that identity never dispatches the pending use for another member.
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
     expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
+    await w.setProps({ actorId: null });
+    await nextTick();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
+
+    await w.setProps({ actorId: ACTOR_ID + 1 });
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
+    await w.setProps({ actorId: ACTOR_ID });
+    await nextTick();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
   });
 
   it("a disabled action is aria-disabled, spells the committed reason, and dispatches nothing", async () => {

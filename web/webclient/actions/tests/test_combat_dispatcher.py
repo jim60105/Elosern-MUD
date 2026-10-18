@@ -391,7 +391,9 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         coordinator = self._coordinator()
         result = self._dispatch(
-            coordinator, "inventory.use", {"item_key": "t_ember_spray"}
+            coordinator,
+            "inventory.use",
+            {"actor_id": self.player.pk, "item_key": "t_ember_spray"},
         )
         self.assertEqual(result["outcome"], "rejected", result)
         self.assertEqual(result["code"], "combat_item_command_required")

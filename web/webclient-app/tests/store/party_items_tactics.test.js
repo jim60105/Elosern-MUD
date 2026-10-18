@@ -320,7 +320,10 @@ describe("party items and tactics (store)", () => {
     store.openHudDrawer("inventory");
     expect(store.view.hudDrawer).toBe("inventory");
 
-    handlers.onInventoryItemAction({ action_id: "inventory.use", payload: { item_key: "t_bomb" } });
+    handlers.onInventoryItemAction({
+      action_id: "inventory.use",
+      payload: { item_key: "t_bomb", actor_id: PLAYER },
+    });
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.view.hudDrawer).toBeNull();
     expect(store.router.currentDescriptor()).toEqual({

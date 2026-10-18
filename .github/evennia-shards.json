@@ -42,6 +42,7 @@
         "world.rules.tests.test_combat_initiation",
         "world.rules.tests.test_field_cast",
         "world.rules.tests.test_companion_field_cast",
+        "world.rules.tests.test_companion_field_item_use",
         "world.rules.tests.test_companion_field_opening",
         "world.rules.tests.test_combat_session_flow",
         "world.rules.tests.test_combat_session_persistence",
