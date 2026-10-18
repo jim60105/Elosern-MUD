@@ -66,6 +66,7 @@ from world.rules.time_skip import (
     seconds_to_full_regen,
     unsafe_rejection,
 )
+from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
 # Wire limits (equal to or below the protocol identifier bound).
 MAX_EXIT_REF_CHARS = 64
@@ -899,6 +900,9 @@ def _wait_adapter(
     settled_seconds = int(dream_clock.tick) - tick_from if dream_clock is not None else seconds
     message = render_skip_summary(settled_seconds, events)
     actor.msg(message)
+    # The summary already carries each committed unlock line; record the
+    # session unread marks from the same committed events.
+    deliver_unlocks(actor, notices_from_events(events), announce=False)
     # Rest-point nomination trigger (title-system D4 §7.1, change G): the
     # service helper gates on a day-boundary event and never raises. The
     # composition-root import is function-local (the dispatcher precedent).

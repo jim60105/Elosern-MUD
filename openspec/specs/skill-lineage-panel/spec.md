@@ -104,10 +104,11 @@ available in and out of combat and SHALL mutate nothing.
 - **THEN** the command prints the fixed unavailable line and repairs nothing
 
 ### Requirement: A newly usable skill pushes one derived unlock notification
-When a practice grant makes `can_use_skill` flip from false to true for any skill
-whose prerequisite edges consume the granted skill (reverse-edge map), the system
-SHALL stage exactly one Traditional-Chinese unlock line (e.g. 「新法術可用：火焰風暴」)
-through the existing post-commit notification channel.
+When a per-use or booked-study practice grant makes `can_use_skill` flip from false to true for any
+skill whose prerequisite edges consume the granted skill (reverse-edge map), the system
+SHALL stage exactly one Traditional-Chinese unlock line through the existing post-commit
+notification channel to the commander: the existing line (e.g. 「新法術可用：火焰風暴」) when the
+learner is the commander, and 「{成員} 學會了 {技能}」 when the learner is a companion.
 
 #### Scenario: Meeting an edge announces the child node
 - **WHEN** practice on `scorching_wave` reaches level 3 for an entity owning `firestorm`
@@ -132,6 +133,14 @@ through the existing post-commit notification channel.
 #### Scenario: Scene-build auto-seed notifies nobody
 - **WHEN** a scene-build auto-seed grants practices
 - **THEN** the unlock line SHALL NOT fire
+
+#### Scenario: A companion unlock names the companion
+- **WHEN** companion 艾拉's practice on 治癒之光 makes 群體治癒 usable during a field cast
+- **THEN** the commander receives exactly one line 「艾拉 學會了 群體治癒」 after the cast commits
+
+#### Scenario: Booked study announces unlocks
+- **WHEN** a rest settles 艾拉's booking and the study grant makes 群體治癒 usable
+- **THEN** the rest summary delivered to the commander includes 「艾拉 學會了 群體治癒」 once, after the advance commits
 
 ### Requirement: Lineage filtering preserves racial discovery without exposing monster chains
 Lineage SHALL filter identity-ineligible entries without using resource affordability or ownership as catalog admission. Roots not consumed by any prerequisite SHALL remain absent.

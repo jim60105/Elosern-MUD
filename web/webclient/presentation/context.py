@@ -6,7 +6,14 @@ dispatcher, or the coordinator, so it cannot mutate presentation or game state.
 """
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Mapping
+
+from world.rules.unlock_notices import MemberUnlocks
+
+#: The immutable empty unlock snapshot every context without session marks
+#: shares.
+_EMPTY_UNLOCKS: Mapping[int, MemberUnlocks] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -138,6 +145,10 @@ class PresentationContext:
             panel's choices read it, and only while the named member is still a
             commandable party member of the same session and round; it never
             authorizes a command.
+        unlocks: The copied session unlock state, keyed by member dbid: the
+            unread dot and the recent-unlock set. Session-scoped and
+            non-persistent — a reconnect starts empty, and clearing the dot
+            keeps the recent set.
     """
 
     actor: Any
@@ -150,6 +161,7 @@ class PresentationContext:
     combat_round: Any = field(default=None)
     skill_use: tuple[int, str, float] | None = field(default=None)
     party_actor: int | None = field(default=None)
+    unlocks: Mapping[int, MemberUnlocks] = field(default=_EMPTY_UNLOCKS)
 
 
 __all__ = [

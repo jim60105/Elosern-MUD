@@ -11,6 +11,7 @@ from typing import Any, Callable, Literal
 
 from world.rules.event_log import EventLog
 from world.rules.targeting import ActionContext
+from world.rules.unlock_notices import UnlockNotice
 
 
 class RejectReason(StrEnum):
@@ -102,6 +103,11 @@ class ActionResult:
     # title planner's grant toasts). Delivered only after the OUTER settlement
     # transaction commits — resolve() only returns them; callers emit.
     notifications: tuple[str, ...] = ()
+    # Structured practice unlocks staged by the same commit. Their rendered
+    # lines are also in ``notifications``; the owner delivers the line through
+    # that channel exactly once and forwards these to
+    # :func:`world.rules.unlock_notices.deliver_unlocks` for the session marks.
+    unlock_notices: tuple[UnlockNotice, ...] = ()
 
     @classmethod
     def success(
@@ -109,8 +115,11 @@ class ActionResult:
         event_log: EventLog,
         time_cost: int,
         notifications: tuple[str, ...] = (),
+        unlock_notices: tuple[UnlockNotice, ...] = (),
     ) -> "ActionResult":
-        return cls("success", event_log, time_cost, None, None, notifications)
+        return cls(
+            "success", event_log, time_cost, None, None, notifications, unlock_notices
+        )
 
     @classmethod
     def rejected(

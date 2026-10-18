@@ -39,6 +39,7 @@ from world.rules.party_scope import (
 from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
 from world.rules.traits import GAUGE_KEYS
+from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -189,10 +190,18 @@ def seconds_to_full_regen(entity: Any) -> int:
 
 
 def render_skip_summary(seconds: int, events: list[ScheduledEvent]) -> str:
-    """Render the stable skip summary from the settled events."""
+    """Render the stable skip summary from the settled events.
+
+    A committed booked-study unlock rides the summary as its own line, so the
+    commander reads the member's unlock exactly once, after the advance
+    committed; the caller records the session marks from the same events.
+    """
     message = f"時間經過了 {seconds} 秒。"
     if any(event.kind == "daily_reset" for event in events):
         message += " 新的一天開始了。"
+    for event in events:
+        if event.kind == PRACTICE_UNLOCK_EVENT:
+            message += f" {event.payload['line']}"
     return message
 
 

@@ -67,6 +67,8 @@ from world.rules.progression._scales import (  # noqa: F401
     _load_freeform_cast_scales,
     _load_freeform_scale_ladder,
 )
+from world.rules.npc_identity import npc_display_name
+from world.rules.unlock_notices import COMPANION_UNLOCK_LINE, UnlockNotice
 from world.rules.progression._scaling import (  # noqa: F401
     MAGIC_TIER_THRESHOLDS,
     _affinity_elements,
@@ -284,12 +286,58 @@ def _mark_practice_day(entity: Any, skill_key: str, day: int) -> None:
     entity.db.skill_practice_day = claims
 
 
+def _unlock_notice(learner: Any, skill: SkillDef) -> UnlockNotice:
+    """One committed unlock's structured notice, rendered for its learner.
+
+    A party companion's unlock names her (``艾拉 學會了 群體治癒``); every other
+    learner keeps the commander line (``新法術可用`` / ``新技能可用``), so the
+    commander's own unlocks and every non-party learner read exactly as they
+    did. The companion test is the canonical bidirectional party binding, so a
+    stale or one-sided record never renames a learner.
+    """
+    from world.rules.party import bound_owner_of
+
+    name = npc_display_name(learner)
+    line = (
+        COMPANION_UNLOCK_LINE.format(member=name, skill=skill.label)
+        if bound_owner_of(learner) is not None
+        else unlock_line(skill)
+    )
+    pk = getattr(learner, "pk", None)
+    return UnlockNotice(
+        learner_id=pk if isinstance(pk, int) and not isinstance(pk, bool) else None,
+        learner_name=name,
+        skill_key=skill.key,
+        line=line,
+    )
+
+
+def _usable_snapshot(entity: Any, skill_key: str) -> dict[str, bool]:
+    """The pre-award ``can_use_skill`` verdict of every reverse-edge consumer."""
+    return {
+        candidate.key: can_use_skill(entity, candidate)
+        for candidate in unlock_candidates_for(skill_key)
+    }
+
+
+def _append_unlock_flips(
+    entity: Any,
+    skill_key: str,
+    was_usable: Mapping[str, bool],
+    unlocks_out: list[UnlockNotice],
+) -> None:
+    """Append one notice per consumer the award just made usable."""
+    for candidate in unlock_candidates_for(skill_key):
+        if not was_usable[candidate.key] and can_use_skill(entity, candidate):
+            unlocks_out.append(_unlock_notice(entity, candidate))
+
+
 def grant_skill_practice_xp(
     entity: Any,
     skill_key: str,
     target: Any = None,
     nonlethal: bool = False,
-    unlocks_out: list[str] | None = None,
+    unlocks_out: list[UnlockNotice] | None = None,
 ) -> bool:
     """Accrue one use of practice XP; return whether XP was actually claimed.
 
@@ -308,14 +356,16 @@ def grant_skill_practice_xp(
     :func:`award_practice_xp`, the only writer, which clamps at the derived
     cap. Reads no school and no magic stat.
 
-    ``unlocks_out`` is an optional caller-owned list sink: when the award
+    ``unlocks_out`` is an optional caller-owned notice sink: when the award
     flips ``can_use_skill`` from false to true for a skill whose prerequisite
-    edges consume ``skill_key``, exactly one unlock line (``新法術可用`` /
-    ``新技能可用``) is appended per newly usable skill. Detection is derived
-    (before/after snapshot of the shared gate, never persisted), happens only
-    alongside a live award, and the SINK ITSELF is not a notification — the
-    caller owns delivery and must stage the lines only after its transaction
-    commits.
+    edges consume ``skill_key``, exactly one :class:`UnlockNotice` is appended
+    per newly usable skill. Its ``line`` is the commander form (``新法術可用``
+    / ``新技能可用``) for every learner that is not a party companion, and the
+    companion form (``{成員} 學會了 {技能}``) for a companion. Detection is
+    derived (before/after snapshot of the shared gate, never persisted),
+    happens only alongside a live award, and the SINK ITSELF is not a
+    notification — the caller owns delivery and must stage the notices only
+    after its transaction commits.
 
     After the award (and the newly-usable-skill lines), the cross-lineage
     rulebook is evaluated for this ``skill_key``: any rule whose clauses just
@@ -338,22 +388,20 @@ def grant_skill_practice_xp(
         return False
     if skill.category is SkillCategory.DIVINE_MYSTERY:
         _mark_practice_day(entity, skill_key, day)
-    candidates = unlock_candidates_for(skill_key) if unlocks_out is not None else ()
-    was_usable = (
-        {candidate.key: can_use_skill(entity, candidate) for candidate in candidates}
-        if unlocks_out is not None
-        else {}
-    )
+    was_usable = _usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
     award_practice_xp(entity, skill_key, amount)
     if unlocks_out is not None:
-        for candidate in candidates:
-            if not was_usable[candidate.key] and can_use_skill(entity, candidate):
-                unlocks_out.append(unlock_line(candidate))
+        _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
     _run_cross_lineage_eval(entity, skill_key, unlocks_out)
     return True
 
 
-def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
+def grant_study_practice_xp(
+    entity: Any,
+    skill_key: str,
+    hours: int,
+    unlocks_out: list[UnlockNotice] | None = None,
+) -> bool:
     """Accrue the closed-form booked-study grant for ``hours`` whole hours.
 
     The declared-practice settlement entry point (D7):
@@ -367,8 +415,10 @@ def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
 
     The cross-lineage rulebook is evaluated right after the award, exactly as
     on the per-use path, so the two practice entry points cannot diverge at a
-    grant boundary. This path carries no announcement sink (the clock
-    settlement has none); the grant itself is unconditional.
+    grant boundary. ``unlocks_out`` is the same optional notice sink the
+    per-use path carries: the clock settlement owns it and turns each notice
+    into a post-commit ``practice_unlock`` event. The grant itself is
+    unconditional.
     """
     if isinstance(hours, bool) or not isinstance(hours, int):
         raise ValueError(f"study hours must be an int, got {hours!r}")
@@ -382,13 +432,16 @@ def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
     )
     if not isfinite(amount) or amount < 0:
         raise ValueError(f"study XP formula produced an invalid {amount!r}")
+    was_usable = _usable_snapshot(entity, skill_key) if unlocks_out is not None else {}
     award_practice_xp(entity, skill_key, amount)
-    _run_cross_lineage_eval(entity, skill_key, None)
+    if unlocks_out is not None:
+        _append_unlock_flips(entity, skill_key, was_usable, unlocks_out)
+    _run_cross_lineage_eval(entity, skill_key, unlocks_out)
     return True
 
 
 def _run_cross_lineage_eval(
-    entity: Any, skill_key: str, unlocks_out: list[str] | None
+    entity: Any, skill_key: str, unlocks_out: list[UnlockNotice] | None
 ) -> None:
     """Evaluate the cross-lineage rulebook after one practice award (D3).
 
@@ -396,9 +449,9 @@ def _run_cross_lineage_eval(
     points, because practice XP is the only quantity any clause reads and
     therefore the only moment a rule can newly become satisfiable. Newly
     granted keys are appended to the entity's stored owned set; when the
-    caller supplied the same sink that carries newly-usable-skill lines, one
-    announcement line per grant is appended there too (the caller owns
-    delivery after its transaction commits).
+    caller supplied the same sink that carries newly-usable-skill notices, one
+    notice per grant is appended there too (the caller owns delivery after its
+    transaction commits).
 
     Imported lazily so importing ``world.rules.progression`` never pulls in
     the rulebook module: cross_lineage_unlock imports progression at its top,
@@ -413,6 +466,4 @@ def _run_cross_lineage_eval(
     )
     if unlocks_out is not None:
         for grant_key in newly_granted:
-            unlocks_out.append(
-                _cross_lineage.unlock_line_for_grant(grant_key, rulebook.registry)
-            )
+            unlocks_out.append(_unlock_notice(entity, rulebook.registry[grant_key]))

@@ -12,6 +12,7 @@ from world.rules import combat
 from world.rules.combat import Battlefield
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.unlock_notices import UnlockNotice
 from world.skills.effects import DamageEffect
 from world.skills.registry import SKILL_REGISTRY
 from world.lore.items import ITEM_REGISTRY
@@ -420,7 +421,7 @@ def _resolve_overwhelm_raw(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
-    notifications_sink: "list[str] | None" = None,
+    notifications_sink: "list[str | UnlockNotice] | None" = None,
     first_actor: str | None = None,
     decision_scope_base: "combat.ExecutionScopeBase | None" = None,
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
@@ -488,7 +489,7 @@ def resolve_overwhelm(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
-    notifications_sink: "list[str] | None" = None,
+    notifications_sink: "list[str | UnlockNotice] | None" = None,
     first_actor: str | None = None,
     decision_scope_base: "combat.ExecutionScopeBase | None" = None,
 ) -> OverwhelmResult:

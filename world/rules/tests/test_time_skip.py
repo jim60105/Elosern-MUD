@@ -81,6 +81,20 @@ class SkipHelperPureTests(unittest.TestCase):
             render_skip_summary(90, [SimpleNamespace(kind="daily_reset", due_tick=0, payload={})]),
             "時間經過了 90 秒。 新的一天開始了。",
         )
+        # A committed booked-study unlock rides the summary as its own line.
+        self.assertEqual(
+            render_skip_summary(
+                90,
+                [
+                    SimpleNamespace(
+                        kind="practice_unlock",
+                        due_tick=0,
+                        payload={"line": "同伴 學會了 合成分枝術"},
+                    )
+                ],
+            ),
+            "時間經過了 90 秒。 同伴 學會了 合成分枝術",
+        )
 
 
 class SkipHelperAdvanceTests(EvenniaTest):
