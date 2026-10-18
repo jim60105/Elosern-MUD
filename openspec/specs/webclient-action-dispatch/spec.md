@@ -20,11 +20,15 @@ Exact bounded UI action validation, allowlisted adapters, session identity, stal
 - **THEN** request ID SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; action ID SHALL be 1..64 lowercase dotted identifier characters; and base revision SHALL be a non-negative JavaScript-safe integer excluding booleans
 
 ### Requirement: Action identity comes only from the authenticated session
-The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only session.puppet as the commander. Only the exact guarded combat schemas SHALL accept subordinate actor_id and active session_id references, reauthorized through the deterministic party boundary; they SHALL NOT select account, puppet or transport identity. All other unknown identity fields SHALL reject, and no error response SHALL disclose another actor's state.
+The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only session.puppet as the acting character, from which the rules resolve the commander. Only exact guarded combat and party member-scoped schemas SHALL accept subordinate member references, each reauthorized through the deterministic party boundary; a rejected reference SHALL NOT be replaced by the commander, and all other identity fields SHALL reject.
 
 #### Scenario: Payload cannot select a different actor
 - **WHEN** a client includes an actor-like unknown field in the envelope or outside an exact guarded combat payload
 - **THEN** exact-schema validation rejects the request without adapter invocation
+
+#### Scenario: A subordinate reference never selects identity
+- **WHEN** a payload carries `actor_id`, `member_id`, `giver_id`, `receiver_id`, `recipient_id` or `seller_id`
+- **THEN** only the exact guarded combat and party member-scoped schemas admit it, and it never selects account, puppet or transport identity
 
 #### Scenario: Unpuppeted action is rejected
 - **WHEN** an anonymous or logged-in but unpuppeted session submits `ui_action`
@@ -33,6 +37,10 @@ The dispatcher SHALL accept actions only from authenticated WebSocket sessions w
 #### Scenario: Guarded party actor reference is subordinate authorization
 - **WHEN** combat.command names an actor_id and active session_id under the authenticated commander
 - **THEN** the dispatcher passes only the puppet commander and rules reauthorize the referenced allied actor; enemies/other sessions reject without leaking state
+
+#### Scenario: A party member reference is reauthorized, never substituted
+- **WHEN** `party.transfer` names a `receiver_id` that is not a member of the authenticated commander's party
+- **THEN** the rules reject it with `not_party_member`, nothing is written, and the commander is not used in its place
 
 ### Requirement: Action registries are allowlisted and duplicate-safe
 
@@ -60,7 +68,7 @@ The action registry SHALL bind each stable action ID to one exact payload valida
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, `gallery.stage.update`,
 `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, `gallery.official.geometry.clear`,
 `letters.list`, `letters.collect`, `letters.read`, `letters.send`, `dream.say`,
-`dream.draft`, `dream.confirm`, and `dream.awaken`, each with its own exact
+`dream.draft`, `dream.confirm`, `dream.awaken`, and `party.transfer`, each with its own exact
 validator and deterministic adapter
 
 #### Scenario: Test proof action remains isolated
@@ -76,7 +84,7 @@ validator and deterministic adapter
 #### Scenario: Production registry composition is fixed
 
 - **WHEN** the production registry is built
-- **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the four combat adapters `combat.actor_choices`, `combat.command`, `combat.exit_prompt`, and `combat.exit_confirm`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, and the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`
+- **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the four combat adapters `combat.actor_choices`, `combat.command`, `combat.exit_prompt`, and `combat.exit_confirm`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`, and the party transfer adapter `party.transfer`
 
 #### Scenario: Skill preview and cast bypass the text parser
 
