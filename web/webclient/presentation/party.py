@@ -395,10 +395,14 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
             else record.definition_key
         )[:MAX_PARTY_COMMISSION_LABEL]
 
-    # The committed art view's admission set, resolved once for the whole
-    # roster: a companion (or the commander) the view does not admit is the
-    # truthful null.
+    # The committed art view's admission set for the companions, resolved once
+    # for the roster: a companion the view does not admit is the truthful null.
     members = _admitted_identities(actor)
+    # The commander's own row is judged by a view built for the commander, not
+    # for the puppet: the exploration view excludes its own actor, so judging
+    # row 0 from a possessed session would flip the reference merely because
+    # the controlled body changed. Possession-identical payloads depend on it.
+    commander_members = _admitted_identities(owner)
     commander_id = int(owner.pk)
     commander_hp_current, commander_hp_maximum = stored_gauge_pair(owner, "hp")
     commander_mp_current, commander_mp_maximum = stored_gauge_pair(owner, "mp")
@@ -409,7 +413,7 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
             "display_name": npc_display_name(owner)[
                 :MAX_DISPLAY_NAME_CODE_POINTS
             ],
-            "portrait_ref": _resolve_portrait_ref(owner, members),
+            "portrait_ref": _resolve_portrait_ref(owner, commander_members),
             "hp_current": commander_hp_current,
             "hp_maximum": commander_hp_maximum,
             "mp_current": commander_mp_current,

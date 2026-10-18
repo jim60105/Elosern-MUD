@@ -536,6 +536,20 @@ class PartyPresenterTests(EvenniaTest):
         self.assertEqual(self.registry.render("party", possessed), expected)
         self.assertNotEqual(first.relations.stage_for(self.player).name, first.relations.stage_for(second).name)
 
+    def test_named_commander_portrait_is_possession_identical(self):
+        # The exploration art view excludes its own actor, so a named commander
+        # is absent from her own view but present in a possessed companion's
+        # view of the room. Row 0 must still resolve identically: it is judged
+        # by a view built for the commander, never by the puppet's.
+        self.player.db.portrait_policy = {"mode": "named", "stable_key": _COMPANION_KEY}
+        companion = _companion("測試同行甲", self.room)
+        join_party(companion, self.player)
+
+        expected = self._render()
+        self.assertIsNone(expected["slots"][0]["portrait_ref"])
+        possessed = PresentationContext(actor=companion, protocol_version=1)
+        self.assertEqual(self.registry.render("party", possessed), expected)
+
     def test_possessed_stranger_or_stale_owner_is_unavailable_not_empty(self):
         npc = _companion("測試陌客", self.room)
         context = PresentationContext(actor=npc, protocol_version=1)
