@@ -57,7 +57,18 @@ class NumberedTargetCommand(_NumberedTargetCommand):
     """
 
     def parse(self):
+        # ``super().parse`` folds an omitted count and an explicitly typed
+        # ``0`` into the same ``self.number == 0``, so the raw left-hand side
+        # is captured first: a typed count (even zero) must reach the transfer
+        # rule's invalid-quantity refusal instead of defaulting to one copy.
+        lhs = self.args or ""
+        for delimiter in getattr(self, "rhs_split", None) or ():
+            if delimiter in lhs:
+                lhs = lhs.split(delimiter, 1)[0]
+                break
         super().parse()
+        head, _, rest = lhs.strip().partition(" ")
+        self.count_given = bool(rest) and head.isdecimal()
         if self.number and self.args.startswith("個"):
             self.args = self.args[1:].lstrip()
         if self.number and self.lhs.startswith("個"):
@@ -605,7 +616,11 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         item_key = resolve_item_token(caller, self.lhs)
         try:
             outcome = transfer_item(
-                caller, caller.pk, member.pk, item_key, self.number or 1
+                caller,
+                caller.pk,
+                member.pk,
+                item_key,
+                self.number if self.count_given else 1,
             )
         except PartyTransferError as error:  # observability: ignore R2: player-facing refusal; the rule's fixed message is the report
             caller.msg(error.message)

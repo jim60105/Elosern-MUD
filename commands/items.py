@@ -183,7 +183,7 @@ class CmdRetrieve(NumberedTargetCommand):
                 member.pk,
                 resolve_commander(caller).pk,
                 resolve_item_token(member, self.lhs),
-                self.number or 1,
+                self.number if self.count_given else 1,
             )
         except (PartyTransferError, PartyScopeError) as error:
             caller.msg(error.message)
