@@ -15,7 +15,7 @@ See proposal.md. `explore.skill_preview` stores `(skill_key, scale)` on the pres
 - **Selection triple** `(actor_id, skill_key, scale)` is copied into the read context; the presenter re-authorizes the caster on every publication and falls back to the unavailable form with reason `member_not_present` / `not_party_member` / `member_cannot_act` instead of silently switching to the commander.
 - **Caster-relative preview.** `preview_field_skill` takes the caster; `field_candidate_entities(caster)` keeps the caster first; `field_opening_anchors` and the initiation preflight run with the caster as initiator under the commander's party, so a companion's openings are exactly those the rule would accept.
 - **Version bump** `SKILL_USE_SCHEMA_VERSION = 2`; the registry-version gate, JS mirror and fixtures change together; old v1 payloads are rejected.
-- **Transitional client** sends `store` controlled figure id; the selection persists across possession because it is keyed by caster, not by puppet.
+- **Transitional client** sends the committed `status` panel's controlled-figure id. The selection records that caster separately from its owning puppet, but its lifetime follows the delta: an unpuppet, reconnect, or puppet/epoch replacement retires it rather than carrying it into the next sequence.
 
 ## Risks / Trade-offs
 

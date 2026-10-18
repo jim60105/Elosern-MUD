@@ -38,7 +38,18 @@ from web.webclient.presentation.skill_use_selection import (
     retire_skill_use_selection,
 )
 from world.rules.clock import get_world_clock, read_world_clock
-from world.rules.combat_session import clear_session, read_session
+from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
+    clear_session,
+    read_session,
+    submit_player_action,
+)
+from world.rules.party import join_party, leave_party
+from world.rules.party_scope import (
+    REASON_MEMBER_CANNOT_ACT,
+    REASON_MEMBER_NOT_PRESENT,
+    REASON_NOT_PARTY_MEMBER,
+)
 from world.rules.tests._combat_session_helpers import (
     SYNTH_SEAM_AREA_SKILL,
     _monster,
@@ -80,44 +91,59 @@ class _Session:
 
 
 class SkillUsePayloadValidationTests(EvenniaTest):
-    def test_preview_accepts_only_skill_key_and_closed_scale(self):
+    def test_preview_requires_the_caster_and_a_closed_scale(self):
         self.assertEqual(
-            validate_skill_preview_payload({"skill_key": "t_a"}),
-            {"skill_key": "t_a", "scale": 1.0},
+            validate_skill_preview_payload({"actor_id": 7, "skill_key": "t_a"}),
+            {"actor_id": 7, "skill_key": "t_a", "scale": 1.0},
         )
         for bad in (
             {},
-            {"skill_key": ""},
-            {"skill_key": "a b"},
-            {"skill_key": "x" * 65},
-            {"skill_key": "t_a", "scale": True},
-            {"skill_key": "t_a", "scale": 0.3},
-            {"skill_key": "t_a", "actor": 1},
+            {"skill_key": "t_a"},
+            {"actor_id": 7},
+            {"actor_id": True, "skill_key": "t_a"},
+            {"actor_id": 0, "skill_key": "t_a"},
+            {"actor_id": "7", "skill_key": "t_a"},
+            {"actor_id": 7, "skill_key": ""},
+            {"actor_id": 7, "skill_key": "a b"},
+            {"actor_id": 7, "skill_key": "x" * 65},
+            {"actor_id": 7, "skill_key": "t_a", "scale": True},
+            {"actor_id": 7, "skill_key": "t_a", "scale": 0.3},
+            {"actor_id": 7, "skill_key": "t_a", "actor": 1},
         ):
             with self.subTest(payload=bad), self.assertRaises(SkillUseActionError):
                 validate_skill_preview_payload(bad)
 
     @covers_requirement("webclient-skillbook-casting::field-cast-payloads-express-one-authoritative-target-shape")
     def test_cast_rejects_every_tampered_shape(self):
-        ok = validate_field_cast_payload({"skill_key": "t_a", "target_ids": [3, 1]})
+        ok = validate_field_cast_payload(
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [3, 1]}
+        )
+        self.assertEqual(ok["actor_id"], 7)
         self.assertEqual(ok["target_ids"], (3, 1))
         self.assertIsNone(ok["opening_target_id"])
-        anchor = validate_field_cast_payload({"skill_key": "t_a", "opening_target_id": 9})
+        anchor = validate_field_cast_payload(
+            {"actor_id": 7, "skill_key": "t_a", "opening_target_id": 9}
+        )
         self.assertEqual(anchor["opening_target_id"], 9)
         for bad in (
-            {"skill_key": "t_a", "target_ids": [1], "opening_target_id": 2},
-            {"skill_key": "t_a", "target_ids": []},
-            {"skill_key": "t_a", "target_ids": [1, 1]},
-            {"skill_key": "t_a", "target_ids": [True]},
-            {"skill_key": "t_a", "target_ids": [0]},
-            {"skill_key": "t_a", "target_ids": [2**53]},
-            {"skill_key": "t_a", "target_ids": list(range(1, 66))},
-            {"skill_key": "t_a", "opening_target_id": True},
-            {"skill_key": "t_a", "target_shorthand": "all"},
-            {"skill_key": "t_a", "scale": False},
-            {"skill_key": "t_a", "actor_id": 1},
-            {"skill_key": "t_a", "cost": {"mp": 0}},
-            {"skill_key": "flee"},
+            {"skill_key": "t_a", "target_ids": [1]},
+            {"actor_id": 7},
+            {"actor_id": True, "skill_key": "t_a"},
+            {"actor_id": 0, "skill_key": "t_a"},
+            {"actor_id": 2**53, "skill_key": "t_a"},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [1], "opening_target_id": 2},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": []},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [1, 1]},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [True]},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [0]},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": [2**53]},
+            {"actor_id": 7, "skill_key": "t_a", "target_ids": list(range(1, 66))},
+            {"actor_id": 7, "skill_key": "t_a", "opening_target_id": True},
+            {"actor_id": 7, "skill_key": "t_a", "target_shorthand": "all"},
+            {"actor_id": 7, "skill_key": "t_a", "scale": False},
+            {"actor_id": 7, "skill_key": "t_a", "actor": 1},
+            {"actor_id": 7, "skill_key": "t_a", "cost": {"mp": 0}},
+            {"actor_id": 7, "skill_key": "flee"},
         ):
             with self.subTest(payload=bad), self.assertRaises(SkillUseActionError):
                 validate_field_cast_payload(bad)
@@ -161,6 +187,7 @@ class _SkillUseCase(BattlefieldIsolation, EvenniaTest):
             PresentationContext(actor=self.player, protocol_version=1)
         )
         self.sequence = 0
+        self.actor_id = int(self.player.pk)
 
     def tearDown(self):
         clear_session(self.player)
@@ -177,7 +204,25 @@ class _SkillUseCase(BattlefieldIsolation, EvenniaTest):
         wolf.location = self.room
         return wolf
 
+    def _companion(self, key, *, mp=20):
+        companion = self._npc(key)
+        companion.traits.mp.base = mp
+        companion.traits.mp.current = mp
+        join_party(companion, self.player)
+        return companion
+
+    def _freeze_gauges(self, *entities):
+        for entity in entities:
+            for gauge_key in ("hp", "mp", "sp"):
+                gauge = getattr(entity.traits, gauge_key, None)
+                if gauge is not None:
+                    gauge.rate = 0
+
     def _act(self, action_id, payload):
+        # Every SkillBook action names its caster; the default is the
+        # authenticated commander, and an explicit actor_id always wins.
+        if action_id in ("explore.skill_preview", "explore.cast"):
+            payload = {"actor_id": self.actor_id, **payload}
         self.sequence += 1
         handle_ui_action(
             self.session,
@@ -266,7 +311,7 @@ class SkillPreviewActionTests(_SkillUseCase):
         self.assertIsNone(other_context.skill_use)
         self.assertEqual(
             build_presentation_context(self.session, self.player).skill_use,
-            (_T_HEAL, 1.0),
+            (self.actor_id, _T_HEAL, 1.0),
         )
         self.coordinator.reset()
         self.assertIsNone(build_presentation_context(self.session, self.player).skill_use)
@@ -280,7 +325,10 @@ class SkillPreviewActionTests(_SkillUseCase):
     def test_preview_without_presentation_session_rejects(self):
         from web.webclient.actions.skill_use_actions import _skill_preview_adapter
 
-        result = _skill_preview_adapter(self.player, {"skill_key": _T_HEAL, "scale": 1.0})
+        result = _skill_preview_adapter(
+            self.player,
+            {"actor_id": self.actor_id, "skill_key": _T_HEAL, "scale": 1.0},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_presentation_session")
 
@@ -303,6 +351,87 @@ class SkillPreviewActionTests(_SkillUseCase):
         for row in openings:
             self.assertEqual(row["target_ids"], ids)
             self.assertIn("3", row["label"])
+
+    @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
+    def test_a_companion_preview_is_computed_for_the_companion(self):
+        from world.rules import field_cast as field_cast_rules
+
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_HEAL])
+        wolf = self._wolf("companion preview wolf")
+        result = self._act(
+            "explore.skill_preview",
+            {"actor_id": companion.pk, "skill_key": _T_HEAL},
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        with patch.object(
+            field_cast_rules,
+            "preview_field_opening",
+            wraps=field_cast_rules.preview_field_opening,
+        ) as opening:
+            panel = self._panel()
+        self.assertEqual(panel["actor_id"], companion.pk)
+        self.assertEqual(panel["skill"]["cost"], {"mp": 11})
+        self.assertTrue(panel["skill"]["enabled"])
+        targets = panel["skill"]["targets"]
+        self.assertEqual(targets[0]["identity"], companion.pk)
+        self.assertIn("（自己）", targets[0]["label"])
+        self.assertIn(self.actor_id, [row["identity"] for row in targets])
+        self.assertEqual(
+            [row["identity"] for row in panel["skill"]["openings"]], [wolf.pk]
+        )
+        self.assertTrue(panel["skill"]["openings"][0]["enabled"])
+        # The opening is judged with the companion as initiator under the
+        # commander's party, never with the authenticated puppet standing in.
+        self.assertIs(opening.call_args.args[0], companion)
+        self.assertIs(opening.call_args.kwargs["commander"], self.player)
+
+    def test_a_forged_or_absent_caster_is_refused(self):
+        outsider = self._npc("unbound outsider")
+        for actor_id in (987_654, outsider.pk):
+            with self.subTest(actor_id=actor_id):
+                result = self._act(
+                    "explore.skill_preview",
+                    {"actor_id": actor_id, "skill_key": _T_HEAL},
+                )
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], REASON_NOT_PARTY_MEMBER)
+        self.assertEqual(self._panel()["available"], False)
+
+    def test_republication_reauthorizes_the_caster(self):
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_HEAL])
+        self._act(
+            "explore.skill_preview",
+            {"actor_id": companion.pk, "skill_key": _T_HEAL},
+        )
+        self.assertEqual(self._panel()["actor_id"], companion.pk)
+        elsewhere = create_object(Room, key="departed glade")
+        cases = (
+            ("move", lambda: setattr(companion, "location", elsewhere), REASON_MEMBER_NOT_PRESENT),
+            (
+                "knockout",
+                lambda: (
+                    setattr(companion, "location", self.room),
+                    setattr(companion.traits.hp, "current", 0),
+                ),
+                REASON_MEMBER_CANNOT_ACT,
+            ),
+            (
+                "leave",
+                lambda: (
+                    setattr(companion.traits.hp, "current", companion.traits.hp.base),
+                    leave_party(companion, self.player, "dismissed"),
+                ),
+                REASON_NOT_PARTY_MEMBER,
+            ),
+        )
+        for name, change, code in cases:
+            with self.subTest(case=name):
+                change()
+                panel = self._panel()
+                self.assertFalse(panel["available"])
+                self.assertEqual(panel["reason"]["code"], code)
 
 
 class FieldCastActionTests(_SkillUseCase):
@@ -434,7 +563,11 @@ class FieldCastActionTests(_SkillUseCase):
         self.player.traits.hp.current = 2000
         doomed = _monster("doomed wolf", hp=100, atk=10)
         doomed.location = self.room
-        payload = {"skill_key": _T_DAMAGE, "opening_target_id": doomed.pk}
+        payload = {
+            "actor_id": self.actor_id,
+            "skill_key": _T_DAMAGE,
+            "opening_target_id": doomed.pk,
+        }
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
@@ -514,7 +647,7 @@ class FieldCastActionTests(_SkillUseCase):
             "request_id": "same",
             "base_revision": self.coordinator.revision,
             "action_id": "explore.cast",
-            "payload": {"skill_key": _T_NONE},
+            "payload": {"actor_id": self.actor_id, "skill_key": _T_NONE},
         }
         handle_ui_action(self.session, self.player, envelope, self.action_registry, self.registry)
         mp_after_first = self.player.traits.mp.value
@@ -523,13 +656,117 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(self.player.traits.mp.value, mp_after_first)
         self.assertEqual(self._tick(), tick_after_first)
 
+    def test_a_companion_cast_charges_the_companion(self):
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_HEAL])
+        self._freeze_gauges(self.player, companion)
+        npc = self._npc("wounded ally")
+        npc.traits.hp.current = 1
+        companion_mp = companion.traits.mp.value
+        commander_mp = self.player.traits.mp.value
+        result = self._act(
+            "explore.cast",
+            {
+                "actor_id": companion.pk,
+                "skill_key": _T_HEAL,
+                "target_ids": [npc.pk],
+            },
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(companion.traits.mp.value, companion_mp - 11)
+        self.assertEqual(self.player.traits.mp.value, commander_mp)
+        self.assertGreater(int(npc.traits.hp.current), 1)
+        self.assertIn(_T_HEAL, companion.db.skill_proficiency)
+
+    def test_a_companion_opening_opens_the_commanders_encounter(self):
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_DAMAGE])
+        self._freeze_gauges(self.player, companion)
+        wolf = self._wolf("companion opening wolf")
+        mp_before = companion.traits.mp.value
+        commander_mp = self.player.traits.mp.value
+        payload = {
+            "actor_id": companion.pk,
+            "skill_key": _T_DAMAGE,
+            "opening_target_id": wolf.pk,
+        }
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = self._act("explore.cast", payload)
+            self.assertEqual(result["outcome"], "success", result)
+            self.assertEqual(result["code"], "draft")
+            record = read_session(self.player)
+            self.assertIsNotNone(record)
+            self.assertIsNone(read_session(companion))
+            self.assertEqual(record.opening_first_actor, str(companion.key))
+            self.assertEqual(
+                record.draft_entries[int(companion.pk)]["payload"]["skill_key"],
+                _T_DAMAGE,
+            )
+            # The seed charges nothing yet; the entry pays once when it runs.
+            self.assertEqual(companion.traits.mp.value, mp_before)
+            self.assertEqual(self.player.traits.mp.value, commander_mp)
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [wolf])
+        self.assertEqual(companion.traits.mp.value, mp_before - 12)
+        self.assertIn(_T_DAMAGE, companion.db.skill_proficiency)
+        self.assertEqual(self.player.traits.mp.value, commander_mp)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
+    def test_forged_or_stale_caster_is_refused_without_substitution(self):
+        npc = self._npc("spared target")
+        npc.traits.hp.current = 1
+        outsider = self._npc("unbound outsider")
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_HEAL])
+        mp_before = self.player.traits.mp.value
+        for actor_id in (987_654, outsider.pk):
+            with self.subTest(case="forged", actor_id=actor_id):
+                result = self._act(
+                    "explore.cast",
+                    {
+                        "actor_id": actor_id,
+                        "skill_key": _T_HEAL,
+                        "target_ids": [npc.pk],
+                    },
+                )
+                self.assertEqual(result["code"], REASON_NOT_PARTY_MEMBER)
+        companion.location = create_object(Room, key="stale glade")
+        stale = self._act(
+            "explore.cast",
+            {
+                "actor_id": companion.pk,
+                "skill_key": _T_HEAL,
+                "target_ids": [npc.pk],
+            },
+        )
+        self.assertEqual(stale["code"], REASON_MEMBER_NOT_PRESENT)
+        companion.location = self.room
+        companion.traits.hp.current = 0
+        down = self._act(
+            "explore.cast",
+            {
+                "actor_id": companion.pk,
+                "skill_key": _T_HEAL,
+                "target_ids": [npc.pk],
+            },
+        )
+        self.assertEqual(down["code"], REASON_MEMBER_CANNOT_ACT)
+        # No forged caster ever caused the commander to stand in.
+        self.assertEqual(npc.traits.hp.current, 1)
+        self.assertEqual(self.player.traits.mp.value, mp_before)
+
 
 class SkillUsePanelValidationTests(_SkillUseCase):
     def _valid(self):
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "available": True,
             "kind": "skill_use",
+            "actor_id": 1,
             "scale": 1.0,
             "skill": {
                 "key": _T_HEAL,
@@ -557,7 +794,9 @@ class SkillUsePanelValidationTests(_SkillUseCase):
 
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_valid_form_round_trips(self):
-        self.assertEqual(validate_skill_use(self._valid())["skill"]["key"], _T_HEAL)
+        normalized = validate_skill_use(self._valid())
+        self.assertEqual(normalized["actor_id"], 1)
+        self.assertEqual(normalized["skill"]["key"], _T_HEAL)
 
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_malformed_forms_are_rejected(self):
@@ -568,7 +807,11 @@ class SkillUsePanelValidationTests(_SkillUseCase):
 
         for name, change in (
             ("unknown field", lambda p: p["skill"].update(extra=1)),
-            ("wrong version", lambda p: p.update(schema_version=2)),
+            ("unknown top-level field", lambda p: p.update(extra=1)),
+            ("wrong version", lambda p: p.update(schema_version=3)),
+            ("missing actor", lambda p: p.pop("actor_id")),
+            ("boolean actor", lambda p: p.update(actor_id=True)),
+            ("zero actor", lambda p: p.update(actor_id=0)),
             ("duplicate identity", lambda p: p["skill"]["targets"].append(dict(p["skill"]["targets"][0]))),
             ("dangling line-up", lambda p: p["skill"]["openings"][0].update(target_ids=[2, 99])),
             ("single opening widened", lambda p: p["skill"]["openings"][0].update(target_ids=[2, 1])),
