@@ -3039,19 +3039,19 @@ An available but empty drawer list — the quest book with no rows, the world co
 - **THEN** each renders the shared glyph, headline, and guidance card, and the empty party additionally keeps its 空位 row
 
 ### Requirement: Lineage identity and inventory rarity use backed fields
-Lineage rows with the same element/style name SHALL be distinguished using their supplied root-node display names and keep progress beside that identity. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label.
+Lineage graph rows with the same element/style name SHALL be distinguished using their supplied root-node display names joined with ‧ and keep their owned/total count beside that identity. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label.
 
 #### Scenario: The collapsed chain row lays out its identity and meter
-- **WHEN** a collapsed chain row renders
-- **THEN** it is about 56px tall and places its progress meter, at most 320px wide, immediately after an identity column shared by every row, followed by its percentage or 已全數見頂; the root-node subtitle is the first node's supplied `display_name_zh`, omitted when absent or equal to the label, and no name is derived from a skill key
+- **WHEN** a graph row renders
+- **THEN** it places its owned/total count (or 已全數見頂 when consumed) immediately after an identity column shared by every row, with no chain meter; the root subtitle joins the graph's supplied root display names, omitted when equal to the label, and no name is derived from a skill key
 
 #### Scenario: Rarity borders stay visible without colour
 - **WHEN** an item's rarity frame renders
 - **THEN** each rarity draws a distinct border pattern at a width where the pattern is visible (uncommon dotted and rare dashed at 2px, epic double and legendary ridge at 3px) with a faint tint, and common and unknown items remain neutral
 
 #### Scenario: Same element has two lineages
-- **WHEN** two chains share an element label but have distinct root-node display names
-- **THEN** both root names are readable beside their own progress
+- **WHEN** two graphs share an element label but have distinct root-node display names
+- **THEN** both root names are readable beside their own owned/total count
 
 #### Scenario: Unknown item has no rarity
 - **WHEN** an inventory row has null presentation
