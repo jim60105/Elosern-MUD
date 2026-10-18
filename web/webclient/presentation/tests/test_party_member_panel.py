@@ -27,6 +27,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from web.webclient.actions.exploration_actions import _party_leave_adapter
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.party import PARTY_MAX_SLOTS
 from web.webclient.presentation.party_member import (
@@ -60,11 +61,18 @@ from world.rules.party import (
     ESCORT_BOUND_MESSAGE,
     HANDBACK_FIRST_MESSAGE,
     add_temporary_source,
+    has_general_membership,
+    is_companion,
     join_party,
     leave_party,
+    reasons_for,
 )
 from world.rules.npc_persona import initialize_npc_persona
-from world.rules.possession import POSSESSED_REFUSAL_MESSAGES, REASON_POSSESSED_TALK
+from world.rules.possession import (
+    POSSESSED_REFUSAL_MESSAGES,
+    REASON_POSSESSED_TALK,
+    enter_possession,
+)
 
 NOT_EXPLORING_MESSAGE = "你目前無法編輯角色資料。"
 
@@ -455,8 +463,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         )
         return party_member_presenter(context)
 
-    def _escort_member(self, key="護衛測試者"):
+    def _escort_member(self, key="護衛測試者", owner=None):
         """A real temporary-only escort binding for ``self.player``."""
+        owner = self.player if owner is None else owner
         register(
             quest(
                 "member_escort",
@@ -472,7 +481,7 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
                 ),
             )
         )
-        npc = _companion(key, self.room)
+        npc = _companion(key, owner.location)
         record = QuestRecord(
             quest_id="member_escort:1",
             definition_key="member_escort",
@@ -488,11 +497,11 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
             failure_reason=None,
             protected_roles=(("escortee", npc.pk),),
         )
-        self.player.db.quest_log = [
-            *list(self.player.db.quest_log or []),
+        owner.db.quest_log = [
+            *list(owner.db.quest_log or []),
             to_storage(record),
         ]
-        add_temporary_source(npc, self.player, record.quest_id, "escortee")
+        add_temporary_source(npc, owner, record.quest_id, "escortee")
         return npc, record
 
     def test_companion_payload_is_exact_and_reports_bond_pips(self):
@@ -581,6 +590,24 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         leave = payload["companion"]["actions"][1]
         self.assertIs(leave["enabled"], True)
         self.assertIsNone(leave["reason"])
+
+    def test_advertised_leave_succeeds_for_the_possessed_general_temporary_member(self):
+        # ``self.char1`` carries the live account session the party authority
+        # boundary requires; the custom test player does not.
+        commander = self.char1
+        companion, record = self._escort_member(owner=commander)
+        join_party(companion, commander)
+        enter_possession(commander, companion)
+        result = _party_leave_adapter(companion, {"npc_id": int(companion.pk)})
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertFalse(has_general_membership(companion, commander))
+        self.assertTrue(is_companion(companion, commander))
+        self.assertEqual(
+            reasons_for(companion, commander),
+            ((record.quest_id, "escortee"),),
+        )
+        self.assertEqual(commander.db.possession["npc_dbid"], int(companion.pk))
+        self.assertEqual(companion.db.possessed_by, int(commander.pk))
 
     def test_possessed_companion_offers_release_and_keeps_companion_facts(self):
         companion = _companion("艾拉", self.room)

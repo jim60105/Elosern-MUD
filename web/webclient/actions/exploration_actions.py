@@ -794,7 +794,18 @@ def _party_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
         commander = resolve_commander(actor)
     except PartyScopeError as error:  # observability: ignore R2: the stable party refusal IS the action result, not a swallowed failure
         return _rejected(error.reason, error.message)
-    npc = _resolve_npc(actor, payload["npc_id"])
+    # The acting puppet may be the dismissal target itself: a player who
+    # possesses a general-plus-temporary companion can relinquish that
+    # companion's general membership without handing back first. Visibility
+    # excludes the looker, so resolve that exact identity directly; every
+    # other target still resolves from the puppet's current room.
+    from typeclasses.npcs import NPC
+
+    npc_id = int(payload["npc_id"])
+    if getattr(actor, "pk", None) == npc_id and isinstance(actor, NPC):
+        npc = actor
+    else:
+        npc = _resolve_npc(actor, npc_id)
     if npc is None:
         return _rejected("no_npc", "這裡沒有這個對象。")
     if not is_companion(npc, commander):
