@@ -164,9 +164,10 @@ var LOCAL_MAP_MAX_LEGEND = 16;
 var LOCAL_MAP_MAX_STRING = 256;
 
 // Exact shared lineage bounds -- must stay equal to
-// web.webclient.presentation.lineage (skill-lineage-panel design DD3).
-var LINEAGE_MAX_CHAINS = 16;
-var LINEAGE_MAX_NODES_PER_CHAIN = 32;
+// web.webclient.presentation.lineage (skill-lineage-panel v2, design §5).
+var LINEAGE_MAX_GRAPHS = 16;
+var LINEAGE_MAX_NODES_PER_GRAPH = 32;
+var LINEAGE_MAX_EDGES_PER_GRAPH = 64;
 var LINEAGE_MAX_TEXT = 128;
 var LOCAL_MAP_MAX_TITLE = 128;
 var LOCAL_MAP_MAX_NODE_ID = 128;
@@ -496,7 +497,7 @@ var PANEL_ALLOWLIST = {
   creation: 6,
   exploration: 4,
   character: 9,
-  lineage: 1,
+  lineage: 2,
   dialogue: 2,
   title_ballot: 1,
   title_codex: 1,
@@ -606,8 +607,9 @@ module.exports = {
   LOCAL_MAP_MAX_EDGES: LOCAL_MAP_MAX_EDGES,
   LOCAL_MAP_MAX_LEGEND: LOCAL_MAP_MAX_LEGEND,
   LOCAL_MAP_MAX_STRING: LOCAL_MAP_MAX_STRING,
-  LINEAGE_MAX_CHAINS: LINEAGE_MAX_CHAINS,
-  LINEAGE_MAX_NODES_PER_CHAIN: LINEAGE_MAX_NODES_PER_CHAIN,
+  LINEAGE_MAX_GRAPHS: LINEAGE_MAX_GRAPHS,
+  LINEAGE_MAX_NODES_PER_GRAPH: LINEAGE_MAX_NODES_PER_GRAPH,
+  LINEAGE_MAX_EDGES_PER_GRAPH: LINEAGE_MAX_EDGES_PER_GRAPH,
   LINEAGE_MAX_TEXT: LINEAGE_MAX_TEXT,
   LOCAL_MAP_MAX_TITLE: LOCAL_MAP_MAX_TITLE,
   LOCAL_MAP_MAX_NODE_ID: LOCAL_MAP_MAX_NODE_ID,

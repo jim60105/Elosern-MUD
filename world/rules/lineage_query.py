@@ -1,4 +1,4 @@
-"""Pure skill-lineage read model (skill-lineage-panel D8, design DD1/DD2).
+"""Pure skill-lineage read model (skill-lineage-panel v2, design §5).
 
 One source, zero writes: every view here derives from ``SKILL_REGISTRY``
 prerequisite edges (plus the load-time reverse-edge cache), the entity's
@@ -7,13 +7,15 @@ function in this module creates, mutates, or persists any entity or world
 state; consumers (the WebClient panel presenter, the ``lineage`` command) are
 serialization only.
 
-A chain (系譜樹) is the reverse-edge closure of one lineage root. A root is a
-skill that declares no prerequisites AND is consumed by at least one
-prerequisite edge: a prerequisite-less skill nobody consumes is not a tree,
-it is an isolated skill, and emitting one-node chains for every such skill
-would bury the real trees (design DD2). Nodes are emitted in topological
-order, so a branch-or-merge content drop upgrades every renderer without a
-contract change (design §9.1).
+A lineage graph (系譜圖) is one connected component of the identity-eligible
+prerequisite graph: a merge node appears once, in the single graph that owns
+both of its parents, and every prerequisite edge is carried explicitly with
+its minimum level. A component qualifies when it contains at least one edge,
+or when its single skill is owned — an unowned isolated skill is not a graph,
+and emitting one for every such registry row would bury the real trees.
+Nodes are emitted in topological order with their longest prerequisite depth,
+so a branch-or-merge content drop upgrades every renderer without a contract
+change (design §9.1).
 """
 
 from collections.abc import Mapping, Sequence
@@ -91,29 +93,43 @@ class LineageNodeView:
     display_name_zh: str
     owned: bool
     usable: bool
+    ready: bool
     level: int
     xp_into_level: float
     xp_to_next_level: float
     capped: bool
     prereq_text_zh: str
+    depth: int
 
 
 @dataclass(frozen=True)
-class LineageChainView:
-    """One root's reachable subtree in topological order."""
+class LineageEdgeView:
+    """One prerequisite edge of a graph: parent key, child key, minimum level."""
 
-    root_skill_key: str
-    element_or_style_zh: str
+    from_key: str
+    to_key: str
+    min_level: int
+
+
+@dataclass(frozen=True)
+class LineageGraphView:
+    """One connected component: its roots, unique nodes, edges and counts."""
+
+    graph_id: str
+    group_label_zh: str
+    root_keys: tuple[str, ...]
     nodes: tuple[LineageNodeView, ...]
+    edges: tuple[LineageEdgeView, ...]
+    owned_count: int
+    total_count: int
     consumed: bool
-    meter: float
 
 
 @dataclass(frozen=True)
 class LineageView:
     """The whole lineage ledger; counts describe the FULL untruncated view."""
 
-    chains: tuple[LineageChainView, ...]
+    graphs: tuple[LineageGraphView, ...]
     completed_count: int
     total_count: int
 
@@ -222,138 +238,213 @@ def proficiency_progress_for_keys(
     }
 
 
-def _chain_root_keys() -> tuple[str, ...]:
-    """Root keys (prereq-less AND consumed) in registry insertion order."""
-    return tuple(
-        key
-        for key, skill in SKILL_REGISTRY.items()
-        if not skill.prerequisites and prerequisite_consumers(key)
-    )
+def _components(eligible: set[str]) -> tuple[tuple[str, ...], ...]:
+    """Connected components of the eligible prerequisite graph, in registry order.
 
-
-def _chain_nodes(root_key: str, eligible: set[str] | None = None) -> tuple[str, ...]:
-    """Reverse-edge closure of ``root_key`` in deterministic topological order.
-
-    Kahn topological sort over the subgraph induced by the closure, keyed by
-    registry insertion order, so the sequence is stable and prerequisite
-    edges always point backwards. A merging node (two root ancestors)
-    legitimately appears in both roots' closures; degree never special-cases.
+    Union-find over identity-eligible skills, joining each skill to every
+    declared prerequisite that is itself eligible. Components are emitted in
+    the registry order of their first member, and members keep registry order,
+    so the sequence is deterministic without any set iteration.
     """
-    closure: set[str] = set()
-    frontier = [root_key]
-    while frontier:
-        current = frontier.pop()
-        if current in closure or (eligible is not None and current not in eligible):
+    parent = {key: key for key in eligible}
+
+    def find(key: str) -> str:
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    for key in SKILL_REGISTRY:
+        if key not in eligible:
             continue
-        closure.add(current)
-        frontier.extend(key for key, _ in prerequisite_consumers(current))
+        for prereq in SKILL_REGISTRY[key].prerequisites:
+            if prereq.skill_key not in eligible:
+                continue
+            root, other = find(key), find(prereq.skill_key)
+            if root != other:
+                parent[other] = root
+
+    grouped: dict[str, list[str]] = {}
+    for key in SKILL_REGISTRY:
+        if key in eligible:
+            grouped.setdefault(find(key), []).append(key)
+    return tuple(tuple(members) for members in grouped.values())
+
+
+def _topological_order(component: set[str]) -> tuple[str, ...]:
+    """Kahn topological sort of one component, registry order as tie-break.
+
+    Prerequisite edges always point backwards in the emitted order, so a merge
+    node follows both of its parents. The canonical graph is acyclic
+    (load-time validation), so the sort always drains; anything left would be
+    a bug, not content.
+    """
     indegree = {
-        key: sum(1 for pre in SKILL_REGISTRY[key].prerequisites if pre.skill_key in closure)
-        for key in closure
+        key: sum(
+            1
+            for pre in SKILL_REGISTRY[key].prerequisites
+            if pre.skill_key in component
+        )
+        for key in component
     }
     registry_order = {key: index for index, key in enumerate(SKILL_REGISTRY)}
-    queue = sorted((key for key, degree in indegree.items() if degree == 0), key=registry_order.get)
+    queue = sorted(
+        (key for key, degree in indegree.items() if degree == 0),
+        key=registry_order.get,
+    )
     ordered: list[str] = []
     while queue:
         current = queue.pop(0)
         ordered.append(current)
         for consumer_key, _ in prerequisite_consumers(current):
-            if consumer_key not in closure:
+            if consumer_key not in component:
                 continue
             indegree[consumer_key] -= 1
             if indegree[consumer_key] == 0:
                 queue.append(consumer_key)
                 queue.sort(key=registry_order.get)
-    # The canonical graph is acyclic (load-time validation), so the sort
-    # always drains; anything left would be a bug, not content.
-    if len(ordered) != len(closure):
+    if len(ordered) != len(component):
         raise LineageQueryError(
-            f"lineage chain from {root_key!r} hit a cycle the registry "
-            "validator should have rejected"
+            "lineage graph hit a cycle the registry validator should have rejected"
         )
     return tuple(ordered)
 
 
-def _chain_label(root_key: str) -> str:
-    """The chain's 元素／風格 label: the root's element, else its category."""
-    skill = SKILL_REGISTRY[root_key]
-    if skill.element is not None:
-        return skill.element.display_name_zh
-    return CATEGORY_LABELS[skill.category]
+def _group_label(root_keys: Sequence[str]) -> str:
+    """The graph's 元素／風格 label: shared root label, else joined labels."""
+    labels: list[str] = []
+    for root_key in root_keys:
+        skill = SKILL_REGISTRY[root_key]
+        label = (
+            skill.element.display_name_zh
+            if skill.element is not None
+            else CATEGORY_LABELS[skill.category]
+        )
+        if label not in labels:
+            labels.append(label)
+    text = "‧".join(labels)
+    if len(text) <= LINEAGE_TEXT_WIRE_MAX:
+        return text
+    return f"{text[: LINEAGE_TEXT_WIRE_MAX - 1]}…"
 
 
-def _node_view(entity: Any, skill_key: str, owned: set, xp: dict[str, float]) -> LineageNodeView:
+def _node_view(
+    entity: Any,
+    skill_key: str,
+    owned: set,
+    xp: dict[str, float],
+    depth: int,
+) -> LineageNodeView:
+    """One node with its live state, unlock gate, readiness and graph depth."""
     skill = SKILL_REGISTRY[skill_key]
     progress = _progress_from_stored(xp.get(skill_key, 0.0), skill_key)
-    prereq = missing_prerequisite(entity, skill)
+    prereq = missing_prerequisite(entity, skill, owned_keys=owned)
     prereq_text = ""
     if prereq is not None:
         prereq_skill = SKILL_REGISTRY[prereq.skill_key]
         prereq_text = _fit_wire_text(prereq_skill.label, prereq.min_proficiency)
+    is_owned = skill_key in owned
+    ready = not is_owned and all(
+        int(xp.get(edge.skill_key, 0.0) // SKILL_PROFICIENCY_XP_PER_LEVEL)
+        >= edge.min_proficiency
+        for edge in skill.prerequisites
+    )
     return LineageNodeView(
         skill_key=skill_key,
         display_name_zh=skill.label,
-        owned=skill_key in owned,
-        usable=can_use_skill(entity, skill),
+        owned=is_owned,
+        usable=can_use_skill(entity, skill, owned_keys=owned),
+        ready=ready,
         level=progress.level,
         xp_into_level=progress.xp_into_level,
         xp_to_next_level=progress.xp_to_next_level,
         capped=progress.capped,
         prereq_text_zh=prereq_text,
+        depth=depth,
     )
 
 
-def _chain_meter(nodes: tuple[LineageNodeView, ...]) -> float:
-    """0..1 shallowest-uncapped progress (design DD2).
-
-    All-capped → exactly 1.0. Otherwise, walking the topological order, every
-    node before the first uncapped one is capped and contributes a full step;
-    the first uncapped node contributes its XP fraction; nothing after it
-    counts: ``meter = (i + fraction) / len(nodes)``.
-    """
-    total = len(nodes)
-    for index, node in enumerate(nodes):
-        if not node.capped:
-            fraction = node.xp_into_level / SKILL_PROFICIENCY_XP_PER_LEVEL
-            return (index + fraction) / total
-    return 1.0
-
-
 def build_lineage_view(entity: Any) -> LineageView:
-    """Return the entity's full lineage ledger; mutates nothing.
+    """Return the entity's full lineage ledger as connected graphs.
+
+    One graph per identity-eligible prerequisite component (a lone skill only
+    when owned), nodes in topological order with their longest prerequisite
+    depth, and every in-component edge with its minimum level. Mutates nothing.
 
     Raises :class:`LineageQueryError` when stored proficiency data is
     structurally invalid, before producing any partial view.
     """
     xp = _proficiency_map(entity)
     owned = set(entity.skills.owned_keys())
-    chains: list[LineageChainView] = []
     eligible = {
-        key for key, skill in SKILL_REGISTRY.items()
+        key
+        for key, skill in SKILL_REGISTRY.items()
         if skill_identity_eligible(entity, skill)
     }
-    for root_key in _chain_root_keys():
-        if root_key not in eligible:
-            continue
-        if not any(key in eligible for key, _ in prerequisite_consumers(root_key)):
-            continue
-        nodes = tuple(
-            _node_view(entity, key, owned, xp) for key in _chain_nodes(root_key, eligible)
+    registry_order = {key: index for index, key in enumerate(SKILL_REGISTRY)}
+    graphs: list[LineageGraphView] = []
+    for members in _components(eligible):
+        component = set(members)
+        has_edge = any(
+            edge.skill_key in component
+            for key in members
+            for edge in SKILL_REGISTRY[key].prerequisites
         )
-        consumed = all(node.capped for node in nodes)
-        chains.append(
-            LineageChainView(
-                root_skill_key=root_key,
-                element_or_style_zh=_chain_label(root_key),
-                nodes=nodes,
-                consumed=consumed,
-                meter=_chain_meter(nodes),
+        if not has_edge and (len(members) != 1 or members[0] not in owned):
+            continue
+        ordered = _topological_order(component)
+        depth: dict[str, int] = {}
+        for key in ordered:
+            parents = [
+                edge.skill_key
+                for edge in SKILL_REGISTRY[key].prerequisites
+                if edge.skill_key in component
+            ]
+            depth[key] = 0 if not parents else max(depth[parent] for parent in parents) + 1
+        nodes = tuple(
+            _node_view(entity, key, owned, xp, depth[key]) for key in ordered
+        )
+        roots = tuple(
+            sorted(
+                (
+                    key
+                    for key in ordered
+                    if not any(
+                        edge.skill_key in component
+                        for edge in SKILL_REGISTRY[key].prerequisites
+                    )
+                ),
+                key=registry_order.get,
             )
         )
+        edges = tuple(
+            LineageEdgeView(
+                from_key=edge.skill_key,
+                to_key=key,
+                min_level=edge.min_proficiency,
+            )
+            for key in ordered
+            for edge in SKILL_REGISTRY[key].prerequisites
+            if edge.skill_key in component
+        )
+        consumed = all(node.capped for node in nodes)
+        graphs.append(
+            LineageGraphView(
+                graph_id=roots[0],
+                group_label_zh=_group_label(roots),
+                root_keys=roots,
+                nodes=nodes,
+                edges=edges,
+                owned_count=sum(1 for node in nodes if node.owned),
+                total_count=len(nodes),
+                consumed=consumed,
+            )
+        )
+    graphs.sort(key=lambda graph: registry_order[graph.graph_id])
     return LineageView(
-        chains=tuple(chains),
-        completed_count=sum(1 for chain in chains if chain.consumed),
-        total_count=len(chains),
+        graphs=tuple(graphs),
+        completed_count=sum(1 for graph in graphs if graph.consumed),
+        total_count=len(graphs),
     )
 
 

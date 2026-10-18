@@ -212,5 +212,12 @@ def _party_view_member_adapter(
     return _success(
         "viewing_member",
         "已選擇檢視的隊伍成員。",
-        ("party", "party_member", "character", "party_inventory", "item_holdings"),
+        (
+            "party",
+            "party_member",
+            "character",
+            "party_inventory",
+            "item_holdings",
+            "lineage",
+        ),
     )

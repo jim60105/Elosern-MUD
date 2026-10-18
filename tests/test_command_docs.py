@@ -93,7 +93,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]",
         "context": "一般（戰鬥內外皆可施放技能）",
     },
-    "lineage": {"syntax": "lineage", "context": "一般（戰鬥內外皆可用）"},
+    "lineage": {"syntax": "lineage [<成員>]", "context": "一般（戰鬥內外皆可用）"},
     "狀態": {"syntax": "狀態 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
     "技能": {"syntax": "技能 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
     "engage": {"syntax": "engage <target>", "context": "戰鬥（需有敵對魔物）"},
@@ -676,10 +676,10 @@ class CommandDocsContractTests(unittest.TestCase):
     def test_lineage_entry_documents_the_ledger_surface(self):
         entry = self.entries["lineage"]
         self.assertEqual(entry["指令"], "lineage")
-        self.assertEqual(parse_aliases(entry["別名"]), set())
-        self.assertEqual(entry["語法"].replace("`", ""), "lineage")
+        self.assertEqual(parse_aliases(entry["別名"]), {"系譜"})
+        self.assertEqual(entry["語法"].replace("`", ""), "lineage [<成員>]")
         self.assertEqual(entry["情境"], EXPECTED_COMMANDS["lineage"]["context"])
-        for token in ("見頂", "門檻", "熟練度"):
+        for token in ("見頂", "門檻", "熟練度", "根節點", "可解鎖", "前置"):
             self.assertIn(token, entry["說明"])
         row = next(
             line
@@ -688,6 +688,7 @@ class CommandDocsContractTests(unittest.TestCase):
         )
         self.assertIn("見頂", row)
         self.assertIn("門檻", row)
+        self.assertIn("可解鎖", row)
 
     @covers_requirement("game-command-docs::the-cast-command-reference-documents-the-optional-scale-token")
     def test_cast_entry_documents_the_freeform_scale_token(self):

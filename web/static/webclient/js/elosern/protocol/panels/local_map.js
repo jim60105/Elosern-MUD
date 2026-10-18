@@ -20,8 +20,9 @@ var LOCAL_MAP_MAX_NODES = C.LOCAL_MAP_MAX_NODES;
 var LOCAL_MAP_MAX_EDGES = C.LOCAL_MAP_MAX_EDGES;
 var LOCAL_MAP_MAX_LEGEND = C.LOCAL_MAP_MAX_LEGEND;
 var LOCAL_MAP_MAX_STRING = C.LOCAL_MAP_MAX_STRING;
-var LINEAGE_MAX_CHAINS = C.LINEAGE_MAX_CHAINS;
-var LINEAGE_MAX_NODES_PER_CHAIN = C.LINEAGE_MAX_NODES_PER_CHAIN;
+var LINEAGE_MAX_GRAPHS = C.LINEAGE_MAX_GRAPHS;
+var LINEAGE_MAX_NODES_PER_GRAPH = C.LINEAGE_MAX_NODES_PER_GRAPH;
+var LINEAGE_MAX_EDGES_PER_GRAPH = C.LINEAGE_MAX_EDGES_PER_GRAPH;
 var LINEAGE_MAX_TEXT = C.LINEAGE_MAX_TEXT;
 var LOCAL_MAP_MAX_TITLE = C.LOCAL_MAP_MAX_TITLE;
 var LOCAL_MAP_COORD_MIN = C.LOCAL_MAP_COORD_MIN;
@@ -128,11 +129,13 @@ function validateLineageNode(value) {
       "display_name_zh",
       "owned",
       "usable",
+      "ready",
       "level",
       "xp_into_level",
       "xp_to_next_level",
       "capped",
       "prereq_text_zh",
+      "depth",
     ],
     []
   );
@@ -155,6 +158,7 @@ function validateLineageNode(value) {
     display_name_zh: displayName,
     owned: requireBool(value.owned, "owned"),
     usable: requireBool(value.usable, "usable"),
+    ready: requireBool(value.ready, "ready"),
     level: requireInt(value.level, "level", 0, MAX_SAFE_INTEGER),
     xp_into_level: requireNumber(
       value.xp_into_level,
@@ -170,40 +174,115 @@ function validateLineageNode(value) {
     ),
     capped: requireBool(value.capped, "capped"),
     prereq_text_zh: prereqText,
+    depth: requireInt(value.depth, "depth", 0, MAX_SAFE_INTEGER),
   };
 }
 
-function validateLineageChain(value) {
+function validateLineageKey(value, field) {
+  return validateIdentifier(value, field);
+}
+
+function validateLineageEdge(value) {
+  requireExactFields(value, "lineage edge", ["from_key", "to_key", "min_level"], []);
+  return {
+    from_key: validateLineageKey(value.from_key, "from_key"),
+    to_key: validateLineageKey(value.to_key, "to_key"),
+    min_level: requireInt(value.min_level, "min_level", 1, MAX_SAFE_INTEGER),
+  };
+}
+
+function validateLineageGraph(value) {
   requireExactFields(
     value,
-    "lineage chain",
-    ["root_skill_key", "element_or_style_zh", "consumed", "meter", "nodes"],
+    "lineage graph",
+    [
+      "graph_id",
+      "group_label_zh",
+      "root_keys",
+      "owned_count",
+      "total_count",
+      "consumed",
+      "nodes",
+      "edges",
+    ],
     []
   );
-  var rootKey = validateIdentifier(value.root_skill_key, "root_skill_key");
-  var label = requireString(
-    value.element_or_style_zh,
-    "element_or_style_zh",
-    LINEAGE_MAX_TEXT
-  );
+  var graphId = validateLineageKey(value.graph_id, "graph_id");
+  var label = requireString(value.group_label_zh, "group_label_zh", LINEAGE_MAX_TEXT);
   if (!label.trim()) {
-    throw new Error("element_or_style_zh must be non-empty");
+    throw new Error("group_label_zh must be non-empty");
   }
-  if (!Array.isArray(value.nodes) || value.nodes.length < 1 || value.nodes.length > LINEAGE_MAX_NODES_PER_CHAIN) {
+  if (
+    !Array.isArray(value.nodes) ||
+    value.nodes.length < 1 ||
+    value.nodes.length > LINEAGE_MAX_NODES_PER_GRAPH
+  ) {
     throw new Error(
-      "nodes must be a list of 1.." + LINEAGE_MAX_NODES_PER_CHAIN + " entries"
+      "nodes must be a list of 1.." + LINEAGE_MAX_NODES_PER_GRAPH + " entries"
     );
   }
   var nodeViews = value.nodes.map(validateLineageNode);
-  if (nodeViews[0].skill_key !== rootKey) {
-    throw new Error("truncated chains keep their head: nodes[0] must be the root");
+  var nodeKeys = nodeViews.map(function (node) {
+    return node.skill_key;
+  });
+  if (new Set(nodeKeys).size !== nodeKeys.length) {
+    throw new Error("nodes must carry unique skill keys");
+  }
+  if (
+    !Array.isArray(value.root_keys) ||
+    value.root_keys.length < 1 ||
+    value.root_keys.length > nodeKeys.length
+  ) {
+    throw new Error("root_keys must be a unique non-empty subset of nodes");
+  }
+  var rootViews = value.root_keys.map(function (root) {
+    return validateLineageKey(root, "root_keys");
+  });
+  if (new Set(rootViews).size !== rootViews.length) {
+    throw new Error("root_keys must be a unique non-empty subset of nodes");
+  }
+  rootViews.forEach(function (root) {
+    if (nodeKeys.indexOf(root) === -1) {
+      throw new Error("root_keys must name graph nodes");
+    }
+  });
+  if (rootViews[0] !== graphId) {
+    throw new Error("graph_id must be the first root key");
+  }
+  if (!Array.isArray(value.edges) || value.edges.length > LINEAGE_MAX_EDGES_PER_GRAPH) {
+    throw new Error(
+      "edges must be a list of at most " + LINEAGE_MAX_EDGES_PER_GRAPH + " entries"
+    );
+  }
+  var edgeViews = value.edges.map(validateLineageEdge);
+  var seenEdges = new Set();
+  edgeViews.forEach(function (edge) {
+    if (edge.from_key === edge.to_key) {
+      throw new Error("a lineage edge must connect two distinct nodes");
+    }
+    var pair = edge.from_key + "\u0000" + edge.to_key;
+    if (seenEdges.has(pair)) {
+      throw new Error("a lineage edge may appear only once");
+    }
+    seenEdges.add(pair);
+    if (nodeKeys.indexOf(edge.from_key) === -1 || nodeKeys.indexOf(edge.to_key) === -1) {
+      throw new Error("an edge must not reference a truncated node");
+    }
+  });
+  var owned = requireInt(value.owned_count, "owned_count", 0, MAX_SAFE_INTEGER);
+  var total = requireInt(value.total_count, "total_count", 0, MAX_SAFE_INTEGER);
+  if (owned > total || total < nodeKeys.length) {
+    throw new Error("graph counts must cover the emitted nodes");
   }
   return {
-    root_skill_key: rootKey,
-    element_or_style_zh: label,
+    graph_id: graphId,
+    group_label_zh: label,
+    root_keys: rootViews,
+    owned_count: owned,
+    total_count: total,
     consumed: requireBool(value.consumed, "consumed"),
-    meter: requireNumber(value.meter, "meter", 0, 1),
     nodes: nodeViews,
+    edges: edgeViews,
   };
 }
 
@@ -211,11 +290,11 @@ function validateLineagePanel(payload) {
   requireExactFields(
     payload,
     "lineage panel",
-    ["schema_version", "available", "kind", "completed_count", "total_count", "chains"],
+    ["schema_version", "available", "kind", "completed_count", "total_count", "graphs"],
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 1) {
+  if (payload.schema_version !== 2) {
     throw new Error("unsupported lineage panel schema_version");
   }
   // Mirror the Python validate_lineage: the exported validator rejects the
@@ -238,19 +317,19 @@ function validateLineagePanel(payload) {
   if (completed > total) {
     throw new Error("completed_count must not exceed total_count");
   }
-  if (!Array.isArray(payload.chains) || payload.chains.length > LINEAGE_MAX_CHAINS) {
+  if (!Array.isArray(payload.graphs) || payload.graphs.length > LINEAGE_MAX_GRAPHS) {
     throw new Error(
-      "chains must be a list of at most " + LINEAGE_MAX_CHAINS + " entries"
+      "graphs must be a list of at most " + LINEAGE_MAX_GRAPHS + " entries"
     );
   }
-  var chainViews = payload.chains.map(validateLineageChain);
+  var graphViews = payload.graphs.map(validateLineageGraph);
   var result = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "lineage",
     completed_count: completed,
     total_count: total,
-    chains: chainViews,
+    graphs: graphViews,
   };
   // Envelope guarantee: the presenter truncates until a real payload fits;
   // the validator enforces the serialized byte size directly and fails

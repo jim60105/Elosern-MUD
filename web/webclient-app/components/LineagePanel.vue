@@ -1,19 +1,21 @@
 <script setup>
-// LineagePanel (skill-lineage-panel, task 2.3): the big-window skill-lineage
-// ledger rendered inside OverlayHost's body slot. Every rendered value comes
-// from the committed `lineage` panel payload alone — the client recomputes no
-// growth rules: levels, meters, 見頂 marks, prerequisite lines, and the
-// header counts are the server's derived view, serialized verbatim. A chain
-// omitted from the payload (truncated) or the whole panel unavailable renders
-// no placeholder chain and no invented progress.
+// LineagePanel (skill-lineage-panel v2): the transitional big-window skill
+// graph view rendered inside OverlayHost's body slot. Every rendered value
+// comes from the committed `lineage` panel payload alone — the client
+// recomputes no growth rules: levels, XP bands, 見頂/可解鎖 marks,
+// prerequisite lines, graph counts and the header counts are the server's
+// derived view, serialized verbatim. A graph omitted from the payload
+// (truncated) or the whole panel unavailable renders no placeholder graph and
+// no invented progress.
 //
-// Tree interaction is client-local view state only: which chains are
-// expanded. A collapsed chain renders its aggregate `meter` (shallowest
-// unlocked node progress); expanding renders the per-node rows.
+// Graph interaction is client-local view state only: which graphs are
+// expanded. A collapsed graph renders its identity and owned/total count;
+// expanding renders the per-node rows. The chain meter is gone: progress is
+// the server's owned/total count and each node's own level band.
 import { computed, ref } from "vue";
 
 const props = defineProps({
-  // The committed `lineage` panel payload (schema version 1), or null when
+  // The committed `lineage` panel payload (schema version 2), or null when
   // no panel has ever been committed.
   lineage: { type: Object, default: null },
 });
@@ -26,28 +28,24 @@ const available = computed(
 // delivered in its unavailable form always carries the registry reason.
 const FALLBACK_REASON = "技能系譜目前無法顯示";
 
-const chains = computed(() =>
-  available.value && Array.isArray(props.lineage.chains)
-    ? props.lineage.chains
+const graphs = computed(() =>
+  available.value && Array.isArray(props.lineage.graphs)
+    ? props.lineage.graphs
     : [],
 );
 
-// Client-local expand/collapse state, keyed by chain root skill key. The
-// default is collapsed (the ledger reads as a per-tree progress board first).
+// Client-local expand/collapse state, keyed by graph id. The default is
+// collapsed (the ledger reads as a per-graph progress board first).
 const expanded = ref(new Set());
 
-function toggleChain(rootKey) {
+function toggleGraph(graphId) {
   const next = new Set(expanded.value);
-  if (next.has(rootKey)) {
-    next.delete(rootKey);
+  if (next.has(graphId)) {
+    next.delete(graphId);
   } else {
-    next.add(rootKey);
+    next.add(graphId);
   }
   expanded.value = next;
-}
-
-function chainPercent(meter) {
-  return Math.max(0, Math.min(100, Math.round(meter * 100)));
 }
 
 // Display-only normalization: practice XP is a float, the payload's
@@ -57,13 +55,22 @@ function formatXp(value) {
   return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
 }
 
-// The chain's disambiguating subtitle (webclient-drawer-content-polish): the
-// supplied root node's display name, so two chains sharing an element/style
-// label stay distinguishable. Omitted when absent or equal to the label; no
-// name is ever derived from a skill key.
-function rootName(chain) {
-  const name = Array.isArray(chain.nodes) ? chain.nodes[0]?.display_name_zh : null;
-  return typeof name === "string" && name && name !== chain.element_or_style_zh ? name : "";
+// The graph's disambiguating subtitle (webclient-contextual-hud): the
+// supplied root nodes' display names joined with ‧, so two graphs sharing an
+// element/style label stay distinguishable. Omitted when absent or equal to
+// the label; no name is ever derived from a skill key.
+function rootSubtitle(graph) {
+  const byKey = new Map(
+    (Array.isArray(graph.nodes) ? graph.nodes : []).map((node) => [
+      node.skill_key,
+      node.display_name_zh,
+    ]),
+  );
+  const names = (Array.isArray(graph.root_keys) ? graph.root_keys : [])
+    .map((key) => byKey.get(key))
+    .filter((name) => typeof name === "string" && name);
+  const joined = names.join("‧");
+  return joined && joined !== graph.group_label_zh ? joined : "";
 }
 
 function nodeMeter(node) {
@@ -85,28 +92,28 @@ function nodeMeter(node) {
         已完成 {{ lineage.completed_count }} / {{ lineage.total_count }} 樹
       </p>
       <p
-        v-if="chains.length === 0"
+        v-if="graphs.length === 0"
         class="lineage-panel__empty"
         data-testid="lineage-panel-empty"
       >
         目前尚無可追蹤的技能系譜。
       </p>
       <section
-        v-for="chain in chains"
-        :key="chain.root_skill_key"
-        class="lineage-chain"
-        :data-testid="`lineage-chain-${chain.root_skill_key}`"
+        v-for="graph in graphs"
+        :key="graph.graph_id"
+        class="lineage-graph"
+        :data-testid="`lineage-graph-${graph.graph_id}`"
       >
         <button
           type="button"
-          class="lineage-chain__head"
-          :aria-expanded="expanded.has(chain.root_skill_key) ? 'true' : 'false'"
-          :data-testid="`lineage-chain-toggle-${chain.root_skill_key}`"
-          @click="toggleChain(chain.root_skill_key)"
+          class="lineage-graph__head"
+          :aria-expanded="expanded.has(graph.graph_id) ? 'true' : 'false'"
+          :data-testid="`lineage-graph-toggle-${graph.graph_id}`"
+          @click="toggleGraph(graph.graph_id)"
         >
           <svg
-            class="lineage-chain__chevron"
-            :class="{ 'lineage-chain__chevron--open': expanded.has(chain.root_skill_key) }"
+            class="lineage-graph__chevron"
+            :class="{ 'lineage-graph__chevron--open': expanded.has(graph.graph_id) }"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -115,41 +122,35 @@ function nodeMeter(node) {
           >
             <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          <span class="lineage-chain__identity">
-            <span class="lineage-chain__label">{{ chain.element_or_style_zh }}</span>
+          <span class="lineage-graph__identity">
+            <span class="lineage-graph__label">{{ graph.group_label_zh }}</span>
             <span
-              v-if="rootName(chain)"
-              class="lineage-chain__root"
-              :data-testid="`lineage-chain-root-${chain.root_skill_key}`"
-              >{{ rootName(chain) }}</span
+              v-if="rootSubtitle(graph)"
+              class="lineage-graph__root"
+              :data-testid="`lineage-graph-root-${graph.graph_id}`"
+              >{{ rootSubtitle(graph) }}</span
             >
           </span>
           <span
-            class="lineage-chain__meter"
-            role="img"
-            :aria-label="`進度 ${chainPercent(chain.meter)}%`"
-            :data-testid="`lineage-chain-meter-${chain.root_skill_key}`"
-          >
-            <span
-              class="lineage-chain__meter-fill"
-              :style="{ width: `${chainPercent(chain.meter)}%` }"
-            ></span>
-          </span>
-          <span
-            v-if="chain.consumed"
-            class="lineage-chain__consumed"
-            data-testid="lineage-chain-consumed"
+            v-if="graph.consumed"
+            class="lineage-graph__consumed"
+            data-testid="lineage-graph-consumed"
             >已全數見頂</span
           >
-          <span v-else class="lineage-chain__percent">{{ chainPercent(chain.meter) }}%</span>
+          <span
+            v-else
+            class="lineage-graph__count"
+            :data-testid="`lineage-graph-count-${graph.graph_id}`"
+            >{{ graph.owned_count }}/{{ graph.total_count }}</span
+          >
         </button>
         <ul
-          v-if="expanded.has(chain.root_skill_key)"
-          class="lineage-chain__nodes"
-          :data-testid="`lineage-chain-nodes-${chain.root_skill_key}`"
+          v-if="expanded.has(graph.graph_id)"
+          class="lineage-graph__nodes"
+          :data-testid="`lineage-graph-nodes-${graph.graph_id}`"
         >
           <li
-            v-for="node in chain.nodes"
+            v-for="node in graph.nodes"
             :key="node.skill_key"
             class="lineage-node"
             :class="{ 'lineage-node--locked': !node.usable }"
@@ -169,6 +170,12 @@ function nodeMeter(node) {
               class="lineage-node__meter"
               :data-testid="`lineage-node-meter-${node.skill_key}`"
               >{{ nodeMeter(node) }}</span
+            >
+            <span
+              v-if="node.ready"
+              class="lineage-node__ready"
+              :data-testid="`lineage-node-ready-${node.skill_key}`"
+              >（可解鎖）</span
             >
             <span
               v-if="node.prereq_text_zh"
@@ -207,21 +214,20 @@ function nodeMeter(node) {
   color: var(--gold-400);
 }
 
-.lineage-chain {
+.lineage-graph {
   border: var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   overflow: hidden;
 }
 
-/* The collapsed chain row (webclient-drawer-content-polish): a compact
-   ~56px row — chevron, identity (label over its root-node subtitle), then
-   the progress meter right beside it (at most 320px) and its figure — so
-   the eye never travels across an empty row to read a chain's progress.
-   The identity column is shared by every row, so the meters align. */
-.lineage-chain__head {
+/* The collapsed graph row (webclient-contextual-hud): a compact ~56px row —
+   chevron, identity (label over its joined root-node subtitle), then the
+   owned/total count (or 已全數見頂) right beside it. The identity column is
+   shared by every row, so the counts align; there is no chain meter. */
+.lineage-graph__head {
   display: grid;
-  grid-template-columns: calc(14px * var(--ui-scale)) minmax(0, 13em) minmax(calc(96px * var(--ui-scale)), calc(320px * var(--ui-scale))) auto;
+  grid-template-columns: calc(14px * var(--ui-scale)) minmax(0, 1fr) auto;
   align-items: center;
   column-gap: var(--sp-3);
   width: 100%;
@@ -236,16 +242,16 @@ function nodeMeter(node) {
   font: inherit;
 }
 
-.lineage-chain__head:hover {
+.lineage-graph__head:hover {
   background: var(--gold-glow);
 }
 
-.lineage-chain__head:focus-visible {
+.lineage-graph__head:focus-visible {
   outline: 1px solid var(--gold-400);
   outline-offset: -2px;
 }
 
-.lineage-chain__chevron {
+.lineage-graph__chevron {
   flex: none;
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
@@ -253,11 +259,11 @@ function nodeMeter(node) {
   transition: transform var(--motion-fast) ease;
 }
 
-.lineage-chain__chevron--open {
+.lineage-graph__chevron--open {
   transform: rotate(90deg);
 }
 
-.lineage-chain__identity {
+.lineage-graph__identity {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -265,49 +271,35 @@ function nodeMeter(node) {
   min-width: 0;
 }
 
-.lineage-chain__label {
+.lineage-graph__label {
   overflow-wrap: anywhere;
   font-family: var(--f-serif);
   font-size: var(--text-lg);
   color: var(--paper-50);
 }
 
-.lineage-chain__root {
+.lineage-graph__root {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--paper-500);
   font-size: var(--text-sm);
 }
 
-.lineage-chain__consumed {
+.lineage-graph__consumed {
   color: var(--gold-400);
   font-size: var(--text-sm);
   white-space: nowrap;
 }
 
-.lineage-chain__percent {
-  min-width: 3.5ch;
+.lineage-graph__count {
+  min-width: 5ch;
   color: var(--paper-300);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
 }
 
-.lineage-chain__meter {
-  display: block;
-  height: calc(6px * var(--ui-scale));
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.lineage-chain__meter-fill {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
-}
-
-.lineage-chain__nodes {
+.lineage-graph__nodes {
   margin: 0;
   padding: 0 var(--sp-4) var(--sp-4) calc(42px * var(--ui-scale));
   list-style: none;
@@ -338,6 +330,10 @@ function nodeMeter(node) {
 
 .lineage-node__tip {
   color: var(--gold-400);
+}
+
+.lineage-node__ready {
+  color: var(--gold-300, var(--gold-400));
 }
 
 .lineage-node__meter {

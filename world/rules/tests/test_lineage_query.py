@@ -138,18 +138,20 @@ class LineageViewShapeTests(_TreeScopeMixin, unittest.TestCase):
             )
         view = build_lineage_view(_entity(TREE_CLOSURE))
         self.assertFalse(any(
-            chain.root_skill_key == "t_tree_root" for chain in view.chains
+            graph.graph_id == "t_tree_root" for graph in view.graphs
         ))
-        self.assertEqual(view.total_count, len(view.chains))
+        self.assertEqual(view.total_count, len(view.graphs))
 
     @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
-    def test_tree_chain_is_one_chain_in_topological_order(self):
+    def test_tree_is_one_graph_in_topological_order(self):
         view = build_lineage_view(_entity(TREE_CLOSURE))
         fire = next(
-            chain for chain in view.chains if chain.root_skill_key == "t_tree_root"
+            graph for graph in view.graphs if graph.graph_id == "t_tree_root"
         )
         keys = [node.skill_key for node in fire.nodes]
         self.assertEqual(set(keys), set(TREE_CLOSURE))
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(fire.root_keys, ("t_tree_root",))
         # Prerequisite edges always point backwards in the emitted order.
         positions = {key: index for index, key in enumerate(keys)}
         for key in keys:
@@ -157,28 +159,60 @@ class LineageViewShapeTests(_TreeScopeMixin, unittest.TestCase):
                 if prereq.skill_key in positions:
                     self.assertLess(positions[prereq.skill_key], positions[key])
         self.assertEqual(
-            fire.element_or_style_zh,
+            fire.group_label_zh,
             TREE["t_tree_root"].element.display_name_zh,
         )
+        self.assertEqual(fire.total_count, len(TREE_CLOSURE))
+        self.assertEqual(fire.owned_count, len(TREE_CLOSURE))
+        self.assertEqual(
+            {(edge.from_key, edge.to_key, edge.min_level) for edge in fire.edges},
+            {
+                ("t_tree_root", "t_tree_sprout", 3),
+                ("t_tree_sprout", "t_tree_branch", 3),
+                ("t_tree_branch", "t_tree_bloom", 5),
+                ("t_tree_bloom", "t_tree_canopy", 8),
+                ("t_tree_canopy", "t_tree_heartwood", 8),
+                ("t_tree_heartwood", "t_tree_crownfire", 8),
+                ("t_tree_branch", "t_tree_mossback", 3),
+                ("t_tree_bloom", "t_tree_burrow", 5),
+                ("t_tree_burrow", "t_tree_fallen", 5),
+            },
+        )
+        by_key = {node.skill_key: node for node in fire.nodes}
+        self.assertEqual(by_key["t_tree_root"].depth, 0)
+        self.assertEqual(by_key["t_tree_branch"].depth, 2)
+        self.assertEqual(by_key["t_tree_crownfire"].depth, 6)
+        self.assertEqual(by_key["t_tree_mossback"].depth, 3)
+        self.assertEqual(by_key["t_tree_fallen"].depth, 5)
 
     @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
-    def test_prereq_less_uncconsumed_skill_starts_no_chain(self):
-        # An injected no-prereq skill that nobody consumes starts nothing.
+    def test_unowned_isolated_skill_is_absent_but_an_owned_one_is_a_graph(self):
+        # An injected no-prereq skill that nobody consumes is no graph until
+        # the member owns it; ownership makes it a one-node graph.
         registry = live_skill_registry()
         registry["t_tree_lonely"] = _fake_skill("t_tree_lonely")
         _revalidate_live()
-        view = build_lineage_view(_entity(("t_tree_lonely",)))
+        view = build_lineage_view(_entity())
         self.assertNotIn(
-            "t_tree_lonely", {chain.root_skill_key for chain in view.chains}
+            "t_tree_lonely", {graph.graph_id for graph in view.graphs}
         )
-        for chain in view.chains:
-            self.assertNotIn("t_tree_lonely", [node.skill_key for node in chain.nodes])
+        for graph in view.graphs:
+            self.assertNotIn("t_tree_lonely", [node.skill_key for node in graph.nodes])
+        owned_view = build_lineage_view(_entity(("t_tree_lonely",)))
+        lonely = next(
+            graph for graph in owned_view.graphs if graph.graph_id == "t_tree_lonely"
+        )
+        self.assertEqual(lonely.root_keys, ("t_tree_lonely",))
+        self.assertEqual(lonely.edges, ())
+        self.assertEqual(lonely.owned_count, 1)
+        self.assertEqual(lonely.total_count, 1)
+        self.assertTrue(lonely.nodes[0].owned)
 
-    def test_counts_match_emitted_chains_and_consumed_flags(self):
+    def test_counts_match_emitted_graphs_and_consumed_flags(self):
         view = build_lineage_view(_entity(TREE_CHAIN))
-        self.assertEqual(view.total_count, len(view.chains))
+        self.assertEqual(view.total_count, len(view.graphs))
         self.assertEqual(
-            view.completed_count, sum(1 for chain in view.chains if chain.consumed)
+            view.completed_count, sum(1 for graph in view.graphs if graph.consumed)
         )
 
 
@@ -187,8 +221,8 @@ class NodeStateTests(_TreeScopeMixin, unittest.TestCase):
         return build_lineage_view(_entity(owned, proficiency))
 
     def _node(self, view, key):
-        chain = next(c for c in view.chains if c.root_skill_key == "t_tree_root")
-        return next(n for n in chain.nodes if n.skill_key == key)
+        graph = next(g for g in view.graphs if g.graph_id == "t_tree_root")
+        return next(n for n in graph.nodes if n.skill_key == key)
 
     @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_capped_mid_tree_node_reports_saturation(self):
@@ -204,8 +238,8 @@ class NodeStateTests(_TreeScopeMixin, unittest.TestCase):
         # Level 10 everywhere satisfies every edge (max edge is Lv.8).
         seeded = {key: _level_xp(10) for key in TREE_CLOSURE}
         view = self._view_for(seeded)
-        chain = next(c for c in view.chains if c.root_skill_key == "t_tree_root")
-        for node in chain.nodes:
+        graph = next(g for g in view.graphs if g.graph_id == "t_tree_root")
+        for node in graph.nodes:
             self.assertEqual(node.prereq_text_zh, "")
             self.assertTrue(node.usable)
 
@@ -222,8 +256,8 @@ class NodeStateTests(_TreeScopeMixin, unittest.TestCase):
         # Own bloom + chain minus branch ownership.
         owned = tuple(key for key in TREE_CHAIN if key != "t_tree_branch")
         view = build_lineage_view(_entity(owned, {"t_tree_sprout": _level_xp(3)}))
-        chain = next(c for c in view.chains if c.root_skill_key == "t_tree_root")
-        node = next(n for n in chain.nodes if n.skill_key == "t_tree_bloom")
+        graph = next(g for g in view.graphs if g.graph_id == "t_tree_root")
+        node = next(n for n in graph.nodes if n.skill_key == "t_tree_bloom")
         self.assertFalse(node.usable)
         self.assertIn(BRANCH_LABEL, node.prereq_text_zh)
 
@@ -236,35 +270,47 @@ class NodeStateTests(_TreeScopeMixin, unittest.TestCase):
         self.assertEqual(node.xp_to_next_level, SKILL_PROFICIENCY_XP_PER_LEVEL - 23.0)
 
 
-class MeterTests(_TreeScopeMixin, unittest.TestCase):
-    def _fire(self, proficiency):
-        view = build_lineage_view(_entity(TREE_CHAIN, proficiency))
-        return next(c for c in view.chains if c.root_skill_key == "t_tree_root")
+class ReadyAndConsumedTests(_TreeScopeMixin, unittest.TestCase):
+    def _fire(self, proficiency, owned=TREE_CHAIN):
+        view = build_lineage_view(_entity(owned, proficiency))
+        return next(g for g in view.graphs if g.graph_id == "t_tree_root")
 
-    def test_empty_progress_is_zero(self):
-        self.assertEqual(self._fire({}).meter, 0.0)
+    def _node(self, graph, key):
+        return next(node for node in graph.nodes if node.skill_key == key)
 
-    def test_shallowest_uncapped_node_drives_the_meter(self):
-        # First node capped (3 = root's consuming-edge cap), second node half
-        # banded.
-        chain = self._fire(
-            {
-                "t_tree_root": _level_xp(3),
-                "t_tree_sprout": _level_xp(1, SKILL_PROFICIENCY_XP_PER_LEVEL / 2),
-            }
+    def test_ready_marks_an_unowned_node_whose_edges_are_met(self):
+        # bloom requires branch Lv.5; owning the chain up to branch at Lv.5
+        # makes the unowned bloom ready, while the deeper canopy is not.
+        graph = self._fire(
+            {"t_tree_branch": _level_xp(5)},
+            owned=("t_tree_root", "t_tree_sprout", "t_tree_branch"),
         )
-        # The capped root contributes 1 step; sprout half of one step.
-        self.assertAlmostEqual(chain.meter, (1 + 0.5) / len(chain.nodes))
+        bloom = self._node(graph, "t_tree_bloom")
+        self.assertFalse(bloom.owned)
+        self.assertTrue(bloom.ready)
+        self.assertEqual(bloom.prereq_text_zh, "")
+        canopy = self._node(graph, "t_tree_canopy")
+        self.assertFalse(canopy.owned)
+        self.assertFalse(canopy.ready)
+        self.assertIn(TREE["t_tree_bloom"].label, canopy.prereq_text_zh)
 
-    def test_full_consumption_reads_one(self):
-        chain = self._fire({key: _level_xp(10) for key in TREE_CLOSURE})
-        self.assertTrue(chain.consumed)
-        self.assertEqual(chain.meter, 1.0)
+    def test_owned_node_is_never_ready(self):
+        graph = self._fire(
+            {key: _level_xp(10) for key in TREE_CLOSURE}, owned=TREE_CLOSURE
+        )
+        for node in graph.nodes:
+            self.assertTrue(node.owned)
+            self.assertFalse(node.ready)
 
-    def test_capped_but_unsatisfied_band_never_shares_a_deeper_step(self):
-        # Root saturated (contributes 1), sprout 0 XP.
-        chain = self._fire({"t_tree_root": _level_xp(3)})
-        self.assertAlmostEqual(chain.meter, 1 / len(chain.nodes))
+    def test_consumed_requires_every_node_capped(self):
+        partial = self._fire({"t_tree_root": _level_xp(3)})
+        self.assertFalse(partial.consumed)
+        full = self._fire({key: _level_xp(10) for key in TREE_CLOSURE})
+        self.assertTrue(full.consumed)
+        view = build_lineage_view(
+            _entity(TREE_CLOSURE, {key: _level_xp(10) for key in TREE_CLOSURE})
+        )
+        self.assertEqual(view.completed_count, 1)
 
 
 class PurityTests(_TreeScopeMixin, unittest.TestCase):
@@ -284,8 +330,8 @@ class PurityTests(_TreeScopeMixin, unittest.TestCase):
                 {"t_tree_crownfire": _level_xp(PROFICIENCY_TIP_CAP - 1)},
             )
         )
-        chain = next(c for c in view.chains if c.root_skill_key == "t_tree_root")
-        tip = next(n for n in chain.nodes if n.skill_key == "t_tree_crownfire")
+        graph = next(g for g in view.graphs if g.graph_id == "t_tree_root")
+        tip = next(n for n in graph.nodes if n.skill_key == "t_tree_crownfire")
         self.assertFalse(tip.capped)
         self.assertEqual(proficiency_cap("t_tree_crownfire"), PROFICIENCY_TIP_CAP)
 
@@ -344,10 +390,10 @@ class WireTextBoundTests(_TreeScopeMixin, unittest.TestCase):
         view = build_lineage_view(
             _entity(("duck_root", "duck_child"), {"duck_root": 1.0})
         )
-        chain = next(
-            chain for chain in view.chains if chain.root_skill_key == "duck_root"
+        graph = next(
+            graph for graph in view.graphs if graph.graph_id == "duck_root"
         )
-        child = next(n for n in chain.nodes if n.skill_key == "duck_child")
+        child = next(n for n in graph.nodes if n.skill_key == "duck_child")
         self.assertLessEqual(len(child.prereq_text_zh), LINEAGE_TEXT_WIRE_MAX)
         self.assertTrue(child.prereq_text_zh.startswith("需「"))
         self.assertTrue(child.prereq_text_zh.endswith("Lv.3」"))
@@ -377,34 +423,49 @@ class WireTextBoundTests(_TreeScopeMixin, unittest.TestCase):
         view = build_lineage_view(
             _entity(("duck_root", "duck_child"), {"duck_root": 1.0})
         )
-        chain = next(
-            chain for chain in view.chains if chain.root_skill_key == "duck_root"
+        graph = next(
+            graph for graph in view.graphs if graph.graph_id == "duck_root"
         )
-        child = next(n for n in chain.nodes if n.skill_key == "duck_child")
+        child = next(n for n in graph.nodes if n.skill_key == "duck_child")
         self.assertLessEqual(len(child.prereq_text_zh), LINEAGE_TEXT_WIRE_MAX)
 
 
 class InjectedGraphTests(_TreeScopeMixin, unittest.TestCase):
-    """Merging topologies: the contract is degree-independent."""
+    """Merging topologies: one graph, one merge node, one edge per parent."""
 
-    def test_merge_node_appears_in_both_root_closures(self):
-        # a -> c <- b: c is consumed by nothing, merges two chains.
+    def test_two_root_merge_is_one_graph_with_explicit_edges_and_depth(self):
+        # a -> d <- b, d -> e: a and b are the roots, d merges both parents.
         registry_extras = {
             "duck_a": _fake_skill("duck_a"),
             "duck_b": _fake_skill("duck_b"),
-            "duck_c": _fake_skill(
-                "duck_c",
-                (SkillPrerequisite("duck_a", 1), SkillPrerequisite("duck_b", 1)),
+            "duck_d": _fake_skill(
+                "duck_d",
+                (SkillPrerequisite("duck_a", 1), SkillPrerequisite("duck_b", 4)),
             ),
+            "duck_e": _fake_skill("duck_e", (SkillPrerequisite("duck_d", 2),)),
         }
         live_skill_registry().update(registry_extras)
         _revalidate_live()
-        view = build_lineage_view(_entity(("duck_a", "duck_b", "duck_c")))
-        by_root = {chain.root_skill_key: chain for chain in view.chains}
-        self.assertIn("duck_a", by_root)
-        self.assertIn("duck_b", by_root)
-        self.assertEqual(by_root["duck_a"].nodes[-1].skill_key, "duck_c")
-        self.assertEqual(by_root["duck_b"].nodes[-1].skill_key, "duck_c")
+        view = build_lineage_view(_entity(tuple(registry_extras)))
+        graph = next(g for g in view.graphs if g.graph_id == "duck_a")
+        self.assertEqual(graph.root_keys, ("duck_a", "duck_b"))
+        self.assertEqual(len(graph.nodes), 4)
+        self.assertEqual(
+            [node.skill_key for node in graph.nodes].count("duck_d"), 1
+        )
+        self.assertEqual(
+            [(edge.from_key, edge.to_key, edge.min_level) for edge in graph.edges],
+            [
+                ("duck_a", "duck_d", 1),
+                ("duck_b", "duck_d", 4),
+                ("duck_d", "duck_e", 2),
+            ],
+        )
+        depths = {node.skill_key: node.depth for node in graph.nodes}
+        self.assertEqual(depths["duck_a"], 0)
+        self.assertEqual(depths["duck_b"], 0)
+        self.assertEqual(depths["duck_d"], 1)
+        self.assertEqual(depths["duck_e"], 2)
 
 
 class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
@@ -487,8 +548,8 @@ class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
         )
         node = next(
             node
-            for chain in build_lineage_view(_entity(TREE_CLOSURE, proficiency)).chains
-            for node in chain.nodes
+            for graph in build_lineage_view(_entity(TREE_CLOSURE, proficiency)).graphs
+            for node in graph.nodes
             if node.skill_key == "t_tree_branch"
         )
         row = progress["t_tree_branch"]

@@ -53,31 +53,35 @@ _ART_PROBE = """() => {
 }"""
 
 _LINEAGE_NODE = {
-    "owned": True, "usable": True, "level": 1, "xp_into_level": 3.0,
-    "xp_to_next_level": 7.0, "capped": False, "prereq_text_zh": "",
+    "owned": True, "usable": True, "ready": False, "level": 1,
+    "xp_into_level": 3.0, "xp_to_next_level": 7.0, "capped": False,
+    "prereq_text_zh": "", "depth": 0,
 }
 
 
 def _same_label_lineage_panel() -> dict:
-    """Two fixture-authored chains that share the element label 燼 but carry
+    """Two fixture-authored graphs that share the element label 燼 but carry
     distinct root-node display names (the client resolves nothing)."""
-    def chain(key, name, meter):
+    def graph(key, name, owned, total):
         return {
-            "root_skill_key": key,
-            "element_or_style_zh": "燼",
+            "graph_id": key,
+            "group_label_zh": "燼",
+            "root_keys": [key],
+            "owned_count": owned,
+            "total_count": total,
             "consumed": False,
-            "meter": meter,
             "nodes": [{"skill_key": key, "display_name_zh": name, **_LINEAGE_NODE}],
+            "edges": [],
         }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "lineage",
         "completed_count": 0,
         "total_count": 2,
-        "chains": [
-            chain("t_content_root_arrow", "燼影箭", 0.3),
-            chain("t_content_root_burst", "燼心爆", 0.7),
+        "graphs": [
+            graph("t_content_root_arrow", "燼影箭", 1, 3),
+            graph("t_content_root_burst", "燼心爆", 2, 4),
         ],
     }
 
@@ -295,32 +299,34 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement("webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields")
-    def test_same_label_lineage_rows_carry_their_root_names_beside_progress(self):
-        """Two chains sharing an element label read apart by their supplied
-        root names, each compact row placing its meter (at most 320px) right
-        after the shared identity column."""
+    def test_same_label_lineage_rows_carry_their_root_names_beside_counts(self):
+        """Two graphs sharing an element label read apart by their supplied
+        root names, each compact row placing its owned/total count right
+        after the shared identity column and rendering no chain meter."""
         page = self.logged_in_page((1451, 790))
         _inject_snapshot(page, {"lineage": _same_label_lineage_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
         page.locator('[data-testid="nav-tool-lineage"]').click()
         page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
         rows = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.lineage-chain__head')).map((head) => {
-                const id = head.querySelector('.lineage-chain__identity').getBoundingClientRect();
-                const meter = head.querySelector('.lineage-chain__meter').getBoundingClientRect();
-                const root = head.querySelector('.lineage-chain__root');
+            """() => Array.from(document.querySelectorAll('.lineage-graph__head')).map((head) => {
+                const id = head.querySelector('.lineage-graph__identity').getBoundingClientRect();
+                const count = head.querySelector('.lineage-graph__count').getBoundingClientRect();
+                const root = head.querySelector('.lineage-graph__root');
                 return {
                     root: root ? root.textContent.trim() : null,
+                    count: head.querySelector('.lineage-graph__count').textContent.trim(),
                     height: head.getBoundingClientRect().height,
-                    gap: meter.left - id.right,
-                    meterWidth: meter.width,
+                    gap: count.left - id.right,
+                    meters: head.querySelectorAll('.lineage-chain__meter').length,
                 };
             })"""
         )
         self.assertEqual([r["root"] for r in rows], ["燼影箭", "燼心爆"])
+        self.assertEqual([r["count"] for r in rows], ["1/3", "2/4"])
         for row in rows:
             self.assertLessEqual(row["height"], 60, row)
-            self.assertLessEqual(row["meterWidth"], 320.5, row)
             self.assertGreaterEqual(row["gap"], 0, row)
             self.assertLessEqual(row["gap"], 16.5, row)
+            self.assertEqual(row["meters"], 0, row)
         page.close()
