@@ -7,8 +7,7 @@ the pure validator's drift rejections, the dual-direction JS parity contract,
 the maximal envelope, and the presenter's selection, possession, combat and
 unavailable behaviour.
 
-The canonical requirement IDs this module carries (they join the traceability
-index when the change's delta specs sync into ``openspec/specs/``):
+The canonical requirement IDs this module carries:
 
 - ``webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel``
 - ``webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability``
@@ -221,6 +220,9 @@ def _maximal_rows():
 class ItemHoldingsWireTests(unittest.TestCase):
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
     )
     def test_bidirectional_boundary_parity(self):
         cases = [
@@ -453,6 +455,9 @@ process.stdout.write(JSON.stringify(results));
                 if js_accepts:
                     self.assertEqual(validate_item_holdings(echoed), value)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_the_maximal_panel_fits_a_whole_envelope(self):
         payload = validate_item_holdings(
             _payload(
@@ -503,6 +508,9 @@ process.stdout.write(JSON.stringify(results));
                         )
                     )
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_the_panel_caps_mirror_the_rules_ceilings(self):
         self.assertEqual(MAX_ROWS, MAX_ITEM_HOLDINGS_ROWS)
         self.assertEqual(MAX_CHANGES, MAX_EQUIPMENT_DELTA_CHANGES)
@@ -562,6 +570,12 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
     )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_no_selection_yields_no_rows(self):
         payload = self._render(member=self.companion)
 
@@ -571,6 +585,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["rows"], [])
         self.assertEqual(payload["giver_id"], int(self.companion.pk))
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_rows_are_commander_first_with_counts(self):
         self._hold(self.player, _TONIC_KEY)
         self._hold(self.companion, _TONIC_KEY, _TONIC_KEY)
@@ -584,6 +601,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual([row["held"] for row in payload["rows"]], [1, 2, 0])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_equipment_delta_is_server_computed_for_each_member(self):
         self._hold(self.companion, _STAFF.key)
         self._wear(self.companion, weapon_main=_STAFF.key)
@@ -600,6 +620,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(row["held"], 0)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_an_already_equipped_item_reports_no_change(self):
         self._hold(self.companion, _SWORD.key)
         self._wear(self.companion, weapon_main=_SWORD.key)
@@ -610,6 +633,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(row["equipped"])
         self.assertEqual(row["delta"], {"equippable": True, "changes": []})
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_possession_publishes_an_identical_payload(self):
         self._hold(self.companion, _SWORD.key)
         self._wear(self.companion, weapon_main=_STAFF.key)
@@ -626,6 +652,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
 
         self.assertEqual(after, before)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_an_unknown_item_key_clears_the_holdings(self):
         payload = self._render(
             member=self.companion, item_key="t_hold_unregistered"
@@ -634,6 +663,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertIsNone(payload["item_key"])
         self.assertEqual(payload["rows"], [])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_an_absent_receiver_is_disabled_with_the_presence_message(self):
         self._hold(self.player, _TONIC_KEY)
         self.kahn.location = create_object(
@@ -648,6 +680,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
             row["receive"]["reason"], PARTY_SCOPE_MESSAGES["member_not_present"]
         )
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_combat_disables_transfer_on_every_row(self):
         self._hold(self.player, _TONIC_KEY)
         monster = _monster("item holdings presenter goblin", hp=500)
@@ -664,6 +699,9 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
                     TRANSFER_MESSAGES["transfer_in_combat"],
                 )
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_rendering_leaves_an_unchanged_snapshot(self):
         self._hold(self.companion, _SWORD.key, _STAFF.key)
         self._wear(self.companion, weapon_main=_STAFF.key)
@@ -688,12 +726,18 @@ class ItemHoldingsPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(self.player.db.party, before["party"])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_registry_registers_the_panel(self):
         spec = self.registry.spec("item_holdings")
         self.assertEqual(spec.schema_version, ITEM_HOLDINGS_SCHEMA_VERSION)
         self.assertIs(spec.presenter, item_holdings_presenter)
         self.assertIn("item_holdings", self.registry.panel_names)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_unavailable_forms_use_the_registry_reason(self):
         creation_pending = _player("待建立者")
         creation_pending.location = self.room1

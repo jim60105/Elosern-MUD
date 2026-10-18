@@ -6,8 +6,7 @@ that member's current slot occupant. The delta is the character panel's own
 breakdown arithmetic run twice (canonical and hypothetical after mapping), so
 nothing is written and the client computes neither counts nor deltas.
 
-The canonical requirement IDs this module carries (they join the traceability
-index when the change's delta specs sync into ``openspec/specs/``):
+The canonical requirement IDs this module carries:
 
 - ``webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel``
 - ``webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability``
@@ -223,6 +222,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
     )
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_sword_upgrade_and_downgrade_are_independent_arithmetic(self):
         self._hold(self.aila, _STAFF.key)
         self._wear(self.aila, weapon_main=_STAFF.key)
@@ -257,6 +259,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, EquipmentToggleReason.ITEM_NOT_HELD)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_accessory_append_reports_the_added_slot_contribution(self):
         self._wear(self.aila)
         self._hold(self.aila, _CHARMS[0].key)
@@ -266,6 +271,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(delta.equippable)
         self.assertEqual(self._changes(delta), [("defense", "防禦", 2)])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_full_accessory_slots_refuse_with_the_toggle_reason(self):
         self._hold(self.aila, *[charm.key for charm in _CHARMS])
         self._wear(self.aila, accessories=[charm.key for charm in _CHARMS[:5]])
@@ -276,6 +284,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(delta.reason, "accessory_slots_full")
         self.assertEqual(delta.changes, ())
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_already_equipped_item_reports_no_change(self):
         self._hold(self.aila, _SWORD.key, _SEAL.key)
         self._wear(self.aila, weapon_main=_SWORD.key, accessories=[_SEAL.key])
@@ -297,6 +308,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(row.equipped)
         self.assertEqual(row.delta.changes, ())
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_non_equipment_delta_is_null(self):
         self._hold(self.aila, _TONIC_KEY)
 
@@ -437,6 +451,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         finally:
             self.aila.traits.hp.mult = 1
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::equipment-deltas-are-server-computed-against-each-member-s-slot-occupant"
+    )
     def test_default_read_model_path_is_byte_identical(self):
         self._hold(self.aila, _SWORD.key, _TONIC_KEY)
         self._wear(self.aila, weapon_main=_SWORD.key)
@@ -448,6 +465,12 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
 
         self.assertEqual(canonical, injected)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_no_selection_yields_no_rows(self):
         for item_key in (None, "t_hold_unregistered"):
             with self.subTest(item_key=item_key):
@@ -457,6 +480,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
                 self.assertIsNone(view.item_key)
                 self.assertEqual(view.rows, ())
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_rows_follow_party_order_commander_first(self):
         self._hold(self.commander, _TONIC_KEY)
         self._hold(self.kahn, _TONIC_KEY, _TONIC_KEY)
@@ -471,6 +497,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual([row.held for row in view.rows], [1, 0, 2])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_own_row_is_disabled_without_a_reason(self):
         self._hold(self.commander, _TONIC_KEY)
 
@@ -485,6 +514,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(other.receive.enabled)
         self.assertIsNone(other.receive.reason)
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_absent_receiver_reports_the_presence_message(self):
         self._hold(self.commander, _TONIC_KEY)
         self.kahn.location = self.other_room
@@ -519,6 +551,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
             TRANSFER_MESSAGES["item_not_held"],
         )
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::holdings-rows-report-counts-and-transfer-availability"
+    )
     def test_combat_reports_counts_and_the_fixed_transfer_bar(self):
         self._hold(self.commander, _TONIC_KEY)
         engage(self.commander, self._spawn_monster())
@@ -580,6 +615,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
 
         self.assertEqual(caught.exception.args[0], "party_too_large")
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_the_query_writes_nothing(self):
         self._hold(self.commander, _TONIC_KEY)
         self._hold(self.aila, _SWORD.key, _STAFF.key)
@@ -622,6 +660,9 @@ class ItemHoldingsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual([member.db.buffs for member in members], before["buffs"])
         self.assertEqual(self.commander.db.party, before["party"])
 
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-item-holdings-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_the_bounds_match_the_design_ceilings(self):
         self.assertEqual(MAX_ITEM_HOLDINGS_ROWS, 17)
         self.assertEqual(MAX_EQUIPMENT_DELTA_CHANGES, 16)

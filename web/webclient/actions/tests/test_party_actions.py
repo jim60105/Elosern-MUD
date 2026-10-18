@@ -345,6 +345,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
     )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
     def test_success_records_the_selection_and_republishes_party(self):
         self.assertEqual(
             self._select(self.aila.pk),
@@ -370,6 +373,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
 
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
     )
     def test_the_selected_item_is_stored_and_an_unknown_key_clears_it(self):
         self._select(self.aila.pk, "bag", item_key=_POTION.key)
