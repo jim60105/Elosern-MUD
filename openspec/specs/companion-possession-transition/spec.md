@@ -153,8 +153,8 @@ A release for `handback` or `party_change` SHALL preserve the companion's occupi
 
 #### Scenario: Release preserves an intentionally remote companion's position
 
-- **WHEN** the controlled companion has moved to another room before a normal release
-- **THEN** it remains in its occupied pre-release room, the owner's body stays in its own room, and release performs no reunion teleport or relaxation of co-location gates
+- **WHEN** a failed follow left the owner's body in another room before a normal release (possessed traversal otherwise brings the whole party along)
+- **THEN** the companion remains in its occupied pre-release room, the owner's body stays where the failed follow left it, and release performs no reunion teleport or relaxation of co-location gates
 
 #### Scenario: A failed handback restores the occupied room state
 

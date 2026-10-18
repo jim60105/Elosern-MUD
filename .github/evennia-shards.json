@@ -193,6 +193,7 @@
         "world.rules.tests.test_overwhelm_threshold",
         "world.rules.tests.test_party",
         "world.rules.tests.test_party_follow",
+        "world.rules.tests.test_party_follow_possession",
         "world.rules.tests.test_party_identity",
         "world.rules.tests.test_party_offline_loop",
         "world.rules.tests.test_party_scope",

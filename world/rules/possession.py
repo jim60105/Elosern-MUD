@@ -330,6 +330,28 @@ def _restore_occupied_location(npc: Any, location: Any) -> None:
     npc.location = location
 
 
+def _materialize_wilderness_location(player: Any) -> None:
+    """Give a registered wilderness body its coordinates' room before repuppet.
+
+    A failed follow can leave the unpuppeted owner body with ``location=None``
+    while the wilderness script still tracks it at its coordinates (the
+    contrib recycles a room as soon as no account remains inside it). Evennia's
+    ``at_pre_puppet`` would then restore the body from its logout target or
+    ``home``; materializing the registered position instead keeps a release
+    from reuniting a party a failed follow left apart. Best-effort: a body
+    with no registration falls through to Evennia's existing restoration.
+    """
+    if getattr(player, "location", None) is not None:
+        return
+    wilderness = getattr(getattr(player, "ndb", None), "wilderness", None)
+    if wilderness is None:
+        return
+    coordinates = wilderness.itemcoordinates.get(player)
+    if coordinates is None:
+        return
+    wilderness.move_obj(player, coordinates)
+
+
 # ---------------------------------------------------------------------------
 # Seam implementations for companion-possession-transition
 # ---------------------------------------------------------------------------
@@ -773,6 +795,19 @@ def release_possession(
 
     # Lock rows in deterministic ascending order before side effects
     ids_to_lock = sorted([player.pk, resolved_npc.pk])
+    if reason != "disconnect":
+        try:
+            # A failed wilderness follow can leave the owner body location-less
+            # but registered. Materialize it in this committed preparation
+            # boundary, before the release transaction opens, so Evennia's
+            # repuppet never restores the body from a stale logout target or
+            # ``home`` and a later rollback cannot strand a rolled-back room.
+            _materialize_wilderness_location(player)
+        except Exception as error:
+            raise PossessionWriteError(
+                REASON_WRITE_FAILED,
+                f"Could not materialize the owner body's wilderness location: {error}",
+            ) from error
     control_before = snapshot_party_control(player, resolved_npc)
 
     try:

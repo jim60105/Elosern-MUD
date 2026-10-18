@@ -13,10 +13,12 @@ dbid (a deleted NPC) as an absent companion. The party auto-leave recheck
 can create or remove a binding.
 
 Companion follow (party-follow D-1) is the same module's read-only movement
-contract: ``follow_companions`` moves every co-located companion of a
-``PlayerCharacter`` through the shared exit success paths -- never a teleport
-or spawn -- with no clock charge, no announce messages, and the party binding
-left untouched.
+contract: ``follow_companions`` moves every effective party member present in
+the traverser's source through the shared exit success paths -- never a
+teleport or spawn -- with no clock charge, no announce messages, and the party
+binding left untouched. Under possession the traverser is the possessed
+companion and the follower set also contains the commander's own unpuppeted
+body, so the party stays co-located while the player acts through the puppet.
 """
 
 from collections.abc import Mapping, Sequence
@@ -286,8 +288,86 @@ def combat_companions(player: Any) -> list[Any]:
     return companions
 
 
+def _effective_follow_members(commander: Any, traverser: Any) -> list[Any]:
+    """Every party member the follow step considers, traverser excluded.
+
+    The commander's own body leads the list when the traverser is a possessed
+    companion; effective companions keep ``live_companions`` order. The
+    traverser is never a follower of itself.
+    """
+    members: list[Any] = []
+    if commander is not traverser:
+        members.append(commander)
+    for npc in live_companions(commander):
+        if npc is traverser or npc in members:
+            continue
+        members.append(npc)
+    return members
+
+
+def follow_scope(
+    traverser: Any,
+    source_location: Any,
+    wilderness_source_coordinates: tuple[int, int] | None = None,
+    *,
+    log_unresolved: bool = True,
+) -> tuple[Any | None, list[Any]]:
+    """The commander and the co-located followers of one traversal.
+
+    The commander is resolved from the traverser through the party authority
+    boundary: the player character itself, or the owner of a possessed
+    companion puppeted by the owner's account. A stale possession flag (an
+    NPC whose ``possessed_by`` survives without a live owner-account
+    possession) resolves no commander and follows nobody; the settlement
+    snapshot suppresses its own diagnostic with ``log_unresolved=False`` so
+    one traversal emits at most one such event.
+
+    Followers keep deterministic order (commander body first, then the
+    effective companions) and are filtered by the existing co-location
+    predicate against the source room or wilderness registration. Any
+    resolution failure degrades to no followers rather than raising from a
+    traversal hook.
+    """
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+
+    try:
+        commander = resolve_commander(traverser)
+    except PartyScopeError:
+        if log_unresolved and getattr(
+            getattr(traverser, "db", None), "possessed_by", None
+        ) is not None:
+            log_warn(
+                "party_follow_commander_unresolved",
+                context={"obj": str(traverser), "possessed": True},
+            )
+        return None, []
+    except Exception as error:
+        log_warn(
+            "party_follow_commander_unresolved",
+            exc=error,
+            context={
+                "obj": str(traverser),
+                "possessed": getattr(
+                    getattr(traverser, "db", None), "possessed_by", None
+                )
+                is not None,
+            },
+        )
+        return None, []
+    followers: list[Any] = []
+    for member in _effective_follow_members(commander, traverser):
+        try:
+            if _companion_co_located(
+                member, source_location, wilderness_source_coordinates
+            ):
+                followers.append(member)
+        except Exception:  # observability: ignore R2: co-location probe isolation on a traversal-hook hot path; degrades to leaving that member behind
+            continue
+    return commander, followers
+
+
 def follow_companions(
-    player: Any,
+    traverser: Any,
     source_location: Any,
     *,
     destination: Any | None = None,
@@ -295,121 +375,241 @@ def follow_companions(
     wilderness_source_coordinates: tuple[int, int] | None = None,
     wilderness_name: str = WILDERNESS_NAME,
 ) -> None:
-    """Move every co-located companion of ``player`` to its new location.
+    """Move every co-located party member to the traverser's destination.
 
     Called from the exit traversal success paths only (party-follow D-1):
     grid/instance/base exits through the shared ``at_post_traverse`` hook,
     the wilderness gate entry, the ordinary wilderness step, and the
-    wilderness return. Only companions co-located with the player move; a
-    bound companion elsewhere is never pulled. Co-location is room-based
-    (``npc.location is source_location``) and, in wilderness mode, also
-    registration-based: the contrib recycles a wilderness room as soon as no
-    account is inside it, so companions left in that room end up with
-    ``location=None`` while still registered in the script's
-    ``itemcoordinates`` at the source coordinates (``wilderness_source_
-    coordinates``).
+    wilderness return. The follower set is derived from effective membership
+    through ``follow_scope``: for a player traverser it is every co-located
+    companion; for a possessed companion it also contains the commander's own
+    unpuppeted body, so the whole party stays co-located while the player
+    acts through the puppet. A bound member elsewhere is never pulled.
+    Co-location is room-based (``member.location is source_location``) and,
+    in wilderness mode, also registration-based: the contrib recycles a
+    wilderness room as soon as no account is inside it, so a member left in
+    that room ends up with ``location=None`` while still registered in the
+    script's ``itemcoordinates`` at the source coordinates
+    (``wilderness_source_coordinates``).
 
-    Grid and instance destinations use quiet ``move_to`` (no announce
-    messages, and the project's arrival observers are all
-    ``PlayerCharacter``-gated); a companion leaving the wilderness through a
-    grid destination is deregistered from the script's ``itemcoordinates``
-    after a successful move, so ``move_to`` never strands it in the
-    wilderness bookkeeping. Wilderness entry and steps go through the
-    provider's coordinate API (``enter_wilderness``), never a plain
-    ``move_to`` into a wilderness room. No world-clock charge occurs here --
-    the clock advances only on the player's own traversal -- and the party
-    binding is never changed. After the companions' moves complete, the
-    player's quest arrival observation re-runs once so co-presence on the
-    first arrival is visible (party-quest D-2); the one-transition rule keeps
-    it idempotent. A companion whose move fails stays put and the player
-    receives one fixed Traditional Chinese 「跟丟了」 notification naming
-    every left-behind companion, exactly once per traversal.
+    Companions use quiet ``move_to`` (no announce messages, and the project's
+    arrival observers are all ``PlayerCharacter``-gated) or the provider's
+    coordinate API in wilderness mode. The owner body instead runs the
+    destination's receive gate explicitly and then moves with
+    ``move_hooks=False`` (or the provider API) so no player-arrival side
+    effect -- action options, arrival lore, encounter activation -- is
+    attributed to a body nobody is playing; its map knowledge records the
+    destination once. A member leaving the wilderness through a grid
+    destination is deregistered from the script's ``itemcoordinates`` after a
+    successful move, so ``move_to`` never strands it in the wilderness
+    bookkeeping. No world-clock charge occurs here -- the clock advances only
+    on the traverser's own traversal -- and the party binding is never
+    changed. After the moves complete, the commander's quest arrival
+    observation re-runs once (quest progression only for a possessed owner
+    body, never arrival lore) so co-presence on the first arrival is visible
+    (party-quest D-2); the one-transition rule keeps it idempotent.
+
+    A member whose move fails stays put and the acting character -- the
+    possessed puppet while possessing, else the player -- receives one fixed
+    Traditional Chinese 「跟丟了」 notification naming every left-behind
+    member, exactly once per traversal.
 
     Never raises from a traversal hook: stale and corrupt entries are skipped
-    by ``live_companions``, each companion's resolution, co-location check,
-    and move are exception-isolated, and the notification itself is isolated
-    -- a failure at any point degrades to fewer (or no) companion moves and
-    a missing (or logged) notification, never a broken traversal.
+    by ``live_companions``, each member's resolution, co-location check, and
+    move are exception-isolated, and the notification itself is isolated --
+    a failure at any point degrades to fewer (or no) moves and a missing (or
+    logged) notification, never a broken traversal.
     """
-    from typeclasses.characters import PlayerCharacter
-
-    if not isinstance(player, PlayerCharacter):
-        return
-    companions: list[Any] = []
-    for npc in live_companions(player):
-        try:
-            if _companion_co_located(
-                npc, source_location, wilderness_source_coordinates
-            ):
-                companions.append(npc)
-        except Exception:  # observability: ignore R2: co-location probe isolation on a traversal-hook hot path; degrades to leaving that companion behind
-            continue
-    if not companions:
-        return
-    destination_had_companion = destination is not None and any(
-        npc.location is destination for npc in live_companions(player)
+    commander, followers = follow_scope(
+        traverser, source_location, wilderness_source_coordinates
     )
+    if commander is None:
+        return
+    possessed = commander is not traverser
+    if not followers:
+        return
+    members = _effective_follow_members(commander, traverser)
+    destination_had_companion = destination is not None and any(
+        member.location is destination for member in members
+    )
+    destination_wilderness = (
+        getattr(destination, "wilderness", None) if destination is not None else None
+    )
+    body_arrived = not possessed
     left_behind: list[Any] = []
-    for npc in companions:
+    for member in followers:
         try:
-            if destination is not None:
-                moved = npc.move_to(destination, quiet=True)
-                if moved and npc.ndb.wilderness is not None:
+            if member is commander:
+                moved = _move_commander_body(
+                    commander,
+                    source_location,
+                    destination,
+                    wilderness_coordinates=wilderness_coordinates,
+                    wilderness_name=wilderness_name,
+                )
+                body_arrived = moved
+            elif destination_wilderness is not None:
+                # A non-exit relocation into a wilderness room: a plain
+                # move_to would run the terrain room's receive hook, which
+                # re-routes an already-registered member to its old
+                # coordinates. Use the provider's coordinate API instead.
+                from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+                moved = enter_wilderness(
+                    member,
+                    coordinates=destination.coordinates,
+                    name=destination_wilderness.db_key or wilderness_name,
+                )
+            elif destination is not None:
+                moved = member.move_to(destination, quiet=True)
+                if moved and member.ndb.wilderness is not None:
                     # Leaving the wilderness: clear the script's registration
-                    # so the companion is not stranded in the bookkeeping.
-                    npc.ndb.wilderness.at_post_object_leave(npc)
+                    # so the member is not stranded in the bookkeeping.
+                    member.ndb.wilderness.at_post_object_leave(member)
             else:
                 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
                 moved = enter_wilderness(
-                    npc, coordinates=wilderness_coordinates, name=wilderness_name
+                    member, coordinates=wilderness_coordinates, name=wilderness_name
                 )
         except Exception:  # observability: ignore R2: a failed move degrades visibly to the left-behind notification below
             moved = False
         if not moved:
-            left_behind.append(npc)
-    _reobserve_quest_arrival(
-        player, destination_had_companion=destination_had_companion
-    )
+            left_behind.append(member)
+    if body_arrived:
+        _reobserve_quest_arrival(
+            commander,
+            destination_had_companion=destination_had_companion,
+            possessed=possessed,
+        )
     if not left_behind:
         return
     try:
-        names = "、".join(npc.key or f"#{npc.pk}" for npc in left_behind)
-        player.msg(FOLLOW_LOST_MESSAGE.format(names=names))
+        names = "、".join(obj.key or f"#{obj.pk}" for obj in left_behind)
+        traverser.msg(FOLLOW_LOST_MESSAGE.format(names=names))
     except Exception as error:
-        # A failed notification must never break the player's traversal.
+        # A failed notification must never break the traversal.
         log_warn(
             "party_follow_notification_failed",
             exc=error,
-            context={"obj": str(player), "left_behind": len(left_behind)},
+            context={
+                "obj": str(traverser),
+                "left_behind": len(left_behind),
+                "possessed": possessed,
+            },
         )
 
 
-def _reobserve_quest_arrival(player: Any, *, destination_had_companion: bool) -> None:
-    """Re-run the quest arrival observation after the companions' moves complete.
+def _move_commander_body(
+    body: Any,
+    source_location: Any,
+    destination: Any | None,
+    *,
+    wilderness_coordinates: tuple[int, int] | None,
+    wilderness_name: str,
+) -> bool:
+    """Move the commander's unpuppeted body without firing player-arrival hooks.
 
-    The player's own ``at_object_receive`` observation runs before the follow
-    moves, so a companion arriving *with* the player would be invisible to the
-    first observation; the re-run happens after the moves (party-quest D-2) and
-    the quest observer's one-transition rule makes the repeated observation
-    idempotent for the shipped quantity-1 objectives. When a companion was
-    already present in the destination before the follow, the first observation
-    has already advanced every matching stage for this arrival event, so the
-    re-run is skipped: it would otherwise count the same event a second time
-    (for example a defensive non-1 quantity could jump two progress points on
-    one arrival). Never raises from a traversal hook.
+    The receiving gate runs explicitly because ``move_hooks=False`` skips Evennia's
+    own pre-receive check; a refusal is an ordinary left-behind. Grid
+    destinations use ``move_to(..., quiet=True, move_hooks=False)`` and a
+    wilderness destination room (only reachable through a non-exit relocation)
+    uses the provider's coordinate API. Wilderness entry and steps resolve the
+    target room the provider already created and run the same explicit gate
+    before ``enter_wilderness``. The commander's map knowledge records the
+    arrival exactly once, after the move succeeds.
     """
-    if destination_had_companion:
+    if destination is not None:
+        wilderness = getattr(destination, "wilderness", None)
+        if wilderness is not None:
+            if not destination.at_pre_object_receive(body, source_location):
+                return False
+            from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+            moved = enter_wilderness(
+                body,
+                coordinates=destination.coordinates,
+                name=wilderness.db_key or wilderness_name,
+            )
+        else:
+            if not destination.at_pre_object_receive(body, source_location):
+                return False
+            moved = body.move_to(destination, quiet=True, move_hooks=False)
+            if moved and body.ndb.wilderness is not None:
+                body.ndb.wilderness.at_post_object_leave(body)
+    else:
+        target = _wilderness_destination_room(
+            wilderness_name, wilderness_coordinates
+        )
+        if target is not None and not target.at_pre_object_receive(
+            body, source_location
+        ):
+            return False
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        moved = enter_wilderness(
+            body, coordinates=wilderness_coordinates, name=wilderness_name
+        )
+    if not moved:
+        return False
+    from world.rules.map_knowledge import record_arrival
+
+    record_arrival(body)
+    return True
+
+
+def _wilderness_destination_room(
+    wilderness_name: str, coordinates: tuple[int, int] | None
+) -> Any | None:
+    """The live room the provider will use for ``coordinates``, if it exists."""
+    if coordinates is None:
+        return None
+    from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+    script = WildernessScript.objects.filter(db_key=wilderness_name).first()
+    if script is None:
+        return None
+    return (script.db.rooms or {}).get(tuple(coordinates))
+
+
+def _reobserve_quest_arrival(
+    commander: Any, *, destination_had_companion: bool, possessed: bool
+) -> None:
+    """Re-run the commander's quest arrival observation after the follow moves.
+
+    The commander's own ``at_object_receive`` observation runs before the
+    follow moves (for a player traversal) or does not run at all (the owner
+    body moves hook-free), so a companion arriving *with* the commander would
+    be invisible to the first observation; the re-run happens after the moves
+    (party-quest D-2) and the quest observer's one-transition rule makes the
+    repeated observation idempotent for the shipped quantity-1 objectives.
+    When a companion was already present in the destination before an ordinary
+    player traversal, the first observation has already advanced every
+    matching stage for this arrival event, so the re-run is skipped: it would
+    otherwise count the same event a second time (for example a defensive
+    non-1 quantity could jump two progress points on one arrival). A possessed
+    traversal has no earlier commander observation, so it always observes
+    exactly once. Arrival lore is never scheduled for the owner body -- the
+    pinned footstep is the only commander surface a possessed traversal may
+    write. Never raises from a traversal hook.
+    """
+    if destination_had_companion and not possessed:
         return
     from world.quests.room_observation import observe_room_entry
 
     try:
-        observe_room_entry(player.location, player)
+        observe_room_entry(
+            commander.location, commander, observe_lore=not possessed
+        )
     except Exception as error:
         log_warn(
             "party_follow_quest_reobservation_failed",
             exc=error,
-            context={"obj": str(player), "key": "location"},
+            context={
+                "obj": str(commander),
+                "key": "location",
+                "possessed": possessed,
+            },
         )
 
 

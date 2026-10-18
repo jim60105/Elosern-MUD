@@ -246,7 +246,7 @@ When an NPC is deleted (instance reclamation, scene teardown, or any `delete()`)
 
 ### Requirement: Companions follow the player through every exit traversal
 
-The follow function in the party module SHALL move every companion of the traversing player who is present in the source room to the player's destination, and SHALL be invoked from every exit success path. Companion movement SHALL charge no world clock, SHALL emit no announce messages, SHALL leave the party binding unchanged, and SHALL never raise from any traversal hook.
+The follow function SHALL resolve the commander from the traverser (the player character, or the owner of a possessed companion puppeted by that account), SHALL move every other party member present in the source room — the commander's body and every effective companion other than the traverser — to the destination on every exit success path, SHALL charge no world clock, SHALL emit no announce messages, SHALL leave the party binding unchanged, and SHALL never raise from a traversal hook.
 
 #### Scenario: Companions follow a successful grid traversal
 - **WHEN** a player with two companions in the source room traverses an ordinary or grid exit
@@ -307,6 +307,26 @@ The follow function in the party module SHALL move every companion of the traver
 #### Scenario: Follow triggers only on exit paths
 - **WHEN** the player is relocated by a teleport, spawn, or other non-exit move, or a bound companion waits in a different room
 - **THEN** follow does not trigger: companions are not pulled, and a bound companion in a different room is not teleported to the player
+
+#### Scenario: The whole party follows a possessed traversal
+- **WHEN** the player possesses 艾拉 and walks her through an exit while the player's own body and companion 卡恩 share her source room
+- **THEN** the player's body and 卡恩 arrive in 艾拉's destination through the same follow moves, with no additional clock charge and the party and possession bindings unchanged
+
+#### Scenario: The owner body follows quietly and stays entranced
+- **WHEN** the player's own body follows a possessed traversal
+- **THEN** the destination's `at_pre_object_receive` gate is run for the body first, the body then moves with `move_to(..., quiet=True, move_hooks=False)` (or the wilderness provider API), so no `PlayerCharacter.at_post_move` side effect (action options, arrival lore, encounter activation) is attributed to it, the commander's map knowledge records the destination once, the body keeps its entranced presentation and possession mirror, and it is never puppeted by the move
+
+#### Scenario: A destination that refuses the body leaves it behind
+- **WHEN** the destination's receive gate refuses the player's body during a possessed traversal
+- **THEN** the body stays in the source room, the other members still follow, and the acting session receives the one 跟丟了 notification naming the body
+
+#### Scenario: A body left in a recycled wilderness room is still found
+- **WHEN** a failed wilderness follow leaves the unpuppeted body registered at the source coordinates after the contrib recycled its room
+- **THEN** a later possessed traversal from those coordinates still treats the body as co-located through the wilderness registration predicate and it follows
+
+#### Scenario: Party members stay together under possession
+- **WHEN** the player, while possessing a companion, traverses several exits in a row with every follow succeeding
+- **THEN** after each traversal the commander's body and every effective companion share the traverser's room
 
 ### Requirement: Companions fight as allies in the player's combat session
 When the player engages a hostile target, `engage` SHALL include every bound companion that is co-located, living, and not knocked out in the session's allied team (`player_ids`). Each companion SHALL receive at most one deterministic policy request per round through the session's non-player action provider, and SHALL NOT consume or delay the player's queued request.

@@ -13,7 +13,9 @@ from commands.default_cmdsets import POSSESSED_DENYLIST, CharacterCmdSet, Posses
 from commands.possess import CmdUnpossess
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import Character, PlayerCharacter
+from typeclasses.exits import Exit
 from typeclasses.npcs import NPC, LLMNPC
+from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.escort_lifecycle import escort_compensation
 from world.rules.party import (
@@ -40,6 +42,17 @@ from world.rules.possession import (
     restore_party_control,
     snapshot_party_control,
 )
+
+
+class BodyRejectingRoom(Room):
+    """A destination gate that refuses the owner's unpuppeted body."""
+
+    rejected_keys: tuple[str, ...] = ()
+
+    def at_pre_object_receive(self, moved_obj, source_location, **kwargs):
+        if getattr(moved_obj, "key", None) in self.rejected_keys:
+            return False
+        return True
 
 
 class PossessionTransitionTests(EvenniaTest):
@@ -851,16 +864,26 @@ class PossessionTransitionTests(EvenniaTest):
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_release_preserves_an_intentionally_remote_companion_position(self):
-        """A companion that moved away keeps its own room; no reunion teleport."""
+        """A body a failed follow left behind stays behind; no reunion teleport."""
+        rejecting = create_object(
+            BodyRejectingRoom, key="Rejecting", location=None
+        )
+        rejecting.rejected_keys = (self.char1.key,)
+        door = create_object(
+            Exit, key="door", location=self.room1, destination=rejecting
+        )
         enter_possession(self.char1, self.npc)
-        self.npc.move_to(self.room2, quiet=True)
-        self.assertIs(self.npc.location, self.room2)
+        door.at_traverse(self.npc, rejecting)
+        # A possessed traversal normally brings the whole party; this
+        # destination refuses the owner's body, the only remaining separation.
+        self.assertIs(self.npc.location, rejecting)
+        self.assertIs(self.char1.location, self.room1)
 
         release_possession(self.char1, npc=self.npc, reason="handback")
 
-        self.assertIs(self.npc.location, self.room2)
-        self.assertEqual(self.npc.db_location_id, self.room2.pk)
-        self.assertIn(self.npc, self.room2.contents)
+        self.assertIs(self.npc.location, rejecting)
+        self.assertEqual(self.npc.db_location_id, rejecting.pk)
+        self.assertIn(self.npc, rejecting.contents)
         self.assertIs(self.char1.location, self.room1)
         self.assertFalse(self.npc.attributes.has("prelogout_location"))
         self.assertTrue(is_companion(self.npc, self.char1))
