@@ -6,9 +6,7 @@ account, and writes no persistent state; clearing a member's dot keeps her
 recent set; a reconnect starts empty; possession neither clears nor duplicates
 the marks and still receives the line.
 
-The added ``party-unlock-notices`` requirements' canonical IDs (their
-decorators land with the archive/sync step, because traceability indexes only
-``openspec/specs/``):
+The added ``party-unlock-notices`` requirements' canonical IDs:
 
 - ``party-unlock-notices::unlocks-mark-the-learner-as-unread-for-the-session``
 - ``party-unlock-notices::opening-a-member-s-skills-clears-only-the-unread-mark``
@@ -141,7 +139,8 @@ class UnlockNoticeTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification"
+        "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification",
+        "party-unlock-notices::unlocks-mark-the-learner-as-unread-for-the-session",
     )
     def test_a_companion_unlock_names_the_companion_and_marks_her(self):
         self._near_edge(self.aila)
@@ -173,6 +172,9 @@ class UnlockNoticeTests(EvenniaTest):
             [f"新技能可用：{TREE[_CHILD].label}"],
         )
 
+    @covers_requirement(
+        "party-unlock-notices::unlocks-mark-the-learner-as-unread-for-the-session"
+    )
     def test_marks_land_on_every_session_of_the_account(self):
         second = _FakeSession()
         with patch.object(
@@ -185,6 +187,9 @@ class UnlockNoticeTests(EvenniaTest):
                 MemberUnlocks(True, frozenset({_CHILD})),
             )
 
+    @covers_requirement(
+        "party-unlock-notices::opening-a-member-s-skills-clears-only-the-unread-mark"
+    )
     def test_clearing_keeps_the_recent_set(self):
         record_unlocks(self.commander, [self._notice(self.aila)])
         mark_unlocks_seen(self.session, self.aila.pk)
@@ -193,12 +198,18 @@ class UnlockNoticeTests(EvenniaTest):
             MemberUnlocks(False, frozenset({_CHILD})),
         )
 
+    @covers_requirement(
+        "party-unlock-notices::unread-state-never-outlives-the-session"
+    )
     def test_a_new_session_has_no_marks(self):
         record_unlocks(self.commander, [self._notice(self.aila)])
         self.assertTrue(unlock_flags(self.session)[self.aila.pk].unread)
         # A reconnect is a new session: ndb state never outlives the old one.
         self.assertEqual(dict(unlock_flags(_FakeSession())), {})
 
+    @covers_requirement(
+        "party-unlock-notices::unread-state-never-outlives-the-session"
+    )
     def test_possession_keeps_the_marks(self):
         record_unlocks(self.commander, [self._notice(self.kahn)])
         enter_possession(self.commander, self.aila)
@@ -222,6 +233,10 @@ class UnlockNoticeTests(EvenniaTest):
             MemberUnlocks(True, frozenset({_CHILD})),
         )
 
+    @covers_requirement(
+        "party-unlock-notices::unlocks-mark-the-learner-as-unread-for-the-session",
+        "party-unlock-notices::unread-state-never-outlives-the-session",
+    )
     def test_nothing_persistent_is_written(self):
         def attributes(entity):
             return {attr.key: attr.value for attr in entity.attributes.all()}
@@ -266,6 +281,9 @@ class UnlockNoticeTests(EvenniaTest):
             MemberUnlocks(True, frozenset({_CHILD})),
         )
 
+    @covers_requirement(
+        "party-unlock-notices::unlocks-mark-the-learner-as-unread-for-the-session"
+    )
     def test_a_rolled_back_advance_emits_no_unlock_event_and_marks_nothing(self):
         self._near_edge(self.aila)
         self.aila.db.practice_booking = _PARENT
