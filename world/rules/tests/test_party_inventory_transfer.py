@@ -1,15 +1,4 @@
-"""Tests for the member item transfer rule (party-item-transfer).
-
-Intended requirement IDs, recorded here until the capability is synced into
-``openspec/specs/`` and ``tools.spec_traceability list`` can hand out the
-canonical ones (``covers_requirement`` decorators are added then):
-
-- ``party-item-transfer::transfers-happen-only-outside-combat``
-- ``party-item-transfer::giver-and-receiver-are-distinct-authorized-members``
-- ``party-item-transfer::equipped-and-locked-items-cannot-be-transferred``
-- ``party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing``
-- ``party-item-transfer::transfer-rejections-are-stable-and-observable``
-"""
+"""Tests for the member item transfer rule (party-item-transfer)."""
 
 from dataclasses import replace
 from unittest.mock import patch
@@ -19,6 +8,8 @@ from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
+
+from tools.spec_traceability import covers_requirement
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -179,6 +170,9 @@ class PartyTransferTestCase(EvenniaTestCase):
 class TransferSuccessTests(PartyTransferTestCase):
     """A transfer moves both bags in both directions and costs nothing."""
 
+    @covers_requirement(
+        "party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing"
+    )
     def test_commander_moves_items_to_a_present_companion(self):
         self.hold(self.commander, *([_POTION.key] * 3))
         first = self.mirror(self.commander, _POTION.key)
@@ -212,6 +206,9 @@ class TransferSuccessTests(PartyTransferTestCase):
         self.assertEqual(list(self.aila.contents_get()), [])
         self.assertEqual([obj.pk for obj in self.commander.contents_get()], [mirror.pk])
 
+    @covers_requirement(
+        "party-item-transfer::giver-and-receiver-are-distinct-authorized-members"
+    )
     def test_knocked_out_receiver_is_admitted(self):
         self.hold(self.commander, _POTION.key)
         self.aila.traits.hp.current = 1
@@ -251,6 +248,9 @@ class TransferSuccessTests(PartyTransferTestCase):
         self.assertEqual(self.commander.db.inventory, [_BLADE.key])
         self.assertEqual(self.aila.db.inventory, [_BLADE.key])
 
+    @covers_requirement(
+        "party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing"
+    )
     def test_transfer_is_free_of_time_and_affinity(self):
         seed_affinity(self.aila, self.commander, 12)
         tick = get_world_clock().tick
@@ -266,6 +266,7 @@ class TransferSuccessTests(PartyTransferTestCase):
 class TransferRejectionTests(PartyTransferTestCase):
     """Every rejection carries its stable code and writes nothing."""
 
+    @covers_requirement("party-item-transfer::transfers-happen-only-outside-combat")
     def test_combat_rejects_the_transfer(self):
         self.hold(self.commander, _POTION.key)
         with patch(
@@ -274,6 +275,9 @@ class TransferRejectionTests(PartyTransferTestCase):
         ):
             self._assert_rejected(REASON_TRANSFER_IN_COMBAT)
 
+    @covers_requirement(
+        "party-item-transfer::giver-and-receiver-are-distinct-authorized-members"
+    )
     def test_absent_receiver_is_refused(self):
         elsewhere = create_object(Room, key="別處")
         absent = create_object(NPC, key="遠方", location=self.room, home=elsewhere)
@@ -285,6 +289,9 @@ class TransferRejectionTests(PartyTransferTestCase):
 
         self._assert_rejected(REASON_MEMBER_NOT_PRESENT, receiver_id=absent.pk)
 
+    @covers_requirement(
+        "party-item-transfer::giver-and-receiver-are-distinct-authorized-members"
+    )
     def test_non_member_is_refused_and_never_replaced(self):
         outsider = self.outsider()
         self.hold(self.commander, _POTION.key)
@@ -294,6 +301,9 @@ class TransferRejectionTests(PartyTransferTestCase):
         self.assertEqual(self.commander.db.inventory, [_POTION.key])
         self.assertFalse(outsider.db.inventory)
 
+    @covers_requirement(
+        "party-item-transfer::giver-and-receiver-are-distinct-authorized-members"
+    )
     def test_same_member_is_refused(self):
         self._assert_rejected(
             REASON_TRANSFER_SAME_MEMBER,
@@ -307,14 +317,23 @@ class TransferRejectionTests(PartyTransferTestCase):
             with self.subTest(quantity=quantity):
                 self._assert_rejected(REASON_INVALID_QUANTITY, quantity=quantity)
 
+    @covers_requirement(
+        "party-item-transfer::equipped-and-locked-items-cannot-be-transferred"
+    )
     def test_unknown_item_is_refused(self):
         self._assert_rejected(REASON_ITEM_NOT_HELD, item_key="t_transfer_unknown")
 
+    @covers_requirement(
+        "party-item-transfer::equipped-and-locked-items-cannot-be-transferred"
+    )
     def test_guild_property_is_locked(self):
         self.hold(self.commander, _SEAL.key)
 
         self._assert_rejected(REASON_ITEM_LOCKED, item_key=_SEAL.key)
 
+    @covers_requirement(
+        "party-item-transfer::equipped-and-locked-items-cannot-be-transferred"
+    )
     def test_exam_restricted_member_locks_the_transfer(self):
         self.hold(self.commander, _POTION.key)
         for restricted in (self.commander, self.aila):
@@ -329,11 +348,17 @@ class TransferRejectionTests(PartyTransferTestCase):
                 finally:
                     restricted.db.guild_exam_restriction = None
 
+    @covers_requirement(
+        "party-item-transfer::equipped-and-locked-items-cannot-be-transferred"
+    )
     def test_item_not_held_when_the_giver_holds_fewer(self):
         self.hold(self.commander, _POTION.key)
 
         self._assert_rejected(REASON_ITEM_NOT_HELD, quantity=2)
 
+    @covers_requirement(
+        "party-item-transfer::equipped-and-locked-items-cannot-be-transferred"
+    )
     def test_equipped_item_is_refused(self):
         self.hold(self.commander, _BLADE.key)
         self.assertEqual(
@@ -349,6 +374,7 @@ class TransferRejectionTests(PartyTransferTestCase):
 class RejectionOrderTests(PartyTransferTestCase):
     """The design's rejection order is observable when several checks fail."""
 
+    @covers_requirement("party-item-transfer::transfers-happen-only-outside-combat")
     def test_combat_wins_over_an_invalid_quantity(self):
         self.hold(self.commander, _POTION.key)
         with patch(
@@ -413,6 +439,9 @@ class TransferAtomicityTests(PartyTransferTestCase):
             for entity in (self.commander, self.aila)
         }
 
+    @covers_requirement(
+        "party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing"
+    )
     def test_failure_after_the_giver_write_restores_both_bags(self):
         self.hold(self.commander, _POTION.key, _POTION.key)
         first = self.mirror(self.commander, _POTION.key)
@@ -437,6 +466,9 @@ class TransferAtomicityTests(PartyTransferTestCase):
             sorted([first.pk, second.pk]),
         )
 
+    @covers_requirement(
+        "party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing"
+    )
     def test_failure_after_the_receiver_write_restores_both_bags(self):
         self.hold(self.commander, _POTION.key)
         self.mirror(self.commander, _POTION.key)
@@ -548,6 +580,9 @@ class TransferAtomicityTests(PartyTransferTestCase):
 class TransferMessageTests(EvenniaTestCase):
     """Rejection messages are fixed and complete."""
 
+    @covers_requirement(
+        "party-item-transfer::transfer-rejections-are-stable-and-observable"
+    )
     def test_rejection_messages_are_fixed_and_complete(self):
         self.assertEqual(
             TRANSFER_MESSAGES,
@@ -565,6 +600,9 @@ class TransferMessageTests(EvenniaTestCase):
 class TransferObservabilityTests(PartyTransferTestCase):
     """A committed transfer emits exactly one info event."""
 
+    @covers_requirement(
+        "party-item-transfer::transfer-rejections-are-stable-and-observable"
+    )
     def test_successful_transfer_emits_one_info_event(self):
         self.hold(self.commander, _POTION.key)
         with patch.object(party_inventory, "log_info") as log_info:

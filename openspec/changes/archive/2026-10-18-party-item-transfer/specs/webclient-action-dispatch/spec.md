@@ -3,11 +3,15 @@
 ## MODIFIED Requirements
 
 ### Requirement: Action identity comes only from the authenticated session
-The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only session.puppet as the acting character, from which the rules resolve the commander. Only the exact guarded combat schemas and the exact party member-scoped schemas SHALL accept subordinate member references (`actor_id`, `member_id`, `giver_id`, `receiver_id`, `recipient_id`, `seller_id`), each reauthorized through the deterministic party boundary; they SHALL NOT select account, puppet or transport identity, and a rejected reference SHALL NOT be replaced by the commander. All other unknown identity fields SHALL reject, and no error response SHALL disclose another actor's state.
+The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only session.puppet as the acting character, from which the rules resolve the commander. Only exact guarded combat and party member-scoped schemas SHALL accept subordinate member references, each reauthorized through the deterministic party boundary; a rejected reference SHALL NOT be replaced by the commander, and all other identity fields SHALL reject.
 
 #### Scenario: Payload cannot select a different actor
 - **WHEN** a client includes an actor-like unknown field in the envelope or outside an exact guarded combat payload
 - **THEN** exact-schema validation rejects the request without adapter invocation
+
+#### Scenario: A subordinate reference never selects identity
+- **WHEN** a payload carries `actor_id`, `member_id`, `giver_id`, `receiver_id`, `recipient_id` or `seller_id`
+- **THEN** only the exact guarded combat and party member-scoped schemas admit it, and it never selects account, puppet or transport identity
 
 #### Scenario: Unpuppeted action is rejected
 - **WHEN** an anonymous or logged-in but unpuppeted session submits `ui_action`

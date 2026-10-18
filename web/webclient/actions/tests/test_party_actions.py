@@ -1,11 +1,4 @@
-"""Tests for the ``party.transfer`` action (party-item-transfer).
-
-Intended requirement ID for the added capability, recorded here until it is
-synced into ``openspec/specs/`` (``covers_requirement`` decorators are added
-then, per the ``party-member-authority`` precedent):
-
-- ``party-item-transfer::the-party-transfer-action-carries-exact-member-references``
-"""
+"""Tests for the ``party.transfer`` action (party-item-transfer)."""
 
 from unittest.mock import patch
 
@@ -41,9 +34,15 @@ _VALID = {
 class PartyTransferPayloadTests(EvenniaTestCase):
     """The payload schema is exact and bounded."""
 
+    @covers_requirement(
+        "party-item-transfer::the-party-transfer-action-carries-exact-member-references"
+    )
     def test_exact_payload_is_normalized(self):
         self.assertEqual(validate_party_transfer_payload(dict(_VALID)), _VALID)
 
+    @covers_requirement(
+        "party-item-transfer::the-party-transfer-action-carries-exact-member-references"
+    )
     def test_each_malformed_payload_rejects(self):
         cases = (
             ("not an object", []),
@@ -123,6 +122,9 @@ class PartyTransferAdapterTests(EvenniaTestCase):
         self.assertFalse(outsider.db.inventory)
         self.assertFalse(self.aila.db.inventory)
 
+    @covers_requirement(
+        "party-item-transfer::the-party-transfer-action-carries-exact-member-references"
+    )
     def test_success_returns_the_fixed_message_and_full_snapshot(self):
         self.commander.db.inventory = [_POTION.key, _POTION.key]
 
@@ -135,6 +137,9 @@ class PartyTransferAdapterTests(EvenniaTestCase):
         self.assertEqual(self.commander.db.inventory, [])
         self.assertEqual(self.aila.db.inventory, [_POTION.key, _POTION.key])
 
+    @covers_requirement(
+        "party-item-transfer::transfer-rejections-are-stable-and-observable"
+    )
     def test_combat_rejection_maps_to_the_stable_code(self):
         self.commander.db.inventory = [_POTION.key]
         with patch(
@@ -151,7 +156,8 @@ class PartyTransferAdapterTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe",
+        "party-item-transfer::the-party-transfer-action-carries-exact-member-references",
     )
     def test_registered_with_an_empty_affected_panel_set(self):
         registry = build_production_action_registry()
