@@ -592,6 +592,26 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     expect(w.emitted("use")).toBeUndefined();
   });
 
+  it("a changed controlled-figure identity retires the open use confirmation", async () => {
+    // The confirmation binds the member it was opened for: losing or replacing
+    // that identity never dispatches the pending use for another member.
+    const w = mountActions();
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
+    await w.setProps({ actorId: null });
+    await nextTick();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
+
+    await w.setProps({ actorId: ACTOR_ID + 1 });
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
+    await w.setProps({ actorId: ACTOR_ID });
+    await nextTick();
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    expect(w.emitted("use")).toBeUndefined();
+  });
+
   it("a disabled action is aria-disabled, spells the committed reason, and dispatches nothing", async () => {
     const w = mountActions();
     const tile = w.get('[data-testid="inventory-panel__tile--potion_full"]');

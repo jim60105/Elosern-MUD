@@ -255,7 +255,9 @@ function onTileActivate(event) {
 // exactly once through the parent; cancel, close, backdrop, and Escape
 // dispatch nothing and restore focus to the originating tile. Every
 // committed panel replacement retires an open confirmation (the descriptor
-// it was opened against is no longer authoritative).
+// it was opened against is no longer authoritative), and so does a changed
+// controlled-figure identity: the confirmation binds the member it was
+// opened for and never dispatches for another (companion-field-item-use).
 const confirming = ref(null);
 const dialogEl = ref(null);
 let openerEl = null;
@@ -270,7 +272,8 @@ function closeConfirmation(restoreFocus = true) {
 }
 
 function onConfirmUse() {
-  if (!confirming.value) {
+  if (!confirming.value || !actorReady.value) {
+    closeConfirmation();
     return;
   }
   emit("use", {
@@ -279,6 +282,15 @@ function onConfirmUse() {
   });
   closeConfirmation();
 }
+
+watch(
+  () => props.actorId,
+  () => {
+    if (confirming.value) {
+      closeConfirmation(false);
+    }
+  },
+);
 
 function onConfirmKeydown(event) {
   if (event.key === "Escape") {
