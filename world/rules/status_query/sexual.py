@@ -163,7 +163,7 @@ def _effective_exposure_label(entity: Any, stored_label: str) -> str:
     return stored_label
 
 
-def _read_intimate(entity: Any) -> IntimateView | None:
+def read_intimate_view(entity: Any) -> IntimateView | None:
     """Build the intimate view from no-create-safe readers, or return None.
 
     A materialized ``sexual_traits`` record must be complete (the ``SexualState``

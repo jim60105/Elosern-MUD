@@ -22,6 +22,9 @@ var PARTY_MAX_SLOTS = C.PARTY_MAX_SLOTS;
 var PARTY_MAX_ROWS = C.PARTY_MAX_ROWS;
 var PARTY_MAX_COMMISSION_LABEL = C.PARTY_MAX_COMMISSION_LABEL;
 var PARTY_MAX_DISPLAY_NAME = C.PARTY_MAX_DISPLAY_NAME;
+var PARTY_MEMBER_SCHEMA_VERSION = C.PARTY_MEMBER_SCHEMA_VERSION;
+var PARTY_MEMBER_MAX_BOND_STAGE = C.PARTY_MEMBER_MAX_BOND_STAGE;
+var PARTY_MEMBER_MAX_REASON = C.PARTY_MEMBER_MAX_REASON;
 var OBJECTIVES_SCHEMA_VERSION = C.OBJECTIVES_SCHEMA_VERSION;
 var OBJECTIVES_MAX_ROWS = C.OBJECTIVES_MAX_ROWS;
 var OBJECTIVES_MAX_QUEST_ID = C.OBJECTIVES_MAX_QUEST_ID;
@@ -41,6 +44,9 @@ var ROSTER_MAX_NAME = C.ROSTER_MAX_NAME;
 var ROSTER_LOCK_REASON = C.ROSTER_LOCK_REASON;
 var artwork = require("../artwork.js");
 var validateArtwork = artwork.validateArtwork;
+var personaSections = require("../persona_sections.js");
+var validatePersona = personaSections.validatePersona;
+var validateIntimate = personaSections.validateIntimate;
 var questLog = require("./quest_log.js");
 var validateQuestLogPanel = questLog.validateQuestLogPanel;
 
@@ -568,13 +574,193 @@ function validateRosterPanel(payload) {
   return result;
 }
 
+// party_member panel validator (mirror of
+// web.webclient.presentation.party_member, party-member-panel): the viewed
+// member's exact member-tab facts. Exactly one of the companion/commander
+// sections is non-null; descriptors are server-authored and carry their
+// verdict's bounded reason, never a client-inferred availability.
+var PARTY_MEMBER_ACTION_POSSESS = "explore.possess";
+var PARTY_MEMBER_ACTION_RELEASE = "explore.possess_release";
+var PARTY_MEMBER_ACTION_LEAVE = "explore.party_leave";
+var PARTY_MEMBER_ACTION_NPC_PERSONA = "npc.persona.read";
+var PARTY_MEMBER_ACTION_COMMANDER_PERSONA = "character.persona.update";
+var PARTY_MEMBER_COMPANION_ACTIONS = [
+  PARTY_MEMBER_ACTION_POSSESS,
+  PARTY_MEMBER_ACTION_LEAVE,
+  PARTY_MEMBER_ACTION_NPC_PERSONA,
+];
+var PARTY_MEMBER_POSSESSION_ACTIONS = [
+  PARTY_MEMBER_ACTION_POSSESS,
+  PARTY_MEMBER_ACTION_RELEASE,
+];
+var PARTY_MEMBER_COMMANDER_ACTIONS = [PARTY_MEMBER_ACTION_COMMANDER_PERSONA];
+
+function validatePartyMemberBond(value) {
+  requireExactFields(value, "bond", ["stage", "step", "steps"], []);
+  var stage = requireString(value.stage, "bond.stage", PARTY_MEMBER_MAX_BOND_STAGE);
+  if (stage.trim().length === 0 || hasLoneSurrogate(stage)) {
+    throw new Error("bond.stage must be non-empty");
+  }
+  var steps = requireInt(value.steps, "bond.steps", 1, MAX_SAFE_INTEGER);
+  var step = requireInt(value.step, "bond.step", 1, steps);
+  return { stage: stage, step: step, steps: steps };
+}
+
+function validatePartyMemberDescriptor(value, name, actionIds, params) {
+  requireExactFields(value, name, ["action_id", "params", "enabled", "reason"], []);
+  if (actionIds.indexOf(value.action_id) === -1) {
+    throw new Error(name + " action_id must be one of " + actionIds.join(","));
+  }
+  requireExactFields(value.params, name + " params", Object.keys(params), []);
+  Object.keys(params).forEach(function (field) {
+    if (value.params[field] !== params[field]) {
+      throw new Error(name + " params." + field + " must name the viewed member");
+    }
+  });
+  var enabled = requireBool(value.enabled, name + " enabled");
+  var reason = value.reason;
+  if (reason !== null) {
+    reason = requireString(reason, name + " reason", PARTY_MEMBER_MAX_REASON);
+    if (reason.trim().length === 0 || hasLoneSurrogate(reason)) {
+      throw new Error(name + " reason must be non-empty when set");
+    }
+  }
+  if (enabled && reason !== null) {
+    throw new Error("an enabled descriptor carries no reason");
+  }
+  if (!enabled && reason === null) {
+    throw new Error("a disabled descriptor carries its reason");
+  }
+  return {
+    action_id: value.action_id,
+    params: params,
+    enabled: enabled,
+    reason: reason,
+  };
+}
+
+function validatePartyMemberActions(value, memberId, order) {
+  if (!Array.isArray(value) || value.length !== order.length) {
+    throw new Error("actions must hold exactly " + order.length + " descriptors");
+  }
+  var descriptors = [];
+  for (var i = 0; i < order.length; i++) {
+    var actionId = order[i];
+    var params =
+      actionId === PARTY_MEMBER_ACTION_COMMANDER_PERSONA
+        ? {}
+        : { npc_id: memberId };
+    var actionIds =
+      actionId === PARTY_MEMBER_ACTION_POSSESS
+        ? PARTY_MEMBER_POSSESSION_ACTIONS
+        : [actionId];
+    descriptors.push(
+      validatePartyMemberDescriptor(
+        value[i],
+        "party_member action " + (i + 1),
+        actionIds,
+        params
+      )
+    );
+  }
+  return descriptors;
+}
+
+function validatePartyMemberCompanion(value, memberId) {
+  requireExactFields(
+    value,
+    "companion",
+    ["bond", "membership", "intimate", "actions"],
+    []
+  );
+  var bond = validatePartyMemberBond(value.bond);
+  var membership = validatePartyMembership(value.membership, "companion membership");
+  var intimate = validateIntimate(value.intimate);
+  var actions = validatePartyMemberActions(
+    value.actions,
+    memberId,
+    PARTY_MEMBER_COMPANION_ACTIONS
+  );
+  return { bond: bond, membership: membership, intimate: intimate, actions: actions };
+}
+
+function validatePartyMemberCommander(value, memberId) {
+  requireExactFields(value, "commander", ["persona", "intimate", "actions"], []);
+  var persona = validatePersona(value.persona);
+  var intimate = validateIntimate(value.intimate);
+  var actions = validatePartyMemberActions(
+    value.actions,
+    memberId,
+    PARTY_MEMBER_COMMANDER_ACTIONS
+  );
+  return { persona: persona, intimate: intimate, actions: actions };
+}
+
+function validatePartyMemberPanel(payload) {
+  requireExactFields(
+    payload,
+    "party_member panel",
+    ["schema_version", "available", "kind", "member_id", "role", "companion", "commander"],
+    []
+  );
+  requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+  if (payload.schema_version !== PARTY_MEMBER_SCHEMA_VERSION) {
+    throw new Error("unsupported party_member schema_version");
+  }
+  if (payload.available !== true) {
+    throw new Error("party_member panel must be available");
+  }
+  if (payload.kind !== "party_member") {
+    throw new Error("kind must be 'party_member'");
+  }
+  var memberId = requireInt(payload.member_id, "member_id", 1, MAX_SAFE_INTEGER);
+  var role = payload.role;
+  if (role !== "commander" && role !== "companion") {
+    throw new Error("role must be commander or companion");
+  }
+  var companion = null;
+  var commander = null;
+  if (role === "commander") {
+    if (payload.companion !== null) {
+      throw new Error("a commander panel carries no companion section");
+    }
+    if (payload.commander === null) {
+      throw new Error("a commander panel requires its section");
+    }
+    commander = validatePartyMemberCommander(payload.commander, memberId);
+  } else {
+    if (payload.commander !== null) {
+      throw new Error("a companion panel carries no commander section");
+    }
+    if (payload.companion === null) {
+      throw new Error("a companion panel requires its section");
+    }
+    companion = validatePartyMemberCompanion(payload.companion, memberId);
+  }
+  var result = {
+    schema_version: PARTY_MEMBER_SCHEMA_VERSION,
+    available: true,
+    kind: "party_member",
+    member_id: memberId,
+    role: role,
+    companion: companion,
+    commander: commander,
+  };
+  if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+    throw new Error("party_member payload exceeds the OOB envelope limit");
+  }
+  return result;
+}
+
 module.exports = {
   validatePartyPanel: validatePartyPanel,
+  validatePartyMemberPanel: validatePartyMemberPanel,
   validateObjectivesPanel: validateObjectivesPanel,
   validateQuestLogPanel: validateQuestLogPanel,
   validateDialoguePanel: validateDialoguePanel,
   validateRosterPanel: validateRosterPanel,
   PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
+  PARTY_MEMBER_SCHEMA_VERSION: PARTY_MEMBER_SCHEMA_VERSION,
   PARTY_GENERAL_LIMIT: PARTY_GENERAL_LIMIT,
   PARTY_MAX_SLOTS: PARTY_MAX_SLOTS,
   PARTY_MAX_ROWS: PARTY_MAX_ROWS,

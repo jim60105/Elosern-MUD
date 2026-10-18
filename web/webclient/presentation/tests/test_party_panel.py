@@ -1646,6 +1646,10 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
             row for row in party["slots"] if row["identity"] == int(companion.pk)
         )
         self.assertIs(row["unread"], False)
+        # The selection also republishes the viewed member's member-tab facts.
+        member_panel = last["panels"]["party_member"]
+        self.assertEqual(member_panel["member_id"], int(companion.pk))
+        self.assertEqual(member_panel["role"], "companion")
         # The dispatcher publishes presentation first and the result second, at
         # the same revision (action-dispatch's completion contract).
         self.assertEqual(results[-1]["presentation_revision"], last["revision"])

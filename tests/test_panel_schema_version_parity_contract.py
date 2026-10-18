@@ -44,6 +44,7 @@ _PANEL_MODULES = (
     ("context_actions", "combat_panel.py"),
     ("local_map", "local_map/validate.py"),
     ("party", "party.py"),
+    ("party_member", "party_member.py"),
     ("objectives", "objectives.py"),
     ("services", "services.py"),
     ("creation", "creation.py"),
@@ -232,6 +233,74 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "js PARTY_MAX_DISPLAY_NAME",
         )}
         self.assertEqual(len(names), 1, f"display-name bound drifted: {extracted}")
+
+    def test_party_member_bounds_are_pinned(self):
+        # party-member-panel: the persona prose cap, the disabled-reason cap
+        # and the bond-stage name cap are shared between the server sections,
+        # the presenter and the JS mirror.
+        presenter_source = (
+            REPO_ROOT / "web/webclient/presentation/party_member.py"
+        ).read_text(encoding="utf-8")
+        persona_source = (
+            REPO_ROOT / "world/rules/character_creation.py"
+        ).read_text(encoding="utf-8")
+        protocol_source = (
+            REPO_ROOT / "web/webclient/presentation/protocol.py"
+        ).read_text(encoding="utf-8")
+        js_source = protocol_client_source()
+        values = {
+            "rules MAX_PERSONA_FIELD_LENGTH": re.search(
+                r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*(\d+)", persona_source, re.MULTILINE
+            ),
+            "protocol MAX_MESSAGE_CODE_POINTS": re.search(
+                r"^MAX_MESSAGE_CODE_POINTS\s*=\s*(\d+)", protocol_source, re.MULTILINE
+            ),
+            "presenter MAX_BOND_STAGE_CODE_POINTS": re.search(
+                r"^MAX_BOND_STAGE_CODE_POINTS\s*=\s*(\d+)",
+                presenter_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_MEMBER_MAX_PERSONA_FIELD": re.search(
+                r"^var PARTY_MEMBER_MAX_PERSONA_FIELD\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_MEMBER_MAX_BOND_STAGE": re.search(
+                r"^var PARTY_MEMBER_MAX_BOND_STAGE\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+            "js PARTY_MEMBER_MAX_REASON": re.search(
+                r"^var PARTY_MEMBER_MAX_REASON\s*=\s*(\d+);",
+                js_source,
+                re.MULTILINE,
+            ),
+        }
+        missing = sorted(key for key, match in values.items() if match is None)
+        self.assertEqual(missing, [], f"pinned bound vanished: {missing}")
+        extracted = {key: match.group(1) for key, match in values.items()}
+        self.assertEqual(
+            {extracted["rules MAX_PERSONA_FIELD_LENGTH"],
+             extracted["js PARTY_MEMBER_MAX_PERSONA_FIELD"]},
+            {"600"},
+            f"persona prose bound drifted: {extracted}",
+        )
+        self.assertEqual(
+            {extracted["protocol MAX_MESSAGE_CODE_POINTS"],
+             extracted["js PARTY_MEMBER_MAX_REASON"]},
+            {"512"},
+            f"disabled-reason bound drifted: {extracted}",
+        )
+        self.assertEqual(
+            {extracted["presenter MAX_BOND_STAGE_CODE_POINTS"],
+             extracted["js PARTY_MEMBER_MAX_BOND_STAGE"]},
+            {"128"},
+            f"bond-stage bound drifted: {extracted}",
+        )
+        self.assertRegex(
+            presenter_source,
+            r"(?m)^MAX_REASON_CODE_POINTS\s*=\s*MAX_MESSAGE_CODE_POINTS\s*$",
+        )
 
     @covers_requirement(
         "webclient-combat-beats::the-client-protocol-mirrors-the-combat-beats-schema",

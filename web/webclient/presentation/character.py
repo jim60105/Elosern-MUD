@@ -56,18 +56,15 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from web.webclient.presentation.persona_sections import (
+    MAX_PERSONA_FIELD_CODE_POINTS,
+    PERSONA_PROSE_FIELDS,
+    serialize_intimate as _serialize_intimate,
+    serialize_persona,
+    validate_intimate,
+    validate_persona,
+)
 from world.lore.items import ITEM_REGISTRY
-from world.lore.sexual_vocab import (
-    AROUSAL_LEVELS,
-    CLIMAX_PHASE_LEVELS,
-    EXPOSURE_LEVELS,
-    SHAME_LEVELS,
-    WETNESS_LEVELS,
-)
-from world.rules.character_creation import (
-    MAX_PERSONA_FIELD_LENGTH,
-    PERSONA_PROSE_KEYS,
-)
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.action_preview import adjusted_cost
 from world.rules.progression import freeform_scale_entries_for
@@ -110,14 +107,9 @@ MAX_SLOT_CODE_POINTS = 32
 # The equipment adjustment summary bound (P3 formatter output; 「｜」-joined
 # segments of the fixed vocabulary).
 MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
-# The display-only persona prose bound mirrors the persona-field cap
-# (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
-# contract pins the JS validator to this same number.
-MAX_PERSONA_FIELD_CODE_POINTS = MAX_PERSONA_FIELD_LENGTH
-# The exact four display-only persona prose keys, in drawer display order
-# (personality, life_story, habit, background). The panel section and the JS
-# validator mirror this tuple.
-PERSONA_PROSE_FIELDS = (*PERSONA_PROSE_KEYS, "background")
+# ``MAX_PERSONA_FIELD_CODE_POINTS`` and ``PERSONA_PROSE_FIELDS`` are imported
+# from ``persona_sections`` (the shared section both this panel and
+# ``party_member`` publish) and stay re-exported from here.
 # The composed full title bound is owned by ``world.rules.titles`` (the
 # producer bounds composition at it); the JS validator mirrors this number in
 # the parity contract.
@@ -434,89 +426,13 @@ def _validate_guild(value: Any) -> dict[str, Any]:
 
 
 def _validate_persona(value: Any) -> dict[str, Any]:
-    """Validate the display-only ``persona`` section of the character panel.
-
-    Carries exactly the four editable prose keys (each a nullable bounded
-    string from the character's persona record). The section is presentation
-    data and is never used to infer any mechanical value; the structural keys
-    (``identity``/``appearance``/``social_connection``) never appear.
-    """
-    _require_exact_fields(
-        value, "persona", set(PERSONA_PROSE_FIELDS), {}
-    )
-    cleaned: dict[str, Any] = {}
-    for field in PERSONA_PROSE_FIELDS:
-        entry = value[field]
-        if entry is None:
-            cleaned[field] = None
-            continue
-        if not isinstance(entry, str):
-            raise ProtocolValidationError(f"persona.{field} must be text or null")
-        text = entry.strip()
-        if not text:
-            cleaned[field] = None
-            continue
-        if sum(1 for _ in text) > MAX_PERSONA_FIELD_CODE_POINTS:
-            raise ProtocolValidationError(
-                f"persona.{field} exceeds its bound"
-            )
-        cleaned[field] = text
-    return cleaned
-
-
-def _validate_intimate_level(
-    value: Any, field: str, vocabulary: tuple[str, ...]
-) -> str:
-    level = _require_str(value, field, maximum=MAX_LABEL_CODE_POINTS)
-    if level not in vocabulary:
-        raise CharacterPanelError(f"intimate.{field} is not a member of its fixed vocabulary")
-    return level
+    """Validate the display-only ``persona`` section (shared section rules)."""
+    return validate_persona(value, error=CharacterPanelError)
 
 
 def _validate_intimate(value: Any) -> dict[str, Any] | None:
-    """Validate the nullable ``intimate`` section of the character payload.
-
-    ``None`` is valid (no sexual-state record); otherwise the section carries
-    exactly the six intimate fields, each level field checked against its fixed
-    vocabulary and ``climax_today`` as a non-negative safe integer.
-    """
-    if value is None:
-        return None
-    _require_exact_fields(
-        value,
-        "intimate",
-        {
-            "arousal",
-            "wetness",
-            "shame",
-            "exposure",
-            "climax_phase",
-            "climax_today",
-        },
-        {},
-    )
-    return {
-        "arousal": _validate_intimate_level(value, "arousal", AROUSAL_LEVELS),
-        "wetness": _validate_intimate_level(value, "wetness", WETNESS_LEVELS),
-        "shame": _validate_intimate_level(value, "shame", SHAME_LEVELS),
-        "exposure": _validate_intimate_level(value, "exposure", EXPOSURE_LEVELS),
-        "climax_phase": _validate_intimate_level(value, "climax_phase", CLIMAX_PHASE_LEVELS),
-        "climax_today": _require_int(value, "climax_today", minimum=0, maximum=MAX_SAFE_INTEGER),
-    }
-
-
-def _serialize_intimate(view: Any) -> dict[str, Any] | None:
-    """Serialize the read model's intimate view into the payload section."""
-    if view is None:
-        return None
-    return {
-        "arousal": view.arousal,
-        "wetness": view.wetness,
-        "shame": view.shame,
-        "exposure": view.exposure,
-        "climax_phase": view.climax_phase,
-        "climax_today": view.climax_today,
-    }
+    """Validate the nullable ``intimate`` section (shared section rules)."""
+    return validate_intimate(value, error=CharacterPanelError)
 
 
 def _validate_full_title(payload: dict[str, Any]) -> str | None:
@@ -824,14 +740,7 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         owner = _resolve_live_object(int(possessed_by))
         if owner is not None:
             persona_source = owner
-    persona: dict[str, Any] = {}
-    for field in PERSONA_PROSE_FIELDS:
-        value = getattr(persona_source, "persona", {}).get(field)
-        if value is not None and not isinstance(value, str):
-            value = None
-        if value is not None and not value.strip():
-            value = None
-        persona[field] = value
+    persona = serialize_persona(persona_source)
     return validate_character(_serialize(model, persona, actor))
 
 

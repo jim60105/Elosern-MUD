@@ -35,7 +35,7 @@ from .readers import (
     _read_disguise,
     _split_active_passive_keys,
 )
-from .sexual import _read_intimate
+from .sexual import read_intimate_view
 
 
 def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, ...]:
@@ -145,7 +145,7 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
     # The intimate view is read before the skill path so a corrupted (partial)
     # materialized record fails the completeness check before anything else in
     # the model build can observe or repair it.
-    intimate = _read_intimate(entity)
+    intimate = read_intimate_view(entity)
     active_keys, passive_keys = _split_active_passive_keys(entity)
 
     possessed_by = getattr(getattr(entity, "db", None), "possessed_by", None)

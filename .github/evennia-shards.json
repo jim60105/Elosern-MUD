@@ -343,6 +343,7 @@
         "web.webclient.presentation.tests.test_lore_codex_panel",
         "web.webclient.presentation.tests.test_lore_codex_registry_contract",
         "web.webclient.presentation.tests.test_local_map",
+        "web.webclient.presentation.tests.test_party_member_panel",
         "web.webclient.presentation.tests.test_party_panel",
         "web.webclient.presentation.tests.test_possession_presentation",
         "web.webclient.presentation.tests.test_presentation_context",

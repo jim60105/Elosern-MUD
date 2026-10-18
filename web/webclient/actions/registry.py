@@ -117,6 +117,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_account_character_switch_payload,
     )
     from web.webclient.actions.character_actions import (
+        AFFECTED_CHARACTER,
         _character_persona_update_adapter,
         validate_character_persona_update_payload,
     )
@@ -516,9 +517,9 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="party.view_member",
             validate_payload=validate_party_view_member_payload,
             adapter=_party_view_member_adapter,
-            # A selection republishes only the party panel: the next protocol
-            # change appends its viewed-member panel to this tuple.
-            affected_panels=("party",),
+            # A selection republishes the roster and the viewed member's
+            # member-tab facts.
+            affected_panels=("party", "party_member"),
         )
     )
     registry.register(
@@ -660,8 +661,8 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_character_persona_update_payload,
             adapter=_character_persona_update_adapter,
             # A persona edit re-renders the character drawer's persona
-            # sections through the character panel.
-            affected_panels=("character",),
+            # sections and the party window's commander member-tab facts.
+            affected_panels=AFFECTED_CHARACTER,
         )
     )
     registry.register(

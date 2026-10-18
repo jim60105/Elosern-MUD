@@ -6,6 +6,7 @@ import ast
 import copy
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
@@ -24,10 +25,11 @@ from world.rules.affinity import (
     AffinitySource,
     AffinitySeedError,
     apply_affinity_change,
+    bond_stage_position,
     seed_affinity,
     raise_affinity_cap,
 )
-from world.rules.affinity_config import get_config
+from world.rules.affinity_config import AffinityConfigError, get_config
 from world.rules.party import is_companion, join_party
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -567,3 +569,35 @@ class SeedAffinityWriterTests(EvenniaTestCase):
                 seed_affinity(self.npc, self.player, 30)
         events = [call.args[0] for call in info.call_args_list if call.args]
         self.assertNotIn("affinity_seed", events)
+
+
+class BondStagePositionTests(unittest.TestCase):
+    """``bond_stage_position`` reports the stage's 1-based table position."""
+
+    def _npc_at(self, stage):
+        return SimpleNamespace(
+            relations=SimpleNamespace(stage_for=lambda player: stage)
+        )
+
+    def test_step_and_steps_come_from_the_stage_table(self):
+        stages = (
+            SimpleNamespace(id="a", name="甲"),
+            SimpleNamespace(id="b", name="乙"),
+            SimpleNamespace(id="c", name="丙"),
+        )
+        npc = self._npc_at(stages[1])
+        with patch(
+            "world.rules.affinity.get_config",
+            return_value=SimpleNamespace(stages=stages),
+        ):
+            self.assertEqual(bond_stage_position(npc, object()), ("乙", 2, 3))
+
+    def test_a_stage_absent_from_the_table_fails_loudly(self):
+        stages = (SimpleNamespace(id="a", name="甲"),)
+        npc = self._npc_at(SimpleNamespace(id="z", name="末"))
+        with patch(
+            "world.rules.affinity.get_config",
+            return_value=SimpleNamespace(stages=stages),
+        ):
+            with self.assertRaises(AffinityConfigError):
+                bond_stage_position(npc, object())

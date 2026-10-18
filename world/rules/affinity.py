@@ -20,7 +20,7 @@ from typing import Any
 from django.db import transaction
 
 from world.observability import log_info, log_warn
-from world.rules.affinity_config import AffinityStage, get_config
+from world.rules.affinity_config import AffinityConfigError, AffinityStage, get_config
 from world.rules.clock import CLOCK_YAML
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
@@ -446,3 +446,21 @@ def affinity_stage_line(npc: Any, looker: Any) -> str:
     if not handler.has_record(looker):
         return ""
     return handler.stage_for(looker).look_flavor
+
+
+def bond_stage_position(npc: Any, player: Any) -> tuple[str, int, int]:
+    """The bond stage as ``(name, step, steps)`` for the member-tab pips.
+
+    ``step`` is the 1-based position of the resolved stage in the rulebook's
+    ordered stage table and ``steps`` its length, so the presentation layer
+    renders pips without ever reading (or shipping) the raw affinity value.
+    Read-only: resolving a stage never materializes or persists a record.
+    """
+    stage = npc.relations.stage_for(player)
+    stages = get_config().stages
+    for step, entry in enumerate(stages, 1):
+        if entry.id == stage.id:
+            return stage.name, step, len(stages)
+    raise AffinityConfigError(
+        f"affinity.yaml: resolved stage {stage.id!r} is absent from the stage table"
+    )

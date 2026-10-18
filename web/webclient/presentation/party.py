@@ -149,7 +149,7 @@ def _validate_commission_ref(value: Any) -> dict[str, Any]:
     }
 
 
-def _validate_membership(value: Any) -> dict[str, Any]:
+def validate_party_membership(value: Any) -> dict[str, Any]:
     """Validate one row's ``membership`` metadata: general flag plus reasons."""
     _require_exact_fields(
         value, "party membership", {"general", "temporary_commissions"}, {}
@@ -241,7 +241,7 @@ def _validate_slot(value: Any) -> dict[str, Any]:
             _require_str(value, "bond_stage", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
             "slot bond_stage",
         )
-        membership = _validate_membership(value["membership"])
+        membership = validate_party_membership(value["membership"])
     return {
         "identity": identity,
         "display_name": display_name,
@@ -366,6 +366,46 @@ def _unread(context: PresentationContext, identity: int) -> bool:
     return bool(entry is not None and entry.unread)
 
 
+def membership_section(
+    npc: Any, owner: Any, records: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Serialize one companion's membership for a party panel.
+
+    The general flag plus the ordered temporary commissions, each carrying the
+    quest's display label. ``records`` may carry the owner's pre-read quest
+    records so a whole-roster render reads them once; a caller presenting one
+    member omits it and this function reads the owner's records itself.
+    """
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+    from world.quests.runtime import read_records
+
+    if records is None:
+        records = {record.quest_id: record for record in read_records(owner)}
+
+    def _commission_label(quest_id: str) -> str:
+        record = records.get(quest_id)
+        if record is None:
+            return quest_id
+        definition = QUEST_DEFINITION_REGISTRY.get(record.definition_key)
+        return (
+            definition.display_name
+            if definition is not None
+            else record.definition_key
+        )[:MAX_PARTY_COMMISSION_LABEL]
+
+    return {
+        "general": has_general_membership(npc, owner),
+        "temporary_commissions": [
+            {
+                "quest_id": quest_id,
+                "role_id": role_id,
+                "label": _commission_label(quest_id),
+            }
+            for quest_id, role_id in reasons_for(npc, owner)
+        ],
+    }
+
+
 def party_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``party`` panel for the authenticated puppet."""
     actor = context.actor
@@ -379,21 +419,9 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
     if owner is None:
         raise PanelUnavailableError
 
-    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
     from world.quests.runtime import read_records
 
     records = {record.quest_id: record for record in read_records(owner)}
-
-    def _commission_label(quest_id: str) -> str:
-        record = records.get(quest_id)
-        if record is None:
-            return quest_id
-        definition = QUEST_DEFINITION_REGISTRY.get(record.definition_key)
-        return (
-            definition.display_name
-            if definition is not None
-            else record.definition_key
-        )[:MAX_PARTY_COMMISSION_LABEL]
 
     # The committed art view's admission set for the companions, resolved once
     # for the roster: a companion the view does not admit is the truthful null.
@@ -435,14 +463,6 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
         hp_current, hp_maximum = stored_gauge_pair(npc, "hp")
         mp_current, mp_maximum = stored_gauge_pair(npc, "mp")
         sp_current, sp_maximum = stored_gauge_pair(npc, "sp")
-        commissions = [
-            {
-                "quest_id": quest_id,
-                "role_id": role_id,
-                "label": _commission_label(quest_id),
-            }
-            for quest_id, role_id in reasons_for(npc, owner)
-        ]
         slots.append(
             {
                 "identity": int(npc.pk),
@@ -460,10 +480,7 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "knocked_out": is_knocked_out(npc),
                 "unread": _unread(context, int(npc.pk)),
                 "bond_stage": npc.relations.stage_for(owner).name,
-                "membership": {
-                    "general": has_general_membership(npc, owner),
-                    "temporary_commissions": commissions,
-                },
+                "membership": membership_section(npc, owner, records),
             }
         )
     viewed_member = resolve_viewed_member(context)
@@ -492,6 +509,8 @@ __all__ = [
     "PARTY_ROLE_COMPANION",
     "PARTY_SCHEMA_VERSION",
     "PartyPanelError",
+    "membership_section",
     "party_presenter",
     "validate_party",
+    "validate_party_membership",
 ]
