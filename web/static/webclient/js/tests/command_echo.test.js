@@ -426,11 +426,19 @@ test("inventory.toggle_equip echoes the typed equip command in both directions",
   // The typed 裝備/equip command IS the toggle: the unequip click echoes the
   // same replayable line, and no `unequip` command is ever invented.
   assert.strictEqual(
-    Echo.commandLine("inventory.toggle_equip", { item_key: "leather_vest" }, null),
+    Echo.commandLine(
+      "inventory.toggle_equip",
+      { item_key: "leather_vest", actor_id: 7 },
+      null
+    ),
     "equip leather_vest"
   );
   assert.strictEqual(
-    Echo.commandLine("inventory.toggle_equip", { item_key: "leather_vest" }, { equipped: true }),
+    Echo.commandLine(
+      "inventory.toggle_equip",
+      { item_key: "leather_vest", actor_id: 7 },
+      { equipped: true }
+    ),
     "equip leather_vest"
   );
 });
@@ -686,7 +694,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "guild.quest_track": { payload: { quest_id: "quest_1", tracked: true }, display: {} },
   "guild.quest_turnin": { payload: { quest_id: "quest_1" }, display: {} },
   "guild.register": { payload: {}, display: {} },
-  "inventory.toggle_equip": { payload: { item_key: "leather_vest" }, display: {} },
+  "inventory.toggle_equip": { payload: { item_key: "leather_vest", actor_id: 7 }, display: {} },
   "inventory.use": { payload: { item_key: SYNTH_ITEM.id }, display: {} },
   "options.dismiss": null,
   "gallery.subject.select": null,

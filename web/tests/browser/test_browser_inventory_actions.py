@@ -230,10 +230,18 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
         ]
         self.assertEqual(len(envelopes), 2)
         # Same server-authored identifier and payload through the same gates;
-        # each envelope pins its own live base revision by design.
+        # each envelope pins its own live base revision by design. The member
+        # reference is the controlled figure's numeric identity
+        # (party-member-equipment), derived from the committed status panel,
+        # so the exact payload is asserted as a whole.
+        expected_actor = int(
+            store_state(page)["panels"]["status"]["actor"]["identity"]
+        )
         for env in envelopes:
             self.assertEqual(env["action_id"], "inventory.toggle_equip")
-            self.assertEqual(env["payload"], {"item_key": weapon})
+            self.assertEqual(
+                env["payload"], {"item_key": weapon, "actor_id": expected_actor}
+            )
         self._wait_row(page, weapon, lambda row: row["equipped"] is False)
 
     @covers_requirement(

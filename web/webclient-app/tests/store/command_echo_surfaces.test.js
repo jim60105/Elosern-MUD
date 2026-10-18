@@ -211,7 +211,13 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       ids: ["inventory.toggle_equip"],
       prepare() {
         openExploration();
-        store.dispatchAction("inventory.toggle_equip", { item_key: "item_leather_armor" });
+        // The drawer names the member whose equipment toggles
+        // (party-member-equipment); the echoed line still replays the typed
+        // `equip <item_key>` for the controlled figure.
+        store.dispatchAction("inventory.toggle_equip", {
+          item_key: "item_leather_armor",
+          actor_id: 42,
+        });
       },
       expected: "equip item_leather_armor",
     },

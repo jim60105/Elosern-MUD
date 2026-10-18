@@ -170,7 +170,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "sell": {"syntax": "sell <item_key> [數量]", "context": "經濟（需當地商人）"},
     "inventory": {"syntax": "inventory", "context": "一般（隨時可用）"},
     "使用": {"syntax": "使用 <item_key> [target]", "context": "一般（探索與戰鬥中皆可用）"},
-    "裝備": {"syntax": "裝備 <item_key>", "context": "一般（探索與戰鬥中皆可用）"},
+    "裝備": {"syntax": "裝備 <物品> [= <成員>]", "context": "一般（探索與戰鬥中皆可用）"},
     "art status": {
         "syntax": "art status [scene|portrait|monster]",
         "context": "管理員（需 Developer 權限）",

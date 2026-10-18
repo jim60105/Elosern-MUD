@@ -124,6 +124,24 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return `錢袋 ${formatCopper(wallet)} 銅`;
   });
 
+  // The inventory drawer's equipment-toggle member (party-member-equipment):
+  // the controlled figure's identity from the committed `status` panel, which
+  // serializes it as a string, converted to the positive safe integer the
+  // exact payload requires. Null when that panel is missing or unavailable —
+  // the toggle then stays unavailable instead of naming an invented member,
+  // and no other identity (the commander included) is ever substituted.
+  const inventoryActorId = computed(() => {
+    if (!panelAvailable("status")) {
+      return null;
+    }
+    const identity = panel("status")?.actor?.identity;
+    if (typeof identity !== "string" || identity.trim() === "") {
+      return null;
+    }
+    const value = Number(identity);
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  });
+
   const partyReason = computed(() => {
     const p = panel("party");
     return p?.reason?.message || "隊伍資訊目前無法顯示";
@@ -139,6 +157,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
     drawerTitle,
     drawerIcon,
     drawerHasArt,
+    inventoryActorId,
     inventoryWalletCopper,
     inventoryWalletSubtitle,
     onHudDrawerClose,

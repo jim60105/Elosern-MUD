@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
+import InventoryPanel from "../components/InventoryPanel.vue";
 import StatusPanel from "../components/StatusPanel.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
@@ -132,6 +133,57 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       expect(other.findAll("[class*='__wallet']").length, name).toBe(0);
       expect(other.text(), name).not.toContain("錢袋");
     }
+  });
+
+  it("passes the controlled figure's numeric identity to the inventory drawer", async () => {
+    // party-member-equipment: the equipment toggle names the member whose
+    // equipment changes. The committed status panel serializes the identity
+    // as a string; the drawer receives the positive integer the exact payload
+    // requires, and no other identity is ever substituted.
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(1, "ui_snapshot", [
+      fx.snapshot({
+        panels: {
+          status: fx.statusPanel({ actor: { identity: "123" } }),
+          character: CHARACTER_PANEL_SAMPLE,
+          services: SERVICES_PANEL_SAMPLE,
+        },
+      }),
+    ]);
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(123);
+  });
+
+  it("passes no member identity when the status panel is absent", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(1, "ui_snapshot", [
+      fx.snapshot({
+        panels: {
+          status: {
+            schema_version: 3,
+            available: false,
+            reason: { code: "no_puppet", message: "目前沒有可顯示的角色。" },
+          },
+          character: CHARACTER_PANEL_SAMPLE,
+          services: SERVICES_PANEL_SAMPLE,
+        },
+      }),
+    ]);
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("inventory");
+    await wrapper.vm.$nextTick();
+    // The bag still renders, but the toggle has no member to name and stays
+    // unavailable (never the commander, never a fabricated id).
+    expect(wrapper.find('[data-testid="inventory-panel"]').exists()).toBe(true);
+    expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(null);
   });
 
   // The character panel is an exact-schema v5 payload: the

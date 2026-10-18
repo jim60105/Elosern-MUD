@@ -297,7 +297,7 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
   or drop action
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-The existing service action allowlist and exact bounded payloads SHALL remain. guild.quest_abandon SHALL revalidate the authenticated owner and referenced record. Active private escort records MAY abandon without a guild host through the quest-owned compensated operation; ordinary guild counter actions retain existing host/eligibility gates. No new action ID or actor/host authority field SHALL be added.
+The existing service action allowlist and exact bounded payloads SHALL remain. Party member references SHALL appear only in their owning capability's exact member field. guild.quest_abandon SHALL revalidate the authenticated owner and referenced record. Active private escort records MAY abandon without a guild host through the quest-owned compensated operation; ordinary guild counter actions retain existing host/eligibility gates. No other new action ID or host authority field SHALL be added.
 
 #### Scenario: Existing registration reaches its deterministic API once
 - **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
@@ -332,11 +332,12 @@ The existing service action allowlist and exact bounded payloads SHALL remain. g
 - **THEN** the adapter resolves current actor mode and delegates to the matching deterministic item-use facade exactly once
 
 #### Scenario: Inventory toggle submits only item key
-- **WHEN** a client submits `inventory.toggle_equip` with one item key
-- **THEN** the adapter delegates to deterministic equipment toggle without accepting a client-selected slot
+- **WHEN** a client submits `inventory.toggle_equip` with one item key and the member's `actor_id`
+- **THEN** the adapter reauthorizes the member, never substitutes the commander, and delegates to
+  deterministic equipment toggle without accepting a client-selected slot
 
 #### Scenario: Authority-like fields can never be supplied
-- **WHEN** any service or inventory action contains an unknown actor, host, session, effect, or slot-like field
+- **WHEN** any service or inventory action contains an actor-like field outside its exact member reference, or a host, session, effect, or slot-like field
 - **THEN** exact-schema validation rejects before adapter invocation
 
 #### Scenario: Below merit request stays enabled
@@ -355,15 +356,15 @@ The existing service action allowlist and exact bounded payloads SHALL remain. g
 
 #### Scenario: Inventory actions carry only a bounded item key
 - **WHEN** an `inventory.use` or `inventory.toggle_equip` payload is validated
-- **THEN** it accepts exactly `item_key` as a 1..64-character non-empty string
+- **THEN** its `item_key` is a 1..64-character non-empty string, `inventory.toggle_equip` accepts exactly `actor_id` and `item_key`, and `inventory.use` keeps its exact item and optional target fields
 
 #### Scenario: Adapters are session-scoped and re-resolve everything
 - **WHEN** a service adapter runs
 - **THEN** it resolves the authenticated actor and referenced canonical state, resolves local hosts where the action requires them, and delegates to the existing public owner; private escort abandonment needs no guild staff
 
 #### Scenario: Inventory payloads reject every authority field
-- **WHEN** an inventory payload carries any of actor, host, branch, session, effect, consumable, quantity, target,
-  slot, HP, combat, price, stock, or wallet fields
+- **WHEN** an inventory payload carries any of host, branch, session, effect, consumable, quantity,
+  slot, HP, combat, price, stock, or wallet fields, or any member reference other than its exact `actor_id`
 - **THEN** exact-schema validation rejects it
 
 #### Scenario: Adapters never write canonical state directly

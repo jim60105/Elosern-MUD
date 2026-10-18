@@ -422,6 +422,11 @@ function servicesWithActions() {
 describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
   let wrapper;
 
+  // party-member-equipment: the equipment toggle names the controlled figure,
+  // so the drawer receives that identity as the number the exact payload
+  // carries (the committed `status` panel serializes it as a string).
+  const ACTOR_ID = 7;
+
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
@@ -437,6 +442,7 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
         services: servicesWithActions(),
         character: CHARACTER_PANEL_SAMPLE,
         wallet: CHARACTER_PANEL_SAMPLE.wallet,
+        actorId: ACTOR_ID,
       },
     });
     return wrapper;
@@ -451,6 +457,7 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
         services: servicesWithActions(),
         character: CHARACTER_PANEL_SAMPLE,
         wallet: CHARACTER_PANEL_SAMPLE.wallet,
+        actorId: ACTOR_ID,
         // webclient-party-items-tactics: the commanded member's own review
         // step is the confirmation, so the drawer must not open its local one.
         combat: true,
@@ -499,7 +506,10 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     // disabled / inspect-only descriptors still dispatch nothing.
     await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
     expect(w.emitted("toggle-equip")).toEqual([
-      [{ action_id: "inventory.toggle_equip", payload: { item_key: "sword_toggle" } }],
+      [{
+        action_id: "inventory.toggle_equip",
+        payload: { item_key: "sword_toggle", actor_id: ACTOR_ID },
+      }],
     ]);
     await w.get('[data-testid="inventory-panel__tile--potion_full"]').trigger("click");
     await w.get('[data-testid="inventory-panel__tile--mystery"]').trigger("click");
@@ -553,10 +563,25 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     const w = mountActions();
     await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
     expect(w.emitted("toggle-equip")).toEqual([
-      [{ action_id: "inventory.toggle_equip", payload: { item_key: "sword_toggle" } }],
+      [{
+        action_id: "inventory.toggle_equip",
+        payload: { item_key: "sword_toggle", actor_id: ACTOR_ID },
+      }],
     ]);
     expect(w.emitted("use")).toBeUndefined();
     expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+  });
+
+  it("without a controlled-figure identity the toggle stays unavailable while use still works", async () => {
+    // The services panel can be available while the status panel is not; the
+    // exact payload requires a positive member id, so no request is sent with
+    // a null or invented actor (and item use stays unaffected).
+    const w = mountActions();
+    await w.setProps({ actorId: null });
+    await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
+    expect(w.emitted("toggle-equip")).toBeUndefined();
+    await w.get('[data-testid="inventory-panel__tile--potion_use"]').trigger("click");
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).not.toBeNull();
   });
 
   it("a disabled action is aria-disabled, spells the committed reason, and dispatches nothing", async () => {
