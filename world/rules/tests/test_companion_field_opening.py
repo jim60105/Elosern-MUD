@@ -172,6 +172,12 @@ class CompanionOpeningTests(_CompanionOpeningCase):
     @covers_requirement(
         "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
     )
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
+    )
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_a_commanded_companion_opens_the_commander_s_encounter(self):
         mp_before = self.aila.traits.mp.current
         battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
@@ -205,6 +211,12 @@ class CompanionOpeningTests(_CompanionOpeningCase):
     @covers_requirement(
         "companion-field-actions::a-field-cast-names-its-caster-explicitly"
     )
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
+    )
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_a_possessed_companion_opens_the_commander_s_encounter(self):
         enter_possession(self.commander, self.aila)
         self.assertIs(self.session.puppet, self.aila)
@@ -229,6 +241,9 @@ class CompanionOpeningTests(_CompanionOpeningCase):
 
     @covers_requirement(
         "companion-field-actions::a-field-cast-names-its-caster-explicitly"
+    )
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
     )
     def test_the_caster_pays_once_when_its_entry_resolves(self):
         battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
@@ -258,6 +273,9 @@ class CompanionOpeningTests(_CompanionOpeningCase):
     @covers_requirement(
         "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
     )
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_the_boundary_event_names_the_commander_and_the_caster(self):
         battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
         with (
@@ -284,6 +302,9 @@ class CompanionOpeningTests(_CompanionOpeningCase):
         self.assertEqual(context["enemy_count"], 1)
         self.assertEqual(context["opening"], "draft")
 
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_an_area_opening_engages_only_living_room_monsters(self):
         second = _monster("opening second wolf", hp=4000, atk=1)
         second.location = self.room
@@ -303,6 +324,9 @@ class CompanionOpeningTests(_CompanionOpeningCase):
             list(living),
         )
 
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_a_second_opening_cannot_replace_the_commander_s_session(self):
         battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
         with battlefield_roll, damage_roll, rounds_roll:
@@ -326,6 +350,9 @@ class CompanionOpeningRefusalTests(_CompanionOpeningCase):
 
     @covers_requirement(
         "companion-field-actions::unfit-casters-are-refused-with-stable-reasons"
+    )
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
     )
     def test_a_forged_caster_is_refused_before_any_session_or_clock_access(self):
         outsider = self._outsider()
@@ -351,6 +378,9 @@ class CompanionOpeningRefusalTests(_CompanionOpeningCase):
 
     @covers_requirement(
         "companion-field-actions::unfit-casters-are-refused-with-stable-reasons"
+    )
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
     )
     def test_an_absent_caster_is_refused_before_any_session(self):
         self.aila.location = self.elsewhere
@@ -385,6 +415,9 @@ class CompanionOpeningRefusalTests(_CompanionOpeningCase):
         self.assertIsNone(read_session(self.commander))
         self.assertEqual(self.aila.traits.mp.current, 20)
 
+    @covers_requirement(
+        "field-combat-initiation::a-companion-initiator-opens-the-commander-s-encounter"
+    )
     def test_an_injected_failure_restores_both_dialogue_surfaces(self):
         commander_host = self._outsider("開場對話者")
         caster_host = self._outsider("同伴對話者")
@@ -465,6 +498,9 @@ class CompanionOpeningPreviewTests(_CompanionOpeningCase):
 class PossessedOpeningCommandTests(_CompanionOpeningCase):
     """The possessed player keeps operating the commander's session."""
 
+    @covers_requirement(
+        "companion-field-actions::a-companion-s-field-cast-may-open-combat-under-the-commander-s-session"
+    )
     def test_the_possessed_puppet_reads_its_commander_s_session(self):
         enter_possession(self.commander, self.aila)
         battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
