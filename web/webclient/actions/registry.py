@@ -95,9 +95,10 @@ def build_production_action_registry() -> ActionRegistry:
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
-    ``party.transfer`` adapter, and the ``options.dismiss`` action. Each action
-    binds one exact payload validator and one narrow deterministic adapter; no
-    action routes through the text parser.
+    two party adapters (``party.transfer``, ``party.view_member``), and the
+    ``options.dismiss`` action. Each action binds one exact payload validator
+    and one narrow deterministic adapter; no action routes through the text
+    parser.
     """
     from web.webclient.actions.combat_actions import (
         _actor_choices_adapter,
@@ -178,7 +179,9 @@ def build_production_action_registry() -> ActionRegistry:
     )
     from web.webclient.actions.party_actions import (
         _party_transfer_adapter,
+        _party_view_member_adapter,
         validate_party_transfer_payload,
+        validate_party_view_member_payload,
     )
     from web.webclient.actions.gallery_actions import (
         _gallery_subject_select_adapter,
@@ -506,6 +509,16 @@ def build_production_action_registry() -> ActionRegistry:
             # A transfer rewrites both bags and their contained mirrors: the
             # empty set publishes a full canonical snapshot.
             affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="party.view_member",
+            validate_payload=validate_party_view_member_payload,
+            adapter=_party_view_member_adapter,
+            # A selection republishes only the party panel: the next protocol
+            # change appends its viewed-member panel to this tuple.
+            affected_panels=("party",),
         )
     )
     registry.register(
