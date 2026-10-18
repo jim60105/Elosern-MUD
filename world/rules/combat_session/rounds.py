@@ -61,6 +61,7 @@ from world.rules.event_log import EventEntry, EventLog
 from django.db import transaction
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
+from world.rules.unlock_notices import UnlockNotice, deliver_unlocks
 from world.rules.progression import (
     restore_practice_dedupe,
     snapshot_practice_dedupe,
@@ -903,8 +904,8 @@ def _finalize_resolved_round(
     hp_before: int,
     round_identities: Any,
     round_hp_before: Any,
-    grants: Sequence[str] = (),
-) -> tuple[dict[str, Any], tuple[str, ...]]:
+    grants: Sequence[str | UnlockNotice] = (),
+) -> tuple[dict[str, Any], tuple[str | UnlockNotice, ...]]:
     """Persist one resolved round's outcome and settle it exactly once.
 
     The single finalization every committed round reaches — the completed
@@ -916,8 +917,9 @@ def _finalize_resolved_round(
     deltas (the consumed draft and the spent opening-order policy clear with
     them), sweeps the markers of every newly removed member, and reaches
     exactly one settlement through :func:`_continue_or_settle`. Returns the
-    settlement result and the notification lines the caller delivers only
-    after its own durable unit commits.
+    settlement result and the notification items — rendered lines and
+    structured unlock notices — the caller delivers only after its own
+    durable unit commits.
     """
     boundary = {
         "char": str(actor.pk),
@@ -1028,9 +1030,9 @@ def _submit_request(
     )
     from django.db import transaction
 
-    notifications: tuple[str, ...] = ()
+    notifications: tuple[str | UnlockNotice, ...] = ()
     item_journals: list[Any] = []
-    grant_notifications: list[str] = []
+    grant_notifications: list[str | UnlockNotice] = []
     tactical_declarations: dict[str, str] | None = None
     taunt_declarations: dict[str, str] | None = None
     simulated, nonlethal_keys = _session_policy(battlefield, record)
@@ -1165,10 +1167,11 @@ def _submit_request(
     from world.rules.defeat_aftermath import drain_pending_undos
 
     drain_pending_undos()
-    # Deliver auto-leave notices only after the whole round committed, so a
-    # rolled-back round never shows a fake disengagement notification.
-    for line in notifications:
-        actor.msg(line)
+    # Deliver the round's notices and unlock marks only after the owning unit
+    # commits, so a rolled-back round never shows a fake disengagement
+    # notification and never marks an unlock the database did not keep. A
+    # nested submission (the exploration opening) defers to the outer unit.
+    _deliver_after_commit(actor, notifications)
     return result
 
 
@@ -1245,21 +1248,40 @@ def _party_retreat_event_log(
     return EventLog(str(commander.key), "", (), (entry,), 0)
 
 
-def _deliver_after_commit(commander: Any, notifications: tuple[str, ...]) -> None:
-    """Deliver one retreat round's staged lines once the exit unit commits.
+def _deliver_notifications(
+    commander: Any, notifications: Sequence[str | UnlockNotice]
+) -> None:
+    """Deliver one committed round's staged lines and unlock marks once.
 
-    The writer never notifies, and a rolled-back exit must not either, so the
-    lines ride the outermost transaction's commit exactly as the ordinary
-    round's boundary events do.
+    The unlock lines are staged twice in the same result — as the rendered
+    string the resolver put in ``notifications`` and inside the structured
+    notice — so the string matching a notice's own line is dropped here and
+    the notice delivers it to the commander's sessions instead. That keeps
+    one line per unlock and still reaches a commander whose body is
+    unpuppeted during possession (the notice helper resolves the account's
+    live sessions).
+    """
+    notices = tuple(item for item in notifications if isinstance(item, UnlockNotice))
+    unlock_lines = {notice.line for notice in notices}
+    for item in notifications:
+        if isinstance(item, str) and item not in unlock_lines:
+            commander.msg(item)
+    deliver_unlocks(commander, notices)
+
+
+def _deliver_after_commit(
+    commander: Any, notifications: Sequence[str | UnlockNotice]
+) -> None:
+    """Deliver one round's staged lines once the owning unit commits.
+
+    The writer never notifies, and a rolled-back round must not either, so the
+    lines and the session marks ride the outermost transaction's commit
+    exactly as the round's boundary events do. Outside a transaction Django
+    runs the callback immediately.
     """
     if not notifications:
         return
-
-    def deliver() -> None:
-        for line in notifications:
-            commander.msg(line)
-
-    transaction.on_commit(deliver)
+    transaction.on_commit(lambda: _deliver_notifications(commander, notifications))
 
 
 def _ordinary_party_defeat(

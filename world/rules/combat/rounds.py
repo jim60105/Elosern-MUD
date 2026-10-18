@@ -39,6 +39,7 @@ from world.rules.items import ItemUseRequest, resolve_item_use
 from world.rules.progression import can_use_skill
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
+from world.rules.unlock_notices import UnlockNotice
 from world.rules.upkeep import settle_upkeep
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
@@ -200,7 +201,7 @@ def run_round(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
-    notifications_sink: "list[str] | None" = None,
+    notifications_sink: "list[str | UnlockNotice] | None" = None,
     first_actor: str | None = None,
     decision_scope_base: ExecutionScopeBase | None = None,
     tactical_declarations: Mapping[str, str] | None = None,
@@ -322,7 +323,7 @@ def _resolve_round(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
-    notifications_sink: "list[str] | None" = None,
+    notifications_sink: "list[str | UnlockNotice] | None" = None,
     decision_scope_base: ExecutionScopeBase | None = None,
     initiative: "list[str] | None" = None,
 ) -> list[EventLog]:
@@ -346,8 +347,9 @@ def _resolve_round(
     actually-deleted mirrors), and every other request resolves as an
     ``ActionRequest``.
 
-    ``notifications_sink`` collects player-facing notification lines staged
-    by committed effects (e.g. title grant toasts) for delivery by the outer
+    ``notifications_sink`` collects the player-facing notification lines
+    staged by committed effects (e.g. title grant toasts) and the structured
+    practice unlocks of the same actions, for delivery by the outer
     settlement boundary after its commit; ``run_round`` itself never sends.
 
     ``decision_scope_base`` (monster-ai-attack-selection) is the encounter
@@ -492,6 +494,12 @@ def _resolve_round(
             notifications = getattr(result, "notifications", ())
             if notifications and notifications_sink is not None:
                 notifications_sink.extend(notifications)
+            # The structured unlocks of the same committed action: the outer
+            # boundary delivers each rendered line once and records the
+            # session marks from these notices.
+            unlocks = getattr(result, "unlock_notices", ())
+            if unlocks and notifications_sink is not None:
+                notifications_sink.extend(unlocks)
     records_by_key = _end_of_round_upkeep(battlefield)
     upkeep_logs = settle_upkeep(
         battlefield,

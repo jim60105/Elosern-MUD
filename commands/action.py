@@ -19,6 +19,7 @@ from world.rules.player_messages import (
 )
 from world.rules.progression import scale_for_label
 from world.rules.targeting import RoomActionContext
+from world.rules.unlock_notices import deliver_unlocks
 
 #: The final ``由 <成員>`` pair names the caster. The greedy prefix makes the
 #: LAST eligible pair win, so a ``由`` inside an earlier target name is kept
@@ -309,5 +310,9 @@ class CmdCast(Command):
             self.caller.msg(render_plain_text(settlement.result.event_log))
             for line in settlement.notifications:
                 self.caller.msg(line)
+            # The rendered unlock line is already among the notifications
+            # above; this records the session unread marks for the same
+            # committed grant without repeating the line.
+            deliver_unlocks(self.caller, settlement.unlock_notices, announce=False)
         else:
             self.caller.msg(rejection_message(settlement.result.reason))

@@ -50,6 +50,7 @@ from world.rules.progression import (
     snapshot_practice_dedupe,
 )
 from world.rules.surfaces import attribute_snapshot
+from world.rules.unlock_notices import UnlockNotice
 
 
 # The action- and clock-touched attribute surfaces of one actor or target: the
@@ -90,11 +91,17 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
 class CastSettlement:
     """The committed out-of-combat cast result, its advance events, and the
     caller-facing auto-leave notification lines the settlement's coercion
-    scan produced (``sexual-resist-out-of-combat``)."""
+    scan produced (``sexual-resist-out-of-combat``).
+
+    ``unlock_notices`` are the structured practice unlocks the committed
+    action staged; their rendered lines are already part of
+    ``notifications``, so the caller delivers the line once through that
+    channel and forwards these to the session-mark helper."""
 
     result: ActionResult
     events: tuple[ScheduledEvent, ...]
     notifications: tuple[str, ...] = ()
+    unlock_notices: tuple[UnlockNotice, ...] = ()
 
 
 @dataclass
@@ -506,4 +513,9 @@ def settle_out_of_combat_cast(
     # The title planner's grant toasts ride the same post-commit delivery
     # channel as the coercion notices: the caller emits every line only after
     # the outer transaction commits, so a rolled-back cast never notifies.
-    return CastSettlement(result, events, result.notifications + notifications)
+    return CastSettlement(
+        result,
+        events,
+        result.notifications + notifications,
+        result.unlock_notices,
+    )

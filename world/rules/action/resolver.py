@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import Any
 
 from world.rules.progression import practice_claim_key, release_practice_claims
+from world.rules.unlock_notices import UnlockNotice
 
 from world.rules.action.contracts import (
     _EFFECT_HANDLERS,
@@ -148,7 +149,7 @@ class ActionResolver:
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             delivered_recipients: list[Any] = []
             practice_claims: list[tuple[Any, str, Any]] = []
-            unlock_lines: list[str] = []
+            unlock_notices: list[UnlockNotice] = []
             if not generic_resisted:
                 seen_delivered_keys: set[Any] = set()
                 for eff_targets in routed_targets:
@@ -162,7 +163,7 @@ class ActionResolver:
                     skill,
                     delivered_recipients,
                     practice_claims,
-                    unlock_lines,
+                    unlock_notices,
                 )
             event_log = _step7_build_event_log(request, skill, pending)
             try:
@@ -201,8 +202,17 @@ class ActionResolver:
         notifications = tuple(effect.notify for effect in pending if effect.notify)
         # Unlock lines ride the same post-commit channel: appended here only
         # because the commit above succeeded. A rolled-back action returns at
-        # the CommitFailed branch above and its sink lines die with the result.
-        if unlock_lines:
-            notifications = notifications + tuple(unlock_lines)
-        return ActionResult.success(event_log, time_cost, notifications)
+        # the CommitFailed branch above and its sink notices die with the
+        # result. The structured notices ride the result so the owner can
+        # record the session unread marks alongside the one delivered line.
+        if unlock_notices:
+            notifications = notifications + tuple(
+                notice.line for notice in unlock_notices
+            )
+        return ActionResult.success(
+            event_log,
+            time_cost,
+            notifications,
+            tuple(unlock_notices),
+        )
 

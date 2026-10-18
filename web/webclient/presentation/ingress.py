@@ -303,12 +303,17 @@ def build_presentation_context(
     Only the dispatcher's completion publication passes it (combat-beats-panel
     D2); every other caller leaves it ``None``, so the beats panel stays
     unavailable outside the one publication that settled the round.
+
+    ``unlocks`` is the session's own unlock snapshot copied through
+    :func:`world.rules.unlock_notices.unlock_flags`, so presenters read the
+    unread dot and the recent set without touching ``ndb``.
     """
     from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
     from web.webclient.presentation.party_actor_selection import (
         party_actor_selection_snapshot,
     )
     from web.webclient.presentation.skill_use_selection import skill_use_selection_snapshot
+    from world.rules.unlock_notices import unlock_flags
 
     return PresentationContext(
         actor=actor,
@@ -320,6 +325,7 @@ def build_presentation_context(
         combat_round=combat_round,
         skill_use=skill_use_selection_snapshot(session, actor),
         party_actor=party_actor_selection_snapshot(session, actor),
+        unlocks=unlock_flags(session),
     )
 
 

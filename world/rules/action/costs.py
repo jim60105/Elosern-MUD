@@ -8,6 +8,7 @@ and the step-8 lookup resolves the world-clock time cost.
 from typing import Any
 
 from world.rules.progression import grant_skill_practice_xp, practice_claim_key
+from world.rules.unlock_notices import UnlockNotice
 from world.skills.registry import SkillDef
 
 from world.rules.action.contracts import (
@@ -73,7 +74,7 @@ def _step6_skill_practice(
     skill: SkillDef,
     targets: list[Any],
     claims_out: list[tuple[Any, str, Any]],
-    unlocks_out: list[str],
+    unlocks_out: list[UnlockNotice],
 ) -> list[PendingEffect]:
     """Stage one practice award per DISTINCT target (DC3).
 
@@ -83,7 +84,7 @@ def _step6_skill_practice(
     examination) context passes the nonlethal marker, so the whole staged
     batch awards nothing. Every claim the batch actually takes is appended to
     ``claims_out`` so a rolled-back commit can release them (a failed action
-    must not silence the same tick's legitimate retry). Unlock lines a live
+    must not silence the same tick's legitimate retry). Unlock notices a live
     award appends to ``unlocks_out`` are notification candidates only — the
     caller folds them into the result AFTER the commit succeeds.
     """
@@ -121,9 +122,9 @@ def _apply_practice(
     target: Any,
     simulated: bool,
     claims_out: list[tuple[Any, str, Any]],
-    unlocks_out: list[str],
+    unlocks_out: list[UnlockNotice],
 ) -> None:
-    """Apply one staged practice award, recording claims and unlock lines."""
+    """Apply one staged practice award, recording claims and unlock notices."""
     if grant_skill_practice_xp(
         actor, skill_key, target=target, nonlethal=simulated, unlocks_out=unlocks_out
     ):

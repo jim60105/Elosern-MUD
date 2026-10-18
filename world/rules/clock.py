@@ -28,6 +28,7 @@ from world.rules.sexual_state import (
 from world.rules.sexual_transitions import apply_event
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import GAUGE_KEYS
+from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT, UnlockNotice
 
 
 CLOCK_YAML = yaml.safe_load(
@@ -269,7 +270,12 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
                 apply_event(entity, "climax_ends")
 
 
-def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: AdvanceSource) -> None:
+def _practice_settlement(
+    entities: tuple[Any, ...],
+    seconds: int,
+    source: AdvanceSource,
+    due_tick: int,
+) -> list[ScheduledEvent]:
     """Settle declared-practice bookings in closed form (D7: the real writer).
 
     SKIP-source only: declared practice is downtime, so a combat advance must
@@ -287,10 +293,17 @@ def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: Advanc
     revalidated against current canonical state when the booking settles, so
     a standing booking whose skill was lost while it stood is consumed
     without progression; the award's own saturation is the cap revalidation.
+
+    Returns one ``practice_unlock`` :class:`ScheduledEvent` per skill the
+    settled award made usable, carrying the learner and the rendered line.
+    The event list is the advance's own return value, so a rolled-back
+    advance discards it and no owner can deliver an unlock the commit did not
+    keep.
     """
     if source is not AdvanceSource.SKIP:
-        return
+        return []
     hours = seconds // 3600
+    events: list[ScheduledEvent] = []
     for entity in entities:
         db = getattr(entity, "db", None)
         if db is None:
@@ -301,7 +314,22 @@ def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: Advanc
         db.practice_booking = None
         if hours < 1 or not _owns_booking_skill(entity, booking):
             continue
-        grant_study_practice_xp(entity, booking, hours)
+        notices: list[UnlockNotice] = []
+        grant_study_practice_xp(entity, booking, hours, unlocks_out=notices)
+        events.extend(
+            ScheduledEvent(
+                PRACTICE_UNLOCK_EVENT,
+                due_tick,
+                {
+                    "learner_id": notice.learner_id,
+                    "learner_name": notice.learner_name,
+                    "skill_key": notice.skill_key,
+                    "line": notice.line,
+                },
+            )
+            for notice in notices
+        )
+    return events
 
 
 def _owns_booking_skill(entity: Any, skill_key: str) -> bool:
@@ -346,9 +374,14 @@ def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any,
 
 def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entities: tuple[Any, ...]) -> list[ScheduledEvent]:
     _settle_gauge_regen(entities, seconds)
+    events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
         _settle_buffs_and_decay(entities, seconds)
-        _practice_settlement(entities, seconds, source)
+        events.extend(
+            _practice_settlement(
+                entities, seconds, source, clock.tick + seconds
+            )
+        )
         # 聖光涓流 (saintess-vessel D2b): the holder's idle-band pin/oscillation
         # runs exactly once per advance — NOT inside the per-quantum settlement
         # loop, which the pending-work guard would early-exit before (a fully
@@ -364,7 +397,8 @@ def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entiti
             resulting_tick = clock.tick + seconds
             for entity in entities:
                 saintess_trickle_step(entity, resulting_tick)
-    return _settle_boundary_stages(clock.tick, clock.tick + seconds, entities)
+    events.extend(_settle_boundary_stages(clock.tick, clock.tick + seconds, entities))
+    return events
 
 
 # Durable attribute surfaces an advance can write on a caller-supplied entity:

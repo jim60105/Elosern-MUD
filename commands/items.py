@@ -49,6 +49,7 @@ from world.rules.party_scope import (
 from world.rules.player_messages import session_reason_message
 from world.rules.quest_delivery import item_display_name
 from world.rules.service_messages import rejection_message
+from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
 
 class CmdUseItem(Command):
@@ -104,16 +105,24 @@ class CmdUseItem(Command):
             return
         target = self._field_target(target_token)
         if member is None:
-            self._render(use_item(self.caller, item_key, target=target).result)
-            return
-        try:
-            outcome = use_member_item(
-                self.caller, int(member.pk), item_key, target=target
+            settlement = use_item(self.caller, item_key, target=target)
+        else:
+            try:
+                outcome = use_member_item(
+                    self.caller, int(member.pk), item_key, target=target
+                )
+            except PartyScopeError as error:
+                self.caller.msg(error.message)
+                return
+            settlement = outcome.settlement
+        self._render(settlement.result)
+        if settlement.result.outcome == "success":
+            # A committed item use settles the present party's advance; any
+            # booked-practice unlock that advance staged is delivered here
+            # (this path renders no notification lines, so the line is new).
+            deliver_unlocks(
+                self.caller, notices_from_events(settlement.events)
             )
-        except PartyScopeError as error:
-            self.caller.msg(error.message)
-            return
-        self._render(outcome.settlement.result)
 
     def _field_target(self, target_token: str) -> Any:
         """Resolve one optional target token for the field path.

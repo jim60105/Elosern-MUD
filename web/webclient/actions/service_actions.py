@@ -67,6 +67,7 @@ from world.rules.service_messages import (
     rejection_code,
     rejection_message,
 )
+from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
 # Wire limits (equal to or below the protocol identifier bound).
 MAX_KEY_CODE_POINTS = 64
@@ -663,6 +664,10 @@ def _inventory_use_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         return _rejected(result.reason)
     message = render_plain_text(result.event_log)
     actor.msg(message)
+    # The committed use settles the present party's advance; a booked-practice
+    # unlock that advance staged is delivered here (this adapter renders no
+    # notification lines, so the line is new).
+    deliver_unlocks(actor, notices_from_events(outcome.settlement.events))
     return _success("item_used", message, ())
 
 

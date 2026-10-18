@@ -191,6 +191,7 @@ def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None
         resolve_commander,
     )
     from world.rules.player_messages import rejection_message, session_reason_message
+    from world.rules.unlock_notices import deliver_unlocks
     from typeclasses.monsters import Monster
 
     if not in_exploration_mode(actor):
@@ -274,6 +275,10 @@ def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None
     actor.msg(render_plain_text(settlement.result.event_log))
     for line in settlement.notifications:
         actor.msg(line)
+    # The rendered unlock line already rode the notifications above; record
+    # the session unread marks for the same committed grant without repeating
+    # the line.
+    deliver_unlocks(actor, settlement.unlock_notices, announce=False)
     retire_skill_use_selection(session)
     return {
         "outcome": "success",

@@ -32,6 +32,7 @@ from world.rules.time_skip import (
     render_skip_summary,
     seconds_to_full_regen,
 )
+from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
 # Thin names retained for the deterministic command tests.
 _parse_duration = parse_duration
@@ -131,6 +132,11 @@ class CmdRest(Command):
                 self.caller.db.practice_booking = previous_booking
             raise
         self.caller.msg(_render_skip_summary(seconds, events))
+        # The summary already carries each committed unlock line; record the
+        # session unread marks from the same committed events.
+        deliver_unlocks(
+            self.caller, notices_from_events(events), announce=False
+        )
         _maybe_nominate_after_rest(self.caller, events)
 
 
@@ -154,6 +160,9 @@ class CmdSleep(Command):
         events = clock.advance(seconds, AdvanceSource.SKIP, entities)
         settled_seconds = int(clock.tick) - tick_from if choice else seconds
         self.caller.msg(_render_skip_summary(settled_seconds, events))
+        deliver_unlocks(
+            self.caller, notices_from_events(events), announce=False
+        )
         _maybe_nominate_after_rest(self.caller, events)
         if choice:
             from server.dream_service import enter_after_sleep
@@ -188,6 +197,9 @@ class CmdWaitUntil(Command):
         # members' standing bookings for the clock's practice stage.
         events = clock.advance(seconds, AdvanceSource.SKIP, entities)
         self.caller.msg(_render_skip_summary(seconds, events))
+        deliver_unlocks(
+            self.caller, notices_from_events(events), announce=False
+        )
         _maybe_nominate_after_rest(self.caller, events)
 
 
