@@ -38,7 +38,7 @@ Every successful traversal through any project exit lineage SHALL run inside one
 
 ### Requirement: A failed movement compensates the persisted relocation and reconciles every Evennia cache surface
 
-When any step inside the movement-settlement transaction raises, when the outer transaction fails at commit, or when a wilderness lineage traversal returns falsy after relocating the traverser, the boundary SHALL compensate before the failure surfaces: the traverser and every companion the settlement moved SHALL be returned to their pre-move locations via hook-free Evennia relocations, or the wilderness coordinate API where applicable.
+When any step inside the movement-settlement transaction raises, when the outer transaction fails at commit, or when a wilderness lineage traversal returns falsy after relocating the traverser, the boundary SHALL compensate before the failure surfaces: the traverser and every party member the settlement moved (companions, and the commander's body under possession) SHALL return to their pre-move locations via hook-free Evennia relocations, or the wilderness coordinate API where applicable.
 
 #### Scenario: A clock-charge failure during a plain exit move returns the player to the source
 
@@ -86,6 +86,10 @@ When any step inside the movement-settlement transaction raises, when the outer 
 - **WHEN** the boundary's compensation sequence runs
 - **THEN** the steps run in a fixed deterministic order and each step is best-effort with a logged diagnostic on failure
 - **AND** a compensation failure does not mask or replace the original failure
+
+#### Scenario: A failed possessed traversal returns the whole party
+- **WHEN** the clock charge raises after a possessed 艾拉 relocated and the follow step had not yet run, or a later settlement step raises after the player's body and 卡恩 followed
+- **THEN** 艾拉, the player's body and 卡恩 are all back in the source room with contents caches, wilderness bookkeeping and the possession mirror unchanged
 
 ### Requirement: A failed movement reports failure truthfully on every client path
 
