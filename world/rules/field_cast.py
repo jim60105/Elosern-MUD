@@ -139,6 +139,43 @@ def cast_in_field(
     return FieldCastOutcome("settlement", settlement=settlement)
 
 
+def cast_as_member(
+    acting: Any,
+    member_id: Any,
+    skill_key: str,
+    *,
+    targets: list[Any] | tuple[Any, ...] = (),
+    opening_target: Any = None,
+    scale: float = 1.0,
+) -> FieldCastOutcome:
+    """Route one field cast performed by an explicitly named party member.
+
+    ``acting`` is the authenticated character; ``member_id`` is re-derived
+    through the party boundary for the acting purpose and never trusted as
+    identity, so a forged, stale, absent, or knocked-out member is rejected
+    before any routing, resource, roll, session, or clock access. The cast
+    then runs the unchanged :func:`cast_in_field` with the member as its
+    actor: the member's owned skill, MP cost, SELF binding and practice award
+    apply, and the settlement advance settles the present party through the
+    member's resolved commander.
+    """
+    from world.rules.party_scope import (
+        PURPOSE_ACT,
+        authorize_member,
+        resolve_commander,
+    )
+
+    commander = resolve_commander(acting)
+    member = authorize_member(commander, member_id, PURPOSE_ACT, anchor=acting)
+    return cast_in_field(
+        member,
+        skill_key,
+        targets=targets,
+        opening_target=opening_target,
+        scale=scale,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Read-only preview.
 # ---------------------------------------------------------------------------

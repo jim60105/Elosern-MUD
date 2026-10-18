@@ -30,7 +30,7 @@ Decisions (``openspec/changes/party-member-authority/design.md``):
 from typing import Any
 
 from world.rules.npc_identity import npc_display_name
-from world.rules.party import live_companions
+from world.rules.party import bound_owner_of, live_companions
 from world.rules.player_control import is_player_driven
 
 # Stable membership rejection codes. Callers branch and render on these; the
@@ -210,9 +210,17 @@ def present_party_scope(acting: Any) -> tuple[Any, ...]:
     they share the commander's room. The acting character is always part of the
     result: a possessed figure that a relocation left outside the commander's
     room is appended last rather than dropped, so no settlement can omit the
-    figure that acted.
+    figure that acted. A bound, unpossessed companion resolves its commander
+    through the party binding, so an explicitly named member's field action
+    settles the same present party its commander's would; a stale possession
+    flag and a one-sided or foreign binding still raise the shared rejection.
     """
-    commander = resolve_commander(acting)
+    try:
+        commander = resolve_commander(acting)
+    except PartyScopeError:
+        commander = _bound_commander(acting)
+        if commander is None:
+            raise
     room = getattr(commander, "location", None)
     scope: list[Any] = [commander]
     if room is not None:
@@ -224,6 +232,21 @@ def present_party_scope(acting: Any) -> tuple[Any, ...]:
     if acting not in scope:
         scope.append(acting)
     return tuple(scope)
+
+
+def _bound_commander(acting: Any) -> Any | None:
+    """The owner of a bound, unpossessed companion, or ``None``.
+
+    Settlement-scope resolution only: a party companion acting on the
+    commander's explicit command settles its commander's present party. A
+    non-``None`` possession flag keeps commander resolution strict (a stale
+    flag grants no authority), and ``bound_owner_of`` itself validates the
+    bidirectional live party binding, so a forged or one-sided record resolves
+    to ``None`` and the original rejection propagates.
+    """
+    if getattr(getattr(acting, "db", None), "possessed_by", None) is not None:
+        return None
+    return bound_owner_of(acting)
 
 
 def resolve_member_token(acting: Any, token: Any) -> Any:

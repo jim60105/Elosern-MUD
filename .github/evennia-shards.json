@@ -41,6 +41,7 @@
         "world.rules.tests.test_combat_round_record",
         "world.rules.tests.test_combat_initiation",
         "world.rules.tests.test_field_cast",
+        "world.rules.tests.test_companion_field_cast",
         "world.rules.tests.test_combat_session_flow",
         "world.rules.tests.test_combat_session_persistence",
         "world.rules.tests.test_combat_session_recovery",
