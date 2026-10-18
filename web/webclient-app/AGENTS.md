@@ -135,3 +135,49 @@ Every primitive size is `calc(<n>px * var(--ui-scale))` or a token, text
 uses `--text-*` tokens (never below `--text-xs`), and durations use
 `--motion-*` (pinned by `tests/components/window_primitives_styles.test.js`).
 The prototype's new glyphs live in `components/dock-icons.js`.
+
+## Party window
+
+`PartyWindow` (webclient-party-window-member-tab; design §6/§6.1 of the party
+member management design) replaced `PartyDrawer`. It mounts under the
+existing `party` drawer key outside the generic `HudDrawer` (it is its own
+`WindowFrame`), with the tabs 成員/背包/狀態/技能/系譜 (keys `member`, `bag`,
+`status`, `skills`, `lineage` — the exact `party.view_member` tab values), the
+party purse (`party_inventory.purse`) in the header and, on 成員, the
+`同伴 used / limit` quota beside it.
+
+- Selection is server truth. The rail's selected entry is
+  `party.viewed_member_id`; a rail click emits `view-member` and
+  `composables/use-party-window.js` sends one `party.view_member` with the
+  open tab. The entry is only marked pending (`MemberRail`'s `pending`,
+  `aria-busy`) while that request id is the store's in-flight dispatch; never
+  switch optimistically. A changed viewed member resets the window's local
+  item selection and quantity (exposed to the later tabs' scoped slots).
+- 空位 is the only local selection (it has no member id): it shows on every
+  tab while the general quota has room, opens 成員 and sends nothing.
+- The tab is session memory (`components/party-window-memory.js`, scoped to
+  `<generation>|<epoch>` like the quest drawer's). The current openers — the
+  character-status drawer's 隊伍 button and a companion figure on the stage
+  lineup (exploration only, outside the stage target step, never the
+  commander's figure) — open on 成員; a bare `openHudDrawer('party')` reopens
+  on the remembered tab. The lineup hit is a pointer convenience over the
+  decorative `aria-hidden` layer; keyboard users reach every member through
+  the rail.
+- `PartyMemberTab` renders only the `party_member` panel's descriptors
+  (possess or release, leave, `npc.persona.read`, `character.persona.update`)
+  through `ActionBar`; 請其離隊 takes two steps and any close attempt while
+  armed (Escape, ✕, scrim, via the window's `closeGuard`) cancels it instead.
+  The commander's persona editor lives here (`composables/
+  use-member-persona.js`); the character-status drawer shows the prose
+  read-only until it is retired. 人物卡 opens `NpcPersonaEditor` through
+  `store.openNpcPersonaEditor`.
+- The window has no possession input: it renders identically while
+  possessing, with no "you" marker. It shows values, states and committed
+  reasons only — no follow, transfer, combat or legend rule prose (design
+  §3.4). The only client-authored state line is the 空位's
+  `這裡沒有可邀請的對象。`.
+- The rail draws initials, not portraits: only the shared attempt lifecycle
+  resolves an artwork descriptor, so the viewed member's portrait is the
+  成員 nameplate's `AvatarArtwork`.
+- The 背包/狀態/技能/系譜 tabs land in the next changes; until then each shows
+  its backing panel's committed unavailable reason or its (empty) scoped slot.
