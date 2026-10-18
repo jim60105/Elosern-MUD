@@ -49,6 +49,7 @@ from world.rules.items.contracts import (
 from world.rules.items.journal import ItemTouchedJournal
 from world.rules.items.planning import preflight_item_use
 from world.rules.items.reads import _gauge_from_storage, _pleasure_current
+from world.rules.party_scope import present_party_scope
 from world.rules.pleasure import apply_pleasure_gain
 from world.rules.status_display import (
     MissingDisplayMetadataError,
@@ -314,15 +315,17 @@ def use_item(
     """Settle one out-of-combat item use plus its canonical six-second cost.
 
     Repeats preflight, then wraps the complete item plan and the
-    player-driven world's command-source advance in one outer transaction. On
-    any failure the clock tick, every callback-owned advance surface, and the
-    item journal's trait/inventory/quest/mirror caches are restored together
-    — for every touched entity — before the exception propagates. ``target``
-    is the caller's single explicit choice consumed by single-scope effects
-    (design D1); resolution uses the room context built from the actor's
-    location. An active combat session rejects with ``active_combat`` so item
-    consumption can never bypass a combat round; a rejection advances no
-    time.
+    player-driven world's command-source advance in one outer transaction.
+    The advance settles the user's present party scope, resolved once before
+    the transaction and reused by the snapshot registry, the advance and the
+    restore. On any failure the clock tick, every callback-owned advance
+    surface, and the item journal's trait/inventory/quest/mirror caches are
+    restored together — for every touched entity and every settled party
+    member — before the exception propagates. ``target`` is the caller's
+    single explicit choice consumed by single-scope effects (design D1);
+    resolution uses the room context built from the actor's location. An
+    active combat session rejects with ``active_combat`` so item consumption
+    can never bypass a combat round; a rejection advances no time.
     """
     from world.rules.combat_session import is_in_active_session
 
@@ -343,8 +346,11 @@ def use_item(
             )
         )
     world_clock = clock if clock is not None else get_world_clock()
+    # Resolve the settled scope once, before the outer transaction, so the
+    # snapshot registry, the advance and the restore share one tuple.
+    scope = present_party_scope(actor)
     registry = build_advance_snapshot_registry(
-        world_clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, (actor,)
+        world_clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, scope
     )
     tick_snapshot = _snapshot_clock_tick(world_clock)
     events: tuple[ScheduledEvent, ...] = ()
@@ -359,7 +365,7 @@ def use_item(
             if result.outcome == "success":
                 events = tuple(
                     world_clock.advance(
-                        item_effects.ITEM_USE_SECONDS, AdvanceSource.COMMAND, (actor,)
+                        item_effects.ITEM_USE_SECONDS, AdvanceSource.COMMAND, scope
                     )
                 )
     except Exception:
@@ -371,7 +377,7 @@ def use_item(
         # surfaces. If the resolver itself failed it already restored its own
         # journal; re-running the restore is an idempotent write.
         _restore_clock_tick(world_clock, tick_snapshot)
-        _restore_advance_registry(registry, (actor,))
+        _restore_advance_registry(registry, scope)
         if result is not None and result.journal is not None:
             result.journal.restore()
         raise

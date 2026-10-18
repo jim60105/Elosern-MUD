@@ -173,7 +173,7 @@ scale with target count.
   actor
 
 ### Requirement: Out-of-combat item use advances deterministic time once
-A successful out-of-combat item use SHALL compose its complete item plan and the player-driven world's canonical six-second advance inside one outer transaction and rollback journal. A rejected or failed use SHALL advance no time. A failure in any due clock callback SHALL roll back the item effect, consumption, contained mirror, clock, due-event effects, and all in-process caches together. Combat use SHALL add no command-default time because combat-session round settlement owns elapsed time.
+A successful out-of-combat item use SHALL commit its item plan and the canonical six-second advance in one outer transaction and rollback journal, and that advance SHALL settle the user's present party scope. A rejected or failed use SHALL advance no time; a due clock-callback failure SHALL roll back the item effect, consumption, contained mirror, clock, due-event effects, and in-process caches together. Combat use SHALL add no command-default time: round settlement owns elapsed time.
 
 #### Scenario: Exploration use advances six seconds
 - **WHEN** an injured actor successfully uses a healing potion outside combat
@@ -186,6 +186,11 @@ A successful out-of-combat item use SHALL compose its complete item plan and the
 #### Scenario: Clock callback failure rolls back item use
 - **WHEN** a due deterministic clock callback fails during the six-second advance after item planning
 - **THEN** HP, inventory, contained mirror, clock tick, due-event state, and in-process caches all equal their pre-use values
+
+#### Scenario: Exploration use settles the present party
+- **WHEN** the commander successfully uses a potion outside combat with companion 艾拉 present
+- **THEN** the six-second advance settles the commander and 艾拉 together, and a clock-callback failure
+  restores both members' surfaces
 
 ### Requirement: Combat item use occupies one initiative-ordered round
 An active combat session SHALL admit a preflight-valid `ItemUseRequest` as a commanded allied actor's selected

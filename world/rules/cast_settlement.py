@@ -5,9 +5,10 @@
 writes, and the command-time charge commit together inside one outer
 ``transaction.atomic()``. On any failure the outer rollback reverts the durable
 rows and the settlement restores every snapshotted Evennia cache -- actor and
-target attributes, the battlefield's fled/knocked-out sets, every
-callback-owned advance surface, and the clock tick -- to the pre-action state
-before the failure propagates (security-audit run-3 finding index 6).
+target attributes, every present party member's advance surfaces, the
+battlefield's fled/knocked-out sets, every callback-owned advance surface, and
+the clock tick -- to the pre-action state before the failure propagates
+(security-audit run-3 finding index 6).
 """
 
 from dataclasses import dataclass
@@ -43,6 +44,7 @@ from world.rules.clock import (
     read_world_clock,
 )
 from world.rules.event_log import EventLog
+from world.rules.party_scope import present_party_scope
 from world.rules.progression import (
     restore_practice_dedupe,
     snapshot_practice_dedupe,
@@ -150,21 +152,24 @@ def _merged_object(
 
 
 def _snapshot_settlement_state(
-    request: ActionRequest, clock: WorldClock
+    request: ActionRequest, clock: WorldClock, scope: tuple[Any, ...]
 ) -> _SettlementSnapshot:
     """Build the pre-resolution snapshot superset, merged by object identity.
 
     Runs entirely before the outer transaction opens. The merged advance
-    registry (``fix-clock-rollback-cache-sync`` D6 seam) covers the actor's
-    advance surfaces and every callback-owned surface; the actor's and every
-    request target's entity surfaces plus quest log, and the battlefield's
-    fled/knocked-out sets when the request context carries one, are merged into
-    the same identity-keyed mapping; the clock tick closes the superset. A
-    contract that raises here fails the settlement before the transaction opens
-    and before any write (fail-closed, exactly the sibling's D2 mandate).
+    registry (``fix-clock-rollback-cache-sync`` D6 seam) covers every present
+    party member's advance surfaces and every callback-owned surface; the
+    actor's, every request target's and every scope member's entity surfaces
+    plus quest log, and the battlefield's fled/knocked-out sets when the
+    request context carries one, are merged into the same identity-keyed
+    mapping; the clock tick closes the superset. ``scope`` is the same tuple
+    the caller passes to ``advance`` and the restore reads from this snapshot,
+    so the three can never disagree. A contract that raises here fails the
+    settlement before the transaction opens and before any write (fail-closed,
+    exactly the sibling's D2 mandate).
     """
     registry = build_advance_snapshot_registry(
-        clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, (request.actor,)
+        clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, scope
     )
     cached = {
         id(obj): obj for obj in _cached_db_instances()
@@ -179,7 +184,7 @@ def _snapshot_settlement_state(
             attributes=dict(snapshot.attributes),
             location=snapshot.location,
         )
-    caller_entities = (request.actor, *request.targets)
+    caller_entities = (request.actor, *request.targets, *scope)
     for entity in caller_entities:
         _merged_object(objects, entity, _entity_attributes(entity))
         objects[id(entity)].refresh_caches = True
@@ -423,14 +428,15 @@ def settle_out_of_combat_cast(
     singleton is obtained only after resolution succeeds, so a rejected cast
     touches no surface and persists nothing.
 
-    Snapshots every action- and clock-touched surface before opening the outer
-    transaction, runs ``ActionResolver.resolve`` and -- only on success --
-    the out-of-combat coercion scan (``_scan_out_of_combat_sexual_coercion``)
-    and ``WorldClock.advance`` as nested operations inside it, and returns
-    only after the outer transaction commits. A rejected resolution advances
-    nothing and touches no surface. On any exception the outer rollback
-    reverts the durable rows and ``_restore_settlement_state`` reconciles
-    every snapshotted Evennia cache before the failure propagates.
+    Snapshots every action- and clock-touched surface, including every member
+    of the caster's present party scope, before opening the outer transaction,
+    runs ``ActionResolver.resolve`` and -- only on success -- the
+    out-of-combat coercion scan (``_scan_out_of_combat_sexual_coercion``) and
+    ``WorldClock.advance`` over that same scope as nested operations inside
+    it, and returns only after the outer transaction commits. A rejected
+    resolution advances nothing and touches no surface. On any exception the
+    outer rollback reverts the durable rows and ``_restore_settlement_state``
+    reconciles every snapshotted Evennia cache before the failure propagates.
     """
     if not isinstance(request.targets, list):
         raise ValueError(
@@ -457,7 +463,12 @@ def settle_out_of_combat_cast(
     supplied = clock is not None
     if clock is None:
         clock = read_world_clock() or WorldClock()
-    snapshot = _snapshot_settlement_state(request, clock)
+    # Resolve the settled scope once, before the outer transaction: the
+    # snapshot, the nested advance and the restore then share one tuple, so a
+    # member moving between those steps can never be settled without being
+    # snapshotted.
+    scope = present_party_scope(request.actor)
+    snapshot = _snapshot_settlement_state(request, clock, scope)
     dedupe_before = snapshot_practice_dedupe()
     coercion_restore: _CoercionRestoreState | None = None
     try:
@@ -474,7 +485,7 @@ def settle_out_of_combat_cast(
                 clock.advance(
                     result.time_cost_seconds,
                     AdvanceSource.COMMAND,
-                    (request.actor,),
+                    scope,
                 )
             )
     except Exception:
