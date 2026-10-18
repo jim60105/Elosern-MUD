@@ -1601,6 +1601,65 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
     )
+    def test_party_view_member_publishes_one_party_update_before_the_result(self):
+        companion = _companion("薇拉", self.room)
+        join_party(companion, self.player)
+        session = _RecordingSession(self.player)
+        session.ndb.party_unlocks = {
+            int(companion.pk): MemberUnlocks(True, frozenset({"t_heal"})),
+        }
+        coordinator = PresentationCoordinator(
+            session, self.registry, calendar_provider=lambda: _CALENDAR
+        )
+        session.ndb.elosern_coordinator = coordinator
+        coordinator.full_snapshot(
+            PresentationContext(actor=self.player, protocol_version=1)
+        )
+        revision_before = coordinator.revision
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": "r1",
+            "base_revision": coordinator.revision,
+            "action_id": "party.view_member",
+            "payload": {"member_id": int(companion.pk), "tab": "skills"},
+        }
+
+        handle_ui_action(
+            session,
+            self.player,
+            envelope,
+            self.action_registry,
+            self.registry,
+        )
+
+        results = self._messages(session, "ui_action_result")
+        self.assertEqual(results[-1]["outcome"], "success")
+        self.assertEqual(results[-1]["code"], "viewing_member")
+        updates = self._messages(session, "ui_update")
+        self.assertTrue(updates, "party.view_member must publish a party update")
+        last = updates[-1]
+        self.assertGreater(last["revision"], revision_before)
+        party = last["panels"]["party"]
+        self.assertEqual(party["viewed_member_id"], int(companion.pk))
+        row = next(
+            row for row in party["slots"] if row["identity"] == int(companion.pk)
+        )
+        self.assertIs(row["unread"], False)
+        # The dispatcher publishes presentation first and the result second, at
+        # the same revision (action-dispatch's completion contract).
+        self.assertEqual(results[-1]["presentation_revision"], last["revision"])
+        sequence = [
+            name
+            for call in session.sent
+            for name in ("ui_update", "ui_action_result")
+            if name in call
+        ]
+        self.assertLess(sequence.index("ui_update"), len(sequence) - 1)
+
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_companion_deletion_pushes_party_update_to_live_watchers(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
