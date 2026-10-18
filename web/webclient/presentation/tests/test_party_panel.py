@@ -1657,6 +1657,10 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         # The character panel is republished for the viewed member too.
         self.assertEqual(last["panels"]["character"]["member_id"], int(companion.pk))
         self.assertIsNone(last["panels"]["character"]["selected_skill"])
+        # The bag tab's inventory panel follows the same viewed member.
+        inventory_panel = last["panels"]["party_inventory"]
+        self.assertEqual(inventory_panel["kind"], "party_inventory")
+        self.assertEqual(inventory_panel["member_id"], int(companion.pk))
         # The dispatcher publishes presentation first and the result second, at
         # the same revision (action-dispatch's completion contract).
         self.assertEqual(results[-1]["presentation_revision"], last["revision"])
