@@ -1,4 +1,4 @@
-"""Member item transfer rule (party-item-transfer).
+"""Member item transfer and equipment-toggle rules (party-item-transfer).
 
 One deterministic entry both transports share: the WebClient
 ``party.transfer`` action and, in the next change, the text commands. The rule
@@ -7,6 +7,12 @@ refuses the ordered conditions with stable codes, and composes the giver's
 removal with the receiver's addition through ``plan_inventory_delta`` inside
 one transaction. It never advances time, changes affinity, or advances quest
 deliveries.
+
+:func:`toggle_member_equipment` is the sibling member-scoped equipment entry
+(party-member-equipment): it authorizes one present member for the organizing
+purpose and then calls the unchanged entity-scoped
+``world.rules.equipment.toggle_equipment``, so the free-action semantics and
+the draft-preview invalidation stay in their single owner.
 
 Both plans are computed inside the transfer transaction and before the first
 write: a plan's ACQUIRE replacement dispatches quest-completion observers, and
@@ -28,6 +34,7 @@ from world.rules.equipment import (
     materialize_registry_object,
     plan_inventory_delta,
     registry_key_for_object,
+    toggle_equipment,
 )
 from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
@@ -91,6 +98,18 @@ class TransferOutcome:
     receiver: Any
     item_key: str
     quantity: int
+
+
+@dataclass(frozen=True)
+class MemberEquipmentOutcome:
+    """One member-scoped toggle: whose equipment was addressed and its result.
+
+    ``member`` is the re-derived live member the toggle ran against, so each
+    transport can name it without re-deciding the member boundary.
+    """
+
+    member: Any
+    result: Any
 
 
 def _live_entity(dbid: Any) -> Any | None:
@@ -350,4 +369,30 @@ def transfer_item(
         receiver=receiver,
         item_key=item_key,
         quantity=quantity,
+    )
+
+
+def toggle_member_equipment(
+    acting: Any, member_id: Any, item_key: Any
+) -> MemberEquipmentOutcome:
+    """Toggle one present party member's own equipment (a free action).
+
+    ``acting`` is the authenticated character; ``member_id`` is a member dbid
+    re-derived through the party boundary and never trusted as identity. The
+    organizing purpose admits a knocked-out member, because reorganizing gear
+    is not acting. The toggle itself is the unchanged entity-scoped
+    :func:`world.rules.equipment.toggle_equipment`, so it stays free in
+    exploration and in combat and its draft-preview invalidation keeps running
+    for the re-equipped member's own commander.
+
+    Membership failures raise :class:`PartyScopeError` with the shared stable
+    code and message; equipment rejections come back in the result, exactly as
+    the entity-scoped rule reports them.
+    """
+    commander = resolve_commander(acting)
+    member = authorize_member(
+        commander, member_id, PURPOSE_ORGANIZE, anchor=acting
+    )
+    return MemberEquipmentOutcome(
+        member=member, result=toggle_equipment(member, item_key)
     )

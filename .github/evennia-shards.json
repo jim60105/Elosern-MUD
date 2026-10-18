@@ -196,6 +196,7 @@
         "world.rules.tests.test_party_follow_possession",
         "world.rules.tests.test_party_identity",
         "world.rules.tests.test_party_inventory_transfer",
+        "world.rules.tests.test_party_member_equipment",
         "world.rules.tests.test_party_offline_loop",
         "world.rules.tests.test_party_scope",
         "world.rules.tests.test_party_time_settlement",

@@ -1061,3 +1061,35 @@ def equipment_adjustment_text(item_key: str) -> str:
         labels = "、".join(display_for(key).label for key in rule.immune)
         segments.append(f"免疫{labels}")
     return "｜".join(segments)
+
+
+def _display_name(item_key: str) -> str:
+    """The item registry's display name, or the raw key when unregistered."""
+    definition = ITEM_REGISTRY.get(item_key)
+    return definition.display_name_zh if definition is not None else item_key
+
+
+def toggle_equipment_message(result: Any, item_key: str, subject: str = "你") -> str:
+    """Render one accepted equipment toggle in the shared player prose.
+
+    ``subject`` is the acting member's display name; the default keeps the
+    caller's own sentence. The text command and the WebClient adapter both
+    render through this one function, so a member-scoped toggle (naming the
+    re-equipped member) can never drift from the caller's own sentence. Equip
+    actions append the server-formatted adjustment summary (P3 D4); unequip
+    actions keep the plain line since nothing new is gained.
+    """
+    display = _display_name(item_key)
+    prose = equipment_adjustment_text(item_key)
+    if result.action == "unequip-singleton":
+        return f"{subject}卸下了 {display}。"
+    if result.action == "unequip-accessory":
+        return f"{subject}除下了 {display}。"
+    if result.action == "equip-accessory":
+        return f"{subject}佩戴了 {display}" + (f"（{prose}）" if prose else "") + "。"
+    if result.replaced_key is not None:
+        replaced = _display_name(result.replaced_key)
+        if prose:
+            return f"{subject}裝備了 {display}（{prose}），原本的 {replaced} 已收回背包。"
+        return f"{subject}裝備了 {display}，原本的 {replaced} 已收回背包。"
+    return f"{subject}裝備了 {display}" + (f"（{prose}）" if prose else "") + "。"
