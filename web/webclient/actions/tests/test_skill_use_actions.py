@@ -37,6 +37,7 @@ from web.webclient.presentation.skill_use_selection import (
     SkillUseSelection,
     retire_skill_use_selection,
 )
+from world.rules.buffs import entity_active_buffs
 from world.rules.clock import get_world_clock, read_world_clock
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
@@ -677,6 +678,20 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(self.player.traits.mp.value, commander_mp)
         self.assertGreater(int(npc.traits.hp.current), 1)
         self.assertIn(_T_HEAL, companion.db.skill_proficiency)
+
+    def test_a_companion_self_cast_binds_to_the_companion(self):
+        companion = self._companion("艾拉")
+        grant_lineage(companion, [_T_SELF])
+        self._freeze_gauges(self.player, companion)
+        commander_mp = self.player.traits.mp.value
+        result = self._act(
+            "explore.cast",
+            {"actor_id": companion.pk, "skill_key": _T_SELF},
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertIn("t_moss_veil", entity_active_buffs(companion))
+        self.assertNotIn("t_moss_veil", entity_active_buffs(self.player))
+        self.assertEqual(self.player.traits.mp.value, commander_mp)
 
     def test_a_companion_opening_opens_the_commanders_encounter(self):
         companion = self._companion("艾拉")
