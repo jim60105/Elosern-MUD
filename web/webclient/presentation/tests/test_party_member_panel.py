@@ -6,9 +6,9 @@ commander, maximal bounds, no raw affinity, read-only rendering), the pure
 validator's drift rejections, the unavailable forms, and the registry/action
 wiring.
 
-The canonical requirement IDs this module will carry at the change's
-archive/sync commit (traceability indexes only ``openspec/specs``, so the
-decorators land with the archive — the party-panel-v3-view-member precedent):
+The canonical requirement IDs this module carries (attached at the change's
+archive/sync commit, once traceability could index ``openspec/specs`` — the
+party-panel-v3-view-member precedent):
 
 - ``webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel``
 - ``webclient-party-member-panel::companion-facts-are-truthful-and-bounded``
@@ -27,6 +27,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from tools.spec_traceability import covers_requirement
 from web.webclient.actions.exploration_actions import _party_leave_adapter
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.party import PARTY_MAX_SLOTS
@@ -185,12 +186,18 @@ def _numbers(value):
 class PartyMemberValidatorTests(unittest.TestCase):
     """The exact version-1 schema rejects every shape drift."""
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_valid_companion_and_commander_forms_normalize_identically(self):
         companion = _panel()
         self.assertEqual(validate_party_member(companion), companion)
         commander = _panel("commander", member_id=7, section=_commander_section())
         self.assertEqual(validate_party_member(commander), commander)
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_shape_drift_is_rejected(self):
         base_companion = _panel()
         base_commander = _panel("commander", member_id=7, section=_commander_section())
@@ -375,6 +382,9 @@ class PartyMemberValidatorTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_party_member(payload)
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_maximal_payload_stays_within_the_canonical_byte_bound(self):
         member_id = MAX_SAFE_INTEGER
         stage = "長" * MAX_BOND_STAGE_CODE_POINTS
@@ -416,6 +426,12 @@ class PartyMemberValidatorTests(unittest.TestCase):
         normalized = validate_party_member(commander)
         self.assertLessEqual(json_byte_size(normalized), MAX_CANONICAL_JSON_BYTES)
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
+    @covers_requirement(
+        "webclient-party-member-panel::companion-facts-are-truthful-and-bounded"
+    )
     def test_a_raw_affinity_number_is_never_part_of_the_shape(self):
         payload = _panel()
         self.assertNotIn(30, _numbers(payload))
@@ -504,6 +520,12 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         add_temporary_source(npc, owner, record.quest_id, "escortee")
         return npc, record
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
+    @covers_requirement(
+        "webclient-party-member-panel::companion-facts-are-truthful-and-bounded"
+    )
     def test_companion_payload_is_exact_and_reports_bond_pips(self):
         companion = _companion("薇拉", self.room)
         self._init_card(companion)
@@ -565,6 +587,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         # The raw affinity value never ships anywhere in the payload.
         self.assertNotIn(affinity_value, _numbers(payload))
 
+    @covers_requirement(
+        "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
+    )
     def test_escort_bound_leave_descriptor_uses_the_existing_reason(self):
         companion, record = self._escort_member()
         payload = self._render(member=companion)
@@ -576,6 +601,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
             ESCORT_BOUND_MESSAGE.format(quests=record.quest_id),
         )
 
+    @covers_requirement(
+        "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
+    )
     def test_general_plus_temporary_member_may_relinquish_general_membership(self):
         # ``leave_party`` removes only the general identity of a dual member;
         # handback-first applies only when the removal would detach entirely.
@@ -591,6 +619,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIs(leave["enabled"], True)
         self.assertIsNone(leave["reason"])
 
+    @covers_requirement(
+        "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
+    )
     def test_advertised_leave_succeeds_for_the_possessed_general_temporary_member(self):
         # ``self.char1`` carries the live account session the party authority
         # boundary requires; the custom test player does not.
@@ -609,6 +640,12 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(commander.db.possession["npc_dbid"], int(companion.pk))
         self.assertEqual(companion.db.possessed_by, int(commander.pk))
 
+    @covers_requirement(
+        "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
+    )
+    @covers_requirement(
+        "webclient-party-member-panel::companion-facts-are-truthful-and-bounded"
+    )
     def test_possessed_companion_offers_release_and_keeps_companion_facts(self):
         companion = _companion("艾拉", self.room)
         join_party(companion, self.player)
@@ -659,6 +696,12 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
             persona["reason"], POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
         )
 
+    @covers_requirement(
+        "webclient-party-member-panel::commander-facts-carry-persona-prose"
+    )
+    @covers_requirement(
+        "webclient-party-member-panel::the-commander-persona-edit-descriptor-is-server-authored"
+    )
     def test_commander_section_carries_persona_intimate_and_edit_descriptor(self):
         self.player.db.persona = {
             "personality": "沉穩",
@@ -695,6 +738,12 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIs(action["enabled"], True)
         self.assertIsNone(action["reason"])
 
+    @covers_requirement(
+        "webclient-party-member-panel::commander-facts-carry-persona-prose"
+    )
+    @covers_requirement(
+        "webclient-party-member-panel::the-commander-persona-edit-descriptor-is-server-authored"
+    )
     def test_possession_shows_the_commanders_own_persona_and_disables_its_editor(self):
         companion = _companion("艾拉", self.room)
         join_party(companion, self.player)
@@ -725,6 +774,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIs(action["enabled"], False)
         self.assertEqual(action["reason"], NOT_EXPLORING_MESSAGE)
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-panel-follows-the-viewed-member"
+    )
     def test_the_panel_falls_back_to_the_commander_after_leave(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
@@ -743,6 +795,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(payload["member_id"], int(self.player.pk))
         self.assertEqual(payload["role"], "commander")
 
+    @covers_requirement(
+        "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"
+    )
     def test_rendering_leaves_an_unchanged_attribute_snapshot(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
@@ -818,6 +873,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
 
 
 class PartyMemberWiringTests(EvenniaTest):
+    @covers_requirement(
+        "webclient-party-member-panel::the-panel-follows-the-viewed-member"
+    )
     def test_registry_registers_the_panel_and_the_selection_republishes_it(self):
         from web.webclient.actions.registry import build_production_action_registry
 
