@@ -36,20 +36,18 @@ export function applySkillUse(ctx) {
     return ctx.router.depth() > 0 ? ctx.router.currentDescriptor() : null;
   }
 
-  // The controlled figure's identity, exactly as the inventory drawer derives
-  // it: the committed `status` panel serializes it as a string. Null when
-  // that panel is missing or unavailable; the book then refuses locally
-  // instead of naming an invented caster or falling back to the commander.
+  // The caster the book's skills belong to: the committed `character` panel's
+  // `member_id` (the viewed party member). The `status` panel is deliberately
+  // not consulted — it names the controlled figure, which may differ from the
+  // member whose skills the book lists. Null when the character panel is
+  // missing or unavailable; the book then refuses locally instead of naming an
+  // invented caster or falling back to the commander.
   function controlledActorId(rs) {
-    const status = rs.panels && rs.panels.status;
-    if (!status || status.available !== true) {
+    const character = rs.panels && rs.panels.character;
+    if (!character || character.available !== true) {
       return null;
     }
-    const identity = status.actor && status.actor.identity;
-    if (typeof identity !== "string" || identity.trim() === "") {
-      return null;
-    }
-    const value = Number(identity);
+    const value = character.member_id;
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   }
 

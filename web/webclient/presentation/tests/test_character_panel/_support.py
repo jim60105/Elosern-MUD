@@ -327,12 +327,27 @@ def _skill_categories_enriched(
     ]
 
 
+def _condition_row(**overrides):
+    value = {
+        "code": "t_buff",
+        "label": "合成增益",
+        "severity": "beneficial",
+        "remaining_seconds": 30,
+        "modifiers": {},
+        "source": "狀態",
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_panel(**overrides):
     value = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
+        "member_id": 7,
         "traits": [_trait(), _trait(key="atk_phys", label="攻擊", base=5, current=5, max=None, effective=5)],
+        "conditions": [_condition_row()],
         "actives": _skill_categories([T_EMBER]),
         "passives": _skill_categories(
             [T_STEADY], category="enhancement", label="強化"
@@ -345,13 +360,6 @@ def _valid_panel(**overrides):
         },
         "guild": {"rank": None, "merit": 0},
         "wallet": 100,
-        "persona": {
-            "background": None,
-            "personality": None,
-            "life_story": None,
-            "habit": None,
-        },
-        "intimate": None,
     }
     value.update(overrides)
     return value

@@ -27,9 +27,11 @@ const T_SWORD = { item_key: "t_thorn_fang", display_name: "荊牙刃" };
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "character",
+      member_id: 101,
+      conditions: [],
       traits: [
         { key: "hp", label: "生命", base: 10, current: 10, max: 10, effective: 10, layers: [] },
         { key: "atk_phys", label: "攻擊", base: 5, current: 5, max: null, effective: 5, layers: [] },
@@ -63,8 +65,6 @@ function validPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
-      persona: { background: null, personality: null, life_story: null, habit: null },
-      intimate: null,
     },
     overrides || {}
   );
@@ -162,30 +162,14 @@ test("an undisguised actor has no disguise section", () => {
   assert.ok(!labels.includes("偽裝"));
 });
 
-test("persona background renders as a display-only row when present", () => {
-  const menu = CharacterMenu.buildMenu(
-    validPanel({
-      persona: {
-        background: "在公會登記的新人冒險者",
-        personality: null,
-        life_story: null,
-        habit: null,
-      },
-    })
-  );
+test("persona prose is absent from the v8 menu (party_member owns it)", () => {
+  const menu = CharacterMenu.buildMenu(validPanel());
   const labels = menu.items.map((item) => item.label);
-  assert.ok(labels.includes("背景"));
-  assert.ok(labels.includes("背景：在公會登記的新人冒險者"));
+  assert.ok(!labels.includes("背景"));
   menu.items.forEach((item) => {
     assert.equal(item.enabled, false);
     assert.equal(item.actionId, null);
   });
-});
-
-test("a character without a background renders no persona row", () => {
-  const menu = CharacterMenu.buildMenu(validPanel());
-  const labels = menu.items.map((item) => item.label);
-  assert.ok(!labels.includes("背景"));
 });
 
 test("a version-5 payload renders totals and ignores the breakdown layers", () => {

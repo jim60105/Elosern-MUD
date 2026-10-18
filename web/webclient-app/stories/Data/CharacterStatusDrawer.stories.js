@@ -8,12 +8,15 @@ import {
   CHARACTER_PANEL_SAMPLE,
   CHARACTER_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_UNDISGUISED_SAMPLE,
+  PARTY_MEMBER_PANEL_SAMPLE,
 } from "../fixtures.js";
 
 // CharacterStatusDrawer (H4, task 5.7): the 角色狀態 drawer body, shown
 // inside the shared right-anchored HudDrawer chrome. Deterministic and
 // offline. The combat story keeps the status vitals + conditions visible
-// while the character sections are unavailable (registry-owned reason).
+// while the character sections are unavailable (registry-owned reason). The
+// persona and intimate sections come from the `party_member` panel: character
+// v8 no longer carries either.
 // The equipment doll and the single drawer-layer wallet moved to the
 // inventory drawer (relocate-inventory-drawer-essentials), so this body
 // renders no wallet figure and no equipment doll.
@@ -31,7 +34,7 @@ function renderDrawer(args) {
   // rows) for the combat story.
   const character = args.combat
     ? {
-        schema_version: 7,
+        schema_version: 8,
         available: false,
         kind: "character",
         reason: { code: "no_puppet", message: "你已離開角色" },
@@ -41,6 +44,14 @@ function renderDrawer(args) {
       : args.titled
         ? CHARACTER_PANEL_TITLED_SAMPLE
         : CHARACTER_PANEL_SAMPLE;
+  const partyMember = args.combat
+    ? {
+        schema_version: 1,
+        available: false,
+        kind: "party_member",
+        reason: { code: "no_party", message: "隊伍成員目前無法顯示" },
+      }
+    : PARTY_MEMBER_PANEL_SAMPLE;
   return {
     render: () =>
       h(
@@ -59,6 +70,7 @@ function renderDrawer(args) {
                       ? STATUS_PANEL_TITLED_SAMPLE
                       : STATUS_PANEL_SAMPLE,
                   character,
+                  partyMember,
                   lowHp: false,
                   partyAvailable: args.partyAvailable ?? (args.combat ? false : true),
                   onOpenParty: () => {},

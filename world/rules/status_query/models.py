@@ -273,14 +273,32 @@ class IntimateView:
 
 
 @dataclass(frozen=True)
+class CharacterConditionView:
+    """One read-only condition row of the ``character`` panel.
+
+    Reuses the ``status`` read model's matched rows: the same code, label,
+    severity, nullable remaining time and modifier map, plus the bounded
+    origin label that panel does not carry.
+    """
+
+    code: str
+    label: str
+    severity: str
+    remaining_seconds: int | None
+    modifiers: tuple[tuple[str, Any], ...]
+    source: str
+
+
+@dataclass(frozen=True)
 class CharacterReadModel:
-    """The complete read-only inputs of the version-5 ``character`` panel.
+    """The complete read-only inputs of the version-8 ``character`` panel.
 
     Shares the same canonical trait storage the compact ``status`` panel reads,
     so the two panels cannot drift apart: gauges go through the same strict
     ``_require_gauge`` parser and statics/counters through the same trait dict.
     Every value is true state; ``disguise_displayed`` is reported separately
-    and is never substituted for a true trait.
+    and is never substituted for a true trait. Persona prose and intimate
+    state are not part of this model: the ``party_member`` panel owns them.
     """
 
     traits: tuple[CharacterTraitView, ...]
@@ -293,5 +311,5 @@ class CharacterReadModel:
     guild_merit: int
     wallet: int
     full_title: str
-    intimate: IntimateView | None
+    conditions: tuple[CharacterConditionView, ...]
     breakdown: tuple[StatBreakdownRow, ...]

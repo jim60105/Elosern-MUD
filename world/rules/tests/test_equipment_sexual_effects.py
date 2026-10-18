@@ -39,7 +39,7 @@ from world.rules.equipment_effects import (
 )
 from world.rules.sexual_act_effects import compute_pleasure_gain
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
-from world.rules.status_query import build_character_read_model, build_status_read_model
+from world.rules.status_query import build_status_read_model, read_intimate_view
 from world.rules.stored_sexual_reads import StoredLevel
 from world.skills.registry import TargetSpec
 
@@ -669,10 +669,10 @@ class StoredStateImmunityTests(EvenniaTest):
     def test_read_model_renders_the_effective_label(self):
         self.actor.sexual.exposure.value = "中等"
         _wear(self.actor, _ROBE.key)
-        model = build_character_read_model(self.actor)
-        self.assertEqual(model.intimate.exposure, "極高")
+        intimate = read_intimate_view(self.actor)
+        self.assertEqual(intimate.exposure, "極高")
         # Every other intimate row keeps the stored value.
-        self.assertEqual(model.intimate.shame, self.actor.sexual.shame.level)
+        self.assertEqual(intimate.shame, self.actor.sexual.shame.level)
         # The stored trait itself is untouched by rendering.
         self.assertEqual(_stored_exposure_ordinal(self.actor), 2)
 
@@ -715,10 +715,13 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             # Attribution compares captured effective/stored contexts; it
             # never reads or writes canonical exposure itself.
             Path("world/rules/status_query/provenance.py"),
-            Path("web/webclient/presentation/character.py"),
+            # The shared persona/intimate section serializers publish the
+            # effective exposure label for both panels; the character panel
+            # itself no longer reads sexual state.
+            Path("web/webclient/presentation/persona_sections.py"),
             # The GM character reader renders the same intimate read model as
-            # the webclient presentation (``build_character_read_model``), so
-            # it consumes the effective overlay, never the stored ordinal.
+            # the webclient presentation (``read_intimate_view``), so it
+            # consumes the effective overlay, never the stored ordinal.
             Path("web/gm/readers/characters.py"),
         }
     )

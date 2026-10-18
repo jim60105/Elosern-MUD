@@ -520,10 +520,12 @@ def possession_section(entity: Any) -> dict[str, Any]:
 
 
 def sexual_section(entity: Any) -> dict[str, Any]:
-    from world.rules.status_query import build_character_read_model
+    # The character read model no longer carries the intimate projection
+    # (party_member owns it), so the GM reader asks the intimate reader
+    # directly — the same fail-closed read the panel uses.
+    from world.rules.status_query import read_intimate_view
 
-    model = build_character_read_model(entity)
-    intimate = model.intimate
+    intimate = read_intimate_view(entity)
     if intimate is None:
         return empty("目前沒有可顯示的情慾狀態。")
     return ledger(

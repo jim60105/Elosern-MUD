@@ -81,7 +81,7 @@ class StatusReadModelTests(EvenniaTest):
         stack.enter_context(patch.dict("world.rules.buffs.BUFF_DEFINITIONS", {
             "t_adverse": SimpleNamespace(), "t_other": SimpleNamespace(),
         }))
-        stack.enter_context(patch("world.rules.status_query.status.display_for",
+        stack.enter_context(patch("world.rules.status_query.conditions.display_for",
                                   return_value=SimpleNamespace(label="合成警告", severity="warning")))
         rules = [
             Rule("t_exposure", {"field": "exposure", "gte": "高"}, {"defense": -15}),

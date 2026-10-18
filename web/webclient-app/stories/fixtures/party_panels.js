@@ -234,3 +234,40 @@ export const PARTY_INTERACT_TARGETS_SAMPLE = [
     ],
   },
 ];
+
+// The committed `party_member` v1 panel for the commander form: the four
+// persona prose keys, the intimate level words, and the one server-authored
+// persona-edit descriptor. `character` v8 no longer carries either section, so
+// the character-status drawer reads them here.
+export const PARTY_MEMBER_PANEL_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_member",
+  member_id: 42,
+  role: "commander",
+  companion: null,
+  commander: {
+    persona: {
+      background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
+      personality: "沉穩寡言，對生人保持距離。",
+      life_story: "在渡口碼頭長大，十六歲跟著商隊上了路。",
+      habit: "清晨練劍，黃昏沿著主街巡一圈。",
+    },
+    intimate: {
+      arousal: "中等",
+      wetness: "微濕",
+      shame: "輕微",
+      exposure: "中等",
+      climax_phase: "未達",
+      climax_today: 2,
+    },
+    actions: [
+      {
+        action_id: "character.persona.update",
+        params: {},
+        enabled: true,
+        reason: null,
+      },
+    ],
+  },
+};

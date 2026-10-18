@@ -8,6 +8,7 @@ import {
   CHARACTER_PANEL_SAMPLE,
   CHARACTER_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_UNDISGUISED_SAMPLE,
+  PARTY_MEMBER_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
 // CharacterStatusDrawer (H4, task 5.8;
@@ -15,19 +16,26 @@ import {
 // status sections (vitals + the FULL condition roster) render in every mode
 // from the committed `status` payload; the `character`-backed sections show
 // the registry-owned reason (and invent nothing) when the `character` panel
-// is unavailable. The 親密狀態 (intimate-status) section renders as a
-// collapsed-by-default `<details>` disclosure when the committed `character`
-// v5 payload's `intimate` field is present, and is entirely absent from the
-// DOM when it is `null` or the `character` panel is unavailable (never a
-// placeholder or a collapsed-empty widget). The equipment doll and the
+// is unavailable. The 親密狀態 (intimate-status) section and the four persona
+// sections read the committed `party_member` panel (character v8 dropped both):
+// the intimate disclosure is collapsed by default and absent from the DOM when
+// its section is null or `party_member` is unavailable; the persona area is
+// absent while a companion is the viewed member. The equipment doll and the
 // single drawer-layer wallet now live in the inventory drawer, so this body
 // renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
+};
+
+const PARTY_MEMBER_UNAVAILABLE = {
+  schema_version: 1,
+  available: false,
+  kind: "party_member",
+  reason: { code: "no_party", message: "隊伍成員目前無法顯示" },
 };
 
 describe("CharacterStatusDrawer", () => {
@@ -44,6 +52,7 @@ describe("CharacterStatusDrawer", () => {
       props: {
         status: STATUS_PANEL_SAMPLE,
         character: CHARACTER_PANEL_SAMPLE,
+        partyMember: PARTY_MEMBER_PANEL_SAMPLE,
         lowHp: false,
         ...props,
       },
@@ -105,7 +114,10 @@ describe("CharacterStatusDrawer", () => {
   });
 
   it("marks the character-backed sections with the registry-owned reason instead of hiding them", () => {
-    const w = mountDrawer({ character: CHARACTER_UNAVAILABLE });
+    const w = mountDrawer({
+      character: CHARACTER_UNAVAILABLE,
+      partyMember: PARTY_MEMBER_UNAVAILABLE,
+    });
     // The status sections still render (vitals + conditions).
     expect(w.get('[data-testid="character-status-drawer__vitals"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__conditions"]').exists()).toBe(true);
@@ -128,6 +140,9 @@ describe("CharacterStatusDrawer", () => {
     expect(w.get('[data-testid="character-status-drawer__disguise-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__persona-unavailable"]').exists()).toBe(true);
+    expect(
+      w.get('[data-testid="character-status-drawer__persona-unavailable"]').text()
+    ).toBe("隊伍成員目前無法顯示");
     // The intimate section is entirely absent from the DOM when the
     // `character` panel is unavailable — no placeholder or collapsed-empty
     // widget stands in for it.
@@ -163,8 +178,16 @@ describe("CharacterStatusDrawer", () => {
     expect(w.get('[data-testid="character-status-drawer__intimate-hint"]').text()).toBe("詞彙封閉；數值依設定折線/級別顯示。");
   });
 
-  it("omits the intimate section entirely when the character panel's intimate field is null", () => {
-    const w = mountDrawer({ character: CHARACTER_PANEL_UNDISGUISED_SAMPLE });
+  it("omits the intimate section entirely when the party_member section is null", () => {
+    const w = mountDrawer({
+      partyMember: {
+        ...PARTY_MEMBER_PANEL_SAMPLE,
+        commander: {
+          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
+          intimate: null,
+        },
+      },
+    });
     expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);
     expect(w.text()).not.toContain("親密");
   });
@@ -207,6 +230,7 @@ describe("CharacterStatusDrawer", () => {
       props: {
         status: STATUS_PANEL_SAMPLE,
         character: CHARACTER_PANEL_SAMPLE,
+        partyMember: PARTY_MEMBER_PANEL_SAMPLE,
         lowHp: false,
       },
       attachTo: host,
@@ -232,31 +256,26 @@ describe("CharacterStatusDrawer", () => {
     }
   });
 
-  it("keeps the full condition roster in combat when the character panel is unavailable", () => {
-    const w = mountDrawer({ status: STATUS_PANEL_COMBAT_SAMPLE, character: CHARACTER_UNAVAILABLE });
+  it("keeps the condition roster, traits and persona in combat", () => {
+    const w = mountDrawer({ status: STATUS_PANEL_COMBAT_SAMPLE });
     expect(w.get('[data-testid="character-status-drawer__vitals"]').exists()).toBe(true);
     // The complete condition roster renders in combat (the status panel is
     // available in every mode).
     expect(w.get('[data-testid="character-status-drawer__conditions"]').exists()).toBe(true);
     expect(w.get('[data-testid="character-status-drawer__condition--combat_focus"]').exists()).toBe(true);
-    const reason = w.get('[data-testid="character-status-drawer__unavailable"]');
-    expect(reason.text()).toBe("你已離開角色");
-    // The character-backed sections are marked with the registry-owned
-    // reason, not hidden.
+    // character v8 stays available in combat: the true traits and guild
+    // standing render, and the persona/intimate sections come from
+    // party_member.
     expect(w.find('[data-testid="character-status-drawer__traits"]').exists()).toBe(true);
-    expect(w.get('[data-testid="character-status-drawer__traits-unavailable"]').exists()).toBe(true);
+    expect(w.get('[data-testid="character-status-drawer__trait--atk_phys"]').exists()).toBe(true);
     // The equipment doll and the wallet moved to the inventory drawer
     // (relocate-inventory-drawer-essentials): this body renders neither.
     expect(w.find('[data-testid="equipment-doll"]').exists()).toBe(false);
     expect(w.find('[data-testid="character-status-drawer__wallet"]').exists()).toBe(false);
-    expect(w.find('[data-testid="character-status-drawer__guild"]').exists()).toBe(true);
-    expect(w.get('[data-testid="character-status-drawer__guild-unavailable"]').exists()).toBe(true);
+    expect(w.get('[data-testid="character-status-drawer__guild-rank"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__disguise"]').exists()).toBe(true);
-    expect(w.get('[data-testid="character-status-drawer__disguise-unavailable"]').exists()).toBe(true);
     expect(w.find('[data-testid="character-status-drawer__persona"]').exists()).toBe(true);
-    // The intimate section is entirely absent in combat, where the `character`
-    // panel is unavailable.
-    expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(false);
+    expect(w.find('[data-testid="character-status-drawer__intimate"]').exists()).toBe(true);
   });
 
   it("renders vitals, traits and guild counters as bordered card tiles in a two-column grid", () => {
@@ -304,6 +323,23 @@ describe("CharacterStatusDrawer", () => {
     expect(fastwind.text()).toContain("剩 60 秒");
   });
 
+  it("suppresses cross-panel gauge layers while a companion is possessed", () => {
+    const w = mountDrawer({
+      // A matching identity is not enough: under possession the status
+      // resources belong to the owner while the identity names the puppet.
+      status: {
+        ...STATUS_PANEL_SAMPLE,
+        actor: { ...STATUS_PANEL_SAMPLE.actor, identity: "42" },
+      },
+      possessing: true,
+    });
+    expect(w.find('[data-testid="character-status-drawer__layers--hp"]').exists()).toBe(false);
+    // The character panel's own trait rows keep their breakdown chips.
+    expect(
+      w.find('[data-testid="character-status-drawer__layer--defense--0"]').exists()
+    ).toBe(true);
+  });
+
   it("keeps the 危險 marker beside the HP label on a low-HP tile", () => {
     const w = mountDrawer({ lowHp: true });
     const danger = w.get('[data-testid="character-status-drawer__vital-danger"]');
@@ -331,6 +367,7 @@ describe("CharacterStatusDrawer full-title line", () => {
       props: {
         status: STATUS_PANEL_SAMPLE,
         character: CHARACTER_PANEL_SAMPLE,
+        partyMember: PARTY_MEMBER_PANEL_SAMPLE,
         lowHp: false,
         ...props,
       },
@@ -381,24 +418,27 @@ describe("CharacterStatusDrawer full-title line", () => {
 
   it("renders the four persona sections with verbatim values and 未設定 placeholders", () => {
     const w = mountDrawer();
-    // CHARACTER_PANEL_SAMPLE carries all four populated values verbatim.
+    // PARTY_MEMBER_PANEL_SAMPLE carries all four populated values verbatim.
     expect(w.get('[data-testid="character-status-drawer__persona-value--personality"]').text()).toBe(
-      CHARACTER_PANEL_SAMPLE.persona.personality
+      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.personality
     );
     expect(w.get('[data-testid="character-status-drawer__persona-value--life_story"]').text()).toBe(
-      CHARACTER_PANEL_SAMPLE.persona.life_story
+      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.life_story
     );
     expect(w.get('[data-testid="character-status-drawer__persona-value--habit"]').text()).toBe(
-      CHARACTER_PANEL_SAMPLE.persona.habit
+      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.habit
     );
     expect(w.get('[data-testid="character-status-drawer__persona-value--background"]').text()).toBe(
-      CHARACTER_PANEL_SAMPLE.persona.background
+      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.background
     );
     // A null value renders the localized placeholder, never an empty block.
     const sparse = mountDrawer({
-      character: {
-        ...CHARACTER_PANEL_SAMPLE,
-        persona: { background: "只有背景", personality: null, life_story: null, habit: null },
+      partyMember: {
+        ...PARTY_MEMBER_PANEL_SAMPLE,
+        commander: {
+          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
+          persona: { background: "只有背景", personality: null, life_story: null, habit: null },
+        },
       },
     });
     expect(sparse.get('[data-testid="character-status-drawer__persona-value--background"]').text()).toBe("只有背景");
@@ -416,7 +456,9 @@ describe("CharacterStatusDrawer full-title line", () => {
     await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
     // The editor textarea is seeded with the committed value.
     const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
-    expect(input.element.value).toBe(CHARACTER_PANEL_SAMPLE.persona.habit);
+    expect(input.element.value).toBe(
+      PARTY_MEMBER_PANEL_SAMPLE.commander.persona.habit
+    );
     await input.setValue("  我改過的習慣  ");
     await w.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
     // Exactly one intent, trimmed, for the edited field.
@@ -465,9 +507,15 @@ describe("CharacterStatusDrawer full-title line", () => {
     await input.setValue("我還沒提交的草稿");
     // A completion publication refreshes habit from elsewhere (e.g. Telnet).
     await w.setProps({
-      character: {
-        ...CHARACTER_PANEL_SAMPLE,
-        persona: { ...CHARACTER_PANEL_SAMPLE.persona, habit: "遠端改過的習慣" },
+      partyMember: {
+        ...PARTY_MEMBER_PANEL_SAMPLE,
+        commander: {
+          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
+          persona: {
+            ...PARTY_MEMBER_PANEL_SAMPLE.commander.persona,
+            habit: "遠端改過的習慣",
+          },
+        },
       },
     });
     // The newer committed value wins over the stale draft.
@@ -484,17 +532,23 @@ describe("CharacterStatusDrawer full-title line", () => {
     const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
     await input.setValue("我的草稿");
     await w.setProps({
-      character: {
-        ...CHARACTER_PANEL_SAMPLE,
-        persona: { ...CHARACTER_PANEL_SAMPLE.persona, personality: "遠端改的個性" },
+      partyMember: {
+        ...PARTY_MEMBER_PANEL_SAMPLE,
+        commander: {
+          ...PARTY_MEMBER_PANEL_SAMPLE.commander,
+          persona: {
+            ...PARTY_MEMBER_PANEL_SAMPLE.commander.persona,
+            personality: "遠端改的個性",
+          },
+        },
       },
     });
     // Only the edited field participates in the refresh check.
     expect(input.element.value).toBe("我的草稿");
   });
 
-  it("offers no persona edit affordance when the character panel is unavailable", () => {
-    const w = mountDrawer({ character: CHARACTER_UNAVAILABLE });
+  it("offers no persona edit affordance when party_member is unavailable", () => {
+    const w = mountDrawer({ partyMember: PARTY_MEMBER_UNAVAILABLE });
     expect(w.find('[data-testid="character-status-drawer__persona-edit--background"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="character-status-drawer__persona-edit--"]').length).toBe(0);
     expect(w.findAll('[data-testid^="character-status-drawer__persona-empty--"]').length).toBe(0);

@@ -25,7 +25,9 @@ The split:
   buff/rule condition projection.
 - :mod:`world.rules.status_query.breakdown` — the stat-breakdown parity-replay
   core (per-source layers + ``build_stat_breakdown``).
-- :mod:`world.rules.status_query.character` — the version-5 character panel
+- :mod:`world.rules.status_query.conditions` — the shared ordered condition
+  projection and the bounded origin label.
+- :mod:`world.rules.status_query.character` — the version-8 character panel
   build plus ``group_skill_keys``.
 
 Everything the historical ``world.rules.status_query`` module exposed is
@@ -44,6 +46,11 @@ from world.rules.status_query.character import (  # noqa: F401
     build_character_read_model,
     group_skill_keys,
 )
+from world.rules.status_query.conditions import (  # noqa: F401
+    CONDITION_SOURCE_LABELS,
+    condition_source,
+    condition_values,
+)
 from world.rules.status_query.models import (  # noqa: F401
     _COUNTER_KEYS,
     _EQUIPMENT_SLOTS,
@@ -53,6 +60,7 @@ from world.rules.status_query.models import (  # noqa: F401
     MAX_LAYERS_PER_STAT,
     TRAIT_LABELS,
     CharacterCategoryGroupView,
+    CharacterConditionView,
     CharacterEquipmentView,
     CharacterReadModel,
     CharacterSkillGroupView,

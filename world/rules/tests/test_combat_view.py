@@ -494,7 +494,8 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         display_patch = patch(
-            "world.rules.status_query.status.display_for", side_effect=strict_display
+            "world.rules.status_query.conditions.display_for",
+            side_effect=strict_display,
         )
         display_patch.start()
         self.addCleanup(display_patch.stop)

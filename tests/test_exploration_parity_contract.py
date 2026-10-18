@@ -52,46 +52,12 @@ _CHARACTER_CONSTANTS = (
     ("MAX_LABEL_CODE_POINTS", "CHARACTER_MAX_LABEL"),
     ("MAX_DESCRIPTION_CODE_POINTS", "CHARACTER_MAX_DESCRIPTION"),
     ("MAX_SLOT_CODE_POINTS", "CHARACTER_MAX_SLOT"),
-    ("MAX_PERSONA_FIELD_CODE_POINTS", "CHARACTER_MAX_PERSONA"),
+    ("MAX_CONDITION_ROWS", "CHARACTER_MAX_CONDITIONS"),
+    ("MAX_CONDITION_LABEL_CODE_POINTS", "CHARACTER_MAX_CONDITION_LABEL"),
+    ("MAX_MODIFIER_KEYS", "CHARACTER_MAX_MODIFIER_KEYS"),
+    ("MAX_CONDITION_SOURCE_CODE_POINTS", "CHARACTER_MAX_CONDITION_SOURCE"),
+    ("MAX_MODIFIER_TEXT_CODE_POINTS", "CHARACTER_MAX_MODIFIER_TEXT"),
 )
-
-
-# The persona prose bound is the one character bound that does not own a
-# numeric literal in the presenter module: the shared cap is the authoritative
-# rules constant (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``)
-# and AGENTS.md forbids duplicating it as a literal. This helper resolves the
-# number through the exact audited indirection only — a module-level import of
-# that name from the rules module plus an exact ``NAME = MAX_PERSONA_FIELD_LENGTH``
-# alias assignment — and the parity comparison still asserts numeric equality.
-_PERSONA_PY_NAME = "MAX_PERSONA_FIELD_CODE_POINTS"
-_PY_CHARACTER_RULES = REPO_ROOT / "world/rules/character_creation.py"
-
-
-def _persona_bound(py_source: str) -> str | None:
-    """Resolve the persona bound, allowing only the named rules indirection."""
-    numeric = re.search(
-        rf"^{_PERSONA_PY_NAME}\s*=\s*([0-9]+)", py_source, re.MULTILINE
-    )
-    if numeric is not None:
-        return numeric.group(1)
-    alias = re.search(
-        rf"^{_PERSONA_PY_NAME}\s*=\s*MAX_PERSONA_FIELD_LENGTH\s*$",
-        py_source,
-        re.MULTILINE,
-    )
-    if alias is None:
-        return None
-    if re.search(
-        r"from world\.rules\.character_creation import \([^)]*MAX_PERSONA_FIELD_LENGTH",
-        py_source,
-        re.DOTALL,
-    ) is None:
-        return None
-    rules_source = _PY_CHARACTER_RULES.read_text(encoding="utf-8")
-    resolved = re.search(
-        r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*([0-9]+)", rules_source, re.MULTILINE
-    )
-    return resolved.group(1) if resolved is not None else None
 
 
 _EXPLORATION_FRAGMENTS = (
@@ -145,13 +111,10 @@ class ExplorationValidatorParityContract(unittest.TestCase):
         js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _CHARACTER_CONSTANTS:
-            if py_name == _PERSONA_PY_NAME:
-                py_value = _persona_bound(py_source)
-            else:
-                py_match = re.search(
-                    rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE
-                )
-                py_value = py_match.group(1) if py_match is not None else None
+            py_match = re.search(
+                rf"^{py_name}\s*=\s*([0-9]+)", py_source, re.MULTILINE
+            )
+            py_value = py_match.group(1) if py_match is not None else None
             js_match = re.search(rf"var {js_name}\s*=\s*([0-9]+)", js_source)
             if py_value is None or js_match is None:
                 mismatches.append(f"{py_name}/{js_name}: missing constant")

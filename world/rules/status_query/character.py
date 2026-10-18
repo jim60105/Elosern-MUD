@@ -1,9 +1,13 @@
-"""The version-5 ``character`` panel read model plus the skill-grouping helper.
+"""The version-8 ``character`` panel read model plus the skill-grouping helper.
 
 ``build_character_read_model`` shares the compact ``status`` panel's canonical
 trait storage and single assembly, so the expanded character surface and the
 compact status surface agree on every shared value; equipment, disguise, guild,
-wallet, and the intimate view are read strictly and fail closed when malformed.
+wallet, and the condition rows are read strictly and fail closed when
+malformed. The subject is the member the caller names: guild, merit, wallet and
+the composed title are that member's own values, never a possession owner's,
+so the panel reports the same facts with and without possession. Persona prose
+and intimate state are not read here at all; ``party_member`` publishes them.
 """
 
 from collections.abc import Sequence
@@ -15,6 +19,7 @@ from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef
 
 from .assembly import _assemble
 from .breakdown import build_stat_breakdown
+from .conditions import condition_source, condition_values
 from .models import (
     _CATEGORY_LABELS,
     _COUNTER_KEYS,
@@ -23,6 +28,7 @@ from .models import (
     _UNKNOWN_CATEGORY,
     _UNKNOWN_CATEGORY_LABEL,
     CharacterCategoryGroupView,
+    CharacterConditionView,
     CharacterReadModel,
     CharacterSkillGroupView,
     CharacterSkillRow,
@@ -35,7 +41,6 @@ from .readers import (
     _read_disguise,
     _split_active_passive_keys,
 )
-from .sexual import read_intimate_view
 
 
 def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, ...]:
@@ -129,9 +134,10 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
 
     Reads the same canonical trait dict the status model reads, so the expanded
     character surface and the compact status surface agree on every shared
-    value. Equipment, disguise, guild, wallet, and the intimate view are read
+    value. Equipment, disguise, guild, wallet, and the condition rows are read
     strictly and fail closed when malformed; no handler is materialized and
-    nothing is written.
+    nothing is written. Every value belongs to ``entity`` itself: the model
+    never substitutes a possession owner's guild, merit, wallet or title.
     """
     assembly = _assemble(entity)
     traits: list[CharacterTraitView] = []
@@ -142,29 +148,18 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         traits.append(CharacterTraitView(key, assembly.trait_values[key], None))
 
     disguise_active, disguise_displayed = _read_disguise(entity)
-    # The intimate view is read before the skill path so a corrupted (partial)
-    # materialized record fails the completeness check before anything else in
-    # the model build can observe or repair it.
-    intimate = read_intimate_view(entity)
     active_keys, passive_keys = _split_active_passive_keys(entity)
-
-    possessed_by = getattr(getattr(entity, "db", None), "possessed_by", None)
-    owner = None
-    if possessed_by is not None:
-        from world.rules.possession import _resolve_live_object
-        owner = _resolve_live_object(int(possessed_by))
-
-    if owner is not None:
-        owner_assembly = _assemble(owner)
-        guild_rank = getattr(owner, "guild_rank", None)
-        guild_merit = _read_guild_merit(owner_assembly.traits_data)
-        wallet = read_wallet(owner, StatusQueryError)
-        full_title = _read_full_title(owner)
-    else:
-        guild_rank = getattr(entity, "guild_rank", None)
-        guild_merit = _read_guild_merit(assembly.traits_data)
-        wallet = read_wallet(entity, StatusQueryError)
-        full_title = _read_full_title(entity)
+    conditions = tuple(
+        CharacterConditionView(
+            code=row.code,
+            label=row.label,
+            severity=row.severity,
+            remaining_seconds=row.remaining_seconds,
+            modifiers=tuple(row.modifiers.items()),
+            source=condition_source(row.provenance),
+        )
+        for row in condition_values(assembly)
+    )
 
     return CharacterReadModel(
         traits=tuple(traits),
@@ -173,10 +168,10 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         equipment=assembly.equipment,
         disguise_active=disguise_active,
         disguise_displayed=disguise_displayed,
-        guild_rank=guild_rank,
-        guild_merit=guild_merit,
-        wallet=wallet,
-        full_title=full_title,
-        intimate=intimate,
+        guild_rank=getattr(entity, "guild_rank", None),
+        guild_merit=_read_guild_merit(assembly.traits_data),
+        wallet=read_wallet(entity, StatusQueryError),
+        full_title=_read_full_title(entity),
+        conditions=conditions,
         breakdown=build_stat_breakdown(entity, assembly),
     )

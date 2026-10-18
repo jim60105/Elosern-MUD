@@ -8,7 +8,7 @@
 import { computed } from "vue";
 import { gaugeRatio } from "../components/vitals.js";
 
-export function useStatusDrawerStatus(props, traits) {
+export function useStatusDrawerStatus(props, traits, subjectMatches) {
   // Per-severity glyph shapes: the same non-colour-separated set H2's
   // ConditionChips uses, so no two severities differ by colour alone.
   const SEVERITY_GLYPHS = {
@@ -90,6 +90,13 @@ export function useStatusDrawerStatus(props, traits) {
   // nothing to decompose). Cross-payload disagreement (a stale pair) renders
   // the existing status text with no breakdown element.
   function gaugeLayers(key) {
+    // `status` describes the controlled figure while `character` follows the
+    // viewed member: attaching one member's breakdown to another member's
+    // gauge would attribute a false explanation, so the layers attach only
+    // when both panels name the same member.
+    if (subjectMatches && !subjectMatches.value) {
+      return [];
+    }
     const trait = traitsByKey.value.get(key);
     const maximum = resources.value?.[key]?.maximum;
     if (!trait || trait.max === null || maximum === null || maximum === undefined) {

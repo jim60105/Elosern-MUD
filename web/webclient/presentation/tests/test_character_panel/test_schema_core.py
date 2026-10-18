@@ -1,9 +1,16 @@
 """Character panel schema tests: core shape, version, trait/layer, and disguise rejections."""
 from tools.spec_traceability import covers_requirement
 import unittest
-from web.webclient.presentation.character import CHARACTER_SCHEMA_VERSION, MAX_LAYERS_PER_STAT, MAX_PERSONA_FIELD_CODE_POINTS, CharacterPanelError, validate_character
-from web.webclient.presentation.protocol import ProtocolValidationError
-from ._support import _equipment_row, _layer, _trait, _valid_panel
+from web.webclient.presentation.character import (
+    CHARACTER_SCHEMA_VERSION,
+    MAX_CONDITION_ROWS,
+    MAX_LAYERS_PER_STAT,
+    MAX_MODIFIER_KEYS,
+    CharacterPanelError,
+    validate_character,
+)
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER, ProtocolValidationError
+from ._support import _condition_row, _equipment_row, _layer, _trait, _valid_panel
 
 
 class CharacterSchemaTests(unittest.TestCase):
@@ -15,80 +22,77 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertEqual(normalized["kind"], "character")
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
-    def test_persona_section_is_exactly_the_four_bounded_prose_keys(self):
-        panel = _valid_panel(
-            persona={
-                "background": "渡口成長的灰誓成員",
-                "personality": "沉穩",
-                "life_story": "來自邊境的小村",
-                "habit": "清晨練劍",
-            }
-        )
-        normalized = validate_character(panel)
-        self.assertEqual(
-            normalized["persona"],
-            {
-                "background": "渡口成長的灰誓成員",
-                "personality": "沉穩",
-                "life_story": "來自邊境的小村",
-                "habit": "清晨練劍",
-            },
-        )
-        # Each key is independently nullable and whitespace-nulling.
-        blanked = validate_character(
-            _valid_panel(
-                persona={
-                    "background": "   ",
-                    "personality": None,
-                    "life_story": " 邊境 ",
-                    "habit": None,
-                }
-            )
-        )
-        self.assertEqual(
-            blanked["persona"],
-            {
-                "background": None,
-                "personality": None,
-                "life_story": "邊境",
-                "habit": None,
-            },
-        )
-        # Structural keys never appear; unknown keys and every arity reject.
-        for persona in (
-            {
-                "background": None,
-                "personality": None,
-                "life_story": None,
-                "habit": None,
-                "identity": {},
-            },
-            {
-                "background": None,
-                "personality": None,
-                "life_story": None,
-            },
-            {"background": "只有背景"},
-            {
-                "background": 42,
-                "personality": None,
-                "life_story": None,
-                "habit": None,
-            },
-            {
-                "background": None,
-                "personality": "長" * (MAX_PERSONA_FIELD_CODE_POINTS + 1),
-                "life_story": None,
-                "habit": None,
-            },
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_condition_rows_are_exact_and_bounded(self):
+        # A buff row and an indefinite rule row round-trip verbatim, including
+        # the rulebook's authored percentage-string adjustment.
+        rows = [
+            _condition_row(
+                code="t_buff",
+                label="合成增益",
+                severity="beneficial",
+                remaining_seconds=30,
+                modifiers={},
+                source="狀態",
+            ),
+            _condition_row(
+                code="t_rule",
+                label="合成警告",
+                severity="warning",
+                remaining_seconds=None,
+                modifiers={"agility": "-10%", "defense": -2},
+                source="裝備",
+            ),
+        ]
+        normalized = validate_character(_valid_panel(conditions=rows))
+        self.assertEqual(normalized["conditions"], rows)
+        # Each row carries exactly its six fields; unknown and missing keys
+        # reject, as does an unknown severity or a negative remaining time.
+        for bad in (
+            {**_condition_row(), "extra": 1},
+            {key: value for key, value in _condition_row().items() if key != "source"},
+            _condition_row(severity="buff"),
+            _condition_row(remaining_seconds=-1),
+            _condition_row(remaining_seconds=MAX_SAFE_INTEGER + 1),
+            _condition_row(source="altar"),
+            _condition_row(source=""),
+            _condition_row(modifiers={"defense": True}),
+            _condition_row(modifiers={"defense": "  "}),
         ):
-            with self.subTest(persona=sorted(persona)):
+            with self.subTest(bad=bad):
                 with self.assertRaises(ProtocolValidationError):
-                    validate_character(_valid_panel(persona=persona))
+                    validate_character(_valid_panel(conditions=[bad]))
+        # The row count and the modifier-key count are bounded.
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(
+                    conditions=[_condition_row() for _ in range(MAX_CONDITION_ROWS + 1)]
+                )
+            )
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(
+                    conditions=[
+                        _condition_row(
+                            modifiers={
+                                f"key_{index}": 1
+                                for index in range(MAX_MODIFIER_KEYS + 1)
+                            }
+                        )
+                    ]
+                )
+            )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    def test_member_id_is_a_positive_safe_integer(self):
+        for bad in (0, -1, True, 1.5, "7", None):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(_valid_panel(member_id=bad))
+
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_version_four_payloads_reject_everywhere(self):
         # The transitional v4 tolerance is closed (render-equipment-
         # breakdown-webclient): a v4 payload rejects on the version gate,
@@ -104,7 +108,7 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_v5_trait_layer_validation_is_exact(self):
         normalized = validate_character(
             _valid_panel(traits=[_trait(layers=[_layer()])])
@@ -161,7 +165,7 @@ class CharacterSchemaTests(unittest.TestCase):
                     validate_character(_valid_panel(traits=[contradiction]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
     def test_v5_equipment_rows_require_the_adjustment_summary(self):
         normalized = validate_character(
             _valid_panel(equipment=[_equipment_row(adjustment="攻擊 −2｜防禦 ＋8")])

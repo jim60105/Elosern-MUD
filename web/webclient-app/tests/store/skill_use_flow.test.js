@@ -63,10 +63,29 @@ describe("SkillBook use hand-over", () => {
     revision = 1;
   });
 
+  // The book's caster is the committed character panel's viewed member.
+  function characterPanel(memberId = 42) {
+    return {
+      schema_version: 8,
+      available: true,
+      kind: "character",
+      member_id: memberId,
+      traits: [],
+      conditions: [],
+      actives: [],
+      passives: [],
+      equipment: [],
+      disguise: { active: false, description: "", displayed: [] },
+      guild: { rank: null, merit: 0 },
+      wallet: 0,
+    };
+  }
+
   function openExploration(
     mode = "exploration",
     contextActions = fx.explorationActions(),
     status = undefined,
+    character = characterPanel(),
   ) {
     store.beginTransport(1);
     store.setConnected(true);
@@ -75,6 +94,7 @@ describe("SkillBook use hand-over", () => {
         mode,
         panels: {
           status: fx.statusPanel(status),
+          character,
           exploration: fx.explorationPanel(),
           context_actions: contextActions,
           local_map: fx.localMapPanel(),
@@ -302,7 +322,7 @@ describe("SkillBook use hand-over", () => {
     expect(sender.sent.actions.filter((a) => a.action_id === "explore.cast")).toEqual([]);
   });
 
-  it("refuses locally when no controlled figure is published", () => {
+  it("refuses locally when the character panel publishes no member", () => {
     store.beginTransport(1);
     store.setConnected(true);
     const snap = fx.snapshot({
@@ -313,7 +333,7 @@ describe("SkillBook use hand-over", () => {
         local_map: fx.localMapPanel(),
       },
     });
-    delete snap.panels.status;
+    delete snap.panels.character;
     store.receive(1, "ui_snapshot", [snap], {});
     store.openHudDrawer("skill");
     const outcome = store.beginSkillUse(KEY);
@@ -332,9 +352,12 @@ describe("SkillBook use hand-over", () => {
   });
 
   it("binds the opening confirmation to the previewed companion", () => {
-    openExploration("exploration", fx.explorationActions(), {
-      actor: { identity: "77" },
-    });
+    openExploration(
+      "exploration",
+      fx.explorationActions(),
+      { actor: { identity: "42" } },
+      characterPanel(77),
+    );
     store.openHudDrawer("skill");
     store.beginSkillUse(KEY);
     expect(lastAction().payload).toEqual({ actor_id: 77, skill_key: KEY });
@@ -361,6 +384,22 @@ describe("SkillBook use hand-over", () => {
       skill_key: KEY,
       opening_target_id: 9,
     });
+  });
+
+  it("names the character member, not the controlled figure, as the caster", () => {
+    // A conflicting status identity (the controlled figure) never selects the
+    // caster: the book lists the viewed member's skills, so the preview and
+    // every later booking name that member.
+    openExploration(
+      "exploration",
+      fx.explorationActions(),
+      { actor: { identity: "77" } },
+      characterPanel(42),
+    );
+    store.openHudDrawer("skill");
+    const outcome = store.beginSkillUse(KEY);
+    expect(outcome.route).toBe("preview");
+    expect(lastAction().payload).toEqual({ actor_id: 42, skill_key: KEY });
   });
 
   it("a replacement preview for another caster retires the open confirmation", () => {

@@ -52,7 +52,7 @@ The production action registry SHALL register `character.persona.update` with a 
 
 #### Scenario: A browser edit updates the panel
 - **WHEN** an activated character's owner submits `character.persona.update` with `field` `life_story` and a bounded text
-- **THEN** the persona record's `life_story` equals the trimmed text, the result is a confirmed success with a Traditional Chinese message, and the refreshed `character` panel renders the new value
+- **THEN** the persona record's `life_story` equals the trimmed text, the result is a confirmed success with a Traditional Chinese message, and the refreshed `party_member` panel's commander section renders the new value
 
 #### Scenario: A non-whitelisted field is rejected
 - **WHEN** a client submits `character.persona.update` with `field` `identity` or any value outside the whitelist
@@ -96,7 +96,7 @@ The `CharacterCmdSet` SHALL mount three commands in addition to the existing `�
 - **THEN** they are part of the command documentation contract
 
 ### Requirement: The character drawer shows and edits the four persona sections
-The browser character drawer SHALL render the persona area as four labelled sections (個性, 生平, 習慣, 背景) from the `character` panel's `persona` object, and SHALL offer an inline edit affordance per section that submits exactly one `character.persona.update` action with the section's field key and the edited text (or null when cleared), then reflects the refreshed panel.
+The browser character drawer SHALL render the persona area as four labelled sections (個性, 生平, 習慣, 背景) from the `party_member` panel's commander `persona` section, and SHALL offer an inline edit affordance per section that submits exactly one `character.persona.update` action with the section's field key and the edited text (or null when cleared), then reflects the refreshed panel.
 
 #### Scenario: Four sections render with placeholders
 - **WHEN** a character with only a `background` value opens the drawer

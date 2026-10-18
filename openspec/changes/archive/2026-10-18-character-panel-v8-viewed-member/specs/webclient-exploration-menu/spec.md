@@ -56,7 +56,7 @@ The production presentation registry SHALL register panel name `character` at sc
 
 #### Scenario: A malformed sexual-state record fails the panel closed
 - **WHEN** an actor's persisted sexual-state record exists but is structurally malformed (e.g. a level field's stored value is absent from its vocabulary)
-- **THEN** the `party_member` panel becomes unavailable via the common unavailable form with no partial or fabricated intimate value, and the `character` panel, which no longer reads sexual state, stays available
+- **THEN** the `party_member` panel becomes unavailable via the common unavailable form with no partial or fabricated intimate value, and the `character` panel, which no longer builds the intimate section, stays available whenever the mechanical inputs it does read (the arousal/exposure/climax-phase condition inputs and the persisted act-unlock counters) remain readable — a corruption confined to an intimate-only level field therefore leaves `character` available, while a corruption of a mechanical input still fails both panels closed exactly as `status` does
 
 #### Scenario: Trait rows carry the breakdown-view shape
 - **WHEN** the presenter builds `traits`
@@ -103,7 +103,7 @@ The production presentation registry SHALL register panel name `character` at sc
 
 #### Scenario: Conditions carry exact rows
 - **WHEN** the viewed member has an active buff from an altar and a debuff from fatigue
-- **THEN** `conditions` lists exactly two rows, each with exactly `code`, `label`, `severity` (`buff` or `debuff`), nullable `remaining_seconds`, bounded `modifiers` summary and bounded `source`, in the status panel's deterministic order
+- **THEN** `conditions` lists exactly two rows, each with exactly `code`, `label`, `severity` (a member of the shared condition-severity vocabulary `beneficial`, `informational`, `warning`, `harmful`, `critical`, the same vocabulary `status` publishes), nullable `remaining_seconds`, bounded `modifiers` map carrying the canonical adjustment scalars (finite numbers and authored percentage strings verbatim) and a bounded `source` origin label, in the status panel's deterministic order
 
 #### Scenario: Combat keeps the panel available
 - **WHEN** a snapshot is built during an active combat session

@@ -219,7 +219,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 4);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 8);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

@@ -883,4 +883,6 @@ class PartyMemberWiringTests(EvenniaTest):
         spec = registry.spec("party_member")
         self.assertEqual(spec.schema_version, PARTY_MEMBER_SCHEMA_VERSION)
         action = build_production_action_registry().spec("party.view_member")
-        self.assertEqual(action.affected_panels, ("party", "party_member"))
+        self.assertEqual(
+            action.affected_panels, ("party", "party_member", "character")
+        )

@@ -268,7 +268,7 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                 "outcome": "success",
                 "code": "viewing_member",
                 "message": "已選擇檢視的隊伍成員。",
-                "affected_panels": ("party",),
+                "affected_panels": ("party", "party_member", "character"),
             },
         )
         self.assertEqual(
@@ -343,4 +343,4 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         spec = registry.spec("party.view_member")
         self.assertIs(spec.validate_payload, validate_party_view_member_payload)
         self.assertIs(spec.adapter, _party_view_member_adapter)
-        self.assertEqual(spec.affected_panels, ("party",))
+        self.assertEqual(spec.affected_panels, ("party", "party_member", "character"))

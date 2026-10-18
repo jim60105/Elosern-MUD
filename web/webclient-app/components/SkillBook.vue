@@ -25,11 +25,6 @@ const props = defineProps({
   // Showcase/mount conveniences.
   initialTab: { type: String, default: "active" },
   initialQuery: { type: String, default: "" },
-  // The controlled figure's identity (a positive safe integer) from the
-  // committed `status` panel: the member every booking names. Null while
-  // that panel is missing, so 修煉 stays unavailable instead of inventing
-  // or substituting a member.
-  actorId: { type: Number, default: null },
   practiceDisabled: { type: Boolean, default: false },
   practiceFeedback: { type: String, default: "" },
   // The committed presentation mode ("exploration" | "combat" | "dialogue"
@@ -48,15 +43,24 @@ const props = defineProps({
 const emit = defineEmits(["practice", "use"]);
 
 // ---------------------------------------------------------------- practice
+// The book's skills belong to the character panel's viewed member, so every
+// booking names that member: `character.member_id` (a positive safe integer).
+// Null while the panel is unavailable or carries no member, so 修煉 stays
+// unavailable instead of inventing or substituting a member.
+const memberId = computed(() =>
+  Number.isSafeInteger(props.skills?.member_id) && props.skills.member_id > 0
+    ? props.skills.member_id
+    : null
+);
 const actorReady = computed(
-  () => Number.isSafeInteger(props.actorId) && props.actorId > 0,
+  () => memberId.value !== null,
 );
 // One booking control: the server reauthorizes the member, so the browser
-// sends the controlled figure's id and the row's skill and computes nothing
+// sends the viewed member's id and the row's skill and computes nothing
 // about eligibility, duration, or progression.
 function bookPractice(key) {
   if (!actorReady.value || props.practiceDisabled) return;
-  emit("practice", { actor_id: props.actorId, skill: key });
+  emit("practice", { actor_id: memberId.value, skill: key });
 }
 
 // ---------------------------------------------------------------- browsing
