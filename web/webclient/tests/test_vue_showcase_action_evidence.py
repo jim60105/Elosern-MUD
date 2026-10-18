@@ -127,7 +127,8 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         The Feedback/ToastQueue key from the add-action-feedback-toasts
         change joins it at the manifest's refreeze at 42.
         The Core/CompanionLineup, Overlays/PartyDrawer, and Overlays/ObjectiveTracker
-        keys join at the manifest refreeze at 44.
+        keys join at the manifest refreeze at 44; webclient-party-window-member-tab
+        replaces Overlays/PartyDrawer with Overlays/PartyWindow.
         The AVG scene overview and the suggestion card family it hosted left
         with exploration-room-actions, whose room-action cards landed in
         Core/ChoiceCard and Core/PlaceCard and whose dream question added
@@ -164,7 +165,14 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/ReadingSample",
                 "Overlays/OverlayHost",
                 "Core/CompanionLineup",
-                "Overlays/PartyDrawer",
+                "Overlays/PartyWindow",
+                # The shared window primitives (webclient-window-primitives) joined the
+                # frozen set; this change pins them with the party window.
+                "Core/WindowFrame",
+                "Core/MemberRail",
+                "Core/ListDetail",
+                "Core/ActionBar",
+                "Data/HoldingsStrip",
                 "Overlays/ObjectiveTracker",
                 # The client-local action-feedback toast queue joined the
                 # frozen set when add-action-feedback-toasts refroze the

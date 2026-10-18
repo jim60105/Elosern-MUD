@@ -60,7 +60,7 @@
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
     "Core/CompanionLineup",
-    "Overlays/PartyDrawer",
+    "Overlays/PartyWindow",
     "Overlays/ObjectiveTracker",
     "Feedback/ToastQueue",
     "Data/GalleryPanel",

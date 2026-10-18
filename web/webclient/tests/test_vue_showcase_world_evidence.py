@@ -160,7 +160,15 @@ PREVIOUS_MANIFEST_KEYS = {
     # when add-action-feedback-toasts refroze the manifest at 42.
     "Feedback/ToastQueue",
     "Overlays/ObjectiveTracker",
-    "Overlays/PartyDrawer",
+    # webclient-party-window-member-tab replaced the party drawer.
+    "Overlays/PartyWindow",
+    # The shared window primitives (webclient-window-primitives) joined the
+    # frozen set; this change pins them with the party window.
+    "Core/WindowFrame",
+    "Core/MemberRail",
+    "Core/ListDetail",
+    "Core/ActionBar",
+    "Data/HoldingsStrip",
     "Core/CompanionLineup",
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
