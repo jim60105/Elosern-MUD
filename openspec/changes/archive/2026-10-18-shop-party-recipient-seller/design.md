@@ -12,8 +12,8 @@ See proposal.md. `buy` validates quantity, registry, sellability, local merchant
 
 ## Decisions
 
-- **Signature** `buy(acting, merchant_host, item_key, quantity, recipient)`: membership is checked first (so a forged id never reaches pricing), then the existing checks in their existing order; the wallet read/write targets the commander; the inventory plan and mirror objects target the recipient. `_snapshot_trade` captures the commander's wallet and the member's inventory and quest log.
-- **Sell eligibility** reuses `plan_inventory_delta(seller, removals=...)`, which already raises `EquippedRemovalError` for equipped copies; it maps to `item_equipped` instead of the generic insufficient reason.
+- **Signature** `buy(acting, merchant_host, item_key, quantity, recipient)`: membership is checked first (so a forged id never reaches pricing), then the existing checks in their existing order; the wallet read/write targets the commander; the inventory plan and mirror objects target the recipient. `_snapshot_trade` captures the commander's wallet and the member's wallet, inventory, quest log, reward claims and traits (an AUTO settlement pays the member's own wallet inside the quest-log delta).
+- **Sell eligibility** reuses `plan_inventory_delta(seller, removals=...)`, which already raises `EquippedRemovalError` for equipped copies; it maps to the existing `equipped_item` refusal instead of the generic insufficient reason.
 - **Affinity** (`AffinitySource.TRADE`) stays between the merchant host and the commander, because the commander pays; recorded explicitly so it is not changed accidentally.
 - **ACQUIRE progress** follows the existing planner for the recipient; the observed effect of buying into a companion's bag on the commander's ACQUIRE objectives is pinned by a test and listed as a planning gap.
 - **Aliases** `買`/`賣` are added because the design's text table uses them; existing keys and aliases remain.

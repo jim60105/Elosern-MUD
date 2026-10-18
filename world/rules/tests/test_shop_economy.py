@@ -14,12 +14,21 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.localized import CmdDrop, CmdGet, CmdGive
+from commands.economy import CmdBuy, CmdSell
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
-from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.quests.definitions import QuestStage
+from world.quests.runtime import read_records
+from world.quests.tests._fixtures import (
+    QuestRegistryIsolation,
+    accept as accept_quest_record,
+    acquire as acquire_objective,
+    quest as quest_definition,
+    register as register_quest,
+)
 from world.lore.settlements.assortments import AssortmentDefinition
 from world.lore.settlements.shops import ShopDefinition
 from world.rules.clock import WorldClock
@@ -37,6 +46,13 @@ from world.rules.guild_config import (
     ItemOfferRule,
     validate_shop_configs,
 )
+from world.rules.party import join_party
+from world.rules.party_scope import (
+    REASON_MEMBER_NOT_PRESENT,
+    REASON_NOT_PARTY_MEMBER,
+    PartyScopeError,
+)
+from world.rules.surfaces import attribute_snapshot
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
@@ -141,7 +157,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     @covers_requirement("shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically", "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_successful_purchase_uses_integer_copper(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = buy(self.player, self.merchant_npc, _T_APPLE, 2)
+            result = buy(self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk)
         self.assertEqual(result["total_copper"], _buy_copper(_T_APPLE) * 2)
         self.assertEqual(result["wallet"], 100 - _buy_copper(_T_APPLE) * 2)
         self.assertEqual(list_items(self.player), [_T_APPLE, _T_APPLE])
@@ -152,7 +168,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     def test_insufficient_funds_changes_nothing(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, self.merchant_npc, _T_FANG, 1)
+                buy(self.player, self.merchant_npc, _T_FANG, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.INSUFFICIENT_FUNDS)
         self.assertEqual(self.player.db.wallet, 100)
         self.assertEqual(list_items(self.player), [])
@@ -163,7 +179,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     def test_insufficient_stock_changes_nothing(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, self.merchant_npc, _T_SPRAY, 4)
+                buy(self.player, self.merchant_npc, _T_SPRAY, 4, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.INSUFFICIENT_STOCK)
 
     def test_sale_cannot_overflow_merchant_stock(self):
@@ -171,7 +187,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.player.db.inventory = [_T_FANG, _T_FANG, _T_FANG]
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
-                sell(self.player, self.merchant_npc, _T_FANG, 3)
+                sell(self.player, self.merchant_npc, _T_FANG, 3, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.STOCK_OVERFLOW)
         self.assertEqual(self.player.db.wallet, 0)
         self.assertEqual(
@@ -184,7 +200,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.player.db.wallet = 0
         self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = sell(self.player, self.merchant_npc, _T_SPRAY, 2)
+            result = sell(self.player, self.merchant_npc, _T_SPRAY, 2, self.player.pk)
         self.assertEqual(result["total_copper"], _sell_copper(_T_SPRAY) * 2)
         self.assertEqual(self.player.db.wallet, _sell_copper(_T_SPRAY) * 2)
         self.assertEqual(list_items(self.player), [])
@@ -195,15 +211,15 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     def test_unknown_or_unsellable_item_rejected(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError):
-                buy(self.player, self.merchant_npc, "no_such_item", 1)
+                buy(self.player, self.merchant_npc, "no_such_item", 1, self.player.pk)
         with self.assertRaises(TradeError) as ctx:
-            sell(self.player, self.merchant_npc, "no_such_item", 1)
+            sell(self.player, self.merchant_npc, "no_such_item", 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.UNKNOWN_ITEM)
         # The kit pass is a genuinely unsellable registry item; the sellable
         # gate precedes merchant and shop-open resolution.
         self.player.db.inventory = [_T_PASS]
         with self.assertRaises(TradeError) as ctx:
-            sell(self.player, self.merchant_npc, _T_PASS, 1)
+            sell(self.player, self.merchant_npc, _T_PASS, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
         self.assertEqual(self.player.db.inventory, [_T_PASS])
 
@@ -215,7 +231,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.player.db.inventory = [_T_PASS]
         # Selling an unsellable item is refused, wallet and inventory unchanged
         with self.assertRaises(TradeError) as ctx:
-            sell(self.player, self.merchant_npc, _T_PASS, 1)
+            sell(self.player, self.merchant_npc, _T_PASS, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
         self.assertEqual(self.player.db.wallet, 100)
         self.assertEqual(self.player.db.inventory, [_T_PASS])
@@ -238,14 +254,14 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             # Selling is still refused by item sellability
             with self.assertRaises(TradeError) as ctx:
-                sell(self.player, self.merchant_npc, _T_PASS, 1)
+                sell(self.player, self.merchant_npc, _T_PASS, 1, self.player.pk)
             self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
             self.assertEqual(self.player.db.wallet, 100)
             self.assertEqual(self.player.db.inventory, [_T_PASS])
 
             # Buying is also refused by item sellability
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, self.merchant_npc, _T_PASS, 1)
+                buy(self.player, self.merchant_npc, _T_PASS, 1, self.player.pk)
             self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
             self.assertEqual(self.player.db.wallet, 100)
             self.assertEqual(self.player.db.inventory, [_T_PASS])
@@ -317,10 +333,10 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
                 return_value=self._open_clock(),
             ):
                 with self.assertRaises(TradeError) as ctx:
-                    sell(self.player, self.merchant_npc, keepsake.key, 1)
+                    sell(self.player, self.merchant_npc, keepsake.key, 1, self.player.pk)
                 self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
                 with self.assertRaises(TradeError) as ctx:
-                    buy(self.player, self.merchant_npc, keepsake.key, 1)
+                    buy(self.player, self.merchant_npc, keepsake.key, 1, self.player.pk)
                 self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
             self.assertEqual(snapshot(), before)
 
@@ -355,19 +371,19 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             # Buying the unstocked registered item is refused with NOT_OFFERED
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, self.merchant_npc, unstocked_key, 1)
+                buy(self.player, self.merchant_npc, unstocked_key, 1, self.player.pk)
             self.assertEqual(ctx.exception.args[0], TradeReason.NOT_OFFERED)
 
             # Distinct from an unknown key which produces UNKNOWN_ITEM
             with self.assertRaises(TradeError) as ctx_unknown:
-                buy(self.player, self.merchant_npc, "completely_unknown_key", 1)
+                buy(self.player, self.merchant_npc, "completely_unknown_key", 1, self.player.pk)
             self.assertEqual(ctx_unknown.exception.args[0], TradeReason.UNKNOWN_ITEM)
 
     def test_closed_shop_rejects_trade(self):
         with patch("world.rules.economy.get_world_clock", return_value=WorldClock(3 * 3600)):
             self.assertFalse(shop_is_open(T_SHOP))
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, self.merchant_npc, _T_APPLE, 1)
+                buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
             self.assertEqual(ctx.exception.args[0], TradeReason.CLOSED)
 
     def test_bad_quantity_rejected(self):
@@ -375,14 +391,14 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             for bad in (0, -1, 1.5, True):
                 with self.subTest(quantity=bad):
                     with self.assertRaises(TradeError) as ctx:
-                        buy(self.player, self.merchant_npc, _T_APPLE, bad)
+                        buy(self.player, self.merchant_npc, _T_APPLE, bad, self.player.pk)
                     self.assertEqual(ctx.exception.args[0], TradeReason.BAD_QUANTITY)
 
     def test_remote_merchant_rejected(self):
         other = create_object(Room, key="other")
         self.player.location = other
         with self.assertRaises(TradeError) as ctx:
-            buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.REMOTE_MERCHANT)
 
     def _make_place_bound(self):
@@ -405,7 +421,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.player.location = square
         wallet_before = self.player.db.wallet
         with self.assertRaises(TradeError) as ctx:
-            buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
         self.assertEqual(self.player.db.wallet, wallet_before)
         self.assertEqual(list_items(self.player), [])
@@ -418,7 +434,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     def test_at_anchor_place_bound_merchant_behaves_as_before_the_gate(self):
         self._make_place_bound()
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            result = buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(result["total_copper"], _buy_copper(_T_APPLE))
         self.assertEqual(self.player.db.wallet, 100 - _buy_copper(_T_APPLE))
 
@@ -433,7 +449,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.merchant_npc.location = square
         self.player.location = square
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            result = buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(result["total_copper"], _buy_copper(_T_APPLE))
         self.assertEqual(self.player.db.wallet, 100 - _buy_copper(_T_APPLE))
 
@@ -447,7 +463,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         )
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
-                buy(self.player, fake, _T_APPLE, 1)
+                buy(self.player, fake, _T_APPLE, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.NO_MERCHANT)
         self.assertEqual(self.player.db.wallet, 100)
         self.assertEqual(list_items(self.player), [])
@@ -471,7 +487,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
 
             with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
                 with self.assertRaises(RuntimeError):
-                    buy(self.player, self.merchant_npc, _T_APPLE, 2)
+                    buy(self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk)
             self.assertEqual(
                 (
                     self.player.db.wallet,
@@ -484,7 +500,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
 
     def test_no_float_created_by_trade(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertNotIsInstance(self.player.db.wallet, float)
         self.assertEqual(self.player.db.wallet, 100 - _buy_copper(_T_APPLE))
 
@@ -495,7 +511,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     @covers_requirement("equipment-inventory::the-key-list-is-the-single-canonical-inventory-record-for-registry-items")
     def test_buy_materializes_a_contained_object_per_item(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            buy(self.player, self.merchant_npc, _T_APPLE, 2)
+            buy(self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk)
         self.assertEqual(len(self._contained(_T_APPLE)), 2)
         self.assertTrue(
             all(obj.db.registry_key == _T_APPLE for obj in self._contained(_T_APPLE))
@@ -505,12 +521,12 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     @covers_requirement("shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory")
     def test_sell_removes_the_contained_objects(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            buy(self.player, self.merchant_npc, _T_APPLE, 2)
-            sell(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk)
+            sell(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(len(self._contained(_T_APPLE)), 1)
         self.assertEqual(list_items(self.player), [_T_APPLE])
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            sell(self.player, self.merchant_npc, _T_APPLE, 1)
+            sell(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         self.assertEqual(self._contained(_T_APPLE), [])
         self.assertEqual(list_items(self.player), [])
 
@@ -524,14 +540,14 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             location=self.player,
         )
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = sell(self.player, self.merchant_npc, _T_APPLE, 2)
+            result = sell(self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk)
         self.assertEqual(result["quantity"], 2)
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(self._contained(_T_APPLE), [])
 
     def test_bought_item_can_be_dropped(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         output = self.call(CmdDrop(), _T_APPLE, caller=self.player)
         self.assertIn(f"你丟下了{_T_APPLE}。", output)
         self.assertEqual(list_items(self.player), [])
@@ -541,7 +557,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
     def test_bought_item_can_be_given(self):
         recipient = create_object(PlayerCharacter, key="recipient", location=self.store)
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            buy(self.player, self.merchant_npc, _T_APPLE, 1)
+            buy(self.player, self.merchant_npc, _T_APPLE, 1, self.player.pk)
         output = self.call(CmdGive(), f"{_T_APPLE} = recipient", caller=self.player)
         self.assertIn(f"你把{_T_APPLE}交給了", output)
         self.assertEqual(list_items(self.player), [])
@@ -560,7 +576,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
         self.assertEqual(list_items(self.player), [_T_SPRAY])
         self.assertEqual(len(self._contained(_T_SPRAY)), 1)
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = sell(self.player, self.merchant_npc, _T_SPRAY, 1)
+            result = sell(self.player, self.merchant_npc, _T_SPRAY, 1, self.player.pk)
         self.assertEqual(result["quantity"], 1)
         self.assertEqual(list_items(self.player), [])
         self.assertEqual(self._contained(_T_SPRAY), [])
@@ -598,8 +614,12 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             self.player.db.inventory = []
             self.merchant.merchant_stock = _stock()
             with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-                buy_result = buy(self.player, self.merchant_npc, _T_APPLE, 2)
-                sell_result = sell(self.player, self.merchant_npc, _T_APPLE, 2)
+                buy_result = buy(
+                    self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk
+                )
+                sell_result = sell(
+                    self.player, self.merchant_npc, _T_APPLE, 2, self.player.pk
+                )
             return (
                 buy_result,
                 sell_result,
@@ -616,6 +636,485 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             registry[_T_APPLE] = original
 
         self.assertEqual(swapped, baseline)
+
+
+class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
+    """Member-scoped shop trades: the member's bag and the commander's purse.
+
+    Covers shop-party-recipient-seller: a purchase names a recipient and
+    debits the unchanged buy price from the party purse (the commander's
+    wallet), a sale names a seller and credits the unchanged sell price to
+    that purse, only the seller's unequipped copies sell, a forged or absent
+    member is refused before pricing, and a failed commit restores the purse,
+    both bags, the member's quest log and the merchant stock.
+
+    The three added ``shop-economy`` requirement IDs are indexed only after
+    archival synchronization promotes this delta into the main spec, so the
+    annotations below name the current canonical requirements the behaviour
+    substantively establishes.
+    """
+
+    EMPTY_EQUIPMENT = {
+        "weapon_main": None,
+        "weapon_off": None,
+        "armor": None,
+        "accessories": [],
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.store = create_object(Room, key="party store")
+        self.merchant_npc = create_object(
+            NPC, key="t_synth_partystallkeeper", location=self.store
+        )
+        self.merchant = Merchant.create(
+            self.merchant_npc,
+            service_id="party-store",
+            shop_key=T_SHOP,
+        )
+        self.merchant_npc.components.add(self.merchant)
+        self.merchant.merchant_stock = _stock()
+        self.player = create_object(PlayerCharacter, key="party shopper")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.store
+        self.player.db.wallet = 1240
+        self.companion = self._companion("艾拉")
+
+    def _companion(self, key):
+        npc = create_object(NPC, key=key, location=self.store, home=self.store)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        join_party(npc, self.player)
+        return npc
+
+    def _open_clock(self, hour=12):
+        return WorldClock(hour * 3600)
+
+    def _surface(self, *members):
+        return (
+            int(self.player.db.wallet or 0),
+            {int(member.pk): list(member.db.inventory or []) for member in members},
+            dict(parse_merchant_stock(self.merchant)),
+        )
+
+    @covers_requirement(
+        "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically",
+        "shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+    )
+    def test_companion_recipient_purchase_debits_the_party_purse(self):
+        # Independent arithmetic: the purse starts at 1,240 and the authored
+        # offer rule prices this kit row, so three units must leave exactly
+        # 1,240 - 3 * buy_copper and fill only the companion's bag.
+        stock_before = parse_merchant_stock(self.merchant)[_T_APPLE]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = buy(
+                self.player, self.merchant_npc, _T_APPLE, 3, self.companion.pk
+            )
+        total = 3 * _buy_copper(_T_APPLE)
+        self.assertEqual(result["total_copper"], total)
+        self.assertEqual(result["wallet"], 1240 - total)
+        self.assertEqual(int(self.player.db.wallet), 1240 - total)
+        self.assertEqual(list_items(self.companion), [_T_APPLE] * 3)
+        self.assertEqual(list_items(self.player), [])
+        # The contained mirrors follow the recipient, not the purse owner.
+        self.assertEqual(
+            [obj.key for obj in self.companion.contents if obj.key == _T_APPLE],
+            [_T_APPLE] * 3,
+        )
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_APPLE], stock_before - 3
+        )
+        # The commander pays, so the trade affinity stays with the commander.
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
+
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+    )
+    def test_forged_or_absent_member_is_refused_before_pricing(self):
+        outsider = create_object(NPC, key="路人", location=self.store)
+        elsewhere = create_object(Room, key="elsewhere")
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            for member_id in (outsider.pk, 999999):
+                with self.assertRaises(PartyScopeError) as caught:
+                    buy(
+                        self.player,
+                        self.merchant_npc,
+                        _T_APPLE,
+                        1,
+                        member_id,
+                    )
+                self.assertEqual(caught.exception.reason, REASON_NOT_PARTY_MEMBER)
+            self.companion.location = elsewhere
+            with self.assertRaises(PartyScopeError) as caught:
+                buy(
+                    self.player,
+                    self.merchant_npc,
+                    _T_APPLE,
+                    1,
+                    self.companion.pk,
+                )
+            self.assertEqual(caught.exception.reason, REASON_MEMBER_NOT_PRESENT)
+            with self.assertRaises(PartyScopeError) as caught:
+                sell(
+                    self.player,
+                    self.merchant_npc,
+                    _T_APPLE,
+                    1,
+                    outsider.pk,
+                )
+            self.assertEqual(caught.exception.reason, REASON_NOT_PARTY_MEMBER)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
+
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
+    def test_companion_recipient_insufficient_purse_changes_nothing(self):
+        self.player.db.wallet = _buy_copper(_T_FANG) - 1
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with self.assertRaises(TradeError) as caught:
+                buy(
+                    self.player,
+                    self.merchant_npc,
+                    _T_FANG,
+                    1,
+                    self.companion.pk,
+                )
+        self.assertEqual(caught.exception.args[0], TradeReason.INSUFFICIENT_FUNDS)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+
+    @covers_requirement(
+        "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically"
+    )
+    def test_acquire_progress_follows_the_recipient(self):
+        # Pinned observed behaviour (design "ACQUIRE progress"): the planner
+        # advances the recipient's own ACQUIRE objectives, so buying into a
+        # companion's bag never advances the commander's matching objective.
+        definition = register_quest(
+            quest_definition(
+                "t_party_shop_acquire",
+                stages=(
+                    QuestStage(index=0, objective=acquire_objective(_T_APPLE, 3)),
+                ),
+            )
+        )
+        commander_record = accept_quest_record(self.player, definition)
+        companion_record = accept_quest_record(self.companion, definition)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            buy(self.player, self.merchant_npc, _T_APPLE, 2, self.companion.pk)
+        companion_rows = {
+            record.quest_id: record for record in read_records(self.companion)
+        }
+        commander_rows = {
+            record.quest_id: record for record in read_records(self.player)
+        }
+        self.assertEqual(
+            companion_rows[companion_record.quest_id].stage_progress, 2
+        )
+        self.assertEqual(commander_rows[commander_record.quest_id].stage_progress, 0)
+
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
+    def test_fault_injection_restores_purse_both_bags_quest_log_and_stock(self):
+        definition = register_quest(
+            quest_definition(
+                "t_party_shop_acquire_rollback",
+                stages=(
+                    QuestStage(index=0, objective=acquire_objective(_T_APPLE, 3)),
+                ),
+            )
+        )
+        accept_quest_record(self.companion, definition)
+        self.companion.db.inventory = [_T_APPLE]
+        wallet_before = int(self.player.db.wallet)
+        commander_bag = list(self.player.db.inventory or [])
+        companion_bag = list(self.companion.db.inventory or [])
+        quest_before = attribute_snapshot(self.companion, "quest_log")
+        stock_before = dict(parse_merchant_stock(self.merchant))
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with patch(
+                "world.rules.economy.materialize_registry_object",
+                side_effect=RuntimeError("mirror failure"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    buy(
+                        self.player,
+                        self.merchant_npc,
+                        _T_APPLE,
+                        2,
+                        self.companion.pk,
+                    )
+        self.assertEqual(int(self.player.db.wallet), wallet_before)
+        self.assertEqual(list(self.player.db.inventory or []), commander_bag)
+        self.assertEqual(list(self.companion.db.inventory or []), companion_bag)
+        self.assertEqual(
+            attribute_snapshot(self.companion, "quest_log"), quest_before
+        )
+        self.assertEqual(dict(parse_merchant_stock(self.merchant)), stock_before)
+
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
+    def test_fault_injection_restores_an_auto_settled_companion_wallet(self):
+        # An AUTO issuance pays the quest actor's own wallet inside the
+        # quest-log delta, so a companion's wallet is a trade surface the
+        # snapshot must cover even though the commander owns the purse.
+        from world.quests.runtime import accept_quest
+        from world.rules.guild_offers import QuestReward
+        from world.rules.quest_issuance import (
+            QuestIssuance,
+            Settlement,
+            npc_issuer_key,
+            register_quest_issuance,
+        )
+
+        definition = register_quest(
+            quest_definition(
+                "t_party_shop_auto_rollback",
+                stages=(
+                    QuestStage(index=0, objective=acquire_objective(_T_APPLE, 3)),
+                ),
+            )
+        )
+        issuer = npc_issuer_key(content_key="t_party_shop_auto_rollback")
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=definition.key,
+                issuer_key=issuer,
+                reward=QuestReward(copper=7, items=(), merit=0),
+                settlement=Settlement.AUTO,
+            )
+        )
+        accept_quest(self.companion, definition.key, issuer)
+        self.companion.db.wallet = 0
+        wallet_before = int(self.player.db.wallet)
+        quest_before = attribute_snapshot(self.companion, "quest_log")
+        claims_before = attribute_snapshot(self.companion, "guild_reward_claims")
+        stock_before = dict(parse_merchant_stock(self.merchant))
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with patch(
+                "world.rules.economy.materialize_registry_object",
+                side_effect=RuntimeError("mirror failure"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    buy(
+                        self.player,
+                        self.merchant_npc,
+                        _T_APPLE,
+                        3,
+                        self.companion.pk,
+                    )
+        self.assertEqual(int(self.player.db.wallet), wallet_before)
+        self.assertEqual(int(self.companion.db.wallet or 0), 0)
+        self.assertEqual(list(self.companion.db.inventory or []), [])
+        self.assertEqual(
+            attribute_snapshot(self.companion, "quest_log"), quest_before
+        )
+        self.assertEqual(
+            attribute_snapshot(self.companion, "guild_reward_claims"), claims_before
+        )
+        self.assertEqual(dict(parse_merchant_stock(self.merchant)), stock_before)
+
+    @covers_requirement(
+        "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically",
+        "shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+    )
+    def test_companion_seller_proceeds_credit_the_party_purse(self):
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_SPRAY, _T_SPRAY]
+        stock_before = parse_merchant_stock(self.merchant)[_T_SPRAY]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(
+                self.player, self.merchant_npc, _T_SPRAY, 2, self.companion.pk
+            )
+        expected = 2 * _sell_copper(_T_SPRAY)
+        self.assertEqual(result["total_copper"], expected)
+        self.assertEqual(result["wallet"], expected)
+        self.assertEqual(int(self.player.db.wallet), expected)
+        self.assertEqual(list_items(self.companion), [])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_SPRAY], stock_before + 2
+        )
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
+
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
+    def test_companion_equipped_copy_is_not_sellable(self):
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_KNIFE]
+        self.companion.db.equipment = {
+            **self.EMPTY_EQUIPMENT,
+            "weapon_main": _T_KNIFE,
+        }
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with self.assertRaises(TradeError) as caught:
+                sell(
+                    self.player,
+                    self.merchant_npc,
+                    _T_KNIFE,
+                    1,
+                    self.companion.pk,
+                )
+        self.assertEqual(caught.exception.args[0], TradeReason.EQUIPPED_ITEM)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+        self.assertEqual(
+            self.companion.db.equipment["weapon_main"], _T_KNIFE
+        )
+
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
+    def test_companion_spare_copy_sells_while_equipped(self):
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_KNIFE, _T_KNIFE]
+        self.companion.db.equipment = {
+            **self.EMPTY_EQUIPMENT,
+            "weapon_main": _T_KNIFE,
+        }
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(
+                self.player, self.merchant_npc, _T_KNIFE, 1, self.companion.pk
+            )
+        self.assertEqual(result["quantity"], 1)
+        self.assertEqual(list_items(self.companion), [_T_KNIFE])
+        self.assertEqual(
+            self.companion.db.equipment["weapon_main"], _T_KNIFE
+        )
+
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
+    def test_companion_seller_stock_cap_refuses(self):
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_FANG, _T_FANG, _T_FANG]
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with self.assertRaises(TradeError) as caught:
+                sell(
+                    self.player,
+                    self.merchant_npc,
+                    _T_FANG,
+                    3,
+                    self.companion.pk,
+                )
+        self.assertEqual(caught.exception.args[0], TradeReason.STOCK_OVERFLOW)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+
+    @covers_requirement(
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant",
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+    )
+    def test_text_member_trades_match_the_action(self):
+        # Text/action parity: the same rule entry settles both transports, so
+        # the typed `= <成員>` purchase leaves the same purse delta and the
+        # same member bag the `shop.buy` recipient payload produces.
+        kahn = self._companion("卡恩")
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            action = buy(self.player, self.merchant_npc, _T_APPLE, 3, kahn.pk)
+            output = self.call(
+                CmdBuy(), f"{_T_APPLE} 3 = 艾拉", caller=self.player
+            )
+        self.assertIn("你買了 3 個", output)
+        self.assertEqual(
+            int(self.player.db.wallet), action["wallet"] - action["total_copper"]
+        )
+        self.assertEqual(list_items(self.companion), [_T_APPLE] * 3)
+        self.assertEqual(list_items(kahn), [_T_APPLE] * 3)
+
+    @covers_requirement(
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant",
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+    )
+    def test_text_member_sale_matches_the_action(self):
+        kahn = self._companion("卡恩")
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_SPRAY]
+        kahn.db.inventory = [_T_SPRAY]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            action = sell(self.player, self.merchant_npc, _T_SPRAY, 1, kahn.pk)
+            output = self.call(
+                CmdSell(), f"{_T_SPRAY} 1 = 艾拉", caller=self.player
+            )
+        self.assertIn("你賣了 1 個", output)
+        self.assertEqual(
+            int(self.player.db.wallet), 2 * action["total_copper"]
+        )
+        self.assertEqual(list_items(self.companion), [])
+        self.assertEqual(list_items(kahn), [])
+
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
+    def test_text_member_token_refusals_match_the_action(self):
+        from world.rules.party_scope import PARTY_SCOPE_MESSAGES
+
+        create_object(NPC, key="路人", location=self.store)
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            unknown = self.call(
+                CmdBuy(), f"{_T_APPLE} 1 = 路人", caller=self.player
+            )
+            empty = self.call(
+                CmdSell(), f"{_T_APPLE} 1 =", caller=self.player
+            )
+        refusal = PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER]
+        self.assertEqual(unknown.strip(), refusal)
+        self.assertEqual(empty.strip(), refusal)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
+    def test_text_default_trade_names_the_caller(self):
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            output = self.call(CmdBuy(), f"{_T_APPLE} 1", caller=self.player)
+        self.assertIn("你買了 1 個", output)
+        self.assertEqual(list_items(self.player), [_T_APPLE])
+        self.assertEqual(list_items(self.companion), [])
+
+    @covers_requirement(
+        "shop-economy::possession-keeps-the-shop-refusal"
+    )
+    def test_text_trades_refuse_possession(self):
+        from world.rules.possession import (
+            POSSESSED_REFUSAL_MESSAGES,
+            REASON_POSSESSED_SHOP,
+        )
+
+        # The text client answers a possessed trade exactly like the web
+        # adapters: the shared fixed line, before any host or argument work,
+        # whatever member the line names.
+        self.companion.db.possessed_by = self.player.pk
+        refusal = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
+        before = self._surface(self.player, self.companion)
+        buy_output = self.call(CmdBuy(), f"{_T_APPLE} 1", caller=self.companion)
+        sell_output = self.call(
+            CmdSell(), f"{_T_APPLE} 1 = 艾拉", caller=self.companion
+        )
+        self.assertEqual(buy_output.strip(), refusal)
+        self.assertEqual(sell_output.strip(), refusal)
+        self.assertEqual(self._surface(self.player, self.companion), before)
+
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
+    def test_shop_aliases_include_the_design_command_table(self):
+        self.assertIn("買", CmdBuy.aliases)
+        self.assertIn("賣", CmdSell.aliases)
 
 
 class EquippedRemovalGuardTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
@@ -664,7 +1163,7 @@ class EquippedRemovalGuardTests(ShopRegistryIsolation, EvenniaCommandTestMixin, 
         stock_before = parse_merchant_stock(self.merchant)[_T_KNIFE]
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as ctx:
-                sell(self.player, self.merchant_npc, _T_KNIFE, 1)
+                sell(self.player, self.merchant_npc, _T_KNIFE, 1, self.player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.EQUIPPED_ITEM)
         self.assertEqual(self.player.db.wallet, 0)
         self.assertEqual(list_items(self.player), [_T_KNIFE])
@@ -677,14 +1176,14 @@ class EquippedRemovalGuardTests(ShopRegistryIsolation, EvenniaCommandTestMixin, 
         self.player.db.inventory = [_T_KNIFE, _T_KNIFE]
         self.player.db.equipment = {**self.EMPTY_EQUIPMENT, "weapon_main": _T_KNIFE}
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = sell(self.player, self.merchant_npc, _T_KNIFE, 1)
+            result = sell(self.player, self.merchant_npc, _T_KNIFE, 1, self.player.pk)
         self.assertEqual(result["quantity"], 1)
         self.assertEqual(list_items(self.player), [_T_KNIFE])
 
     def test_unequipped_item_sells_normally(self):
         self.player.db.inventory = [_T_KNIFE]
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
-            result = sell(self.player, self.merchant_npc, _T_KNIFE, 1)
+            result = sell(self.player, self.merchant_npc, _T_KNIFE, 1, self.player.pk)
         self.assertEqual(result["quantity"], 1)
         self.assertEqual(list_items(self.player), [])
 

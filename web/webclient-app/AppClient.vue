@@ -1230,6 +1230,7 @@ const rootStyle = computed(() => {
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"
         :services="panel('services') || {}"
+        :actor-id="controlledActorId"
         @buy="onShopBuy"
         @sell="onShopSell"
       />

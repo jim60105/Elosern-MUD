@@ -18,6 +18,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     outbound_messages,
     sent_action_count,
+    store_state,
     wait_for_store_state,
 )
 from .test_browser_services_base import ServicesBrowserTest
@@ -47,6 +48,8 @@ class ShopJourneys(ServicesBrowserTest):
         first_key, unit_buy = shelf["item_key"], shelf["buy_copper"]
         self.assertGreater(unit_buy, 0)
         expected_wallet = panel["player"]["wallet"] - 2 * unit_buy
+        # The transitional drawer names the controlled figure as the recipient.
+        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
 
         frame_before = page.evaluate(
             "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
@@ -108,7 +111,10 @@ class ShopJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "shop.buy"
         )
-        self.assertEqual(payload, {"item_key": first_key, "quantity": 2})
+        self.assertEqual(
+            payload,
+            {"item_key": first_key, "quantity": 2, "recipient_id": actor_id},
+        )
         self.assertEqual(self._services_panel(page)["player"]["wallet"], expected_wallet)
 
         # Close drawer and verify router state unchanged
@@ -131,6 +137,7 @@ class ShopJourneys(ServicesBrowserTest):
         rows = {row["item_key"]: row for row in panel["inventory"]["rows"]}
         STORE = store_fixture_values()
         potion, staple = STORE["potion_key"], STORE["staple_key"]
+        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
         self.assertEqual(rows[staple]["held"], 2)
         # services v3 ships a server-authored action on every inventory row;
         # the full-HP store fixture refuses the potion with the stable
@@ -194,7 +201,10 @@ class ShopJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "shop.sell"
         )
-        self.assertEqual(payload, {"item_key": potion, "quantity": 1})
+        self.assertEqual(
+            payload,
+            {"item_key": potion, "quantity": 1, "seller_id": actor_id},
+        )
         rows = {row["item_key"]: row for row in self._services_panel(page)["inventory"]["rows"]}
         self.assertNotIn(potion, rows)
         self.assertEqual(rows[staple]["held"], 2)

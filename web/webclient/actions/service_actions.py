@@ -12,8 +12,9 @@ rank, merit, quest log, wallet, inventory, merchant stock, or location
 directly. No payload accepts an actor, host, branch, session, price, stock, or
 wallet field; a party member reference appears only in the exact member field
 its owning capability defines (``inventory.use`` and
-``inventory.toggle_equip`` ``actor_id``), and no action routes through the
-text command parser.
+``inventory.toggle_equip`` ``actor_id``, ``shop.buy`` ``recipient_id``,
+``shop.sell`` ``seller_id``), and no action routes through the text command
+parser.
 """
 
 from typing import Any
@@ -51,13 +52,10 @@ from world.rules.guild_offers import (
 )
 from world.rules.npc_identity import npc_display_name
 from world.rules.npc_schedules import interaction_reason
-from world.rules.party_inventory import (
-    PartyScopeError,
-    toggle_member_equipment,
-    use_member_item,
-)
+from world.rules.party_inventory import toggle_member_equipment, use_member_item
 from world.rules.party_scope import (
     PURPOSE_ACT,
+    PartyScopeError,
     authorize_member,
     party_in_combat,
     resolve_commander,
@@ -180,27 +178,34 @@ def validate_exam_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
     )}
 
 
-def _validate_trade_payload(payload: dict[str, Any], action_id: str) -> dict[str, Any]:
+def _validate_trade_payload(
+    payload: dict[str, Any], action_id: str, member_field: str
+) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ServiceActionError(f"{action_id} payload must be an object")
-    if set(payload) != {"item_key", "quantity"}:
-        raise ServiceActionError(f"{action_id} requires exactly item_key and quantity")
+    if set(payload) != {"item_key", "quantity", member_field}:
+        raise ServiceActionError(
+            f"{action_id} requires exactly item_key, quantity and {member_field}"
+        )
     return {
         "item_key": _require_non_empty_string(
             payload["item_key"], "item_key", MAX_KEY_CODE_POINTS
         ),
         "quantity": _require_quantity(payload["quantity"]),
+        member_field: _require_member_identifier(
+            payload[member_field], member_field
+        ),
     }
 
 
 def validate_buy_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``shop.buy`` payload (item key plus quantity)."""
-    return _validate_trade_payload(payload, "shop.buy")
+    """Validate the exact ``shop.buy`` payload (item, quantity, recipient)."""
+    return _validate_trade_payload(payload, "shop.buy", "recipient_id")
 
 
 def validate_sell_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``shop.sell`` payload (item key plus quantity)."""
-    return _validate_trade_payload(payload, "shop.sell")
+    """Validate the exact ``shop.sell`` payload (item, quantity, seller)."""
+    return _validate_trade_payload(payload, "shop.sell", "seller_id")
 
 
 def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
@@ -219,7 +224,7 @@ def _require_key_identifier(value: Any, field: str, maximum: int) -> str:
     return text
 
 
-def _require_member_identifier(value: Any) -> int:
+def _require_member_identifier(value: Any, field: str = "actor_id") -> int:
     """Require one positive safe integer member identity.
 
     A bool is an int subclass, so it is excluded explicitly; a string, float,
@@ -230,7 +235,7 @@ def _require_member_identifier(value: Any) -> int:
         or not isinstance(value, int)
         or not 1 <= value <= MAX_SAFE_INTEGER
     ):
-        raise ServiceActionError("actor_id must be a positive safe integer")
+        raise ServiceActionError(f"{field} must be a positive safe integer")
     return value
 
 
@@ -486,7 +491,13 @@ def _exam_request_adapter(actor: Any, payload: dict[str, Any], session: Any = No
 
 
 def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Recheck open state, price, funds, and stock, then call ``economy.buy``."""
+    """Recheck the host, then buy for the named recipient from the party purse.
+
+    The possessed refusal stays first. The recipient is reauthorized by the
+    economy rule's party boundary (a forged, absent, or non-member id rejects
+    with the shared party code and the commander never receives the goods in
+    its place); the adapter itself never writes state.
+    """
     del session
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -511,7 +522,15 @@ def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> di
     if blocked is not None:
         return blocked
     try:
-        result = buy(actor, merchant_host, item_key, quantity)
+        result = buy(
+            actor, merchant_host, item_key, quantity, payload["recipient_id"]
+        )
+    except PartyScopeError as error:
+        return {
+            "outcome": "rejected",
+            "code": error.reason,
+            "message": error.message,
+        }
     except TradeError as error:
         return _rejected(error)
     message = (
@@ -523,7 +542,12 @@ def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> di
 
 
 def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Recheck open state, held items, and stock cap, then call ``economy.sell``."""
+    """Recheck the host, then sell the named seller's unequipped items.
+
+    The possessed refusal stays first. The seller is reauthorized by the
+    economy rule's party boundary; the unchanged sell price is credited to
+    the party purse, and the adapter itself never writes state.
+    """
     del session
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -548,7 +572,15 @@ def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     if blocked is not None:
         return blocked
     try:
-        result = sell(actor, merchant_host, item_key, quantity)
+        result = sell(
+            actor, merchant_host, item_key, quantity, payload["seller_id"]
+        )
+    except PartyScopeError as error:
+        return {
+            "outcome": "rejected",
+            "code": error.reason,
+            "message": error.message,
+        }
     except TradeError as error:
         return _rejected(error)
     message = (

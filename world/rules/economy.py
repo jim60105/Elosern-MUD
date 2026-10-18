@@ -1,11 +1,12 @@
 """Deterministic merchant-stock and buy/sell transactions (guild-economy D-8).
 
 Shops use finite persistent integer stock and exact integer copper prices.
-``buy`` and ``sell`` preflight every input, compute complete replacement values
-without writing, then commit wallet, inventory, ACQUIRE quest progress, and
-merchant stock in one transaction with full cache restoration. Money is always
-integer copper; wallet can never become negative and stock never overflows its
-cap.
+``buy`` and ``sell`` name one party member (the recipient or the seller), pay
+from and credit the party purse (the commander's wallet), preflight every input,
+compute complete replacement values without writing, then commit purse, the
+member's inventory and ACQUIRE quest progress, and merchant stock in one
+transaction with full cache restoration. Money is always integer copper; the
+purse can never become negative and stock never overflows its cap.
 """
 
 from enum import StrEnum
@@ -25,9 +26,15 @@ from world.rules.surfaces import (
     snapshot_traits,
 )
 from world.rules.equipment import (
+    EquippedRemovalError,
     materialize_registry_object,
     plan_inventory_delta,
     registry_key_for_object,
+)
+from world.rules.party_scope import (
+    PURPOSE_ORGANIZE,
+    authorize_member,
+    resolve_commander,
 )
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
@@ -140,24 +147,50 @@ def _offer_rule(shop_key: str, item_key: str):
     raise TradeError(TradeReason.NOT_OFFERED, item_key)
 
 
-def _snapshot_trade(actor: Any, merchant: Any) -> dict[str, Any]:
+def _trade_member(acting: Any, member_id: Any) -> tuple[Any, Any]:
+    """Re-derive the commander purse owner and one authorized member.
+
+    Membership is checked before any price, stock, or item read, so a forged
+    or stale id never reaches pricing. The organizing purpose admits a
+    knocked-out member: buying into or selling from a bag reorganizes it
+    without asking the member to act.
+    """
+    commander = resolve_commander(acting)
+    member = authorize_member(
+        commander, member_id, PURPOSE_ORGANIZE, anchor=acting
+    )
+    return commander, member
+
+
+def _snapshot_trade(commander: Any, member: Any, merchant: Any) -> dict[str, Any]:
     return {
-        "wallet": attribute_snapshot(actor, "wallet"),
-        "inventory": attribute_snapshot(actor, "inventory"),
-        "quest_log": attribute_snapshot(actor, "quest_log"),
-        "guild_reward_claims": attribute_snapshot(actor, "guild_reward_claims"),
+        "wallet": attribute_snapshot(commander, "wallet"),
+        # A completed ACQUIRE objective auto-settles inside the quest-log
+        # delta and pays the quest actor's own wallet, so a companion
+        # recipient's wallet is a distinct trade surface.
+        "member_wallet": (
+            None if member is commander else attribute_snapshot(member, "wallet")
+        ),
+        "inventory": attribute_snapshot(member, "inventory"),
+        "quest_log": attribute_snapshot(member, "quest_log"),
+        "guild_reward_claims": attribute_snapshot(member, "guild_reward_claims"),
         "merchant_stock": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::merchant_stock"),
         "last_restock_day": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::last_restock_day"),
         "merchant_relations": attribute_snapshot(merchant.host, "relations_data"),
-        "traits": snapshot_traits(actor),
+        "traits": snapshot_traits(member),
     }
 
 
-def _restore_trade(actor: Any, merchant: Any, snapshot: dict[str, Any]) -> None:
+def _restore_trade(
+    commander: Any, member: Any, merchant: Any, snapshot: dict[str, Any]
+) -> None:
     from world.rules.surfaces import restore_attribute_best_effort
 
-    for key in ("wallet", "inventory", "quest_log", "guild_reward_claims"):
-        restore_attribute_best_effort(actor, key, snapshot[key])
+    restore_attribute_best_effort(commander, "wallet", snapshot["wallet"])
+    if snapshot["member_wallet"] is not None:
+        restore_attribute_best_effort(member, "wallet", snapshot["member_wallet"])
+    for key in ("inventory", "quest_log", "guild_reward_claims"):
+        restore_attribute_best_effort(member, key, snapshot[key])
     restore_attribute_best_effort(
         merchant.host,
         f"{merchant.get_component_slot()}::merchant_stock",
@@ -171,18 +204,31 @@ def _restore_trade(actor: Any, merchant: Any, snapshot: dict[str, Any]) -> None:
     restore_attribute_best_effort(
         merchant.host, "relations_data", snapshot["merchant_relations"]
     )
-    restore_traits(actor, snapshot["traits"])
+    restore_traits(member, snapshot["traits"])
 
 
-def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dict[str, Any]:
-    """Buy ``quantity`` of an offered item with exact integer copper."""
+def buy(
+    acting: Any,
+    merchant_host: Any,
+    item_key: str,
+    quantity: int,
+    recipient: Any,
+) -> dict[str, Any]:
+    """Buy ``quantity`` of an offered item into one member's bag.
+
+    ``recipient`` is a member dbid re-derived through the party boundary and
+    never trusted as identity; the unchanged buy price is debited from the
+    commander's wallet (the party purse) and the merchant affinity stays
+    between the host and the commander, because the commander pays.
+    """
+    commander, member = _trade_member(acting, recipient)
     quantity = _require_positive_quantity(quantity)
     if item_key not in ITEM_REGISTRY:
         raise TradeError(TradeReason.UNKNOWN_ITEM, item_key)
     definition = ITEM_REGISTRY[item_key]
     if not definition.sellable:
         raise TradeError(TradeReason.UNSELLABLE, item_key)
-    merchant = _require_local_merchant(actor, merchant_host)
+    merchant = _require_local_merchant(acting, merchant_host)
     shop_key = merchant.shop_key
     offer = _offer_rule(shop_key, item_key)
     if not shop_is_open(shop_key):
@@ -191,15 +237,15 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
     if stock.get(item_key, 0) < quantity:
         raise TradeError(TradeReason.INSUFFICIENT_STOCK)
     total = offer.buy_copper * quantity
-    wallet = int(actor.db.wallet or 0)
+    wallet = int(commander.db.wallet or 0)
     if wallet < total:
         raise TradeError(TradeReason.INSUFFICIENT_FUNDS)
 
     inventory_plan = plan_inventory_delta(
-        actor,
+        member,
         additions=tuple(item_key for _ in range(quantity)),
     )
-    snapshot = _snapshot_trade(actor, merchant)
+    snapshot = _snapshot_trade(commander, member, merchant)
     pin_operations = inventory_plan.acquire[1] if inventory_plan.acquire is not None else ()
     pin_snapshots = {}
     from world.quests.transitions import snapshot_pin_reasons
@@ -208,13 +254,13 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
         pin_snapshots[id(room)] = snapshot_pin_reasons(room)
 
     def writer():
-        actor.db.wallet = wallet - total
-        actor.db.inventory = list(inventory_plan.after)
+        commander.db.wallet = wallet - total
+        member.db.inventory = list(inventory_plan.after)
         if inventory_plan.acquire is not None:
             from world.quests.transitions import apply_quest_log_delta
 
             apply_quest_log_delta(
-                actor,
+                member,
                 list(inventory_plan.acquire[0]),
                 inventory_plan.acquire[1],
             )
@@ -223,14 +269,16 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
         merchant.merchant_stock = new_stock
         from world.rules.affinity import AffinitySource, apply_affinity_change
 
-        apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
+        # The commander pays, so the trade affinity stays with the commander
+        # even when the goods enter a companion's bag.
+        apply_affinity_change(merchant.host, commander, AffinitySource.TRADE, 1)
         # Mirror the key-list entries with one contained object each, so
         # drop/give always resolve a real object for the bought items.
         for _ in range(quantity):
-            materialize_registry_object(actor, item_key)
+            materialize_registry_object(member, item_key)
 
     def restore():
-        _restore_trade(actor, merchant, snapshot)
+        _restore_trade(commander, member, merchant, snapshot)
         from world.quests.transitions import restore_pin_reasons
 
         for room, _, _ in pin_operations:
@@ -250,36 +298,50 @@ def buy(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dic
     }
 
 
-def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> dict[str, Any]:
-    """Sell ``quantity`` of a sellable held item for exact integer copper."""
+def sell(
+    acting: Any,
+    merchant_host: Any,
+    item_key: str,
+    quantity: int,
+    seller: Any,
+) -> dict[str, Any]:
+    """Sell ``quantity`` of one member's unequipped item into the party purse.
+
+    ``seller`` is a member dbid re-derived through the party boundary and
+    never trusted as identity. Only that member's unequipped copies are
+    sellable: the planner refuses an equipped removal, which maps to
+    ``item_equipped``. The unchanged sell price (half the buy price) is
+    credited to the commander's wallet, and the trade affinity stays between
+    the host and the commander, because the commander receives the proceeds.
+    """
+    commander, member = _trade_member(acting, seller)
     quantity = _require_positive_quantity(quantity)
     if item_key not in ITEM_REGISTRY:
         raise TradeError(TradeReason.UNKNOWN_ITEM, item_key)
     definition = ITEM_REGISTRY[item_key]
     if not definition.sellable:
         raise TradeError(TradeReason.UNSELLABLE, item_key)
-    merchant = _require_local_merchant(actor, merchant_host)
+    merchant = _require_local_merchant(acting, merchant_host)
     shop_key = merchant.shop_key
     offer = _offer_rule(shop_key, item_key)
     if not shop_is_open(shop_key):
         raise TradeError(TradeReason.CLOSED)
-    inventory = list(actor.db.inventory or [])
+    inventory = list(member.db.inventory or [])
     if inventory.count(item_key) < quantity:
         raise TradeError(TradeReason.INSUFFICIENT_ITEMS)
-    from world.rules.equipment import equipped_removal_conflict
-
-    if equipped_removal_conflict(actor, (item_key,) * quantity) is not None:
+    try:
+        inventory_plan = plan_inventory_delta(
+            member,
+            removals=tuple(item_key for _ in range(quantity)),
+        )
+    except EquippedRemovalError:
         raise TradeError(TradeReason.EQUIPPED_ITEM, item_key)
     stock = parse_merchant_stock(merchant)
     if stock.get(item_key, 0) + quantity > offer.max_stock:
         raise TradeError(TradeReason.STOCK_OVERFLOW)
     total = offer.sell_copper * quantity
 
-    inventory_plan = plan_inventory_delta(
-        actor,
-        removals=tuple(item_key for _ in range(quantity)),
-    )
-    snapshot = _snapshot_trade(actor, merchant)
+    snapshot = _snapshot_trade(commander, member, merchant)
     pin_operations = inventory_plan.acquire[1] if inventory_plan.acquire is not None else ()
     pin_snapshots = {}
     from world.quests.transitions import snapshot_pin_reasons
@@ -288,13 +350,13 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
         pin_snapshots[id(room)] = snapshot_pin_reasons(room)
 
     def writer():
-        actor.db.wallet = int(actor.db.wallet or 0) + total
-        actor.db.inventory = list(inventory_plan.after)
+        commander.db.wallet = int(commander.db.wallet or 0) + total
+        member.db.inventory = list(inventory_plan.after)
         if inventory_plan.acquire is not None:
             from world.quests.transitions import apply_quest_log_delta
 
             apply_quest_log_delta(
-                actor,
+                member,
                 list(inventory_plan.acquire[0]),
                 inventory_plan.acquire[1],
             )
@@ -303,17 +365,19 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
         merchant.merchant_stock = new_stock
         from world.rules.affinity import AffinitySource, apply_affinity_change
 
-        apply_affinity_change(merchant.host, actor, AffinitySource.TRADE, 1)
+        # The commander receives the proceeds, so the trade affinity stays
+        # with the commander even when a companion's item was sold.
+        apply_affinity_change(merchant.host, commander, AffinitySource.TRADE, 1)
         # Drop the mirrored contained objects for the sold key; the key list
         # stays authoritative when containment holds fewer than sold.
         contained = [
-            obj for obj in actor.contents if registry_key_for_object(obj) == item_key
+            obj for obj in member.contents if registry_key_for_object(obj) == item_key
         ]
         for obj in contained[:quantity]:
             obj.delete()
 
     def restore():
-        _restore_trade(actor, merchant, snapshot)
+        _restore_trade(commander, member, merchant, snapshot)
         from world.quests.transitions import restore_pin_reasons
 
         for room, _, _ in pin_operations:
@@ -329,5 +393,5 @@ def sell(actor: Any, merchant_host: Any, item_key: str, quantity: int = 1) -> di
         "item_key": item_key,
         "quantity": quantity,
         "total_copper": total,
-        "wallet": int(actor.db.wallet or 0),
+        "wallet": int(commander.db.wallet or 0),
     }

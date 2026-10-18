@@ -26,7 +26,7 @@ A sale SHALL name a seller member (authorized for the organizing purpose), remov
 
 #### Scenario: An equipped copy is not sellable
 - **WHEN** the seller's only copy of an item is equipped
-- **THEN** the sale is rejected with `item_equipped` and nothing changes
+- **THEN** the sale is rejected with the existing `equipped_item` refusal and nothing changes
 
 ### Requirement: Possession keeps the shop refusal
 Every purchase and sale requested while the player is possessing a companion SHALL keep the existing `possessed_shop` refusal, whatever recipient or seller is named.

@@ -302,7 +302,10 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_busy_merchant_rejects_buy_without_a_transaction(self):
         self.player.location = self.store
         self.merchant_npc.db.schedule_state = "busy"
-        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIn("她現在正忙著", result["message"])
@@ -314,7 +317,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.location = self.store
         self.player.db.inventory = [_T_MEAL, _T_MEAL]
         self.merchant_npc.db.schedule_state = "resting"
-        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
+        result = _sell_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertEqual(self.player.db.wallet, 1000)
@@ -475,7 +481,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         self.player.location = self.store
         self.player.db.wallet = 1000
-        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "bought")
         floor, _ceiling = price_band(_T_MEAL)
@@ -490,7 +499,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.location = self.store
         self.player.db.wallet = 5
         before = list(self.player.db.inventory or [])
-        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_funds")
         self.assertEqual(self.player.db.wallet, 5)
@@ -499,14 +511,20 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_buy_rejects_insufficient_stock(self):
         self.player.location = self.store
         self.player.db.wallet = 10000
-        result = _buy_adapter(self.player, {"item_key": _T_POTION, "quantity": 4})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_POTION, "quantity": 4, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_stock")
 
     def test_buy_rejects_closed_shop(self):
         self.player.location = self.store
         get_world_clock()._persist(TICK_NIGHT)
-        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "closed")
 
@@ -514,7 +532,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.location = self.store
         self.merchant.merchant_stock = {_T_MEAL: 10, _T_POTION: 3, _T_SWORD: 1}
         self.player.db.inventory = [_T_MEAL, _T_MEAL]
-        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
+        result = _sell_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "sold")
         floor, _ceiling = price_band(_T_MEAL)
@@ -526,7 +547,10 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_sell_rejects_insufficient_items(self):
         self.player.location = self.store
         self.player.db.inventory = [_T_MEAL]
-        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
+        result = _sell_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 2, "seller_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_items")
 
@@ -534,16 +558,84 @@ class ServiceAdapterTests(ServiceActionBase):
         self.player.location = self.store
         self.merchant.merchant_stock = {_T_MEAL: 20, _T_POTION: 3, _T_SWORD: 3}
         self.player.db.inventory = [_T_SWORD, _T_SWORD]
-        result = _sell_adapter(self.player, {"item_key": _T_SWORD, "quantity": 1})
+        result = _sell_adapter(
+            self.player,
+            {"item_key": _T_SWORD, "quantity": 1, "seller_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "stock_overflow")
 
     def test_buy_rejects_without_local_merchant(self):
         self._register()
         self.player.location = self.hall
-        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+        )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_merchant")
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+    )
+    def test_buy_adapter_fills_the_named_companion_from_the_party_purse(self):
+        from world.rules.party import join_party
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 1000
+        companion = create_object(NPC, key="艾拉", location=self.store)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk},
+        )
+        self.assertEqual(result["outcome"], "success")
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, 1000 - 2 * (floor + 2))
+        self.assertEqual(list_items(companion), [_T_MEAL, _T_MEAL])
+        self.assertEqual(list_items(self.player), [])
+
+    def test_buy_adapter_refuses_a_forged_recipient_without_mutation(self):
+        self.player.location = self.store
+        outsider = create_object(NPC, key="路人", location=self.store)
+        wallet_before = self.player.db.wallet
+        result = _buy_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": outsider.pk},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "not_party_member")
+        self.assertEqual(self.player.db.wallet, wallet_before)
+        self.assertEqual(list(self.player.db.inventory or []), [])
+        self.assertEqual(list(outsider.db.inventory or []), [])
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+    )
+    def test_sell_adapter_sells_the_named_companion_and_credits_the_purse(self):
+        from world.rules.party import join_party
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 0
+        self.merchant.merchant_stock = {_T_MEAL: 10, _T_POTION: 3, _T_SWORD: 1}
+        companion = create_object(NPC, key="卡恩", location=self.store)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        companion.db.inventory = [_T_MEAL, _T_MEAL]
+        result = _sell_adapter(
+            self.player,
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": companion.pk},
+        )
+        self.assertEqual(result["outcome"], "success")
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, floor)
+        self.assertEqual(list_items(companion), [_T_MEAL])
+        self.assertEqual(list_items(self.player), [])
 
 
     def test_validate_quest_track_payload(self):
@@ -606,21 +698,30 @@ class ServiceAdapterTests(ServiceActionBase):
 
     def test_tampered_host_like_payload_rejected_by_validator(self):
         from web.webclient.actions.service_actions import validate_buy_payload
+        from web.webclient.actions.service_actions import validate_sell_payload
         from web.webclient.actions.service_actions import ServiceActionError
 
         for bad in (
-            {"item_key": _T_MEAL, "quantity": 1, "host": "1234"},
-            {"item_key": _T_MEAL, "quantity": 1, "branch": BRANCH},
-            {"item_key": _T_MEAL, "quantity": 1, "price": 5},
-            {"item_key": _T_MEAL, "quantity": 1, "actor": "player"},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "host": "1234"},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "branch": BRANCH},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "price": 5},
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1, "actor": "player"},
             {"item_key": _T_MEAL},
-            {"item_key": _T_MEAL, "quantity": 0},
-            {"item_key": _T_MEAL, "quantity": 1001},
-            {"item_key": _T_MEAL, "quantity": True},
-            {"item_key": _T_MEAL, "quantity": "3"},
+            {"item_key": _T_MEAL, "quantity": 0, "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": 1001, "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": True, "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": "3", "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": 1},
         ):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_buy_payload(bad)
+        for bad in (
+            {"item_key": _T_MEAL, "quantity": 1, "recipient_id": 1},
+            {"item_key": _T_MEAL, "quantity": 1, "seller_id": 1, "wallet": 5},
+            {"item_key": _T_MEAL, "quantity": 1},
+        ):
+            with self.assertRaises(ServiceActionError, msg=bad):
+                validate_sell_payload(bad)
 
 
 class ExamRequestTests(ServiceActionBase):
@@ -840,7 +941,11 @@ class ServiceDispatchTests(ServiceActionBase):
         handle_ui_action(
             self.session,
             self.player,
-            self._envelope(coordinator, "shop.buy", {"item_key": _T_MEAL, "quantity": 1}),
+            self._envelope(
+                coordinator,
+                "shop.buy",
+                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+            ),
             self.action_registry,
             self.registry,
         )
@@ -865,7 +970,13 @@ class ServiceDispatchTests(ServiceActionBase):
             self.session,
             self.player,
             self._envelope(
-                coordinator, "shop.buy", {"item_key": _T_POTION, "quantity": 1}
+                coordinator,
+                "shop.buy",
+                {
+                    "item_key": _T_POTION,
+                    "quantity": 1,
+                    "recipient_id": self.player.pk,
+                },
             ),
             self.action_registry,
             self.registry,
@@ -886,7 +997,11 @@ class ServiceDispatchTests(ServiceActionBase):
         handle_ui_action(
             self.session,
             self.player,
-            self._envelope(coordinator, "shop.buy", {"item_key": _T_MEAL, "quantity": 1}),
+            self._envelope(
+                coordinator,
+                "shop.buy",
+                {"item_key": _T_MEAL, "quantity": 1, "recipient_id": self.player.pk},
+            ),
             self.action_registry,
             self.registry,
         )

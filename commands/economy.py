@@ -1,5 +1,7 @@
 """Player-facing shop stock, buy, and sell commands."""
 
+from typing import Any
+
 from commands.command import Command
 
 from typeclasses.components import Merchant
@@ -20,6 +22,7 @@ from world.rules.service_gate import (
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.npc_schedules import interaction_reason
+from world.rules.party_scope import PartyScopeError, resolve_member_token
 from world.skills.equipment import list_items
 
 
@@ -50,6 +53,25 @@ class _ShopCommandBase(Command):
     locks = "cmd:all()"
     help_category = "Economy"
 
+    def refuse_possessed_trade(self) -> bool:
+        """Refuse a trade requested while the player possesses a companion.
+
+        The web adapters already answer this request with the shared
+        ``possessed_shop`` line; the text client keeps the same refusal so
+        both transports behave identically, before any host resolution or
+        argument parsing and whatever member the line names.
+        """
+        from world.rules.possession import (
+            POSSESSED_REFUSAL_MESSAGES,
+            REASON_POSSESSED_SHOP,
+            is_possessed_actor,
+        )
+
+        if not is_possessed_actor(self.caller):
+            return False
+        self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP])
+        return True
+
     def resolve_merchant(self):
         try:
             from world.rules.guild import resolve_local_service_host
@@ -59,16 +81,27 @@ class _ShopCommandBase(Command):
             self.caller.msg("這裡沒有商人。")
             return None
 
-    def _parse_trade_args(self, usage_verb: str) -> tuple[str, int] | None:
-        """Parse ``<item_key> [數量]`` from ``self.args``, messaging on failure.
+    def _parse_trade_args(
+        self, usage_verb: str
+    ) -> tuple[str, int, Any] | None:
+        """Parse ``<item_key> [數量] [= <成員>]``, messaging on failure.
 
-        An empty command line reports the usage line (embedding the ENGLISH
-        command key) and a non-integer quantity reports the canonical
-        ``數量必須是正整數。`` rejection; either returns ``None``.
+        The ``= <成員>`` suffix is reserved syntax split first, exactly like
+        裝備: everything after the ``=`` names the member, and the ordinary
+        ``item [quantity]`` parse runs on the left side. An empty suffix never
+        falls back to the caller, and an unknown or ambiguous token rejects
+        with the shared party message. An empty command line reports the usage
+        line (embedding the ENGLISH command key) and a non-integer quantity
+        reports the canonical ``數量必須是正整數。`` rejection; either returns
+        ``None``. The member is ``None`` when the suffix is absent, meaning
+        the caller.
         """
-        parts = self.args.strip().split()
+        item_part, separator, member_token = self.args.partition("=")
+        parts = item_part.strip().split()
         if not parts:
-            self.caller.msg(f"用法：{usage_verb} <item_key> [數量]")
+            self.caller.msg(
+                f"用法：{usage_verb} <item_key> [數量] [= <成員>]"
+            )
             return None
         item_key = parts[0]
         try:
@@ -76,7 +109,14 @@ class _ShopCommandBase(Command):
         except ValueError:
             self.caller.msg("數量必須是正整數。")
             return None
-        return item_key, quantity
+        member: Any = None
+        if separator:
+            try:
+                member = resolve_member_token(self.caller, member_token)
+            except PartyScopeError as error:
+                self.caller.msg(error.message)
+                return None
+        return item_key, quantity, member
 
     def _trade_error_message(
         self,
@@ -137,12 +177,14 @@ class CmdShopStock(_ShopCommandBase):
 
 
 class CmdBuy(_ShopCommandBase):
-    """Buy an item from the merchant."""
+    """Buy an item from the merchant into the named member's bag."""
 
     key = "buy"
-    aliases = ("購買", "shop buy")
+    aliases = ("購買", "買", "shop buy")
 
     def func(self) -> None:
+        if self.refuse_possessed_trade():
+            return
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
             return
@@ -153,9 +195,15 @@ class CmdBuy(_ShopCommandBase):
         parsed = self._parse_trade_args("buy")
         if parsed is None:
             return
-        item_key, quantity = parsed
+        item_key, quantity, member = parsed
+        recipient_id = int(member.pk) if member is not None else int(self.caller.pk)
         try:
-            result = buy(self.caller, merchant_host, item_key, quantity)
+            result = buy(
+                self.caller, merchant_host, item_key, quantity, recipient_id
+            )
+        except PartyScopeError as error:
+            self.caller.msg(error.message)
+            return
         except TradeError as error:
             self.caller.msg(
                 self._trade_error_message(error, BUY_ERROR_MESSAGES, "購買")
@@ -168,12 +216,14 @@ class CmdBuy(_ShopCommandBase):
 
 
 class CmdSell(_ShopCommandBase):
-    """Sell a held item to the merchant."""
+    """Sell the named member's unequipped item to the merchant."""
 
     key = "sell"
-    aliases = ("販賣", "shop sell")
+    aliases = ("販賣", "賣", "shop sell")
 
     def func(self) -> None:
+        if self.refuse_possessed_trade():
+            return
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
             return
@@ -184,9 +234,15 @@ class CmdSell(_ShopCommandBase):
         parsed = self._parse_trade_args("sell")
         if parsed is None:
             return
-        item_key, quantity = parsed
+        item_key, quantity, member = parsed
+        seller_id = int(member.pk) if member is not None else int(self.caller.pk)
         try:
-            result = sell(self.caller, merchant_host, item_key, quantity)
+            result = sell(
+                self.caller, merchant_host, item_key, quantity, seller_id
+            )
+        except PartyScopeError as error:
+            self.caller.msg(error.message)
+            return
         except TradeError as error:
             self.caller.msg(
                 self._trade_error_message(error, SELL_ERROR_MESSAGES, "販賣")

@@ -297,7 +297,7 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
   or drop action
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-The existing service action allowlist and exact bounded payloads SHALL remain. A party member reference SHALL appear only in the exact member-scoped `actor_id` its owning capability defines, reauthorized by the rules and never replaced by the commander. `guild.quest_abandon` SHALL revalidate the authenticated owner and record; an active private escort MAY abandon without a guild host through the quest-owned compensated operation. No other action ID or authority field SHALL be added.
+The existing service action allowlist and exact bounded payloads SHALL remain. Party member references SHALL appear only in the exact member-scoped fields their owning capabilities define, reauthorized by the rules and never replaced by the commander. `guild.quest_abandon` SHALL revalidate the authenticated owner and record; private escort abandonment needs no host, while ordinary guild actions retain their gates. No other action ID or host field SHALL be added.
 
 #### Scenario: Existing registration reaches its deterministic API once
 - **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
@@ -324,8 +324,8 @@ The existing service action allowlist and exact bounded payloads SHALL remain. A
 - **THEN** exact validation or the coordinator rejects before any exam creation and only the exact next-rank payload is accepted
 
 #### Scenario: Existing buy and sell submit only item and quantity
-- **WHEN** a client submits `shop.buy` with item key and quantity only
-- **THEN** the adapter re-resolves and rechecks the local merchant before calling deterministic economy settlement
+- **WHEN** a client submits `shop.buy` with item key, quantity and `recipient_id` only
+- **THEN** the adapter re-resolves and rechecks the local merchant and reauthorizes the recipient before calling deterministic economy settlement
 
 #### Scenario: Inventory use submits only item key
 - **WHEN** a client submits `inventory.use` with one item key and the user's `actor_id`
@@ -347,7 +347,7 @@ The existing service action allowlist and exact bounded payloads SHALL remain. A
 - **WHEN** any service action payload is validated
 - **THEN** `guild.register` accepts exactly an empty payload, guild quest and exam actions retain their exact
   bounded identifiers, `guild.quest_track` accepts exactly `quest_id` (the shared bounded quest identifier) and
-  boolean `tracked`, and `shop.buy` and `shop.sell` retain exactly bounded `item_key` and integer `quantity`
+  boolean `tracked`, `shop.buy` accepts exactly bounded `item_key`, integer `quantity` and `recipient_id`, and `shop.sell` accepts exactly bounded `item_key`, integer `quantity` and `seller_id`
 
 #### Scenario: Registration idempotency is retained
 - **WHEN** registration is submitted again after the actor is already registered
@@ -528,7 +528,7 @@ combat bag drawer, and direct equipment toggle.
 
 #### Scenario: Shop buy journey completes by keyboard in the frameless drawer
 - **WHEN** a player opens the shop drawer from the merchant's navigate row, Tabs to the first stock row's quantity entry, types a quantity above the row's advertised maximum and Tabs away, then replaces it with a quantity within bounds, Tabs to the row's buy control, and presses Enter
-- **THEN** leaving the entry clamps the out-of-bounds value to the advertised maximum and sends nothing, exactly one `shop.buy` is sent only on the buy control's activation with the row's `item_key` and the corrected quantity, the wallet decreases by exactly that quantity times the row's `buy_copper`, and no `dock-menu` or `dock-detail` element renders inside the shop drawer at any step
+- **THEN** leaving the entry clamps the out-of-bounds value to the advertised maximum and sends nothing, exactly one `shop.buy` is sent only on the buy control's activation with the row's `item_key`, the corrected quantity and the recipient's `recipient_id`, the wallet decreases by exactly that quantity times the row's `buy_copper`, and no `dock-menu` or `dock-detail` element renders inside the shop drawer at any step
 
 #### Scenario: Abandon requires confirmation
 - **WHEN** the player focuses or points to active-quest abandon before confirmation

@@ -353,7 +353,8 @@ class PossessionPresentationTests(EvenniaTest):
         })
 
     @covers_requirement(
-        "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results"
+        "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results",
+        "shop-economy::possession-keeps-the-shop-refusal",
     )
     def test_dispatcher_refuses_possession_incompatible_actions(self):
         """Shop buy/sell and talk/engage return zero-write rejections while possessed."""
@@ -362,7 +363,14 @@ class PossessionPresentationTests(EvenniaTest):
         inv_before = list(self.npc.db.inventory)
 
         # shop.buy refusal
-        buy_res = _buy_adapter(self.npc, {"item_key": "t_possession_ration", "quantity": 1})
+        buy_res = _buy_adapter(
+            self.npc,
+            {
+                "item_key": "t_possession_ration",
+                "quantity": 1,
+                "recipient_id": self.player.pk,
+            },
+        )
         self.assertEqual(buy_res["outcome"], "rejected")
         self.assertEqual(buy_res["code"], REASON_POSSESSED_SHOP)
         self.assertEqual(buy_res["message"], POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP])
@@ -370,7 +378,14 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(list(self.npc.db.inventory), inv_before)
 
         # shop.sell refusal
-        sell_res = _sell_adapter(self.npc, {"item_key": "t_possession_ration", "quantity": 1})
+        sell_res = _sell_adapter(
+            self.npc,
+            {
+                "item_key": "t_possession_ration",
+                "quantity": 1,
+                "seller_id": self.player.pk,
+            },
+        )
         self.assertEqual(sell_res["outcome"], "rejected")
         self.assertEqual(sell_res["code"], REASON_POSSESSED_SHOP)
         self.assertEqual(self.player.db.wallet, wallet_before)

@@ -20,6 +20,7 @@ describe("ShopPanel (B4 world / services family)", () => {
     wrapper = mount(ShopPanel, {
       props: {
         services: SERVICES_PANEL_SAMPLE,
+        actorId: 7,
         ...props,
       },
     });
@@ -88,7 +89,10 @@ describe("ShopPanel (B4 world / services family)", () => {
     qty.setValue(3);
     await row.find(".shop-row__buy").trigger("click");
     expect(w.emitted("buy")).toEqual([
-      [{ action_id: "shop.buy", payload: { item_key: "item_iron_sword", quantity: 3 } }],
+      [{
+        action_id: "shop.buy",
+        payload: { item_key: "item_iron_sword", quantity: 3, recipient_id: 7 },
+      }],
     ]);
 
    // Out-of-bounds quantities set without a change event are not emitted (no invented values).
@@ -96,7 +100,10 @@ describe("ShopPanel (B4 world / services family)", () => {
    await qty.trigger("input");
     await row.find(".shop-row__buy").trigger("click");
     expect(w.emitted("buy")).toEqual([
-      [{ action_id: "shop.buy", payload: { item_key: "item_iron_sword", quantity: 3 } }],
+      [{
+        action_id: "shop.buy",
+        payload: { item_key: "item_iron_sword", quantity: 3, recipient_id: 7 },
+      }],
     ]);
   });
 
@@ -191,15 +198,37 @@ describe("ShopPanel (B4 world / services family)", () => {
     qty.setValue(2);
     await sellable.find(".shop-row__sell").trigger("click");
     expect(w.emitted("sell")).toEqual([
-      [{ action_id: "shop.sell", payload: { item_key: "item_herb_moon", quantity: 2 } }],
+      [{
+        action_id: "shop.sell",
+        payload: { item_key: "item_herb_moon", quantity: 2, seller_id: 7 },
+      }],
     ]);
    // Above the held-count bound set without a change event: not emitted.
    qty.element.value = "4";
    await qty.trigger("input");
     await sellable.find(".shop-row__sell").trigger("click");
     expect(w.emitted("sell")).toEqual([
-      [{ action_id: "shop.sell", payload: { item_key: "item_herb_moon", quantity: 2 } }],
+      [{
+        action_id: "shop.sell",
+        payload: { item_key: "item_herb_moon", quantity: 2, seller_id: 7 },
+      }],
     ]);
+  });
+
+  it("emits nothing when the controlled figure's identity is unavailable", async () => {
+    // A missing status identity never invents a member: both trades stay
+    // silent rather than naming the commander in the controlled figure's place.
+    for (const actorId of [null, 0, -1, 1.5]) {
+      const w = mountPanel({ actorId });
+      const stockRow = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
+      await stockRow.find(".shop-row__buy").trigger("click");
+      expect(w.emitted("buy")).toBeUndefined();
+      const sellRow = w.get('[data-testid="shop-panel__sellable--item_herb_moon"]');
+      await sellRow.find(".shop-row__sell").trigger("click");
+      expect(w.emitted("sell")).toBeUndefined();
+      w.unmount();
+      wrapper = null;
+    }
   });
 
   it("omits the wallet line (H4 task 7.1: the wallet now lives in CharacterStatusDrawer — the single wallet rendering)", () => {
