@@ -222,6 +222,10 @@ def build_production_registry() -> PresentationRegistry:
         PARTY_SCHEMA_VERSION,
         party_presenter,
     )
+    from web.webclient.presentation.party_member import (
+        PARTY_MEMBER_SCHEMA_VERSION,
+        party_member_presenter,
+    )
     from web.webclient.presentation.possession_banner import (
         POSSESSION_BANNER_SCHEMA_VERSION,
         possession_banner_presenter,
@@ -294,6 +298,17 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=PARTY_SCHEMA_VERSION,
             unavailable_reason=("party_unavailable", "隊伍資訊目前無法顯示"),
             presenter=party_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="party_member",
+            schema_version=PARTY_MEMBER_SCHEMA_VERSION,
+            unavailable_reason=(
+                "party_member_unavailable",
+                "隊伍成員資訊目前無法顯示",
+            ),
+            presenter=party_member_presenter,
         )
     )
     registry.register(

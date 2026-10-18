@@ -367,6 +367,16 @@ var PARTY_MAX_SLOTS = 16;
 var PARTY_MAX_ROWS = 17;
 var PARTY_MAX_COMMISSION_LABEL = 128;
 var PARTY_MAX_DISPLAY_NAME = 128;
+// party_member panel bounds (mirror of
+// web.webclient.presentation.party_member, party-member-panel): the viewed
+// member's exact member-tab facts. Persona prose reuses the shared
+// persona-field cap, the bond stage reuses the party display-name bound, and a
+// disabled action reason is one existing fixed verdict line bounded like every
+// action-result message.
+var PARTY_MEMBER_SCHEMA_VERSION = 1;
+var PARTY_MEMBER_MAX_PERSONA_FIELD = 600;
+var PARTY_MEMBER_MAX_BOND_STAGE = 128;
+var PARTY_MEMBER_MAX_REASON = 512;
 
 // Objectives panel bounds (mirror of web.webclient.presentation.objectives,
 // webclient-align-06): at most three tracked quest rows; the row cap mirrors
@@ -454,6 +464,7 @@ var PANEL_ALLOWLIST = {
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
   party: PARTY_SCHEMA_VERSION,
+  party_member: PARTY_MEMBER_SCHEMA_VERSION,
   objectives: 1,
   services: 6,
   creation: 6,
@@ -667,6 +678,10 @@ module.exports = {
   PARTY_MAX_ROWS: PARTY_MAX_ROWS,
   PARTY_MAX_COMMISSION_LABEL: PARTY_MAX_COMMISSION_LABEL,
   PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
+  PARTY_MEMBER_SCHEMA_VERSION: PARTY_MEMBER_SCHEMA_VERSION,
+  PARTY_MEMBER_MAX_PERSONA_FIELD: PARTY_MEMBER_MAX_PERSONA_FIELD,
+  PARTY_MEMBER_MAX_BOND_STAGE: PARTY_MEMBER_MAX_BOND_STAGE,
+  PARTY_MEMBER_MAX_REASON: PARTY_MEMBER_MAX_REASON,
   OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,
   OBJECTIVES_MAX_ROWS: OBJECTIVES_MAX_ROWS,
   OBJECTIVES_MAX_QUEST_ID: OBJECTIVES_MAX_QUEST_ID,

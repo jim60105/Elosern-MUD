@@ -176,4 +176,8 @@ def _party_view_member_adapter(
     select_party_view(session, commander_id, member_id, payload["tab"])
     if payload["tab"] == "skills":
         mark_unlocks_seen(session, member_id)
-    return _success("viewing_member", "已選擇檢視的隊伍成員。", ("party",))
+    return _success(
+        "viewing_member",
+        "已選擇檢視的隊伍成員。",
+        ("party", "party_member"),
+    )

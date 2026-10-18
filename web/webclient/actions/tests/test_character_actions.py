@@ -176,7 +176,7 @@ class PersonaUpdateRegistryWiringTests(unittest.TestCase):
             validate_character_persona_update_payload,
         )
         self.assertIs(adapter, _character_persona_update_adapter)
-        self.assertEqual(spec.affected_panels, ("character",))
+        self.assertEqual(spec.affected_panels, ("character", "party_member"))
 
 
 if __name__ == "__main__":

@@ -36,8 +36,9 @@ PERSONA_FIELD_LABELS: dict[str, str] = {
     "background": "背景",
 }
 
-# A successful update re-renders the character drawer's persona sections.
-AFFECTED_CHARACTER = ("character",)
+# A successful update re-renders the character drawer's persona sections and
+# the party window's commander member-tab facts.
+AFFECTED_CHARACTER = ("character", "party_member")
 
 
 class CharacterActionError(ValueError):

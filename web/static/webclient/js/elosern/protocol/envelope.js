@@ -83,6 +83,7 @@ var PANEL_VALIDATORS = {
   context_actions: combat.validateContextActionsPanel,
   local_map: localMap.validateLocalMapPanel,
   party: misc.validatePartyPanel,
+  party_member: misc.validatePartyMemberPanel,
   objectives: misc.validateObjectivesPanel,
   quest_log: misc.validateQuestLogPanel,
   dialogue: misc.validateDialoguePanel,
