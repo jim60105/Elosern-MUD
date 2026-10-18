@@ -163,7 +163,7 @@ class PartyInventoryViewTests(BattlefieldIsolation, EvenniaTestCase):
         return monster
 
     @covers_requirement(
-        "webclient-party-inventory-panel::equipment-reflects-the-viewed-members-worn-slots"
+        "webclient-party-inventory-panel::equipment-reflects-the-viewed-member-s-worn-slots"
     )
     @covers_requirement(
         "webclient-party-inventory-panel::bag-rows-carry-presentation-and-server-authored-descriptors"

@@ -634,7 +634,7 @@ def _scope_reason(commander: Any, member: Any, purpose: str) -> str | None:
     """The member boundary's fixed refusal line, or ``None`` when admitted."""
     try:
         authorize_member(commander, int(member.pk), purpose)
-    except PartyScopeError as error:
+    except PartyScopeError as error:  # observability: ignore R2: the boundary verdict becomes the descriptor's fixed refusal line; no state or I/O is involved
         return PARTY_SCOPE_MESSAGES[error.reason]
     return None
 
@@ -714,7 +714,7 @@ def _combat_item_choices(member: Any) -> tuple[dict[str, Any], str | None]:
             return {}, session_reason_message(str(SessionReason.NO_ACTIVE_SESSION))
         battlefield = reconstruct_battlefield(commander, record)
         authorize_combat_actor(commander, member, record, battlefield)
-    except CombatSessionError as error:
+    except CombatSessionError as error:  # observability: ignore R2: an unreadable session degrades to a disabled descriptor carrying the session's own fixed message; the presenter publishes it
         code = (
             str(error.args[0])
             if error.args

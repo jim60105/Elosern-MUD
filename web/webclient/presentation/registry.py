@@ -226,6 +226,10 @@ def build_production_registry() -> PresentationRegistry:
         PARTY_MEMBER_SCHEMA_VERSION,
         party_member_presenter,
     )
+    from web.webclient.presentation.party_inventory import (
+        PARTY_INVENTORY_SCHEMA_VERSION,
+        party_inventory_presenter,
+    )
     from web.webclient.presentation.possession_banner import (
         POSSESSION_BANNER_SCHEMA_VERSION,
         possession_banner_presenter,
@@ -309,6 +313,16 @@ def build_production_registry() -> PresentationRegistry:
                 "隊伍成員資訊目前無法顯示",
             ),
             presenter=party_member_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="party_inventory",
+            schema_version=PARTY_INVENTORY_SCHEMA_VERSION,
+            # The delta pins the panel to the registered COMMON unavailable
+            # form (shared reason and semantics), not a bespoke reason.
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=party_inventory_presenter,
         )
     )
     registry.register(
