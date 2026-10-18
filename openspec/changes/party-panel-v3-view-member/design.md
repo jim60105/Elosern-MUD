@@ -16,11 +16,11 @@ See proposal.md. `party.py` builds v2 rows from `live_companions(owner)` (owner 
 - **knocked_out** reuses the `party-member-authority` predicate (companion stored HP at or below 1); always false for the commander row.
 - **Selection store** `session.ndb.party_view = PartyViewSelection(commander_id, member_id, tab)`. Unlike the combat actor selection it is *not* retired on unpuppet, because possession unpuppets the owner and the window must stay identical; it is bound to the commander id and dropped with the session. The coordinator copies it into `PresentationContext.party_view`; `resolve_viewed_member(context)` returns the live member when still effective, else the commander.
 - **Action** `party.view_member` validates exactly `{member_id, tab}`, authorizes membership only, writes the selection, calls `mark_unlocks_seen` for `tab == "skills"`, and returns success with `affected_panels=("party",)`; each later protocol change appends its viewed-member panel to this tuple.
-- **Bounds**: rows ≤ 17 (commander + `PARTY_MAX_SLOTS`), 15 fields per row; the validator keeps the canonical byte bound and a maximal-row fixture proves it.
+- **Bounds**: rows ≤ 17 (commander + `PARTY_MAX_SLOTS`), 14 fields per row (identity, display name, portrait reference, the three gauge pairs, role, knocked-out, unread, bond stage, membership); the validator keeps the canonical byte bound. A maximum-row-count fixture proves the full roster fits, and a separate oversized-metadata case proves the byte guard still rejects a hostile payload.
 
 ## Risks / Trade-offs
 
-- [Existing consumers assume companions only] → All JS consumers filter `role === "companion"`; Vitest covers lineup and drawer.
+- [Existing consumers assume companions only] → Every JS consumer skips the commander row through the shared `companionRows` predicate (it excludes `role === "commander"` because transformed display figures carry no role); Vitest covers lineup, drawer, plates and the presence rail.
 - [Selection on a second browser session] → Per-session by design; each session has its own viewed member.
 
 ## Migration Plan

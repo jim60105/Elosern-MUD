@@ -144,7 +144,7 @@ The production registry SHALL register `party.view_member` accepting exactly `{m
 
 #### Scenario: Selecting a companion republishes the party panel
 - **WHEN** the player selects 艾拉 on the member rail
-- **THEN** one success result is followed by an update whose `party.viewed_member_id` is 艾拉's identity, and no gameplay state changes
+- **THEN** one party update at a new revision carrying 艾拉's identity as `party.viewed_member_id` is followed by one success result naming the same revision, and no gameplay state changes
 
 #### Scenario: A forged member is refused, not substituted
 - **WHEN** `party.view_member` names an NPC outside the party
