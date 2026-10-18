@@ -18,21 +18,20 @@ from typing import Any
 from commands.command import Command
 from commands.localized.general import NumberedTargetCommand
 
-from world.lore.items import ITEM_REGISTRY
 from world.rules.combat_result import settle_to_messages
 from world.rules.combat_session import (
     CombatSessionError,
     is_in_active_session,
     submit_player_item_use,
 )
-from world.rules.equipment import toggle_equipment
-from world.rules.equipment_effects import equipment_adjustment_text
+from world.rules.equipment_effects import toggle_equipment_message
 from world.rules.event_log import render_plain_text
 from world.rules.items import use_item
 from world.rules.npc_identity import npc_display_name
 from world.rules.party_inventory import (
     PartyTransferError,
     resolve_item_token,
+    toggle_member_equipment,
     transfer_item,
 )
 from world.rules.party_scope import (
@@ -43,33 +42,6 @@ from world.rules.party_scope import (
 from world.rules.player_messages import session_reason_message
 from world.rules.quest_delivery import item_display_name
 from world.rules.service_messages import rejection_message
-
-
-def _item_display_name(item_key: str) -> str:
-    definition = ITEM_REGISTRY.get(item_key)
-    return definition.display_name_zh if definition is not None else item_key
-
-
-def _toggle_message(result, item_key: str) -> str:
-    """Render the accepted equipment toggle in the shared command prose.
-
-    Equip actions append the server-formatted adjustment summary (P3 D4);
-    unequip actions keep the plain line since nothing new is gained.
-    """
-    display = _item_display_name(item_key)
-    prose = equipment_adjustment_text(item_key)
-    if result.action == "unequip-singleton":
-        return f"你卸下了 {display}。"
-    if result.action == "unequip-accessory":
-        return f"你除下了 {display}。"
-    if result.action == "equip-accessory":
-        return f"你佩戴了 {display}" + (f"（{prose}）" if prose else "") + "。"
-    if result.replaced_key is not None:
-        base = f"你裝備了 {display}，原本的 {_item_display_name(result.replaced_key)} 已收回背包。"
-        if prose:
-            return f"你裝備了 {display}（{prose}），原本的 {_item_display_name(result.replaced_key)} 已收回背包。"
-        return base
-    return f"你裝備了 {display}" + (f"（{prose}）" if prose else "") + "。"
 
 
 class CmdUseItem(Command):
@@ -130,7 +102,16 @@ class CmdUseItem(Command):
 
 
 class CmdToggleEquip(Command):
-    """Equip or unequip one held equipment item (a free action)."""
+    """裝備或卸下一件裝備（免費動作）
+
+    用法：
+      裝備 <物品> [= <成員>]
+
+    裝備或卸下自己或一名同行隊伍成員身上的裝備；指定成員時以「=」分隔。
+    成員可以是倒地的同伴，因為整理裝備不是行動。這是免費動作：探索與戰鬥中
+    都不消耗時間或回合。成員不在場或不屬於你的隊伍時以固定語句拒絕，且不會
+    改變任何人的裝備。
+    """
 
     key = "裝備"
     aliases = ("equip",)
@@ -138,15 +119,31 @@ class CmdToggleEquip(Command):
     help_category = "General"
 
     def func(self) -> None:
-        item_key = self.args.strip().partition(" ")[0]
+        item_part, separator, member_token = self.args.partition("=")
+        item_key = item_part.strip().partition(" ")[0]
         if not item_key:
-            self.caller.msg("用法：裝備 <item_key>")
+            self.caller.msg("用法：裝備 <物品> [= <成員>]")
             return
-        result = toggle_equipment(self.caller, item_key)
+        member = self.caller
+        if separator:
+            try:
+                member = resolve_member_token(self.caller, member_token)
+            except PartyScopeError as error:
+                self.caller.msg(error.message)
+                return
+        try:
+            outcome = toggle_member_equipment(self.caller, member.pk, item_key)
+        except PartyScopeError as error:
+            self.caller.msg(error.message)
+            return
+        result = outcome.result
         if result.outcome != "success":
             self.caller.msg(rejection_message(result.reason))
             return
-        self.caller.msg(_toggle_message(result, item_key))
+        subject = "你" if outcome.member is self.caller else npc_display_name(
+            outcome.member
+        )
+        self.caller.msg(toggle_equipment_message(result, item_key, subject))
 
 
 class CmdRetrieve(NumberedTargetCommand):

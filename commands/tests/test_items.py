@@ -22,6 +22,8 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 
 from commands.items import CmdToggleEquip, CmdUseItem
+from typeclasses.npcs import NPC
+from typeclasses.rooms import Room
 from world.lore.items import (
     EquipmentModifierKey,
     ItemDefinition,
@@ -34,6 +36,12 @@ from world.rules.combat_session import engage, read_session
 from world.rules.equipment import EquipmentToggleReason
 from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.items import ItemUseReason
+from world.rules.party import join_party
+from world.rules.party_scope import (
+    PARTY_SCOPE_MESSAGES,
+    REASON_MEMBER_NOT_PRESENT,
+    REASON_NOT_PARTY_MEMBER,
+)
 from world.rules.service_messages import rejection_message
 from world.rules.item_effects import (
     GaugeAdjustEffect,
@@ -203,7 +211,7 @@ class _ItemsCommandBase(EvenniaCommandTest):
 class ExplorationUseTests(_ItemsCommandBase):
     def test_usage_hints_without_arguments(self):
         self.call(CmdUseItem(), "", "用法：使用 <item_key>")
-        self.call(CmdToggleEquip(), "", "用法：裝備 <item_key>")
+        self.call(CmdToggleEquip(), "", "用法：裝備 <物品> [= <成員>]")
 
     def test_exploration_use_heals_and_consumes_one_of_two(self):
         # The restored amount is clamped to the missing HP: missing 20 is
@@ -253,6 +261,14 @@ class ExplorationUseTests(_ItemsCommandBase):
 
 
 class EquipmentToggleCommandTests(_ItemsCommandBase):
+    def _companion(self, key="艾拉"):
+        npc = create_object(NPC, key=key, location=self.room1, home=self.room1)
+        npc.race = _race_key()
+        npc.apply_race_baseline()
+        npc.db.inventory = []
+        join_party(npc, self.player)
+        return npc
+
     def test_singleton_equip_then_replace_states_the_returned_item(self):
         self.player.db.inventory = [_BLADE.key, _BLADE_B.key]
         self.call(
@@ -317,6 +333,84 @@ class EquipmentToggleCommandTests(_ItemsCommandBase):
             caller=self.player,
         )
         self.assertIsNone(self.player.db.equipment)
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_named_member_toggles_that_members_equipment(self):
+        companion = self._companion()
+        companion.db.inventory = [_BLADE.key]
+        self.player.db.inventory = [_BLADE.key]
+        self.call(
+            CmdToggleEquip(),
+            f"{_BLADE.key} = {companion.key}",
+            f"{companion.key}裝備了 {_BLADE.display_name_zh}{_equip_prose(_BLADE)}。",
+            caller=self.player,
+        )
+        self.assertEqual(companion.db.equipment["weapon_main"], _BLADE.key)
+        # The commander's own equipment is never the substitute target.
+        self.assertIsNone(self.player.db.equipment)
+        self.call(
+            CmdToggleEquip(),
+            f"{_BLADE.key} = {companion.key}",
+            f"{companion.key}卸下了 {_BLADE.display_name_zh}。",
+            caller=self.player,
+        )
+        self.assertIsNone(companion.db.equipment["weapon_main"])
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_member_refusals_render_the_shared_party_lines(self):
+        companion = self._companion()
+        companion.db.inventory = [_BLADE.key]
+        self.call(
+            CmdToggleEquip(),
+            f"{_BLADE.key} = 路人",
+            PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER],
+            caller=self.player,
+        )
+        companion.location = create_object(Room, key="測試遠方房間")
+        self.call(
+            CmdToggleEquip(),
+            f"{_BLADE.key} = {companion.key}",
+            PARTY_SCOPE_MESSAGES[REASON_MEMBER_NOT_PRESENT],
+            caller=self.player,
+        )
+        self.assertIsNone(companion.db.equipment)
+        self.assertEqual(list_items(companion), [_BLADE.key])
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_text_and_action_member_toggle_produce_the_same_message(self):
+        # Text/action parity: the same member and item render one sentence,
+        # whichever transport settled the toggle.
+        from web.webclient.actions.service_actions import (
+            _inventory_toggle_equip_adapter,
+        )
+
+        companion = self._companion()
+        companion.db.inventory = [_BLADE.key]
+        expected = (
+            f"{companion.key}裝備了 {_BLADE.display_name_zh}"
+            f"{_equip_prose(_BLADE)}。"
+        )
+        self.call(
+            CmdToggleEquip(),
+            f"{_BLADE.key} = {companion.key}",
+            expected,
+            caller=self.player,
+        )
+        companion.db.equipment = None
+        sent: list[str] = []
+        with patch.object(self.player, "msg", side_effect=sent.append):
+            result = _inventory_toggle_equip_adapter(
+                self.player,
+                {"actor_id": companion.pk, "item_key": _BLADE.key},
+            )
+        self.assertEqual(result["message"], expected)
+        self.assertEqual(sent, [expected])
 
 
 class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
@@ -385,6 +479,33 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
             [f"你裝備了 {_BLADE.display_name_zh}{_equip_prose(_BLADE)}。"],
         )
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+
+    @covers_requirement(
+        "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
+    )
+    def test_combat_named_member_toggle_is_free(self):
+        # Delta: "Text equip names a companion" — the companion's slot toggles
+        # during command selection, no round or world time is consumed, and the
+        # result matches the action with that companion's actor id.
+        companion = create_object(NPC, key="艾拉", location=self.room, home=self.room)
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        companion.db.inventory = [_BLADE.key]
+        join_party(companion, self.player)
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        messages = self._run(CmdToggleEquip(), f"{_BLADE.key} = {companion.key}")
+        self.assertEqual(
+            messages,
+            [
+                f"{companion.key}裝備了 {_BLADE.display_name_zh}"
+                f"{_equip_prose(_BLADE)}。"
+            ],
+        )
+        self.assertEqual(companion.db.equipment["weapon_main"], _BLADE.key)
+        after = read_session(self.player)
+        self.assertEqual(after.rounds_elapsed, record.rounds_elapsed)
+        self.assertEqual(after.round_revision, record.round_revision)
 
 
 class _TargetedUseBase(_ItemsCommandBase):
