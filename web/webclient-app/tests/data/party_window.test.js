@@ -156,6 +156,33 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
     expect(entry(101).attributes("aria-current")).toBe("true");
   });
 
+  it("keeps 空位 selected while a requested member is pending, then adopts it", async () => {
+    mountWindow();
+    await wrapper.get('[data-testid="member-rail__entry--empty"]').trigger("click");
+    await entry(102).trigger("click");
+    expect(wrapper.emitted("view-member")).toEqual([[{ memberId: 102, tab: "member" }]]);
+    await wrapper.setProps({ pendingMemberId: 102 });
+    expect(wrapper.get('[data-testid="member-rail__entry--empty"]').attributes("aria-current")).toBe("true");
+    expect(entry(102).attributes("aria-busy")).toBe("true");
+    await wrapper.setProps({ pendingMemberId: null, party: { ...PARTY_WINDOW_PANEL_SAMPLE, viewed_member_id: 102 } });
+    expect(entry(102).attributes("aria-current")).toBe("true");
+  });
+
+  it("refuses one close while a persona draft is unsaved, then closes", async () => {
+    mountWindow({ party: { ...PARTY_WINDOW_PANEL_SAMPLE, viewed_member_id: 42 }, partyMember: PARTY_MEMBER_PANEL_SAMPLE });
+    await wrapper.get('[data-testid="action-bar__btn--persona-edit"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-edit--habit"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-input--habit"]').setValue("新的習慣");
+    expect(wrapper.get('[data-testid="action-bar__btn--persona-done"]').attributes("aria-disabled")).toBe("true");
+    await wrapper.get('[data-testid="hud-drawer"]').trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toBeUndefined();
+    expect(wrapper.get('[data-testid="party-member-tab__unsaved-warning"]').text()).toBe("尚有未儲存的人物設定。");
+    expect(wrapper.get('[data-testid="party-member-tab__persona-input--habit"]').element.value).toBe("新的習慣");
+    await wrapper.get('[data-testid="hud-drawer"]').trigger("keydown", { key: "Escape" });
+    expect(wrapper.emitted("close")).toHaveLength(1);
+    expect(wrapper.emitted("persona-edit")).toBeUndefined();
+  });
+
   it("reopens on its last tab for the session and forgets it on a new scope", async () => {
     mountWindow();
     await tab("技能").trigger("click");

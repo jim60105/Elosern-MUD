@@ -121,7 +121,18 @@ function cancelArmed() {
   return true;
 }
 
-defineExpose({ cancelArmed });
+// The whole guard: the armed leave first, then an unsaved persona draft,
+// which refuses one close attempt and says so in the action bar.
+function guardClose() {
+  if (cancelArmed()) return true;
+  if (draftDirty.value && !closeWarned.value) {
+    closeWarned.value = true;
+    return true;
+  }
+  return false;
+}
+
+defineExpose({ cancelArmed, guardClose });
 
 // ---------------------------------------------------------------- persona
 
@@ -134,6 +145,17 @@ const { editingField, editDraft, onPersonaInput, openPersonaEdit, cancelPersonaE
   useMemberPersona(emit, personaSections);
 
 const editing = ref(false);
+// An open field whose draft differs from its committed value.
+const draftDirty = computed(() => {
+  if (editingField.value === null) return false;
+  const section = personaSections.value.find((entry) => entry.key === editingField.value);
+  return (editDraft.value ?? "").trim() !== (section?.value ?? "").trim();
+});
+const UNSAVED_TEXT = "尚有未儲存的人物設定。";
+const closeWarned = ref(false);
+watch([editingField, editDraft], () => {
+  closeWarned.value = false;
+});
 watch(
   () => personaEditDescriptor.value?.enabled === true,
   (enabled) => {
@@ -160,7 +182,11 @@ const barActions = computed(() => {
     return [{ key: "invite", label: "邀請同行", tone: "primary", enabled: invite.value.enabled, reason: invite.value.enabled ? null : invite.value.reason }];
   }
   if (commander.value) {
-    if (editing.value) return [{ key: "persona-done", label: "完成編輯", tone: "gold" }];
+    if (editing.value) {
+      // 完成編輯 never discards an open draft: save or cancel it first.
+      const open = editingField.value !== null;
+      return [{ key: "persona-done", label: "完成編輯", tone: "gold", enabled: !open, reason: open ? "請先儲存或取消正在編輯的欄位。" : null }];
+    }
     return [descriptorAction(personaEditDescriptor.value, { key: "persona-edit", label: "編輯人物設定", tone: "gold" })];
   }
   if (!companion.value) return [];
@@ -377,6 +403,9 @@ const hasReference = computed(() => props.member?.portrait_ref !== null && props
         <ActionBar :actions="barActions" @action="onBarAction">
           <template v-if="armed" #lead>
             <p class="party-member-tab__warn" role="alert" data-testid="party-member-tab__leave-warning">{{ member.display_name }}會離開隊伍。</p>
+          </template>
+          <template v-else-if="closeWarned" #lead>
+            <p class="party-member-tab__warn" role="alert" data-testid="party-member-tab__unsaved-warning">{{ UNSAVED_TEXT }}</p>
           </template>
         </ActionBar>
       </template>

@@ -64,6 +64,8 @@ const props = defineProps({
 const emit = defineEmits(["close", "view-member", "action", "open-npc-persona", "persona-edit"]);
 
 const memory = usePartyWindowMemory(props.memoryScope);
+// The memory is one module-level reactive object: re-syncing the scope
+// resets it in place, so `memory` above stays the live reference.
 watch(
   () => props.memoryScope,
   (scope) => usePartyWindowMemory(scope),
@@ -101,10 +103,17 @@ function onSelect(key) {
     tab.value = "member";
     return;
   }
-  emptySelected.value = false;
-  if (key === viewedId.value) return;
+  if (key === viewedId.value) {
+    emptySelected.value = false;
+    return;
+  }
+  // 空位 stays selected until the server adopts the requested member (the
+  // watch below), so the rail never flips back to the previous member.
   emit("view-member", { memberId: key, tab: tab.value });
 }
+watch(viewedId, () => {
+  emptySelected.value = false;
+});
 
 // The local item selection and quantity (the 背包 tab's state, owned here so
 // a changed viewed member resets them in one place).
@@ -142,11 +151,12 @@ const tabReason = computed(() => {
   return name ? panelReason(backingPanels.value[name]) : null;
 });
 
-// The 成員 tab's armed leave: any close attempt (Escape, ✕, the scrim)
-// cancels the confirmation first and sends nothing.
+// The 成員 tab's armed leave and unsaved persona draft: a close attempt
+// (Escape, ✕, the scrim) first cancels the confirmation or warns about the
+// draft, sends nothing and keeps the window; the next attempt closes.
 const memberTab = ref(null);
 function closeGuard() {
-  return !memberTab.value?.cancelArmed?.();
+  return !memberTab.value?.guardClose?.();
 }
 </script>
 
