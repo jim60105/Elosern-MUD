@@ -2,7 +2,6 @@
 
 var C = require("../constants.js");
 var core = require("../core.js");
-var personaSections = require("../persona_sections.js");
 var skillDescriptor = require("./skill_descriptor.js");
 
 var requireNumber = skillDescriptor.requireNumber;
@@ -22,6 +21,7 @@ var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 var MAX_FULL_TITLE_CODE_POINTS = C.MAX_FULL_TITLE_CODE_POINTS;
 var MAX_COST_KEYS = C.MAX_COST_KEYS;
 var TARGET_SPECS = C.TARGET_SPECS;
+var SEVERITIES = C.SEVERITIES;
 
 // ---------------------------------------------------------------------------
 // character panel v1 validators (mirror of
@@ -52,6 +52,15 @@ var CHARACTER_MAX_LAYERS = 16;
 var CHARACTER_MAX_ADJUSTMENT = CHARACTER_MAX_DESCRIPTION;
 var CHARACTER_LAYER_SOURCES = ["skill", "condition", "equipment"];
 var CHARACTER_LAYER_KINDS = ["mult", "flat", "pct"];
+// v8 condition-row bounds (mirror of web.webclient.presentation.character):
+// at most 32 ordered rows, a 128-code-point label, at most 16 modifier pairs
+// and a bounded origin label. A modifier value is the rulebook's canonical
+// adjustment scalar: a finite number or a bounded authored percentage string.
+var CHARACTER_MAX_CONDITIONS = 32;
+var CHARACTER_MAX_CONDITION_LABEL = 128;
+var CHARACTER_MAX_MODIFIER_KEYS = 16;
+var CHARACTER_MAX_CONDITION_SOURCE = 32;
+var CHARACTER_MAX_MODIFIER_TEXT = 16;
 
 function validateCharacterKey(value, field) {
   var key = validateIdentifier(value, field);
@@ -293,20 +302,67 @@ function validateCharacterGuild(value) {
   return value;
 }
 
-// The persona and intimate sections are shared with the party_member panel
-// (persona_sections.js); these aliases keep the character module's public
-// names stable.
-var CHARACTER_MAX_PERSONA = personaSections.MAX_PERSONA_FIELD;
-var CHARACTER_PERSONA_FIELDS = personaSections.PERSONA_FIELDS;
-var validateCharacterPersona = personaSections.validatePersona;
-var validateCharacterIntimate = personaSections.validateIntimate;
+// One canonical adjustment scalar: a finite number (flat/mult amounts) or a
+// bounded authored percentage string ("-10%"), carried verbatim from the
+// status read model. Anything else fails closed.
+function validateCharacterModifierValue(value, field) {
+  if (typeof value === "string") {
+    if (!value.trim() || codePoints(value) > CHARACTER_MAX_MODIFIER_TEXT) {
+      throw new Error(field + " must be a bounded string");
+    }
+    return value;
+  }
+  return requireNumber(value, field, -MAX_SAFE_INTEGER, MAX_SAFE_INTEGER);
+}
 
-// Exact available character panel v7 schema (design D10: skill category
-// grouping + the intimate-status section; expose-stat-breakdown-read-model
-// added the breakdown trait rows and the adjustment-bearing equipment
-// rows; render-equipment-breakdown-webclient closed the transitional v4
-// tolerance window; title-system added the optional composed full_title).
-// Shared bounds are guarded by a dual-direction parity test.
+// One exact v8 condition row. Severity is the shared condition-severity
+// vocabulary; remaining_seconds is null for an indefinite condition;
+// modifiers is the canonical adjustment map; source is the bounded origin
+// label (the character panel carries it instead of structured provenance).
+function validateCharacterConditionRow(value) {
+  requireExactFields(
+    value,
+    "condition row",
+    ["code", "label", "severity", "remaining_seconds", "modifiers", "source"],
+    []
+  );
+  validateCharacterKey(value.code, "condition code");
+  var label = requireString(value.label, "label", CHARACTER_MAX_CONDITION_LABEL);
+  if (!label.trim()) {
+    throw new Error("condition label must be non-empty");
+  }
+  if (SEVERITIES.indexOf(value.severity) === -1) {
+    throw new Error("condition severity is not a stable severity");
+  }
+  if (value.remaining_seconds !== null) {
+    requireInt(value.remaining_seconds, "remaining_seconds", 0, MAX_SAFE_INTEGER);
+  }
+  if (!isPlainObject(value.modifiers)) {
+    throw new Error("condition modifiers must be an object");
+  }
+  var modifierKeys = Object.keys(value.modifiers);
+  if (modifierKeys.length > CHARACTER_MAX_MODIFIER_KEYS) {
+    throw new Error(
+      "condition modifiers exceeds the maximum of " +
+        CHARACTER_MAX_MODIFIER_KEYS +
+        " keys"
+    );
+  }
+  modifierKeys.forEach(function (key) {
+    validateCharacterKey(key, "condition modifier key");
+    validateCharacterModifierValue(
+      value.modifiers[key],
+      "condition modifier " + key
+    );
+  });
+  requireString(value.source, "source", CHARACTER_MAX_CONDITION_SOURCE);
+  return value;
+}
+
+// Exact available character panel v8 schema (design D10). v8 builds the
+// panel for the viewed party member, adds `member_id` and the ordered
+// `conditions` rows, and removes `persona`/`intimate` (party_member owns
+// them). Shared bounds are guarded by a dual-direction parity test.
 function validateCharacterAvailablePanel(payload) {
   requireExactFields(
     payload,
@@ -315,15 +371,15 @@ function validateCharacterAvailablePanel(payload) {
       "schema_version",
       "available",
       "kind",
+      "member_id",
       "traits",
+      "conditions",
       "actives",
       "passives",
       "equipment",
       "disguise",
       "guild",
       "wallet",
-      "persona",
-      "intimate",
     ],
     ["full_title"]
   );
@@ -338,12 +394,13 @@ function validateCharacterAvailablePanel(payload) {
       throw new Error("full_title must be non-empty when present");
     }
   }
-  if (payload.schema_version !== 7) {
+  if (payload.schema_version !== 8) {
     throw new Error("unsupported character schema_version");
   }
   if (payload.available !== true || payload.kind !== "character") {
     throw new Error("character panel must be available with kind character");
   }
+  requireInt(payload.member_id, "member_id", 1, MAX_SAFE_INTEGER);
   if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
     throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
   }
@@ -355,6 +412,12 @@ function validateCharacterAvailablePanel(payload) {
     }
     traitKeys[row.key] = true;
   });
+  if (!Array.isArray(payload.conditions) || payload.conditions.length > CHARACTER_MAX_CONDITIONS) {
+    throw new Error(
+      "conditions must be a list of at most " + CHARACTER_MAX_CONDITIONS + " rows"
+    );
+  }
+  payload.conditions.forEach(validateCharacterConditionRow);
   if (!Array.isArray(payload.actives) || payload.actives.length > CHARACTER_MAX_CATEGORY_GROUPS) {
     throw new Error(
       "actives must be a list of at most " + CHARACTER_MAX_CATEGORY_GROUPS + " category groups"
@@ -388,22 +451,20 @@ function validateCharacterAvailablePanel(payload) {
   validateCharacterDisguise(payload.disguise);
   validateCharacterGuild(payload.guild);
   requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
-  var persona = validateCharacterPersona(payload.persona);
 
-  var intimate = validateCharacterIntimate(payload.intimate);
   var result = {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "character",
+    member_id: payload.member_id,
     traits: payload.traits,
+    conditions: payload.conditions,
     actives: payload.actives,
     passives: payload.passives,
     equipment: payload.equipment,
     disguise: payload.disguise,
     guild: payload.guild,
     wallet: payload.wallet,
-    persona: persona,
-    intimate: intimate,
   };
   if (fullTitle !== null) {
     result.full_title = fullTitle;
@@ -416,10 +477,10 @@ function validateCharacterAvailablePanel(payload) {
 }
 
 function validateCharacterPanel(payload) {
-  // Version gate (mirror of the server validator): 7 is the only accepted
-  // schema version (persona-editing four-key persona section).
+  // Version gate (mirror of the server validator): 8 is the only accepted
+  // schema version (viewed-member panel with condition rows).
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 7) {
+  if (payload.schema_version !== 8) {
     throw new Error("unsupported character schema_version");
   }
   return validateCharacterAvailablePanel(payload);
@@ -436,11 +497,15 @@ module.exports = {
   CHARACTER_MAX_LABEL: CHARACTER_MAX_LABEL,
   CHARACTER_MAX_DESCRIPTION: CHARACTER_MAX_DESCRIPTION,
   CHARACTER_MAX_SLOT: CHARACTER_MAX_SLOT,
+  CHARACTER_MAX_CONDITIONS: CHARACTER_MAX_CONDITIONS,
+  CHARACTER_MAX_CONDITION_LABEL: CHARACTER_MAX_CONDITION_LABEL,
+  CHARACTER_MAX_MODIFIER_KEYS: CHARACTER_MAX_MODIFIER_KEYS,
+  CHARACTER_MAX_CONDITION_SOURCE: CHARACTER_MAX_CONDITION_SOURCE,
+  CHARACTER_MAX_MODIFIER_TEXT: CHARACTER_MAX_MODIFIER_TEXT,
   validateCharacterPanel: validateCharacterPanel,
   validateCharacterTraitRow: validateCharacterTraitRow,
+  validateCharacterConditionRow: validateCharacterConditionRow,
   validateCharacterEquipmentRow: validateCharacterEquipmentRow,
   validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
   validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
-  CHARACTER_MAX_PERSONA: CHARACTER_MAX_PERSONA,
-  CHARACTER_PERSONA_FIELDS: CHARACTER_PERSONA_FIELDS,
 };

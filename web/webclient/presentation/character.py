@@ -1,4 +1,4 @@
-"""Exact schema-version-7 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-8 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
@@ -29,6 +29,13 @@ Version 7 (persona-editing) widens the ``persona`` section from exactly
 (``background``/``personality``/``life_story``/``habit``), each nullable and
 bounded by the shared persona-field cap. Version 7 is the only accepted schema
 version: the validator accepts v7 exactly and rejects every other version.
+Version 8 (character-panel-v8-viewed-member) makes the panel the session's
+viewed party member (falling back to the commander) in exploration and combat,
+adds ``member_id`` and the ordered ``conditions`` rows (code, label, severity,
+nullable remaining seconds, modifiers, bounded origin label), and removes the
+``persona`` and ``intimate`` sections: ``party_member`` publishes them. Version
+8 is the only accepted schema version: the validator accepts v8 exactly and
+rejects every other version.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -55,19 +62,13 @@ from web.webclient.presentation.protocol import (
     _validate_identifier,
     json_byte_size,
 )
+from web.webclient.presentation.party_view_selection import resolve_viewed_member
 from web.webclient.presentation.registry import PanelUnavailableError
-from web.webclient.presentation.persona_sections import (
-    MAX_PERSONA_FIELD_CODE_POINTS,
-    PERSONA_PROSE_FIELDS,
-    serialize_intimate as _serialize_intimate,
-    serialize_persona,
-    validate_intimate,
-    validate_persona,
-)
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.action_preview import adjusted_cost
 from world.rules.progression import freeform_scale_entries_for
+from world.rules.status_display import CONDITION_SEVERITIES
 from world.rules.status_query import (
     CharacterReadModel,
     StatusQueryError,
@@ -78,7 +79,7 @@ from world.rules.status_query import (
 from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 7
+CHARACTER_SCHEMA_VERSION = 8
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -107,9 +108,17 @@ MAX_SLOT_CODE_POINTS = 32
 # The equipment adjustment summary bound (P3 formatter output; 「｜」-joined
 # segments of the fixed vocabulary).
 MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
-# ``MAX_PERSONA_FIELD_CODE_POINTS`` and ``PERSONA_PROSE_FIELDS`` are imported
-# from ``persona_sections`` (the shared section both this panel and
-# ``party_member`` publish) and stay re-exported from here.
+# The condition-row bounds mirror the ``status`` panel's own condition
+# contract: at most 32 ordered rows, a 128-code-point label, at most 16
+# modifier pairs, and a bounded origin label. ``remaining_seconds`` is null
+# for an indefinite condition.
+MAX_CONDITION_ROWS = 32
+MAX_CONDITION_LABEL_CODE_POINTS = 128
+MAX_MODIFIER_KEYS = 16
+MAX_CONDITION_SOURCE_CODE_POINTS = 32
+# A modifier value is the rulebook's canonical adjustment scalar: a finite
+# number or a bounded authored percentage string (e.g. "-10%").
+MAX_MODIFIER_TEXT_CODE_POINTS = 16
 # The composed full title bound is owned by ``world.rules.titles`` (the
 # producer bounds composition at it); the JS validator mirrors this number in
 # the parity contract.
@@ -425,14 +434,70 @@ def _validate_guild(value: Any) -> dict[str, Any]:
     return {"rank": rank, "merit": merit}
 
 
-def _validate_persona(value: Any) -> dict[str, Any]:
-    """Validate the display-only ``persona`` section (shared section rules)."""
-    return validate_persona(value, error=CharacterPanelError)
+def _validate_modifier_value(value: Any, field: str) -> int | float | str:
+    """Validate one canonical adjustment scalar.
+
+    The rulebook authors both finite numbers (flat/mult amounts) and signed
+    percentage strings (``"-10%"``), and the ``status`` panel carries them
+    verbatim. Both forms are accepted here; anything else fails closed.
+    """
+    if isinstance(value, str):
+        if not value.strip() or len(value) > MAX_MODIFIER_TEXT_CODE_POINTS:
+            raise CharacterPanelError(f"{field} must be a bounded string")
+        return value
+    return _require_number(
+        value, field, minimum=-MAX_SAFE_INTEGER, maximum=MAX_SAFE_INTEGER
+    )
 
 
-def _validate_intimate(value: Any) -> dict[str, Any] | None:
-    """Validate the nullable ``intimate`` section (shared section rules)."""
-    return validate_intimate(value, error=CharacterPanelError)
+def _validate_condition_row(value: Any) -> dict[str, Any]:
+    """Validate one exact ``{code, label, severity, ...}`` condition row."""
+    _require_exact_fields(
+        value,
+        "condition row",
+        {"code", "label", "severity", "remaining_seconds", "modifiers", "source"},
+        {},
+    )
+    code = _validate_key(value["code"], "condition code")
+    label = _require_str(
+        value, "label", maximum=MAX_CONDITION_LABEL_CODE_POINTS
+    )
+    if not label.strip():
+        raise CharacterPanelError("condition label must be non-empty")
+    severity = value["severity"]
+    if not isinstance(severity, str) or severity not in CONDITION_SEVERITIES:
+        raise CharacterPanelError("condition severity is not a stable severity")
+    remaining = value["remaining_seconds"]
+    if remaining is not None and (
+        isinstance(remaining, bool)
+        or not isinstance(remaining, int)
+        or remaining < 0
+    ):
+        raise CharacterPanelError(
+            "condition remaining_seconds must be null or a non-negative integer"
+        )
+    modifiers = value["modifiers"]
+    if not isinstance(modifiers, dict) or len(modifiers) > MAX_MODIFIER_KEYS:
+        raise CharacterPanelError(
+            f"condition modifiers must be an object of at most {MAX_MODIFIER_KEYS} keys"
+        )
+    normalized_modifiers: dict[str, Any] = {}
+    for key, amount in modifiers.items():
+        modifier_key = _validate_key(key, "condition modifier key")
+        normalized_modifiers[modifier_key] = _validate_modifier_value(
+            amount, f"condition modifier {modifier_key}"
+        )
+    source = _require_str(
+        value, "source", maximum=MAX_CONDITION_SOURCE_CODE_POINTS
+    )
+    return {
+        "code": code,
+        "label": label,
+        "severity": severity,
+        "remaining_seconds": remaining,
+        "modifiers": normalized_modifiers,
+        "source": source,
+    }
 
 
 def _validate_full_title(payload: dict[str, Any]) -> str | None:
@@ -446,7 +511,7 @@ def _validate_full_title(payload: dict[str, Any]) -> str | None:
 
 
 def _validate_available(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-7 character payload."""
+    """Validate one exact available version-8 character payload."""
     _require_exact_fields(
         payload,
         "character panel",
@@ -454,15 +519,15 @@ def _validate_available(payload: Any) -> dict[str, Any]:
             "schema_version",
             "available",
             "kind",
+            "member_id",
             "traits",
+            "conditions",
             "actives",
             "passives",
             "equipment",
             "disguise",
             "guild",
             "wallet",
-            "persona",
-            "intimate",
         },
         {"full_title": "optional"},
     )
@@ -475,6 +540,9 @@ def _validate_available(payload: Any) -> dict[str, Any]:
         raise CharacterPanelError("available must be true for the character form")
     if payload["kind"] != "character":
         raise CharacterPanelError("character panel kind must be character")
+    member_id = _require_int(
+        payload, "member_id", minimum=1, maximum=MAX_SAFE_INTEGER
+    )
 
     traits = payload["traits"]
     if not isinstance(traits, list) or len(traits) > MAX_TRAIT_ROWS:
@@ -483,6 +551,13 @@ def _validate_available(payload: Any) -> dict[str, Any]:
     trait_keys = [row["key"] for row in traits]
     if len(set(trait_keys)) != len(trait_keys):
         raise CharacterPanelError("trait keys must be unique")
+
+    conditions = payload["conditions"]
+    if not isinstance(conditions, list) or len(conditions) > MAX_CONDITION_ROWS:
+        raise CharacterPanelError(
+            f"conditions must be a list of at most {MAX_CONDITION_ROWS} rows"
+        )
+    conditions = [_validate_condition_row(row) for row in conditions]
 
     actives = payload["actives"]
     if not isinstance(actives, list) or len(actives) > MAX_CATEGORY_GROUPS:
@@ -520,21 +595,20 @@ def _validate_available(payload: Any) -> dict[str, Any]:
     disguise = _validate_disguise(payload["disguise"])
     guild = _validate_guild(payload["guild"])
     wallet = _require_int(payload, "wallet", minimum=0, maximum=MAX_SAFE_INTEGER)
-    persona = _validate_persona(payload["persona"])
 
     result: dict[str, Any] = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
+        "member_id": member_id,
         "traits": traits,
+        "conditions": conditions,
         "actives": actives,
         "passives": passives,
         "equipment": equipment,
         "disguise": disguise,
         "guild": guild,
         "wallet": wallet,
-        "persona": persona,
-        "intimate": _validate_intimate(payload["intimate"]),
     }
     full_title = _validate_full_title(payload)
     if full_title is not None:
@@ -547,7 +621,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
 
 
 def validate_character(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-7 ``character`` payload.
+    """Validate one exact available version-8 ``character`` payload.
 
     Returns a normalized payload or raises :class:`CharacterPanelError`. The
     common unavailable form is NOT accepted here; the registry handles it.
@@ -576,13 +650,6 @@ def _item_display_name(item_key: str) -> str:
     if definition is None:
         return item_key
     return getattr(definition, "display_name_zh", item_key)
-
-
-def _in_exploration_mode(actor: Any) -> bool:
-    """The shared exploration predicate (session-owner aware), imported lazily."""
-    from web.webclient.presentation.affordances import in_exploration_mode
-
-    return in_exploration_mode(actor)
 
 
 def _serialize_passive_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -658,21 +725,21 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
     ]
 
 
-def _serialize(
-    model: CharacterReadModel, persona: dict[str, Any], actor: Any
-) -> dict[str, Any]:
-    """Serialize the frozen read model into the v7 available payload.
+def _serialize(model: CharacterReadModel, member: Any) -> dict[str, Any]:
+    """Serialize the frozen read model into the v8 available payload.
 
     Trait rows come from ``model.breakdown`` (the single assembly the whole
     read shares); labels stay the shared ``TRAIT_LABELS`` map; equipment rows
-    gain the P3 adjustment summary. Every other section is byte-identical to
-    v4.
+    gain the P3 adjustment summary; condition rows are the shared ordered
+    projection. Persona prose and intimate state are not part of this payload:
+    ``party_member`` publishes them.
     """
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
     payload: dict[str, Any] = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
+        "member_id": int(member.pk),
         "traits": [
             {
                 "key": row.key,
@@ -693,7 +760,18 @@ def _serialize(
             }
             for row in model.breakdown
         ],
-        "actives": _serialize_active_skill_groups(model.active_keys, actor),
+        "conditions": [
+            {
+                "code": row.code,
+                "label": row.label,
+                "severity": row.severity,
+                "remaining_seconds": row.remaining_seconds,
+                "modifiers": dict(row.modifiers),
+                "source": row.source,
+            }
+            for row in model.conditions
+        ],
+        "actives": _serialize_active_skill_groups(model.active_keys, member),
         "passives": _serialize_passive_skill_groups(model.passive_keys),
         "equipment": [
             {
@@ -714,8 +792,6 @@ def _serialize(
         },
         "guild": {"rank": model.guild_rank, "merit": model.guild_merit},
         "wallet": model.wallet,
-        "persona": persona,
-        "intimate": _serialize_intimate(model.intimate),
     }
     # The composed live full title; omitted when empty so pre-creation
     # characters keep the payload shape identical.
@@ -725,23 +801,24 @@ def _serialize(
 
 
 def character_presenter(context: PresentationContext) -> dict[str, Any]:
-    """Return the exact available ``character`` panel for the authenticated puppet."""
+    """Return the exact available ``character`` panel for the viewed member.
+
+    The subject is the session's viewed party member (the commander when no
+    effective selection exists), in exploration and combat alike. The read
+    model mutates nothing, so no mode gate is needed; a member whose canonical
+    records cannot be read gets the common unavailable form.
+    """
     actor = context.actor
-    if not _in_exploration_mode(actor):
+    if bool(getattr(actor, "creation_pending", False)):
+        raise PanelUnavailableError
+    member = resolve_viewed_member(context)
+    if member is None:
         raise PanelUnavailableError
     try:
-        model = build_character_read_model(actor)
+        model = build_character_read_model(member)
     except StatusQueryError:
         raise PanelUnavailableError
-    possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
-    persona_source = actor
-    if possessed_by is not None:
-        from world.rules.possession import _resolve_live_object
-        owner = _resolve_live_object(int(possessed_by))
-        if owner is not None:
-            persona_source = owner
-    persona = serialize_persona(persona_source)
-    return validate_character(_serialize(model, persona, actor))
+    return validate_character(_serialize(model, member))
 
 
 __all__ = [
@@ -749,14 +826,18 @@ __all__ = [
     "CharacterPanelError",
     "MAX_ACTIVE_ROWS",
     "MAX_CATEGORY_GROUPS",
+    "MAX_CONDITION_LABEL_CODE_POINTS",
+    "MAX_CONDITION_ROWS",
+    "MAX_CONDITION_SOURCE_CODE_POINTS",
     "MAX_DISPLAYED_ROWS",
     "MAX_EQUIPMENT_ROWS",
     "MAX_FULL_TITLE_CODE_POINTS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_LAYERS_PER_STAT",
     "MAX_ADJUSTMENT_CODE_POINTS",
+    "MAX_MODIFIER_KEYS",
+    "MAX_MODIFIER_TEXT_CODE_POINTS",
     "MAX_PASSIVE_ROWS",
-    "MAX_PERSONA_FIELD_CODE_POINTS",
     "MAX_SLOT_CODE_POINTS",
     "MAX_TRAIT_ROWS",
     "TRAIT_LABELS",
