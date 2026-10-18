@@ -4,7 +4,7 @@ Total estimate: **6.5 hours**, including implementation, focused verification, d
 
 ## 1. Rules view (2.5h)
 
-- [ ] 1.1 Add `inventory_view(member, *, in_combat)` with row grouping and the three descriptors; verify rules tests for equipped/locked give refusals with `max_quantity`, combat give refusal text, combat-draft use enabled for a commandable companion and disabled for a knocked-out one, and toggle reasons (accessory cap, exam kit).
+- [x] 1.1 Add `inventory_view(member, *, in_combat)` with row grouping and the three descriptors; verify rules tests for equipped/locked give refusals with `max_quantity`, combat give refusal text, combat-draft use enabled for a commandable companion and disabled for a knocked-out one, and toggle reasons (accessory cap, exam kit).
 
 ## 2. Presenter, validator and mirror (2.5h)
 
