@@ -21,7 +21,7 @@ from typing import Any
 from django.db import transaction
 
 from world.lore.items import ITEM_REGISTRY
-from world.observability import log_info
+from world.observability import log_info, log_warn
 from world.rules.equipment import (
     apply_inventory_plan,
     equipped_removal_conflict,
@@ -159,17 +159,36 @@ def _contents_snapshot(*holders: Any) -> dict[int, tuple[Any, Any]]:
     }
 
 
-def _pin_snapshots(plans: tuple[Any, ...]) -> dict[int, tuple[Any, Any]]:
-    """The pre-transfer pin reasons of every room a plan's completion releases."""
+def _plan_pin_operations(plan: Any) -> tuple[Any, ...]:
+    """The plan's direct ACQUIRE pins plus its AUTO-settlement chain pins.
+
+    Applying a plan can settle an ``AUTO`` reward whose paid items complete a
+    further ACQUIRE stage: those rooms are absent from ``plan.acquire[1]``, so
+    the outer rollback boundary must plan them here (the same preflight
+    ``world/rules/gm.py`` performs) before any write.
+    """
+    if plan.acquire is None:
+        return ()
+    from world.quests.settlement import plan_auto_settlement_chain
+
+    operations = list(plan.acquire[1])
+    settlement = plan_auto_settlement_chain(
+        plan.entity, list(plan.entity.db.quest_log or []), list(plan.acquire[0])
+    )
+    operations.extend(settlement.chain_pins)
+    return tuple(operations)
+
+
+def _pin_snapshots(
+    pin_operations: tuple[Any, ...],
+) -> dict[int, tuple[Any, Any]]:
+    """The pre-transfer pin reasons of every room the transfer may unpin."""
     from world.quests.transitions import snapshot_pin_reasons
 
     snapshots: dict[int, tuple[Any, Any]] = {}
-    for plan in plans:
-        if plan.acquire is None:
-            continue
-        for room, _, _ in plan.acquire[1]:
-            if id(room) not in snapshots:
-                snapshots[id(room)] = (room, snapshot_pin_reasons(room))
+    for room, _, _ in pin_operations:
+        if id(room) not in snapshots:
+            snapshots[id(room)] = (room, snapshot_pin_reasons(room))
     return snapshots
 
 
@@ -207,15 +226,33 @@ def _restore_transfer(
     contents: dict[int, tuple[Any, Any]],
     pins: dict[int, tuple[Any, Any]],
 ) -> None:
-    """Re-point rolled-back moves and restore both bags' in-process state."""
+    """Re-point rolled-back moves and restore both bags' in-process state.
+
+    Every step is independent and best-effort: a cleanup failure must never
+    replace the transfer failure the caller is about to re-raise.
+    """
     for obj, location in contents.values():
         obj.db_location = location
-    _flush_rolled_back_instances()
+    try:
+        _flush_rolled_back_instances()
+    except Exception as error:
+        log_warn(
+            "party_transfer_restore_failed",
+            exc=error,
+            context={"stage": "idmapper"},
+        )
     for holder, snapshot in zip(holders, surfaces):
         _restore_surface_snapshots(holder, snapshot)
     _restore_pin_snapshots(pins)
     for holder in holders:
-        holder.contents_cache.init()
+        try:
+            holder.contents_cache.init()
+        except Exception as error:
+            log_warn(
+                "party_transfer_restore_failed",
+                exc=error,
+                context={"stage": "contents_cache", "char": str(holder.pk)},
+            )
 
 
 def transfer_item(
@@ -268,7 +305,11 @@ def transfer_item(
             receiver_plan = plan_inventory_delta(
                 receiver, additions=(item_key,) * quantity
             )
-            pins = _pin_snapshots((giver_plan, receiver_plan))
+            pin_operations = (
+                *_plan_pin_operations(giver_plan),
+                *_plan_pin_operations(receiver_plan),
+            )
+            pins = _pin_snapshots(pin_operations)
             for obj in moved:
                 if not obj.move_to(receiver, quiet=True, move_type="give"):
                     raise _TransferRefused(item_key)

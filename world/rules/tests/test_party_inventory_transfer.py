@@ -18,7 +18,7 @@ from django.db import transaction
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -26,18 +26,23 @@ from typeclasses.rooms import Room
 from world.lore.items import EquipmentModifierKey
 from world.quests import runtime as quest_runtime
 from world.quests.definitions import QuestStage
+from world.quests.runtime import read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
     accept,
+    accept_auto,
     acquire,
     quest,
     register,
+    stage_active_record,
 )
+from world.quests.transitions import apply_quest_log_replacement, stage_pin_reason
 from world.rules import party_inventory
 from world.rules.affinity import seed_affinity
 from world.rules.clock import get_world_clock
 from world.rules.equipment import apply_inventory_plan as real_apply_inventory_plan
 from world.rules.equipment import materialize_registry_object, toggle_equipment
+from world.rules.guild_offers import ItemQuantity, QuestReward
 from world.rules.party import join_party
 from world.rules.party_inventory import (
     MAX_TRANSFER_QUANTITY,
@@ -56,6 +61,7 @@ from world.rules.party_scope import (
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
 )
+from world.rules.possession import enter_possession
 from world.skills.equipment import EquipmentSlot
 from world.tests.synthetic_data import make_item, synthetic_registries
 
@@ -72,6 +78,7 @@ _BLADE = make_item(
 _SEAL = make_item(
     "t_transfer_seal", display_name_zh="測試徽記", sellable=False, guild_property=True
 )
+_REWARD = make_item("t_transfer_reward", display_name_zh="測試獎勵", sellable=False)
 
 
 class PartyTransferTestCase(EvenniaTestCase):
@@ -84,7 +91,11 @@ class PartyTransferTestCase(EvenniaTestCase):
             "static_tiers",
             "subraces",
             "items",
-            extra={"items": {row.key: row for row in (_POTION, _BLADE, _SEAL)}},
+            extra={
+                "items": {
+                    row.key: row for row in (_POTION, _BLADE, _SEAL, _REWARD)
+                }
+            },
         )
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
@@ -511,6 +522,28 @@ class TransferAtomicityTests(PartyTransferTestCase):
 
         self.assertEqual(self.room.db.pin_reasons, ["before"])
 
+    def test_cleanup_failure_does_not_mask_the_transfer_failure(self):
+        self.hold(self.commander, _POTION.key)
+        self.mirror(self.commander, _POTION.key)
+        before = self._both_bags()
+
+        def failing(plan):
+            raise RuntimeError("injected transfer failure")
+
+        with patch.object(party_inventory, "apply_inventory_plan", failing):
+            with patch.object(
+                party_inventory,
+                "_flush_rolled_back_instances",
+                side_effect=RuntimeError("injected cleanup failure"),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "injected transfer failure"
+                ):
+                    self.transfer()
+
+        for entity in (self.commander, self.aila):
+            self.assertEqual(self._bag_state(entity), before[entity.pk])
+
 
 class TransferMessageTests(EvenniaTestCase):
     """Rejection messages are fixed and complete."""
@@ -606,3 +639,123 @@ class TransferPlanObserverTests(QuestRegistryIsolation, PartyTransferTestCase):
                     with self.assertRaises(RuntimeError):
                         self.transfer()
         self.assertEqual(self.effects, [])
+
+
+class TransferChainPinTests(QuestRegistryIsolation, PartyTransferTestCase):
+    """An AUTO reward chain's released pins join the outer rollback snapshot.
+
+    Receiving the potion completes an AUTO quest whose paid item completes a
+    second, room-bound ACQUIRE stage. That second room is absent from the
+    receiver plan's own pin operations, so only the transfer's preflight can
+    restore it when a later write fails.
+    """
+
+    def setUp(self):
+        super().setUp()
+        reward_definition = register(
+            quest(
+                "transfer_chain_reward",
+                stages=(QuestStage(0, acquire(_REWARD.key, quantity=1)),),
+            )
+        )
+        staged = stage_active_record(self.aila, reward_definition)
+        apply_quest_log_replacement(
+            self.aila,
+            [
+                replace(record, stage_room_id=self.room.pk)
+                if record.quest_id == staged.quest_id
+                else record
+                for record in read_records(self.aila)
+            ],
+        )
+        self.chain_reason = stage_pin_reason(
+            self.aila.pk, staged.quest_id, staged.stage_index
+        )
+        self.room.db.pin_reasons = [self.chain_reason]
+        trigger_definition = register(
+            quest(
+                "transfer_chain_trigger",
+                stages=(QuestStage(0, acquire(_POTION.key, quantity=1)),),
+            )
+        )
+        accept_auto(
+            self.aila,
+            trigger_definition,
+            QuestReward(copper=0, items=(ItemQuantity(_REWARD.key, 1),), merit=0),
+        )
+
+    def test_a_late_failure_restores_a_chain_released_pin(self):
+        self.hold(self.commander, _POTION.key)
+        self.mirror(self.commander, _POTION.key)
+        calls = []
+
+        def failing(plan):
+            calls.append(plan.entity)
+            real_apply_inventory_plan(plan)
+            if len(calls) == 2:
+                raise RuntimeError("injected failure after the receiver write")
+
+        with patch.object(party_inventory, "apply_inventory_plan", failing):
+            with self.assertRaises(RuntimeError):
+                self.transfer()
+
+        self.assertEqual(self.room.db.pin_reasons, [self.chain_reason])
+        self.assertNotIn(_REWARD.key, list(self.aila.db.inventory or []))
+
+
+class PossessedTransferTests(EvenniaTest):
+    """A possessed figure is only the anchor; the commander authorizes."""
+
+    def setUp(self):
+        super().setUp()
+        scope = synthetic_registries(
+            "races",
+            "static_tiers",
+            "subraces",
+            "items",
+            extra={"items": {_POTION.key: _POTION}},
+        )
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+        self.aila = self._companion("艾拉")
+        self.kahn = self._companion("卡恩")
+        enter_possession(self.char1, self.aila)
+
+    def _companion(self, key):
+        npc = create_object(NPC, key=key, location=self.room1, home=self.room1)
+        npc.race = _race_key()
+        npc.apply_race_baseline()
+        join_party(npc, self.char1)
+        return npc
+
+    def test_a_possessed_figure_can_organize_another_pair(self):
+        self.char1.db.inventory = [_POTION.key]
+
+        outcome = transfer_item(
+            self.aila, self.char1.pk, self.kahn.pk, _POTION.key, 1
+        )
+
+        self.assertEqual(outcome.giver, self.char1)
+        self.assertEqual(self.kahn.db.inventory, [_POTION.key])
+
+    def test_combat_on_the_possessed_figure_alone_bars_the_transfer(self):
+        self.char1.db.inventory = [_POTION.key]
+        with patch(
+            "world.rules.combat_session.is_in_active_session",
+            side_effect=lambda actor: actor is self.aila,
+        ):
+            with self.assertRaises(PartyTransferError) as context:
+                transfer_item(
+                    self.aila, self.char1.pk, self.kahn.pk, _POTION.key, 1
+                )
+        self.assertEqual(context.exception.reason, REASON_TRANSFER_IN_COMBAT)
+
+    def test_a_possessed_figure_outside_the_commander_room_cannot_act(self):
+        self.char1.db.inventory = [_POTION.key]
+        elsewhere = create_object(Room, key="別處")
+        self.aila.move_to(elsewhere, quiet=True)
+
+        with self.assertRaises(PartyTransferError) as context:
+            transfer_item(self.aila, self.char1.pk, self.kahn.pk, _POTION.key, 1)
+
+        self.assertEqual(context.exception.reason, REASON_MEMBER_NOT_PRESENT)
