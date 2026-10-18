@@ -53,8 +53,18 @@ class PanelUnavailableError(RuntimeError):
 
     Raised by a presenter to request its registry-owned non-internal
     unavailable payload (no correlation ID) instead of an internal-failure
-    payload.
+    payload. ``reason`` optionally supplies a public ``(code, message)`` pair
+    for that common unavailable form; without one the panel's registered
+    reason applies. A presenter uses it when the player needs the specific
+    stable refusal (for example a party-scope code), never to change the
+    payload's shape.
     """
+
+    def __init__(
+        self, message: str = "", *, reason: tuple[str, str] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 class PresentationRegistry:
@@ -97,17 +107,21 @@ class PresentationRegistry:
         *,
         internal: bool = False,
         correlation_id: str | None = None,
+        reason: tuple[str, str] | None = None,
     ) -> dict[str, Any]:
         """Return the exact common unavailable payload owned by a panel spec.
 
         ``internal=True`` selects the generic internal-failure reason and a
         bounded correlation ID; the ordinary path uses the panel's stable
-        reason without a correlation ID.
+        reason without a correlation ID. A declared-unavailable presenter may
+        pass its own bounded public ``reason`` pair instead.
         """
         spec = self.spec(panel_name)
         if internal:
             reason_code = _INTERNAL_REASON_CODE
             reason_message = _INTERNAL_REASON_MESSAGE
+        elif reason is not None:
+            reason_code, reason_message = reason
         else:
             reason_code, reason_message = spec.unavailable_reason
         return unavailable_payload(
@@ -127,8 +141,8 @@ class PresentationRegistry:
         spec = self.spec(panel_name)
         try:
             payload = spec.presenter(context)
-        except PanelUnavailableError:  # observability: ignore R2: a declared-unavailable panel is the designed degrade path; the unavailable payload IS the client-visible report
-            return self.build_unavailable(panel_name)
+        except PanelUnavailableError as error:  # observability: ignore R2: a declared-unavailable panel is the designed degrade path; the unavailable payload IS the client-visible report
+            return self.build_unavailable(panel_name, reason=error.reason)
         except Exception as error:
             correlation_id = secrets.token_hex(16)
             log_error(

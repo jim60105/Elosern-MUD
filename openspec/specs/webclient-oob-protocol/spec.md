@@ -223,7 +223,7 @@ The presentation registry SHALL reject duplicate panel names and SHALL expose on
 #### Scenario: Skill use selection is isolated presentation context
 
 - **WHEN** a selected skill is rendered and the session later adopts another puppet/epoch
-- **THEN** `skill_use` is registered at version 1, other registered versions remain unchanged, no gameplay state was mutated by rendering, and the new epoch receives no old selection
+- **THEN** `skill_use` is registered at version 2, other registered versions remain unchanged, no gameplay state was mutated by rendering, and the new epoch receives no old selection
 
 #### Scenario: Registered production panels join additively
 - **WHEN** the production registry is built
@@ -239,7 +239,7 @@ The presentation registry SHALL reject duplicate panel names and SHALL expose on
 
 #### Scenario: Skill use recomputes availability without mutation
 - **WHEN** the `skill_use` presenter renders a selection
-- **THEN** it SHALL receive only a copied skill/scale presentation selection belonging to the current transport-and-puppet epoch, never the transport session itself, SHALL recompute current canonical availability without invoking a cast, creating a combat record or clock, or changing persistent state, and an absent or retired selection SHALL produce its common unavailable form
+- **THEN** it SHALL receive only a copied caster/skill/scale presentation selection belonging to the current transport-and-puppet epoch, never the transport session itself, SHALL recompute current canonical availability without invoking a cast, creating a combat record or clock, or changing persistent state, and an absent or retired selection SHALL produce its common unavailable form
 - **AND** this registration SHALL NOT change existing panel schema versions or the envelope protocol version
 
 #### Scenario: Panel versions derive from module constants

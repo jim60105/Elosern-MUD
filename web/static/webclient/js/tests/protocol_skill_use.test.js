@@ -1,7 +1,8 @@
 /*
- * skill_use panel v1 mirror: the exact available form, unique bounded
- * identities, opening line-up cross references, the enabled/disabled_reason
- * pairing, the registered version, and panel validation through the facade.
+ * skill_use panel v2 mirror: the exact available form, the explicit caster,
+ * unique bounded identities, opening line-up cross references, the
+ * enabled/disabled_reason pairing, the registered version, and panel
+ * validation through the facade.
  *
  * All fixtures are synthetic: invented keys, invented prose.
  */
@@ -15,9 +16,10 @@ const Protocol = require("../elosern/protocol.js");
 
 function panel(overrides) {
   const base = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "skill_use",
+    actor_id: 3,
     scale: 1,
     skill: {
       key: "t_soft_mend",
@@ -47,20 +49,20 @@ function panel(overrides) {
   return overrides ? overrides(base) || base : base;
 }
 
-test("the registered allowlist version is 1", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.skill_use, 1);
-  assert.equal(Protocol.SKILL_USE_SCHEMA_VERSION, 1);
+test("the registered allowlist version is 2", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.skill_use, 2);
+  assert.equal(Protocol.SKILL_USE_SCHEMA_VERSION, 2);
 });
 
 test("a valid preview passes through the facade and validatePanel", () => {
   assert.doesNotThrow(() => Protocol.validateSkillUsePanel(panel()));
-  assert.doesNotThrow(() => Protocol.validatePanel("skill_use", 1, panel()));
+  assert.doesNotThrow(() => Protocol.validatePanel("skill_use", 2, panel()));
 });
 
 test("the common unavailable form is accepted", () => {
   assert.doesNotThrow(() =>
-    Protocol.validatePanel("skill_use", 1, {
-      schema_version: 1,
+    Protocol.validatePanel("skill_use", 2, {
+      schema_version: 2,
       available: false,
       reason: { code: "skill_use_unavailable", message: "技能施放預覽目前無法顯示" },
     })
@@ -103,7 +105,12 @@ test("freeform rungs are shape-checked and an unadvertised scale stays readable"
 
 const BAD = {
   "unknown field": (p) => { p.skill.extra = 1; },
-  "wrong version": (p) => { p.schema_version = 2; },
+  "unknown top-level field": (p) => { p.extra = 1; },
+  "wrong version": (p) => { p.schema_version = 3; },
+  "missing actor": (p) => { delete p.actor_id; },
+  "boolean actor": (p) => { p.actor_id = true; },
+  "zero actor": (p) => { p.actor_id = 0; },
+  "string actor": (p) => { p.actor_id = "3"; },
   "wrong kind": (p) => { p.kind = "combat"; },
   "duplicate identity": (p) => { p.skill.targets.push(Object.assign({}, p.skill.targets[0])); },
   "dangling line-up": (p) => { p.skill.openings[0].target_ids = [9, 99]; },

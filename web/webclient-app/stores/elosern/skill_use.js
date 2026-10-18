@@ -36,6 +36,23 @@ export function applySkillUse(ctx) {
     return ctx.router.depth() > 0 ? ctx.router.currentDescriptor() : null;
   }
 
+  // The controlled figure's identity, exactly as the inventory drawer derives
+  // it: the committed `status` panel serializes it as a string. Null when
+  // that panel is missing or unavailable; the book then refuses locally
+  // instead of naming an invented caster or falling back to the commander.
+  function controlledActorId(rs) {
+    const status = rs.panels && rs.panels.status;
+    if (!status || status.available !== true) {
+      return null;
+    }
+    const identity = status.actor && status.actor.identity;
+    if (typeof identity !== "string" || identity.trim() === "") {
+      return null;
+    }
+    const value = Number(identity);
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+
   // The book's 施放 entry. Exploration: request the authoritative preview
   // (nothing else is sent until the player confirms in the dock). Combat:
   // close the book and hand focus to the existing combat 技能 entry without
@@ -56,12 +73,21 @@ export function applySkillUse(ctx) {
     if (rs.mode !== "exploration" || typeof skillKey !== "string" || skillKey === "") {
       return { route: "refused" };
     }
-    const requestId = ctx.dispatchAction(SkillUseMenu.PREVIEW_ACTION, { skill_key: skillKey }, null);
+    const actorId = controlledActorId(rs);
+    if (actorId === null) {
+      return { route: "refused" };
+    }
+    const requestId = ctx.dispatchAction(
+      SkillUseMenu.PREVIEW_ACTION,
+      { actor_id: actorId, skill_key: skillKey },
+      null,
+    );
     if (requestId === null) {
       return { route: "refused" };
     }
     ctx.skillUse = {
       phase: "pending",
+      actorId,
       skillKey,
       requestId,
       epoch: rs.activeEpoch,
@@ -82,7 +108,10 @@ export function applySkillUse(ctx) {
       // The book closes BEFORE the dock frame mounts (the drawer's own close
       // teardown may re-home the exploration root first).
       ctx.closeHudDrawer();
-      ctx.pushFrame({ source: "skilluse.root", params: { skillKey: flow.skillKey } }, null);
+      ctx.pushFrame(
+        { source: "skilluse.root", params: { skillKey: flow.skillKey, actorId: flow.actorId } },
+        null,
+      );
       flow.phase = "active";
       ctx.skillUseEscaped = false;
       ctx.dockFocusRequest += 1;
@@ -120,6 +149,7 @@ export function applySkillUse(ctx) {
         result.outcome === "success" &&
         preview &&
         preview.available === true &&
+        preview.actor_id === flow.actorId &&
         preview.skill.key === flow.skillKey &&
         rs.mode === "exploration";
       if (!ready) {
@@ -142,8 +172,21 @@ export function applySkillUse(ctx) {
       enterDock(flow);
       return;
     }
-    // Active: the flow lives while one of its frames is current.
+    // Active: the flow lives while one of its frames is current AND the
+    // committed preview still names the same caster and skill. A replacement
+    // preview for another caster retires the flow instead of silently
+    // re-binding the open confirmation to that actor.
     if (isSkillUseSource(currentDescriptor())) {
+      const preview = (rs.panels && rs.panels.skill_use) || null;
+      const stillCurrent =
+        preview &&
+        preview.available === true &&
+        preview.actor_id === flow.actorId &&
+        preview.skill.key === flow.skillKey;
+      if (!stillCurrent) {
+        ctx.skillUse = null;
+        return;
+      }
       ctx.skillUseEscaped = false;
       return;
     }
@@ -172,7 +215,8 @@ export function applySkillUse(ctx) {
       return false;
     }
     const skillKey = descriptor.params && descriptor.params.skillKey;
-    const model = ctx.frameResolver.skillUseModel(skillKey);
+    const actorId = descriptor.params && descriptor.params.actorId;
+    const model = ctx.frameResolver.skillUseModel(skillKey, actorId);
     if (!model) {
       return true;
     }
@@ -187,7 +231,10 @@ export function applySkillUse(ctx) {
       return true;
     }
     if (item.actionId === "open-skilluse-scale") {
-      ctx.pushFrame({ source: "skilluse.scale", params: { skillKey } }, item.key);
+      ctx.pushFrame(
+        { source: "skilluse.scale", params: { skillKey, actorId } },
+        item.key,
+      );
       ctx.publishView();
       return true;
     }
@@ -197,7 +244,11 @@ export function applySkillUse(ctx) {
       if (item.payload.scale !== model.panel.scale) {
         const request = ctx.dispatchAction(
           SkillUseMenu.PREVIEW_ACTION,
-          { skill_key: skillKey, scale: item.payload.scale },
+          {
+            actor_id: model.panel.actor_id,
+            skill_key: skillKey,
+            scale: item.payload.scale,
+          },
           null,
         );
         if (request === null) {
@@ -219,7 +270,10 @@ export function applySkillUse(ctx) {
     }
     if (item.actionId === "open-skilluse-opening" && item.payload) {
       ctx.pushFrame(
-        { source: "skilluse.opening", params: { skillKey, identity: item.payload.identity } },
+        {
+          source: "skilluse.opening",
+          params: { skillKey, actorId, identity: item.payload.identity },
+        },
         item.key,
       );
       ctx.publishView();
@@ -251,7 +305,10 @@ export function applySkillUse(ctx) {
     if (!isSkillUseSource(descriptor)) {
       return null;
     }
-    const model = ctx.frameResolver.skillUseModel(descriptor.params && descriptor.params.skillKey);
+    const model = ctx.frameResolver.skillUseModel(
+      descriptor.params && descriptor.params.skillKey,
+      descriptor.params && descriptor.params.actorId,
+    );
     if (!model) {
       return null;
     }

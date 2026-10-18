@@ -8,9 +8,10 @@ import SkillUseMenu from "../../lib/skill_use_menu.js";
 
 function panel(spec, skill = {}) {
   const base = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "skill_use",
+    actor_id: 42,
     scale: 1,
     skill: {
       key: "t_soft_mend",

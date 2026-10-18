@@ -8,6 +8,7 @@ from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.registry import (
+    PanelUnavailableError,
     PresenterSpec,
     PresentationRegistry,
     build_production_registry,
@@ -71,6 +72,25 @@ class RegistryTests(unittest.TestCase):
                 "schema_version": 1,
                 "available": False,
                 "reason": {"code": "missing_data", "message": "無法讀取角色資料"},
+            },
+        )
+
+    def test_declared_unavailable_can_carry_a_public_reason(self):
+        def presenter(context):
+            raise PanelUnavailableError(
+                "member_not_present",
+                reason=("member_not_present", "對方不在這裡。"),
+            )
+
+        registry = PresentationRegistry("test")
+        registry.register(_spec(presenter=presenter))
+        payload = registry.render("status", _context())
+        self.assertEqual(
+            payload,
+            {
+                "schema_version": 1,
+                "available": False,
+                "reason": {"code": "member_not_present", "message": "對方不在這裡。"},
             },
         )
 

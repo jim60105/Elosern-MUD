@@ -1,14 +1,17 @@
-"""Exact schema-version-1 ``skill_use`` panel and presenter.
+"""Exact schema-version-2 ``skill_use`` panel and presenter.
 
 The panel is the on-demand SkillBook use preview (change
 ``skillbook-authoritative-casting`` D1/D2): one owned active skill at one
 selected scale, with its server-computed adjusted cost, its ordinary explicit
 field targets, and its separate monster openings (each disclosing that the
 cast starts combat, and an AREA opening its whole current line-up). The
-selection comes only from the copied ``PresentationContext.skill_use`` pair of
-the current transport-and-puppet epoch; without one, outside exploration, or
-when the skill is no longer an owned active skill, the registry emits the
-common unavailable form.
+caster is explicit: version 2 names ``actor_id`` and computes costs, targets,
+openings, and availability for that member. The selection comes only from the
+copied ``PresentationContext.skill_use`` triple of the current
+transport-and-puppet epoch; the presenter reauthorizes the caster on every
+publication. Without a selection, outside exploration, when the caster is no
+longer an authorized acting party member, or when the skill is no longer that
+caster's owned active skill, the registry emits the common unavailable form.
 
 The presenter is read-only: ``world.rules.field_cast.preview_field_skill``
 never rolls, stages effects, spends resources, awards practice, creates or
@@ -37,7 +40,7 @@ from world.rules.player_messages import rejection_message, session_reason_messag
 from world.rules.progression import FREEFORM_SCALE_VALUES
 from world.skills.registry import SKILL_REGISTRY
 
-SKILL_USE_SCHEMA_VERSION = 1
+SKILL_USE_SCHEMA_VERSION = 2
 
 MAX_SKILL_KEY = 64
 MAX_LABEL = 128
@@ -130,13 +133,14 @@ def validate_skill_use(payload: Any) -> dict[str, Any]:
     _require_exact_fields(
         payload,
         "skill_use",
-        {"schema_version", "available", "kind", "skill", "scale"},
+        {"schema_version", "available", "kind", "actor_id", "skill", "scale"},
         {},
     )
     if payload["schema_version"] != SKILL_USE_SCHEMA_VERSION:
         raise SkillUseError("skill_use schema_version mismatch")
     if payload["available"] is not True or payload["kind"] != "skill_use":
         raise SkillUseError("skill_use available form discriminator mismatch")
+    actor_id = _validate_identity(payload["actor_id"], "skill_use actor_id")
     scale = payload["scale"]
     if isinstance(scale, bool) or not isinstance(scale, (int, float)):
         raise SkillUseError("skill_use scale must be numeric")
@@ -231,6 +235,7 @@ def validate_skill_use(payload: Any) -> dict[str, Any]:
         "schema_version": SKILL_USE_SCHEMA_VERSION,
         "available": True,
         "kind": "skill_use",
+        "actor_id": actor_id,
         "skill": normalized_skill,
         "scale": scale,
     }
@@ -336,17 +341,36 @@ def skill_use_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``skill_use`` panel for the selection."""
     from web.webclient.presentation.affordances import in_exploration_mode
     from world.rules.field_cast import owned_active_skill, preview_field_skill
+    from world.rules.party_scope import (
+        PARTY_SCOPE_MESSAGES,
+        PURPOSE_ACT,
+        PartyScopeError,
+        authorize_member,
+        resolve_commander,
+    )
     from world.rules.progression import freeform_scale_entries_for
 
     actor = context.actor
     selection = context.skill_use
     if selection is None or actor is None or not in_exploration_mode(actor):
         raise PanelUnavailableError("no current skill use selection")
-    skill_key, scale = selection
-    skill = owned_active_skill(actor, skill_key)
+    actor_id, skill_key, scale = selection
+    # Reauthorize the caster on every publication: a member who left the
+    # party or the room, or who can no longer act, degrades to the common
+    # unavailable form carrying the stable party reason. The authenticated
+    # puppet is never substituted for the previewed caster.
+    try:
+        commander = resolve_commander(actor)
+        caster = authorize_member(commander, actor_id, PURPOSE_ACT, anchor=actor)
+    except PartyScopeError as error:  # observability: ignore R2: the declared-unavailable degrade path is the designed report
+        raise PanelUnavailableError(
+            error.reason,
+            reason=(error.reason, PARTY_SCOPE_MESSAGES[error.reason]),
+        ) from error
+    skill = owned_active_skill(caster, skill_key)
     if skill is None:
         raise PanelUnavailableError("the selected skill is no longer usable")
-    preview = preview_field_skill(actor, skill, scale)
+    preview = preview_field_skill(caster, skill, scale, commander=commander)
     if preview.overflow:
         raise PanelUnavailableError("field candidates exceed the panel bound")
     spec = skill.target_spec.value
@@ -357,7 +381,7 @@ def skill_use_presenter(context: PresentationContext) -> dict[str, Any]:
     for choice in preview.targets:
         pk = int(choice.entity.pk)
         label = names[pk]
-        if choice.entity is actor:
+        if choice.entity is caster:
             label = f"{label}（自己）"
         targets.append(
             {
@@ -393,7 +417,7 @@ def skill_use_presenter(context: PresentationContext) -> dict[str, Any]:
         "targets": targets,
         "openings": openings,
     }
-    scales = freeform_scale_entries_for(actor, skill)
+    scales = freeform_scale_entries_for(caster, skill)
     if scales:
         payload_skill["freeform_scales"] = [
             {"scale": rung, "label": label, "mp_cost": mp_cost}
@@ -404,6 +428,7 @@ def skill_use_presenter(context: PresentationContext) -> dict[str, Any]:
             "schema_version": SKILL_USE_SCHEMA_VERSION,
             "available": True,
             "kind": "skill_use",
+            "actor_id": actor_id,
             "skill": payload_skill,
             "scale": float(scale),
         }

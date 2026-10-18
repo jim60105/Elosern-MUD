@@ -1,13 +1,14 @@
 """Exact SkillBook use payload validators and narrow adapters.
 
-``explore.skill_preview`` selects one owned active skill (and an optional
-scale) for the session's on-demand ``skill_use`` panel; it is presentation
-work only and never rolls, spends, awards practice, touches the world clock,
-or creates a combat session. ``explore.cast`` performs one field cast through
-the deterministic ``world.rules.field_cast.cast_in_field`` entry after
-re-resolving every submitted identity from the actor's current co-located
-candidates. Neither action routes through the text command parser, and no
-payload accepts an actor, context, cost, shorthand, or roster field.
+``explore.skill_preview`` selects one explicitly named party member's owned
+active skill (and an optional scale) for the session's on-demand ``skill_use``
+panel; it is presentation work only and never rolls, spends, awards practice,
+touches the world clock, or creates a combat session. ``explore.cast``
+performs one field cast through the deterministic
+``world.rules.field_cast.cast_as_member`` entry after re-authorizing the
+caster and re-resolving every submitted identity from that caster's current
+co-located candidates. Neither action routes through the text command parser,
+and no payload accepts a context, cost, shorthand, or roster field.
 """
 
 from typing import Any
@@ -69,13 +70,16 @@ def _identity(value: Any, field: str) -> int:
 
 
 def validate_skill_preview_payload(payload: Any) -> dict[str, Any]:
-    """Validate ``{skill_key[, scale]}`` for ``explore.skill_preview``."""
+    """Validate ``{actor_id, skill_key[, scale]}`` for ``explore.skill_preview``."""
     if not isinstance(payload, dict):
         raise SkillUseActionError("explore.skill_preview payload must be an object")
-    unknown = set(payload) - {"skill_key", "scale"}
-    if unknown or "skill_key" not in payload:
-        raise SkillUseActionError("explore.skill_preview requires skill_key and optional scale")
+    unknown = set(payload) - {"actor_id", "skill_key", "scale"}
+    if unknown or not {"actor_id", "skill_key"} <= set(payload):
+        raise SkillUseActionError(
+            "explore.skill_preview requires actor_id, skill_key and optional scale"
+        )
     return {
+        "actor_id": _identity(payload["actor_id"], "actor_id"),
         "skill_key": _skill_key(payload["skill_key"]),
         "scale": _scale(payload.get("scale", 1.0)),
     }
@@ -84,23 +88,31 @@ def validate_skill_preview_payload(payload: Any) -> dict[str, Any]:
 def validate_field_cast_payload(payload: Any) -> dict[str, Any]:
     """Validate the exact ``explore.cast`` payload.
 
-    ``{skill_key[, scale]}`` plus at most one target form: ``target_ids`` (a
-    non-empty unique list of at most 64 positive safe identities, in
-    presenter order) or ``opening_target_id`` (one monster anchor). Target
-    cardinality against the skill's TargetSpec is a domain rejection, not a
-    schema failure, so a stale but well-formed request reads its real reason.
+    ``{actor_id, skill_key[, scale]}`` plus at most one target form:
+    ``target_ids`` (a non-empty unique list of at most 64 positive safe
+    identities, in presenter order) or ``opening_target_id`` (one monster
+    anchor). Target cardinality against the skill's TargetSpec is a domain
+    rejection, not a schema failure, so a stale but well-formed request reads
+    its real reason.
     """
     if not isinstance(payload, dict):
         raise SkillUseActionError("explore.cast payload must be an object")
-    unknown = set(payload) - {"skill_key", "scale", "target_ids", "opening_target_id"}
-    if unknown or "skill_key" not in payload:
-        raise SkillUseActionError("explore.cast has unknown fields or no skill_key")
+    unknown = set(payload) - {
+        "actor_id",
+        "skill_key",
+        "scale",
+        "target_ids",
+        "opening_target_id",
+    }
+    if unknown or not {"actor_id", "skill_key"} <= set(payload):
+        raise SkillUseActionError("explore.cast has unknown fields or no actor_id/skill_key")
     if "target_ids" in payload and "opening_target_id" in payload:
         raise SkillUseActionError("explore.cast target forms are mutually exclusive")
     skill_key = _skill_key(payload["skill_key"])
     if skill_key == RESERVED_FLEE_KEY:
         raise SkillUseActionError("explore.cast never carries the reserved flee skill")
     normalized: dict[str, Any] = {
+        "actor_id": _identity(payload["actor_id"], "actor_id"),
         "skill_key": skill_key,
         "scale": _scale(payload.get("scale", 1.0)),
         "target_ids": (),
@@ -137,20 +149,28 @@ def _skill_preview_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     """Record the preview selection; the dispatcher publishes ``skill_use``."""
     from web.webclient.presentation.skill_use_selection import select_skill_use
 
-    result = dict(select_skill_use(session, actor, payload["skill_key"], payload["scale"]))
+    result = dict(
+        select_skill_use(
+            session, actor, payload["actor_id"], payload["skill_key"], payload["scale"]
+        )
+    )
     result["affected_panels"] = AFFECTED_PREVIEW
     return result
 
 
 def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Re-resolve identities and cast through the shared field entry.
+    """Re-authorize the caster, re-resolve identities, and cast as that member.
 
     The mode is rechecked first (an admitted stale field request after combat
-    began never settles). Ordinary identities resolve only among the actor's
-    current visible co-located field candidates; a monster in that list is
-    refused (monster use requires the explicit anchor). The anchor resolves
-    only among the current living co-located monsters — the same set the
-    preview advertises. Every domain gate then reruns inside the entry.
+    began never settles). The named caster is re-derived through the party
+    boundary for the acting purpose before any routing: a forged, absent,
+    knocked-out, or otherwise unauthorized id is refused and the authenticated
+    puppet is never substituted for it. Ordinary identities resolve only among
+    that caster's current visible co-located field candidates; a monster in
+    that list is refused (monster use requires the explicit anchor). The
+    anchor resolves only among the caster's current living co-located
+    monsters — the same set the preview advertises. Every domain gate then
+    reruns inside ``cast_as_member``.
     """
     from web.webclient.presentation.affordances import in_exploration_mode
     from web.webclient.presentation.skill_use_selection import retire_skill_use_selection
@@ -159,29 +179,44 @@ def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None
     from world.rules.combat_session import CombatSessionError
     from world.rules.event_log import render_plain_text
     from world.rules.field_cast import (
-        cast_in_field,
+        cast_as_member,
         field_candidate_entities,
         field_opening_anchors,
+    )
+    from world.rules.party_scope import (
+        PARTY_SCOPE_MESSAGES,
+        PURPOSE_ACT,
+        PartyScopeError,
+        authorize_member,
+        resolve_commander,
     )
     from world.rules.player_messages import rejection_message, session_reason_message
     from typeclasses.monsters import Monster
 
     if not in_exploration_mode(actor):
         return _rejected(*_NOT_EXPLORATION)
+    try:
+        caster = authorize_member(
+            resolve_commander(actor), payload["actor_id"], PURPOSE_ACT, anchor=actor
+        )
+    except PartyScopeError as error:  # observability: ignore R2: the stable party refusal IS the action result, not a swallowed failure
+        return _rejected(
+            error.reason, PARTY_SCOPE_MESSAGES.get(error.reason, "目前無法施放。")
+        )
     skill_key = payload["skill_key"]
     scale = payload["scale"]
     targets: list[Any] = []
     anchor = None
     if payload["opening_target_id"] is not None:
-        anchors = {int(monster.pk): monster for monster in field_opening_anchors(actor)}
+        anchors = {int(monster.pk): monster for monster in field_opening_anchors(caster)}
         anchor = anchors.get(payload["opening_target_id"])
         if anchor is None:
             return _rejected(*_TARGET_GONE)
     elif payload["target_ids"]:
-        candidates = {int(entity.pk): entity for entity in field_candidate_entities(actor)}
+        candidates = {int(entity.pk): entity for entity in field_candidate_entities(caster)}
         # Only an advertised opening anchor earns the distinct message, so an
         # arbitrary id never reveals anything the preview did not disclose.
-        anchors = {int(monster.pk) for monster in field_opening_anchors(actor)}
+        anchors = {int(monster.pk) for monster in field_opening_anchors(caster)}
         for identity in payload["target_ids"]:
             entity = candidates.get(identity)
             if entity is None:
@@ -195,8 +230,9 @@ def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None
             # entry's trusted-text normalization never applies to OOB input.
             return _rejected(*_MONSTER_NEEDS_OPENING)
     try:
-        outcome = cast_in_field(
+        outcome = cast_as_member(
             actor,
+            payload["actor_id"],
             skill_key,
             targets=targets,
             opening_target=anchor,

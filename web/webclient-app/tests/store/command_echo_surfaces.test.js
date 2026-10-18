@@ -534,7 +534,10 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       silence: true,
       prepare() {
         openExploration();
-        store.dispatchAction("explore.skill_preview", { skill_key: SYNTH_SKILL.id });
+        store.dispatchAction("explore.skill_preview", {
+          actor_id: 42,
+          skill_key: SYNTH_SKILL.id,
+        });
       },
     },
     {
@@ -544,7 +547,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         store.dispatchAction(
           "explore.cast",
-          { skill_key: SYNTH_SKILL.id, target_ids: [7] },
+          { actor_id: 42, skill_key: SYNTH_SKILL.id, target_ids: [7] },
           { skillLabel: "合成癒合", targetLabel: "店長" },
         );
       },
@@ -557,7 +560,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         store.dispatchAction(
           "explore.cast",
-          { skill_key: SYNTH_SKILL.id, opening_target_id: 9 },
+          { actor_id: 42, skill_key: SYNTH_SKILL.id, opening_target_id: 9 },
           { skillLabel: "合成癒合", actionLabel: "合成狼（開戰）" },
         );
       },

@@ -6,11 +6,11 @@ Provide authoritative graphical skill use from SkillBook through the existing fi
 
 ### Requirement: Skill use has an exact on-demand versioned read model
 
-The production OOB registry SHALL expose `skill_use` at schema version 1. Its available form SHALL contain exactly `schema_version`, `available: true`, `kind: "skill_use"`, `skill`, and the selected numeric `scale`. `skill` SHALL contain exactly `key`, `label`, `description`, `target_spec`, `usable_out_of_combat`, `cost`, `enabled`, `disabled_reason`, `targets`, `openings`, and optional `freeform_scales`.
+The production OOB registry SHALL expose `skill_use` at schema version 2. Its available form SHALL contain exactly `schema_version`, `available: true`, `kind: "skill_use"`, `actor_id` (the selected caster member), `skill`, and the selected numeric `scale`; costs, targets, openings and availability SHALL be computed for that caster. The `skill` object SHALL contain exactly the fields its scenario fixes.
 
 #### Scenario: Selected preview is a read-only bounded replacement
 - **WHEN** an owned active skill is selected for field use
-- **THEN** the browser receives one complete version-1 `skill_use` replacement with canonical costs, targets, opening consequences and availability, and no trait, resource, proficiency, session or clock state changes
+- **THEN** the browser receives one complete version-2 `skill_use` replacement with canonical costs, targets, opening consequences and availability, and no trait, resource, proficiency, session or clock state changes
 
 #### Scenario: Malformed or excessive preview fails safely
 - **WHEN** a panel includes an unknown field, wrong version, duplicate identity, dangling opening target reference, more than 64 candidates or an over-budget full envelope
@@ -23,6 +23,10 @@ The production OOB registry SHALL expose `skill_use` at schema version 1. Its av
 #### Scenario: Nested definitions are reused and cost is server-adjusted
 - **WHEN** the panel's skill, cost and scale fields are constructed
 - **THEN** existing bounded skill-key, metadata, resource-cost and freeform-scale definitions are reused, and `cost` is the server-computed adjusted cost at the selected scale
+
+#### Scenario: The skill object carries exactly its declared fields
+- **WHEN** the available form's `skill` object is published
+- **THEN** it contains exactly `key`, `label`, `description`, `target_spec`, `usable_out_of_combat`, `cost`, `enabled`, `disabled_reason`, `targets`, `openings`, and optional `freeform_scales`
 
 #### Scenario: Target and opening entries are exactly shaped
 - **WHEN** targets or openings appear in the panel
@@ -48,9 +52,13 @@ The production OOB registry SHALL expose `skill_use` at schema version 1. Its av
 - **WHEN** selection is missing, mode is invalid, data is unavailable or the presenter fails
 - **THEN** the common unavailable form is used without suppressing other panels or text access
 
+#### Scenario: A companion preview is computed for the companion
+- **WHEN** the selection names companion 艾拉 and 治癒之光
+- **THEN** `actor_id` is 艾拉's id, `cost` reflects 艾拉's adjusted cost, `enabled` reflects 艾拉's MP, the candidates include 艾拉 herself, and `openings` lists the co-located monster openings validated for 艾拉 as initiator under the commander's party
+
 ### Requirement: Preview selection is session-scoped and never executes gameplay
 
-`explore.skill_preview` SHALL accept exactly required `skill_key` (1..64 characters under the existing skill-key validator) and optional `scale` from the existing numeric closed scale set, defaulting to 1.0. It SHALL publish a freshly computed `skill_use` panel before its result and SHALL perform no roll, cast, practice award, world-clock creation/advance or combat creation.
+`explore.skill_preview` SHALL accept exactly required `actor_id` (a positive safe-integer party member id reauthorized for the acting purpose), required `skill_key` (1..64 characters under the existing skill-key validator) and optional `scale` from the existing numeric closed scale set, defaulting to 1.0. It SHALL publish a freshly computed `skill_use` panel before its result and SHALL perform no roll, cast, practice award, world-clock creation/advance or combat creation.
 
 #### Scenario: Inspecting a disabled skill spends nothing
 - **WHEN** a player selects an owned active skill that cannot currently execute
@@ -70,10 +78,10 @@ The production OOB registry SHALL expose `skill_use` at schema version 1. Its av
 
 #### Scenario: Selection is ephemeral and ownership-gated
 - **WHEN** the player is in exploration with no active combat session
-- **THEN** it MAY select only the skill/scale pair in ephemeral presentation state, only an owned registered active skill is selectable, and a disabled but owned active skill is still inspectable
+- **THEN** it MAY select only the actor/skill/scale triple in ephemeral presentation state, only an active skill registered and owned by that actor is selectable, and a disabled but owned active skill is still inspectable
 
 #### Scenario: Invalid preview keys reject safely
-- **WHEN** an unowned, unknown or passive key, an invalid mode or a missing presentation session is submitted
+- **WHEN** an unowned, unknown or passive key, a forged or absent `actor_id`, an invalid mode or a missing presentation session is submitted
 - **THEN** a safe bounded rejection is returned
 
 #### Scenario: Selection lifetime ends with the session
@@ -130,11 +138,11 @@ Field previews SHALL be side-effect-free and apply the same field permission, ow
 
 ### Requirement: Field cast payloads express one authoritative target shape
 
-`explore.cast` SHALL accept required `skill_key`, optional bounded `scale` defaulting to 1.0, and at most one of `target_ids` or `opening_target_id`. IDs SHALL be positive JavaScript-safe integers excluding booleans; `target_ids` SHALL be a nonempty unique list of at most 64 IDs. NONE/SELF SHALL submit neither target field, with SELF bound server-side to the authenticated puppet.
+`explore.cast` SHALL accept required `actor_id` (the caster member), required `skill_key`, optional bounded `scale` defaulting to 1.0, and at most one of `target_ids` or `opening_target_id`. IDs SHALL be positive JavaScript-safe integers excluding booleans; `target_ids` SHALL be a nonempty unique list of at most 64 IDs. NONE/SELF SHALL submit neither target field, with SELF bound server-side to the reauthorized caster.
 
 #### Scenario: NONE and SELF contain no target authority
 - **WHEN** the player confirms a NONE cast and separately a SELF cast
-- **THEN** each request carries its skill and any chosen allowed scale with neither target field nor an actor field, and SELF binds only the session puppet
+- **THEN** each request carries its caster `actor_id`, its skill and any chosen allowed scale with neither target field, and SELF binds only the reauthorized caster
 
 #### Scenario: Ordinary AREA uses explicit unique identities
 - **WHEN** the player toggles two permitted non-monster candidates and confirms
@@ -145,7 +153,7 @@ Field previews SHALL be side-effect-free and apply the same field permission, ow
 - **THEN** one request carries the anchor identity only, and the server determines the current complete monster line-up
 
 #### Scenario: Tampered shape cannot execute
-- **WHEN** a request includes both target forms, duplicate IDs, a shorthand, a boolean scale or an actor override
+- **WHEN** a request includes both target forms, duplicate IDs, a shorthand, a boolean scale, a missing `actor_id` or an unknown identity field
 - **THEN** it receives `malformed_payload`, no adapter executes and no game state changes
 
 #### Scenario: Ordinary SINGLE and AREA submit server-provided identities
@@ -157,7 +165,7 @@ Field previews SHALL be side-effect-free and apply the same field permission, ow
 - **THEN** it submits exactly one server-provided `opening_target_id`, never a browser-expanded roster
 
 #### Scenario: Malformed or unauthorized payloads reject without adapter invocation
-- **WHEN** a payload carries actor/context/cost fields, unknown fields, shorthands, simultaneous target forms, duplicate or empty IDs or malformed scale values
+- **WHEN** a payload carries context/cost fields, unknown fields, shorthands, simultaneous target forms, duplicate or empty IDs, a non-integer `actor_id` or malformed scale values
 - **THEN** it rejects without adapter invocation
 
 #### Scenario: TargetSpec mismatches reject before mutation
@@ -171,6 +179,10 @@ Field previews SHALL be side-effect-free and apply the same field permission, ow
 #### Scenario: The browser is limited to allowlisted OOB actions
 - **WHEN** the browser submits casting traffic
 - **THEN** it sends allowlisted OOB actions only and never synthesizes or executes a text cast command
+
+#### Scenario: A companion opening anchor opens the commander's encounter
+- **WHEN** `explore.cast` names companion 艾拉 as caster with an `opening_target_id`
+- **THEN** the dispatcher passes only the authenticated puppet, the rules reauthorize 艾拉, and one commander-owned session opens with 艾拉's opening draft entry
 
 ### Requirement: Field submissions revalidate and preserve deterministic routing
 
@@ -379,3 +391,18 @@ Cast selection SHALL be local until final submission. Transport loss, new epoch/
 #### Scenario: Tests are traceable and shard-owned
 - **WHEN** acceptance tests are registered
 - **THEN** they are traceable to the synchronized canonical requirements and registered with exact shard ownership under the repository rules
+
+### Requirement: A companion's monster opening uses the same caster-bound confirmation
+A preview whose caster is a companion SHALL present its monster openings as the same separate opening rows with the same explicit final opening confirmation the commander's cast uses (開戰並施放), bound to the previewed caster; confirming SHALL send exactly one `explore.cast` carrying that caster's `actor_id` and the `opening_target_id`.
+
+#### Scenario: Confirming opens combat for the caster
+- **WHEN** 艾拉 is the previewed caster of 冰錐術 and the player confirms 開戰並施放 on a monster opening
+- **THEN** exactly one `explore.cast {actor_id: 艾拉, skill_key, opening_target_id}` is sent, the commander stays the authenticated puppet, and combat opens with 艾拉's cost and practice accounted once when her entry resolves
+
+#### Scenario: Cancelling changes nothing
+- **WHEN** the player cancels or presses Escape at the opening confirmation
+- **THEN** no action is sent and no session, resource, practice or clock state changes
+
+#### Scenario: A forged or stale caster is refused
+- **WHEN** a confirmation arrives naming a caster that is no longer a present party member, or a forged id
+- **THEN** it is rejected with `member_not_present` or `not_party_member`, no session opens, and the commander is not used in its place
