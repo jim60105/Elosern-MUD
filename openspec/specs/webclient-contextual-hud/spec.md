@@ -1234,8 +1234,8 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 - **THEN** the head carries a subtitle stating its owner's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that same payload `SkillBook` renders); when the panel is unavailable the subtitle is empty, matching the drawer's existing degrade-without-inventing-data contract
 
 #### Scenario: Skill use is graphical and practice retitles the head
-- **WHEN** the skill-book drawer offers skill use, and while the declared-practice sub-screen replaces the book body
-- **THEN** the drawer provides discoverable graphical skill-use and practice affordances under the `webclient-skillbook-casting` contract, without requiring a cast-syntax footer or memorized skill/target keys, and the prescribed static `施放入口：cast <技法>[@威力]=<代號>` footer is removed; while the practice sub-screen is up the head title reads 修煉 and book-use guidance is absent
+- **WHEN** the skill-book drawer offers skill use and practice booking
+- **THEN** the drawer provides discoverable graphical skill-use and practice-booking affordances under the `webclient-skillbook-casting` contract, without requiring a cast-syntax footer or memorized skill/target keys, the prescribed static `施放入口：cast <技法>[@威力]=<代號>` footer is removed, and booking opens no sub-screen and never retitles the head
 
 #### Scenario: Book use hands the modal focus owner over
 - **WHEN** the player explicitly transfers from book use to dock-owned casting
@@ -2034,12 +2034,12 @@ The HUD SHALL carry the objective tracker as one line in the stage's `map` ancho
 - **WHEN** the first row's `objective_line` is longer than the line's width
 - **THEN** the text is truncated with an overflow indicator, the line keeps its single-row height, and the full `objective_line` is the line's accessible text
 
-### Requirement: The skill book offers a bounded declared-practice sub-screen
-The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed `character` panel supports, and activating it SHALL replace the book body with a practice sub-screen inside the same drawer: the drawer title becomes 修煉, the body lists the panel's active skills for selection, and one bounded-duration control starts the practice.
+### Requirement: The skill book offers a practice booking control
+The skill-book drawer SHALL offer a 修煉 booking affordance on each active skill row the committed `character` panel supports; activating it SHALL send one booking for the panel's member and SHALL open no sub-screen, duration control or title change.
 
 #### Scenario: The browser computes nothing about practice
-- **WHEN** the practice sub-screen renders and submits
-- **THEN** the browser computes nothing about eligibility, duration outcome, or progression: every row state comes from the committed panel, the duration control reuses the waiting surface's bounded hours form, and confirmation submits exactly one `explore.practice` with the selected `skill` and the converted whole `seconds` through the shared dispatch/confirmation lock
+- **WHEN** the booking control renders and submits
+- **THEN** the browser computes nothing about eligibility or progression: every row state comes from the committed panel and activation submits exactly one `explore.practice {actor_id, skill}` through the shared dispatch lock
 
 #### Scenario: In-flight submissions lock the control
 - **WHEN** a submission is in flight or its declared presentation revision is pending
@@ -2047,31 +2047,31 @@ The skill-book drawer SHALL offer a 修煉 affordance on each active skill row t
 
 #### Scenario: The result line is escaped and local
 - **WHEN** a server-authored result line (success summary or rejection message) arrives
-- **THEN** it renders as escaped text inside the sub-screen and nowhere else
+- **THEN** it renders as escaped text beside the booking control and nowhere else
 
 #### Scenario: Closing restores the book, not the footer
-- **WHEN** the sub-screen closes
-- **THEN** the book body, the original drawer title, and the book's graphical use/practice guidance are restored without restoring the removed cast-syntax footer
+- **WHEN** a booking completes
+- **THEN** the book body and title never changed, and no cast-syntax footer appears
 
 #### Scenario: Casting leaves practice intact
 - **WHEN** the player casts
 - **THEN** casting does not replace or bypass this practice workflow
 
 #### Scenario: Practice dispatches one server-trusted intent
-- **WHEN** the player opens 修煉 from an active skill row, selects the skill, enters `2` hours, and confirms
-- **THEN** exactly one `ui_action` is submitted, `explore.practice` with that `skill` and `seconds: 7200`, and the drawer controls stay locked until the result revision is adopted
+- **WHEN** the player activates 修煉 on an active skill row
+- **THEN** exactly one `ui_action` is submitted, `explore.practice` with the member's `actor_id` and that `skill`, no time passes, and the drawer controls stay locked until the result revision is adopted
 
 #### Scenario: The result line is the server's
 - **WHEN** a practice result arrives
-- **THEN** its Traditional Chinese summary or rejection message renders verbatim as escaped text in the sub-screen, with no client-computed progression, elapsed-time, or eligibility claim
+- **THEN** its Traditional Chinese booking summary or rejection message renders verbatim as escaped text, with no client-computed progression, elapsed-time, or eligibility claim
 
 #### Scenario: The practice screen is gated by committed data only
 - **WHEN** the `character` panel is unavailable or a row carries no practice support
 - **THEN** no 修煉 affordance renders for that row and no practice state is invented
 
 #### Scenario: Closing the practice screen restores the book
-- **WHEN** the player closes the practice sub-screen
-- **THEN** the drawer shows the skill book again with its original title and graphical use/practice guidance, no cast-syntax footer and no second drawer
+- **WHEN** the player books practice and continues browsing
+- **THEN** the drawer keeps showing the skill book with its original title, no cast-syntax footer and no second drawer
 
 ### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
 The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.

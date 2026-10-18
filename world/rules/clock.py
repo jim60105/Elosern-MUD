@@ -283,7 +283,10 @@ def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: Advanc
     Storage routes exclusively through progression's ``grant_study_practice_xp``
     (whose sole writer is ``award_practice_xp``), so booked awards saturate
     identically to per-use awards at the derived tip cap. An entity without a
-    booking — or without a ``db`` at all — is written nothing.
+    booking — or without a ``db`` at all — is written nothing. Ownership is
+    revalidated against current canonical state when the booking settles, so
+    a standing booking whose skill was lost while it stood is consumed
+    without progression; the award's own saturation is the cap revalidation.
     """
     if source is not AdvanceSource.SKIP:
         return
@@ -296,8 +299,16 @@ def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: Advanc
         if booking is None:
             continue
         db.practice_booking = None
-        if hours >= 1:
-            grant_study_practice_xp(entity, booking, hours)
+        if hours < 1 or not _owns_booking_skill(entity, booking):
+            continue
+        grant_study_practice_xp(entity, booking, hours)
+
+
+def _owns_booking_skill(entity: Any, skill_key: str) -> bool:
+    """Whether the entity still owns the booked skill at settlement time."""
+    skills = getattr(entity, "skills", None)
+    owned = getattr(skills, "owned_keys", None)
+    return callable(owned) and skill_key in owned()
 
 
 def register_event_source(

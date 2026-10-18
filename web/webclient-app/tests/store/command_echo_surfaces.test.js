@@ -523,15 +523,15 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "wait until dusk",
     },
     {
-      id: "skill book: practice screen dispatch (payload-only)",
+      id: "skill book: practice booking dispatch (payload-only)",
       ids: ["explore.practice"],
       prepare() {
         openExploration();
-        // The practice screen intent (AppClient.onPractice forwards the
-        // RestForm's {skill, seconds}; the echo replays the typed rest line).
-        store.dispatchAction("explore.practice", { skill: "firebolt", seconds: 3600 });
+        // The booking intent (AppClient.onPractice forwards the book's
+        // {actor_id, skill}; the echo names the typed booking command).
+        store.dispatchAction("explore.practice", { actor_id: 42, skill: "firebolt" });
       },
-      expected: "rest 3600s practice firebolt",
+      expected: "修煉 firebolt",
     },
     {
       id: "EXPECTED SILENCE: explore.skill_preview book preview (reads, casts nothing)",

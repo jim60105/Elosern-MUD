@@ -306,7 +306,7 @@ SkillBook SHALL offer discoverable active-skill use without typing keys. In expl
 
 #### Scenario: Practice and passive inspection retain their behavior
 - **WHEN** the player practices an active skill and then browses a passive skill
-- **THEN** practice sends exactly its existing bounded `explore.practice` intent with unchanged feedback, and the passive row offers no casting mutation
+- **THEN** practice sends exactly one `explore.practice` booking intent `{actor_id, skill}` for the book's member and shows the booking feedback, and the passive row offers no casting mutation
 
 #### Scenario: Keys drive the dock's real choices
 - **WHEN** the keyboard player navigates the field-use flow
@@ -322,7 +322,7 @@ SkillBook SHALL offer discoverable active-skill use without typing keys. In expl
 
 #### Scenario: Practice keeps its own bounded surface
 - **WHEN** casting and practice coexist in the book
-- **THEN** practice keeps its existing bounded drawer sub-screen, payload, feedback and shared submission lock independently of casting
+- **THEN** practice is a single booking control with its own payload, feedback and shared submission lock independently of casting, and it opens no duration sub-screen
 
 ### Requirement: SkillBook redesign is apply-owned and availability is truthful
 

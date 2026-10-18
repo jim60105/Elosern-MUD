@@ -168,7 +168,7 @@ class RestPracticeBookingTests(unittest.TestCase):
         )
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_capped_skill_rejects_and_clears_stale_booking(self):
+    def test_capped_skill_rejects_and_leaves_the_standing_booking(self):
         # Nobody consumes the kit row, so its derived cap is the configured
         # tip ceiling; read it through the same authority the command uses.
         cap = proficiency_cap(_PRACTICE_SKILL)
@@ -180,16 +180,18 @@ class RestPracticeBookingTests(unittest.TestCase):
         clock, _ = self._run(f"8h practice {_PRACTICE_SKILL}", caller)
         clock.advance.assert_not_called()
         self.assertIn("PRACTICE_SKILL_CAPPED", caller.msg.call_args_list[0].args[0])
-        # A rejected clause leaves no booking — new or stale — to settle later.
-        self.assertIsNone(caller.db.practice_booking)
+        # A rejected clause leaves the caller's standing booking unchanged.
+        self.assertEqual(caller.db.practice_booking, _PRACTICE_SKILL)
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_plain_rest_clears_a_stale_rolled_back_booking(self):
+    def test_plain_rest_leaves_the_standing_booking_for_the_advance(self):
         caller = _booking_caller(owned=(_PRACTICE_SKILL,), booking=_PRACTICE_SKILL)
         clock, observed = self._run("8h", caller)
         clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, (caller,))
-        self.assertEqual(observed, [None])
-        self.assertIsNone(caller.db.practice_booking)
+        # A clause-less rest records nothing: the standing booking reaches the
+        # clock untouched, and the stage (not the command) consumes it.
+        self.assertEqual(observed, [_PRACTICE_SKILL])
+        self.assertEqual(caller.db.practice_booking, _PRACTICE_SKILL)
 
     @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")
     def test_safety_gate_rejection_precedes_booking_preflight(self):
@@ -228,8 +230,8 @@ class RestPracticeBookingTests(unittest.TestCase):
 
 
 @synthetic_registries("skills")
-class UnlabeledSkipClearingTests(unittest.TestCase):
-    """Accepted unlabeled skips clear stale bookings before advancing."""
+class UnlabeledSkipStandingBookingTests(unittest.TestCase):
+    """Accepted unlabeled skips leave standing bookings for the clock stage."""
 
     @staticmethod
     def _caller():
@@ -254,7 +256,7 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         return clock
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_sleep_clears_stale_booking_before_advance(self):
+    def test_sleep_leaves_the_standing_booking_before_advance(self):
         caller = self._caller()
         seen: list = []
         clock = self._clock(seen, caller)
@@ -268,10 +270,10 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         ):
             command.func()
         clock.advance.assert_called_once()
-        self.assertEqual(seen, [None])
+        self.assertEqual(seen, [_PRACTICE_SKILL])
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_wait_until_clears_stale_booking_before_advance(self):
+    def test_wait_until_leaves_the_standing_booking_before_advance(self):
         caller = self._caller()
         seen: list = []
         clock = self._clock(seen, caller)
@@ -286,10 +288,10 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         ):
             command.func()
         clock.advance.assert_called_once_with(60, AdvanceSource.SKIP, (caller,))
-        self.assertEqual(seen, [None])
+        self.assertEqual(seen, [_PRACTICE_SKILL])
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
-    def test_advance_skip_clears_before_the_webclient_adapter_advance(self):
+    def test_advance_skip_leaves_the_standing_booking_for_the_adapter_advance(self):
         caller = self._caller()
         seen: list = []
         clock = self._clock(seen, caller)
@@ -301,6 +303,6 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
             ),
         ):
             advance_skip(caller, 3600)
-        self.assertEqual(seen, [None])
-        self.assertIsNone(caller.db.practice_booking)
+        self.assertEqual(seen, [_PRACTICE_SKILL])
+        self.assertEqual(caller.db.practice_booking, _PRACTICE_SKILL)
         clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, (caller,))

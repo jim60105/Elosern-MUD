@@ -274,26 +274,19 @@
       var fallback = label(display && display.waitLabel);
       return fallback;
     },
-    // Declared practice books the typed `rest <seconds>s practice <skill>`
-    // line (commands/skip.py CmdRest: `rest <duration> [practice <skill>]`).
-    // The skill key is a whitespace-free bounded key (the registry's
-    // validate_practice_payload) and the rest form converts whole hours to
-    // whole seconds, so the echoed line is byte-replayable. A malformed
-    // local payload stays silent rather than echoing a non-replayable line.
+    // Practice booking echoes the typed `修煉 <skill>` line
+    // (commands/skip.py CmdPractice: `修煉 <技能> [= <成員>]`). The skill key
+    // is a whitespace-free bounded key (the registry's
+    // validate_practice_payload). The member clause is omitted exactly like
+    // the member-scoped inventory echoes: this is a display line, never a
+    // replay, so a malformed local payload stays silent instead of echoing an
+    // invented line.
     "explore.practice": function (payload) {
       var skill = payload && payload.skill;
-      var seconds = payload && payload.seconds;
       if (!isNonEmpty(skill) || /\s/.test(skill)) {
         return null;
       }
-      if (
-        typeof seconds !== "number" ||
-        !Number.isInteger(seconds) ||
-        seconds < 0
-      ) {
-        return null;
-      }
-      return join(["rest", String(seconds) + "s", "practice", skill]);
+      return join(["修煉", skill]);
     },
     // Exit traversal has no `move` command; the exit's server label is the
     // documented action description, never a guessed command.

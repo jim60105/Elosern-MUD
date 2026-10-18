@@ -124,14 +124,15 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return `錢袋 ${formatCopper(wallet)} 銅`;
   });
 
-  // The inventory drawer's member reference (party-member-equipment,
-  // companion-field-item-use): the controlled figure's identity from the
-  // committed `status` panel, which serializes it as a string, converted to
-  // the positive safe integer the exact payloads require. Null when that
-  // panel is missing or unavailable — the item use and the equipment toggle
-  // then stay unavailable instead of naming an invented member, and no other
-  // identity (the commander included) is ever substituted.
-  const inventoryActorId = computed(() => {
+  // The member reference the member-scoped drawer controls name
+  // (party-member-equipment, companion-field-item-use, party-practice-
+  // booking): the controlled figure's identity from the committed `status`
+  // panel, which serializes it as a string, converted to the positive safe
+  // integer the exact payloads require. Null when that panel is missing or
+  // unavailable — the item use, the equipment toggle and 修煉 then stay
+  // unavailable instead of naming an invented member, and no other identity
+  // (the commander included) is ever substituted.
+  const controlledActorId = computed(() => {
     if (!panelAvailable("status")) {
       return null;
     }
@@ -155,10 +156,10 @@ export function useDrawers(store, { panel, panelAvailable }) {
 
   return {
     SKILL_BOOK_KEY_HINT,
+    controlledActorId,
     drawerTitle,
     drawerIcon,
     drawerHasArt,
-    inventoryActorId,
     inventoryWalletCopper,
     inventoryWalletSubtitle,
     onHudDrawerClose,

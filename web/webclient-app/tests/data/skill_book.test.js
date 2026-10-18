@@ -48,29 +48,37 @@ describe("SkillBook (skillbook-authoritative-casting master–detail book)", () 
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
-  it("keeps practice separate and converts fractional hours to seconds", async () => {
-    const w = mountBook();
+  it("books the controlled member's practice without opening a sub-screen", async () => {
+    const w = mountBook({ actorId: 42 });
     await w.get(`button[aria-label="修煉${FIREBOLT.label}"]`).trigger("click");
-    expect(w.find('[data-testid="skill-book"]').exists()).toBe(false);
-    await w.get('input[type="number"]').setValue("1.5");
-    await w.get("form").trigger("submit");
-    expect(w.emitted("practice")).toEqual([[{ skill: FIREBOLT.key, seconds: 5400 }]]);
+    expect(w.emitted("practice")).toEqual([[{ actor_id: 42, skill: FIREBOLT.key }]]);
+    // The book body and title never changed: one booking control, no screen.
+    expect(w.find('[data-testid="skill-book"]').exists()).toBe(true);
+    expect(w.find('[data-testid="practice-screen"]').exists()).toBe(false);
+    expect(w.find("form").exists()).toBe(false);
   });
 
-  it("rejects out-of-range duration and blocks repeat practice while locked", async () => {
+  it("keeps the booking control unavailable without a member and while locked", async () => {
     const w = mountBook();
-    await w.get(`button[aria-label="修煉${FIREBOLT.label}"]`).trigger("click");
-    await w.get('input[type="number"]').setValue("12.01");
-    await w.get("form").trigger("submit");
-    expect(w.get('[role="alert"]').text()).toContain("12");
+    const control = () => w.get('[data-testid="skill-book__practice"]');
+    expect(control().attributes("disabled")).toBeDefined();
+    await control().trigger("click");
     expect(w.emitted("practice")).toBeUndefined();
-    await w.get('input[type="number"]').setValue("12");
-    await w.setProps({ practiceDisabled: true });
-    await w.get("form").trigger("submit");
+    await w.setProps({ actorId: 42, practiceDisabled: true });
+    expect(control().attributes("disabled")).toBeDefined();
+    await control().trigger("click");
     expect(w.emitted("practice")).toBeUndefined();
     await w.setProps({ practiceDisabled: false });
-    await w.get("form").trigger("submit");
-    expect(w.emitted("practice")[0][0].seconds).toBe(43200);
+    await control().trigger("click");
+    expect(w.emitted("practice")).toEqual([[{ actor_id: 42, skill: FIREBOLT.key }]]);
+  });
+
+  it("renders the server's booking line beside the control", async () => {
+    const w = mountBook({ actorId: 42, practiceFeedback: "艾拉將在下次休息時修煉「火矢」。" });
+    expect(
+      w.get('[data-testid="skill-book__practice-feedback"]').text(),
+    ).toContain("艾拉將在下次休息時修煉");
+    expect(w.findAll('[data-testid="skill-book__practice-feedback"]')).toHaveLength(1);
   });
 
   it("keeps the payload's category, group, and skill order in a keyboard tree", () => {

@@ -26,6 +26,7 @@ None.
 - `webclient-exploration-menu`: `explore.practice` books for a member without advancing time.
 - `webclient-skillbook-casting`: SkillBook practice is a booking control.
 - `webclient-contextual-hud`: the reference-drawer scenario and the declared-practice sub-screen requirement (renamed to a booking control) no longer describe a duration sub-screen.
+- `game-command-docs`: both player command documents document `修煉` and qualify the plain-rest zero-growth claim with the standing bookings it now settles.
 
 ## Impact
 
