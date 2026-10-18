@@ -8,6 +8,7 @@ the stored state is untouched, and a malformed record prints the fixed
 unavailable line.
 """
 
+import dataclasses
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -32,7 +33,7 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_lineage_tree,
 )
-from world.skills.registry import validate_prerequisite_graph
+from world.skills.registry import SkillPrerequisite, validate_prerequisite_graph
 
 # The kit's seven-node chain plus sister leaves, swapped in for the skills
 # scope; the load-time reverse-edge caches are rebuilt against the scoped
@@ -156,6 +157,58 @@ class LineageCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         }
         output = self.call(CmdLineage(), "")
         self.assertIn(f"{TREE['t_tree_bloom'].label} Lv.0（可解鎖）", output)
+
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
+    def test_capped_ready_node_prints_both_markers(self):
+        # Saturation and readiness are independent: an unowned node whose
+        # stored band is already at its cap still carries 可解鎖.
+        bloom_cap = proficiency_cap("t_tree_bloom")
+        self.char1.db.skills = {
+            "active": ["t_tree_root", "t_tree_sprout", _MID_KEY],
+            "passive": [],
+        }
+        self.char1.db.skill_proficiency = {
+            _MID_KEY: SKILL_PROFICIENCY_XP_PER_LEVEL * 5,
+            "t_tree_bloom": SKILL_PROFICIENCY_XP_PER_LEVEL * bloom_cap,
+        }
+        output = self.call(CmdLineage(), "")
+        self.assertIn(
+            f"{TREE['t_tree_bloom'].label} Lv.{bloom_cap}（見頂）（可解鎖）",
+            output,
+        )
+
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
+    def test_printed_graphs_match_the_bounded_panel_view(self):
+        # The command renders the same bounded view the panel serializes:
+        # trailing graphs drop under the cap while the full-view counts stay.
+        from web.webclient.presentation.context import PresentationContext
+        from web.webclient.presentation.lineage import lineage_presenter
+
+        baseline = build_lineage_view(self.char1).total_count
+        registry = live_skill_registry()
+        registry["cmd_extra"] = dataclasses.replace(
+            TREE["t_tree_root"], key="cmd_extra", prerequisites=(), label="指令測試根"
+        )
+        registry["cmd_extra_child"] = dataclasses.replace(
+            TREE["t_tree_sprout"],
+            key="cmd_extra_child",
+            prerequisites=(SkillPrerequisite("cmd_extra", 1),),
+            label="指令測試葉",
+        )
+        _revalidate_live()
+        with patch("web.webclient.presentation.lineage.MAX_GRAPHS", 1):
+            payload = lineage_presenter(
+                PresentationContext(actor=self.char1, protocol_version=1)
+            )
+            output = self.call(CmdLineage(), "")
+        self.assertEqual(len(payload["graphs"]), 1)
+        self.assertEqual(payload["total_count"], baseline + 1)
+        self.assertEqual(output.count("── "), 1)
+        self.assertIn(
+            f"已完成 {payload['completed_count']} / {payload['total_count']} 樹",
+            output,
+        )
+        self.assertIn(payload["graphs"][0]["group_label_zh"], output)
 
     @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
     def test_state_unchanged_after_print(self):

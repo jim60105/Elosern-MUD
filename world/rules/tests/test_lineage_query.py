@@ -434,13 +434,15 @@ class InjectedGraphTests(_TreeScopeMixin, unittest.TestCase):
     """Merging topologies: one graph, one merge node, one edge per parent."""
 
     def test_two_root_merge_is_one_graph_with_explicit_edges_and_depth(self):
-        # a -> d <- b, d -> e: a and b are the roots, d merges both parents.
+        # a -> x -> d <- b, d -> e: a and b are the roots, d merges both
+        # parents, and d's depth is the LONGEST path (2), not b's short one.
         registry_extras = {
             "duck_a": _fake_skill("duck_a"),
             "duck_b": _fake_skill("duck_b"),
+            "duck_x": _fake_skill("duck_x", (SkillPrerequisite("duck_a", 1),)),
             "duck_d": _fake_skill(
                 "duck_d",
-                (SkillPrerequisite("duck_a", 1), SkillPrerequisite("duck_b", 4)),
+                (SkillPrerequisite("duck_x", 1), SkillPrerequisite("duck_b", 4)),
             ),
             "duck_e": _fake_skill("duck_e", (SkillPrerequisite("duck_d", 2),)),
         }
@@ -449,14 +451,15 @@ class InjectedGraphTests(_TreeScopeMixin, unittest.TestCase):
         view = build_lineage_view(_entity(tuple(registry_extras)))
         graph = next(g for g in view.graphs if g.graph_id == "duck_a")
         self.assertEqual(graph.root_keys, ("duck_a", "duck_b"))
-        self.assertEqual(len(graph.nodes), 4)
+        self.assertEqual(len(graph.nodes), 5)
         self.assertEqual(
             [node.skill_key for node in graph.nodes].count("duck_d"), 1
         )
         self.assertEqual(
             [(edge.from_key, edge.to_key, edge.min_level) for edge in graph.edges],
             [
-                ("duck_a", "duck_d", 1),
+                ("duck_a", "duck_x", 1),
+                ("duck_x", "duck_d", 1),
                 ("duck_b", "duck_d", 4),
                 ("duck_d", "duck_e", 2),
             ],
@@ -464,8 +467,9 @@ class InjectedGraphTests(_TreeScopeMixin, unittest.TestCase):
         depths = {node.skill_key: node.depth for node in graph.nodes}
         self.assertEqual(depths["duck_a"], 0)
         self.assertEqual(depths["duck_b"], 0)
-        self.assertEqual(depths["duck_d"], 1)
-        self.assertEqual(depths["duck_e"], 2)
+        self.assertEqual(depths["duck_x"], 1)
+        self.assertEqual(depths["duck_d"], 2)
+        self.assertEqual(depths["duck_e"], 3)
 
 
 class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):

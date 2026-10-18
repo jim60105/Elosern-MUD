@@ -17,6 +17,7 @@ graph's ``owned_count``/``total_count``/``consumed`` always describe the FULL
 untruncated view.
 """
 
+from dataclasses import replace
 from math import isfinite
 from typing import Any
 
@@ -34,7 +35,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.rules.lineage_query import LineageQueryError, build_lineage_view
+from world.rules.lineage_query import LineageQueryError, LineageView, build_lineage_view
 
 LINEAGE_SCHEMA_VERSION = 2
 
@@ -301,20 +302,50 @@ def _serialize_graph(graph: Any) -> dict[str, Any]:
     }
 
 
-def _truncate_graph(graph: dict[str, Any]) -> dict[str, Any]:
+def _truncate_graph_view(graph: Any) -> Any:
     """Apply the per-graph node and edge caps without leaving dangling edges."""
-    nodes = graph["nodes"][:MAX_NODES_PER_GRAPH]
-    node_keys = {node["skill_key"] for node in nodes}
-    return {
-        **graph,
-        "root_keys": [key for key in graph["root_keys"] if key in node_keys],
-        "nodes": nodes,
-        "edges": [
+    nodes = graph.nodes[:MAX_NODES_PER_GRAPH]
+    node_keys = {node.skill_key for node in nodes}
+    return replace(
+        graph,
+        root_keys=tuple(key for key in graph.root_keys if key in node_keys),
+        nodes=nodes,
+        edges=tuple(
             edge
-            for edge in graph["edges"]
-            if edge["from_key"] in node_keys and edge["to_key"] in node_keys
-        ][:MAX_EDGES_PER_GRAPH],
-    }
+            for edge in graph.edges
+            if edge.from_key in node_keys and edge.to_key in node_keys
+        )[:MAX_EDGES_PER_GRAPH],
+    )
+
+
+def bounded_lineage_view(view: LineageView) -> LineageView | None:
+    """The view bounded by the declared caps and the OOB envelope.
+
+    The one truncation both surfaces use, so the Telnet command prints exactly
+    the graphs the panel renders. Trailing graphs drop first, then trailing
+    nodes (and every edge touching them), then further trailing graphs until
+    the serialized payload fits. Counts keep their full-view values. ``None``
+    means even a single caps-bounded graph cannot fit, and the caller fails
+    closed.
+    """
+    graphs = tuple(_truncate_graph_view(graph) for graph in view.graphs[:MAX_GRAPHS])
+    while True:
+        bounded = replace(view, graphs=graphs)
+        payload = {
+            "schema_version": LINEAGE_SCHEMA_VERSION,
+            "available": True,
+            "kind": "lineage",
+            "completed_count": bounded.completed_count,
+            "total_count": bounded.total_count,
+            "graphs": [_serialize_graph(graph) for graph in bounded.graphs],
+        }
+        if json_byte_size(payload) <= MAX_CANONICAL_JSON_BYTES:
+            return bounded
+        if len(graphs) <= 1:
+            # A single caps-bounded graph cannot exceed the envelope; anything
+            # else is a bug, and the caller fails closed rather than emitting.
+            return None
+        graphs = graphs[:-1]
 
 
 def lineage_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -333,23 +364,15 @@ def lineage_presenter(context: PresentationContext) -> dict[str, Any]:
         view = build_lineage_view(member)
     except LineageQueryError:
         raise PanelUnavailableError from None
-    serialized = [_serialize_graph(graph) for graph in view.graphs]
-    kept = min(len(serialized), MAX_GRAPHS)
-    while True:
-        truncated = [_truncate_graph(graph) for graph in serialized[:kept]]
-        payload = {
-            "schema_version": LINEAGE_SCHEMA_VERSION,
-            "available": True,
-            "kind": "lineage",
-            "completed_count": view.completed_count,
-            "total_count": view.total_count,
-            "graphs": truncated,
-        }
-        if json_byte_size(payload) <= MAX_CANONICAL_JSON_BYTES:
-            break
-        if kept <= 1:
-            # A single caps-bounded graph cannot exceed the envelope; anything
-            # else is a bug, and the panel fails closed rather than emitting.
-            raise PanelUnavailableError from None
-        kept -= 1
+    bounded = bounded_lineage_view(view)
+    if bounded is None:
+        raise PanelUnavailableError
+    payload = {
+        "schema_version": LINEAGE_SCHEMA_VERSION,
+        "available": True,
+        "kind": "lineage",
+        "completed_count": view.completed_count,
+        "total_count": view.total_count,
+        "graphs": [_serialize_graph(graph) for graph in bounded.graphs],
+    }
     return validate_lineage(payload)

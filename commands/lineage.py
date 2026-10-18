@@ -12,6 +12,7 @@ proficiency prints one fixed unavailable line.
 
 from commands.command import Command
 
+from web.webclient.presentation.lineage import bounded_lineage_view
 from world.rules.lineage_query import LineageQueryError, build_lineage_view
 from world.rules.party_scope import (
     PartyScopeError,
@@ -45,8 +46,11 @@ class CmdLineage(Command):
             self.caller.msg(error.message)
             return
         try:
-            view = build_lineage_view(member)
+            view = bounded_lineage_view(build_lineage_view(member))
         except LineageQueryError:
+            self.caller.msg(_UNAVAILABLE)
+            return
+        if view is None:
             self.caller.msg(_UNAVAILABLE)
             return
         if not view.graphs:
@@ -66,7 +70,7 @@ class CmdLineage(Command):
                     row += _TIP_MARK
                 elif node.owned:
                     row += f"（本階 {node.xp_into_level:g}/{node.xp_into_level + node.xp_to_next_level:g}）"
-                elif node.ready:
+                if node.ready:
                     row += _READY_MARK
                 parents = [
                     edge
