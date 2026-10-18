@@ -2,6 +2,7 @@
 
 var C = require("../constants.js");
 var core = require("../core.js");
+var personaSections = require("../persona_sections.js");
 var skillDescriptor = require("./skill_descriptor.js");
 
 var requireNumber = skillDescriptor.requireNumber;
@@ -51,13 +52,6 @@ var CHARACTER_MAX_LAYERS = 16;
 var CHARACTER_MAX_ADJUSTMENT = CHARACTER_MAX_DESCRIPTION;
 var CHARACTER_LAYER_SOURCES = ["skill", "condition", "equipment"];
 var CHARACTER_LAYER_KINDS = ["mult", "flat", "pct"];
-// Fixed level vocabularies for the character panel's intimate section
-// (mirror of world/lore/sexual_vocab.py, the shared vocabulary source).
-var CHARACTER_INTIMATE_AROUSAL_LEVELS = ["平靜", "微興奮", "中等", "高度", "極限"];
-var CHARACTER_INTIMATE_WETNESS_LEVELS = ["乾燥", "微濕", "濕潤", "大量", "泛濫"];
-var CHARACTER_INTIMATE_SHAME_LEVELS = ["無", "輕微", "中等", "強烈", "成癮"];
-var CHARACTER_INTIMATE_EXPOSURE_LEVELS = ["極低", "低", "中等", "高", "極高"];
-var CHARACTER_INTIMATE_CLIMAX_PHASE_LEVELS = ["未達", "接近", "進行中", "餘韻"];
 
 function validateCharacterKey(value, field) {
   var key = validateIdentifier(value, field);
@@ -299,67 +293,13 @@ function validateCharacterGuild(value) {
   return value;
 }
 
-var CHARACTER_MAX_PERSONA = 600;
-var CHARACTER_PERSONA_FIELDS = [
-  "background",
-  "personality",
-  "life_story",
-  "habit",
-];
-
-function validateCharacterPersona(value) {
-  // The four editable persona prose keys (persona-editing D3): each is
-  // independently nullable, whitespace-nulling, and bounded at the shared
-  // 600-code-point cap. Structural keys never appear in this section.
-  requireExactFields(value, "persona", CHARACTER_PERSONA_FIELDS, []);
-  var result = {};
-  for (var i = 0; i < CHARACTER_PERSONA_FIELDS.length; i++) {
-    var field = CHARACTER_PERSONA_FIELDS[i];
-    if (value[field] === null) {
-      result[field] = null;
-      continue;
-    }
-    var text = requireString(
-      value[field],
-      "persona." + field,
-      CHARACTER_MAX_PERSONA
-    );
-    result[field] = text.trim() ? text.trim() : null;
-  }
-  return result;
-}
-
-// Nullable intimate section of the character panel (webclient-intimate-status-section).
-// `null` means the actor has no sexual-state record; otherwise the section
-// carries exactly the six intimate fields, each level field checked against
-// its fixed vocabulary and `climax_today` as a non-negative safe integer.
-function validateCharacterIntimateLevel(value, field, vocabulary) {
-  var level = requireString(value, field, CHARACTER_MAX_LABEL);
-  if (vocabulary.indexOf(level) === -1) {
-    throw new Error(field + " is not a member of its fixed vocabulary");
-  }
-  return level;
-}
-
-function validateCharacterIntimate(value) {
-  if (value === null) {
-    return null;
-  }
-  requireExactFields(
-    value,
-    "intimate",
-    ["arousal", "wetness", "shame", "exposure", "climax_phase", "climax_today"],
-    []
-  );
-  return {
-    arousal: validateCharacterIntimateLevel(value.arousal, "intimate.arousal", CHARACTER_INTIMATE_AROUSAL_LEVELS),
-    wetness: validateCharacterIntimateLevel(value.wetness, "intimate.wetness", CHARACTER_INTIMATE_WETNESS_LEVELS),
-    shame: validateCharacterIntimateLevel(value.shame, "intimate.shame", CHARACTER_INTIMATE_SHAME_LEVELS),
-    exposure: validateCharacterIntimateLevel(value.exposure, "intimate.exposure", CHARACTER_INTIMATE_EXPOSURE_LEVELS),
-    climax_phase: validateCharacterIntimateLevel(value.climax_phase, "intimate.climax_phase", CHARACTER_INTIMATE_CLIMAX_PHASE_LEVELS),
-    climax_today: requireInt(value.climax_today, "intimate.climax_today", 0, MAX_SAFE_INTEGER),
-  };
-}
+// The persona and intimate sections are shared with the party_member panel
+// (persona_sections.js); these aliases keep the character module's public
+// names stable.
+var CHARACTER_MAX_PERSONA = personaSections.MAX_PERSONA_FIELD;
+var CHARACTER_PERSONA_FIELDS = personaSections.PERSONA_FIELDS;
+var validateCharacterPersona = personaSections.validatePersona;
+var validateCharacterIntimate = personaSections.validateIntimate;
 
 // Exact available character panel v7 schema (design D10: skill category
 // grouping + the intimate-status section; expose-stat-breakdown-read-model

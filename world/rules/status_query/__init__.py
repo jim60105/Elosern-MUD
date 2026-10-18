@@ -70,3 +70,4 @@ from world.rules.status_query.models import (  # noqa: F401
 from world.rules.status_query.status import (  # noqa: F401
     build_status_read_model,
 )
+from world.rules.status_query.sexual import read_intimate_view  # noqa: F401
