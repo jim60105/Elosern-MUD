@@ -172,7 +172,9 @@ class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_give_to_self_keeps_the_item(self):
         create_object("typeclasses.objects.Object", key="銅幣", location=self.char1)
         output = self.call(CmdGive(), "銅幣 = 測試者")
-        self.assertIn("留給了", output)
+        # The commander is a member token, so the give routes through the
+        # party item transfer rule and reports its same-member refusal.
+        self.assertIn("不能交給同一個人。", output)
         self.assertEqual(len([o for o in self.char1.contents if o.key == "銅幣"]), 1)
 
     def test_give_unmovable_item_reports_failure(self):
@@ -425,7 +427,7 @@ class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_give_to_self_with_canonical_key_keeps_it(self):
         self.char1.db.inventory = [_MEAL_KEY]
         output = self.call(CmdGive(), f"{_MEAL_KEY} = 測試者")
-        self.assertIn("留給了", output)
+        self.assertIn("不能交給同一個人。", output)
         self.assertEqual(self.char1.db.inventory, [_MEAL_KEY])
 
     @covers_requirement("equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list")
