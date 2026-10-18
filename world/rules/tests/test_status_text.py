@@ -28,7 +28,7 @@ from world.rules.status_query import (
     StatLayer,
     build_character_read_model,
 )
-from world.rules.status_text import breakdown_text
+from world.rules.status_text import breakdown_text, detailed_breakdown_text
 
 from ._combat_session_helpers import _race_key, _live_registry, open_synthetic_scope
 
@@ -119,6 +119,33 @@ class FormattingTests(unittest.TestCase):
     def test_integer_looking_floats_print_bare(self):
         row = StatBreakdownRow("atk_phys", 3, 5.0, 5.0, [])
         self.assertEqual(breakdown_text(_Model([row])), "攻擊：5")
+
+    @covers_requirement("character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only")
+    def test_detailed_rows_add_the_literal_base_before_layers(self):
+        rows = [
+            StatBreakdownRow(
+                "hp",
+                100,
+                68,
+                115,
+                [StatLayer("equipment", "格式護甲", "flat", 15)],
+            ),
+            StatBreakdownRow(
+                "defense",
+                4,
+                12.0,
+                12.0,
+                [
+                    StatLayer("equipment", "格式護甲", "flat", 8),
+                    StatLayer("condition", "grace", "flat", -2.5),
+                ],
+            ),
+        ]
+        self.assertEqual(
+            detailed_breakdown_text(_Model(rows)),
+            "生命：68／115（基礎 100｜格式護甲 ＋15）\n"
+            "防禦：12（基礎 4｜格式護甲 ＋8｜grace −2.5）",
+        )
 
     @covers_requirement("character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only")
     def test_multiplier_factors_carry_no_sign_prefix(self):

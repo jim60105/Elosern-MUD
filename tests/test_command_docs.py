@@ -94,6 +94,8 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（戰鬥內外皆可施放技能）",
     },
     "lineage": {"syntax": "lineage", "context": "一般（戰鬥內外皆可用）"},
+    "狀態": {"syntax": "狀態 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
+    "技能": {"syntax": "技能 [<成員>]", "context": "一般（戰鬥內外皆可用）"},
     "engage": {"syntax": "engage <target>", "context": "戰鬥（需有敵對魔物）"},
     "combat forfeit": {
         "syntax": "combat forfeit、combat forfeit confirm <token>",
@@ -449,6 +451,9 @@ class CommandDocsContractTests(unittest.TestCase):
         return "\n".join(body)
 
     @covers_requirement("game-command-docs::complete-command-reference", "game-command-docs::drift-contract-test")
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
+    )
     def test_every_mounted_project_command_is_documented(self):
         manifest_keys = set(EXPECTED_COMMANDS)
         self.assertCountEqual(
@@ -888,6 +893,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::drift-contract-test")
     @covers_requirement(
         "party-item-transfer::text-clients-move-items-between-members"
+    )
+    @covers_requirement(
+        "party-member-text-views::member-views-are-documented-and-possession-identical"
     )
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)

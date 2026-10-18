@@ -52,9 +52,26 @@ def _row_text(row: Any) -> str:
     return f"{head}（{'｜'.join(_segment_text(layer) for layer in row.layers)}）"
 
 
+def _detailed_row_text(row: Any) -> str:
+    """One breakdown row that also names its literal base value."""
+    label = TRAIT_LABELS.get(row.key, row.key)
+    if row.key in GAUGE_KEYS:
+        head = f"{label}：{_number_text(row.current)}／{_number_text(row.effective)}"
+    else:
+        head = f"{label}：{_number_text(row.current)}"
+    segments = [f"基礎 {_number_text(row.base)}"]
+    segments.extend(_segment_text(layer) for layer in row.layers)
+    return f"{head}（{'｜'.join(segments)}）"
+
+
 def breakdown_text(model: Any) -> str:
     """Render every breakdown row of a character read model, in order."""
     return "\n".join(_row_text(row) for row in model.breakdown)
 
 
-__all__ = ["GAUGE_KEYS", "breakdown_text"]
+def detailed_breakdown_text(model: Any) -> str:
+    """Render every breakdown row with its literal base, in order."""
+    return "\n".join(_detailed_row_text(row) for row in model.breakdown)
+
+
+__all__ = ["GAUGE_KEYS", "breakdown_text", "detailed_breakdown_text"]

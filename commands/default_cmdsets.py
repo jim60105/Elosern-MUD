@@ -68,6 +68,7 @@ from commands.invite import CmdInvite
 from commands.leave import CmdLeave
 from commands.lore import CmdLore
 from commands.possess import CmdPossess, CmdUnpossess
+from commands.party_views import CmdMemberSkills, CmdMemberStatus
 from commands.quest_delivery import CmdDeliver
 from commands.localized import (
     CmdColorTest,
@@ -250,6 +251,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdPersonaHabit)
         self.add(CmdTitle)
         self.add(CmdLineage)
+        self.add(CmdMemberStatus)
+        self.add(CmdMemberSkills)
         self.add(ProjectXYZGridCmdSet)
 
 
