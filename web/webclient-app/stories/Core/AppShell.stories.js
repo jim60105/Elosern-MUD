@@ -6,7 +6,11 @@ import { useElosernStore } from "../../stores/elosern.js";
 import { createWindowBridge } from "../../bridge.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import * as protocolFixtures from "../../tests/store/protocol_fixtures.js";
-import { COMPANION_PORTRAIT_CATALOG, PARTY_PANEL_FULL_SAMPLE } from "../fixtures/party_panels.js";
+import {
+  COMPANION_PORTRAIT_CATALOG,
+  PARTY_COMPANION_ROWS,
+  PARTY_PANEL_FULL_SAMPLE,
+} from "../fixtures/party_panels.js";
 import {
   ART_PANEL_PENDING_SAMPLE,
   ART_PANEL_SAMPLE,
@@ -233,7 +237,7 @@ const MODE_JOURNEY_DIALOGUE_CLOSED = {
 // defeated-foes: they kneel in their slots with a 倒地 plate).
 const partyParticipants = (companions, downed = []) => [
   PARTY_PARTICIPANTS[0],
-  ...PARTY_PANEL_FULL_SAMPLE.slots.slice(0, companions).map((slot, index) => ({
+  ...PARTY_COMPANION_ROWS.slice(0, companions).map((slot, index) => ({
     identity: slot.identity,
     token: `a${index + 2}`,
     display_name: slot.display_name,
@@ -338,7 +342,10 @@ const renderPlayer = (args) => ({
           ...(args.populated || args.combat ? {
             party: {
               ...PARTY_PANEL_FULL_SAMPLE,
-              slots: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, args.companions ?? 2).map((s) => ({ ...s, portrait_ref: args.placeholders ? null : String(s.identity) })),
+              // Row 0 is the commander; the companions follow.
+              slots: PARTY_PANEL_FULL_SAMPLE.slots
+                .slice(0, (args.companions ?? 2) + 1)
+                .map((s) => (s.role === "commander" ? s : { ...s, portrait_ref: args.placeholders ? null : String(s.identity) })),
             },
             objectives: OBJECTIVES_PANEL_SAMPLE,
             art: args.combat ? combatArt(ART_PANEL_SAMPLE) : {

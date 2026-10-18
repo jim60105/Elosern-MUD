@@ -84,6 +84,9 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
       portrait_ref: null,
       hp_current: 12,
       hp_maximum: 12,
+      role: "companion",
+      knocked_out: false,
+      unread: false,
       bond_stage: "初識",
       membership: {
         general: false,
@@ -235,7 +238,8 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
 
     // Simulate commit removing companion 101
     await w.setProps({
-      slots: [PARTY_PANEL_SAMPLE.slots[1]], // only 幽 remains
+      // The commander row stays row 0; only 幽 remains among the companions.
+      slots: [PARTY_PANEL_SAMPLE.slots[0], PARTY_PANEL_SAMPLE.slots[2]],
     });
 
     expect(w.findAll('[data-testid^="party-drawer__row-"]')).toHaveLength(1);
@@ -253,11 +257,12 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     // Commit updating companion 101's HP but retaining companion 101
     await w.setProps({
       slots: [
+        PARTY_PANEL_SAMPLE.slots[0],
         {
-          ...PARTY_PANEL_SAMPLE.slots[0],
+          ...PARTY_PANEL_SAMPLE.slots[1],
           hp_current: 200,
         },
-        PARTY_PANEL_SAMPLE.slots[1],
+        PARTY_PANEL_SAMPLE.slots[2],
       ],
     });
 

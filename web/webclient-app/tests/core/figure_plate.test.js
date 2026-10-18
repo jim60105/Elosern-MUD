@@ -15,7 +15,10 @@ import CombatMenu from "../../lib/combat_menu.js";
 import { combatFormation } from "../../components/combat-formation.js";
 import { bySeverity, isLowPlateHp, plateHpCurrent, plateHpPercent, plateLabel, repeatedNames } from "../../components/figure-plate.js";
 import { useElosernStore } from "../../stores/elosern.js";
-import { PARTY_PANEL_FULL_SAMPLE } from "../../stories/fixtures/party_panels.js";
+import {
+  PARTY_COMPANION_ROWS,
+  PARTY_PANEL_FULL_SAMPLE,
+} from "../../stories/fixtures/party_panels.js";
 import { ART_PANEL_SAMPLE } from "../../stories/fixtures.js";
 import * as fx from "../store/protocol_fixtures.js";
 
@@ -373,7 +376,8 @@ describe("the plates layer in the client", () => {
   });
 
   it("gives every drawn figure but the controlled one its plate at its slot, with tokens only for repeated names", async () => {
-    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 2);
+    // Commander row 0 plus the two companion rows.
+    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 3);
     const participants = [
       foeRow(201, "e1", "哥布林", 24),
       foeRow(202, "e2", "哥布林", 9),
@@ -517,19 +521,27 @@ describe("the plates layer in the client", () => {
   });
 
   it("states a defeated foe and a downed companion on their plates, and kneels the companion's figure", async () => {
-    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 1);
+    const companionRow = PARTY_COMPANION_ROWS[0];
+    // The commander row stays row 0; the downed companion follows.
+    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 2);
     const participants = [
       { ...foeRow(201, "e1", "哥布林", 0), state: "defeated", conditions: [POISON] },
       { ...foeRow(202, "e2", "狼", 3), state: "knocked_out" },
       foeRow(203, "e3", "史萊姆", 20),
-      { identity: slots[0].identity, token: "a2", display_name: slots[0].display_name, team: "party", state: "knocked_out", hp_current: 0, hp_maximum: 120, portrait_ref: null, conditions: [POISON] },
+      { identity: companionRow.identity, token: "a2", display_name: companionRow.display_name, team: "party", state: "knocked_out", hp_current: 0, hp_maximum: 120, portrait_ref: null, conditions: [POISON] },
     ];
     store.receive(1, "ui_snapshot", [fx.snapshot({
       presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
       panels: {
         status: fx.statusPanel(),
         exploration: fx.explorationPanel(),
-        party: { ...PARTY_PANEL_FULL_SAMPLE, slots },
+        party: {
+          ...PARTY_PANEL_FULL_SAMPLE,
+          // The sliced panel presents only the commander and this companion,
+          // so the viewed member must name a row it actually carries.
+          viewed_member_id: companionRow.identity,
+          slots,
+        },
         context_actions: fx.combatActions({ participants }),
         art: ART_PANEL_SAMPLE,
       },
@@ -540,16 +552,16 @@ describe("the plates layer in the client", () => {
     expect(plate(201).attributes("data-fallen")).toBe("defeated");
     expect(plate(202).attributes("data-fallen")).toBe("defeated");
     expect(plate(203).attributes("data-fallen")).toBeUndefined();
-    expect(plate(slots[0].identity).attributes("data-fallen")).toBe("down");
+    expect(plate(companionRow.identity).attributes("data-fallen")).toBe("down");
     expect(plate(201).attributes("aria-label")).toBe("哥布林 e1，敵方，生命 0/24，已擊破");
-    expect(plate(slots[0].identity).attributes("aria-label")).toBe(
-      `${slots[0].display_name} a2，我方，生命 0/120，狀態：中毒，倒地`,
+    expect(plate(companionRow.identity).attributes("aria-label")).toBe(
+      `${companionRow.display_name} a2，我方，生命 0/120，狀態：中毒，倒地`,
     );
     // Every figure keeps its slot: three foes stand.
     expect(wrapper.findAll('[data-testid="foe-slot"]').map((s) => s.attributes("data-fallen") ?? null)).toEqual([
       "defeated", "defeated", null,
     ]);
-    const companion = wrapper.get(`[data-testid="companion-figure"][data-identity="${slots[0].identity}"]`);
+    const companion = wrapper.get(`[data-testid="companion-figure"][data-identity="${companionRow.identity}"]`);
     expect(companion.attributes("data-fallen")).toBe("down");
     expect(companion.find('[data-testid="stage-actor-seal"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="companion-figure"][data-controlled="true"]').attributes("data-fallen")).toBeUndefined();
@@ -557,7 +569,7 @@ describe("the plates layer in the client", () => {
     store.receive(1, "ui_update", [fx.update({ revision: 2, mode: "exploration", panels: { context_actions: fx.explorationActions() } })], {});
     await nextTick();
     await nextTick();
-    expect(wrapper.get(`[data-testid="companion-figure"][data-identity="${slots[0].identity}"]`).attributes("data-fallen")).toBeUndefined();
+    expect(wrapper.get(`[data-testid="companion-figure"][data-identity="${companionRow.identity}"]`).attributes("data-fallen")).toBeUndefined();
   });
 
   it("gives the player's own figure a plate while a companion is possessed, and none to the possessed one", async () => {
@@ -589,7 +601,7 @@ describe("the plates layer in the client", () => {
         status: fx.statusPanel({ actor: { identity: "102" } }),
         roster,
         possession_banner: { schema_version: 1, available: true, host_name: "幽", since_tick: 1 },
-        party: { ...PARTY_PANEL_FULL_SAMPLE, slots: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 2) },
+        party: { ...PARTY_PANEL_FULL_SAMPLE, slots: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 3) },
         context_actions: fx.combatActions({ participants }),
         art: ART_PANEL_SAMPLE,
       },
