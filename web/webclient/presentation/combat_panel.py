@@ -1285,9 +1285,12 @@ def _combat_view_for(context: PresentationContext) -> Any | None:
     party, was removed from the roster, or is no longer commandable) the view
     falls back to the panel's own default actor instead of failing, so a stale
     selection can never blank the combat panel. ``None`` means the actor has no
-    active session, which renders the exploration form.
+    active session, which renders the exploration form. The session is read
+    through its owner, so a possessed puppet renders its commander's encounter.
     """
-    actor = context.actor
+    from world.rules.combat_session import session_owner
+
+    actor = session_owner(context.actor)
     if context.party_actor is not None:
         from evennia.objects.models import ObjectDB
 

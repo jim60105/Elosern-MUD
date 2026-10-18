@@ -82,6 +82,7 @@ from world.rules.combat_session.records import (  # noqa: F401
     is_in_active_session,
     read_session,
     session_id_for,
+    session_owner,
     to_storage,
 )
 from world.rules.combat_session.rounds import (  # noqa: F401
@@ -194,6 +195,7 @@ __all__ = [
     "party_exit_token",
     "read_session",
     "reconstruct_battlefield",
+    "session_owner",
     "preflight_draft_entries",
     "request_party_exit",
     "resolve_overwhelm",

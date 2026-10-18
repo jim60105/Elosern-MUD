@@ -431,3 +431,29 @@ def is_in_active_session(actor: Any) -> bool:
         return read_session(actor) is not None
     except CombatSessionError:  # observability: ignore R2: the predicate deliberately reports an unreadable session as inactive; the caller branches on the bool
         return False
+
+
+def session_owner(acting: Any) -> Any:
+    """The character whose ``active_combat`` holds ``acting``'s session.
+
+    ``acting`` itself whenever it owns a readable session. A possessed puppet
+    owns none: the party's encounter is persisted under its commander (a
+    companion's field cast opens the commander's session), so the puppet
+    operates that commander's session while it remains possessed. Possession
+    is barred while either side is in a session, so a puppet can only ever
+    find a session its commander opened, and a non-party or unbound acting
+    character is its own owner.
+
+    Read-only: it never writes, engages or advances anything.
+    """
+    if read_session(acting) is not None:
+        return acting
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+
+    try:
+        commander = resolve_commander(acting)
+    except PartyScopeError:  # observability: ignore R2: a non-party acting character owns only its own session; the caller's own read already reported absence
+        return acting
+    if commander is acting:
+        return acting
+    return commander if read_session(commander) is not None else acting

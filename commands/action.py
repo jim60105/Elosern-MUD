@@ -39,12 +39,19 @@ class CmdCast(Command):
         return target
 
     def _active_session(self):
-        from world.rules.combat_session import read_session
+        """Return ``(commander, session)`` for the caller's active session.
+
+        A possessed puppet owns no session: the party's encounter is persisted
+        under the commander it operates, so the commander keys every in-session
+        submission while the caller keeps receiving the messages.
+        """
+        from world.rules.combat_session import read_session, session_owner
 
         try:
-            return read_session(self.caller)
+            commander = session_owner(self.caller)
+            return commander, read_session(commander)
         except Exception:
-            return None
+            return self.caller, None
 
     def _split_member_suffix(self, args: str) -> tuple[str, str | None]:
         """Split the final ``由 <成員>`` pair off one cast argument string.
@@ -85,14 +92,17 @@ class CmdCast(Command):
             except PartyScopeError as error:
                 self.caller.msg(error.message)
                 return
-        session = self._active_session()
+        commander, session = self._active_session()
         if session is not None:
-            self._cast_in_session(session, skill_key, target_key, scale, member)
+            self._cast_in_session(
+                commander, session, skill_key, target_key, scale, member
+            )
             return
         self._cast_out_of_combat(skill_key, target_key, scale, member)
 
     def _cast_in_session(
         self,
+        commander: Any,
         session,
         skill_key: str,
         target_key: str,
@@ -100,6 +110,10 @@ class CmdCast(Command):
         member: Any = None,
     ) -> None:
         """Delegate an active-session cast to combat-session orchestration.
+
+        ``commander`` owns the session (the caller itself, or the commander a
+        possessed caller operates); every submission and token parse is keyed
+        on it, while all feedback goes to the caller.
 
         Combat time accumulates in the session and settles exactly once at the
         terminal result; this command never advances command time. The target
@@ -127,17 +141,25 @@ class CmdCast(Command):
         if member is not None:
             from commands.combat import build_skill_command, submit_actor_command
 
-            command = build_skill_command(self.caller, skill_key, scale, target_key)
+            command = build_skill_command(
+                self.caller,
+                skill_key,
+                scale,
+                target_key,
+                commander=commander,
+            )
             if command is None:
                 return
-            submit_actor_command(self.caller, session, member, command)
+            submit_actor_command(
+                self.caller, session, member, command, commander=commander
+            )
             return
         if skill_key == FLEE_SKILL_KEY:
-            self._request_party_flee(session)
+            self._request_party_flee(commander, session)
             return
         try:
             targets = parse_session_targets(
-                self.caller,
+                commander,
                 target_key,
                 search=lambda name: self._resolve_target(name),
             )
@@ -146,10 +168,14 @@ class CmdCast(Command):
             return
         try:
             result = submit_player_action(
-                self.caller,
+                commander,
                 skill_key,
                 targets,
                 scale=scale,
+                # The caller is the caster: a possessed puppet acts for itself
+                # inside its commander's encounter, exactly as the commander
+                # acts for itself.
+                commanded_actor=self.caller,
             )
         except CombatSessionError as error:
             reason = error.args[0]
@@ -162,8 +188,11 @@ class CmdCast(Command):
             self.caller.msg(line)
         self.caller.msg(message)
 
-    def _request_party_flee(self, session) -> None:
+    def _request_party_flee(self, commander: Any, session) -> None:
         """Return the party-scope retreat prompt for an in-session ``flee``.
+
+        ``commander`` owns the session; the prompt is keyed on it and rendered
+        to the caller.
 
         No draft entry is selected, no round resolves and no time advances
         until the player confirms with the returned token; enemy
@@ -178,7 +207,7 @@ class CmdCast(Command):
 
         try:
             prompt = request_party_exit(
-                self.caller,
+                commander,
                 session.session_id,
                 session.round_revision,
                 PARTY_EXIT_RETREAT,
@@ -226,10 +255,10 @@ class CmdCast(Command):
                 self.caller.msg(error.message)
                 return
             except CombatSessionError as error:
-                # A companion's monster target reaches the initiation seam;
-                # its commander-keyed opening support lands in
-                # ``companion-field-combat-opening``. Until then the seam
-                # reports its existing stable rejection and nothing changes.
+                # A member's monster target opens the commander's encounter
+                # (the member is the caster, the commander the session owner);
+                # an engagement refusal still reports its stable session
+                # reason and leaves nothing behind.
                 reason = error.args[0] if error.args else "malformed_session"
                 self.caller.msg(session_reason_message(str(reason)))
                 return

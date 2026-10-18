@@ -663,13 +663,10 @@ def _item_display_name(item_key: str) -> str:
 
 
 def _in_exploration_mode(actor: Any) -> bool:
-    from world.rules.combat_session import is_in_active_session
+    """The shared exploration predicate (session-owner aware), imported lazily."""
+    from web.webclient.presentation.affordances import in_exploration_mode
 
-    if bool(getattr(actor, "creation_pending", False)):
-        return False
-    if is_in_active_session(actor):
-        return False
-    return True
+    return in_exploration_mode(actor)
 
 
 def _serialize_passive_skill_groups(keys: tuple[str, ...]) -> list[dict[str, Any]]:

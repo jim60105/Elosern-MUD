@@ -300,7 +300,11 @@ class CombatCommandBranchTests(TestCase):
             ("other", "繼續戰鬥。"),
         ):
             command = _command(CmdCombatForfeit, "confirm S-0-0123456789ABCDEF0123")
-            with patch("commands.combat.read_session", return_value=session), patch(
+            with patch(
+                "commands.combat.session_owner", return_value=command.caller
+            ), patch(
+                "commands.combat.read_session", return_value=session
+            ), patch(
                 "commands.combat.confirm_party_exit",
                 return_value={"outcome": outcome},
             ):
@@ -309,6 +313,8 @@ class CombatCommandBranchTests(TestCase):
 
         command = _command(CmdCombatForfeit)
         with patch(
+            "commands.combat.session_owner", return_value=command.caller
+        ), patch(
             "commands.combat.read_session",
             side_effect=CombatSessionError(SessionReason.NO_ACTIVE_SESSION),
         ):
@@ -571,7 +577,7 @@ class ActionCommandBranchTests(TestCase):
         )
 
         command = _command(CmdCast, "skill=missing")
-        command._active_session = Mock(return_value=None)
+        command._active_session = Mock(return_value=(command.caller, None))
         command.caller.search.return_value = None
         with patch("world.rules.cast_settlement.settle_out_of_combat_cast") as settle:
             command.func()
@@ -589,7 +595,7 @@ class ActionCommandBranchTests(TestCase):
                 "world.rules.combat_session.submit_player_action",
                 side_effect=CombatSessionError(reason),
             ):
-                command._cast_in_session(object(), "skill", "")
+                command._cast_in_session(command.caller, object(), "skill", "")
             command.caller.msg.assert_called_with(message)
 
         command.caller.msg.reset_mock()
@@ -597,7 +603,7 @@ class ActionCommandBranchTests(TestCase):
             "world.rules.combat_session.submit_player_action",
             return_value={"outcome": "rejected", "reason": object()},
         ):
-            command._cast_in_session(object(), "skill", "")
+            command._cast_in_session(command.caller, object(), "skill", "")
         command.caller.msg.assert_called_with("這項行動無法完成。")
 
         command.caller.msg.reset_mock()
@@ -608,7 +614,7 @@ class ActionCommandBranchTests(TestCase):
             "world.rules.combat_result.settle_to_messages",
             return_value=(("rendered",), "戰鬥結束，你取得了勝利。"),
         ):
-            command._cast_in_session(object(), "skill", "")
+            command._cast_in_session(command.caller, object(), "skill", "")
         self.assertEqual(
             [call.args[0] for call in command.caller.msg.call_args_list],
             ["rendered", "戰鬥結束，你取得了勝利。"],

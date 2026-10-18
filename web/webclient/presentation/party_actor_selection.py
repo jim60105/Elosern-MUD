@@ -85,8 +85,10 @@ def party_actor_selection_snapshot(session, actor) -> int | None:
     A selection bound to a retired epoch, another puppet or another owner is
     discarded, and one whose combat session or round revision has moved on is
     dropped so the panel returns to its own default actor for the new round.
+    The session is read through its owner, so a possessed puppet's selection
+    stays valid while it operates its commander's encounter.
     """
-    from world.rules.combat_session import read_session
+    from world.rules.combat_session import read_session, session_owner
 
     ndb = getattr(session, "ndb", None)
     selection = getattr(ndb, "party_actor_selection", None)
@@ -100,7 +102,7 @@ def party_actor_selection_snapshot(session, actor) -> int | None:
     ):
         return None
     try:
-        record = read_session(actor)
+        record = read_session(session_owner(actor))
     except Exception:  # observability: ignore R2: an unreadable session cannot keep a selection; the panel falls back to its own default actor
         return None
     if (

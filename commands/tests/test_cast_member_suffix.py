@@ -174,16 +174,21 @@ class CastMemberSuffixTests(EvenniaCommandTestMixin, EvenniaTest):
         self._run(CmdCast(), f"{_HEAL.key} 由 卡恩", "對方目前無法行動。")
         self.assertEqual(self.clock.tick, 0)
 
-    def test_a_companion_monster_target_is_refused_at_the_seam(self):
+    def test_a_companion_monster_target_opens_the_commander_s_encounter(self):
         wolf = _monster("suffix wolf", hp=2000, atk=1)
         wolf.location = self.room1
-        self._run(
-            CmdCast(),
-            f"{_HEAL.key}={wolf.key} 由 艾拉",
-            "這個角色不能參與戰鬥。",
-        )
-        self.assertIsNone(read_session(self.char1))
+        self._run(CmdCast(), f"{_HEAL.key}={wolf.key} 由 艾拉")
+        # The suffix's monster target opens the commander's encounter with
+        # 艾拉's selection as its opening entry; nothing is spent or advanced
+        # before the remaining members choose.
+        record = read_session(self.char1)
+        self.assertIsNotNone(record)
         self.assertIsNone(read_session(self.aila))
+        self.assertEqual(record.opening_first_actor, str(self.aila.key))
+        self.assertEqual(
+            record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"],
+            _HEAL.key,
+        )
         self.assertEqual(self.aila.traits.mp.current, 20)
         self.assertEqual(self.clock.tick, 0)
 

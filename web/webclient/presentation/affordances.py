@@ -197,12 +197,17 @@ class AffordanceView:
 
 
 def in_exploration_mode(actor: Any) -> bool:
-    """Whether the actor is a puppeted player outside creation and combat."""
-    from world.rules.combat_session import is_in_active_session
+    """Whether the actor is a puppeted player outside creation and combat.
+
+    The combat check reads the session owner: a possessed puppet operates its
+    commander's encounter, so it is never in exploration mode while that
+    session is live.
+    """
+    from world.rules.combat_session import is_in_active_session, session_owner
 
     if bool(getattr(actor, "creation_pending", False)):
         return False
-    if is_in_active_session(actor):
+    if is_in_active_session(session_owner(actor)):
         return False
     return True
 

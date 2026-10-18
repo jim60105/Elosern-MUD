@@ -82,6 +82,7 @@ def cast_in_field(
     opening_target: Any = None,
     scale: float = 1.0,
     context: Any = None,
+    commander: Any = None,
 ) -> FieldCastOutcome:
     """Route one exploration cast to field settlement or field initiation.
 
@@ -100,6 +101,10 @@ def cast_in_field(
        resource, roll, session, or clock access.
     5. Everything else settles through ``settle_out_of_combat_cast`` under
        ``context`` (default: the actor's room with no extra event context).
+
+    ``actor`` is the caster; ``commander`` is the authenticated session owner
+    behind it (default: the commander behind ``actor``), forwarded to the
+    opening route so a companion's cast opens the commander's encounter.
     """
     from world.rules.cast_settlement import settle_out_of_combat_cast
 
@@ -114,7 +119,11 @@ def cast_in_field(
         return FieldCastOutcome(
             "initiation",
             combat_result=initiate_field_combat(
-                actor, skill_key, opening_target, scale=scale
+                actor,
+                skill_key,
+                opening_target,
+                scale=scale,
+                commander=commander,
             ),
         )
     if any(field_combat_target(actor, target) is not None for target in targets):
@@ -158,6 +167,11 @@ def cast_as_member(
     actor: the member's owned skill, MP cost, SELF binding and practice award
     apply, and the settlement advance settles the present party through the
     member's resolved commander.
+
+    A monster target opens combat as it does for the commander, with the
+    commander resolved here as the authenticated session owner and forwarded
+    so the encounter is persisted under the commander's ``active_combat``
+    while the member's selection seeds the opening draft entry.
     """
     from world.rules.party_scope import (
         PURPOSE_ACT,
@@ -173,6 +187,7 @@ def cast_as_member(
         targets=targets,
         opening_target=opening_target,
         scale=scale,
+        commander=commander,
     )
 
 
@@ -188,7 +203,9 @@ class FieldChoice:
     ``entity`` is the candidate (or the anchor monster); ``line_up`` is the
     effective enemy line-up of an opening (empty for ordinary targets).
     ``reason``/``detail`` carry the first failing gate when disabled;
-    ``session_reason`` names a candidate-battlefield failure instead.
+    ``session_reason`` names a candidate-battlefield failure instead, and
+    ``party_reason`` the stable party-scope code when the caster itself is
+    not an authorized acting member.
     """
 
     entity: Any
@@ -197,6 +214,7 @@ class FieldChoice:
     detail: str | None = None
     session_reason: str | None = None
     line_up: tuple[Any, ...] = ()
+    party_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -279,6 +297,8 @@ def preview_field_skill(
     actor: Any,
     skill: SkillDef,
     scale: float = 1.0,
+    *,
+    commander: Any = None,
 ) -> FieldSkillPreview:
     """Preview every field confirmation of one owned active skill at ``scale``.
 
@@ -288,6 +308,10 @@ def preview_field_skill(
     them. Monster openings are judged by ``preview_field_opening`` against an
     unpersisted candidate battlefield. Missing effect context disables a
     choice; it is never fabricated.
+
+    ``commander`` is the authenticated session owner behind the caster
+    (default: the commander behind ``actor``), so a companion's preview judges
+    the commander's encounter exactly as the initiation would.
     """
     location = getattr(actor, "location", None)
     context = RoomActionContext(location, {})
@@ -339,7 +363,9 @@ def preview_field_skill(
         if spec is TargetSpec.AREA and shared is not None:
             opening = shared
         else:
-            opening = preview_field_opening(actor, skill.key, monster, scale=scale)
+            opening = preview_field_opening(
+                actor, skill.key, monster, scale=scale, commander=commander
+            )
             if spec is TargetSpec.AREA:
                 shared = opening
         openings.append(
@@ -350,6 +376,7 @@ def preview_field_skill(
                 opening.detail,
                 opening.session_reason,
                 tuple(opening.targets) or (monster,),
+                opening.party_reason,
             )
         )
     return FieldSkillPreview(skill, scale, cost, None, tuple(targets), tuple(openings))

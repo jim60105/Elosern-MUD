@@ -123,7 +123,9 @@ class CastInFieldRoutingTests(_FieldCase):
         ) as initiate:
             outcome = cast_in_field(self.player, _T_HEAL, targets=[wolf])
         self.assertEqual(outcome.route, "initiation")
-        initiate.assert_called_once_with(self.player, _T_HEAL, wolf, scale=1.0)
+        initiate.assert_called_once_with(
+            self.player, _T_HEAL, wolf, scale=1.0, commander=None
+        )
 
     def test_mixed_list_with_a_living_monster_never_settles(self):
         wolf = self._wolf("mixed wolf")
