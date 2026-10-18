@@ -311,8 +311,8 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
 
     def test_skills_tab_clears_only_that_members_unread_mark(self):
         self.session.ndb.party_unlocks = {
-            int(self.aila.pk): MemberUnlocks(True, frozenset({"group_heal"})),
-            int(self.kahn.pk): MemberUnlocks(True, frozenset({"guard"})),
+            int(self.aila.pk): MemberUnlocks(True, frozenset({"t_group_heal"})),
+            int(self.kahn.pk): MemberUnlocks(True, frozenset({"t_guard"})),
         }
         # A non-skills tab never clears a dot.
         self._select(self.aila.pk, "member")
