@@ -521,6 +521,9 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(ctx.exception.reason, REASON_NOT_CO_LOCATED)
 
 
+    # Re-pointed to `webclient-party-panel::the-party-window-member-tab-offers-
+    # possession-controls-per-companion` when webclient-party-window-member-tab
+    # is archived (the main spec still names the requirement by its old title).
     @covers_requirement(
         "webclient-party-panel::the-party-drawer-offers-possession-controls-per-companion"
     )

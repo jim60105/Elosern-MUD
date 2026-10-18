@@ -472,17 +472,37 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    # Temporary traceability (the repository convention while a change is
+    # applied): the main specs still carry the party-drawer requirements this
+    # evidence replaces. The archive re-points the annotation to
+    # `webclient-party-window::the-party-window-presents-the-whole-party-through-one-rail`,
+    # `webclient-party-window::the-window-remembers-its-tab-and-member-for-the-session`,
+    # `webclient-party-window::the-member-tab-presents-bond-membership-persona-and-actions`,
+    # `webclient-party-window::windows-show-state-never-rule-explanations` and
+    # `webclient-party-panel::the-party-window-member-tab-offers-possession-controls-per-companion`
+    # (the removed party-drawer compbig requirement then leaves the specs).
     @covers_requirement(
         "webclient-contextual-hud::the-party-drawer-presents-compbig-rows-and-the-fixed-follow-rules",
+        "webclient-party-panel::the-party-drawer-offers-possession-controls-per-companion",
     )
-    def test_party_drawer_node_suite_passes(self):
+    def test_party_window_vitest_evidence_passes(self):
+        """The party window shell, its 成員 tab and their AppClient wiring
+        (webclient-party-window-member-tab): rail dispatch and pending,
+        server-truth adoption and fallback reset, session tab memory,
+        possession-identical rendering, the descriptor-driven member actions
+        with the two-step leave, the empty-slot invite and the no-rule-prose
+        text check."""
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/data/party_drawer.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_member_tab.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_party_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/components/member_rail.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/core/companion_lineup.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -492,7 +512,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "party-drawer Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "party-window Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
@@ -896,7 +916,7 @@ class GalleryArtConsumptionEvidenceTest(unittest.TestCase):
 
 class SmallAvatarZoomCropEvidenceTest(unittest.TestCase):
     """face-crop-small-avatar-thumbnails: the shared faceCropStyle zoom
-    mapping and its switcher/drawer thumbnail bindings are Vue-layer
+    mapping and its switcher and party-window nameplate bindings are Vue-layer
     contracts; the Vitest files are their executed evidence."""
 
     @covers_requirement(
@@ -910,7 +930,7 @@ class SmallAvatarZoomCropEvidenceTest(unittest.TestCase):
                 "vitest",
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/core/character_switcher.test.js"),
-                str(REPO_ROOT / "web/webclient-app/tests/data/party_drawer.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_member_tab.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,

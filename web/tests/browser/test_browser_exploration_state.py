@@ -41,6 +41,7 @@ def _press(page, key, wait_ms=80):
 # loaded art rather than a placeholder.
 COMPANION_LINEUP_METHODS = (
     "test_companion_lineup_dialogue_geometry_and_real_possession",
+    "test_party_window_opens_on_a_lineup_companion_and_switches_members",
     "test_exploration_companion_focus_reuses_the_lineup_figure",
 )
 COMPANION_FOCUS_METHOD = "test_exploration_companion_focus_reuses_the_lineup_figure"
@@ -121,7 +122,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
         page.evaluate("window.__elosernBridge.store.openHudDrawer('status')")
         page.locator('[data-testid="character-status-drawer__open-party"]').click()
-        page.locator(f'[data-testid="party-drawer__row-{target_id}"] [data-testid="party-drawer__possess-btn"]').click()
+        # The party window (webclient-party-window-member-tab) opens on 成員;
+        # the rail selects the companion through the server, and 附身 is its
+        # committed descriptor.
+        self._select_party_member(page, target_id)
+        page.locator('[data-testid="action-bar__btn--possess"]').click()
         self.assertEqual(sent_action_count(page, "explore.possess"), 1)
         self._wait_panel(page, "possession_banner", lambda p: p.get("available"))
         swapped = [target_id, rows[0]["identity"], player_id, rows[2]["identity"], rows[3]["identity"]]
@@ -132,10 +137,74 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(possessed_roster["available"])
         self.assertEqual(next(row for row in possessed_roster["characters"] if row["current"]), owner_roster_row)
         page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
-        page.locator('[data-testid="party-drawer__release-btn"]').click()
+        release = page.locator('[data-testid="action-bar__btn--possess"]')
+        release.wait_for(timeout=30000)
+        self.assertEqual(release.inner_text().strip(), "解除附身")
+        release.click()
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
         wait_for_store_state(page, lambda s: s["panels"]["status"]["actor"]["identity"] == str(player_id))
         self.assertEqual(identities(), expected)
+
+    def _select_party_member(self, page, member_id):
+        """Select one member on the party window's rail and wait for the
+        server to adopt it (server-truth selection)."""
+        entry = page.locator(f'[data-testid="member-rail__entry--{member_id}"]')
+        entry.wait_for(timeout=30000)
+        if entry.get_attribute("aria-current") != "true":
+            entry.click()
+        self._wait_panel(page, "party", lambda p: p.get("viewed_member_id") == member_id)
+        self._wait_panel(page, "party_member", lambda p: p.get("member_id") == member_id)
+        page.wait_for_selector(
+            f'[data-testid="member-rail__entry--{member_id}"][aria-current="true"]', timeout=30000
+        )
+
+    # Traceability: the webclient-party-window requirement IDs exist only in
+    # the change's delta until it is archived; the archive tags this journey
+    # with `webclient-party-window::the-party-window-presents-the-whole-party-
+    # through-one-rail` and `...::the-member-tab-presents-bond-membership-
+    # persona-and-actions`. Until then it evidences the lineup it activates.
+    @covers_requirement(
+        "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor"
+    )
+    def test_party_window_opens_on_a_lineup_companion_and_switches_members(self):
+        page = self.logged_in_page()
+        page.set_viewport_size({"width": 1451, "height": 790})
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 5)
+        party = store_state(page)["panels"]["party"]
+        commander_id = party["slots"][0]["identity"]
+        companions = [row["identity"] for row in party["slots"] if row.get("role") == "companion"]
+        # The front companion figure (the rear ones overlap behind it) is the
+        # one fully exposed to a pointer.
+        first, second = companions[0], companions[2]
+        # A companion figure on the stage lineup opens 成員 with it selected.
+        page.locator(f'[data-testid="companion-member-hit"][data-identity="{first}"]').click()
+        page.wait_for_selector('[data-testid="party-window"][data-tab="member"]', timeout=30000)
+        self._wait_panel(page, "party", lambda p: p.get("viewed_member_id") == first)
+        page.wait_for_selector(f'[data-testid="party-member-tab"][data-member="{first}"]', timeout=30000)
+        self.assertEqual(sent_action_count(page, "party.view_member"), 1)
+        # The rail lists the commander first and no figure for the commander
+        # is activatable.
+        rail = page.locator('[data-testid^="member-rail__entry--"]').evaluate_all(
+            "(els) => els.map(el => el.dataset.testid)"
+        )
+        self.assertEqual(rail[0], f"member-rail__entry--{commander_id}")
+        self.assertEqual(
+            page.locator(f'[data-testid="companion-member-hit"][data-identity="{commander_id}"]').count(), 0
+        )
+        # Switching members on the 狀態 tab keeps the tab and sends that tab.
+        page.locator('[data-testid="icon-tabs__tab--status"]').click()
+        self._select_party_member(page, second)
+        self.assertEqual(sent_action_count(page, "party.view_member"), 2)
+        self.assertEqual(
+            page.locator('[data-testid="party-window"]').get_attribute("data-tab"), "status"
+        )
+        self.assertEqual(store_state(page)["panels"]["party"]["viewed_member_id"], second)
+        # Back on 成員 the companion's bond and actions render from its panel.
+        page.locator('[data-testid="icon-tabs__tab--member"]').click()
+        page.wait_for_selector('[data-testid="party-member-tab__bond"]', timeout=30000)
+        self.assertEqual(page.locator('[data-testid="action-bar__btn--npc-persona"]').count(), 1)
 
     @covers_requirement(
         "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover"

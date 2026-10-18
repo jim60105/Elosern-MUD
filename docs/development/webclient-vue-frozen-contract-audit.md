@@ -332,7 +332,8 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | Hook family | Wave | Bucket |
 |---|---|---|
 | `companion-lineup`, `companion-figure` (equal-size decorative party row and per-slot geometry/identity hooks; replaces the retired party-strip surface) | companion-portrait-lineup | REMAP-TO-TESTID |
-| `character-status-drawer__open-party`, `party-drawer__possess-btn`, `party-drawer__release-btn` (existing drawer entry and possession controls exercised by the real companion swap journey) | companion-portrait-lineup | REMAP-TO-TESTID |
+| `character-status-drawer__open-party`, `party-drawer__possess-btn`, `party-drawer__release-btn` (existing drawer entry and possession controls exercised by the real companion swap journey; the two `party-drawer__` hooks retired with the drawer, see the party window row) | companion-portrait-lineup | REMAP-TO-TESTID |
+| `party-window`, `party-window__purse`, `party-window__quota`, `member-rail__entry--<id>`, `party-member-tab`, `party-member-tab__<suffix>`, `action-bar__btn--<key>` (`possess`, `leave`, `leave-confirm`, `npc-persona`, `persona-edit`, `invite`), `icon-tabs__tab--member`, `icon-tabs__tab--status`, `companion-member-hit` (the party window and its 成員 tab that replaced the party drawer; exercised by the companion swap and member-switch journeys in `test_browser_exploration_state.py`) | webclient-party-window-member-tab | REMAP-TO-TESTID |
 | `npc-persona-editor` + `npc-persona-editor-<suffix>` and `npc-persona-field-<suffix>` (the correlated editor, budgets, notices, conflict and discard controls, named field controls; targeted by `test_browser_npc_persona_editor.py`) | npc-persona-editor-window | REMAP-TO-TESTID |
 | `topbar`, `topbar-clock`, `topbar-location` | H1 | REMAP-TO-TESTID |
 | `narrative-feed`, `narrative-fulllog-control` | H1 | REMAP-TO-TESTID |
