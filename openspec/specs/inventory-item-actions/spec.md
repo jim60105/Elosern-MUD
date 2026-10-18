@@ -6,10 +6,11 @@ Allowlisted UI actions, adapters, client confirmation and toggle behavior, text 
 
 ### Requirement: Inventory mutations use exact allowlisted UI actions
 The production UI action registry SHALL register `inventory.use` and `inventory.toggle_equip`.
-`inventory.toggle_equip` SHALL accept exactly `{item_key}`. `inventory.use` SHALL accept exactly
-`{item_key}` or `{item_key, target_key}`, where each key is a bounded non-empty string containing
-no whitespace. A supplied `target_key` SHALL name **whom** an effect reaches and SHALL NOT
-influence **what** the item does. The authenticated session SHALL be the only exploration actor source.
+`inventory.toggle_equip` SHALL accept exactly `{actor_id, item_key}`, where `actor_id` names the member
+whose equipment toggles and the rules reauthorize it. `inventory.use` SHALL accept exactly
+`{item_key}` or `{item_key, target_key}`, each a bounded non-empty string with no whitespace. A
+supplied `target_key` SHALL name **whom** an effect reaches and SHALL NOT influence **what** the
+item does.
 
 #### Scenario: Item use delegates once
 - **WHEN** an authenticated actor in exploration submits `inventory.use` with one held usable item key
@@ -40,9 +41,9 @@ influence **what** the item does. The authenticated session SHALL be the only ex
 
 #### Scenario: Item keys stay byte-replayable in echoed input
 - **WHEN** the whitespace ban on item and target keys is examined
-- **THEN** it holds because the typed `use`/`equip` commands parse their arguments as
-  whitespace-delimited tokens and the browser input echo prints the line verbatim, so an echoed
-  line must stay byte-replayable
+- **THEN** it holds because the typed `use`/`equip` commands resolve the echoed token to exactly
+  that item (a registry key or a held display name) while the browser input echo prints the line
+  verbatim, so a whitespace-bearing key would replay as a different item
 
 #### Scenario: Effects and scopes come from the item-effect rulebook
 - **WHEN** an `inventory.use` settlement determines what an item does
@@ -50,9 +51,11 @@ influence **what** the item does. The authenticated session SHALL be the only ex
   supplied target is consumed only by an effect the rulebook already scoped to a single entity
 
 #### Scenario: Payloads reject non-key fields
-- **WHEN** an `inventory.use` or `inventory.toggle_equip` payload carries actor, quantity, effect,
-  consumable, slot, HP, combat, or presentation fields
-- **THEN** exact payload validation rejects it before adapter invocation
+- **WHEN** an `inventory.use` payload carries actor, quantity, effect, consumable, slot, HP, combat,
+  or presentation fields, or an `inventory.toggle_equip` payload carries any field other than
+  `actor_id` and `item_key`
+- **THEN** exact payload validation rejects it before adapter invocation, and only the
+  authenticated session supplies the acting character
 
 #### Scenario: Adapters use only public deterministic APIs
 - **WHEN** an inventory adapter handles a validated payload
@@ -63,6 +66,10 @@ influence **what** the item does. The authenticated session SHALL be the only ex
 #### Scenario: Active combat cannot use actorless inventory adapter
 - **WHEN** inventory.use is submitted during a party combat session
 - **THEN** it rejects without mutation; only guarded combat.command may save an actor item selection
+
+#### Scenario: A companion's equipment toggles through the action
+- **WHEN** `inventory.toggle_equip` names companion 艾拉 and a staff she holds
+- **THEN** the adapter authorizes 艾拉 for the organizing purpose and toggles her equipment once, and a forged `actor_id` is rejected with `not_party_member` instead of toggling the commander
 
 ### Requirement: Inventory tiles confirm use and directly toggle equipment
 The combat dock root SHALL add one client-local `背包` row that opens the frameless inventory
@@ -174,10 +181,11 @@ from that accepted commit and SHALL NOT optimistically decrement or toggle them.
 
 ### Requirement: Text clients expose the same deterministic item operations
 The player command surface SHALL provide `使用 <item_key> [target]` (alias `use`) and
-`裝備 <item_key>` (alias `equip`), passing only the parsed item key and, for `使用`, its optional
-target token into the same deterministic APIs UI adapters use. Both SHALL work in exploration and
-active combat: use confirms the commander draft entry, companion use goes through combat command
-with an actor token; equip stays commander-only and free.
+`裝備 <item_key> [= <成員>]` (alias `equip`), passing only the parsed item key, for `使用` its optional
+target token, and for `裝備` the resolved member into the same deterministic APIs UI adapters use. Both
+SHALL work in exploration and active combat: use confirms the commander draft entry, companion use goes
+through combat command with an actor token; equip toggles the caller or the named present member and
+stays free.
 
 #### Scenario: Command additions update both player documents
 - **WHEN** a command key, alias, syntax, or context changes for this item surface
@@ -213,3 +221,7 @@ with an actor token; equip stays commander-only and free.
 #### Scenario: Final text item selection has graphical command parity
 - **WHEN** equivalent actors submit the same final item selection through combat command and guarded combat.command
 - **THEN** both complete the same party draft and resolve the item at its actor initiative position with the same targets, costs and once-only round result
+
+#### Scenario: Text equip names a companion
+- **WHEN** a text client in combat runs `裝備 橡木圓盾 = 卡恩` while 卡恩 holds the shield
+- **THEN** 卡恩's off hand toggles, no round or world time is consumed, and the result matches `inventory.toggle_equip` with 卡恩's `actor_id`

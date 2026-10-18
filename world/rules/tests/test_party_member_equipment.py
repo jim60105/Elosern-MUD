@@ -129,7 +129,8 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         return caught.exception
 
     @covers_requirement(
-        "equipment-inventory::equipment-toggle-revalidates-ownership-and-registry-slot"
+        "equipment-inventory::equipment-toggle-revalidates-ownership-and-registry-slot",
+        "equipment-inventory::any-present-party-member-s-equipment-toggles-through-the-same-free-rule",
     )
     def test_companion_equips_replaces_and_unequips_in_its_own_bag(self):
         self.aila.db.inventory = [_BLADE.key, _AXE.key]
@@ -158,7 +159,8 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.clock.tick, tick_before)
 
     @covers_requirement(
-        "party-member-authority::acting-purposes-exclude-knocked-out-members"
+        "party-member-authority::acting-purposes-exclude-knocked-out-members",
+        "equipment-inventory::any-present-party-member-s-equipment-toggles-through-the-same-free-rule",
     )
     def test_knocked_out_companion_is_re_equipped_and_nothing_else_changes(self):
         self.kahn.traits.hp.current = 1
@@ -178,7 +180,8 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.clock.tick, tick_before)
 
     @covers_requirement(
-        "party-member-authority::member-presence-is-checked-against-the-commander-s-room"
+        "party-member-authority::member-presence-is-checked-against-the-commander-s-room",
+        "equipment-inventory::any-present-party-member-s-equipment-toggles-through-the-same-free-rule",
     )
     def test_absent_member_is_rejected_and_changes_nothing(self):
         self.aila.db.inventory = [_BLADE.key]
@@ -189,7 +192,8 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(list_items(self.aila), [_BLADE.key])
 
     @covers_requirement(
-        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted",
+        "equipment-inventory::any-present-party-member-s-equipment-toggles-through-the-same-free-rule",
     )
     def test_forged_member_is_rejected_without_toggling_the_commander(self):
         outsider = self._outsider()
@@ -204,7 +208,8 @@ class PartyMemberEquipmentTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(list_items(self.commander), [_BLADE.key])
 
     @covers_requirement(
-        "equipment-inventory::equipment-toggling-consumes-neither-a-combat-turn-nor-world-time"
+        "equipment-inventory::equipment-toggling-consumes-neither-a-combat-turn-nor-world-time",
+        "equipment-inventory::any-present-party-member-s-equipment-toggles-through-the-same-free-rule",
     )
     def test_active_session_toggle_is_free_and_invalidates_the_member_draft(self):
         self.aila.db.inventory = [_DRAUGHT_KEY, _WARD.key]
