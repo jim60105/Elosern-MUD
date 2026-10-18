@@ -151,10 +151,11 @@ For every item whose key exists in `ITEM_REGISTRY`, `actor.db.inventory` SHALL b
 - **THEN** both key quantity and mirrors remain unchanged
 
 ### Requirement: Localized item commands synchronize containment and the key list
-`拿`, `丟`, and `給` SHALL move the Evennia Object's containment AND apply the matching key-list delta
-through the deterministic inventory planner in one atomic step, so a held registry item is always
-mirrored in `db.inventory` and vice versa. A `丟`/`給` on a key that has no contained object yet SHALL
-first materialize the missing mirror object and then transfer the key in the same atomic step.
+`拿`, `丟`, and `給` SHALL move the Object's containment and apply the matching key-list delta through
+the deterministic inventory planner atomically, keeping containment and `db.inventory` mirrored. A
+`給` naming the commander or an effective party member SHALL use the party item transfer rule, not the
+legacy give path; `取回` SHALL use that rule with the commander as receiver. A `丟`/`給` on a key with
+no contained object SHALL materialize the missing mirror and transfer the key atomically.
 
 #### Scenario: Picked-up object is recorded in the canonical inventory
 - **WHEN** a player uses `拿 <item>` on a room object whose key is in `ITEM_REGISTRY`
@@ -168,7 +169,7 @@ first materialize the missing mirror object and then transfer the key in the sam
 
 #### Scenario: Given object leaves the canonical inventory
 - **WHEN** a player uses `給 <item> = <target>` on an item they hold and the target is a player
-  character or NPC
+  character or NPC that is not a member of the caller's party
 - **THEN** the object moves to the target, its key is removed from the giver's `db.inventory`, and the
   key is added to the target's `db.inventory` in the same atomic operation
 
@@ -191,6 +192,10 @@ first materialize the missing mirror object and then transfer the key in the sam
 #### Scenario: Non-registry objects remain containment-only
 - **WHEN** a player uses `拿`/`丟`/`給` on an Evennia Object whose key is not in `ITEM_REGISTRY`
 - **THEN** the object moves as today and no `db.inventory` entry is created or removed
+
+#### Scenario: Giving to a party member uses the transfer rule
+- **WHEN** the commander uses `給 2 個 治療藥水 = 艾拉` outside combat with 艾拉 present
+- **THEN** the party item transfer rule moves two potions with containment and key lists synchronized, no time passes, and the same command in combat is refused with 「戰鬥中無法交換物品。」
 
 ### Requirement: Equipment toggle revalidates ownership and registry slot
 The deterministic equipment service SHALL expose a side-effect-free preflight shared by presentation and settlement. It SHALL accept only an entity and item key, resolve the item's exact slot from immutable registry mechanics, verify current canonical inventory ownership, compute the exact replacement or removal, and return stable reasons without writing. Mutation SHALL repeat this preflight and atomically apply its immutable plan.

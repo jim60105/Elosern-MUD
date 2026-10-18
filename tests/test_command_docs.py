@@ -640,6 +640,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
     @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
             entry = self.entries[key]
@@ -844,6 +847,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::drift-contract-test")
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)
         self.assertCountEqual(links.keys(), self.entries.keys())

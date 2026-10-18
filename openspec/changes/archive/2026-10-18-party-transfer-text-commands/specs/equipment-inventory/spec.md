@@ -3,12 +3,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: Localized item commands synchronize containment and the key list
-`拿`, `丟`, and `給` SHALL move the Evennia Object's containment AND apply the matching key-list delta
-through the deterministic inventory planner in one atomic step, so a held registry item is always
-mirrored in `db.inventory` and vice versa. A `給` whose target token names the commander or an
-effective party member SHALL route through the party item transfer rule instead of the legacy give
-path; `取回` SHALL route through the same rule with the commander as receiver. A `丟`/`給` on a key that has no contained object yet SHALL
-first materialize the missing mirror object and then transfer the key in the same atomic step.
+`拿`, `丟`, and `給` SHALL move the Object's containment and apply the matching key-list delta through
+the deterministic inventory planner atomically, keeping containment and `db.inventory` mirrored. A
+`給` naming the commander or an effective party member SHALL use the party item transfer rule, not the
+legacy give path; `取回` SHALL use that rule with the commander as receiver. A `丟`/`給` on a key with
+no contained object SHALL materialize the missing mirror and transfer the key atomically.
 
 #### Scenario: Picked-up object is recorded in the canonical inventory
 - **WHEN** a player uses `拿 <item>` on a room object whose key is in `ITEM_REGISTRY`

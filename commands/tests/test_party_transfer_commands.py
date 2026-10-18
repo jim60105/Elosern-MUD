@@ -5,13 +5,6 @@ transfer rule, while every other target keeps the legacy give path (including
 quest delivery advancement). ``取回`` moves an item from a present member back
 into the commander's bag. Both surfaces share the rule's fixed refusals with
 the ``party.transfer`` action.
-
-Intended requirement IDs, recorded here until the added requirement is synced
-into ``openspec/specs/`` and ``tools.spec_traceability list`` hands out the
-canonical ones (the ``covers_requirement`` decorators are added then, the repo
-precedent for a change's own new capability):
-
-- ``party-item-transfer::text-clients-move-items-between-members``
 """
 
 from tools.spec_traceability import covers_requirement
@@ -147,6 +140,9 @@ class MemberGiveCommandTests(_TransferCommandBase):
 
     @covers_requirement(
         "equipment-inventory::localized-item-commands-synchronize-containment-and-the-key-list"
+    )
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
     )
     def test_member_give_with_a_count_moves_both_bags_through_the_rule(self):
         self._hold(self.commander, *([_POTION.key] * 3))
@@ -295,6 +291,9 @@ class RetrieveCommandTests(_TransferCommandBase):
     @covers_requirement(
         "party-item-transfer::a-transfer-moves-both-bags-atomically-and-costs-nothing"
     )
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_retrieve_moves_a_copy_to_the_commander_without_advancing_time(self):
         self._hold(self.aila, _POTION.key, _POTION.key)
         first = self._mirror(self.aila, _POTION.key)
@@ -344,6 +343,9 @@ class RetrieveCommandTests(_TransferCommandBase):
     @covers_requirement(
         "party-item-transfer::transfer-rejections-are-stable-and-observable"
     )
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
+    )
     def test_unknown_member_token_is_refused(self):
         self._hold(self.aila, _POTION.key)
         before = self._bags(self.commander, self.aila)
@@ -369,6 +371,9 @@ class RetrieveCommandTests(_TransferCommandBase):
 
     @covers_requirement(
         "party-item-transfer::transfer-rejections-are-stable-and-observable"
+    )
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
     )
     def test_equipped_item_is_refused(self):
         self._hold(self.aila, _BLADE.key)
@@ -427,6 +432,9 @@ class PossessedRetrieveTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement(
         "party-item-transfer::giver-and-receiver-are-distinct-authorized-members"
+    )
+    @covers_requirement(
+        "party-item-transfer::text-clients-move-items-between-members"
     )
     def test_retrieve_while_possessing_a_member_fills_the_commander_bag(self):
         self.char1.db.inventory = []
