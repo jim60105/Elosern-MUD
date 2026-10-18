@@ -35,8 +35,20 @@ const props = defineProps({
   // position changes; when the step ends the figures return to the dims
   // above.
   targeting: { type: Object, default: null },
+  // The companion identities whose figure opens the party window's 成員 tab
+  // with that companion selected (webclient-party-window-member-tab, design
+  // §8). AppClient passes the committed companion rows in exploration and an
+  // empty list otherwise; the commander's figure is never listed. The hit
+  // area is a pointer convenience over this decorative (aria-hidden) layer:
+  // every companion stays keyboard-reachable through the window's own rail.
+  activatableIds: { type: Array, default: () => [] },
 });
-const emit = defineEmits(["target-pointer"]);
+const emit = defineEmits(["target-pointer", "activate-member"]);
+function memberActivatable(slot) {
+  if (props.targeting || slot.identity == null) return false;
+  const id = Number(slot.identity);
+  return Number.isSafeInteger(id) && props.activatableIds.includes(id);
+}
 function idOf(slot) {
   return slot.identity == null ? null : String(slot.identity);
 }
@@ -119,6 +131,14 @@ function slotStyle(index) {
         @pointerenter="emit('target-pointer', slot.identity, 'hover')"
         @click="emit('target-pointer', slot.identity, 'activate')"
       ></span>
+      <span
+        v-else-if="memberActivatable(slot)"
+        class="companion-lineup__member-hit"
+        data-testid="companion-member-hit"
+        :data-identity="slot.identity"
+        aria-hidden="true"
+        @click="emit('activate-member', Number(slot.identity))"
+      ></span>
     </div>
   </div>
 </template>
@@ -145,6 +165,7 @@ function slotStyle(index) {
   pointer-events: none;
 }
 .companion-lineup[data-motion-level="off"] .companion-lineup__slot { transition: none; }
+.companion-lineup__member-hit { position: absolute; inset: 0; pointer-events: auto; cursor: pointer; }
 .companion-lineup__slot > .formation-figure { position: relative; height: 100%; }
 .companion-lineup__slot > .formation-figure > .stage-actor { height: 100%; }
 /* Combat (webclient-combat-formation D1/D3): the anchor spans the stage and

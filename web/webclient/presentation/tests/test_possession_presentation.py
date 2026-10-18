@@ -522,7 +522,7 @@ class PossessionPresentationTests(EvenniaTest):
 
 
     @covers_requirement(
-        "webclient-party-panel::the-party-drawer-offers-possession-controls-per-companion"
+        "webclient-party-panel::the-party-window-member-tab-offers-possession-controls-per-companion"
     )
     def test_party_panel_schema_untouched_and_companion_affordance_present(self):
         """party panel payload schema carries no possession field; vocabulary offers possess."""

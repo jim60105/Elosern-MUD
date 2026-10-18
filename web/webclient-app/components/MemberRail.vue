@@ -25,6 +25,9 @@ const props = defineProps({
   // The selected member id, EMPTY_SLOT, or null.
   selected: { type: [Number, String], default: null },
   emptySlot: { type: Boolean, default: false },
+  // The member whose selection was requested but not yet adopted by the
+  // server (webclient-party-window-member-tab): marked busy, never selected.
+  pending: { type: [Number, String], default: null },
   ariaLabel: { type: String, default: "隊伍成員" },
 });
 
@@ -145,11 +148,12 @@ function onFocusout(event) {
       :ref="(el) => setButton(member.id, el)"
       type="button"
       class="member-rail__entry"
-      :class="{ 'is-active': member.id === selected, 'is-down': member.knockedOut }"
+      :class="{ 'is-active': member.id === selected, 'is-down': member.knockedOut, 'is-pending': member.id === pending }"
       :data-rail-index="index"
       :data-testid="`member-rail__entry--${member.id}`"
       :tabindex="member.id === rovingKey ? 0 : -1"
       :aria-current="member.id === selected ? 'true' : undefined"
+      :aria-busy="member.id === pending ? 'true' : undefined"
       :aria-label="accessibleName(member)"
       @click="select(member.id)"
       @keyup.space.prevent
@@ -280,6 +284,15 @@ function onFocusout(event) {
 .member-rail__entry.is-active .member-rail__avatar {
   border-color: var(--gold-400);
   box-shadow: 0 0 calc(8px * var(--ui-scale)) rgba(228, 200, 142, 0.35);
+}
+
+.member-rail__entry.is-pending {
+  color: var(--paper-300);
+  opacity: 0.7;
+}
+
+.member-rail__entry.is-pending .member-rail__avatar {
+  border-style: dashed;
 }
 
 .member-rail__entry.is-down .member-rail__avatar {

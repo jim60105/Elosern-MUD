@@ -24,6 +24,7 @@ import {
   PARTY_MEMBER_PANEL_SAMPLE,
 } from "../stories/fixtures.js";
 import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
+import { resetPartyWindowMemory } from "../components/party-window-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 import {
@@ -48,6 +49,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     setActivePinia(createPinia());
     store = useElosernStore();
     resetQuestDrawerMemory();
+    resetPartyWindowMemory();
   });
 
   // The closed reference-drawer name -> the body's root testid.
@@ -58,7 +60,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     quest: "quest-drawer",
     lore: "lore-codex-drawer",
     status: "character-status-drawer",
-    party: "party-drawer",
+    party: "party-window",
   };
 
   it("renders no reference surface in the DOM while every drawer is closed", async () => {
@@ -451,9 +453,10 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
   });
 
-  // add-persona-edit-surface: one drawer persona edit submits exactly one
+  // add-persona-edit-surface, moved to the party window's 成員 tab by
+  // webclient-party-window-member-tab: one persona edit submits exactly one
   // character.persona.update envelope through the single store dispatch.
-  it("submits one character.persona.update envelope per drawer persona edit", async () => {
+  it("submits one character.persona.update envelope per 成員-tab persona edit", async () => {
     const sender = fx.createFakeSender();
     store.setSender(sender);
     mountAppClient();
@@ -470,19 +473,25 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
             exploration: fx.explorationPanel(),
             context_actions: fx.explorationActions(),
             character: CHARACTER_PANEL_SAMPLE,
+            party: PARTY_PANEL_EMPTY_SAMPLE,
             party_member: PARTY_MEMBER_PANEL_SAMPLE,
           },
         }),
       ],
     );
     await wrapper.vm.$nextTick();
+    // The character-status drawer shows the prose read-only.
     store.openHudDrawer("status");
     await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="character-status-drawer__persona-edit--life_story"]').trigger("click");
+    expect(wrapper.find('[data-testid^="character-status-drawer__persona-edit"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="character-status-drawer__open-party"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="action-bar__btn--persona-edit"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-edit--life_story"]').trigger("click");
     await wrapper
-      .get('[data-testid="character-status-drawer__persona-input--life_story"]')
+      .get('[data-testid="party-member-tab__persona-input--life_story"]')
       .setValue("  我在渡口寫下的新生平。  ");
-    await wrapper.get('[data-testid="character-status-drawer__persona-submit--life_story"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-submit--life_story"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(1);
     const envelope = sender.sent.actions[0];
     expect(envelope.action_id).toBe("character.persona.update");
@@ -498,7 +507,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     expect(result.accepted).toBe(true);
     // The completion publication refreshes the `party_member` panel at the
-    // result's revision (character v8 no longer carries persona); the drawer
+    // result's revision (character v8 no longer carries persona); the tab
     // reflects the new text with no reload.
     const refreshed = {
       ...PARTY_MEMBER_PANEL_SAMPLE,
@@ -519,12 +528,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(update.accepted).toBe(true);
     await wrapper.vm.$nextTick();
     expect(
-      wrapper.get('[data-testid="character-status-drawer__persona-value--life_story"]').text()
+      wrapper.get('[data-testid="party-member-tab__persona-value--life_story"]').text()
     ).toBe("我在渡口寫下的新生平。");
     // A blank submit clears: the same action carries text null.
-    await wrapper.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
-    await wrapper.get('[data-testid="character-status-drawer__persona-input--habit"]').setValue("   ");
-    await wrapper.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-edit--habit"]').trigger("click");
+    await wrapper.get('[data-testid="party-member-tab__persona-input--habit"]').setValue("   ");
+    await wrapper.get('[data-testid="party-member-tab__persona-submit--habit"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(2);
     expect(sender.sent.actions[1].payload).toEqual({ field: "habit", text: null });
   });
@@ -696,9 +705,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.openHudDrawer("party");
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
-    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
-    expect(wrapper.get('.drawer-header__title').text()).toBe("同伴 ‧ 隊伍");
-    expect(wrapper.get('.drawer-header__subtitle').text()).toBe("1 / 4");
+    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(true);
+    expect(wrapper.get('.drawer-header__title').text()).toBe("隊伍");
+    expect(wrapper.get('[data-testid="party-window__quota"]').text()).toBe("同伴 1 / 4");
   });
 
   it("keeps a solo figure for unavailable party and hides the lineup in creation", async () => {
@@ -770,7 +779,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.openHudDrawer("party");
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
-    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(true);
 
     // Commit an update where party panel becomes unavailable
     store.receive(
@@ -793,7 +802,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
 
     // The party drawer must be closed and unmounted
     expect(store.view.hudDrawer).toBe(null);
-    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="hud-drawer"]').exists()).toBe(false);
   });
 
@@ -1143,6 +1152,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
 
     expect(store.view.hudDrawer).toBe("party");
-    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(true);
   });
 });

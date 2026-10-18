@@ -1,9 +1,9 @@
 ## Purpose
 
-The version-1 `party` presentation panel: the server-owned companion read
+The version-3 `party` presentation panel: the server-owned companion read
 model (shape, NPC wire vocabulary reuse, stage-name-only bond disclosure,
 staleness filtering, push timing around the party write seams, and read-only
-presenter isolation) that the companion quickbar and party drawer consume.
+presenter isolation) that the companion quickbar and the party window consume.
 
 ## Requirements
 
@@ -185,29 +185,28 @@ combat panel's participant rows by `identity`.
 - **THEN** every party row that is fighting resolves to exactly one `aN` token from the combat
   panel, and the party payload itself named no token
 
-### Requirement: The party drawer offers possession controls per companion
-Existing party drawer controls SHALL render server-owned possess/release enablement and reasons for every effective row, including temporary actors beyond the general quota. Dispatch SHALL remain through the shared action path. Existing layout/input behavior SHALL remain; no dedicated escort-control screen SHALL be introduced. Source-aware dismissal SHALL route to existing quest abandonment choices when an effective escort reason would be removed.
+### Requirement: The party window member tab offers possession controls per companion
+The party window's 成員 tab SHALL render the `party_member` panel's server-authored possess or release descriptor, with its enablement and reason, for every effective companion selected on the member rail, including temporary actors beyond the general quota. Dispatch SHALL remain through the shared action path. No dedicated escort-control screen SHALL be introduced. Source-aware dismissal SHALL route to existing quest abandonment choices when an effective escort reason would be removed.
 
 #### Scenario: Beyond-quota temporary actor remains controllable
-- **WHEN** a temporary-only sixth row passes possession gates
-- **THEN** its existing possess control dispatches for its exact identity and the normal release control remains available
+- **WHEN** a temporary-only sixth companion is selected on the rail and passes possession gates
+- **THEN** its 附身 control dispatches `explore.possess` for its exact identity and the normal 解除附身 control remains available while possessing
 
 #### Scenario: A possessable companion row offers the action
-- **WHEN** the drawer renders a co-located bound companion whose possess entry is enabled
-- **THEN** the row carries the 附身 control and dispatching it submits `explore.possess` with the
-  companion's id
+- **WHEN** the 成員 tab shows a co-located bound companion whose possess descriptor is enabled
+- **THEN** the action bar carries the 附身 control and dispatching it submits `explore.possess` with the companion's id
 
 #### Scenario: A gated companion row shows the gate honestly
-- **WHEN** the companion's possess entry is disabled with a gate reason
-- **THEN** the row renders the control disabled carrying the emitted reason, never hidden
+- **WHEN** the companion's possess descriptor is disabled with a gate reason
+- **THEN** the control renders disabled with the committed reason in the action bar's reason slot, never hidden
 
 #### Scenario: The panel payload schema is untouched
-- **WHEN** party possession controls render for general and temporary rows after the coordinated unreleased payload extension
-- **THEN** controls use the existing vocabulary while server and client validators agree on membership metadata and general quota fields
+- **WHEN** possession controls render for general and temporary companions
+- **THEN** they read only the `party_member` descriptors and the `party` v3 rows, and server and client validators agree on both
 
 #### Scenario: Possession state rides the vocabulary and banner only
-- **WHEN** possession control state is displayed on the extended party panel
-- **THEN** control permission still comes from the existing shared vocabulary/banner and rows add no duplicated possession state or combat token
+- **WHEN** possession control state is displayed
+- **THEN** control permission comes only from the `party_member` descriptor and the possession banner, the rail carries no possession marker and no "you" marker, and the window is otherwise identical while possessing
 
 ### Requirement: party.view_member selects the viewed member for the session
 The production registry SHALL register `party.view_member` accepting exactly `{member_id, tab, skill_key, item_key}` and SHALL store the selection per session, keyed to the commander, without ever authorizing a mutation.

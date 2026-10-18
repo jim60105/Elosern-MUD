@@ -24,7 +24,6 @@ import { computed } from "vue";
 import { conditionLabel, conditionSource } from "../lib/condition_label.js";
 import { useStatusDrawerCharacter } from "../composables/use-status-drawer-character.js";
 import { useStatusDrawerStatus } from "../composables/use-status-drawer-status.js";
-import { useStatusDrawerPersona } from "../composables/use-status-drawer-persona.js";
 
 const props = defineProps({
   // The committed `status` v1 panel payload (vitals + conditions).
@@ -46,10 +45,10 @@ const props = defineProps({
   possessing: { type: Boolean, default: false },
 });
 
-// `open-skill` opens the skill drawer; `open-party` opens the party drawer; `persona-edit` carries one
-// `{ field, text }` persona edit intent (text null clears the field) that
-// AppClient dispatches as exactly one character.persona.update action.
-const emit = defineEmits(["open-skill", "open-party", "persona-edit"]);
+// `open-skill` opens the skill drawer; `open-party` opens the party window on
+// its 成員 tab. Persona editing moved to that tab
+// (webclient-party-window-member-tab); this drawer shows the prose read-only.
+const emit = defineEmits(["open-skill", "open-party"]);
 
 // The condition prose is the shared label rule (the same label, duration,
 // and modifier text the H2 chips carry in their accessible names) — one
@@ -111,15 +110,6 @@ const guildRank = computed(() => {
   return typeof rank === "string" ? rank.trim() : "";
 });
 
-// The persona inline-editor state machine (watch stays with its state).
-const {
-  editingField,
-  editDraft,
-  onPersonaInput,
-  openPersonaEdit,
-  cancelPersonaEdit,
-  submitPersonaEdit,
-} = useStatusDrawerPersona(emit, personaSections);
 </script>
 
 <template>
@@ -433,11 +423,10 @@ const {
          body renders no balance of its own (and never a zero). -->
     <!-- The persona area (add-persona-edit-surface D4): four labelled
          sections in 個性／生平／習慣／背景 order. Each shows the committed
-         verbatim text or the localized 未設定 placeholder, plus an inline
-         edit affordance that submits exactly one persona-edit intent
-         ({ field, text }; a blank draft submits null). When the
-         `party_member` panel is unavailable the area stays visible, is marked
-         with the registry-owned reason, and offers no edit controls; while a
+         verbatim text or the localized 未設定 placeholder, read-only (the
+         editor lives in the party window's 成員 tab). When the
+         `party_member` panel is unavailable the area stays visible and is
+         marked with the registry-owned reason; while a
          companion is the viewed member there is no commander section to show,
          so the area is absent rather than borrowing another member's prose. -->
     <section v-if="personaVisible" class="character-status-drawer__section character-status-drawer__section--full character-status-drawer__persona" data-testid="character-status-drawer__persona" aria-label="設定">
@@ -467,44 +456,8 @@ const {
         <p v-else class="character-status-drawer__persona-empty" :data-testid="`character-status-drawer__persona-empty--${section.key}`">
           未設定
         </p>
-        <button
-          v-if="editingField !== section.key"
-          type="button"
-          class="ui-btn ui-btn--sm character-status-drawer__persona-edit"
-          :data-testid="`character-status-drawer__persona-edit--${section.key}`"
-          @click="openPersonaEdit(section)"
-        >
-          編輯{{ section.label }}
-        </button>
-        <div v-else class="character-status-drawer__persona-editor">
-          <textarea
-            rows="3"
-            :aria-label="section.label"
-            @input="onPersonaInput"
-            :data-testid="`character-status-drawer__persona-input--${section.key}`"
-            v-model="editDraft"
-          ></textarea>
-          <div class="character-status-drawer__persona-editor-buttons">
-            <button
-              type="button"
-              class="ui-btn ui-btn--sm ui-btn--primary character-status-drawer__persona-submit"
-              :data-testid="`character-status-drawer__persona-submit--${section.key}`"
-              @click="submitPersonaEdit(section)"
-            >
-              儲存
-            </button>
-            <button
-              type="button"
-              class="ui-btn ui-btn--sm character-status-drawer__persona-cancel"
-              :data-testid="`character-status-drawer__persona-cancel--${section.key}`"
-              @click="cancelPersonaEdit"
-            >
-              取消
-            </button>
-          </div>
         </div>
-        </div>
-</template>
+      </template>
     </section>
   </section>
 </template>

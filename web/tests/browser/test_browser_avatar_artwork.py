@@ -51,7 +51,9 @@ _INVALID_PNG = b"not-an-image"
 AVATAR = '[data-testid="avatar-artwork"]'
 MARKER = '[data-testid="artwork-failure"]'
 PILL = '[data-testid="character-switcher-trigger"]'
-PARTY_DRAWER = '[data-testid="hud-drawer"][data-drawer-key="party"]'
+# The party window's 成員 nameplate (webclient-party-window-member-tab) is
+# the companion avatar surface that replaced the party drawer rows.
+PARTY_PLATE = '[data-testid="hud-drawer"][data-drawer-key="party"] [data-testid="party-member-tab__plate"]'
 PARTICIPANT_FRAME = '[data-testid="participant-frame"]'
 
 _AVATAR_STATE = """
@@ -257,9 +259,7 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         )
         self.assertIn(LOAD_FAILURE_TEXT, entry_described)
 
-        # --- a party drawer companion row (standalone focusable marker) -------
-        page.evaluate("() => window.__elosernBridge.store.openHudDrawer('party')")
-        page.wait_for_selector(f"{PARTY_DRAWER} {AVATAR}", timeout=30000)
+        # --- the party window's 成員 nameplate (standalone focusable marker) --
         party = [
             slot
             for slot in store_state(page)["panels"]["party"]["slots"]
@@ -271,7 +271,21 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertIsNotNone(
             companion, "the portrait seed must join a companion with a real card"
         )
-        party_row = f'[data-testid="party-drawer__row-{companion["identity"]}"] {AVATAR}'
+        page.evaluate("() => window.__elosernBridge.store.openHudDrawer('party')")
+        entry = page.locator(f'[data-testid="member-rail__entry--{companion["identity"]}"]')
+        entry.wait_for(timeout=30000)
+        if entry.get_attribute("aria-current") != "true":
+            entry.click()
+        wait_for_store_state(
+            page,
+            lambda s: s["panels"]["party"].get("viewed_member_id") == companion["identity"],
+            timeout=30000,
+        )
+        page.wait_for_selector(
+            f'[data-testid="party-member-tab"][data-member="{companion["identity"]}"] {AVATAR}',
+            timeout=30000,
+        )
+        party_row = f"{PARTY_PLATE} {AVATAR}"
         party_state = self._assert_avatar_fallback(page, party_row, companion["display_name"])
         # A real focusable control in the tab order: keyboard reachable with no
         # pointer hover, and its accessible name carries the whole sentence.

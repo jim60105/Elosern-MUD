@@ -61,6 +61,7 @@ const selectedTab = computed(() => props.tabs.find((tab) => tab.key === props.mo
           class="window-frame__tabs"
           data-testid="window-frame__tabs"
           orientation="horizontal"
+          show-labels
           :aria-label="tabsLabel"
           :tabs="frameTabs"
           :model-value="modelValue"

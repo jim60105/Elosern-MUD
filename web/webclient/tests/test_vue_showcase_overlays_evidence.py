@@ -53,7 +53,8 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/CreationOverlay",
     "Overlays/OverlayHost",
     "Overlays/ObjectiveTracker",
-    "Overlays/PartyDrawer",
+    # webclient-party-window-member-tab replaced the party drawer.
+    "Overlays/PartyWindow",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -76,10 +77,14 @@ OVERLAYS_STORY_IDS = {
     "overlays-creationoverlay--proposal",
     "overlays-creationoverlay--unavailable",
     "overlays-creationoverlay--storyboard",
-    "overlays-partydrawer--two-companions",
-    "overlays-partydrawer--empty-party",
-    "overlays-partydrawer--full-party",
-    "overlays-partydrawer--combat-mode",
+    "overlays-partywindow--companion-reference",
+    "overlays-partywindow--companion-full-hd",
+    "overlays-partywindow--commander-reference",
+    "overlays-partywindow--commander-full-hd",
+    "overlays-partywindow--knocked-out-reference",
+    "overlays-partywindow--knocked-out-full-hd",
+    "overlays-partywindow--empty-slot-reference",
+    "overlays-partywindow--empty-slot-full-hd",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -230,6 +235,13 @@ PREVIOUS_MANIFEST_KEYS = {
     # quest-drawer-book-tab, when World/QuestDrawer replaced World/QuestLog.
     "World/QuestList",
     "World/QuestDetail",
+    # The shared window primitives (webclient-window-primitives) joined the
+    # frozen set; this change pins them with the party window.
+    "Core/WindowFrame",
+    "Core/MemberRail",
+    "Core/ListDetail",
+    "Core/ActionBar",
+    "Data/HoldingsStrip",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
@@ -374,7 +386,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyDrawer",
+                "ObjectiveTracker", "PartyWindow",
             )},
         )
 

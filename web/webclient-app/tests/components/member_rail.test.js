@@ -49,6 +49,18 @@ describe("MemberRail (webclient-window-primitives)", () => {
     expect(entry(12).attributes("aria-current")).toBeUndefined();
   });
 
+  // webclient-party-window-member-tab: a requested, not yet adopted
+  // selection is busy, never selected.
+  it("marks the pending entry busy without selecting it", async () => {
+    mountRail({ pending: 12 });
+    expect(entry(12).attributes("aria-busy")).toBe("true");
+    expect(entry(12).classes()).toContain("is-pending");
+    expect(entry(12).attributes("aria-current")).toBeUndefined();
+    expect(entry(11).attributes("aria-busy")).toBeUndefined();
+    await wrapper.setProps({ pending: null });
+    expect(entry(12).attributes("aria-busy")).toBeUndefined();
+  });
+
   it("states a knocked-out member by the ▼ shape and the text 倒地, also in the accessible name", () => {
     mountRail();
     const down = entry(13).get('[data-testid="member-rail__down"]');

@@ -1,12 +1,13 @@
-// CharacterStatusDrawer persona-editing group (add-persona-edit-surface D4):
-// the inline editor state machine extracted verbatim from
-// `CharacterStatusDrawer.vue`. Owns the at-most-one-open editing field, the
-// code-point-bound draft, and the refresh-reseeding watcher (the watch stays
-// with the state it mutates). Consumes the character group's `personaSections`
-// computed and the SFC's `persona-edit` emit explicitly.
+// The commander's persona-editing group (add-persona-edit-surface D4, moved
+// from the character-status drawer to the party window's 成員 tab by
+// webclient-party-window-member-tab): the inline editor state machine. Owns
+// the at-most-one-open editing field, the code-point-bound draft, and the
+// refresh-reseeding watcher (the watch stays with the state it mutates).
+// Consumes the tab's `personaSections` computed and its `persona-edit` emit
+// explicitly.
 import { ref, watch } from "vue";
 
-export function useStatusDrawerPersona(emit, personaSections) {
+export function useMemberPersona(emit, personaSections) {
   // Inline editing state: at most one section is open; the draft is seeded
   // from the committed value on open. Submitting emits exactly one
   // `persona-edit` intent ({ field, text }) — AppClient turns it into a

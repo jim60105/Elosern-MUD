@@ -193,7 +193,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Overlays/OverlayHost",
      "Overlays/CreationOverlay",
      "Core/CompanionLineup",
-     "Overlays/PartyDrawer",
+     "Overlays/PartyWindow",
      "Overlays/ObjectiveTracker",
      "Core/CommandLine",
      "Action/DockBreadcrumb",
@@ -310,12 +310,14 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     expect(titles.filter((title) => /\bBag\b/i.test(title))).toEqual([]);
   });
 
-  it("documents the party quickbar and drawer are now backed by the party read model, so the party/companion deferred patterns are retired", () => {
+  it("documents the party quickbar and window are now backed by the party read models, so the party/companion deferred patterns are retired", () => {
     // webclient-align-05-party-hud: the party surfaces are NO LONGER deferred —
-    // the `party` read model (webclient-party-panel) backs the four-slot party listing.
-    // The standing lineup and party drawer render the committed listing.
+    // the `party` read model (webclient-party-panel) backs the party listing.
+    // The standing lineup and the party window (webclient-party-window-member-
+    // tab, backed by `party` and `party_member`) render the committed listing.
     expect(manifest.required).toContain("Core/CompanionLineup");
-    expect(manifest.required).toContain("Overlays/PartyDrawer");
+    expect(manifest.required).toContain("Overlays/PartyWindow");
+    expect(manifest.required).not.toContain("Overlays/PartyDrawer");
   });
 
   it("reserves no intimate collapsible, item-rarity affordance or discovered-lore compendium (task 8.4)", () => {

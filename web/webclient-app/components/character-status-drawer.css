@@ -419,11 +419,9 @@
   overflow-wrap: anywhere;
 }
 
-/* Persona editing (add-persona-edit-surface D4): the unset placeholder is
-   muted display copy; the inline editor reuses the shared control layer
-   (`ui-btn` / `ui-btn--primary` from styles/tokens.css) and never relies on
-   colour alone (buttons carry text labels). The rules below add layout
-   only; they never restate the control chrome. */
+/* The persona area (add-persona-edit-surface D4; read-only since
+   webclient-party-window-member-tab moved the editor to the party window's
+   成員 tab): the unset placeholder is muted display copy. */
 .character-status-drawer__persona {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(280px * var(--ui-scale), 100%), 1fr));
@@ -439,37 +437,10 @@
   min-width: 0;
 }
 
-.character-status-drawer__persona-editor {
-  align-self: stretch;
-}
-
 .character-status-drawer__persona-empty {
   margin: 0;
   color: var(--paper-500);
   font-size: var(--text-md);
-}
-
-.character-status-drawer__persona-edit {
-  margin-top: calc(4px * var(--ui-scale));
-}
-
-.character-status-drawer__persona-editor textarea {
-  width: 100%;
-  font: inherit;
-  font-size: var(--text-md);
-  color: var(--paper-300);
-  background: var(--ink-820);
-  border: 1px solid var(--ink-600);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2);
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.character-status-drawer__persona-editor-buttons {
-  display: flex;
-  gap: calc(8px * var(--ui-scale));
-  margin-top: calc(4px * var(--ui-scale));
 }
 
 /* The design's 親密狀態 disclosure: the native `<details>` header carries the
