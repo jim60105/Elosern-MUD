@@ -87,24 +87,33 @@ def commander_sessions(acting: Any) -> tuple[Any, ...]:
 
 
 def _possession_sessions(commander: Any) -> tuple[Any, ...]:
-    """Sessions puppeting the commander's possessed companion.
+    """Every session of the account puppeting the commander's possessed companion.
 
     A possessed commander body is unpuppeted, so Evennia removes its account
     link; the account's sessions then belong to the possessed companion. The
     possession mirror (``db.possessed_by``, whose single writer is
-    :mod:`world.rules.possession`) is the read-only way back to them.
+    :mod:`world.rules.possession`) plus the party binding identify the account;
+    its full session list is returned, so a second connection of the same
+    account (for example one still at character selection) is marked too.
     """
     commander_id = getattr(commander, "pk", None)
     if not isinstance(commander_id, int) or isinstance(commander_id, bool):
         return ()
+    from world.rules.party import bound_owner_of
     from evennia.server.sessionhandler import SESSION_HANDLER
 
-    return tuple(
-        session
-        for session in SESSION_HANDLER.values()
-        if getattr(getattr(getattr(session, "puppet", None), "db", None), "possessed_by", None)
-        == commander_id
-    )
+    for session in SESSION_HANDLER.values():
+        puppet = getattr(session, "puppet", None)
+        if (
+            getattr(getattr(puppet, "db", None), "possessed_by", None)
+            != commander_id
+            or bound_owner_of(puppet) is not commander
+        ):
+            continue
+        sessions = getattr(getattr(session, "account", None), "sessions", None)
+        if sessions is not None:
+            return tuple(sessions.all())
+    return ()
 
 
 def record_unlocks(acting: Any, notices: Iterable[UnlockNotice]) -> None:
@@ -139,15 +148,31 @@ def deliver_unlocks(
     line through their own post-commit channel (the resolver's notification
     tuple, the combat round delivery, or the skip summary): the line then
     reaches the commander exactly once and this call only records the marks.
+
+    The delivery is scheduled on the outermost transaction commit, so an
+    owner running inside an enclosing unit that later rolls back never leaves
+    a mark (or an item-use line) behind. Outside a transaction Django runs
+    the callback immediately.
     """
     pending = tuple(notices)
     if not pending:
         return
+    from django.db import transaction
+
+    transaction.on_commit(
+        lambda: _deliver_unlocks(acting, pending, announce=announce)
+    )
+
+
+def _deliver_unlocks(
+    acting: Any, notices: tuple[UnlockNotice, ...], *, announce: bool
+) -> None:
+    """The committed delivery body: the line, then the session marks."""
     if announce:
         for session in commander_sessions(acting):
-            for notice in pending:
+            for notice in notices:
                 session.msg(notice.line)
-    record_unlocks(acting, pending)
+    record_unlocks(acting, notices)
 
 
 def mark_unlocks_seen(session: Any, member_id: int) -> None:

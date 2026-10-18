@@ -108,6 +108,9 @@ class UnlockNoticeTests(EvenniaTest):
         npc = create_object(NPC, key=key, location=self.room1, home=self.room1)
         npc.race = _race_key()
         npc.apply_race_baseline()
+        npc.traits.mp.base = 20
+        npc.traits.mp.current = 20
+        npc.traits.magic_power.base = 30
         join_party(npc, self.commander)
         return npc
 
@@ -150,7 +153,8 @@ class UnlockNoticeTests(EvenniaTest):
         self.assertEqual(
             notice.line, f"{self.aila.key} 學會了 {TREE[_CHILD].label}"
         )
-        deliver_unlocks(self.commander, sink)
+        with self.captureOnCommitCallbacks(execute=True):
+            deliver_unlocks(self.commander, sink)
         # One line, to the account's live session.
         self.session.data_out.assert_called_once_with(text=notice.line)
         self.assertEqual(
@@ -210,7 +214,8 @@ class UnlockNoticeTests(EvenniaTest):
         # possession mirror instead of messaging the body.
         enter_possession(self.commander, self.aila)
         notice = self._notice(self.aila)
-        deliver_unlocks(self.commander, [notice])
+        with self.captureOnCommitCallbacks(execute=True):
+            deliver_unlocks(self.commander, [notice])
         self.session.data_out.assert_called_with(text=notice.line)
         self.assertEqual(
             unlock_flags(self.session)[self.aila.pk],
@@ -222,7 +227,8 @@ class UnlockNoticeTests(EvenniaTest):
             return {attr.key: attr.value for attr in entity.attributes.all()}
 
         before = (attributes(self.commander), attributes(self.aila))
-        deliver_unlocks(self.commander, [self._notice(self.aila)])
+        with self.captureOnCommitCallbacks(execute=True):
+            deliver_unlocks(self.commander, [self._notice(self.aila)])
         self.assertEqual(
             (attributes(self.commander), attributes(self.aila)), before
         )
@@ -252,7 +258,8 @@ class UnlockNoticeTests(EvenniaTest):
         summary = render_skip_summary(3600 * 5, events)
         self.assertEqual(summary.count(notices[0].line), 1)
         # The summary already carried the line; the marks ride along silently.
-        deliver_unlocks(self.commander, notices, announce=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            deliver_unlocks(self.commander, notices, announce=False)
         self.session.data_out.assert_not_called()
         self.assertEqual(
             unlock_flags(self.session)[self.aila.pk],
@@ -291,6 +298,49 @@ class UnlockNoticeTests(EvenniaTest):
             unlock_flags(self.session)[self.aila.pk],
             MemberUnlocks(True, frozenset({_CHILD})),
         )
+
+    def test_possession_marks_every_session_of_the_account(self):
+        enter_possession(self.commander, self.aila)
+        second = _FakeSession()
+        notice = self._notice(self.aila)
+        with (
+            patch.object(
+                self.account.sessions,
+                "all",
+                return_value=[self.session, second],
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            deliver_unlocks(self.commander, [notice])
+        for session in (self.session, second):
+            self.assertEqual(
+                unlock_flags(session)[self.aila.pk],
+                MemberUnlocks(True, frozenset({_CHILD})),
+            )
+        self.assertEqual(second.messages, [notice.line])
+
+    def test_an_enclosing_rollback_leaves_no_mark(self):
+        from django.db import transaction
+
+        with self.captureOnCommitCallbacks(execute=True):
+            try:
+                with transaction.atomic():
+                    deliver_unlocks(self.commander, [self._notice(self.aila)])
+                    transaction.set_rollback(True)
+            except Exception:  # observability: ignore R2: the test's own rollback is the assertion
+                pass
+        self.assertEqual(dict(unlock_flags(self.session)), {})
+        self.session.data_out.assert_not_called()
+
+    def test_combat_delivery_keeps_a_second_identical_line(self):
+        notice = self._notice(self.aila)
+        with self.captureOnCommitCallbacks(execute=True):
+            _deliver_after_commit(
+                self.commander, (notice.line, notice, notice.line)
+            )
+        # One occurrence is the notice's own staged line; the other is a
+        # separately staged line that happens to read the same.
+        self.assertEqual(self.session.data_out.call_count, 2)
 
     def test_the_context_snapshot_is_a_detached_immutable_copy(self):
         record_unlocks(self.commander, [self._notice(self.aila)])

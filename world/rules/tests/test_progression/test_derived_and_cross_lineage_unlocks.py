@@ -202,6 +202,13 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
             [f"新法術可用：{_tree_child_label()}"],
         )
         self.assertEqual(retry.notifications[-1], f"新法術可用：{_tree_child_label()}")
+        # The same commit carries the structured notice the delivery owners
+        # forward for the session marks.
+        self.assertEqual(len(retry.unlock_notices), 1)
+        self.assertEqual(
+            retry.unlock_notices[0].line,
+            f"新法術可用：{_tree_child_label()}",
+        )
 
 
 class CrossLineageUnlockWiringTests(EvenniaTestCase):

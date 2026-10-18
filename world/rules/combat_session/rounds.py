@@ -1255,17 +1255,22 @@ def _deliver_notifications(
 
     The unlock lines are staged twice in the same result — as the rendered
     string the resolver put in ``notifications`` and inside the structured
-    notice — so the string matching a notice's own line is dropped here and
-    the notice delivers it to the commander's sessions instead. That keeps
-    one line per unlock and still reaches a commander whose body is
-    unpuppeted during possession (the notice helper resolves the account's
-    live sessions).
+    notice — so exactly one matching string occurrence per notice is consumed
+    here and the notice delivers that line to the commander's sessions
+    instead. A second, independently staged line with the same text is still
+    delivered. That keeps one line per unlock and still reaches a commander
+    whose body is unpuppeted during possession (the notice helper resolves
+    the account's live sessions).
     """
     notices = tuple(item for item in notifications if isinstance(item, UnlockNotice))
-    unlock_lines = {notice.line for notice in notices}
+    staged = [notice.line for notice in notices]
     for item in notifications:
-        if isinstance(item, str) and item not in unlock_lines:
-            commander.msg(item)
+        if not isinstance(item, str):
+            continue
+        if item in staged:
+            staged.remove(item)
+            continue
+        commander.msg(item)
     deliver_unlocks(commander, notices)
 
 
