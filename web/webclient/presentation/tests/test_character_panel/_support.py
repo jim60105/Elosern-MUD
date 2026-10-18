@@ -1,5 +1,4 @@
 """Shared module-level helpers for the ``character_panel`` test package."""
-import math
 import importlib
 from unittest.mock import patch
 from web.webclient.presentation.character import CHARACTER_SCHEMA_VERSION
@@ -244,8 +243,25 @@ def _equipment_row(**overrides):
     return value
 
 
-def _skill_categories(keys, category="elemental_magic", label="元素魔法"):
+def _active_row(key, **overrides):
+    """One valid v9 active row: identity plus the six required growth facts."""
+    value = {
+        "key": key,
+        "label": key,
+        "level": 1,
+        "xp_into_level": 10,
+        "xp_to_next_level": 40,
+        "capped": False,
+        "fresh": False,
+        "booked": False,
+    }
+    value.update(overrides)
+    return value
+
+
+def _skill_categories(keys, category="elemental_magic", label="元素魔法", row=None):
     """One minimal valid category group carrying the given keys as rows."""
+    builder = row or (lambda key: {"key": key, "label": key})
     return [
         {
             "category": category,
@@ -254,7 +270,7 @@ def _skill_categories(keys, category="elemental_magic", label="元素魔法"):
                 {
                     "group": None,
                     "label": None,
-                    "skills": [{"key": key, "label": key} for key in keys],
+                    "skills": [builder(key) for key in keys],
                 }
             ],
         }
@@ -279,29 +295,8 @@ def _skill_categories_enriched(
     group="t_合成",
     group_label="合成分組",
     cost=None,
-    scales=None,
 ):
     """One valid category group carrying registry-backed detail on every row."""
-    # The shared ladder over the fixture skill's own cost: five ascending
-    # rungs whose mp_costs scale the row's base mp (invented numbers, never
-    # a shipped pricing row).
-    if scales is None:
-        base_mp = int((cost or {"mp": 0})["mp"])
-        scales = [
-            {
-                "scale": scale,
-                "label": label,
-                # Mirrors the shipped rounding (floor(x + 0.5), floor at 1).
-                "mp_cost": max(1, math.floor(base_mp * scale + 0.5)),
-            }
-            for scale, label in (
-                (0.25, "1/4"),
-                (0.5, "1/2"),
-                (1, "1"),
-                (2, "2"),
-                (4, "4"),
-            )
-        ]
     return [
         {
             "category": category,
@@ -311,14 +306,12 @@ def _skill_categories_enriched(
                     "group": group,
                     "label": group_label,
                     "skills": [
-                        {
-                            "key": key,
-                            "label": key,
-                            "cost": dict(cost or {}),
-                            "target_spec": "single",
-                            "usable_out_of_combat": True,
-                            "freeform_scales": scales,
-                        }
+                        _active_row(
+                            key,
+                            cost=dict(cost or {}),
+                            target_spec="single",
+                            usable_out_of_combat=True,
+                        )
                         for key in keys
                     ],
                 }
@@ -348,7 +341,7 @@ def _valid_panel(**overrides):
         "member_id": 7,
         "traits": [_trait(), _trait(key="atk_phys", label="攻擊", base=5, current=5, max=None, effective=5)],
         "conditions": [_condition_row()],
-        "actives": _skill_categories([T_EMBER]),
+        "actives": _skill_categories([T_EMBER], row=_active_row),
         "passives": _skill_categories(
             [T_STEADY], category="enhancement", label="強化"
         ),

@@ -1,14 +1,20 @@
 """Character panel schema tests: byte-envelope, label/value bounds, and intimate-field validation."""
 from tools.spec_traceability import covers_requirement
 import unittest
-from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_CONDITION_ROWS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_LABEL_CODE_POINTS, MAX_MODIFIER_KEYS, MAX_PASSIVE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
+from web.webclient.presentation.character import MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS, MAX_CONDITION_ROWS, MAX_DISPLAYED_ROWS, MAX_EQUIPMENT_ROWS, MAX_FULL_TITLE_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_MODIFIER_KEYS, MAX_PASSIVE_ROWS, MAX_TRAIT_ROWS, CharacterPanelError, validate_character
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
-from ._support import _skill_categories, _trait, _valid_panel
+from ._support import _active_row, _skill_categories, _trait, _valid_panel
 
 
 class CharacterSchemaTests(unittest.TestCase):
 
-    def test_worst_case_legal_payload_fits_the_envelope(self):
+    def test_maximal_payload_fits_the_envelope(self):
+        # Every section is present with its row count at its cap, and every
+        # active row carries its growth facts plus the registry detail. The
+        # per-stat layer lists stay empty: the pre-existing D10 contract bounds
+        # the envelope by serialized size (a simultaneous maximum of 32 traits
+        # x 16 layers x 128-code-point names cannot conform at all), so this
+        # fixture pins the v9 additions at full row counts instead.
         traits = [
             _trait(
                 key=f"trait_{i}",
@@ -19,6 +25,19 @@ class CharacterSchemaTests(unittest.TestCase):
             )
             for i in range(MAX_TRAIT_ROWS)
         ]
+        conditions = [
+            {
+                "code": f"condition_{i}",
+                "label": "很長的狀態名稱" * 3,
+                "severity": "beneficial",
+                "remaining_seconds": 30,
+                "modifiers": {
+                    f"modifier_{m}": -10 for m in range(MAX_MODIFIER_KEYS)
+                },
+                "source": "狀態",
+            }
+            for i in range(MAX_CONDITION_ROWS)
+        ]
         actives = [
             {
                 "category": f"cat_{c}",
@@ -28,7 +47,16 @@ class CharacterSchemaTests(unittest.TestCase):
                         "group": f"group_{c}",
                         "label": "很長的子分類名稱" * 3,
                         "skills": [
-                            {"key": f"active_{i}", "label": "很長的主動技能名稱" * 3}
+                            _active_row(
+                                f"active_{i}",
+                                label="很長的主動技能名稱" * 3,
+                                level=9,
+                                xp_into_level=49,
+                                xp_to_next_level=1,
+                                cost={"mp": 12, "sp": 3},
+                                target_spec="single",
+                                usable_out_of_combat=True,
+                            )
                             for i in range(c, MAX_ACTIVE_ROWS, MAX_CATEGORY_GROUPS)
                         ],
                     }
@@ -68,9 +96,11 @@ class CharacterSchemaTests(unittest.TestCase):
         ]
         payload = _valid_panel(
             traits=traits,
+            conditions=conditions,
             actives=actives,
             passives=passives,
             equipment=equipment,
+            full_title="長" * MAX_FULL_TITLE_CODE_POINTS,
             disguise={
                 "active": True,
                 "description": "偽裝中的描述文字" * 10,
@@ -253,10 +283,11 @@ class CharacterSchemaTests(unittest.TestCase):
         for field in ("actives", "passives"):
             with self.subTest(field=field):
                 bound = MAX_ACTIVE_ROWS if field == "actives" else MAX_PASSIVE_ROWS
+                row = _active_row if field == "actives" else None
                 payload = _valid_panel(
                     **{
                         field: _skill_categories(
-                            [f"skill_{i}" for i in range(bound + 1)]
+                            [f"skill_{i}" for i in range(bound + 1)], row=row
                         )
                     }
                 )
@@ -265,11 +296,14 @@ class CharacterSchemaTests(unittest.TestCase):
                 payload = _valid_panel(
                     **{
                         field: [
-                            *_skill_categories([f"skill_{i}" for i in range(bound // 2)]),
+                            *_skill_categories(
+                                [f"skill_{i}" for i in range(bound // 2)], row=row
+                            ),
                             *_skill_categories(
                                 [f"skill_{i}" for i in range(bound // 2)],
                                 category="enhancement",
                                 label="強化",
+                                row=row,
                             ),
                         ]
                     }
@@ -293,7 +327,7 @@ class CharacterSchemaTests(unittest.TestCase):
                             "group": None,
                             "label": None,
                             "skills": [
-                                {"key": f"active_{i}", "label": "主動技能"}
+                                _active_row(f"active_{i}", label="主動技能")
                                 for i in range(c, total, MAX_CATEGORY_GROUPS)
                             ],
                         }
@@ -369,7 +403,7 @@ class CharacterSchemaTests(unittest.TestCase):
                             "group": "t_合成",
                             "label": "合成分組",
                             "skills": [
-                                {"key": f"a{i}", "label": wide}
+                                _active_row(f"a{i}", label=wide)
                                 for i in range(MAX_ACTIVE_ROWS)
                             ],
                         }

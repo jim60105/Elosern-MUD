@@ -14,6 +14,7 @@ from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.party import join_party
 from world.rules.status_query import StatusQueryError
+from world.rules.unlock_notices import MemberUnlocks
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from ._support import (
     BRANCH,
@@ -75,7 +76,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return build_production_registry()
 
 
-    def _render(self, *, actor=None, member=None):
+    def _render(self, *, actor=None, member=None, unlocks=None):
         """Render the panel for ``member`` as the session's viewed member."""
         selection = (
             None
@@ -86,6 +87,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             actor=actor or self.player,
             protocol_version=1,
             party_view=selection,
+            unlocks=unlocks or {},
         )
         return self._registry().render("character", context)
 
@@ -209,6 +211,74 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
                 _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
             ],
         )
+
+    def _active_row(self, payload, key):
+        return next(
+            row
+            for category in payload["actives"]
+            for group in category["groups"]
+            for row in group["skills"]
+            if row["key"] == key
+        )
+
+    def test_active_rows_carry_the_member_proficiency_band(self):
+        self.player.db.skill_proficiency = {T_EMBER: 60.0}
+        payload = self._render()
+        row = self._active_row(payload, T_EMBER)
+        self.assertEqual(row["level"], 1)
+        self.assertEqual(row["xp_into_level"], 10.0)
+        self.assertEqual(row["xp_to_next_level"], 40.0)
+        self.assertIs(row["capped"], False)
+        # The band is derived from the stored proficiency exactly as the
+        # lineage read does (the rules test pins that single computation).
+        self.assertEqual(row["xp_into_level"] + row["xp_to_next_level"], 50.0)
+
+    def test_a_capped_row_reports_a_zero_next_level_band(self):
+        self.player.db.skill_proficiency = {T_EMBER: 500.0}
+        row = self._active_row(self._render(), T_EMBER)
+        self.assertEqual(row["level"], 10)
+        self.assertIs(row["capped"], True)
+        self.assertEqual(row["xp_to_next_level"], 0)
+
+    def test_a_newly_unlocked_skill_is_fresh_only_in_that_session(self):
+        member_id = int(self.player.pk)
+        fresh = self._render(
+            unlocks={member_id: MemberUnlocks(True, frozenset({T_EMBER}))}
+        )
+        self.assertIs(self._active_row(fresh, T_EMBER)["fresh"], True)
+        other_active = _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY")
+        self.assertIs(self._active_row(fresh, other_active)["fresh"], False)
+        # A reconnect starts a new session: the copied unlock snapshot is empty.
+        self.assertIs(self._active_row(self._render(unlocks={}), T_EMBER)["fresh"], False)
+
+    def test_only_the_booked_skill_is_flagged(self):
+        self.player.db.practice_booking = T_EMBER
+        payload = self._render()
+        self.assertIs(self._active_row(payload, T_EMBER)["booked"], True)
+        for key in _flattened_keys(payload["actives"]):
+            if key != T_EMBER:
+                self.assertIs(self._active_row(payload, key)["booked"], False, key)
+
+    def test_an_unregistered_active_key_reports_zero_growth_facts(self):
+        skills = dict(self.player.db.skills)
+        skills["active"] = [*skills.get("active", []), "t_unknown_active"]
+        self.player.db.skills = skills
+        payload = self._render()
+        row = self._active_row(payload, "t_unknown_active")
+        self.assertEqual(
+            {key: row[key] for key in ("level", "xp_into_level", "xp_to_next_level", "capped")},
+            {"level": 0, "xp_into_level": 0, "xp_to_next_level": 0, "capped": False},
+        )
+        self.assertNotIn("cost", row)
+        self.assertNotIn("target_spec", row)
+        self.assertNotIn("usable_out_of_combat", row)
+
+    def test_growth_facts_never_write_proficiency(self):
+        self.player.db.skill_proficiency = {T_EMBER: 60.0}
+        before = dict(self.player.db.skill_proficiency)
+        payload = self._render()
+        self.assertIs(payload["available"], True)
+        self.assertEqual(dict(self.player.db.skill_proficiency), before)
 
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
@@ -479,46 +549,22 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
                     self.assertEqual(set(r), {"key", "label"})
 
 
-    def test_freeform_scales_populated_for_mastery_holder(self):
-        # The kit burst's derived tip cap is Lv.3 (the file-local mastery
-        # passive's consuming edge), so the ladder can never unlock above
-        # the 1.0 rung for it (use-driven-skill-lineage D6: a ceiling is
-        # the max consuming edge). Entitlement is the registry-idiom
-        # element-mastery passive ownership (direct, never conferred); the
-        # entitlement query never resolves the row through the catalog, and
-        # the ladder's mp_costs scale the burst's own registered cost.
-        grant_lineage(
-            self.player,
-            [T_EMBER],
-            [T_STEADY, _element_mastery_key()],
-            rungs={T_EMBER: 3},
-        )
-        payload = self._render()
-        row = next(
-            r
-            for c in payload["actives"]
-            for g in c["groups"]
-            for r in g["skills"]
-            if r["key"] == T_EMBER
-        )
-        # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0. Each rung
-        # scales the actor's EFFECTIVE cost: the kit burst declares 12 MP and
-        # the equipped kit dagger adjusts it by −5%, so the base the rungs
-        # scale is 11 and the rounded rungs are 3, 6 and 11.
-        self.assertEqual(row["cost"], {"mp": 11})
-        self.assertEqual(
-            [entry["mp_cost"] for entry in row["freeform_scales"]],
-            [3, 6, 11],
-        )
-
-
     def test_unregistered_active_key_stays_bare_in_presenter(self):
         self.player.db.skills = {"active": ["no_such_skill"], "passive": []}
         payload = self._render()
         fallback = next(c for c in payload["actives"] if c["category"] == "unknown")
         self.assertEqual(
             fallback["groups"][0]["skills"][0],
-            {"key": "no_such_skill", "label": "no_such_skill"},
+            {
+                "key": "no_such_skill",
+                "label": "no_such_skill",
+                "level": 0,
+                "xp_into_level": 0,
+                "xp_to_next_level": 0,
+                "capped": False,
+                "fresh": False,
+                "booked": False,
+            },
         )
 
 
@@ -555,7 +601,19 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(
             set(row),
-            {"key", "label", "cost", "target_spec", "usable_out_of_combat"},
+            {
+                "key",
+                "label",
+                "level",
+                "xp_into_level",
+                "xp_to_next_level",
+                "capped",
+                "fresh",
+                "booked",
+                "cost",
+                "target_spec",
+                "usable_out_of_combat",
+            },
         )
         # The declared 12 MP carries the equipped kit dagger's −5% adjustment
         # like every other presented row.

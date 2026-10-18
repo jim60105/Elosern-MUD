@@ -5,7 +5,6 @@ var core = require("../core.js");
 var skillDescriptor = require("./skill_descriptor.js");
 
 var requireNumber = skillDescriptor.requireNumber;
-var validateFreeformScales = skillDescriptor.validateFreeformScales;
 var isPlainObject = core.isPlainObject;
 var codePoints = core.codePoints;
 var jsonByteSize = core.jsonByteSize;
@@ -156,14 +155,32 @@ function validateCharacterActiveSkillRow(value) {
   requireExactFields(
     value,
     "active skill row",
-    ["key", "label"],
-    ["cost", "target_spec", "usable_out_of_combat", "freeform_scales"]
+    [
+      "key",
+      "label",
+      "level",
+      "xp_into_level",
+      "xp_to_next_level",
+      "capped",
+      "fresh",
+      "booked",
+    ],
+    ["cost", "target_spec", "usable_out_of_combat"]
   );
   validateCharacterKey(value.key, "active key");
   var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
   if (!label.trim()) {
     throw new Error("active skill label must be non-empty");
   }
+  requireInt(value.level, "level", 0, MAX_SAFE_INTEGER);
+  requireNumber(value.xp_into_level, "xp_into_level", 0, MAX_SAFE_INTEGER);
+  requireNumber(value.xp_to_next_level, "xp_to_next_level", 0, MAX_SAFE_INTEGER);
+  var capped = requireBool(value.capped, "capped");
+  if (capped && value.xp_to_next_level !== 0) {
+    throw new Error("a capped skill's xp_to_next_level must be zero");
+  }
+  requireBool(value.fresh, "fresh");
+  requireBool(value.booked, "booked");
   var cost = value.cost;
   if (cost !== undefined) {
     if (!isPlainObject(cost) || Object.keys(cost).length > MAX_COST_KEYS) {
@@ -179,15 +196,6 @@ function validateCharacterActiveSkillRow(value) {
   }
   if (value.usable_out_of_combat !== undefined && typeof value.usable_out_of_combat !== "boolean") {
     throw new Error("skill usable_out_of_combat must be a boolean");
-  }
-  var baseMp =
-    isPlainObject(cost) && Number.isInteger(cost.mp) && cost.mp > 0 ? cost.mp : null;
-  if (value.freeform_scales !== undefined) {
-    validateFreeformScales(value.freeform_scales, baseMp);
-  }
-  // Python omits the field when it is null; normalize identically.
-  if (value.freeform_scales === null) {
-    delete value.freeform_scales;
   }
   return value;
 }
@@ -364,10 +372,12 @@ function validateCharacterConditionRow(value) {
   return value;
 }
 
-// Exact available character panel v8 schema (design D10). v8 builds the
-// panel for the viewed party member, adds `member_id` and the ordered
-// `conditions` rows, and removes `persona`/`intimate` (party_member owns
-// them). Shared bounds are guarded by a dual-direction parity test.
+// Exact available character panel v9 schema (design D10). v8 builds the panel
+// for the viewed party member with `member_id` and the ordered `conditions`
+// rows (persona/intimate belong to party_member). v9 requires the six growth
+// facts on every active row and drops the per-row `freeform_scales`; the one
+// selected skill's lineage position and ladder ride `selected_skill`. Shared
+// bounds are guarded by a dual-direction parity test.
 function validateCharacterAvailablePanel(payload) {
   requireExactFields(
     payload,
@@ -399,7 +409,7 @@ function validateCharacterAvailablePanel(payload) {
       throw new Error("full_title must be non-empty when present");
     }
   }
-  if (payload.schema_version !== 8) {
+  if (payload.schema_version !== 9) {
     throw new Error("unsupported character schema_version");
   }
   if (payload.available !== true || payload.kind !== "character") {
@@ -458,7 +468,7 @@ function validateCharacterAvailablePanel(payload) {
   requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
 
   var result = {
-    schema_version: 8,
+    schema_version: 9,
     available: true,
     kind: "character",
     member_id: payload.member_id,
@@ -482,10 +492,10 @@ function validateCharacterAvailablePanel(payload) {
 }
 
 function validateCharacterPanel(payload) {
-  // Version gate (mirror of the server validator): 8 is the only accepted
-  // schema version (viewed-member panel with condition rows).
+  // Version gate (mirror of the server validator): 9 is the only accepted
+  // schema version (growth rows; the selected skill's lineage and ladder).
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 8) {
+  if (payload.schema_version !== 9) {
     throw new Error("unsupported character schema_version");
   }
   return validateCharacterAvailablePanel(payload);

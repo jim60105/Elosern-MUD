@@ -34,7 +34,7 @@ function renderDrawer(args) {
   // rows) for the combat story.
   const character = args.combat
     ? {
-        schema_version: 8,
+        schema_version: 9,
         available: false,
         kind: "character",
         reason: { code: "no_puppet", message: "你已離開角色" },

@@ -192,7 +192,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(null);
   });
 
-  // The character panel is an exact-schema v8 payload: the
+  // The character panel is an exact-schema v9 payload: the
   // `SKILLS_SLICE_SAMPLE` skill rows carry a `shorthands` field the
   // character-panel active-row schema does not register, so it is stripped
   // before committing. The other exact fields (member_id, traits, conditions,
@@ -200,7 +200,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "character",
       member_id: CHARACTER_PANEL_SAMPLE.member_id,
@@ -299,7 +299,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 7,
+              schema_version: 9,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },
@@ -332,7 +332,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 7,
+              schema_version: 9,
               available: false,
               reason: { code: "no_puppet", message: "你已離開角色" },
             },

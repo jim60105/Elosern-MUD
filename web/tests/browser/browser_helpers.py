@@ -1343,7 +1343,7 @@ def valid_lore_codex_panel(**overrides) -> dict:
 
 
 def valid_character_panel(**overrides) -> dict:
-    """A schema-valid available character panel (schema version 8) for
+    """A schema-valid available character panel (schema version 9) for
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
@@ -1353,11 +1353,11 @@ def valid_character_panel(**overrides) -> dict:
     the viewed member's ``member_id``, ordered condition rows, adjustment-
     bearing equipment rows, a guild rank/merit, and an integer-copper wallet.
     Persona prose and intimate state are published by ``party_member``, so the
-    v8 exact-field set carries neither. ``overrides`` replace top-level fields
+    v9 exact-field set carries neither. ``overrides`` replace top-level fields
     for variant cases (e.g. an active disguise).
     """
     panel = {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "character",
         "member_id": 101,

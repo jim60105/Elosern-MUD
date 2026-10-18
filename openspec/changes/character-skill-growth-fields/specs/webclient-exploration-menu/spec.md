@@ -112,7 +112,7 @@ The production presentation registry SHALL register panel name `character` at sc
 ## ADDED Requirements
 
 ### Requirement: Character active skill rows carry compact growth facts
-Each active skill row of the version-9 `character` panel SHALL carry exactly the member's proficiency `level`, `xp_into_level`, `xp_to_next_level`, `capped`, the session `fresh` flag (skill in the member's recent-unlock set) and the `booked` flag (the member's standing practice booking); no other growth field is added. A maximal payload SHALL stay within the canonical byte bound.
+Each active skill row of the version-9 `character` panel SHALL carry exactly the member's proficiency `level`, `xp_into_level`, `xp_to_next_level`, `capped`, the session `fresh` flag (skill in the member's recent-unlock set) and the `booked` flag (the member's standing practice booking); no other growth field is added.
 
 #### Scenario: A newly unlocked skill is fresh
 - **WHEN** 艾拉 unlocked 群體治癒 this session and the viewed member is 艾拉
@@ -127,7 +127,7 @@ Each active skill row of the version-9 `character` panel SHALL carry exactly the
 - **THEN** its row carries `level: 0`, `xp_into_level: 0`, `xp_to_next_level: 0`, `capped: false`, and the member's own `fresh` and `booked` facts, and no registry-backed detail field
 
 #### Scenario: The maximal payload fits
-- **WHEN** a fixture fills every section with every row count at its cap and every bounded text at its cap
+- **WHEN** a fixture fills every section with every row count at its cap and a full `selected_skill`
 - **THEN** the serialized `character` payload is at most 65,536 bytes
 
 ### Requirement: The selected skill carries lineage position and the freeform ladder

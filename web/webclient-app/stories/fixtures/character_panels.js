@@ -1,6 +1,20 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The committed `character` v8 payload for the viewed member: all eight
+// One active row: identity plus the six v9 growth facts.
+function activeRow(key, label, level = 1) {
+  return {
+    key,
+    label,
+    level,
+    xp_into_level: 10,
+    xp_to_next_level: 40,
+    capped: false,
+    fresh: false,
+    booked: false,
+  };
+}
+
+// The committed `character` v9 payload for the viewed member: all eight
 // breakdown trait rows — gauges carry a non-null max with `effective == max`
 // (the maximum the layers decompose), statics/counters carry a null max with
 // `current == effective` — each with its server-computed `layers` in payload
@@ -11,7 +25,7 @@
 // panel contract test's serialized sample (web/webclient/presentation/tests/
 // test_character_panel/); reviewers diff both when either changes.
 export const CHARACTER_PANEL_SAMPLE = {
-  schema_version: 8,
+  schema_version: 9,
   available: true,
   kind: "character",
   member_id: 42,
@@ -102,12 +116,12 @@ export const CHARACTER_PANEL_SAMPLE = {
         {
           group: "fire",
           label: "火",
-          skills: [{ key: "firebolt", label: "火矢" }, { key: "fireball", label: "火球" }],
+          skills: [activeRow("firebolt", "火矢"), activeRow("fireball", "火球", 2)],
         },
         {
           group: "water",
           label: "水",
-          skills: [{ key: "mend_glow", label: "微光治癒" }],
+          skills: [activeRow("mend_glow", "微光治癒")],
         },
       ],
     },
@@ -118,7 +132,7 @@ export const CHARACTER_PANEL_SAMPLE = {
         {
           group: null,
           label: null,
-          skills: [{ key: "basic_attack", label: "基本攻擊" }, { key: "light_blade", label: "輕劍式" }],
+          skills: [activeRow("basic_attack", "基本攻擊"), activeRow("light_blade", "輕劍式")],
         },
       ],
     },

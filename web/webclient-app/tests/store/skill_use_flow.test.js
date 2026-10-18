@@ -66,7 +66,7 @@ describe("SkillBook use hand-over", () => {
   // The book's caster is the committed character panel's viewed member.
   function characterPanel(memberId = 42) {
     return {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "character",
       member_id: memberId,

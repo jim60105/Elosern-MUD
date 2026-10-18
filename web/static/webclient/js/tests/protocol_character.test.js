@@ -33,16 +33,16 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
-  // The unavailable fixture carries the registered version (8), and the real
-  // validatePanel dispatch path is exercised. Only the registered version 8
+  // The unavailable fixture carries the registered version (9), and the real
+  // validatePanel dispatch path is exercised. Only the registered version 9
   // is accepted on both forms.
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
-      unavailableStatusPanel({ schema_version: 8 })
+      unavailableStatusPanel({ schema_version: 9 })
     ),
-    unavailableStatusPanel({ schema_version: 8 })
+    unavailableStatusPanel({ schema_version: 9 })
   );
   assert.throws(() =>
     Protocol.validatePanel(
@@ -72,11 +72,18 @@ test("validates the character panel available/unavailable discriminator", () => 
       unavailableStatusPanel({ schema_version: 7 })
     )
   );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 8 })
+    )
+  );
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
-  // The normalized result carries the registered version 8 (not a stale 7).
+  // The normalized result carries the registered version 9 (not a stale 8).
   assert.equal(
     Protocol.validateCharacterPanel(validCharacterPanel()).schema_version,
-    8
+    9
   );
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
@@ -87,6 +94,7 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 5 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 6 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 7 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 8 })));
   // A legacy v4 trait row smuggled under version 6 rejects on the exact
   // breakdown-shape rules.
   assert.throws(() =>
@@ -123,7 +131,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
   const store = Protocol.createStore();
   store.beginTransport(1);
   const status = validStatusPanel();
-  const unavailable = unavailableStatusPanel({ schema_version: 8 });
+  const unavailable = unavailableStatusPanel({ schema_version: 9 });
   const accepted = snapshot({ panels: { status: status, character: unavailable } });
   const result = store.receive(1, "ui_snapshot", [accepted], {});
   assert.equal(result.accepted, true);
@@ -139,7 +147,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
     panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
   });
   assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
-  assert.equal(store.getState().phase, "active", "the version-8 state remains committed");
+  assert.equal(store.getState().phase, "active", "the version-9 state remains committed");
   assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
   assert.deepEqual(store.getState().panels.character, unavailable, "character panel untouched");
 });

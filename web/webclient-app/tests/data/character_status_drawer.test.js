@@ -25,7 +25,7 @@ import {
 // renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 8,
+  schema_version: 9,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
