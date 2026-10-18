@@ -19,6 +19,7 @@ var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 var PARTY_SCHEMA_VERSION = C.PARTY_SCHEMA_VERSION;
 var PARTY_GENERAL_LIMIT = C.PARTY_GENERAL_LIMIT;
 var PARTY_MAX_SLOTS = C.PARTY_MAX_SLOTS;
+var PARTY_MAX_ROWS = C.PARTY_MAX_ROWS;
 var PARTY_MAX_COMMISSION_LABEL = C.PARTY_MAX_COMMISSION_LABEL;
 var PARTY_MAX_DISPLAY_NAME = C.PARTY_MAX_DISPLAY_NAME;
 var OBJECTIVES_SCHEMA_VERSION = C.OBJECTIVES_SCHEMA_VERSION;
@@ -80,7 +81,11 @@ function validatePartySlot(value, index) {
   requireExactFields(
     value,
     name,
-    ["identity", "display_name", "portrait_ref", "hp_current", "hp_maximum", "bond_stage", "membership"],
+    [
+      "identity", "display_name", "portrait_ref",
+      "hp_current", "hp_maximum", "mp_current", "mp_maximum", "sp_current", "sp_maximum",
+      "role", "knocked_out", "unread", "bond_stage", "membership",
+    ],
     []
   );
   var identity = requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
@@ -94,26 +99,69 @@ function validatePartySlot(value, index) {
   )) {
     throw new Error("portrait_ref must be a bounded decimal string or null");
   }
-  var hpCurrent = requireInt(value.hp_current, "hp_current", 0, MAX_SAFE_INTEGER);
-  var hpMaximum = requireInt(value.hp_maximum, "hp_maximum", 0, MAX_SAFE_INTEGER);
-  var bondStage = requireString(value.bond_stage, "bond_stage", PARTY_MAX_DISPLAY_NAME);
-  if (bondStage.length === 0 || hasLoneSurrogate(bondStage)) {
-    throw new Error("slot bond_stage must be a non-empty stage name");
+  // Bounds only — zero is legal and the current/maximum ordering is trait
+  // truth, exactly like the Python mirror.
+  function gauge(key) {
+    return [
+      requireInt(value[key + "_current"], key + "_current", 0, MAX_SAFE_INTEGER),
+      requireInt(value[key + "_maximum"], key + "_maximum", 0, MAX_SAFE_INTEGER),
+    ];
   }
-  var membership = validatePartyMembership(value.membership, name + " membership");
+  var hp = gauge("hp");
+  var mp = gauge("mp");
+  var sp = gauge("sp");
+  var role = value.role;
+  if (role !== "commander" && role !== "companion") {
+    throw new Error("role must be commander or companion");
+  }
+  var knockedOut = requireBool(value.knocked_out, "knocked_out");
+  var unread = requireBool(value.unread, "unread");
+  var bondStage = null;
+  var membership = null;
+  if (role === "commander") {
+    // The commander row is the player's own: no bond stage, no party
+    // membership, and never knocked out.
+    if (value.bond_stage !== null) {
+      throw new Error("the commander row carries no bond_stage");
+    }
+    if (value.membership !== null) {
+      throw new Error("the commander row carries no membership");
+    }
+    if (knockedOut) {
+      throw new Error("the commander row is never knocked out");
+    }
+  } else {
+    bondStage = requireString(value.bond_stage, "bond_stage", PARTY_MAX_DISPLAY_NAME);
+    if (bondStage.length === 0 || hasLoneSurrogate(bondStage)) {
+      throw new Error("slot bond_stage must be a non-empty stage name");
+    }
+    membership = validatePartyMembership(value.membership, name + " membership");
+  }
   return {
     identity: identity,
     display_name: displayName,
     portrait_ref: portraitRef,
-    hp_current: hpCurrent,
-    hp_maximum: hpMaximum,
+    hp_current: hp[0],
+    hp_maximum: hp[1],
+    mp_current: mp[0],
+    mp_maximum: mp[1],
+    sp_current: sp[0],
+    sp_maximum: sp[1],
+    role: role,
+    knocked_out: knockedOut,
+    unread: unread,
     bond_stage: bondStage,
     membership: membership,
   };
 }
 
 function validatePartyPanel(payload) {
-  requireExactFields(payload, "party panel", ["schema_version", "available", "slots", "general_quota"], []);
+  requireExactFields(
+    payload,
+    "party panel",
+    ["schema_version", "available", "slots", "general_quota", "viewed_member_id"],
+    []
+  );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
   if (payload.schema_version !== PARTY_SCHEMA_VERSION) {
     throw new Error("unsupported party schema_version");
@@ -125,8 +173,8 @@ function validatePartyPanel(payload) {
   if (!Array.isArray(slots)) {
     throw new Error("party slots must be a list");
   }
-  if (slots.length > PARTY_MAX_SLOTS) {
-    throw new Error("party slots must hold at most " + PARTY_MAX_SLOTS + " rows");
+  if (slots.length > PARTY_MAX_ROWS) {
+    throw new Error("party slots must hold at most " + PARTY_MAX_ROWS + " rows");
   }
   var normalized = [];
   var seen = {};
@@ -138,6 +186,16 @@ function validatePartyPanel(payload) {
     seen[row.identity] = true;
     normalized.push(row);
   }
+  // Exactly one commander row, and it is row 0 (the rail's own ordering).
+  var commanders = [];
+  for (var c = 0; c < normalized.length; c++) {
+    if (normalized[c].role === "commander") {
+      commanders.push(c);
+    }
+  }
+  if (commanders.length !== 1 || commanders[0] !== 0) {
+    throw new Error("the party panel carries exactly one commander row, first");
+  }
   var quota = payload.general_quota;
   requireExactFields(quota, "general quota", ["used", "limit"], []);
   var used = requireInt(quota.used, "used", 0, MAX_SAFE_INTEGER);
@@ -145,11 +203,18 @@ function validatePartyPanel(payload) {
   if (used > limit) {
     throw new Error("general quota used exceeds the limit");
   }
+  var viewedMemberId = requireInt(
+    payload.viewed_member_id, "viewed_member_id", 1, MAX_SAFE_INTEGER
+  );
+  if (!Object.prototype.hasOwnProperty.call(seen, viewedMemberId)) {
+    throw new Error("viewed_member_id must name a presented row");
+  }
   var result = {
     schema_version: PARTY_SCHEMA_VERSION,
     available: true,
     general_quota: { used: used, limit: limit },
     slots: normalized,
+    viewed_member_id: viewedMemberId,
   };
   // Envelope guarantee mirrors the Python validator's closing check.
   if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
@@ -512,6 +577,7 @@ module.exports = {
   PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
   PARTY_GENERAL_LIMIT: PARTY_GENERAL_LIMIT,
   PARTY_MAX_SLOTS: PARTY_MAX_SLOTS,
+  PARTY_MAX_ROWS: PARTY_MAX_ROWS,
   PARTY_MAX_COMMISSION_LABEL: PARTY_MAX_COMMISSION_LABEL,
   PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
   OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,

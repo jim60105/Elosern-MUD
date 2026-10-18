@@ -11,6 +11,7 @@ import AvatarArtwork from "./AvatarArtwork.vue";
 import EmptyState from "./EmptyState.vue";
 import {
   buildCombatTokenMap,
+  companionRows,
   hpFillRatio,
   portraitFor,
 } from "./party-helpers.js";
@@ -38,7 +39,9 @@ const emit = defineEmits(["action", "close"]);
 
 const MAX_PARTY_SLOTS = 4;
 
-const safeSlots = computed(() => (Array.isArray(props.slots) ? props.slots : []));
+// Version-3 party rows carry the commander as row 0; this drawer draws the
+// companions only, so the commander's own row is filtered here.
+const safeSlots = computed(() => companionRows(props.slots));
 const emptyCount = computed(() => Math.max(0, MAX_PARTY_SLOTS - safeSlots.value.length));
 const tokenById = computed(() => buildCombatTokenMap(props.combatParticipants));
 

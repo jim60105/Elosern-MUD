@@ -45,15 +45,20 @@ from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import PresentationCoordinator
 from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES,
     ProtocolValidationError,
+    json_byte_size,
     validate_ui_snapshot,
 )
 from web.webclient.presentation.party import (
     PARTY_GENERAL_LIMIT,
+    PARTY_MAX_ROWS,
     PARTY_MAX_SLOTS,
     PARTY_SCHEMA_VERSION,
+    MAX_PARTY_COMMISSION_LABEL,
     validate_party,
 )
+from web.webclient.presentation.party_view_selection import PartyViewSelection
 from web.webclient.presentation.registry import build_production_registry
 from world.quests.catalog import register_catalog
 from world.art import official, official_refs
@@ -81,7 +86,8 @@ from world.rules.affinity_config import get_config
 from world.rules.art_view import portrait_catalog_key
 from world.rules.combat_session import engage, read_session
 from world.rules.npc_identity import npc_display_name
-from world.rules.party import join_party
+from world.rules.party import join_party, leave_party
+from world.rules.unlock_notices import MemberUnlocks, unlock_flags
 from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
@@ -121,6 +127,27 @@ def _monster(key="哥布林測試", hp=100):
     return monster
 
 
+def _commander(**overrides):
+    row = {
+        "identity": 7,
+        "display_name": "隊伍測試者",
+        "portrait_ref": None,
+        "hp_current": 100,
+        "hp_maximum": 120,
+        "mp_current": 30,
+        "mp_maximum": 50,
+        "sp_current": 12,
+        "sp_maximum": 40,
+        "role": "commander",
+        "knocked_out": False,
+        "unread": False,
+        "bond_stage": None,
+        "membership": None,
+    }
+    row.update(overrides)
+    return row
+
+
 def _slot(**overrides):
     row = {
         "identity": 41,
@@ -128,6 +155,13 @@ def _slot(**overrides):
         "portrait_ref": None,
         "hp_current": 180,
         "hp_maximum": 220,
+        "mp_current": 60,
+        "mp_maximum": 80,
+        "sp_current": 24,
+        "sp_maximum": 40,
+        "role": "companion",
+        "knocked_out": False,
+        "unread": False,
         "bond_stage": "摯友",
         "membership": {"general": True, "temporary_commissions": []},
     }
@@ -334,13 +368,18 @@ class PartyPresenterTests(EvenniaTest):
         """
         key = portrait_catalog_key(npc.pk)
         slots = panels["party"]["slots"]
-        self.assertEqual([slot["identity"] for slot in slots], [int(npc.pk)])
+        # Row 0 is the commander's own row; the companion follows in party order.
+        self.assertEqual(
+            [slot["identity"] for slot in slots],
+            [int(self.player.pk), int(npc.pk)],
+        )
+        companion_slot = slots[1]
         self.assertIn(key, panels["art"]["portrait_catalog"])
         # The catalog value is exactly {artwork, context}: the row and the art
         # panel agree on one complete canonical descriptor.
         entry = panels["art"]["portrait_catalog"][key]
         self.assertEqual(set(entry), {"artwork", "context"})
-        return slots[0], entry["artwork"]
+        return companion_slot, entry["artwork"]
 
     @staticmethod
     def _candidate(artwork):
@@ -449,19 +488,20 @@ class PartyPresenterTests(EvenniaTest):
             record = record_for(subject, create=False)
             before = deepcopy(record.db.cards)
             rows = self._render()["slots"]
-            self.assertEqual(rows[0]["portrait_ref"], str(first.pk))
+            # Row 0 is the commander's own row; the companions follow.
+            self.assertEqual(rows[1]["portrait_ref"], str(first.pk))
             # The other co-located companion is ADMITTED too (a live party
             # member present in the room), so its reference is non-null even
             # though it has no named policy and no real image at all: the
             # reference names its complete descriptor, not a real portrait.
-            self.assertEqual(rows[1]["portrait_ref"], str(second.pk))
+            self.assertEqual(rows[2]["portrait_ref"], str(second.pk))
             catalog = self.registry.render("art", self.context)["portrait_catalog"]
             self.assertEqual(
-                catalog[rows[0]["portrait_ref"]]["artwork"]["attempts"][0]["resource"]["url"],
+                catalog[rows[1]["portrait_ref"]]["artwork"]["attempts"][0]["resource"]["url"],
                 f"/art/{identity}",
             )
             self.assertEqual(
-                catalog[rows[1]["portrait_ref"]]["artwork"]["attempts"], []
+                catalog[rows[2]["portrait_ref"]]["artwork"]["attempts"], []
             )
             self.assertEqual(record.db.cards, before)
             # Membership never depends on the imagery: a default naming no card
@@ -470,11 +510,11 @@ class PartyPresenterTests(EvenniaTest):
             # real candidate (silhouette artwork is decorative, never the
             # payload's own image).
             record.db.default_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
-            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
+            self.assertEqual(self._render()["slots"][1]["portrait_ref"], str(first.pk))
             record.db.default_image_id = None
-            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
+            self.assertEqual(self._render()["slots"][1]["portrait_ref"], str(first.pk))
             record.delete()
-            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
+            self.assertEqual(self._render()["slots"][1]["portrait_ref"], str(first.pk))
             self.assertIsNone(record_for(subject, create=False))
             catalog = self.registry.render("art", self.context)["portrait_catalog"]
             self.assertEqual(
@@ -522,10 +562,34 @@ class PartyPresenterTests(EvenniaTest):
         self.assertIs(payload["available"], True)
         self.assertEqual(
             [row["identity"] for row in payload["slots"]],
-            [int(first.pk), int(second.pk)],
+            [int(self.player.pk), int(first.pk), int(second.pk)],
         )
+        self.assertEqual(payload["viewed_member_id"], int(self.player.pk))
         self.assertEqual(
             payload["slots"][0],
+            {
+                "identity": int(self.player.pk),
+                "display_name": npc_display_name(self.player)[
+                    :MAX_DISPLAY_NAME_CODE_POINTS
+                ],
+                # The exploration art view excludes ordinary player actors, so
+                # the commander's own row carries the truthful null.
+                "portrait_ref": None,
+                "hp_current": stored_gauge_pair(self.player, "hp")[0],
+                "hp_maximum": stored_gauge_pair(self.player, "hp")[1],
+                "mp_current": stored_gauge_pair(self.player, "mp")[0],
+                "mp_maximum": stored_gauge_pair(self.player, "mp")[1],
+                "sp_current": stored_gauge_pair(self.player, "sp")[0],
+                "sp_maximum": stored_gauge_pair(self.player, "sp")[1],
+                "role": "commander",
+                "knocked_out": False,
+                "unread": False,
+                "bond_stage": None,
+                "membership": None,
+            },
+        )
+        self.assertEqual(
+            payload["slots"][1],
             {
                 "identity": int(first.pk),
                 "display_name": npc_display_name(first)[
@@ -537,6 +601,13 @@ class PartyPresenterTests(EvenniaTest):
                 "portrait_ref": str(first.pk),
                 "hp_current": 60,
                 "hp_maximum": 120,
+                "mp_current": stored_gauge_pair(first, "mp")[0],
+                "mp_maximum": stored_gauge_pair(first, "mp")[1],
+                "sp_current": stored_gauge_pair(first, "sp")[0],
+                "sp_maximum": stored_gauge_pair(first, "sp")[1],
+                "role": "companion",
+                "knocked_out": False,
+                "unread": False,
                 "bond_stage": get_config().stage_for_value(affinity_value).name,
                 "membership": {"general": True, "temporary_commissions": []},
             },
@@ -545,7 +616,7 @@ class PartyPresenterTests(EvenniaTest):
             payload["general_quota"], {"used": 2, "limit": PARTY_GENERAL_LIMIT}
         )
         self.assertEqual(
-            payload["slots"][1]["bond_stage"],
+            payload["slots"][2]["bond_stage"],
             get_config().stage_for_value(0).name,
         )
         # The raw affinity number never ships: the row key set is exact and no
@@ -559,6 +630,13 @@ class PartyPresenterTests(EvenniaTest):
                     "portrait_ref",
                     "hp_current",
                     "hp_maximum",
+                    "mp_current",
+                    "mp_maximum",
+                    "sp_current",
+                    "sp_maximum",
+                    "role",
+                    "knocked_out",
+                    "unread",
                     "bond_stage",
                     "membership",
                 },
@@ -570,10 +648,131 @@ class PartyPresenterTests(EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
-    def test_empty_party_is_available_with_no_slots(self):
+    def test_gauge_fields_come_from_the_true_traits_under_disguise(self):
+        companion = _companion("卡恩", self.room, hp_current=60, hp_maximum=120)
+        companion.traits.mp.current = 20
+        companion.traits.mp.base = 40
+        companion.traits.sp.current = 5
+        companion.traits.sp.base = 30
+        companion.db.disguised_stats = {"hp": 1, "mp": 0, "sp": 0}
+        join_party(companion, self.player)
+
+        row = self._render()["slots"][1]
+        self.assertEqual((row["hp_current"], row["hp_maximum"]), (60, 120))
+        self.assertEqual((row["mp_current"], row["mp_maximum"]), (20, 40))
+        self.assertEqual((row["sp_current"], row["sp_maximum"]), (5, 30))
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_fractional_stored_hp_stays_alive_above_the_floor(self):
+        # The knockout predicate compares the unrounded stored value (exactly
+        # as the combat rules do), while the presented gauge truncates to an
+        # integer: 1.4 HP reads as 1 HP and is still alive.
+        companion = _companion("卡恩", self.room)
+        # The trait setter stores integers, so write the fractional stored
+        # value the predicate is specified against directly.
+        companion.traits.hp._data["current"] = 1.4
+        join_party(companion, self.player)
+        row = self._render()["slots"][1]
+        self.assertEqual(row["hp_current"], 1)
+        self.assertIs(row["knocked_out"], False)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_knocked_out_and_unread_flags_are_truthful(self):
+        kahn = _companion("卡恩", self.room, hp_current=1, hp_maximum=120)
+        aila = _companion("艾拉", self.room)
+        other = _companion("米雅", self.room)
+        for npc in (kahn, aila, other):
+            join_party(npc, self.player)
+        session = _RecordingSession(self.player)
+        session.ndb.party_unlocks = {
+            int(aila.pk): MemberUnlocks(True, frozenset({"group_heal"})),
+        }
+        context = PresentationContext(
+            actor=self.player,
+            protocol_version=1,
+            unlocks=unlock_flags(session),
+        )
+
+        rows = {
+            row["identity"]: row
+            for row in self.registry.render("party", context)["slots"]
+        }
+        self.assertIs(rows[int(kahn.pk)]["knocked_out"], True)
+        self.assertIs(rows[int(aila.pk)]["knocked_out"], False)
+        self.assertIs(rows[int(aila.pk)]["unread"], True)
+        self.assertIs(rows[int(other.pk)]["unread"], False)
+        # The commander's own row carries the session dot too, and is never
+        # knocked out by the companion predicate.
+        self.assertIs(rows[int(self.player.pk)]["unread"], False)
+        self.assertIs(rows[int(self.player.pk)]["knocked_out"], False)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_viewed_member_falls_back_to_the_commander_after_leave_or_delete(self):
+        first = _companion("薇拉", self.room)
+        second = _companion("米雅", self.room)
+        for npc in (first, second):
+            join_party(npc, self.player)
+        selection = PartyViewSelection(int(self.player.pk), int(first.pk), "member")
+        context = PresentationContext(
+            actor=self.player, protocol_version=1, party_view=selection
+        )
+        self.assertEqual(
+            self.registry.render("party", context)["viewed_member_id"],
+            int(first.pk),
+        )
+
+        leave_party(first, self.player, "dismissed")
+        self.assertEqual(
+            self.registry.render("party", context)["viewed_member_id"],
+            int(self.player.pk),
+        )
+
+        deleted_selection = PartyViewSelection(
+            int(self.player.pk), int(second.pk), "status"
+        )
+        deleted_context = PresentationContext(
+            actor=self.player, protocol_version=1, party_view=deleted_selection
+        )
+        second.delete()
+        self.assertEqual(
+            self.registry.render("party", deleted_context)["viewed_member_id"],
+            int(self.player.pk),
+        )
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_possession_keeps_the_viewed_member_selection(self):
+        first = _companion("薇拉", self.room)
+        second = _companion("米雅", self.room)
+        for npc in (first, second):
+            join_party(npc, self.player)
+        selection = PartyViewSelection(int(self.player.pk), int(first.pk), "member")
+        possessed = PresentationContext(
+            actor=second, protocol_version=1, party_view=selection
+        )
+        self.assertEqual(
+            self.registry.render("party", possessed)["viewed_member_id"],
+            int(first.pk),
+        )
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_empty_party_is_available_with_only_the_commander_row(self):
         payload = self._render()
         self.assertIs(payload["available"], True)
-        self.assertEqual(payload["slots"], [])
+        self.assertEqual(
+            [row["identity"] for row in payload["slots"]], [int(self.player.pk)]
+        )
+        self.assertEqual(payload["slots"][0]["role"], "commander")
+        self.assertEqual(payload["viewed_member_id"], int(self.player.pk))
         self.assertNotIn("reason", payload)
 
     @covers_requirement(
@@ -585,7 +784,8 @@ class PartyPresenterTests(EvenniaTest):
         self.player.db.party = [int(companion.pk), 999_999]
         payload = self._render()
         self.assertEqual(
-            [row["identity"] for row in payload["slots"]], [int(companion.pk)]
+            [row["identity"] for row in payload["slots"]],
+            [int(self.player.pk), int(companion.pk)],
         )
         validate_party(payload)
 
@@ -625,7 +825,8 @@ class PartyPresenterTests(EvenniaTest):
         first = self._render()
         second = self._render()
 
-        self.assertEqual(len(first["slots"]), PARTY_GENERAL_LIMIT)
+        # The commander row plus every general companion.
+        self.assertEqual(len(first["slots"]), PARTY_GENERAL_LIMIT + 1)
         self.assertEqual(
             first["general_quota"], {"used": PARTY_GENERAL_LIMIT, "limit": PARTY_GENERAL_LIMIT}
         )
@@ -978,7 +1179,7 @@ class PartyPresenterTests(EvenniaTest):
 
 
 class PartyValidatorTests(unittest.TestCase):
-    def _panel(self, slots):
+    def _panel(self, slots, viewed_member_id=None):
         used = sum(
             1
             for slot in slots
@@ -986,10 +1187,14 @@ class PartyValidatorTests(unittest.TestCase):
             and isinstance(slot.get("membership"), dict)
             and slot["membership"].get("general") is True
         )
+        if viewed_member_id is None:
+            first = slots[0] if slots and isinstance(slots[0], dict) else {}
+            viewed_member_id = first.get("identity", 1)
         return {
             "schema_version": PARTY_SCHEMA_VERSION,
             "available": True,
             "general_quota": {"used": used, "limit": PARTY_GENERAL_LIMIT},
+            "viewed_member_id": viewed_member_id,
             "slots": slots,
         }
 
@@ -997,17 +1202,22 @@ class PartyValidatorTests(unittest.TestCase):
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_valid_forms_normalize_identically(self):
-        self.assertEqual(
-            validate_party(self._panel([_slot()])), self._panel([_slot()])
-        )
-        self.assertEqual(validate_party(self._panel([])), self._panel([]))
+        # The commander row alone is the available empty party.
+        commander_only = self._panel([_commander()])
+        self.assertEqual(validate_party(commander_only), commander_only)
+        two_rows = self._panel([_commander(), _slot()])
+        self.assertEqual(validate_party(two_rows), two_rows)
+        # Any presented row may be the viewed member.
+        viewed = self._panel([_commander(), _slot()], viewed_member_id=41)
+        self.assertEqual(validate_party(viewed), viewed)
         # Paired astral code points (surrogate pairs in UTF-16 terms) are
         # legal text on both mirrors.
-        validate_party(self._panel([_slot(display_name="薇拉\U0001F600")]))
+        validate_party(
+            self._panel([_commander(), _slot(display_name="薇拉\U0001F600")])
+        )
         for ref in ("42", "1" * 32):
-            self.assertEqual(
-                validate_party(self._panel([_slot(portrait_ref=ref)]))["slots"][0]["portrait_ref"], ref
-            )
+            panel = self._panel([_commander(), _slot(portrait_ref=ref)])
+            self.assertEqual(validate_party(panel)["slots"][1]["portrait_ref"], ref)
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
@@ -1015,14 +1225,25 @@ class PartyValidatorTests(unittest.TestCase):
     def test_bounds_only_hp_semantics(self):
         # Zero is legal and no current/maximum cross assertion exists — traits
         # are truth (the delta spec overrides the proposal's "positive" wording).
-        validate_party(self._panel([_slot(hp_current=0, hp_maximum=0)]))
-        validate_party(self._panel([_slot(hp_current=500, hp_maximum=1)]))
+        validate_party(self._panel([
+            _commander(
+                hp_current=0, hp_maximum=0,
+                mp_current=0, mp_maximum=0,
+                sp_current=0, sp_maximum=0,
+            ),
+            _slot(hp_current=500, hp_maximum=1),
+        ]))
+        validate_party(self._panel([
+            _commander(),
+            _slot(mp_current=9, mp_maximum=1, sp_current=0, sp_maximum=0),
+        ]))
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_extended_shape_accepts_membership_and_beyond_quota_rows(self):
         payload = self._panel([
+            _commander(),
             _slot(identity=1),
             _slot(identity=2, membership={
                 "general": False,
@@ -1040,103 +1261,234 @@ class PartyValidatorTests(unittest.TestCase):
         self.assertEqual(validate_party(payload), payload)
         self.assertEqual(payload["general_quota"], {"used": 1, "limit": PARTY_GENERAL_LIMIT})
 
+    def test_maximal_row_count_payload_stays_inside_the_byte_bound(self):
+        # Maximum row count (commander + every companion slot) with bounded
+        # names, gauges and representative commission metadata. This proves
+        # the row envelope, not a maximum possible payload: the byte guard
+        # below is what rejects oversized metadata.
+        name = "同" * MAX_DISPLAY_NAME_CODE_POINTS
+        commission = {
+            "quest_id": "q" * MAX_DISPLAY_NAME_CODE_POINTS,
+            "role_id": "r" * MAX_DISPLAY_NAME_CODE_POINTS,
+            "label": "護" * MAX_PARTY_COMMISSION_LABEL,
+        }
+        rows = [_commander(display_name=name)]
+        rows += [
+            _slot(
+                identity=index + 100,
+                display_name=name,
+                bond_stage=name,
+                membership={
+                    "general": False,
+                    "temporary_commissions": [commission],
+                },
+            )
+            for index in range(PARTY_MAX_SLOTS)
+        ]
+        validated = validate_party(self._panel(rows, viewed_member_id=7))
+        self.assertEqual(len(validated["slots"]), PARTY_MAX_ROWS)
+        self.assertLessEqual(json_byte_size(validated), MAX_CANONICAL_JSON_BYTES)
+
+    def test_oversized_metadata_is_rejected_by_the_byte_guard(self):
+        # The commission list has no party-specific count bound, so the closing
+        # envelope check is what keeps a hostile row from reaching the wire.
+        name = "同" * MAX_DISPLAY_NAME_CODE_POINTS
+        rows = [_commander(display_name=name)]
+        rows += [
+            _slot(
+                identity=index + 100,
+                display_name=name,
+                bond_stage=name,
+                membership={
+                    "general": False,
+                    "temporary_commissions": [
+                        {
+                            "quest_id": f"{index}-{slot}" + "q" * 120,
+                            "role_id": "r" * MAX_DISPLAY_NAME_CODE_POINTS,
+                            "label": "護" * MAX_PARTY_COMMISSION_LABEL,
+                        }
+                        for slot in range(8)
+                    ],
+                },
+            )
+            for index in range(PARTY_MAX_SLOTS)
+        ]
+        with self.assertRaises(ProtocolValidationError):
+            validate_party(self._panel(rows, viewed_member_id=7))
+
     def test_drift_rejections(self):
         cases = {
-            "over slot bound": self._panel([
-                _slot(
-                    identity=i + 1,
-                    membership={"general": False, "temporary_commissions": []},
-                )
-                for i in range(PARTY_MAX_SLOTS + 1)
-            ]),
-            "missing row key": self._panel(
-                [{
+            "over slot bound": self._panel(
+                [_commander()]
+                + [
+                    _slot(
+                        identity=i + 1,
+                        membership={"general": False, "temporary_commissions": []},
+                    )
+                    for i in range(PARTY_MAX_SLOTS + 1)
+                ]
+            ),
+            "missing row key": self._panel([
+                _commander(),
+                {
                     "identity": 1,
                     "display_name": "a",
                     "portrait_ref": None,
                     "hp_current": 0,
                     "hp_maximum": 0,
                     "bond_stage": "摯友",
-                }]
+                },
+            ]),
+            "unknown row key": self._panel([_commander(), _slot(token="a1")]),
+            "missing membership": self._panel([
+                _commander(),
+                {
+                    key: value
+                    for key, value in _slot().items()
+                    if key != "membership"
+                },
+            ]),
+            "membership not a mapping": self._panel(
+                [_commander(), _slot(membership=[])]
             ),
-            "unknown row key": self._panel([_slot(token="a1")]),
-            "missing membership": self._panel([{
-                key: value for key, value in _slot().items() if key != "membership"
-            }]),
-            "membership not a mapping": self._panel([_slot(membership=[])]),
             "unknown membership key": self._panel(
-                [_slot(membership={"general": True, "temporary_commissions": [], "x": 1})]
+                [
+                    _commander(),
+                    _slot(membership={"general": True, "temporary_commissions": [], "x": 1}),
+                ]
             ),
             "numeric general": self._panel(
-                [_slot(membership={"general": 1, "temporary_commissions": []})]
+                [_commander(), _slot(membership={"general": 1, "temporary_commissions": []})]
             ),
             "commission not a mapping": self._panel(
-                [_slot(membership={"general": False, "temporary_commissions": ["q"]})]
+                [
+                    _commander(),
+                    _slot(membership={"general": False, "temporary_commissions": ["q"]}),
+                ]
             ),
-            "unknown commission key": self._panel([_slot(membership={
+            "unknown commission key": self._panel([_commander(), _slot(membership={
                 "general": False,
                 "temporary_commissions": [
                     {"quest_id": "q", "role_id": "r", "label": "l", "x": 1}
                 ],
             })]),
-            "duplicate commission": self._panel([_slot(membership={
+            "duplicate commission": self._panel([_commander(), _slot(membership={
                 "general": False,
                 "temporary_commissions": [
                     {"quest_id": "q", "role_id": "r", "label": "l"},
                     {"quest_id": "q", "role_id": "r", "label": "l"},
                 ],
             })]),
-            "numeric bond_stage": self._panel([_slot(bond_stage=3)]),
-            "bool bond_stage": self._panel([_slot(bond_stage=True)]),
-            "blank bond_stage": self._panel([_slot(bond_stage="")]),
-            "blank display_name": self._panel([_slot(display_name="")]),
+            "numeric bond_stage": self._panel([_commander(), _slot(bond_stage=3)]),
+            "bool bond_stage": self._panel([_commander(), _slot(bond_stage=True)]),
+            "blank bond_stage": self._panel([_commander(), _slot(bond_stage="")]),
+            "blank display_name": self._panel([_commander(), _slot(display_name="")]),
             "over-bound display_name": self._panel(
-                [_slot(display_name="同" * (MAX_DISPLAY_NAME_CODE_POINTS + 1))]
+                [
+                    _commander(),
+                    _slot(display_name="同" * (MAX_DISPLAY_NAME_CODE_POINTS + 1)),
+                ]
             ),
-            "negative hp_current": self._panel([_slot(hp_current=-1)]),
-            "bool identity": self._panel([_slot(identity=True)]),
-            "zero identity": self._panel([_slot(identity=0)]),
-            "numeric portrait_ref": self._panel([_slot(portrait_ref=42)]),
-            "non-decimal portrait_ref": self._panel([_slot(portrait_ref="4a")]),
-            "unicode decimal portrait_ref": self._panel([_slot(portrait_ref="４２")]),
-            "empty portrait_ref": self._panel([_slot(portrait_ref="")]),
-            "over-bound portrait_ref": self._panel([_slot(portrait_ref="1" * 33)]),
-            "old version": {"schema_version": 1, "available": True, "slots": []},
+            "negative hp_current": self._panel([_commander(), _slot(hp_current=-1)]),
+            "negative mp_maximum": self._panel([_commander(), _slot(mp_maximum=-1)]),
+            "string sp_current": self._panel([_commander(), _slot(sp_current="3")]),
+            "bool knocked_out": self._panel([_commander(), _slot(knocked_out=1)]),
+            "string unread": self._panel([_commander(), _slot(unread="no")]),
+            "unknown role": self._panel([_commander(), _slot(role="ally")]),
+            "bool identity": self._panel([_commander(), _slot(identity=True)]),
+            "zero identity": self._panel([_commander(), _slot(identity=0)]),
+            "numeric portrait_ref": self._panel([_commander(), _slot(portrait_ref=42)]),
+            "non-decimal portrait_ref": self._panel([_commander(), _slot(portrait_ref="4a")]),
+            "unicode decimal portrait_ref": self._panel(
+                [_commander(), _slot(portrait_ref="４２")]
+            ),
+            "empty portrait_ref": self._panel([_commander(), _slot(portrait_ref="")]),
+            "over-bound portrait_ref": self._panel(
+                [_commander(), _slot(portrait_ref="1" * 33)]
+            ),
+            "old version": {
+                "schema_version": 2,
+                "available": True,
+                "general_quota": {"used": 0, "limit": 4},
+                "viewed_member_id": 7,
+                "slots": [_commander()],
+            },
             "missing general_quota": {
                 "schema_version": PARTY_SCHEMA_VERSION,
                 "available": True,
-                "slots": [],
+                "viewed_member_id": 7,
+                "slots": [_commander()],
             },
             "unknown quota key": {
                 "schema_version": PARTY_SCHEMA_VERSION,
                 "available": True,
                 "general_quota": {"used": 0, "limit": 4, "x": 1},
-                "slots": [],
+                "viewed_member_id": 7,
+                "slots": [_commander()],
             },
             "quota used exceeds limit": {
                 "schema_version": PARTY_SCHEMA_VERSION,
                 "available": True,
                 "general_quota": {"used": 5, "limit": 4},
-                "slots": [],
+                "viewed_member_id": 7,
+                "slots": [_commander()],
             },
+            "missing viewed_member_id": {
+                "schema_version": PARTY_SCHEMA_VERSION,
+                "available": True,
+                "general_quota": {"used": 0, "limit": 4},
+                "slots": [_commander()],
+            },
+            "viewed member not presented": self._panel(
+                [_commander(), _slot()], viewed_member_id=99
+            ),
+            "zero viewed_member_id": self._panel(
+                [_commander()], viewed_member_id=0
+            ),
+            "bool viewed_member_id": self._panel(
+                [_commander()], viewed_member_id=True
+            ),
+            "no commander row": self._panel([_slot()]),
+            "two commander rows": self._panel(
+                [_commander(), _commander(identity=8)]
+            ),
+            "commander row not first": self._panel([_slot(), _commander()]),
+            "commander bond_stage": self._panel(
+                [_commander(bond_stage="摯友")]
+            ),
+            "commander membership": self._panel(
+                [_commander(membership={"general": True, "temporary_commissions": []})]
+            ),
+            "knocked-out commander": self._panel(
+                [_commander(knocked_out=True)]
+            ),
             "duplicate identities": self._panel(
-                [_slot(identity=7), _slot(identity=7)]
+                [_commander(), _slot(identity=7)]
             ),
             "lone high surrogate display_name": self._panel(
-                [_slot(display_name="\ud800")]
+                [_commander(), _slot(display_name="\ud800")]
             ),
-            "lone low surrogate bond_stage": self._panel([_slot(bond_stage="\udc00")]),
+            "lone low surrogate bond_stage": self._panel(
+                [_commander(), _slot(bond_stage="\udc00")]
+            ),
             "version drift": {
                 "schema_version": PARTY_SCHEMA_VERSION + 1,
                 "available": True,
-                "slots": [],
+                "viewed_member_id": 7,
+                "slots": [_commander()],
             },
             "unavailable discriminator": {
                 "schema_version": PARTY_SCHEMA_VERSION,
                 "available": False,
-                "slots": [],
+                "viewed_member_id": 7,
+                "slots": [_commander()],
             },
-            "slots not a list": {"schema_version": 1, "available": True, "slots": {}},
+            "slots not a list": {
+                "schema_version": PARTY_SCHEMA_VERSION,
+                "available": True,
+                "viewed_member_id": 7,
+                "slots": {},
+            },
             "panel not a dict": ["nope"],
         }
         for label, payload in cases.items():
@@ -1272,7 +1624,11 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         payload = updates[-1]["panels"]["party"]
         self.assertIs(payload["available"], True)
         self.assertNotIn(companion_id, [row["identity"] for row in payload["slots"]])
-        self.assertEqual(payload["slots"], [])
+        # The purge leaves the commander's own row and nothing else.
+        self.assertEqual(
+            [row["identity"] for row in payload["slots"]], [int(self.player.pk)]
+        )
+        self.assertEqual(payload["viewed_member_id"], int(self.player.pk))
         del self.sessionhandler[session.sessid]
 
     @covers_requirement(

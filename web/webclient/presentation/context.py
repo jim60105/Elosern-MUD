@@ -149,6 +149,11 @@ class PresentationContext:
             unread dot and the recent-unlock set. Session-scoped and
             non-persistent — a reconnect starts empty, and clearing the dot
             keeps the recent set.
+        party_view: The copied viewed-member selection of this session (a
+            ``party_view_selection.PartyViewSelection``, or ``None``).
+            Session-scoped and non-persistent; it survives a possession
+            transition because it is bound to the commander, and it never
+            authorizes anything.
     """
 
     actor: Any
@@ -162,6 +167,7 @@ class PresentationContext:
     skill_use: tuple[int, str, float] | None = field(default=None)
     party_actor: int | None = field(default=None)
     unlocks: Mapping[int, MemberUnlocks] = field(default=_EMPTY_UNLOCKS)
+    party_view: Any = field(default=None)
 
 
 __all__ = [

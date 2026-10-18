@@ -104,12 +104,14 @@ def _answers_to(entity: Any, token: str) -> bool:
     return bool(key) and key == token
 
 
-def _knocked_out(member: Any) -> bool:
+def is_knocked_out(member: Any) -> bool:
     """Whether ``member``'s stored HP is at or below the nonlethal floor.
 
     The unrounded stored value is compared, exactly as ``combat_companions``
     decides engagement: the integer ``stored_gauge_pair`` presentation would
     round 1.5 HP down to the floor and bar a companion the combat rules admit.
+    Public because the party panel's ``knocked_out`` row flag must be the same
+    predicate the authority boundary applies, never a second HP comparison.
     """
     from world.rules.action import _stored_trait_value
 
@@ -198,7 +200,7 @@ def authorize_member(
         raise PartyScopeError(REASON_MEMBER_NOT_PRESENT)
     if room is None or getattr(member, "location", None) is not room:
         raise PartyScopeError(REASON_MEMBER_NOT_PRESENT)
-    if purpose == PURPOSE_ACT and member is not commander and _knocked_out(member):
+    if purpose == PURPOSE_ACT and member is not commander and is_knocked_out(member):
         raise PartyScopeError(REASON_MEMBER_CANNOT_ACT)
     return member
 

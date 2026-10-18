@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import StageActor from "./StageActor.vue";
-import { companionSlots, COMPANION_LINEUP_MAX } from "./companion-lineup.js";
+import { companionSlots, COMPANION_LINEUP_MAX, displayedLineup } from "./companion-lineup.js";
 
 const props = defineProps({
   slots: { type: Array, default: () => [] },
@@ -58,7 +58,9 @@ function targetSelectable(slot) {
 function fallenFor(slot) {
   return (slot.identity != null && props.fallen?.[String(slot.identity)]) || null;
 }
-const shown = computed(() => props.slots.slice(0, COMPANION_LINEUP_MAX));
+// The displayed list owns the commander-row exclusion and its own maximum, so
+// a version-3 party panel's row 0 can never stand as a companion figure.
+const shown = computed(() => displayedLineup(props.slots));
 const geometry = computed(() => companionSlots(shown.value.length));
 const lineupStyle = computed(() => ({
   "--companion-count": shown.value.length,

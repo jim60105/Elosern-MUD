@@ -307,10 +307,17 @@ def build_presentation_context(
     ``unlocks`` is the session's own unlock snapshot copied through
     :func:`world.rules.unlock_notices.unlock_flags`, so presenters read the
     unread dot and the recent set without touching ``ndb``.
+
+    ``party_view`` is this session's viewed-member selection copied through
+    ``party_view_selection_snapshot``: it survives possession, and a reconnect
+    starts without one.
     """
     from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
     from web.webclient.presentation.party_actor_selection import (
         party_actor_selection_snapshot,
+    )
+    from web.webclient.presentation.party_view_selection import (
+        party_view_selection_snapshot,
     )
     from web.webclient.presentation.skill_use_selection import skill_use_selection_snapshot
     from world.rules.unlock_notices import unlock_flags
@@ -326,6 +333,7 @@ def build_presentation_context(
         skill_use=skill_use_selection_snapshot(session, actor),
         party_actor=party_actor_selection_snapshot(session, actor),
         unlocks=unlock_flags(session),
+        party_view=party_view_selection_snapshot(session, actor),
     )
 
 

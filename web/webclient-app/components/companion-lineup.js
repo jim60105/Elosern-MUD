@@ -1,3 +1,5 @@
+import { companionRows } from "./party-helpers.js";
+
 // Fractions of the standing-portrait anchor; front first, rear last.
 export const COMPANION_LINEUP_MAX = 5;
 // Figures share the controlled character's full size and ground line.
@@ -22,7 +24,7 @@ export function companionLineupSpan(count, maximumSpan = Infinity) {
 // (reuse-lineup-person-focus D1) — never from raw `party.slots`, a display name,
 // a portrait key or art availability.
 export function displayedLineup(slots) {
-  return (Array.isArray(slots) ? slots : []).slice(0, COMPANION_LINEUP_MAX);
+  return companionRows(slots).slice(0, COMPANION_LINEUP_MAX);
 }
 
 // The rendered figure for one wire identity, or null. `String(identity)` is the
@@ -54,8 +56,10 @@ function position(portraitFor, artPanel, portraitRef) {
 // Slots retain positions across possession; only the front and possessed
 // companion's original slot exchange portraits. No client-built art key.
 export function companionFigures({ player, companions, actorIdentity, possessing, controlledName = "", artPanel, portraitFor }) {
-  const rows = Array.isArray(companions) ? companions.slice(0, 4) : [];
-  // status v2 has a bounded string identity; party v2 has safe integers.
+  // Version-3 party rows carry the commander as row 0; the lineup draws only
+  // companions, so the commander's own row is filtered before the limit.
+  const rows = companionRows(companions).slice(0, 4);
+  // status v3 has a bounded string identity; party v3 has safe integers.
   const controlledIndex = possessing ? rows.findIndex((row) => String(row.identity) === actorIdentity) : -1;
   const figure = (row) => ({
     identity: row.identity, ...position(portraitFor, artPanel, row.portrait_ref),
