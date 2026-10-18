@@ -553,7 +553,12 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
             # The real success bookkeeping runs before the falsy return, so
             # compensation must undo its clock charge and the body's arrival
             # knowledge as well as the relocation.
-            charge_movement(self.npc, "wilderness_move")
+            charge_movement(
+                self.npc,
+                "wilderness_move",
+                source_location=source_room,
+                wilderness_source_coordinates=current,
+            )
             record_arrival(self.npc)
             follow_companions(
                 self.npc,

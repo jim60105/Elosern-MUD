@@ -26,6 +26,7 @@ from world.rules.clock import (
     ScheduledEvent,
     get_world_clock,
 )
+from world.rules.party_scope import present_party_scope
 from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
 from world.rules.traits import GAUGE_KEYS
@@ -160,14 +161,21 @@ def advance_skip(
 
     ``seconds`` must already be safe and validated; this call performs the
     single ``AdvanceSource.SKIP`` advance and returns the settled events.
+    The settled scope is the acting commander's present party
+    (``present_party_scope``), so a companion resting in the same room
+    regenerates, expires buffs, and settles its own practice booking in the
+    same advance (party-rest-move-settlement). A companion in another room is
+    never settled. Scope resolution happens before any booking write, so an
+    authority refusal cannot half-apply the declaration.
     A declared skill must pass ``preflight_practice_booking`` before entry.
     Unlabeled skips clear stale bookings and carry zero growth. The clock's
     practice settlement remains the sole progression writer.
     """
+    entities = present_party_scope(actor)
     previous_booking = actor.db.practice_booking if practice_skill is not None else None
     actor.db.practice_booking = practice_skill
     try:
-        return get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])
+        return get_world_clock().advance(seconds, AdvanceSource.SKIP, entities)
     except Exception:
         # Clock rollback restores its entry snapshot, which already contains
         # this declaration. A failed graphical action must not leave a new

@@ -624,15 +624,26 @@ def _companion_co_located(
     that survived recycling; the registration match covers companions whose
     wilderness room the contrib recycled (location ``None`` but still tracked
     in the script's ``itemcoordinates`` at the source coordinates).
+
+    When the source is a wilderness cell, the registration is authoritative:
+    ``WildernessScript.move_obj`` recycles the source room and may immediately
+    reuse the same room object for the destination cell, so room identity
+    alone would count a destination-only companion as co-located
+    (party-rest-move-settlement). A room-identity match therefore also
+    requires the room to still represent the source coordinates.
     """
-    if npc.location is source_location:
-        return True
     if wilderness_source_coordinates is None:
-        return False
+        return npc.location is source_location
     wilderness = npc.ndb.wilderness
-    return (
+    if (
         wilderness is not None
         and wilderness.itemcoordinates.get(npc) == wilderness_source_coordinates
+    ):
+        return True
+    return (
+        npc.location is source_location
+        and getattr(source_location, "coordinates", None)
+        == wilderness_source_coordinates
     )
 
 

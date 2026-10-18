@@ -40,10 +40,16 @@ def after_successful_movement(
     """Complete a successful traversal through the shared movement boundary.
 
     Runs the success-path sequence every exit lineage shares: charge the
-    ``cost_key`` clock cost, record the
-    destination map-knowledge node, and move co-located companions.
-    ``charge_movement``, ``record_arrival``, and ``follow_companions`` are
-    internally no-ops for anything that is not a ``PlayerCharacter``;
+    ``cost_key`` clock cost for the traverser and its travelling party,
+    record the destination map-knowledge node, and move co-located
+    companions. The charge receives the pre-move ``source_location`` (and the
+    wilderness source coordinates) so it settles exactly the members
+    ``follow_companions`` will move (party-rest-move-settlement).
+    Each tail step is gated by its own rule: ``charge_movement`` charges only a
+    player-driven traverser (a player character or a possessed, puppeted
+    companion), ``record_arrival`` records only a ``PlayerCharacter``, and
+    ``follow_companions`` resolves its follower set through the party authority
+    boundary (no commander means no followers);
     ``charge_movement`` can raise when ``WorldClock.advance`` fails — the
     movement-settlement boundary (movement-settlement-atomicity design D1)
     compensates that failure — and ``record_arrival``/``follow_companions``
@@ -65,7 +71,12 @@ def after_successful_movement(
     from world.rules.movement import charge_movement
     from world.rules.party import follow_companions
 
-    charge_movement(traversing_object, cost_key)
+    charge_movement(
+        traversing_object,
+        cost_key,
+        source_location=source_location,
+        wilderness_source_coordinates=wilderness_source_coordinates,
+    )
     record_arrival(traversing_object)
     follow_companions(
         traversing_object,
@@ -102,7 +113,8 @@ class MovementCostMixin:
     ``after_successful_movement`` — charging the ``movement_cost_key`` cost,
     recording the destination node through ``world.rules.map_knowledge.
     record_arrival`` (map-knowledge-minimap design D3) and moving companions —
-    all no-ops for anything that is not a ``PlayerCharacter``.
+    each step applying its own eligibility gate (player-driven charge,
+    ``PlayerCharacter`` map knowledge, party-authorized followers).
 
     ``at_traverse`` is overridden ONLY to open the movement-settlement boundary
     (movement-settlement-atomicity design D5): the stock traversal, relocation,

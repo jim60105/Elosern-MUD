@@ -39,11 +39,12 @@ class SkipCommandHelperTests(unittest.TestCase):
         with (
             patch("commands.skip.evaluate_skip_safety", return_value=None) as safety,
             patch("commands.skip.get_world_clock", return_value=clock),
+            patch("commands.skip.present_party_scope", return_value=(caller,)),
         ):
             command.func()
 
         safety.assert_called_once_with(caller)
-        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, [caller])
+        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, (caller,))
         caller.msg.assert_called_once_with("時間經過了 3600 秒。")
 
     def test_rest_longer_than_the_maximum_is_capped(self):
@@ -57,11 +58,12 @@ class SkipCommandHelperTests(unittest.TestCase):
         with (
             patch("commands.skip.evaluate_skip_safety", return_value=None),
             patch("commands.skip.get_world_clock", return_value=clock),
+            patch("commands.skip.present_party_scope", return_value=(caller,)),
         ):
             command.func()
 
         clock.advance.assert_called_once_with(
-            MAX_SKIP_SECONDS, AdvanceSource.SKIP, [caller]
+            MAX_SKIP_SECONDS, AdvanceSource.SKIP, (caller,)
         )
         caller.msg.assert_called_once_with(
             f"時間經過了 {MAX_SKIP_SECONDS} 秒。"
@@ -127,6 +129,7 @@ class RestPracticeBookingTests(unittest.TestCase):
         with (
             patch("commands.skip.evaluate_skip_safety", return_value=None),
             patch("commands.skip.get_world_clock", return_value=clock),
+            patch("commands.skip.present_party_scope", return_value=(caller,)),
         ):
             command.func()
         return clock, observed
@@ -135,7 +138,7 @@ class RestPracticeBookingTests(unittest.TestCase):
     def test_valid_booking_is_recorded_before_the_advance(self):
         caller = _booking_caller(owned=(_PRACTICE_SKILL,))
         clock, observed = self._run(f"8h practice {_PRACTICE_SKILL}", caller)
-        clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, [caller])
+        clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, (caller,))
         # Recorded on the caller BEFORE advance; the clock stage is the writer.
         self.assertEqual(observed, [_PRACTICE_SKILL])
 
@@ -184,7 +187,7 @@ class RestPracticeBookingTests(unittest.TestCase):
     def test_plain_rest_clears_a_stale_rolled_back_booking(self):
         caller = _booking_caller(owned=(_PRACTICE_SKILL,), booking=_PRACTICE_SKILL)
         clock, observed = self._run("8h", caller)
-        clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, [caller])
+        clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, (caller,))
         self.assertEqual(observed, [None])
         self.assertIsNone(caller.db.practice_booking)
 
@@ -261,6 +264,7 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         with (
             patch("commands.skip._safe_to_skip", return_value=True),
             patch("commands.skip.get_world_clock", return_value=clock),
+            patch("commands.skip.present_party_scope", return_value=(caller,)),
         ):
             command.func()
         clock.advance.assert_called_once()
@@ -278,9 +282,10 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
             patch("commands.skip._safe_to_skip", return_value=True),
             patch("commands.skip.seconds_until_daypart", return_value=60),
             patch("commands.skip.get_world_clock", return_value=clock),
+            patch("commands.skip.present_party_scope", return_value=(caller,)),
         ):
             command.func()
-        clock.advance.assert_called_once_with(60, AdvanceSource.SKIP, [caller])
+        clock.advance.assert_called_once_with(60, AdvanceSource.SKIP, (caller,))
         self.assertEqual(seen, [None])
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
@@ -288,8 +293,14 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         caller = self._caller()
         seen: list = []
         clock = self._clock(seen, caller)
-        with patch("world.rules.time_skip.get_world_clock", return_value=clock):
+        with (
+            patch("world.rules.time_skip.get_world_clock", return_value=clock),
+            patch(
+                "world.rules.time_skip.present_party_scope",
+                return_value=(caller,),
+            ),
+        ):
             advance_skip(caller, 3600)
         self.assertEqual(seen, [None])
         self.assertIsNone(caller.db.practice_booking)
-        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, [caller])
+        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, (caller,))

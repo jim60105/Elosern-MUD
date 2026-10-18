@@ -230,8 +230,9 @@ PRACTICE_XP_PER_STUDY_HOUR` scaled by learning, affinity, and `growth_rate_multi
   and a COMMAND-source advance leaves the booking unconsumed for the actor's next SKIP advance.
   Settlement is per-entity against each entity's OWN booking — the design §11 batch note's
   contract that every member's growth comes only from that member's own declared command; the
-  only production SKIP callers supply a single-entity scope, and every unlabeled skip path
-  clears stale bookings before advancing (see `time-skip-commands`)
+  production SKIP callers supply the caller's present party scope (each member settled against its
+  own booking), and every unlabeled skip path clears the caller's stale booking before advancing
+  (see `time-skip-commands`)
 
 ### Requirement: Hourly and daily boundary stages fire by tick-boundary arithmetic, never by iterating
 every second or quantum

@@ -4,13 +4,14 @@ Define deterministic player commands that advance game time through the world cl
 
 ## Requirements
 
-
 ### Requirement: rest <duration> parses an explicit duration and advances the clock by that much, capped at the configured maximum
-`commands/skip.py::CmdRest` SHALL parse an explicit duration argument (e.g., `"1h"`, `"30m"`)
-into a concrete number of seconds, cap that value at `MAX_SKIP_SECONDS`
-(`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`,
-call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities=[caller])` with exactly the capped
-value.
+`commands/skip.py::CmdRest` SHALL parse an explicit duration into concrete
+seconds, cap that value at `MAX_SKIP_SECONDS` (`rulebook/clock.yaml`'s
+`max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`, call
+`WorldClock.advance(seconds, AdvanceSource.SKIP, entities)` with exactly the
+capped value. `entities` is the caller's present party scope (commander first,
+then co-located effective companions, in party order), whether or not the
+caller is a possessed companion.
 
 #### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
 - **WHEN** a rolled-back advance has restored a stale `practice_booking` and the accepted
@@ -89,6 +90,11 @@ value.
   adapter performs an accepted unlabeled SKIP advance
 - **THEN** any stale booking is cleared before that advance, so the accepted `rest` practice clause
   is the only way a booking can ever settle
+
+#### Scenario: rest settles the present party
+- **WHEN** a safe commander standing with companion 艾拉 issues `rest 1h`
+- **THEN** `WorldClock.advance()` is called once with `seconds == 3600` and entities exactly the
+  commander followed by 艾拉
 
 ### Requirement: sleep computes its own duration from gauge regen, capped at a configured maximum
 `commands/skip.py::CmdSleep` SHALL take no duration argument. When `evaluate_skip_safety()` returns

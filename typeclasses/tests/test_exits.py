@@ -313,6 +313,7 @@ class WildernessClockChargeSourceTests(EvenniaTestCase):
     @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     def test_shared_helper_charges_and_records_through_shared_functions(self):
         source = inspect.getsource(after_successful_movement)
-        self.assertIn("charge_movement(traversing_object, cost_key)", source)
+        self.assertIn("charge_movement(", source)
+        self.assertIn("source_location=source_location", source)
         self.assertIn("record_arrival(traversing_object)", source)
         self.assertNotIn("get_world_clock().advance", source)

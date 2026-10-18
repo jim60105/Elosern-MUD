@@ -138,7 +138,8 @@ class MovementCostMixinSourceTests(EvenniaTestCase):
         self.assertIn("cost_key=self.movement_cost_key", source)
         self.assertNotIn("get_world_clock().advance", source)
         helper = inspect.getsource(after_successful_movement)
-        self.assertIn("charge_movement(traversing_object, cost_key)", helper)
+        self.assertIn("charge_movement(", helper)
+        self.assertIn("source_location=source_location", helper)
         self.assertIn("record_arrival(traversing_object)", helper)
         self.assertNotIn("get_world_clock().advance", helper)
 

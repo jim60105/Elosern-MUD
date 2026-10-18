@@ -357,11 +357,14 @@ def _snapshot_movement_state(
         # known here, and a widened window is a strict superset of what the
         # actual advance can write (every registered contract's discovery
         # queries are window-independent today).
-        snapshot_entities = [traversing_object]
-        if commander is not None and commander is not traversing_object:
-            # A possessed traverser's owner body is moved by the follow step and
-            # its map-knowledge/quest surfaces can be written there too.
-            snapshot_entities.append(commander)
+        # The travelling party is exactly the set the charge and the follow
+        # step settle: the traverser plus every follower resolved from the
+        # pre-move source (companions and, under possession, the commander's
+        # body). party-rest-move-settlement.
+        snapshot_entities = [
+            traversing_object,
+            *(state.entity for state in companions),
+        ]
         registry = build_advance_snapshot_registry(
             clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, snapshot_entities
         )
@@ -668,12 +671,13 @@ def _restore_surfaces(snapshot: MovementSnapshot) -> None:
         # locations by primary key and assigns through the location setter so
         # the contents caches reconcile, flushes cached-but-deleted instances,
         # and refreshes the restored entities' trait/sexual caches.
-        restore_entities = [snapshot.traverser]
-        if (
-            snapshot.commander is not None
-            and snapshot.commander is not snapshot.traverser
-        ):
-            restore_entities.append(snapshot.commander)
+        # Restore the same travelling party the registry was built from, so
+        # every settled member's gauges, buffs, and practice booking roll back
+        # together (party-rest-move-settlement).
+        restore_entities = [
+            snapshot.traverser,
+            *(state.entity for state in snapshot.companions),
+        ]
         _restore_advance_registry(snapshot.registry, tuple(restore_entities))
     except Exception as error:
         log_warn(

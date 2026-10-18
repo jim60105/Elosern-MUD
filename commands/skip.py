@@ -17,6 +17,7 @@ from world.rules.clock import (
     get_world_clock,
     seconds_until_daypart,
 )
+from world.rules.party_scope import present_party_scope
 from world.rules.skip_safety import evaluate_skip_safety
 from world.rules.time_skip import (
     DurationParseError,
@@ -99,8 +100,9 @@ class CmdRest(Command):
         # accepted clause records it, a clause-less explicit rest clears any
         # stale booking (plain rest grows nothing), and the clock's
         # practice_settlement stage is the sole consumer/writer.
+        entities = present_party_scope(self.caller)
         self.caller.db.practice_booking = skill_key
-        events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
+        events = get_world_clock().advance(seconds, AdvanceSource.SKIP, entities)
         self.caller.msg(_render_skip_summary(seconds, events))
         _maybe_nominate_after_rest(self.caller, events)
 
@@ -117,10 +119,11 @@ class CmdSleep(Command):
         if not _safe_to_skip(self.caller):
             return
         seconds = _seconds_to_full_regen(self.caller)
+        entities = present_party_scope(self.caller)
         self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         clock = get_world_clock()
         tick_from = int(clock.tick) if choice else None
-        events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
+        events = clock.advance(seconds, AdvanceSource.SKIP, entities)
         settled_seconds = int(clock.tick) - tick_from if choice else seconds
         self.caller.msg(_render_skip_summary(settled_seconds, events))
         _maybe_nominate_after_rest(self.caller, events)
@@ -152,7 +155,8 @@ class CmdWaitUntil(Command):
             return
         if not _safe_to_skip(self.caller):
             return
+        entities = present_party_scope(self.caller)
         self.caller.db.practice_booking = None  # unlabeled skips grow nothing
-        events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
+        events = clock.advance(seconds, AdvanceSource.SKIP, entities)
         self.caller.msg(_render_skip_summary(seconds, events))
         _maybe_nominate_after_rest(self.caller, events)

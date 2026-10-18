@@ -113,7 +113,9 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
         # Movement has no HP gate (pinned behavior, no edit): the shared cost
         # charge succeeds at the post-settlement wake state.
         before = self.clock.tick
-        charge_movement(self.player, "move")
+        charge_movement(
+            self.player, "move", source_location=self.player.location
+        )
         self.assertGreater(self.clock.tick, before)
 
     @covers_requirement(
