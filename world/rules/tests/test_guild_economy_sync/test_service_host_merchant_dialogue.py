@@ -108,9 +108,9 @@ class MerchantDialogueSyncTests(ServiceContentIsolation, EvenniaTestCase):
         with patch(
             "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
         ):
-            purchase = buy(actor, host, offer.item_key, 1)
+            purchase = buy(actor, host, offer.item_key, 1, actor.pk)
             stock_after_buy = dict(parse_merchant_stock(merchant))
-            sale = sell(actor, host, offer.item_key, 1)
+            sale = sell(actor, host, offer.item_key, 1, actor.pk)
         return {
             "paid": purchase["total_copper"],
             "credit": sale["total_copper"],

@@ -71,9 +71,14 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         self.assertEqual(panel["player"]["wallet"], 1000)
         stale_revision = store_state(page)["revision"] - 1
         first_key = panel["shop"]["stock"][0]["item_key"]
+        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
 
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "stale-buy-1", stale_revision
+            page,
+            "shop.buy",
+            {"item_key": first_key, "quantity": 1, "recipient_id": actor_id},
+            "stale-buy-1",
+            stale_revision,
         )
         result = self._wait_result(page, lambda r: r["requestId"] == "stale-buy-1")
         self.assertEqual(result["outcome"], "stale")
@@ -93,10 +98,16 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         shelf = panel["shop"]["stock"][0]
         first_key, unit_buy = shelf["item_key"], shelf["buy_copper"]
         one_buy_wallet = panel["player"]["wallet"] - unit_buy
+        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
+        buy_payload = {
+            "item_key": first_key,
+            "quantity": 1,
+            "recipient_id": actor_id,
+        }
 
         # First delivery executes the buy exactly once.
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "dup-buy-1", revision
+            page, "shop.buy", buy_payload, "dup-buy-1", revision
         )
         first = self._wait_result(
             page, lambda r: r["requestId"] == "dup-buy-1" and r["outcome"] == "success"
@@ -108,7 +119,7 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         # re-executes the trade: the same envelope is delivered again, the
         # second result arrives, and the wallet stays at exactly one purchase.
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "dup-buy-1", revision
+            page, "shop.buy", buy_payload, "dup-buy-1", revision
         )
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:

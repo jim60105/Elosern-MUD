@@ -1377,20 +1377,20 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
                 merchants.append((host, merchant, offer))
                 with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
                     before = player.db.wallet
-                    result = buy(player, host, key, 2)
+                    result = buy(player, host, key, 2, player.pk)
                     self.assertEqual(result["total_copper"], price * 2)
                     self.assertEqual(player.db.wallet, before - price * 2)
                     snapshot = (player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant))
                     with self.assertRaises(TradeError) as caught:
-                        buy(player, host, key, 1)
+                        buy(player, host, key, 1, player.pk)
                     self.assertEqual(caught.exception.args[0], TradeReason.INSUFFICIENT_STOCK)
                     self.assertEqual((player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant)), snapshot)
-                    sold = sell(player, host, key, 1)
+                    sold = sell(player, host, key, 1, player.pk)
                     self.assertEqual(sold["total_copper"], price // 2)
                     snapshot = (player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant))
                     with patch("world.rules.affinity.apply_affinity_change", side_effect=RuntimeError("persistence fault")):
                         with self.assertRaises(RuntimeError):
-                            buy(player, host, key, 1)
+                            buy(player, host, key, 1, player.pk)
                     self.assertEqual((player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant)), snapshot)
                 # Two bought and one resold leaves the declared stock minus one.
                 self.assertEqual(

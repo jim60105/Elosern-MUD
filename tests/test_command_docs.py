@@ -167,8 +167,14 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "教會（需已入教）",
     },
     "shop stock": {"syntax": "shop stock", "context": "經濟（需當地商人）"},
-    "buy": {"syntax": "buy <item_key> [數量]", "context": "經濟（需當地商人）"},
-    "sell": {"syntax": "sell <item_key> [數量]", "context": "經濟（需當地商人）"},
+    "buy": {
+        "syntax": "buy <item_key> [數量] [= <成員>]",
+        "context": "經濟（需當地商人；附身中拒絕）",
+    },
+    "sell": {
+        "syntax": "sell <item_key> [數量] [= <成員>]",
+        "context": "經濟（需當地商人；附身中拒絕）",
+    },
     "inventory": {"syntax": "inventory", "context": "一般（隨時可用）"},
     "使用": {"syntax": "使用 <item_key> [target] [= <成員>]", "context": "一般（探索與戰鬥中皆可用）"},
     "裝備": {"syntax": "裝備 <物品> [= <成員>]", "context": "一般（探索與戰鬥中皆可用）"},

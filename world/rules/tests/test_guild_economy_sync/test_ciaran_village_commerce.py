@@ -299,8 +299,8 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         with patch(
             "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
         ):
-            in_village = buy(village_buyer, village_host, item_key, 1)
-            in_capital = buy(capital_buyer, capital_host, item_key, 1)
+            in_village = buy(village_buyer, village_host, item_key, 1, village_buyer.pk)
+            in_capital = buy(capital_buyer, capital_host, item_key, 1, capital_buyer.pk)
         # Two settlements, two prices (the data half the companion test
         # pins): what leaves each wallet differs...
         self.assertNotEqual(
@@ -416,7 +416,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         player.location = store
         player.db.wallet = 1000
         with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
-            result = buy(player, host, item_key, 1)
+            result = buy(player, host, item_key, 1, player.pk)
         offer = next(
             offer for offer in village_config.offers if offer.item_key == item_key
         )
@@ -451,7 +451,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         player.location = square
         player.db.wallet = 1000
         with self.assertRaises(TradeError) as ctx:
-            buy(player, host, item_key, 1)
+            buy(player, host, item_key, 1, player.pk)
         self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
         self.assertEqual(player.db.wallet, 1000)
         self.assertEqual(list(player.db.inventory or []), [])

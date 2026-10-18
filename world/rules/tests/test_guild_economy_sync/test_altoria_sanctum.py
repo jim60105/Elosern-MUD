@@ -347,7 +347,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         with patch(
             "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
         ):
-            purchase = buy(visitor, deacon, holy_water, 1)
+            purchase = buy(visitor, deacon, holy_water, 1, visitor.pk)
         self.assertEqual(purchase["total_copper"], offer.buy_copper)
         self.assertEqual(visitor.db.wallet, 100000 - offer.buy_copper)
         self.assertIn(holy_water, visitor.db.inventory)
@@ -359,7 +359,7 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
         with patch(
             "world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)
         ):
-            sale = sell(visitor, deacon, holy_water, 1)
+            sale = sell(visitor, deacon, holy_water, 1, visitor.pk)
         self.assertEqual(sale["total_copper"], offer.sell_copper)
         self.assertEqual(
             visitor.db.wallet, 100000 - offer.buy_copper + offer.sell_copper

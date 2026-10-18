@@ -12,9 +12,20 @@ import { computed, reactive, ref, watch } from "vue";
 const props = defineProps({
   // The committed `services` v2 panel payload (or the unavailable form).
   services: { type: Object, required: true },
+  // The controlled figure's identity from the committed `status` panel. The
+  // transitional shop drawer names it as the recipient/seller of every trade
+  // until the shop window lands; a missing identity emits nothing rather
+  // than naming an invented member (the exact payloads require a positive
+  // safe integer).
+  actorId: { type: Number, default: null },
 });
 
 const emit = defineEmits(["buy", "sell"]);
+
+function memberId() {
+  const value = props.actorId;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
 
 // Integer copper, thousands-separated for display only (no float money).
 function formatCopper(value) {
@@ -116,7 +127,12 @@ function buyNow(row) {
   const { min, max } = quantityBounds(action);
   const qty = Number(quantities[row.item_key]);
   if (!Number.isInteger(qty) || qty < min || qty > max) return;
-  emit("buy", { action_id: action.action_id, payload: { item_key: row.item_key, quantity: qty } });
+  const recipient = memberId();
+  if (recipient === null) return;
+  emit("buy", {
+    action_id: action.action_id,
+    payload: { item_key: row.item_key, quantity: qty, recipient_id: recipient },
+  });
   selectedKey.value = null;
 }
 
@@ -126,7 +142,12 @@ function sellNow(row) {
   const { min, max } = quantityBounds(action);
   const qty = Number(quantities[row.item_key]);
   if (!Number.isInteger(qty) || qty < min || qty > max) return;
-  emit("sell", { action_id: action.action_id, payload: { item_key: row.item_key, quantity: qty } });
+  const seller = memberId();
+  if (seller === null) return;
+  emit("sell", {
+    action_id: action.action_id,
+    payload: { item_key: row.item_key, quantity: qty, seller_id: seller },
+  });
   selectedKey.value = null;
 }
 </script>

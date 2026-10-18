@@ -206,7 +206,13 @@ class ChurchMeritWalletIsolationTests(EvenniaTest):
         before = church.read_ledger(self.player)
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             with self.assertRaises(TradeError) as caught:
-                buy(self.player, self.merchant_npc, self._item_key, 1)
+                buy(
+                    self.player,
+                    self.merchant_npc,
+                    self._item_key,
+                    1,
+                    self.player.pk,
+                )
         self.assertEqual(caught.exception.args[0], TradeReason.INSUFFICIENT_FUNDS)
         self.assertEqual(self.player.db.wallet, 0)
         self.assertEqual(church.read_ledger(self.player), before)

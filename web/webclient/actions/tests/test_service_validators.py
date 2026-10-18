@@ -79,26 +79,45 @@ class ServiceValidatorTests(unittest.TestCase):
 
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
     def test_trade_payloads(self):
-        valid = {"item_key": "meal", "quantity": 3}
-        self.assertEqual(validate_buy_payload(valid), valid)
-        self.assertEqual(validate_sell_payload(valid), valid)
+        buy_payload = {"item_key": "meal", "quantity": 3, "recipient_id": 7}
+        sell_payload = {"item_key": "meal", "quantity": 3, "seller_id": 7}
+        self.assertEqual(validate_buy_payload(buy_payload), buy_payload)
+        self.assertEqual(validate_sell_payload(sell_payload), sell_payload)
+        # Each trade names exactly its own member field: the buy recipient is
+        # not a seller, and no commander or host field stands in for either.
+        with self.assertRaises(ServiceActionError):
+            validate_buy_payload(sell_payload)
+        with self.assertRaises(ServiceActionError):
+            validate_sell_payload(buy_payload)
         for bad in (
             None,
             {},
             {"item_key": "meal"},
             {"quantity": 3},
-            {"item_key": "meal", "quantity": 3, "host": "1"},
-            {"item_key": "", "quantity": 3},
-            {"item_key": "x" * 65, "quantity": 3},
-            {"item_key": "meal", "quantity": 0},
-            {"item_key": "meal", "quantity": -1},
-            {"item_key": "meal", "quantity": 1001},
-            {"item_key": "meal", "quantity": True},
-            {"item_key": "meal", "quantity": "3"},
-            {"item_key": "meal", "quantity": 3.0},
+            {"item_key": "meal", "quantity": 3},
+            {"item_key": "meal", "quantity": 3, "recipient_id": 7, "host": "1"},
+            {"item_key": "", "quantity": 3, "recipient_id": 7},
+            {"item_key": "x" * 65, "quantity": 3, "recipient_id": 7},
+            {"item_key": "meal", "quantity": 0, "recipient_id": 7},
+            {"item_key": "meal", "quantity": -1, "recipient_id": 7},
+            {"item_key": "meal", "quantity": 1001, "recipient_id": 7},
+            {"item_key": "meal", "quantity": True, "recipient_id": 7},
+            {"item_key": "meal", "quantity": "3", "recipient_id": 7},
+            {"item_key": "meal", "quantity": 3.0, "recipient_id": 7},
+            {"item_key": "meal", "quantity": 3, "recipient_id": 0},
+            {"item_key": "meal", "quantity": 3, "recipient_id": -1},
+            {"item_key": "meal", "quantity": 3, "recipient_id": True},
+            {"item_key": "meal", "quantity": 3, "recipient_id": "7"},
+            {"item_key": "meal", "quantity": 3, "recipient_id": 7.0},
+            {"item_key": "meal", "quantity": 3, "recipient_id": 2**53},
         ):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_buy_payload(bad)
+        for bad in (
+            {"item_key": "meal", "quantity": 3, "seller_id": 0},
+            {"item_key": "meal", "quantity": 3, "seller_id": "7"},
+            {"item_key": "meal", "quantity": 3, "seller_id": True},
+        ):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_sell_payload(bad)
 
