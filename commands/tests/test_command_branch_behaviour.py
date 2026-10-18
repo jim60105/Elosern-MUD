@@ -657,7 +657,9 @@ class SkipCommandBranchTests(TestCase):
         event = SimpleNamespace(kind="daily_reset")
         with patch("commands.skip._safe_to_skip", return_value=True), patch(
             "commands.skip._seconds_to_full_regen", return_value=90
-        ), patch("commands.skip.get_world_clock") as clock:
+        ), patch("commands.skip.get_world_clock") as clock, patch(
+            "commands.skip.present_party_scope", return_value=(command.caller,)
+        ):
             clock.return_value.advance.return_value = [event]
             command.func()
         clock.return_value.advance.assert_called_once()
@@ -705,11 +707,13 @@ class SkipCommandBranchTests(TestCase):
         event = SimpleNamespace(kind="daily_reset")
         with patch("commands.skip._safe_to_skip", return_value=True), patch(
             "commands.skip.seconds_until_daypart", return_value=120
-        ), patch("commands.skip.get_world_clock") as clock:
+        ), patch("commands.skip.get_world_clock") as clock, patch(
+            "commands.skip.present_party_scope", return_value=(command.caller,)
+        ):
             clock.return_value.advance.return_value = [event]
             command.func()
         clock.return_value.advance.assert_called_once_with(
-            120, AdvanceSource.SKIP, [command.caller]
+            120, AdvanceSource.SKIP, (command.caller,)
         )
         command.caller.msg.assert_called_with("時間經過了 120 秒。 新的一天開始了。")
 

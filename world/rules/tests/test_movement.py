@@ -44,7 +44,7 @@ class ChargeMovementTests(EvenniaTest):
     @covers_requirement("movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function")
     def test_charge_movement_advances_clock_by_move_cost(self):
         before = get_world_clock().tick
-        charge_movement(self.char1, "move")
+        charge_movement(self.char1, "move", source_location=self.room1)
         self.assertEqual(
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["move"],
@@ -52,13 +52,13 @@ class ChargeMovementTests(EvenniaTest):
 
     def test_charge_movement_is_a_noop_for_npc(self):
         before = get_world_clock().tick
-        charge_movement(self.npc, "move")
+        charge_movement(self.npc, "move", source_location=self.room1)
         self.assertEqual(get_world_clock().tick, before)
 
     def test_charge_movement_always_uses_command_source(self):
         with patch("world.rules.clock.get_world_clock") as clock:
-            charge_movement(self.char1, "move")
-            charge_movement(self.char1, "wilderness_move")
+            charge_movement(self.char1, "move", source_location=self.room1)
+            charge_movement(self.char1, "wilderness_move", source_location=self.room1)
         move_call = clock.return_value.advance.call_args_list[0]
         wild_call = clock.return_value.advance.call_args_list[1]
         self.assertEqual(move_call.args[0], CLOCK_YAML["command_defaults"]["move"])
@@ -70,7 +70,7 @@ class ChargeMovementTests(EvenniaTest):
 
     def test_charge_movement_is_cost_key_generic(self):
         before = get_world_clock().tick
-        charge_movement(self.char1, "wilderness_move")
+        charge_movement(self.char1, "wilderness_move", source_location=self.room1)
         self.assertEqual(
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],
@@ -90,7 +90,7 @@ class ChargeMovementTests(EvenniaTest):
         self.npc.sessions.add(session)
         try:
             before = get_world_clock().tick
-            charge_movement(self.npc, "move")
+            charge_movement(self.npc, "move", source_location=self.room1)
             self.assertEqual(get_world_clock().tick, before + CLOCK_YAML["command_defaults"]["move"])
         finally:
             self.npc.sessions.remove(session)
@@ -100,7 +100,7 @@ class ChargeMovementTests(EvenniaTest):
     def test_flight_owner_is_waived_the_wilderness_move_cost(self):
         self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         before = get_world_clock().tick
-        charge_movement(self.char1, "wilderness_move")
+        charge_movement(self.char1, "wilderness_move", source_location=self.room1)
         self.assertEqual(get_world_clock().tick, before)
 
     @covers_requirement(
@@ -119,7 +119,9 @@ class ChargeMovementTests(EvenniaTest):
         self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         with patch.dict(live_skill_registry(), {_FLIGHT_KEY: restricted}):
             with patch("world.rules.clock.get_world_clock") as clock:
-                charge_movement(self.char1, "wilderness_move")
+                charge_movement(
+                    self.char1, "wilderness_move", source_location=self.room1
+                )
                 clock.return_value.advance.assert_called_once()
             exit_obj = create_object(Exit, key="restricted route", location=self.room1)
             self.assertFalse(exit_obj._owns_movement_waiver(self.char1))
@@ -127,7 +129,7 @@ class ChargeMovementTests(EvenniaTest):
     def test_flight_owner_still_pays_other_cost_keys(self):
         self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         before = get_world_clock().tick
-        charge_movement(self.char1, "move")
+        charge_movement(self.char1, "move", source_location=self.room1)
         self.assertEqual(
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["move"],
@@ -135,7 +137,7 @@ class ChargeMovementTests(EvenniaTest):
 
     def test_non_flight_owner_pays_wilderness_move_normally(self):
         before = get_world_clock().tick
-        charge_movement(self.char1, "wilderness_move")
+        charge_movement(self.char1, "wilderness_move", source_location=self.room1)
         self.assertEqual(
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],
@@ -145,7 +147,7 @@ class ChargeMovementTests(EvenniaTest):
         # Any owned mobility skill that is not the waiver-keyed one charges.
         self.char1.db.skills = {"active": [], "passive": [_DART_STEP.key]}
         before = get_world_clock().tick
-        charge_movement(self.char1, "wilderness_move")
+        charge_movement(self.char1, "wilderness_move", source_location=self.room1)
         self.assertEqual(
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],

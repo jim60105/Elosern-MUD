@@ -197,6 +197,7 @@
         "world.rules.tests.test_party_identity",
         "world.rules.tests.test_party_offline_loop",
         "world.rules.tests.test_party_scope",
+        "world.rules.tests.test_party_time_settlement",
         "world.rules.tests.test_persona",
         "world.rules.tests.test_persona_edit",
         "world.rules.tests.test_player_control",
