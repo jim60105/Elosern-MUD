@@ -233,6 +233,25 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(event, "clock_advance")
         self.assertEqual(kwargs["context"]["scope"], 2)
 
+    def test_possessed_rest_settles_the_whole_present_party_once(self):
+        self.kahn.location = self.room1
+        enter_possession(self.player, self.ella)
+        self._set_gauges(self.player, (0.005, 0.01, 0.015))
+        self._set_gauges(self.ella, (0.005, 0.01, 0.015))
+        self._set_gauges(self.kahn, (0.005, 0.01, 0.015))
+        before = get_world_clock().tick
+
+        command = CmdRest()
+        command.caller = self.ella
+        command.args = "1h"
+        command.func()
+
+        self.assertEqual(get_world_clock().tick - before, 3600)
+        # The commander's body, the puppet and the companion settle once each:
+        # a duplicated puppet entry would double the regenerated gauges.
+        for member in (self.player, self.ella, self.kahn):
+            self.assertEqual(self._gauges(member), (28, 46, 64))
+
 
 class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     """A successful traversal settles the traverser's travelling party."""
@@ -464,6 +483,35 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(self._gauges(self.kahn), (10, 10, 10))
         self.assertIn(_PROBE_BUFF, entity_active_buffs(self.kahn))
         self.assertEqual(script.db.itemcoordinates.get(self.kahn), target)
+
+    def test_possessed_step_settles_the_registered_owner_body_and_companion(self):
+        self.gate.at_traverse(self.player, self.east_gate)
+        script = self._script()
+        source_coordinates = self.player.location.coordinates
+        enter_possession(self.player, self.ella)
+        self._set_gauges(self.player, (0.001, 0.002, 0.003))
+        self._set_gauges(self.ella, (0.001, 0.002, 0.003))
+        self._set_gauges(self.kahn, (0.001, 0.002, 0.003))
+        before = get_world_clock().tick
+        calls = []
+        real_advance = WorldClock.advance
+
+        def spy(clock, seconds, source, entities):
+            calls.append(list(entities))
+            return real_advance(clock, seconds, source, entities)
+
+        with patch.object(WorldClock, "advance", spy):
+            self._exit("east").at_traverse(self.ella, self.ella.location)
+
+        # The puppet, the owner's registered body and the companion travel
+        # together, so the one advance settles all three in that order.
+        self.assertEqual(calls[0], [self.ella, self.player, self.kahn])
+        target = (source_coordinates[0] + 1, source_coordinates[1])
+        for member in (self.ella, self.player, self.kahn):
+            self.assertEqual(member.location.coordinates, target)
+            self.assertEqual(self._gauges(member), (19, 28, 37))
+            self.assertEqual(script.db.itemcoordinates.get(member), target)
+        self.assertEqual(get_world_clock().tick - before, WILDERNESS_MOVE)
 
 
 class UnchangedSettlementScopeTests(EvenniaTest):
