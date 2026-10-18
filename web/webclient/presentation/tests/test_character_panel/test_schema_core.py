@@ -9,7 +9,7 @@ from web.webclient.presentation.character import (
     CharacterPanelError,
     validate_character,
 )
-from web.webclient.presentation.protocol import ProtocolValidationError
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER, ProtocolValidationError
 from ._support import _condition_row, _equipment_row, _layer, _trait, _valid_panel
 
 
@@ -53,6 +53,9 @@ class CharacterSchemaTests(unittest.TestCase):
             {key: value for key, value in _condition_row().items() if key != "source"},
             _condition_row(severity="buff"),
             _condition_row(remaining_seconds=-1),
+            _condition_row(remaining_seconds=MAX_SAFE_INTEGER + 1),
+            _condition_row(source="altar"),
+            _condition_row(source=""),
             _condition_row(modifiers={"defense": True}),
             _condition_row(modifiers={"defense": "  "}),
         ):

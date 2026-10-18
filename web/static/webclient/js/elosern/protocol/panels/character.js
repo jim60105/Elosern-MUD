@@ -61,6 +61,8 @@ var CHARACTER_MAX_CONDITION_LABEL = 128;
 var CHARACTER_MAX_MODIFIER_KEYS = 16;
 var CHARACTER_MAX_CONDITION_SOURCE = 32;
 var CHARACTER_MAX_MODIFIER_TEXT = 16;
+// The closed origin vocabulary (mirror of CONDITION_SOURCE_LABELS).
+var CHARACTER_CONDITION_SOURCES = ["裝備", "狀態", "裝備、狀態", "未知"];
 
 function validateCharacterKey(value, field) {
   var key = validateIdentifier(value, field);
@@ -355,7 +357,10 @@ function validateCharacterConditionRow(value) {
       "condition modifier " + key
     );
   });
-  requireString(value.source, "source", CHARACTER_MAX_CONDITION_SOURCE);
+  var source = requireString(value.source, "source", CHARACTER_MAX_CONDITION_SOURCE);
+  if (CHARACTER_CONDITION_SOURCES.indexOf(source) === -1) {
+    throw new Error("condition source is not a stable origin");
+  }
   return value;
 }
 
@@ -502,6 +507,7 @@ module.exports = {
   CHARACTER_MAX_MODIFIER_KEYS: CHARACTER_MAX_MODIFIER_KEYS,
   CHARACTER_MAX_CONDITION_SOURCE: CHARACTER_MAX_CONDITION_SOURCE,
   CHARACTER_MAX_MODIFIER_TEXT: CHARACTER_MAX_MODIFIER_TEXT,
+  CHARACTER_CONDITION_SOURCES: CHARACTER_CONDITION_SOURCES,
   validateCharacterPanel: validateCharacterPanel,
   validateCharacterTraitRow: validateCharacterTraitRow,
   validateCharacterConditionRow: validateCharacterConditionRow,

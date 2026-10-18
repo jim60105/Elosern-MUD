@@ -14,7 +14,7 @@ export const CHARACTER_PANEL_SAMPLE = {
   schema_version: 8,
   available: true,
   kind: "character",
-  member_id: 101,
+  member_id: 42,
   traits: [
     {
       key: "hp",

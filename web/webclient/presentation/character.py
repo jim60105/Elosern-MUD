@@ -70,6 +70,7 @@ from world.rules.action_preview import adjusted_cost
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_display import CONDITION_SEVERITIES
 from world.rules.status_query import (
+    CONDITION_SOURCE_LABELS,
     CharacterReadModel,
     StatusQueryError,
     TRAIT_LABELS,
@@ -116,6 +117,9 @@ MAX_CONDITION_ROWS = 32
 MAX_CONDITION_LABEL_CODE_POINTS = 128
 MAX_MODIFIER_KEYS = 16
 MAX_CONDITION_SOURCE_CODE_POINTS = 32
+# The closed origin vocabulary the read model produces; a bounded string is not
+# enough, every row must name one of these origins.
+CONDITION_SOURCES = tuple(sorted(CONDITION_SOURCE_LABELS.values()))
 # A modifier value is the rulebook's canonical adjustment scalar: a finite
 # number or a bounded authored percentage string (e.g. "-10%").
 MAX_MODIFIER_TEXT_CODE_POINTS = 16
@@ -472,9 +476,10 @@ def _validate_condition_row(value: Any) -> dict[str, Any]:
         isinstance(remaining, bool)
         or not isinstance(remaining, int)
         or remaining < 0
+        or remaining > MAX_SAFE_INTEGER
     ):
         raise CharacterPanelError(
-            "condition remaining_seconds must be null or a non-negative integer"
+            "condition remaining_seconds must be null or a bounded non-negative integer"
         )
     modifiers = value["modifiers"]
     if not isinstance(modifiers, dict) or len(modifiers) > MAX_MODIFIER_KEYS:
@@ -490,6 +495,8 @@ def _validate_condition_row(value: Any) -> dict[str, Any]:
     source = _require_str(
         value, "source", maximum=MAX_CONDITION_SOURCE_CODE_POINTS
     )
+    if source not in CONDITION_SOURCES:
+        raise CharacterPanelError("condition source is not a stable origin")
     return {
         "code": code,
         "label": label,

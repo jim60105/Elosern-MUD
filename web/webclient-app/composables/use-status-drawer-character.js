@@ -112,9 +112,12 @@ export function useStatusDrawerCharacter(props) {
   const intimate = computed(() => memberSection.value?.intimate ?? null);
 
   // The character panel follows the viewed member while `status` describes
-  // the controlled figure; their trait/gauge facts may only be combined when
-  // both name the same member.
+  // the controlled figure — and under possession that panel's resources
+  // belong to the owner while its identity names the puppet. The two panels'
+  // trait/gauge facts may therefore only be combined when no possession is
+  // active and both name the same member.
   const characterSubjectMatches = computed(() => {
+    if (props.possessing) return false;
     const memberId = props.character?.member_id;
     const identity = props.status?.actor?.identity;
     if (!Number.isSafeInteger(memberId) || memberId <= 0) return false;

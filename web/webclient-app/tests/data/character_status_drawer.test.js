@@ -323,6 +323,23 @@ describe("CharacterStatusDrawer", () => {
     expect(fastwind.text()).toContain("剩 60 秒");
   });
 
+  it("suppresses cross-panel gauge layers while a companion is possessed", () => {
+    const w = mountDrawer({
+      // A matching identity is not enough: under possession the status
+      // resources belong to the owner while the identity names the puppet.
+      status: {
+        ...STATUS_PANEL_SAMPLE,
+        actor: { ...STATUS_PANEL_SAMPLE.actor, identity: "42" },
+      },
+      possessing: true,
+    });
+    expect(w.find('[data-testid="character-status-drawer__layers--hp"]').exists()).toBe(false);
+    // The character panel's own trait rows keep their breakdown chips.
+    expect(
+      w.find('[data-testid="character-status-drawer__layer--defense--0"]').exists()
+    ).toBe(true);
+  });
+
   it("keeps the 危險 marker beside the HP label on a low-HP tile", () => {
     const w = mountDrawer({ lowHp: true });
     const danger = w.get('[data-testid="character-status-drawer__vital-danger"]');

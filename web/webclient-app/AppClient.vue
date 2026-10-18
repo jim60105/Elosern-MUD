@@ -1250,6 +1250,7 @@ const rootStyle = computed(() => {
         :party-member="panel('party_member') || {}"
         :low-hp="store.view.vitals.lowHp"
         :party-available="store.partyAvailable"
+        :possessing="isControllingCompanion"
         @open-party="() => store.openHudDrawer('party')"
         @open-skill="() => store.openHudDrawer('skill')"
         @persona-edit="onPersonaEdit"

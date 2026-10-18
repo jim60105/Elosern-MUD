@@ -148,12 +148,18 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // purse rather than attributing one member's facts to another.
   const controlledCharacterPanel = computed(() => {
     const character = panel("character");
-    if (!character || character.available === false) {
+    if (!character) {
       return null;
+    }
+    // Keep the registry-owned unavailable form so the doll states its reason.
+    if (character.available === false) {
+      return character;
     }
     const subject = controlledActorId.value;
     if (subject === null || character.member_id !== subject) {
-      return { ...character, equipment: [], wallet: null };
+      // Unknown ownership is not "no equipment": omit the doll instead of
+      // presenting an authoritative empty slot set.
+      return null;
     }
     return character;
   });
@@ -173,7 +179,10 @@ export function useDrawers(store, { panel, panelAvailable }) {
       party && party.available !== false && Array.isArray(party.slots) && party.slots.length
         ? party.slots[0]?.identity
         : null;
-    if (Number.isSafeInteger(commanderId) && character.member_id !== commanderId) {
+    // The purse is only presented once the viewed member is proven to be the
+    // commander; an unavailable party panel withholds it rather than risking
+    // a companion's balance being read as the player's.
+    if (!Number.isSafeInteger(commanderId) || character.member_id !== commanderId) {
       return { ...character, wallet: null };
     }
     return character;

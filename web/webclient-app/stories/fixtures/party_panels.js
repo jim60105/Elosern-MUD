@@ -243,7 +243,7 @@ export const PARTY_MEMBER_PANEL_SAMPLE = {
   schema_version: 1,
   available: true,
   kind: "party_member",
-  member_id: 101,
+  member_id: 42,
   role: "commander",
   companion: null,
   commander: {

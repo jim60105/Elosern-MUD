@@ -346,10 +346,18 @@ test("character panel v8 validates the ordered condition rows", () => {
     )
   );
   // remaining_seconds is null or a non-negative integer.
-  for (const bad of [-1, 1.5, "30", true]) {
+  for (const bad of [-1, 1.5, "30", true, Protocol.MAX_SAFE_INTEGER + 1]) {
     assert.throws(() =>
       Protocol.validateCharacterPanel(
         validCharacterPanel({ conditions: [{ ...rows[0], remaining_seconds: bad }] })
+      )
+    );
+  }
+  // The origin is a member of the closed vocabulary, never free prose.
+  for (const bad of ["", "altar", "裝備來源"]) {
+    assert.throws(() =>
+      Protocol.validateCharacterPanel(
+        validCharacterPanel({ conditions: [{ ...rows[0], source: bad }] })
       )
     );
   }

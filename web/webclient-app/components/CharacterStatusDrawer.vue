@@ -40,6 +40,10 @@ const props = defineProps({
   lowHp: { type: Boolean, default: false },
   // Whether the party panel is available in the store (webclient-retire-redundant-hud design D4).
   partyAvailable: { type: Boolean, default: false },
+  // Whether a companion is possessed: the status panel's resources then belong
+  // to the owner while its identity names the puppet, so no cross-panel gauge
+  // breakdown is attached.
+  possessing: { type: Boolean, default: false },
 });
 
 // `open-skill` opens the skill drawer; `open-party` opens the party drawer; `persona-edit` carries one

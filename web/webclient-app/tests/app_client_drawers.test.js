@@ -101,6 +101,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: CHARACTER_PANEL_SAMPLE,
+            party: PARTY_PANEL_SAMPLE,
             services: {
               ...SERVICES_PANEL_SAMPLE,
               inventory: { ...SERVICES_PANEL_SAMPLE.inventory, wallet: 1200 },
@@ -241,6 +242,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           panels: {
             character: characterPanelWithSkillSlice(),
             services: SERVICES_PANEL_SAMPLE,
+            party: PARTY_PANEL_SAMPLE,
           },
         }),
       ],
