@@ -702,6 +702,7 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically",
         "shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory",
         "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
     )
     def test_companion_recipient_purchase_debits_the_party_purse(self):
         # Independent arithmetic: the purse starts at 1,240 and the authored
@@ -730,6 +731,10 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
         self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
 
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+    )
     def test_forged_or_absent_member_is_refused_before_pricing(self):
         outsider = create_object(NPC, key="路人", location=self.store)
         elsewhere = create_object(Room, key="elsewhere")
@@ -767,6 +772,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(self._surface(self.player, self.companion), before)
         self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
     def test_companion_recipient_insufficient_purse_changes_nothing(self):
         self.player.db.wallet = _buy_copper(_T_FANG) - 1
         before = self._surface(self.player, self.companion)
@@ -812,6 +820,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         )
         self.assertEqual(commander_rows[commander_record.quest_id].stage_progress, 0)
 
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
     def test_fault_injection_restores_purse_both_bags_quest_log_and_stock(self):
         definition = register_quest(
             quest_definition(
@@ -849,6 +860,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         )
         self.assertEqual(dict(parse_merchant_stock(self.merchant)), stock_before)
 
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
     def test_fault_injection_restores_an_auto_settled_companion_wallet(self):
         # An AUTO issuance pays the quest actor's own wallet inside the
         # quest-log delta, so a companion's wallet is a trade surface the
@@ -913,6 +927,7 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically",
         "shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory",
         "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
     )
     def test_companion_seller_proceeds_credit_the_party_purse(self):
         self.player.db.wallet = 0
@@ -934,6 +949,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
         self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
 
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
     def test_companion_equipped_copy_is_not_sellable(self):
         self.player.db.wallet = 0
         self.companion.db.inventory = [_T_KNIFE]
@@ -957,6 +975,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
             self.companion.db.equipment["weapon_main"], _T_KNIFE
         )
 
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
     def test_companion_spare_copy_sells_while_equipped(self):
         self.player.db.wallet = 0
         self.companion.db.inventory = [_T_KNIFE, _T_KNIFE]
@@ -974,6 +995,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
             self.companion.db.equipment["weapon_main"], _T_KNIFE
         )
 
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
     def test_companion_seller_stock_cap_refuses(self):
         self.player.db.wallet = 0
         self.companion.db.inventory = [_T_FANG, _T_FANG, _T_FANG]
@@ -991,7 +1015,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(self._surface(self.player, self.companion), before)
 
     @covers_requirement(
-        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant",
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
     )
     def test_text_member_trades_match_the_action(self):
         # Text/action parity: the same rule entry settles both transports, so
@@ -1011,7 +1036,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(list_items(kahn), [_T_APPLE] * 3)
 
     @covers_requirement(
-        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant",
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
     )
     def test_text_member_sale_matches_the_action(self):
         kahn = self._companion("卡恩")
@@ -1030,6 +1056,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(list_items(self.companion), [])
         self.assertEqual(list_items(kahn), [])
 
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
     def test_text_member_token_refusals_match_the_action(self):
         from world.rules.party_scope import PARTY_SCOPE_MESSAGES
 
@@ -1047,6 +1076,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(empty.strip(), refusal)
         self.assertEqual(self._surface(self.player, self.companion), before)
 
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
     def test_text_default_trade_names_the_caller(self):
         with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
             output = self.call(CmdBuy(), f"{_T_APPLE} 1", caller=self.player)
@@ -1054,6 +1086,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(list_items(self.player), [_T_APPLE])
         self.assertEqual(list_items(self.companion), [])
 
+    @covers_requirement(
+        "shop-economy::possession-keeps-the-shop-refusal"
+    )
     def test_text_trades_refuse_possession(self):
         from world.rules.possession import (
             POSSESSED_REFUSAL_MESSAGES,
@@ -1074,6 +1109,9 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(sell_output.strip(), refusal)
         self.assertEqual(self._surface(self.player, self.companion), before)
 
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
     def test_shop_aliases_include_the_design_command_table(self):
         self.assertIn("買", CmdBuy.aliases)
         self.assertIn("賣", CmdSell.aliases)

@@ -650,6 +650,9 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement(
         "party-item-transfer::text-clients-move-items-between-members"
     )
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+    )
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
             entry = self.entries[key]

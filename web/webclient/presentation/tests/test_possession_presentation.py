@@ -353,7 +353,8 @@ class PossessionPresentationTests(EvenniaTest):
         })
 
     @covers_requirement(
-        "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results"
+        "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results",
+        "shop-economy::possession-keeps-the-shop-refusal",
     )
     def test_dispatcher_refuses_possession_incompatible_actions(self):
         """Shop buy/sell and talk/engage return zero-write rejections while possessed."""
