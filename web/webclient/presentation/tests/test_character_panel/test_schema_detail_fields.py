@@ -1,5 +1,6 @@
 """Character panel schema tests: v9 growth facts and registry-backed row detail."""
 import unittest
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.character import MAX_ACTIVE_ROWS, validate_character
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
 from ._support import (
@@ -23,6 +24,7 @@ _GROWTH_FIELDS = (
 
 class CharacterSchemaTests(unittest.TestCase):
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_active_row_with_registry_backed_detail_fields_validates(self):
         fixture_cost = {"mp": 12}
         normalized = validate_character(
@@ -40,6 +42,7 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertIs(row["booked"], False)
         self.assertNotIn("freeform_scales", row)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_every_growth_fact_is_required(self):
         for field in _GROWTH_FIELDS:
             with self.subTest(field=field):
@@ -49,6 +52,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_character(payload)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_growth_facts_are_typed_and_bounded(self):
         for field, bad in (
             ("level", -1),
@@ -68,6 +72,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_character(payload)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_a_capped_row_reports_zero_xp_to_the_next_level(self):
         row = _active_row(T_EMBER, level=10, xp_into_level=0, xp_to_next_level=0, capped=True)
         normalized = validate_character(
@@ -91,6 +96,7 @@ class CharacterSchemaTests(unittest.TestCase):
         row = normalized["actives"][0]["groups"][0]["skills"][0]
         self.assertEqual(set(row), {"key", "label", *_GROWTH_FIELDS})
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_freeform_scales_are_rejected_on_a_row(self):
         # v9 moves the ladder to selected_skill: a row carrying the v8 field
         # fails the exact-field contract instead of being silently ignored.

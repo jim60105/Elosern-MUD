@@ -1,5 +1,6 @@
 """Character panel schema tests: the v9 ``selected_skill`` section."""
 import unittest
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.character import (
     MAX_FREEFORM_LADDER_RUNGS,
     MAX_SELECTED_LINEAGE_ROWS,
@@ -33,6 +34,7 @@ def _selected(**overrides):
 
 class SelectedSkillSchemaTests(unittest.TestCase):
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_null_and_a_full_section_are_accepted(self):
         self.assertIsNone(validate_character(_valid_panel())["selected_skill"])
         normalized = validate_character(_valid_panel(selected_skill=_selected()))
@@ -50,6 +52,7 @@ class SelectedSkillSchemaTests(unittest.TestCase):
                 _valid_panel(selected_skill=_selected(lineage={"prerequisites": []}))
             )
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_each_lineage_side_is_bounded_and_typed(self):
         for field, level_field in (("prerequisites", "level"), ("next", "min_level")):
             with self.subTest(field=field):
@@ -94,6 +97,7 @@ class SelectedSkillSchemaTests(unittest.TestCase):
                         _valid_panel(selected_skill=_selected(lineage=lineage))
                     )
 
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_the_ladder_is_the_canonical_five_rungs(self):
         self.assertEqual(len(_LADDER), MAX_FREEFORM_LADDER_RUNGS)
         # Short, over-long, and mis-ordered ladders fail closed.
@@ -123,6 +127,7 @@ class SelectedSkillSchemaTests(unittest.TestCase):
                 _valid_panel(selected_skill=_selected(freeform_ladder=boolean_scale))
             )
 
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_each_rung_carries_exactly_one_of_cost_and_level(self):
         both = [dict(rung) for rung in _LADDER]
         both[3]["mp_cost"] = 28
@@ -141,6 +146,7 @@ class SelectedSkillSchemaTests(unittest.TestCase):
                 _valid_panel(selected_skill=_selected(freeform_ladder=extra))
             )
 
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_costs_and_unlock_levels_are_bounded(self):
         # A zero adjusted cost is legal on an unlocked rung.
         free = [dict(rung) for rung in _LADDER]
@@ -160,6 +166,7 @@ class SelectedSkillSchemaTests(unittest.TestCase):
                         _valid_panel(selected_skill=_selected(freeform_ladder=ladder))
                     )
 
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_the_ladder_is_omittable_for_a_non_master(self):
         without = _selected()
         del without["freeform_ladder"]

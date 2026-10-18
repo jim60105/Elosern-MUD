@@ -424,6 +424,7 @@ class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
         _revalidate_live()
         return extras
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_merge_node_reports_both_prerequisites_and_no_next_unlock(self):
         extras = self._merge_registry()
         position = lineage_position_for(_entity(), "duck_c")
@@ -436,6 +437,7 @@ class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
         )
         self.assertEqual(position.next, ())
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_root_reports_its_consumers_as_next_unlocks(self):
         extras = self._merge_registry()
         position = lineage_position_for(_entity(), "duck_a")
@@ -445,6 +447,7 @@ class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
             [("duck_c", extras["duck_c"].label, 1)],
         )
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_identity_ineligible_consumers_are_not_advertised(self):
         registry_extras = {
             "duck_a": _fake_skill("duck_a"),
@@ -459,6 +462,7 @@ class LineagePositionTests(_TreeScopeMixin, unittest.TestCase):
         # and never appears as a next unlock.
         self.assertEqual(lineage_position_for(_entity(), "duck_a").next, ())
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_each_side_is_bounded_to_the_position_rows(self):
         extras = {"duck_a": _fake_skill("duck_a")}
         for index in range(MAX_LINEAGE_POSITION_ROWS + 2):

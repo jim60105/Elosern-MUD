@@ -365,6 +365,7 @@ class FreeformLadderForTests(EvenniaTestCase):
     @covers_requirement(
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_master_sees_every_rung_with_a_cost_or_its_unlock_level(self):
         self._entitled(3)
         base_mp = int(_T_CAST.cost["mp"])
@@ -390,6 +391,7 @@ class FreeformLadderForTests(EvenniaTestCase):
     @covers_requirement(
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_without_mastery_or_eligibility_there_is_no_ladder(self):
         self.entity.db.skills = _owned(_T_CAST)
         self.assertEqual(freeform_ladder_for(self.entity, _T_CAST), ())
@@ -402,6 +404,7 @@ class FreeformLadderForTests(EvenniaTestCase):
     @covers_requirement(
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_zero_adjusted_cost_keeps_unlocked_rungs_free(self):
         self._entitled(3)
         with (
@@ -436,6 +439,7 @@ class FreeformLadderForTests(EvenniaTestCase):
     @covers_requirement(
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_rungs_above_the_derived_tip_cap_stay_locked(self):
         consumer = _ceiling_row()
         registry = live_skill_registry()

@@ -8,6 +8,8 @@ from ._support import _active_row, _skill_categories, _trait, _valid_panel
 
 class CharacterSchemaTests(unittest.TestCase):
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_maximal_payload_fits_the_envelope(self):
         # Every section is present with its row count at its cap, and every
         # active row carries its growth facts plus the registry detail; the
@@ -274,7 +276,7 @@ class CharacterSchemaTests(unittest.TestCase):
             )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_maximal_condition_rows_fit_the_envelope(self):
         # The newly added section's own maximal legal payload (32 rows, a
         # 128-code-point label, 16 modifier pairs and a 32-code-point source)

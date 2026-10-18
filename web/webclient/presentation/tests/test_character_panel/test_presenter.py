@@ -115,7 +115,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             self.assertNotIn(T_STEADY, _flattened_keys(payload["passives"]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -224,6 +224,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             if row["key"] == key
         )
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_active_rows_carry_the_member_proficiency_band(self):
         self.player.db.skill_proficiency = {T_EMBER: 60.0}
         payload = self._render()
@@ -236,6 +237,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         # lineage read does (the rules test pins that single computation).
         self.assertEqual(row["xp_into_level"] + row["xp_to_next_level"], 50.0)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_a_capped_row_reports_a_zero_next_level_band(self):
         self.player.db.skill_proficiency = {T_EMBER: 500.0}
         row = self._active_row(self._render(), T_EMBER)
@@ -243,6 +245,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertIs(row["capped"], True)
         self.assertEqual(row["xp_to_next_level"], 0)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_a_newly_unlocked_skill_is_fresh_only_in_that_session(self):
         member_id = int(self.player.pk)
         fresh = self._render(
@@ -257,6 +260,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         # A reconnect starts a new session: the copied unlock snapshot is empty.
         self.assertIs(self._active_row(self._render(unlocks={}), T_EMBER)["fresh"], False)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_only_the_booked_skill_is_flagged(self):
         self.player.db.practice_booking = T_EMBER
         payload = self._render()
@@ -265,6 +269,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             if key != T_EMBER:
                 self.assertIs(self._active_row(payload, key)["booked"], False, key)
 
+    @covers_requirement("webclient-exploration-menu::character-active-skill-rows-carry-compact-growth-facts")
     def test_an_unregistered_active_key_reports_zero_growth_facts(self):
         skills = dict(self.player.db.skills)
         skills["active"] = [*skills.get("active", []), "t_unknown_active"]
@@ -286,6 +291,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertIs(payload["available"], True)
         self.assertEqual(dict(self.player.db.skill_proficiency), before)
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_the_selected_skill_carries_its_lineage_position(self):
         selected = self._render(skill_key=T_EMBER, tab="skills")["selected_skill"]
         self.assertEqual(selected["key"], T_EMBER)
@@ -293,6 +299,8 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         # A non-master sees no ladder at all (the field is omitted).
         self.assertNotIn("freeform_ladder", selected)
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
+    @covers_requirement("webclient-exploration-menu::the-freeform-ladder-lists-every-rung-for-a-mastery-owner")
     def test_a_mastery_owner_sees_the_full_ladder_with_locked_rungs(self):
         grant_lineage(
             self.player,
@@ -311,6 +319,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         for rung in ladder:
             self.assertNotEqual("mp_cost" in rung, "unlock_level" in rung)
 
+    @covers_requirement("webclient-exploration-menu::the-selected-skill-carries-lineage-position-and-the-freeform-ladder")
     def test_an_unowned_or_unknown_selection_reports_null(self):
         # A passive, an unowned active key and an unregistered key all publish
         # no detail (the panel never invents one for another member's skill).
@@ -350,7 +359,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(while_possessing, before)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -367,7 +376,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(atk["current"], atk["effective"])
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -392,7 +401,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["merit"], 60)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()
@@ -407,7 +416,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_persona_record_never_leaks_into_the_payload(self):
         self.player.db.persona = {
             "identity": {"public_view": {"name": "甲"}},
@@ -444,7 +453,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         return companion
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_the_panel_follows_the_viewed_companion(self):
         companion = self._companion()
         payload = self._render(member=companion)
@@ -464,7 +473,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(fallback["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_the_payload_is_identical_with_and_without_possession(self):
         from world.rules.possession import enter_possession, release_possession
 
@@ -480,7 +489,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(while_possessing, before)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_combat_keeps_the_panel_available(self):
         from typeclasses.monsters import Monster
 
@@ -497,7 +506,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-9-panel")
     def test_conditions_carry_buff_and_indefinite_rule_rows(self):
         from types import SimpleNamespace
 
