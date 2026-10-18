@@ -89,7 +89,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},
     "cast": {
-        "syntax": "cast <skill_key>[@<scale>][=<target_key>]",
+        "syntax": "cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]",
         "context": "一般（戰鬥內外皆可施放技能）",
     },
     "lineage": {"syntax": "lineage", "context": "一般（戰鬥內外皆可用）"},
@@ -683,13 +683,21 @@ class CommandDocsContractTests(unittest.TestCase):
         )
         self.assertEqual(
             entry["語法"],
-            "cast <skill_key>[@<scale>][=<target_key>]",
+            "cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]",
         )
         for token in ("1/4", "1/2", "1", "2", "4"):
             self.assertIn(token, entry["說明"])
         self.assertIn("主宰", entry["說明"])
         self.assertIn("威力", entry["說明"])
         self.assertIn("MP", entry["說明"])
+        self.assertIn("由 <成員>", entry["說明"])
+        self.assertIn("施法者", entry["說明"])
+        row = next(
+            line
+            for line in self.overview.splitlines()
+            if line.startswith("| [`cast`](")
+        )
+        self.assertIn("由 <成員>", row)
 
     @covers_requirement(
         "game-command-docs::the-command-reference-documents-the-sexual-act-system",
