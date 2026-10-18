@@ -26,8 +26,6 @@ from commands.localized.general import NumberedTargetCommand
 from world.rules.combat_result import settle_to_messages
 from world.rules.combat_session import (
     CombatSessionError,
-    SessionReason,
-    is_in_active_session,
     read_session,
     session_owner,
     submit_player_item_use,
@@ -94,8 +92,15 @@ class CmdUseItem(Command):
             except PartyScopeError as error:
                 self.caller.msg(error.message)
                 return
-        if is_in_active_session(self.caller):
-            self._use_in_session(item_key, target_token, member)
+        # The session is resolved through its owner, exactly like ``cast``: a
+        # possessed puppet owns none, so its commander's encounter is the one
+        # an in-session use must join. The caller's own read would miss it and
+        # send the request down the field path.
+        commander, record = self._active_session()
+        if record is not None:
+            self._use_in_session(
+                commander, record, item_key, target_token, member
+            )
             return
         target = self._field_target(target_token)
         if member is None:
@@ -134,32 +139,41 @@ class CmdUseItem(Command):
             return
         self.caller.msg(render_plain_text(result.event_log))
 
+    def _active_session(self):
+        """Return ``(commander, record)`` for the caller's active session.
+
+        A possessed puppet owns no session: the party's encounter is persisted
+        under the commander it operates, so the commander keys every in-session
+        submission while the caller keeps receiving the messages. A missing or
+        unreadable record is no session, matching the field rules' own read.
+        """
+        try:
+            commander = session_owner(self.caller)
+            return commander, read_session(commander)
+        except CombatSessionError:
+            return self.caller, None
+
     def _use_in_session(
-        self, item_key: str, target_token: str, member: Any = None
+        self,
+        commander: Any,
+        record: Any,
+        item_key: str,
+        target_token: str,
+        member: Any = None,
     ) -> None:
         """Save one item selection into the party draft, consuming nothing yet.
 
-        ``member`` is the explicitly named member; ``None`` keeps the caller's
-        own entry through the commander facade. The member route builds the
-        same actor item command ``combat command <token> item ...`` builds and
-        admits it through the same actor-command facade, so a companion's text
-        use and its graphical selection are one draft entry: no round, time,
-        or item is consumed until the complete draft's final confirmation.
+        ``commander`` owns the session; ``member`` is the explicitly named
+        member, and ``None`` keeps the caller's own entry through the
+        commander facade. The member route builds the same actor item command
+        ``combat command <token> item ...`` builds and admits it through the
+        same actor-command facade, so a companion's text use and its graphical
+        selection are one draft entry: no round, time, or item is consumed
+        until the complete draft's final confirmation.
         """
         if member is not None:
             from commands.combat import build_item_command, submit_actor_command
 
-            try:
-                commander = session_owner(self.caller)
-                record = read_session(commander)
-            except CombatSessionError as error:
-                self.caller.msg(session_reason_message(str(error.args[0])))
-                return
-            if record is None:
-                self.caller.msg(
-                    session_reason_message(str(SessionReason.NO_ACTIVE_SESSION))
-                )
-                return
             command = build_item_command(
                 self.caller, item_key, target_token, commander=commander
             )
@@ -171,7 +185,14 @@ class CmdUseItem(Command):
             return
         target = self._field_target(target_token)
         try:
-            result = submit_player_item_use(self.caller, item_key, target=target)
+            result = submit_player_item_use(
+                commander,
+                item_key,
+                target=target,
+                # The caller is the actor: a possessed puppet uses for itself
+                # inside its commander's encounter.
+                commanded_actor=None if commander is self.caller else self.caller,
+            )
         except CombatSessionError as error:
             self.caller.msg(session_reason_message(str(error.args[0])))
             return

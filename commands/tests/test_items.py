@@ -654,6 +654,24 @@ class CombatItemCommandTests(BattlefieldIsolation, EvenniaTest):
         join_party(companion, self.player)
         return companion
 
+    def test_the_session_is_resolved_through_its_owner(self):
+        # A possessed puppet owns no session of its own; the routing reads the
+        # commander's through `session_owner`, exactly like `cast`, so an
+        # in-session use is never sent down the field path.
+        engage(self.player, self.monster)
+        command = CmdUseItem()
+        command.caller = self.player
+        commander, record = command._active_session()
+        self.assertIs(commander, self.player)
+        self.assertIsNotNone(record)
+        companion = self._companion()
+        command.caller = companion
+        self.assertIsNone(read_session(companion))
+        with patch("commands.items.session_owner", return_value=self.player):
+            commander, record = command._active_session()
+        self.assertIs(commander, self.player)
+        self.assertIsNotNone(record)
+
     @covers_requirement(
         "inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations"
     )
