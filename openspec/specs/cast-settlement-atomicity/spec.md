@@ -10,7 +10,8 @@ surfaces.
 ### Requirement: Out-of-combat casts settle resolution and world-time cost in one outer transaction
 The out-of-combat cast command path SHALL route every cast that is not a field-combat initiation through
 `world/rules/cast_settlement.settle_out_of_combat_cast(request)`, which SHALL snapshot all action- and
-clock-touched objects before resolution and open one outer `transaction.atomic()`.
+clock-touched objects, including every member of the caster's present party scope, before resolution
+and open one outer `transaction.atomic()`.
 
 #### Scenario: A successful status_disguise cast commits disguise, practice, and tick together
 - **WHEN** a player casts `status_disguise` out of combat and the settlement succeeds with
@@ -23,7 +24,7 @@ clock-touched objects before resolution and open one outer `transaction.atomic()
 #### Scenario: Resolution and clock advance run nested and the call returns only after commit
 
 - **WHEN** the settlement runs inside its outer transaction
-- **THEN** it runs `ActionResolver.resolve(request)` and — only on success — `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, [request.actor])` as nested operations inside the outer transaction, and returns only after the outer transaction commits
+- **THEN** it runs `ActionResolver.resolve(request)` and — only on success — `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, present_party_scope(request.actor))` as nested operations inside the outer transaction, and returns only after the outer transaction commits
 
 #### Scenario: A successful buff-applying out-of-combat cast commits the buff and tick together
 - **WHEN** a player casts a buff-applying spell registered `usable_out_of_combat=True` with an empty
@@ -77,6 +78,12 @@ clock-touched objects before resolution and open one outer `transaction.atomic()
 
 - **WHEN** `ActionResolver.resolve` rejects the request inside the settlement
 - **THEN** the settlement advances nothing and leaves every snapshotted surface untouched
+
+#### Scenario: A field cast settles the present party
+- **WHEN** the commander successfully casts a six-second field skill with companion 艾拉 present and
+  companion 卡恩 in another room
+- **THEN** the one advance regenerates the commander and 艾拉 and leaves 卡恩 unchanged, and a failure
+  after the advance restores both settled members
 
 ### Requirement: A failed out-of-combat settlement restores every touched Evennia cache before the failure surfaces
 When the clock callback, the final clock persistence, or the outer commit fails after a successful

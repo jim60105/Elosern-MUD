@@ -80,10 +80,9 @@ scan, or `evennia`-wide object search to discover additional entities to settle.
   settlement
 
 #### Scenario: The registered call sites pass their documented scopes
-- **WHEN** `CmdCast`'s integration and the skip commands call `advance()`
-- **THEN** `CmdCast` passes `entities=[caller]`, the skip commands pass the caller's present party
-  scope, `charge_movement()` passes the travelling party, and `settle_combat_result()` passes
-  `entities=battlefield.roster.values()`
+- **WHEN** `CmdCast`'s integration, out-of-combat item use, and the skip commands call `advance()`
+- **THEN** each passes the acting character's present party scope, `charge_movement()` passes the
+  travelling party, and `settle_combat_result()` passes `entities=battlefield.roster.values()`
 
 ### Requirement: gauge regen is a closed-form computation, never a per-second or per-quantum loop
 `world/rules/clock.py` SHALL compute HP/MP/SP regen for a settled entity as
@@ -187,7 +186,7 @@ rejected. During an active persistent combat session, CmdCast SHALL NOT advance 
 #### Scenario: Settlement nests resolve and advance in one transaction
 - **WHEN** the settlement runs for an out-of-combat cast
 - **THEN** it invokes `ActionResolver.resolve()` and, only on success,
-  `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, entities=[self.caller])` as
+  `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, entities=present_party_scope(self.caller))` as
   nested operations inside the single outer transaction, committing only after both succeed
 
 #### Scenario: An active-session cast is delegated to session orchestration

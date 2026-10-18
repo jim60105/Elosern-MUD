@@ -8,17 +8,13 @@ out-of-combat field cast or item use likewise settles the present party and
 rolls every member back on failure. Church, GM-console, defeat-aftermath, and
 combat settlements keep their existing entity tuples.
 
-Intended ``party-time-settlement`` requirement IDs (recorded here until the
-capability reaches ``openspec/specs/``, per the party-member-authority
-precedent; the decorators are added by the archive/sync step):
+``party-time-settlement`` requirement IDs pinned by the decorators below:
 
 - ``party-time-settlement::skip-advances-settle-the-present-party``
 - ``party-time-settlement::movement-advances-settle-the-travelling-party``
 - ``party-time-settlement::other-advances-keep-their-scope``
 - ``party-time-settlement::a-failed-party-advance-restores-every-settled-member``
 - ``party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party``
-  (added by ``party-field-settlement-scope``; recorded here until the archive/
-  sync step, per the same precedent)
 """
 
 from copy import deepcopy
@@ -629,6 +625,10 @@ class FieldCastPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "cast-settlement-atomicity::out-of-combat-casts-settle-resolution-and-"
         "world-time-cost-in-one-outer-transaction"
     )
+    @covers_requirement(
+        "party-time-settlement::field-cast-and-item-use-advances-settle-the-"
+        "present-party"
+    )
     def test_field_cast_settles_the_present_party_only(self):
         self._set_gauges(self.player, (1.0, 1.0, 1.0))
         self._set_gauges(self.ella, (1.0, 1.0, 1.0))
@@ -780,6 +780,10 @@ class FieldItemUsePartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
         "time-once"
     )
+    @covers_requirement(
+        "party-time-settlement::field-cast-and-item-use-advances-settle-the-"
+        "present-party"
+    )
     def test_potion_use_settles_the_present_party_once(self):
         self._set_gauges(self.player, (1.0, 1.0, 1.0))
         self._set_gauges(self.ella, (1.0, 1.0, 1.0))
@@ -804,6 +808,10 @@ class FieldItemUsePartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "item-use-resolution::out-of-combat-item-use-advances-deterministic-"
         "time-once"
+    )
+    @covers_requirement(
+        "party-time-settlement::field-cast-and-item-use-advances-settle-the-"
+        "present-party"
     )
     def test_rejected_potion_use_settles_nobody(self):
         self._set_gauges(self.player, (1.0, 1.0, 1.0))
