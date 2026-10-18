@@ -130,6 +130,26 @@ def _reject_item(giver: Any, receiver: Any, item_key: Any, quantity: int) -> str
     return item_key
 
 
+def resolve_item_token(entity: Any, token: Any) -> str:
+    """The registry key ``entity``'s canonical bag answers to for ``token``.
+
+    Text commands accept the registry key or the held display name; both
+    resolve against the giver's canonical ``db.inventory`` list only, never a
+    containment search, so a refusal is always the rule's own stable code. An
+    unresolved token is returned unchanged and rejected by :func:`_reject_item`
+    as ``item_not_held``.
+    """
+    stripped = token.strip() if isinstance(token, str) else ""
+    held = list(getattr(entity.db, "inventory", None) or [])
+    if stripped in held:
+        return stripped
+    for key in held:
+        definition = ITEM_REGISTRY.get(key)
+        if definition is not None and definition.display_name_zh == stripped:
+            return key
+    return stripped
+
+
 def _mirrors(holder: Any, item_key: str) -> list[Any]:
     """The contained mirror objects answering to ``item_key``."""
     return [

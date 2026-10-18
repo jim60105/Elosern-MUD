@@ -1,17 +1,22 @@
-"""Player-facing item use and equipment toggle commands.
+"""Player-facing item use, equipment toggle and member retrieve commands.
 
-Both commands parse only the item key and delegate to the same deterministic
+Each command parses only its arguments and delegates to the same deterministic
 APIs the UI action adapters call: ``world.rules.items.use_item`` outside
 combat, ``world.rules.combat_session.submit_player_item_use`` inside an
 active session (one initiative-ordered round), and
 ``world.rules.equipment.toggle_equipment`` for equipment (a free action that
 never consumes a round). Stable rejections render the same Traditional
 Chinese reason semantics as UI actions through ``service_messages``.
+
+``取回`` moves an item from a present party member back into the commander's
+bag through ``world.rules.party_inventory.transfer_item``, the same rule the
+``party.transfer`` action and the member branch of ``給`` call.
 """
 
 from typing import Any
 
 from commands.command import Command
+from commands.localized.general import NumberedTargetCommand
 
 from world.lore.items import ITEM_REGISTRY
 from world.rules.combat_result import settle_to_messages
@@ -24,7 +29,19 @@ from world.rules.equipment import toggle_equipment
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.event_log import render_plain_text
 from world.rules.items import use_item
+from world.rules.npc_identity import npc_display_name
+from world.rules.party_inventory import (
+    PartyTransferError,
+    resolve_item_token,
+    transfer_item,
+)
+from world.rules.party_scope import (
+    PartyScopeError,
+    resolve_commander,
+    resolve_member_token,
+)
 from world.rules.player_messages import session_reason_message
+from world.rules.quest_delivery import item_display_name
 from world.rules.service_messages import rejection_message
 
 
@@ -130,3 +147,48 @@ class CmdToggleEquip(Command):
             self.caller.msg(rejection_message(result.reason))
             return
         self.caller.msg(_toggle_message(result, item_key))
+
+
+class CmdRetrieve(NumberedTargetCommand):
+    """取回隊伍成員身上的物品
+
+    用法：
+      取回 [數量] <物品> = <成員>
+
+    從同行的隊伍成員身上取回物品，放進指揮者的背包。免費動作：不推進時間、
+    不改變好感度；戰鬥中會以固定語句拒絕，成員不在場或物品無法交換時也不會
+    改變任何東西。
+    """
+
+    key = "取回"
+    aliases = ("retrieve",)
+    locks = "cmd:all()"
+    help_category = "General"
+    rhs_split = ("=", " to ")
+
+    def func(self) -> None:
+        """執行取回。"""
+        caller = self.caller
+        if not self.args or not self.rhs:
+            caller.msg("用法：取回 [數量] <物品> = <成員>")
+            return
+        try:
+            member = resolve_member_token(caller, self.rhs)
+        except PartyScopeError as error:
+            caller.msg(error.message)
+            return
+        try:
+            outcome = transfer_item(
+                caller,
+                member.pk,
+                resolve_commander(caller).pk,
+                resolve_item_token(member, self.lhs),
+                self.number or 1,
+            )
+        except (PartyTransferError, PartyScopeError) as error:
+            caller.msg(error.message)
+            return
+        caller.msg(
+            f"你從{npc_display_name(outcome.giver)}那裡取回了 "
+            f"{outcome.quantity} 個{item_display_name(outcome.item_key)}。"
+        )
