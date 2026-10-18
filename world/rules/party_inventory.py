@@ -14,6 +14,12 @@ purpose and then calls the unchanged entity-scoped
 ``world.rules.equipment.toggle_equipment``, so the free-action semantics and
 the draft-preview invalidation stay in their single owner.
 
+:func:`use_member_item` is the member-scoped item-use entry
+(companion-field-item-use): it authorizes one present member for the acting
+purpose and then calls the unchanged entity-scoped
+``world.rules.items.use_item``, so the member's own bag, SELF binding, and the
+commander's six-second present-party advance stay in their single owner.
+
 Both plans are computed inside the transfer transaction and before the first
 write: a plan's ACQUIRE replacement dispatches quest-completion observers, and
 their contract is to defer through ``transaction.on_commit``. Computing the
@@ -38,6 +44,7 @@ from world.rules.equipment import (
 )
 from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
+    PURPOSE_ACT,
     PURPOSE_ORGANIZE,
     PartyScopeError,
     authorize_member,
@@ -110,6 +117,18 @@ class MemberEquipmentOutcome:
 
     member: Any
     result: Any
+
+
+@dataclass(frozen=True)
+class MemberItemUseOutcome:
+    """One member-scoped item use: whose bag was addressed and its settlement.
+
+    ``member`` is the re-derived live member the use ran against, so each
+    transport can name it without re-deciding the member boundary.
+    """
+
+    member: Any
+    settlement: Any
 
 
 def _live_entity(dbid: Any) -> Any | None:
@@ -395,4 +414,51 @@ def toggle_member_equipment(
     )
     return MemberEquipmentOutcome(
         member=member, result=toggle_equipment(member, item_key)
+    )
+
+
+def use_member_item(
+    acting: Any, member_id: Any, item_key: Any, target: Any = None
+) -> MemberItemUseOutcome:
+    """Use one item from a present party member's own bag (a field action).
+
+    ``acting`` is the authenticated character; ``member_id`` is a member dbid
+    re-derived through the party boundary for the acting purpose and never
+    trusted as identity, so a forged, stale, absent, or knocked-out member is
+    rejected with the shared stable code before anything is read or written.
+    ``target`` is the caller's single explicit choice, resolved by the
+    transport relative to the member's room and consumed only by
+    single-scope effects.
+
+    The use itself is the unchanged entity-scoped
+    :func:`world.rules.items.use_item` with the member as its actor: the
+    member's own bag is consumed, SELF effects bind to the member, and the
+    command's six-second advance settles the present party through the
+    member's resolved commander.
+
+    A party session anywhere in the request refuses the field path with the
+    item rule's own ``active_combat`` rejection and no mutation: the member's
+    ``use_item`` alone would not see a session persisted under the commander,
+    and a combat round is the only place an item selection may be made.
+    """
+    from world.rules.items import (
+        ItemUseReason,
+        ItemUseResult,
+        ItemUseSettlement,
+        use_item,
+    )
+
+    commander = resolve_commander(acting)
+    member = authorize_member(commander, member_id, PURPOSE_ACT, anchor=acting)
+    if party_in_combat(acting, member):
+        return MemberItemUseOutcome(
+            member=member,
+            settlement=ItemUseSettlement(
+                ItemUseResult(
+                    outcome="rejected", reason=ItemUseReason.ACTIVE_SESSION
+                )
+            ),
+        )
+    return MemberItemUseOutcome(
+        member=member, settlement=use_item(member, item_key, target=target)
     )
