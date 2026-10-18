@@ -676,19 +676,13 @@ def _worn_item_keys(equipment: Mapping) -> list[str]:
     return keys
 
 
-def _worn_rules(entity: Any) -> list[EquipmentEffectRule]:
-    """Resolve one entity's worn equipment to its loaded effect rules.
+def _worn_rules_for(equipment: Mapping) -> list[EquipmentEffectRule]:
+    """Resolve one normalized equipment mapping to its loaded effect rules.
 
-    Fail-closed: malformed equipment storage (``normalized_equipment`` →
-    ``None``) reads as "nothing worn". A registry-validated mapping only ever
-    holds equipment keys with bound modifier keys (the normalization checks
-    registry membership and slot fit), so every lookup resolves.
+    A registry-validated mapping only ever holds equipment keys with bound
+    modifier keys (the normalization checks registry membership and slot
+    fit), so every lookup resolves.
     """
-    from world.rules.equipment import normalized_equipment
-
-    equipment = normalized_equipment(entity)
-    if equipment is None:
-        return []
     rules: list[EquipmentEffectRule] = []
     for item_key in _worn_item_keys(equipment):
         definition = ITEM_REGISTRY[item_key]
@@ -699,21 +693,31 @@ def _worn_rules(entity: Any) -> list[EquipmentEffectRule]:
     return rules
 
 
-def equipment_adjustments(entity: Any) -> Mapping[str, int | str]:
-    """Return the pure additive adjustment bundle of one entity's worn gear.
+def _worn_rules(entity: Any) -> list[EquipmentEffectRule]:
+    """Resolve one entity's worn equipment to its loaded effect rules.
 
-    The single accessor converting worn equipment into combat adjustments
-    (wire-equipment-combat-modifiers): every consumer reads the merged
-    bundle from ``combat_modifiers`` — none may compute a parallel equipment
-    formula. Flat fields sum as integers; percent fields sum and re-render as
-    signed percent strings; flat ``agility`` lands under ``agility_flat``
-    (see ``_BUNDLE_FLAT_FIELDS``). Malformed storage yields the empty bundle.
-    Writes nothing.
+    Fail-closed: malformed equipment storage (``normalized_equipment`` →
+    ``None``) reads as "nothing worn".
+    """
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return []
+    return _worn_rules_for(equipment)
+
+
+def equipment_adjustments_for(equipment: Mapping) -> Mapping[str, int | str]:
+    """Return the pure additive adjustment bundle of one equipment mapping.
+
+    The hypothetical-read sibling of :func:`equipment_adjustments`, shared by
+    the item-holdings preview so the after mapping is folded by the same
+    accessor rather than a second equipment formula.
     """
     flats: dict[str, int] = {}
     percents: dict[str, int] = {}
     agility_flat_total = 0
-    for rule in _worn_rules(entity):
+    for rule in _worn_rules_for(equipment):
         for field, value in rule.adjustments.items():
             if field in _BUNDLE_FLAT_FIELDS:
                 flats[field] = flats.get(field, 0) + int(value)
@@ -735,6 +739,37 @@ def equipment_adjustments(entity: Any) -> Mapping[str, int | str]:
     return MappingProxyType(bundle)
 
 
+def equipment_adjustments(entity: Any) -> Mapping[str, int | str]:
+    """Return the pure additive adjustment bundle of one entity's worn gear.
+
+    The single accessor converting worn equipment into combat adjustments
+    (wire-equipment-combat-modifiers): every consumer reads the merged
+    bundle from ``combat_modifiers`` — none may compute a parallel equipment
+    formula. Flat fields sum as integers; percent fields sum and re-render as
+    signed percent strings; flat ``agility`` lands under ``agility_flat``
+    (see ``_BUNDLE_FLAT_FIELDS``). Malformed storage yields the empty bundle.
+    Writes nothing.
+    """
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return MappingProxyType({})
+    return equipment_adjustments_for(equipment)
+
+
+def equipment_gauge_caps_for(equipment: Mapping) -> Mapping[str, int]:
+    """Return the additive per-gauge caps of one equipment mapping.
+
+    The hypothetical-read sibling of :func:`equipment_gauge_caps`.
+    """
+    caps: dict[str, int] = {}
+    for rule in _worn_rules_for(equipment):
+        for target, cap in rule.gauge_caps.items():
+            caps[target] = caps.get(target, 0) + int(cap)
+    return MappingProxyType(caps)
+
+
 def equipment_gauge_caps(entity: Any) -> Mapping[str, int]:
     """Return the additive per-gauge caps of one entity's worn gear.
 
@@ -742,11 +777,12 @@ def equipment_gauge_caps(entity: Any) -> Mapping[str, int]:
     ``world.rules.equipment`` is its only consumer). Positive-only by loader
     contract; malformed storage yields the empty mapping. Writes nothing.
     """
-    caps: dict[str, int] = {}
-    for rule in _worn_rules(entity):
-        for target, cap in rule.gauge_caps.items():
-            caps[target] = caps.get(target, 0) + int(cap)
-    return MappingProxyType(caps)
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return MappingProxyType({})
+    return equipment_gauge_caps_for(equipment)
 
 
 def reload_equipment_effect_rules(path: Path | None = None) -> None:

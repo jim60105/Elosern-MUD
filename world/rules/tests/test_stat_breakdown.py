@@ -318,6 +318,12 @@ def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
         buff_provenance={},
         rule_provenance={},
         equipment=tuple(equipment),
+        equipment_mapping={
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        },
         combat=None,
     )
 

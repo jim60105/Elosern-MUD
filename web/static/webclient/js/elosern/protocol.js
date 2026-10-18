@@ -37,6 +37,7 @@ var gallery = require("./protocol/panels/gallery.js");
 var titles = require("./protocol/panels/titles.js");
 var misc = require("./protocol/panels/misc.js");
 var partyInventory = require("./protocol/panels/party_inventory.js");
+var itemHoldings = require("./protocol/panels/item_holdings.js");
 var exotic = require("./protocol/panels/exotic.js");
 var combat_beats = require("./protocol/panels/combat_beats.js");
 var skill_use = require("./protocol/panels/skill_use.js");
@@ -248,6 +249,13 @@ var skill_use = require("./protocol/panels/skill_use.js");
       C.PARTY_INVENTORY_MAX_PRESENTATION_SUMMARY,
     PARTY_INVENTORY_MAX_REASON: C.PARTY_INVENTORY_MAX_REASON,
     PARTY_INVENTORY_ACCESSORY_LIMIT: C.PARTY_INVENTORY_ACCESSORY_LIMIT,
+    ITEM_HOLDINGS_SCHEMA_VERSION: C.ITEM_HOLDINGS_SCHEMA_VERSION,
+    ITEM_HOLDINGS_MAX_ROWS: C.ITEM_HOLDINGS_MAX_ROWS,
+    ITEM_HOLDINGS_MAX_CHANGES: C.ITEM_HOLDINGS_MAX_CHANGES,
+    ITEM_HOLDINGS_MAX_KEY: C.ITEM_HOLDINGS_MAX_KEY,
+    ITEM_HOLDINGS_MAX_LABEL: C.ITEM_HOLDINGS_MAX_LABEL,
+    ITEM_HOLDINGS_MAX_REASON: C.ITEM_HOLDINGS_MAX_REASON,
+    validateItemHoldingsPanel: itemHoldings.validateItemHoldingsPanel,
     PARTY_GENERAL_LIMIT: C.PARTY_GENERAL_LIMIT,
     PARTY_MAX_SLOTS: C.PARTY_MAX_SLOTS,
     PARTY_MAX_ROWS: C.PARTY_MAX_ROWS,

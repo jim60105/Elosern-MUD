@@ -16,7 +16,7 @@ from world.rules.combat_modifiers import (
     _restriction_aware_merge,
 )
 from world.rules.equipment_effects import (
-    equipment_adjustments,
+    equipment_adjustments_for,
     equipment_modifier_layers,
 )
 from world.rules.status_display import display_for
@@ -123,11 +123,13 @@ def _merged_bundle(assembly: _Assembly) -> dict[str, Any]:
 
     Byte-identical to ``combat_modifiers.evaluate_combat_modifiers`` for the
     same storage: ``_merge_adjustments`` (the shipped merge) over
-    ``assembly.matches`` (the shipped matches) plus
-    ``equipment_adjustments`` (the shipped pure gear read).
+    ``assembly.matches`` (the shipped matches) plus the single-source pure
+    gear read of ``assembly.equipment_mapping``.
     """
     return _restriction_aware_merge(
-        assembly.entity, [dict(adjustments) for _, adjustments in assembly.matches]
+        assembly.entity,
+        [dict(adjustments) for _, adjustments in assembly.matches],
+        equipment_mapping=assembly.equipment_mapping,
     )
 
 
@@ -238,11 +240,7 @@ def _worn_gear(assembly: _Assembly) -> list[tuple[int, str, Any, Any]]:
     ``equipment_modifier_layers`` accessor (single-source guard). Rows sort
     by ``(slot order, item key)`` for display.
     """
-    from world.rules.equipment import normalized_equipment
-
-    equipment = normalized_equipment(assembly.entity)
-    if equipment is None:
-        return []
+    equipment = assembly.equipment_mapping
     worn: list[tuple[str, str]] = [
         (slot, equipment[slot])
         for slot in _EQUIPMENT_SLOTS
@@ -462,7 +460,9 @@ def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
         raw_bundle = {}
         for _, adjustments in assembly.matches:
             raw_bundle = _merge_adjustments(raw_bundle, dict(adjustments))
-        raw_bundle = _merge_adjustments(raw_bundle, equipment_adjustments(assembly.entity))
+        raw_bundle = _merge_adjustments(
+            raw_bundle, equipment_adjustments_for(assembly.equipment_mapping)
+        )
         raw_total = after_skill * (1 + float(raw_bundle.get("agility", "+0%")[:-1]) / 100)
         raw_total += raw_bundle.get("agility_flat", 0)
         if agility != raw_total:
@@ -490,7 +490,10 @@ def _merit_breakdown(assembly: _Assembly) -> StatBreakdownRow:
 
 
 def build_stat_breakdown(
-    entity: Any, assembly: _Assembly | None = None
+    entity: Any,
+    assembly: _Assembly | None = None,
+    *,
+    equipment: Any = None,
 ) -> tuple[StatBreakdownRow, ...]:
     """Return the eight breakdown rows composed from named sources (tasks 1.1–1.4).
 
@@ -505,7 +508,7 @@ def build_stat_breakdown(
     if assembly is None:
         from .assembly import _assemble
 
-        assembly = _assemble(entity)
+        assembly = _assemble(entity, equipment=equipment)
     rows: list[StatBreakdownRow] = []
     for key in _BREAKDOWN_ROW_ORDER:
         if key in _GAUGE_KEYS:

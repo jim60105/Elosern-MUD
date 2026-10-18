@@ -30,6 +30,7 @@ export function useSkillUse(store) {
       member_id: payload.member_id,
       tab: "skills",
       skill_key: payload.skill_key,
+      item_key: null,
     });
   }
 

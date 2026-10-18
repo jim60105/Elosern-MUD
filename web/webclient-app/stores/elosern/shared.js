@@ -30,6 +30,7 @@ export const PANEL_ALLOWLIST = [
   "party",
   "party_member",
   "party_inventory",
+  "item_holdings",
   "objectives",
   "services",
   "creation",

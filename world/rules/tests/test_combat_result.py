@@ -68,6 +68,7 @@ class CombatResultRenderingTests(unittest.TestCase):
                 "objectives",
                 "quest_log",
                 "combat_beats",
+                "item_holdings",
             ),
         )
         self.assertNotIn("logs", result)

@@ -697,6 +697,58 @@ function validPartyInventoryPanel(overrides) {
   );
 }
 
+function validItemHoldingsReceive(overrides) {
+  return deepMerge({ enabled: true, reason: null }, overrides || {});
+}
+
+function validItemHoldingsChange(overrides) {
+  return deepMerge(
+    { key: "atk_phys", label: "攻擊", amount: 6 },
+    overrides || {}
+  );
+}
+
+function validItemHoldingsDelta(overrides) {
+  return deepMerge(
+    { equippable: true, changes: [validItemHoldingsChange()] },
+    overrides || {}
+  );
+}
+
+function validItemHoldingsRow(overrides) {
+  return deepMerge(
+    {
+      member_id: 41,
+      held: 0,
+      equipped: false,
+      delta: null,
+      receive: validItemHoldingsReceive(),
+    },
+    overrides || {}
+  );
+}
+
+function validItemHoldingsPanel(overrides) {
+  return deepMerge(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "item_holdings",
+      item_key: T_MEAL,
+      giver_id: 7,
+      rows: [
+        validItemHoldingsRow({
+          member_id: 7,
+          held: 2,
+          receive: validItemHoldingsReceive({ enabled: false, reason: null }),
+        }),
+        validItemHoldingsRow(),
+      ],
+    },
+    overrides || {}
+  );
+}
+
 module.exports = {
   fixtureDigest,
   validArtworkResource,
@@ -709,6 +761,11 @@ module.exports = {
   validPartyInventoryRow,
   validPartyInventoryEquipment,
   validPartyInventoryPanel,
+  validItemHoldingsReceive,
+  validItemHoldingsChange,
+  validItemHoldingsDelta,
+  validItemHoldingsRow,
+  validItemHoldingsPanel,
   validCombatSkill,
   validSkillGroup,
   validCategoryGroup,

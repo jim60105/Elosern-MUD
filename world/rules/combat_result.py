@@ -69,6 +69,7 @@ AFFECTED_PANELS = (
     "objectives",
     "quest_log",
     "combat_beats",
+    "item_holdings",
 )
 
 

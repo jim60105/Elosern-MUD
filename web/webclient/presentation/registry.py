@@ -230,6 +230,10 @@ def build_production_registry() -> PresentationRegistry:
         PARTY_INVENTORY_SCHEMA_VERSION,
         party_inventory_presenter,
     )
+    from web.webclient.presentation.item_holdings import (
+        ITEM_HOLDINGS_SCHEMA_VERSION,
+        item_holdings_presenter,
+    )
     from web.webclient.presentation.possession_banner import (
         POSSESSION_BANNER_SCHEMA_VERSION,
         possession_banner_presenter,
@@ -323,6 +327,16 @@ def build_production_registry() -> PresentationRegistry:
             # form (shared reason and semantics), not a bespoke reason.
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=party_inventory_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="item_holdings",
+            schema_version=ITEM_HOLDINGS_SCHEMA_VERSION,
+            # The holdings query publishes the same COMMON unavailable form:
+            # an unreadable canonical record never invents rows or deltas.
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=item_holdings_presenter,
         )
     )
     registry.register(

@@ -43,6 +43,7 @@ from django.db import transaction
 from world.lore.items import ITEM_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules.equipment import (
+    EquipmentToggleReason,
     apply_inventory_plan,
     equipped_removal_conflict,
     materialize_registry_object,
@@ -52,7 +53,7 @@ from world.rules.equipment import (
     registry_key_for_object,
     toggle_equipment,
 )
-from world.rules.party import bound_owner_of
+from world.rules.party import bound_owner_of, live_companions
 from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
     PURPOSE_ACT,
@@ -524,6 +525,12 @@ def use_member_item(
 #: one bounded screen of aggregated rows.
 MAX_MEMBER_INVENTORY_ROWS = 32
 
+#: The bounded ``item_holdings`` row ceiling (one per party member).
+MAX_ITEM_HOLDINGS_ROWS = 17
+
+#: The bounded per-row delta ceiling (one per nonzero effective-trait change).
+MAX_EQUIPMENT_DELTA_CHANGES = 16
+
 #: The closed descriptor routes the panel publishes.
 ROUTE_FIELD_USE = "field_use"
 ROUTE_COMBAT_DRAFT = "combat_draft"
@@ -534,9 +541,10 @@ class PartyInventoryViewError(ValueError):
     """The viewed member's canonical inventory cannot be read truthfully.
 
     ``args[0]`` is one stable code: ``malformed_inventory``,
-    ``malformed_equipment``, ``wallet_unreadable``, or a party-scope code when
-    no commander resolves. The presenter turns any of them into the common
-    unavailable form rather than inventing rows, counts, or descriptors.
+    ``malformed_equipment``, ``malformed_traits``, ``wallet_unreadable``,
+    ``party_too_large``, or a party-scope code when no commander resolves.
+    The presenter turns any of them into the common unavailable form rather
+    than inventing rows, counts, or descriptors.
     """
 
 
@@ -608,6 +616,58 @@ class MemberInventoryView:
     rows: tuple[MemberInventoryRow, ...]
 
 
+@dataclass(frozen=True)
+class EquipmentDeltaChange:
+    """One nonzero effective-trait change of a hypothetical equipment swap."""
+
+    key: str
+    label: str
+    amount: int | float
+
+
+@dataclass(frozen=True)
+class EquipmentDelta:
+    """One member's hypothetical stat delta for the selected equipment.
+
+    ``equippable`` is the toggle rule's own verdict (without the ownership
+    check); ``changes`` lists only nonzero effective-trait changes in the
+    character panel's canonical row order. A refusal carries the rule's
+    stable reason code instead.
+    """
+
+    equippable: bool
+    changes: tuple[EquipmentDeltaChange, ...] = ()
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ReceiveDescriptor:
+    """One holdings row's transfer verdict for the selected item."""
+
+    enabled: bool
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ItemHoldingRow:
+    """One party member's held count, equipped state, delta, and transfer verdict."""
+
+    member_id: int
+    held: int
+    equipped: bool
+    delta: EquipmentDelta | None
+    receive: ReceiveDescriptor
+
+
+@dataclass(frozen=True)
+class ItemHoldingsView:
+    """The frozen read-only inputs of the ``item_holdings`` panel."""
+
+    giver: Any
+    item_key: str | None
+    rows: tuple[ItemHoldingRow, ...]
+
+
 def _strict_inventory(member: Any) -> list[str]:
     """Read the canonical flat inventory strictly, or fail closed."""
     raw = member.db.inventory
@@ -630,10 +690,17 @@ def _commander_of(member: Any) -> Any | None:
     return bound_owner_of(member)
 
 
-def _scope_reason(commander: Any, member: Any, purpose: str) -> str | None:
-    """The member boundary's fixed refusal line, or ``None`` when admitted."""
+def _scope_reason(
+    commander: Any, member: Any, purpose: str, *, anchor: Any = None
+) -> str | None:
+    """The member boundary's fixed refusal line, or ``None`` when admitted.
+
+    ``anchor`` is the acting character the settlement rule scopes the request
+    through; the holdings receive descriptor supplies it so its verdict can
+    never be more permissive than :func:`transfer_item`.
+    """
     try:
-        authorize_member(commander, int(member.pk), purpose)
+        authorize_member(commander, int(member.pk), purpose, anchor=anchor)
     except PartyScopeError as error:  # observability: ignore R2: the boundary verdict becomes the descriptor's fixed refusal line; no state or I/O is involved
         return PARTY_SCOPE_MESSAGES[error.reason]
     return None
@@ -882,3 +949,185 @@ def inventory_view(member: Any, *, in_combat: bool) -> MemberInventoryView:
         equipment=_equipment_view(equipment),
         rows=tuple(rows),
     )
+
+
+# ---------------------------------------------------------------------------
+# Item holdings query (item-holdings-panel).
+# ---------------------------------------------------------------------------
+
+
+def _worn_keys(equipment: dict) -> set[str]:
+    """Every item key one normalized equipment mapping wears."""
+    worn = {
+        equipment[slot]
+        for slot in ("weapon_main", "weapon_off", "armor")
+        if equipment[slot] is not None
+    }
+    worn.update(equipment["accessories"])
+    return worn
+
+
+def _signed_amount(value: Any) -> int | float:
+    """Normalize an integral float so the wire carries a plain integer."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def equipment_delta(member: Any, item_key: Any) -> EquipmentDelta:
+    """Compare one equipment item against a member's current slot occupant.
+
+    Reads the character panel's own breakdown twice: once from canonical
+    storage and once with the hypothetical after mapping the toggle would
+    write. Nothing is written. The ownership check is the only toggle guard
+    skipped, so a member who does not hold the item still gets a delta; every
+    other stable toggle refusal is published as the delta's reason. A member
+    already wearing the item has no change (a real toggle would unequip it,
+    which is not the comparison the holdings query asks).
+    """
+    from world.rules.status_query import (
+        TRAIT_LABELS,
+        StatusQueryError,
+        build_stat_breakdown,
+    )
+
+    definition = (
+        ITEM_REGISTRY.get(item_key)
+        if isinstance(item_key, str) and item_key
+        else None
+    )
+    if definition is None or definition.equipment_slot is None:
+        return EquipmentDelta(False, (), EquipmentToggleReason.NOT_EQUIPMENT.value)
+    equipment = normalized_equipment(member)
+    if equipment is None:
+        raise PartyInventoryViewError("malformed_equipment")
+    if item_key in _worn_keys(equipment):
+        return EquipmentDelta(True, ())
+    preflight = preflight_equipment_toggle(member, item_key, require_held=False)
+    if not preflight.allowed or preflight.plan is None:
+        reason = preflight.reason or EquipmentToggleReason.MALFORMED_STORAGE
+        return EquipmentDelta(False, (), reason.value)
+    before_rows = build_stat_breakdown(member)
+    after = {
+        row.key: row.effective
+        for row in build_stat_breakdown(member, equipment=preflight.plan.after)
+    }
+    changes: list[EquipmentDeltaChange] = []
+    for row in before_rows:
+        amount = _signed_amount(after[row.key] - row.effective)
+        if amount == 0:
+            continue
+        changes.append(
+            EquipmentDeltaChange(row.key, TRAIT_LABELS.get(row.key, row.key), amount)
+        )
+    return EquipmentDelta(True, tuple(changes))
+
+
+def _receive_descriptor(
+    acting: Any,
+    commander: Any,
+    giver: Any,
+    member: Any,
+    item_key: str,
+    *,
+    in_combat: bool,
+    giver_reason: str | None,
+) -> ReceiveDescriptor:
+    """The transfer verdict for giving the selected item to ``member``.
+
+    Mirrors :func:`transfer_item`'s admission order: combat first (the fixed
+    bar on every row, the viewed member's included), then the viewed member's
+    own row (disabled with no reason), then the giver's and receiver's member
+    boundaries with the acting anchor, then the shared transfer preflight.
+    """
+    if in_combat or party_in_combat(acting, giver, member):
+        return ReceiveDescriptor(False, TRANSFER_MESSAGES[REASON_TRANSFER_IN_COMBAT])
+    if member is giver:
+        return ReceiveDescriptor(False, None)
+    if giver_reason is not None:
+        return ReceiveDescriptor(False, giver_reason)
+    receiver_reason = _scope_reason(
+        commander, member, PURPOSE_ORGANIZE, anchor=acting
+    )
+    if receiver_reason is not None:
+        return ReceiveDescriptor(False, receiver_reason)
+    preflight = preflight_transfer(
+        giver, item_key, MIN_TRANSFER_QUANTITY, receiver=member
+    )
+    if preflight.allowed:
+        return ReceiveDescriptor(True, None)
+    reason = preflight.reason or REASON_ITEM_NOT_HELD
+    return ReceiveDescriptor(False, TRANSFER_MESSAGES[reason])
+
+
+def item_holdings(
+    acting: Any, giver: Any, item_key: Any, *, in_combat: bool
+) -> ItemHoldingsView:
+    """Build the frozen read-only ``item_holdings`` inputs for one item.
+
+    Rows are the effective party in party order (commander first), including
+    members who are absent or knocked out: the query reports counts and
+    transfer availability rather than a present roster. An unselected or
+    unknown registry key yields no rows. Every canonical inventory and
+    equipment record is read strictly; a malformed one raises
+    :class:`PartyInventoryViewError` instead of inventing a count or delta.
+    The panel publishes at most ``MAX_ITEM_HOLDINGS_ROWS`` rows, and an
+    over-bound roster fails closed rather than silently dropping members.
+    """
+    from world.rules.status_query import StatusQueryError
+
+    # The same single-owner rule the other viewed-member surfaces apply: the
+    # commander is the viewed member's bound owner, never a caller assertion.
+    commander = _commander_of(giver)
+    if commander is None:
+        raise PartyInventoryViewError(REASON_NOT_PARTY_MEMBER)
+    resolved_key = (
+        item_key
+        if isinstance(item_key, str) and item_key in ITEM_REGISTRY
+        else None
+    )
+    if resolved_key is None:
+        return ItemHoldingsView(giver=giver, item_key=None, rows=())
+    members = [commander, *live_companions(commander)]
+    if len(members) > MAX_ITEM_HOLDINGS_ROWS:
+        raise PartyInventoryViewError("party_too_large")
+    in_combat = in_combat or commander.db.active_combat is not None
+    giver_reason = _scope_reason(
+        commander, giver, PURPOSE_ORGANIZE, anchor=acting
+    )
+    definition = ITEM_REGISTRY[resolved_key]
+    rows: list[ItemHoldingRow] = []
+    for member in members:
+        inventory = _strict_inventory(member)
+        equipment = normalized_equipment(member)
+        if equipment is None:
+            raise PartyInventoryViewError("malformed_equipment")
+        equipped = (
+            resolved_key in _worn_keys(equipment)
+            if definition.equipment_slot is not None
+            else False
+        )
+        delta = None
+        if definition.equipment_slot is not None:
+            try:
+                delta = equipment_delta(member, resolved_key)
+            except StatusQueryError as error:
+                raise PartyInventoryViewError("malformed_traits") from error
+        rows.append(
+            ItemHoldingRow(
+                member_id=int(member.pk),
+                held=Counter(inventory)[resolved_key],
+                equipped=equipped,
+                delta=delta,
+                receive=_receive_descriptor(
+                    acting,
+                    commander,
+                    giver,
+                    member,
+                    resolved_key,
+                    in_combat=in_combat,
+                    giver_reason=giver_reason,
+                ),
+            )
+        )
+    return ItemHoldingsView(giver=giver, item_key=resolved_key, rows=tuple(rows))

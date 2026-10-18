@@ -184,20 +184,51 @@ class PartyViewMemberPayloadTests(unittest.TestCase):
     def test_exact_payload_is_normalized(self):
         self.assertEqual(
             validate_party_view_member_payload(
-                {"member_id": 7, "tab": "member", "skill_key": None}
+                {
+                    "member_id": 7,
+                    "tab": "member",
+                    "skill_key": None,
+                    "item_key": None,
+                }
             ),
-            {"member_id": 7, "tab": "member", "skill_key": None},
+            {
+                "member_id": 7,
+                "tab": "member",
+                "skill_key": None,
+                "item_key": None,
+            },
         )
         self.assertEqual(
             validate_party_view_member_payload(
-                {"member_id": 7, "tab": "skills", "skill_key": "t_ember_burst"}
+                {
+                    "member_id": 7,
+                    "tab": "skills",
+                    "skill_key": "t_ember_burst",
+                    "item_key": _POTION.key,
+                }
             )["skill_key"],
             "t_ember_burst",
+        )
+        self.assertEqual(
+            validate_party_view_member_payload(
+                {
+                    "member_id": 7,
+                    "tab": "bag",
+                    "skill_key": None,
+                    "item_key": _POTION.key,
+                }
+            )["item_key"],
+            _POTION.key,
         )
         for tab in ("member", "bag", "status", "skills", "lineage", "shop"):
             self.assertEqual(
                 validate_party_view_member_payload(
-                    {"member_id": 1, "tab": tab, "skill_key": None}
+                    {
+                        "member_id": 1,
+                        "tab": tab,
+                        "skill_key": None,
+                        "item_key": None,
+                    }
                 )["tab"],
                 tab,
             )
@@ -208,33 +239,48 @@ class PartyViewMemberPayloadTests(unittest.TestCase):
     def test_each_malformed_payload_rejects(self):
         cases = (
             ("not an object", []),
-            ("missing tab", {"member_id": 1, "skill_key": None}),
-            ("missing skill key", {"member_id": 1, "tab": "member"}),
+            ("missing tab", {"member_id": 1, "skill_key": None, "item_key": None}),
+            ("missing skill key", {"member_id": 1, "tab": "member", "item_key": None}),
+            ("missing item key", {"member_id": 1, "tab": "member", "skill_key": None}),
             (
                 "extra key",
-                {"member_id": 1, "tab": "member", "skill_key": None, "x": 1},
+                {
+                    "member_id": 1,
+                    "tab": "member",
+                    "skill_key": None,
+                    "item_key": None,
+                    "x": 1,
+                },
             ),
-            ("unknown tab", {"member_id": 1, "tab": "detail", "skill_key": None}),
-            ("non-string tab", {"member_id": 1, "tab": 3, "skill_key": None}),
-            ("zero member", {"member_id": 0, "tab": "member", "skill_key": None}),
-            ("negative member", {"member_id": -1, "tab": "member", "skill_key": None}),
-            ("bool member", {"member_id": True, "tab": "member", "skill_key": None}),
-            ("string member", {"member_id": "7", "tab": "member", "skill_key": None}),
-            ("float member", {"member_id": 7.0, "tab": "member", "skill_key": None}),
+            ("unknown tab", {"member_id": 1, "tab": "detail", "skill_key": None, "item_key": None}),
+            ("non-string tab", {"member_id": 1, "tab": 3, "skill_key": None, "item_key": None}),
+            ("zero member", {"member_id": 0, "tab": "member", "skill_key": None, "item_key": None}),
+            ("negative member", {"member_id": -1, "tab": "member", "skill_key": None, "item_key": None}),
+            ("bool member", {"member_id": True, "tab": "member", "skill_key": None, "item_key": None}),
+            ("string member", {"member_id": "7", "tab": "member", "skill_key": None, "item_key": None}),
+            ("float member", {"member_id": 7.0, "tab": "member", "skill_key": None, "item_key": None}),
             (
                 "over safe integer",
                 {
                     "member_id": MAX_SAFE_INTEGER + 1,
                     "tab": "member",
                     "skill_key": None,
+                    "item_key": None,
                 },
             ),
-            ("non-string skill", {"member_id": 1, "tab": "skills", "skill_key": 3}),
-            ("blank skill", {"member_id": 1, "tab": "skills", "skill_key": "  "}),
-            ("empty skill", {"member_id": 1, "tab": "skills", "skill_key": ""}),
+            ("non-string skill", {"member_id": 1, "tab": "skills", "skill_key": 3, "item_key": None}),
+            ("blank skill", {"member_id": 1, "tab": "skills", "skill_key": "  ", "item_key": None}),
+            ("empty skill", {"member_id": 1, "tab": "skills", "skill_key": "", "item_key": None}),
             (
                 "over-bound skill",
-                {"member_id": 1, "tab": "skills", "skill_key": "k" * 65},
+                {"member_id": 1, "tab": "skills", "skill_key": "k" * 65, "item_key": None},
+            ),
+            ("non-string item", {"member_id": 1, "tab": "bag", "skill_key": None, "item_key": 3}),
+            ("blank item", {"member_id": 1, "tab": "bag", "skill_key": None, "item_key": "  "}),
+            ("empty item", {"member_id": 1, "tab": "bag", "skill_key": None, "item_key": ""}),
+            (
+                "over-bound item",
+                {"member_id": 1, "tab": "bag", "skill_key": None, "item_key": "k" * 65},
             ),
         )
         for label, payload in cases:
@@ -248,7 +294,13 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
 
     def setUp(self):
         super().setUp()
-        scope = synthetic_registries("races", "static_tiers", "subraces", "items")
+        scope = synthetic_registries(
+            "races",
+            "static_tiers",
+            "subraces",
+            "items",
+            extra={"items": {_POTION.key: _POTION}},
+        )
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
         self.room = create_object(Room, key="隊伍房間")
@@ -273,10 +325,15 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         join_party(npc, self.commander)
         return npc
 
-    def _select(self, member_id, tab="member", skill_key=None):
+    def _select(self, member_id, tab="member", skill_key=None, item_key=None):
         return _party_view_member_adapter(
             self.commander,
-            {"member_id": member_id, "tab": tab, "skill_key": skill_key},
+            {
+                "member_id": member_id,
+                "tab": tab,
+                "skill_key": skill_key,
+                "item_key": item_key,
+            },
             self.session,
         )
 
@@ -287,6 +344,9 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
 
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
     )
     def test_success_records_the_selection_and_republishes_party(self):
         self.assertEqual(
@@ -300,15 +360,42 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                     "party_member",
                     "character",
                     "party_inventory",
+                    "item_holdings",
                 ),
             },
         )
         self.assertEqual(
             self._selection(),
             PartyViewSelection(
-                int(self.commander.pk), int(self.aila.pk), "member", None
+                int(self.commander.pk), int(self.aila.pk), "member", None, None
             ),
         )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    @covers_requirement(
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection"
+    )
+    def test_the_selected_item_is_stored_and_an_unknown_key_clears_it(self):
+        self._select(self.aila.pk, "bag", item_key=_POTION.key)
+        self.assertEqual(self._selection().item_key, _POTION.key)
+        self.assertEqual(
+            self._selection(),
+            PartyViewSelection(
+                int(self.commander.pk),
+                int(self.aila.pk),
+                "bag",
+                None,
+                _POTION.key,
+            ),
+        )
+        # A later selection without an item clears it.
+        self._select(self.aila.pk, "bag")
+        self.assertIsNone(self._selection().item_key)
+        # An unknown registry key stores null rather than an invented selection.
+        self._select(self.aila.pk, "bag", item_key="t_unregistered_item")
+        self.assertIsNone(self._selection().item_key)
 
     @covers_requirement(
         "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
@@ -396,5 +483,33 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
         self.assertIs(spec.adapter, _party_view_member_adapter)
         self.assertEqual(
             spec.affected_panels,
-            ("party", "party_member", "character", "party_inventory"),
+            (
+                "party",
+                "party_member",
+                "character",
+                "party_inventory",
+                "item_holdings",
+            ),
         )
+
+    @covers_requirement(
+        "webclient-party-panel::party-view-member-selects-the-viewed-member-for-the-session"
+    )
+    def test_every_holding_mutation_republishes_the_holdings_panel(self):
+        # Selection and every partial-publication mutation that can change a
+        # member's held count or the combat transfer bar names the panel;
+        # transfers, item use and equipment toggles publish full snapshots.
+        registry = build_production_action_registry()
+        for action_id in (
+            "party.view_member",
+            "shop.buy",
+            "shop.sell",
+            "guild.quest_turnin",
+            "guild.exam_request",
+            "explore.engage",
+        ):
+            with self.subTest(action=action_id):
+                self.assertIn(
+                    "item_holdings",
+                    registry.spec(action_id).affected_panels,
+                )

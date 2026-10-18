@@ -313,7 +313,13 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_turnin",
             validate_payload=validate_quest_turnin_payload,
             adapter=_quest_turnin_adapter,
-            affected_panels=("status", "services", "objectives", "quest_log"),
+            affected_panels=(
+                "status",
+                "services",
+                "objectives",
+                "quest_log",
+                "item_holdings",
+            ),
         )
     )
     registry.register(
@@ -329,7 +335,12 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.exam_request",
             validate_payload=validate_exam_request_payload,
             adapter=_exam_request_adapter,
-            affected_panels=("status", "services", "context_actions"),
+            affected_panels=(
+                "status",
+                "services",
+                "context_actions",
+                "item_holdings",
+            ),
         )
     )
     registry.register(
@@ -337,7 +348,13 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="shop.buy",
             validate_payload=validate_buy_payload,
             adapter=_buy_adapter,
-            affected_panels=("status", "services", "objectives", "quest_log"),
+            affected_panels=(
+                "status",
+                "services",
+                "objectives",
+                "quest_log",
+                "item_holdings",
+            ),
         )
     )
     registry.register(
@@ -345,7 +362,13 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="shop.sell",
             validate_payload=validate_sell_payload,
             adapter=_sell_adapter,
-            affected_panels=("status", "services", "objectives", "quest_log"),
+            affected_panels=(
+                "status",
+                "services",
+                "objectives",
+                "quest_log",
+                "item_holdings",
+            ),
         )
     )
     registry.register(
@@ -525,6 +548,7 @@ def build_production_action_registry() -> ActionRegistry:
                 "party_member",
                 "character",
                 "party_inventory",
+                "item_holdings",
             ),
         )
     )

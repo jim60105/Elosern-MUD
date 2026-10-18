@@ -191,6 +191,7 @@
       "name": "rules-c",
       "labels": [
         "world.rules.tests.test_cross_lineage_unlock",
+        "world.rules.tests.test_item_holdings",
         "world.rules.tests.test_npc_persona",
         "world.rules.tests.test_npc_roster_validation",
         "world.rules.tests.test_overwhelm_threshold",
@@ -341,6 +342,7 @@
         "web.webclient.presentation.tests.test_creation_panel",
         "web.webclient.presentation.tests.test_dialogue_panel",
         "web.webclient.presentation.tests.test_lineage_panel",
+        "web.webclient.presentation.tests.test_item_holdings_panel",
         "web.webclient.presentation.tests.test_lore_codex_panel",
         "web.webclient.presentation.tests.test_lore_codex_registry_contract",
         "web.webclient.presentation.tests.test_local_map",

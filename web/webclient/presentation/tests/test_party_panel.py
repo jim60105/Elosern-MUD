@@ -1626,6 +1626,7 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
                 "member_id": int(companion.pk),
                 "tab": "skills",
                 "skill_key": None,
+                "item_key": None,
             },
         }
 

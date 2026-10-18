@@ -81,12 +81,22 @@ MIN_QUANTITY = 1
 AFFECTED_REGISTER = ("status", "services")
 AFFECTED_ACCEPT = ("services", "objectives", "quest_log")
 AFFECTED_ABANDON = ("services", "objectives", "quest_log")
-AFFECTED_TURNIN = ("status", "services", "objectives", "quest_log")
-AFFECTED_EXAM = ("status", "services", "context_actions")
+# A turn-in can add reward items to a member's canonical bag, and an admitted
+# examination enters combat, so both republish the selected item's holdings.
+AFFECTED_TURNIN = (
+    "status",
+    "services",
+    "objectives",
+    "quest_log",
+    "item_holdings",
+)
+AFFECTED_EXAM = ("status", "services", "context_actions", "item_holdings")
 # Planned attendance writes nothing; republishing the unchanged services
 # panel settles the request without a full snapshot.
 AFFECTED_EXAM_SCHEDULE = ("services",)
-AFFECTED_TRADE = ("status", "services", "objectives", "quest_log")
+# A trade rewrites a member's canonical bag, so the selected item's holdings
+# query must be republished beside the shop rows.
+AFFECTED_TRADE = ("status", "services", "objectives", "quest_log", "item_holdings")
 AFFECTED_TRACK = ("services", "objectives", "quest_log")
 
 

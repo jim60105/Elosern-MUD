@@ -207,6 +207,8 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.dispatchAction("party.view_member", {
           member_id: 101,
           tab: "member",
+          skill_key: null,
+          item_key: null,
         });
       },
     },
