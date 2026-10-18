@@ -196,6 +196,35 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     })),
     {
+      // The two party actions have no client producer yet (the member rail and
+      // inventory panel land later in the batch), so both are declared silent;
+      // party.view_member is a pure presentation selection.
+      id: "EXPECTED SILENCE: party.view_member member-rail selection",
+      ids: ["party.view_member"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("party.view_member", {
+          member_id: 101,
+          tab: "member",
+        });
+      },
+    },
+    {
+      id: "EXPECTED SILENCE: party.transfer item hand-over",
+      ids: ["party.transfer"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("party.transfer", {
+          giver_id: 42,
+          receiver_id: 101,
+          item_key: SYNTH_ITEM.id,
+          quantity: 1,
+        });
+      },
+    },
+    {
       id: "backpack row: confirmed item use",
       ids: ["inventory.use"],
       prepare() {

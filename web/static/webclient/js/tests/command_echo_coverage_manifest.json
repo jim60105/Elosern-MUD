@@ -59,6 +59,8 @@
     "npc.persona.read",
     "npc.persona.update",
     "options.dismiss",
+    "party.transfer",
+    "party.view_member",
     "shop.buy",
     "shop.sell",
     "title.accept",
@@ -89,6 +91,8 @@
     "gallery.official.geometry.clear",
     "npc.persona.read",
     "npc.persona.update",
-    "options.dismiss"
+    "options.dismiss",
+    "party.transfer",
+    "party.view_member"
   ]
 }

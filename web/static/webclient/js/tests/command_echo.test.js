@@ -693,6 +693,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "inventory.toggle_equip": { payload: { item_key: "leather_vest", actor_id: 7 }, display: {} },
   "inventory.use": { payload: { item_key: SYNTH_ITEM.id }, display: {} },
   "options.dismiss": null,
+  "party.transfer": null,
+  "party.view_member": null,
   "gallery.subject.select": null,
   "gallery.generate": null,
   "gallery.default.set": null,
