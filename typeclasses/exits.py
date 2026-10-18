@@ -40,8 +40,11 @@ def after_successful_movement(
     """Complete a successful traversal through the shared movement boundary.
 
     Runs the success-path sequence every exit lineage shares: charge the
-    ``cost_key`` clock cost, record the
-    destination map-knowledge node, and move co-located companions.
+    ``cost_key`` clock cost for the traverser and its travelling party,
+    record the destination map-knowledge node, and move co-located
+    companions. The charge receives the pre-move ``source_location`` (and the
+    wilderness source coordinates) so it settles exactly the members
+    ``follow_companions`` will move (party-rest-move-settlement).
     ``charge_movement``, ``record_arrival``, and ``follow_companions`` are
     internally no-ops for anything that is not a ``PlayerCharacter``;
     ``charge_movement`` can raise when ``WorldClock.advance`` fails — the
@@ -65,7 +68,12 @@ def after_successful_movement(
     from world.rules.movement import charge_movement
     from world.rules.party import follow_companions
 
-    charge_movement(traversing_object, cost_key)
+    charge_movement(
+        traversing_object,
+        cost_key,
+        source_location=source_location,
+        wilderness_source_coordinates=wilderness_source_coordinates,
+    )
     record_arrival(traversing_object)
     follow_companions(
         traversing_object,
