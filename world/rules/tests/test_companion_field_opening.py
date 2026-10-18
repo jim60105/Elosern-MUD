@@ -21,6 +21,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from commands.combat import CmdCombatCommand
+from commands.action import CmdCast
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.action import RejectReason
@@ -483,3 +484,51 @@ class PossessedOpeningCommandTests(_CompanionOpeningCase):
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 1)
         self.assertEqual(self.aila.traits.mp.current, 20 - _SPELL_COST_MP)
+
+    def test_an_ordinary_possessed_cast_stays_the_puppet_s_own_entry(self):
+        enter_possession(self.commander, self.aila)
+        battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
+        with battlefield_roll, damage_roll, rounds_roll:
+            initiate_field_combat(self.aila, _CAST, self.wolf)
+        command = CmdCast()
+        command.caller = self.aila
+        command.args = f"{BASIC_ATTACK_KEY}=e1"
+        battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
+        with battlefield_roll, damage_roll, rounds_roll:
+            command.func()
+        record = read_session(self.commander)
+        # The puppet replaces its own entry; the commander never selects.
+        self.assertEqual(
+            record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"],
+            BASIC_ATTACK_KEY,
+        )
+        self.assertNotIn(int(self.commander.pk), record.draft_entries)
+
+    def test_the_possessed_puppet_keeps_its_member_selection(self):
+        from types import SimpleNamespace
+
+        from web.webclient.presentation.party_actor_selection import (
+            PartyActorSelection,
+            party_actor_selection_snapshot,
+        )
+
+        enter_possession(self.commander, self.aila)
+        battlefield_roll, damage_roll, rounds_roll = self._durable_rolls()
+        with battlefield_roll, damage_roll, rounds_roll:
+            initiate_field_combat(self.aila, _CAST, self.wolf)
+        record = read_session(self.commander)
+        # The puppet owns the presentation selection; the combat session it is
+        # validated against belongs to the commander it operates.
+        self.session.ndb.elosern_coordinator = SimpleNamespace(epoch="epoch-1")
+        self.session.ndb.party_actor_selection = PartyActorSelection(
+            int(self.aila.pk),
+            "epoch-1",
+            record.session_id,
+            record.round_revision,
+            int(self.kahn.pk),
+        )
+        self.assertEqual(
+            party_actor_selection_snapshot(self.session, self.aila),
+            int(self.kahn.pk),
+        )
+        self.assertIsNone(party_actor_selection_snapshot(self.session, self.commander))

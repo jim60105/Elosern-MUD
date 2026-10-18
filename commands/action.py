@@ -172,6 +172,10 @@ class CmdCast(Command):
                 skill_key,
                 targets,
                 scale=scale,
+                # The caller is the caster: a possessed puppet acts for itself
+                # inside its commander's encounter, exactly as the commander
+                # acts for itself.
+                commanded_actor=self.caller,
             )
         except CombatSessionError as error:
             reason = error.args[0]
