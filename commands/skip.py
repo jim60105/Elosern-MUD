@@ -115,9 +115,21 @@ class CmdRest(Command):
         # the present members' standing bookings. The clock's
         # practice_settlement stage remains the sole consumer/writer.
         entities = present_party_scope(self.caller)
+        previous_booking = None
         if skill_key is not None:
+            previous_booking = self.caller.db.practice_booking
             self.caller.db.practice_booking = skill_key
-        events = get_world_clock().advance(seconds, AdvanceSource.SKIP, entities)
+        try:
+            events = get_world_clock().advance(
+                seconds, AdvanceSource.SKIP, entities
+            )
+        except Exception:
+            # The clock's rollback restores its entry snapshot, which already
+            # contains this declaration; restoring the caller's previous
+            # booking keeps a failed clause from replacing a standing one.
+            if skill_key is not None:
+                self.caller.db.practice_booking = previous_booking
+            raise
         self.caller.msg(_render_skip_summary(seconds, events))
         _maybe_nominate_after_rest(self.caller, events)
 

@@ -262,6 +262,35 @@ class StandingPracticeBookingTests(EvenniaTest):
     @covers_requirement(
         "party-time-settlement::each-member-owns-one-standing-practice-booking"
     )
+    def test_a_failed_rest_clause_keeps_the_previous_booking(self):
+        _own(self.player, _SLASH, _HEAL)
+        self.player.db.skill_proficiency = {_SLASH: 20.0, _HEAL: 20.0}
+        self.player.db.practice_booking = _SLASH
+        before = get_world_clock().tick
+
+        command = CmdRest()
+        command.caller = self.player
+        command.args = f"3h practice {_HEAL}"
+        with (
+            patch(
+                "world.rules.clock._settle_boundary_stages",
+                side_effect=RuntimeError("settlement failed"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            command.func()
+
+        # The failed advance half-applied nothing: the standing booking is the
+        # one that stood before the command, not the clause it carried.
+        self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(self.player.db.practice_booking, _SLASH)
+        self.assertEqual(self.player.db.skill_proficiency[_SLASH], 20.0)
+        self.assertEqual(self.player.db.skill_proficiency[_HEAL], 20.0)
+
+    @synthetic_registries("skills")
+    @covers_requirement(
+        "party-time-settlement::each-member-owns-one-standing-practice-booking"
+    )
     def test_booking_in_combat_is_refused(self):
         _own(self.ella, _HEAL)
         self.ella.db.practice_booking = _SLASH
@@ -346,7 +375,8 @@ class StandingPracticeBookingTests(EvenniaTest):
     )
     def test_text_booking_rejections_use_the_shared_messages(self):
         self.player.msg = Mock()
-        _own(self.ella, _HEAL)
+        _own(self.ella, _SLASH, _HEAL)
+        self.ella.db.practice_booking = _SLASH
 
         unknown_member = CmdPractice()
         unknown_member.caller = self.player
@@ -363,7 +393,8 @@ class StandingPracticeBookingTests(EvenniaTest):
         self.assertIn(
             "PRACTICE_SKILL_UNKNOWN", self.player.msg.call_args_list[-1].args[0]
         )
-        self.assertIsNone(self.ella.db.practice_booking)
+        # The rejected command leaves the member's standing booking standing.
+        self.assertEqual(self.ella.db.practice_booking, _SLASH)
 
         usage = CmdPractice()
         usage.caller = self.player
