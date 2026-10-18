@@ -37,10 +37,11 @@ const props = defineProps({
   // the confirmation. Inspection and equipment toggles are unaffected.
   combat: { type: Boolean, required: false, default: false },
   // The controlled figure's identity (the committed `status` panel's actor
-  // identity as a number), which the bag drawer's rows belong to. An
-  // equipment toggle names that member explicitly (party-member-equipment);
-  // absent (`null`) it stays unavailable rather than guessing an actor, so no
-  // request is ever sent with an invented or null member reference.
+  // identity as a number), which the bag drawer's rows belong to. Both the
+  // item use and the equipment toggle name that member explicitly
+  // (party-member-equipment, companion-field-item-use); absent (`null`) they
+  // stay unavailable rather than guessing an actor, so no request is ever
+  // sent with an invented or null member reference.
   actorId: { type: Number, required: false, default: null },
 });
 
@@ -48,10 +49,11 @@ const props = defineProps({
 // single store dispatch path — the panel itself never touches the transport.
 const emit = defineEmits(["use", "toggle-equip"]);
 
-// The equipment toggle names the controlled figure explicitly, so it needs
-// that identity: the services panel can be available while the status panel
-// is not, and the exact payload schema rejects a missing member reference.
-// Inspection and item use stay available; only the toggle fails closed.
+// The item use and the equipment toggle name the controlled figure
+// explicitly, so both need that identity: the services panel can be available
+// while the status panel is not, and the exact payload schema rejects a
+// missing member reference. Inspection stays available; the two mutating
+// actions fail closed.
 const actorReady = computed(
   () => Number.isSafeInteger(props.actorId) && props.actorId > 0,
 );
@@ -233,10 +235,13 @@ function onTileActivate(event) {
       payload: { item_key: row.item_key, actor_id: props.actorId },
     });
   } else if (action.action_id === "inventory.use") {
+    if (!actorReady.value) {
+      return;
+    }
     if (props.combat) {
       emit("use", {
         action_id: "inventory.use",
-        payload: { item_key: row.item_key },
+        payload: { item_key: row.item_key, actor_id: props.actorId },
       });
       return;
     }
@@ -270,7 +275,7 @@ function onConfirmUse() {
   }
   emit("use", {
     action_id: "inventory.use",
-    payload: { item_key: confirming.value.itemKey },
+    payload: { item_key: confirming.value.itemKey, actor_id: props.actorId },
   });
   closeConfirmation();
 }

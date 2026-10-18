@@ -124,12 +124,13 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return `錢袋 ${formatCopper(wallet)} 銅`;
   });
 
-  // The inventory drawer's equipment-toggle member (party-member-equipment):
-  // the controlled figure's identity from the committed `status` panel, which
-  // serializes it as a string, converted to the positive safe integer the
-  // exact payload requires. Null when that panel is missing or unavailable —
-  // the toggle then stays unavailable instead of naming an invented member,
-  // and no other identity (the commander included) is ever substituted.
+  // The inventory drawer's member reference (party-member-equipment,
+  // companion-field-item-use): the controlled figure's identity from the
+  // committed `status` panel, which serializes it as a string, converted to
+  // the positive safe integer the exact payloads require. Null when that
+  // panel is missing or unavailable — the item use and the equipment toggle
+  // then stay unavailable instead of naming an invented member, and no other
+  // identity (the commander included) is ever substituted.
   const inventoryActorId = computed(() => {
     if (!panelAvailable("status")) {
       return null;

@@ -47,6 +47,7 @@ from world.rules.combat_beats import RoundRecord
 from world.rules.combat_session import engage, read_session
 from world.rules.party import join_party
 from world.rules.party_scope import (
+    REASON_MEMBER_CANNOT_ACT,
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
 )
@@ -121,10 +122,15 @@ class InventoryActionBase(EvenniaTestCase):
 
 
 class InventoryPayloadValidatorTests(InventoryActionBase):
-    def test_use_accepts_one_item_key(self):
+    def test_use_accepts_exactly_the_member_and_item_key(self):
+        # companion-field-item-use: the use names the member whose own bag is
+        # consumed. The identity is reauthorized by the rules in the adapter;
+        # the payload itself carries no other field.
         self.assertEqual(
-            validate_inventory_use_payload({"item_key": _T_POTION.key}),
-            {"item_key": _T_POTION.key},
+            validate_inventory_use_payload(
+                {"actor_id": 7, "item_key": _T_POTION.key}
+            ),
+            {"actor_id": 7, "item_key": _T_POTION.key},
         )
 
     @covers_requirement(
@@ -152,7 +158,9 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
         for key in ("t_ember spray", "t_ember\tspray", " t_ember_spray", "t_ember_spray "):
             with self.subTest(key=key):
                 with self.assertRaises(ServiceActionError):
-                    validate_inventory_use_payload({"item_key": key})
+                    validate_inventory_use_payload(
+                        {"actor_id": 7, "item_key": key}
+                    )
                 # Every toggle case carries a valid member id, so only the key
                 # rule can be the rejection under test.
                 with self.assertRaises(ServiceActionError):
@@ -166,13 +174,16 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
     def test_authority_like_fields_are_rejected(self):
         use_cases = (
             {},
-            {"item_key": ""},
-            {"item_key": "x" * 65},
-            {"item_key": _T_UNUSABLE.key, "quantity": 1},
-            {"item_key": _T_UNUSABLE.key, "slot": "weapon_main"},
-            {"item_key": _T_UNUSABLE.key, "effect_key": "self_heal"},
-            {"item_key": _T_UNUSABLE.key, "actor": 7},
-            {"item_key": _T_UNUSABLE.key, "consumable": True},
+            {"item_key": _T_UNUSABLE.key},
+            {"actor_id": 7},
+            {"actor_id": 7, "item_key": ""},
+            {"actor_id": 7, "item_key": "x" * 65},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "quantity": 1},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "slot": "weapon_main"},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "effect_key": "self_heal"},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "actor": 7},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "member_id": 8},
+            {"actor_id": 7, "item_key": _T_UNUSABLE.key, "consumable": True},
             _T_POTION.key,
         )
         for payload in use_cases:
@@ -218,23 +229,42 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
     @covers_requirement(
         "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
     )
+    def test_use_actor_id_is_one_positive_safe_integer(self):
+        # The same identity rule governs the use: a bool, string, float, zero,
+        # negative, or out-of-range member never reaches the party boundary,
+        # and an omitted member is rejected rather than defaulted.
+        for actor_id in (None, True, False, "7", 7.0, 0, -1, 2**53):
+            with self.subTest(actor_id=actor_id):
+                with self.assertRaises(ServiceActionError):
+                    validate_inventory_use_payload(
+                        {"actor_id": actor_id, "item_key": _T_POTION.key}
+                    )
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
     def test_use_accepts_one_optional_bounded_target_key(self):
         # add-item-effect-targeting: the use payload accepts exactly
-        # {item_key} or {item_key, target_key} with the same bounded,
-        # whitespace-free key rules; toggle_equip never gains a target.
+        # {actor_id, item_key} or {actor_id, item_key, target_key} with the
+        # same bounded, whitespace-free key rules; toggle_equip never gains a
+        # target.
         self.assertEqual(
             validate_inventory_use_payload(
-                {"item_key": _T_POTION.key, "target_key": "t_somebody"}
+                {
+                    "actor_id": 7,
+                    "item_key": _T_POTION.key,
+                    "target_key": "t_somebody",
+                }
             ),
-            {"item_key": _T_POTION.key, "target_key": "t_somebody"},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": "t_somebody"},
         )
         for payload in (
-            {"item_key": _T_POTION.key, "target_key": ""},
-            {"item_key": _T_POTION.key, "target_key": "t some body"},
-            {"item_key": _T_POTION.key, "target_key": "x" * 65},
-            {"item_key": _T_POTION.key, "target_key": 7},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": ""},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": "t some body"},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": "x" * 65},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": 7},
             {"target_key": "t_somebody"},
-            {"item_key": _T_POTION.key, "target_key": "ok", "quantity": 1},
+            {"actor_id": 7, "item_key": _T_POTION.key, "target_key": "ok", "quantity": 1},
         ):
             with self.subTest(payload=payload):
                 with self.assertRaises(ServiceActionError):
@@ -254,7 +284,10 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.player.db.inventory = [_T_POTION.key, _T_POTION.key]
         clock = get_world_clock()
         tick_before = clock.tick
-        result = _inventory_use_adapter(self.player, {"item_key": _T_POTION.key})
+        result = _inventory_use_adapter(
+            self.player,
+            {"actor_id": self.player.pk, "item_key": _T_POTION.key},
+        )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "item_used")
         self.assertEqual(result["affected_panels"], ())
@@ -269,11 +302,11 @@ class InventoryUseAdapterTests(InventoryActionBase):
     def test_domain_rejections_are_stable_and_unmutating(self):
         self.player.db.inventory = [_T_POTION.key, _T_UNUSABLE.key]
         cases = (
-            ({"item_key": _T_POTION.key}, "hp_full"),
-            ({"item_key": "mystery_key"}, "unknown_item"),
-            ({"item_key": _T_BLADE.key}, "not_usable"),
-            ({"item_key": _T_UNUSABLE.key}, "not_usable"),
-            ({"item_key": _T_POTION.key}, "hp_full"),
+            ({"actor_id": self.player.pk, "item_key": _T_POTION.key}, "hp_full"),
+            ({"actor_id": self.player.pk, "item_key": "mystery_key"}, "unknown_item"),
+            ({"actor_id": self.player.pk, "item_key": _T_BLADE.key}, "not_usable"),
+            ({"actor_id": self.player.pk, "item_key": _T_UNUSABLE.key}, "not_usable"),
+            ({"actor_id": self.player.pk, "item_key": _T_POTION.key}, "hp_full"),
         )
         before = {
             "inventory": list(self.player.db.inventory),
@@ -307,9 +340,17 @@ class InventoryUseAdapterTests(InventoryActionBase):
         engage(self.player, self._monster())
         record = read_session(self.player)
         for payload in (
-            {"item_key": _T_POTION.key},
-            {"item_key": _T_POTION.key, "target_key": "no_such_ally"},
-            {"item_key": _T_POTION.key, "target_key": "all-allies"},
+            {"actor_id": self.player.pk, "item_key": _T_POTION.key},
+            {
+                "actor_id": self.player.pk,
+                "item_key": _T_POTION.key,
+                "target_key": "no_such_ally",
+            },
+            {
+                "actor_id": self.player.pk,
+                "item_key": _T_POTION.key,
+                "target_key": "all-allies",
+            },
         ):
             with self.subTest(payload=payload):
                 result = _inventory_use_adapter(self.player, payload)
@@ -355,7 +396,12 @@ class InventoryUseTargetingTests(InventoryActionBase):
         self.player.traits.hp.current = int(self.player.traits.hp.max)
         self.player.db.inventory = [_T_POTION.key, _T_POTION.key]
         result = _inventory_use_adapter(
-            self.player, {"item_key": _T_POTION.key, "target_key": self.ally.key}
+            self.player,
+            {
+                "actor_id": self.player.pk,
+                "item_key": _T_POTION.key,
+                "target_key": self.ally.key,
+            },
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(int(self.ally.traits.hp.current), ally_max)
@@ -374,7 +420,12 @@ class InventoryUseTargetingTests(InventoryActionBase):
         self.ally.traits.hp.current = ally_max - 30
         self.player.db.inventory = [_T_POTION.key]
         result = _inventory_use_adapter(
-            self.player, {"item_key": _T_POTION.key, "target_key": self.ally.key}
+            self.player,
+            {
+                "actor_id": self.player.pk,
+                "item_key": _T_POTION.key,
+                "target_key": self.ally.key,
+            },
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(int(self.player.traits.hp.current), int(self.player.traits.hp.max))
@@ -394,7 +445,12 @@ class InventoryUseTargetingTests(InventoryActionBase):
         for token in ("all", "all-allies", "all-enemies"):
             with self.subTest(token=token):
                 result = _inventory_use_adapter(
-                    self.player, {"item_key": _T_POTION.key, "target_key": token}
+                    self.player,
+                    {
+                        "actor_id": self.player.pk,
+                        "item_key": _T_POTION.key,
+                        "target_key": token,
+                    },
                 )
                 self.assertEqual(result["outcome"], "rejected")
                 self.assertEqual(result["code"], "target_invalid")
@@ -412,11 +468,138 @@ class InventoryUseTargetingTests(InventoryActionBase):
         self.player.location = elsewhere
         result = _inventory_use_adapter(
             self.player,
-            {"item_key": _T_POTION.key, "target_key": self.ally.key},
+            {
+                "actor_id": self.player.pk,
+                "item_key": _T_POTION.key,
+                "target_key": self.ally.key,
+            },
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "combat_item_command_required")
         self.assertEqual(list_items(self.player), [_T_POTION.key])
+
+
+class InventoryMemberUseAdapterTests(InventoryActionBase):
+    """inventory.use names the member whose own bag is used (delta scenarios)."""
+
+    def _companion_holding(self, key="艾拉") -> NPC:
+        companion = self._companion(key)
+        companion.db.inventory = [_T_POTION.key]
+        maximum = int(companion.traits.hp.max)
+        companion.traits.hp.current = maximum - 30
+        return companion
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions",
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+    )
+    def test_a_companion_uses_her_own_potion_and_the_commander_holds_none(self):
+        # Delta: "A companion uses her own potion" — the named member's bag is
+        # consumed and her gauge rises; the same payload naming the commander
+        # is rejected because the commander holds none.
+        companion = self._companion_holding()
+        maximum = int(companion.traits.hp.max)
+        self.player.db.inventory = []
+        result = _inventory_use_adapter(
+            self.player,
+            {"actor_id": companion.pk, "item_key": _T_POTION.key},
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], "item_used")
+        self.assertEqual(int(companion.traits.hp.current), maximum)
+        self.assertEqual(list_items(companion), [])
+        self.assertEqual(list_items(self.player), [])
+        rejected = _inventory_use_adapter(
+            self.player,
+            {"actor_id": self.player.pk, "item_key": _T_POTION.key},
+        )
+        self.assertEqual(rejected["outcome"], "rejected")
+        self.assertEqual(rejected["code"], "item_not_held")
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_a_knocked_out_member_is_refused_without_consuming(self):
+        companion = self._companion_holding()
+        companion.traits.hp.current = 1
+        result = _inventory_use_adapter(
+            self.player,
+            {"actor_id": companion.pk, "item_key": _T_POTION.key},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], REASON_MEMBER_CANNOT_ACT)
+        self.assertEqual(list_items(companion), [_T_POTION.key])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_an_absent_or_forged_member_is_refused_without_consuming(self):
+        companion = self._companion_holding()
+        outsider = create_object(NPC, key="路人", location=self.room)
+        outsider.race = "human"
+        outsider.apply_race_baseline()
+        outsider.db.inventory = [_T_POTION.key]
+        self.player.db.inventory = [_T_POTION.key]
+        companion.location = create_object(Room, key="t_use_elsewhere")
+        cases = (
+            (outsider, REASON_NOT_PARTY_MEMBER),
+            (companion, REASON_MEMBER_NOT_PRESENT),
+        )
+        for member, code in cases:
+            with self.subTest(code=code):
+                result = _inventory_use_adapter(
+                    self.player,
+                    {"actor_id": member.pk, "item_key": _T_POTION.key},
+                )
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], code)
+        self.assertEqual(list_items(companion), [_T_POTION.key])
+        self.assertEqual(list_items(outsider), [_T_POTION.key])
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_target_key_resolves_against_the_member_room(self):
+        # The member is co-located with the commander by the party boundary, so
+        # the adapter's target view is the member's own room: the single-scope
+        # effect reaches the ally named there, and the member's bag pays.
+        live_item_effect_profiles()[_T_POTION.key] = ItemEffectProfile(
+            effects=(
+                GaugeAdjustEffect(
+                    stat=ItemStat.HP, amount=40, scope=ItemTargetScope.SINGLE
+                ),
+            )
+        )
+        companion = self._companion_holding()
+        companion.traits.hp.current = int(companion.traits.hp.max)
+        ally_max = int(self.player.traits.hp.max)
+        self.player.traits.hp.current = ally_max - 30
+        result = _inventory_use_adapter(
+            self.player,
+            {
+                "actor_id": companion.pk,
+                "item_key": _T_POTION.key,
+                "target_key": self.player.key,
+            },
+        )
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(int(self.player.traits.hp.current), ally_max)
+        self.assertEqual(list_items(companion), [])
+
+    @covers_requirement(
+        "inventory-item-actions::inventory-mutations-use-exact-allowlisted-ui-actions"
+    )
+    def test_in_session_member_use_is_rejected_before_resolution(self):
+        companion = self._companion_holding()
+        engage(self.player, self._monster())
+        result = _inventory_use_adapter(
+            self.player,
+            {"actor_id": companion.pk, "item_key": _T_POTION.key},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "combat_item_command_required")
+        self.assertEqual(list_items(companion), [_T_POTION.key])
 
 
 class InventoryToggleAdapterTests(InventoryActionBase):
@@ -580,7 +763,9 @@ class InventoryDispatchTests(InventoryActionBase):
         self.player.db.inventory = [_T_POTION.key]
         coordinator = self._coordinator()
         envelope = self._envelope(
-            coordinator, "inventory.use", {"item_key": _T_POTION.key},
+            coordinator,
+            "inventory.use",
+            {"actor_id": self.player.pk, "item_key": _T_POTION.key},
             request_id="dup-item",
         )
         for _ in range(2):
@@ -608,7 +793,9 @@ class InventoryDispatchTests(InventoryActionBase):
             self.session,
             self.player,
             self._envelope(
-                coordinator, "inventory.use", {"item_key": _T_POTION.key},
+                coordinator,
+                "inventory.use",
+                {"actor_id": self.player.pk, "item_key": _T_POTION.key},
                 request_id="fresh",
             ),
             self.action_registry,
@@ -620,7 +807,9 @@ class InventoryDispatchTests(InventoryActionBase):
             self.session,
             self.player,
             self._envelope(
-                coordinator, "inventory.use", {"item_key": _T_POTION.key},
+                coordinator,
+                "inventory.use",
+                {"actor_id": self.player.pk, "item_key": _T_POTION.key},
                 request_id="stale",
                 base_revision=coordinator.revision - 1,
             ),
@@ -644,7 +833,11 @@ class InventoryDispatchTests(InventoryActionBase):
             self._envelope(
                 coordinator,
                 "inventory.use",
-                {"item_key": _T_POTION.key, "quantity": 5},
+                {
+                    "actor_id": self.player.pk,
+                    "item_key": _T_POTION.key,
+                    "quantity": 5,
+                },
             ),
             self.action_registry,
             self.registry,

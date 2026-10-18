@@ -202,7 +202,12 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         // The drawer row intent path (AppClient.onInventoryItemAction forwards
         // the panel's {action_id, payload}; the catalog resolves the key).
-        store.dispatchAction("inventory.use", { item_key: SYNTH_ITEM.id });
+        // The use names the controlled figure (companion-field-item-use); the
+        // echoed line still replays the typed `use <item_key>`.
+        store.dispatchAction("inventory.use", {
+          item_key: SYNTH_ITEM.id,
+          actor_id: 42,
+        });
       },
       expected: "use " + SYNTH_ITEM.id,
     },
