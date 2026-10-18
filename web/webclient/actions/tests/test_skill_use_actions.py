@@ -693,6 +693,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertNotIn("t_moss_veil", entity_active_buffs(self.player))
         self.assertEqual(self.player.traits.mp.value, commander_mp)
 
+    @covers_requirement("webclient-skillbook-casting::a-companion-s-monster-opening-uses-the-same-caster-bound-confirmation")
     def test_a_companion_opening_opens_the_commanders_encounter(self):
         companion = self._companion("艾拉")
         grant_lineage(companion, [_T_DAMAGE])
@@ -731,6 +732,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(self.player.traits.mp.value, commander_mp)
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
+    @covers_requirement("webclient-skillbook-casting::a-companion-s-monster-opening-uses-the-same-caster-bound-confirmation")
     def test_forged_or_stale_caster_is_refused_without_substitution(self):
         npc = self._npc("spared target")
         npc.traits.hp.current = 1
