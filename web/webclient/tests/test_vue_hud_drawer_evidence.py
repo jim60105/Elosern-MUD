@@ -182,11 +182,8 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
             "drawer mutations dispatch + confirmation",
         )
 
-    # Re-pointed to `persona-editing::the-party-window-member-tab-shows-and-
-    # edits-the-four-persona-sections` when webclient-party-window-member-tab
-    # is archived (the main spec still names the requirement by its old title).
     @covers_requirement(
-        "persona-editing::the-character-drawer-shows-and-edits-the-four-persona-sections"
+        "persona-editing::the-party-window-member-tab-shows-and-edits-the-four-persona-sections"
     )
     def test_persona_member_tab_sections_and_single_action_edit(self):
         # The party window's 成員 tab renders the commander's persona area as

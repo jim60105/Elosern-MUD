@@ -1954,48 +1954,6 @@ Committed narrative lines SHALL render with the reference draft's semantic prese
   `◈` marker, and both fragments of the prose
   line render in the monospace reading face with the emphasis still gold in whichever fragment holds it
 
-### Requirement: The party drawer presents compbig rows and the fixed follow rules
-The 同伴 ‧ 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count `N / 4`, one compbig row per committed party slot (initial-letter/gold avatar with the same portrait fallback, display name, bond stage line, HP bar with numerals, the joined 參戰 token when the companion fights, and a 請其離隊 control), and one 空位 row stating the invite rule in stage-name words.
-
-#### Scenario: The empty slot never shows the raw threshold
-- **WHEN** the 空位 row states the invite rule
-- **THEN** it names the rule in stage-name words — the raw affinity threshold number is not shown
-
-#### Scenario: The invite control dispatches the exact existing payload
-- **WHEN** the 空位 row's `邀請當前 NPC…` control is activated
-- **THEN** it dispatches `explore.party_invite` with the exact existing payload `{npc_id: <the committed invite-capable interact target's identity>, message: ""}` — the fixed empty message, since the drawer invents no freeform invitation input — under the existing dispatch and confirmation contract
-
-#### Scenario: The invite control never fabricates a target
-- **WHEN** the committed exploration context names an invite-capable interact target, and when it does not
-- **THEN** the control is enabled only in the first case and otherwise disabled with its rule line as the reason — it never fabricates a target
-
-#### Scenario: Leaving dispatches under the same contract
-- **WHEN** the player activates 請其離隊
-- **THEN** it dispatches `explore.party_leave` for that identity under the same contract
-
-#### Scenario: The section closes with the reference's fixed rules
-- **WHEN** the drawer closes the party section
-- **THEN** it states three fixed follow-rule statements matching the reference draft verbatim, and renders no companion detail control that has no backing read model
-
-#### Scenario: Rows follow the committed party
-- **WHEN** the drawer is open and a party mutation commits a third companion
-- **THEN** a third compbig row appears with its committed fields and the sub-count reads `3 / 4`
-
-#### Scenario: Leaving dispatches through the confirmation contract
-- **WHEN** the player activates 請其離隊 on a companion row
-- **THEN** the existing confirmation flow submits `explore.party_leave` for that identity and the
-  row disappears only when the corresponding commit lands
-
-#### Scenario: The invite control is honest about its preconditions
-- **WHEN** the exploration context carries no invite-capable interact target
-- **THEN** 邀請當前 NPC… is disabled with the stated rule as its reason and dispatches nothing,
-  and the raw invite threshold number is never shown
-
-#### Scenario: The follow rules are the reference's three lines
-- **WHEN** the drawer body is enumerated
-- **THEN** the 跟隨規則 card carries the reference draft's three fixed statements and no invented
-  rules
-
 ### Requirement: The objective tracker island presents the committed objectives only
 The HUD SHALL carry the objective tracker as one line in the stage's `map` anchor, directly beneath the minimap island, while the committed mode is exploration and the committed `objectives` panel is available with a non-empty `rows` list; it SHALL be hidden with `display:none` in combat and dialogue mode and SHALL render nothing when `rows` is empty, when the panel is unavailable, or in creation mode. The line SHALL have one fixed row height whatever the payload holds.
 
@@ -3059,7 +3017,7 @@ Lineage graph rows with the same element/style name SHALL be distinguished using
 
 ### Requirement: Client help and finite display vocabularies are localized
 
-The client-owned help reference, the combat detail's skill target type and element, and the party drawer's guidance SHALL read in Traditional Chinese rather than English prose or raw identifiers.
+The client-owned help reference (including its party guidance), the combat detail's skill target type and element, and the party window's labels SHALL read in Traditional Chinese rather than English prose or raw identifiers.
 
 #### Scenario: Literal keys and syntax stay verbatim
 - **WHEN** localized content renders literal key names or command syntax
@@ -3074,8 +3032,8 @@ The client-owned help reference, the combat detail's skill target type and eleme
 - **THEN** `target_spec` shows by the closed name set 無目標 / 自身 / 單一目標 / 範圍, `element` by the element registry's own name followed by 屬性 (火屬性), and an outside identifier reads 未知目標類型 or 未知屬性, never the raw key and never a guessed mechanic
 
 #### Scenario: The party drawer uses the established term
-- **WHEN** the party drawer's follow rules name affinity
-- **THEN** they use the established term 羈絆
+- **WHEN** party guidance or the party window names affinity
+- **THEN** it uses the established term 羈絆
 
 #### Scenario: Help describes real keys
 - **WHEN** the help overlay opens

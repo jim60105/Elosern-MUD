@@ -472,18 +472,12 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
-    # Temporary traceability (the repository convention while a change is
-    # applied): the main specs still carry the party-drawer requirements this
-    # evidence replaces. The archive re-points the annotation to
-    # `webclient-party-window::the-party-window-presents-the-whole-party-through-one-rail`,
-    # `webclient-party-window::the-window-remembers-its-tab-and-member-for-the-session`,
-    # `webclient-party-window::the-member-tab-presents-bond-membership-persona-and-actions`,
-    # `webclient-party-window::windows-show-state-never-rule-explanations` and
-    # `webclient-party-panel::the-party-window-member-tab-offers-possession-controls-per-companion`
-    # (the removed party-drawer compbig requirement then leaves the specs).
     @covers_requirement(
-        "webclient-contextual-hud::the-party-drawer-presents-compbig-rows-and-the-fixed-follow-rules",
-        "webclient-party-panel::the-party-drawer-offers-possession-controls-per-companion",
+        "webclient-party-window::the-party-window-presents-the-whole-party-through-one-rail",
+        "webclient-party-window::the-window-remembers-its-tab-and-member-for-the-session",
+        "webclient-party-window::the-member-tab-presents-bond-membership-persona-and-actions",
+        "webclient-party-window::windows-show-state-never-rule-explanations",
+        "webclient-party-panel::the-party-window-member-tab-offers-possession-controls-per-companion",
     )
     def test_party_window_vitest_evidence_passes(self):
         """The party window shell, its 成員 tab and their AppClient wiring

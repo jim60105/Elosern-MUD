@@ -403,7 +403,7 @@ manifest-listed overlay that nothing imports is not complete.
 
 #### Scenario: The party surfaces are no longer deferred
 - **WHEN** the complete component set and its deferred-surface assertion are enumerated
-- **THEN** the party quickbar and the 同伴 ‧ 隊伍 drawer are absent from the deferred-surface list, because they now have a backing OOB read model (the `party` panel), their components are manifest-listed with deterministic offline stories, and their behaviour is asserted by `webclient-contextual-hud`'s party requirements instead
+- **THEN** the party quickbar and the party window are absent from the deferred-surface list, because they now have backing OOB read models (the `party` and `party_member` panels), their components are manifest-listed with deterministic offline stories, and their behaviour is asserted by `webclient-contextual-hud`'s party requirements and `webclient-party-window` instead
 
 #### Scenario: The action-feedback queue is built while the event-log queue stays deferred
 - **WHEN** the complete component set and the deferred-surface assertion are enumerated
