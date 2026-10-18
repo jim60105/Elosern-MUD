@@ -7,15 +7,13 @@ member's skill command through the same actor-command facade
 ``combat command <actor-token> skill ...`` uses, without casting or advancing
 time.
 
-Intended canonical ID for the added ``companion-field-actions`` requirement
-(its decorator lands with the archive/sync step, because traceability indexes
-only ``openspec/specs/``):
-
-- ``companion-field-actions::the-text-cast-command-accepts-a-caster-suffix``
+The ``companion-field-actions`` requirement this module establishes is
+annotated with its canonical ID on the substantive tests below.
 
 Data-independent: every skill, race, buff and monster is a synthetic kit row.
 """
 
+from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -136,6 +134,9 @@ class CastMemberSuffixTests(EvenniaCommandTestMixin, EvenniaTest):
         ):
             return self.call(command, args, expected)
 
+    @covers_requirement(
+        "companion-field-actions::the-text-cast-command-accepts-a-caster-suffix"
+    )
     def test_out_of_combat_suffix_casts_as_the_member(self):
         self._run(CmdCast(), f"{_HEAL.key}={self.char1.key} 由 艾拉")
         # The member pays, the commander is healed, and the member accrues the
@@ -148,6 +149,9 @@ class CastMemberSuffixTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(self.char1.db.skill_proficiency)
         self.assertEqual(self.clock.tick, DEFAULT_CAST_SECONDS)
 
+    @covers_requirement(
+        "companion-field-actions::the-text-cast-command-accepts-a-caster-suffix"
+    )
     def test_in_combat_suffix_saves_the_member_skill_command(self):
         monster = _monster("suffix goblin", hp=500)
         monster.location = self.room1

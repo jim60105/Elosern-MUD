@@ -6,13 +6,8 @@ binding, practice award, time cost), the present-party settlement scope, the
 stable refusals, and the forward-declared companion monster opening seam that
 ``companion-field-combat-opening`` owns.
 
-Intended canonical IDs for the added ``companion-field-actions`` requirements
-(their decorators land with the archive/sync step, because traceability
-indexes only ``openspec/specs/``):
-
-- ``companion-field-actions::a-field-cast-names-its-caster-explicitly``
-- ``companion-field-actions::companion-field-casts-cost-the-commander-s-time-and-settle-the-party``
-- ``companion-field-actions::unfit-casters-are-refused-with-stable-reasons``
+The ``companion-field-actions`` requirements this module establishes are
+annotated with their canonical IDs on the substantive tests below.
 
 Data-independent: every skill, race, buff and monster is a synthetic kit row.
 """
@@ -187,7 +182,9 @@ class CompanionCastRuleTests(_CompanionCastCase):
     """The wrapper routes with the member as actor and settles the party once."""
 
     @covers_requirement(
-        "party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party"
+        "party-time-settlement::field-cast-and-item-use-advances-settle-the-present-party",
+        "companion-field-actions::a-field-cast-names-its-caster-explicitly",
+        "companion-field-actions::companion-field-casts-cost-the-commander-s-time-and-settle-the-party",
     )
     def test_companion_heal_charges_the_companion_and_heals_the_commander(self):
         commander_mp = self.commander.traits.mp.current
@@ -216,6 +213,9 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(scope, (self.commander, self.aila, self.kahn))
         self.assertEqual(self.clock.tick, DEFAULT_CAST_SECONDS)
 
+    @covers_requirement(
+        "companion-field-actions::a-field-cast-names-its-caster-explicitly"
+    )
     def test_self_buff_binds_to_the_caster(self):
         outcome = self._cast(self.aila, _SELF.key)
         self.assertEqual(outcome.settlement.result.outcome, "success")
@@ -224,7 +224,8 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(self.aila.traits.mp.current, 7)
 
     @covers_requirement(
-        "party-member-authority::acting-purposes-exclude-knocked-out-members"
+        "party-member-authority::acting-purposes-exclude-knocked-out-members",
+        "companion-field-actions::unfit-casters-are-refused-with-stable-reasons",
     )
     def test_a_knocked_out_caster_is_refused(self):
         self.kahn.traits.hp.current = 1
@@ -237,7 +238,8 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertIsNone(read_session(self.commander))
 
     @covers_requirement(
-        "party-member-authority::member-presence-is-checked-against-the-commander-s-room"
+        "party-member-authority::member-presence-is-checked-against-the-commander-s-room",
+        "companion-field-actions::unfit-casters-are-refused-with-stable-reasons",
     )
     def test_an_absent_caster_is_refused(self):
         self.aila.location = self.elsewhere
@@ -247,7 +249,8 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(self.clock.tick, 0)
 
     @covers_requirement(
-        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted",
+        "companion-field-actions::unfit-casters-are-refused-with-stable-reasons",
     )
     def test_a_non_member_caster_is_refused(self):
         outsider = self._outsider()
@@ -269,6 +272,9 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(self.clock.tick, 0)
         self.assertIsNone(read_session(self.commander))
 
+    @covers_requirement(
+        "companion-field-actions::a-field-cast-names-its-caster-explicitly"
+    )
     def test_an_unowned_skill_is_refused_with_the_existing_reason(self):
         outcome = self._cast(self.kahn, _HEAL.key, targets=[self.commander])
         self.assertEqual(outcome.route, "settlement")
@@ -280,6 +286,9 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(int(self.commander.traits.hp.current), 10)
         self.assertEqual(self.clock.tick, 0)
 
+    @covers_requirement(
+        "companion-field-actions::unfit-casters-are-refused-with-stable-reasons"
+    )
     def test_an_existing_action_gate_returns_its_own_reason(self):
         grant_lineage(self.kahn, [_HEAL.key])
         self.kahn.traits.mp.current = 0
