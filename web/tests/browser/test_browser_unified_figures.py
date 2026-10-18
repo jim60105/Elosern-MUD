@@ -216,16 +216,40 @@ def _roster_panel(*, with_candidate: bool = True) -> dict:
 
 def _party_panel() -> dict:
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "general_quota": {"used": 1, "limit": 4},
+        "viewed_member_id": 1,
         "slots": [
+            {
+                "identity": 1,
+                "display_name": "影行者",
+                "portrait_ref": None,
+                "hp_current": 100,
+                "hp_maximum": 100,
+                "mp_current": 50,
+                "mp_maximum": 50,
+                "sp_current": 40,
+                "sp_maximum": 40,
+                "role": "commander",
+                "knocked_out": False,
+                "unread": False,
+                "bond_stage": None,
+                "membership": None,
+            },
             {
                 "identity": 7,
                 "display_name": "店長",
                 "portrait_ref": "7",
                 "hp_current": 100,
                 "hp_maximum": 100,
+                "mp_current": 40,
+                "mp_maximum": 60,
+                "sp_current": 10,
+                "sp_maximum": 30,
+                "role": "companion",
+                "knocked_out": False,
+                "unread": False,
                 "bond_stage": "熟識",
                 "membership": {"general": True, "temporary_commissions": []},
             }
@@ -320,7 +344,8 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
             "candidate": panels["art"]["portrait_catalog"]["7"]["artwork"]["attempts"][0]["resource"]["url"],
             "terminal": panels["art"]["portrait_catalog"]["7"]["artwork"]["terminal"]["resource"]["url"],
             "rosterPortraitKeys": sorted(panels["roster"]["characters"][0]["portrait"]),
-            "partyRef": panels["party"]["slots"][0]["portrait_ref"],
+            # Row 0 is the commander; the companion row follows.
+            "partyRef": panels["party"]["slots"][1]["portrait_ref"],
             "interactRef": panels["exploration"]["interact"][0]["portrait_ref"],
         }
         self.assertEqual(state["entryKeys"], ["artwork", "context"])

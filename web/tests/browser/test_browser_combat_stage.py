@@ -77,22 +77,48 @@ def _foes(
 
 
 def _party_panel(companions: int) -> dict:
-    """A committed party v2 panel with ``companions`` slots (no portraits)."""
+    """A committed party v3 panel: the commander row, then ``companions`` rows."""
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
-        "general_quota": {"used": companions, "limit": 4},
+        "general_quota": {"used": min(companions, 4), "limit": 4},
+        "viewed_member_id": 1,
         "slots": [
+            {
+                "identity": 1,
+                "display_name": "影行者",
+                "portrait_ref": None,
+                "hp_current": 100,
+                "hp_maximum": 100,
+                "mp_current": 50,
+                "mp_maximum": 50,
+                "sp_current": 40,
+                "sp_maximum": 40,
+                "role": "commander",
+                "knocked_out": False,
+                "unread": False,
+                "bond_stage": None,
+                "membership": None,
+            },
+            *[
             {
                 "identity": 101 + i,
                 "display_name": _COMPANION_NAMES[i],
                 "portrait_ref": None,
                 "hp_current": 90 + i,
                 "hp_maximum": 120,
+                "mp_current": 40,
+                "mp_maximum": 60,
+                "sp_current": 10,
+                "sp_maximum": 30,
+                "role": "companion",
+                "knocked_out": False,
+                "unread": False,
                 "bond_stage": "初識",
                 "membership": {"general": True, "temporary_commissions": []},
             }
             for i in range(companions)
+            ],
         ],
     }
 

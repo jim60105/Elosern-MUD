@@ -77,9 +77,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.set_viewport_size({"width": 1451, "height": 790})
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
-        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 4)
+        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 5)
         state = store_state(page)
-        rows = state["panels"]["party"]["slots"]
+        rows = [
+            row
+            for row in state["panels"]["party"]["slots"]
+            if row.get("role") == "companion"
+        ]
         player_id = int(state["panels"]["status"]["actor"]["identity"])
         owner_roster_row = next(row for row in state["panels"]["roster"]["characters"] if row["current"])
         target_id = rows[1]["identity"]
@@ -123,7 +127,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         swapped = [target_id, rows[0]["identity"], player_id, rows[2]["identity"], rows[3]["identity"]]
         page.wait_for_function("(ids) => [...document.querySelectorAll('[data-testid=\"companion-figure\"]')].map(el=>Number(el.dataset.identity)).join(',') === ids.join(',')", arg=swapped)
         self.assertEqual(identities(), swapped)
-        self.assertEqual(len(store_state(page)["panels"]["party"]["slots"]), 4)
+        self.assertEqual(len(store_state(page)["panels"]["party"]["slots"]), 5)
         possessed_roster = store_state(page)["panels"]["roster"]
         self.assertTrue(possessed_roster["available"])
         self.assertEqual(next(row for row in possessed_roster["characters"] if row["current"]), owner_roster_row)
@@ -161,9 +165,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page((1451, 790), motion_level="full")
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
-        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 4)
+        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 5)
         state = store_state(page)
-        rows = state["panels"]["party"]["slots"]
+        rows = [
+            row
+            for row in state["panels"]["party"]["slots"]
+            if row.get("role") == "companion"
+        ]
         catalog = state["panels"]["art"]["portrait_catalog"]
         present = {row["identity"] for row in self._live_exploration_panel(page)["interact"]}
         present_rows = [row for row in rows if row["identity"] in present]
@@ -217,15 +225,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         def party_panel(subset) -> dict:
             committed = store_state(page)["panels"]["party"]
+            commander = committed["slots"][0]
             return {
                 "schema_version": committed["schema_version"],
                 "available": True,
                 "general_quota": committed["general_quota"],
-                "slots": list(subset),
+                "viewed_member_id": commander["identity"],
+                "slots": [commander, *subset],
             }
 
         def slots_of(state_now: dict) -> int:
-            return len(((state_now.get("panels") or {}).get("party") or {}).get("slots") or [])
+            slots = ((state_now.get("panels") or {}).get("party") or {}).get("slots") or []
+            return sum(1 for row in slots if row.get("role") == "companion")
 
         def wait_for_right(identities, timeout: int = 15000) -> None:
             """Wait until actor-right's stage actors are exactly `identities`.

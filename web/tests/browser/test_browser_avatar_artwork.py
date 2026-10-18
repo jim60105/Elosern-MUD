@@ -260,7 +260,11 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # --- a party drawer companion row (standalone focusable marker) -------
         page.evaluate("() => window.__elosernBridge.store.openHudDrawer('party')")
         page.wait_for_selector(f"{PARTY_DRAWER} {AVATAR}", timeout=30000)
-        party = store_state(page)["panels"]["party"]["slots"]
+        party = [
+            slot
+            for slot in store_state(page)["panels"]["party"]["slots"]
+            if slot.get("role") == "companion"
+        ]
         companion = next(
             (slot for slot in party if slot.get("portrait_ref") in admitted), None
         )
