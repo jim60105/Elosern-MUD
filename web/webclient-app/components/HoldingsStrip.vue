@@ -9,8 +9,9 @@
 //
 // A give control appears only on a cell whose row carries an enabled
 // receive fact; a disabled receive shows its committed reason, and the
-// viewed member's own cell is marked 持有者. In combat the strip shows counts
-// only: no delta, no give control, no reason.
+// viewed member's own cell is marked 持有者 (in combat too, so the owner is
+// never told by colour alone). In combat the strip shows counts only: no
+// delta, no give control, no reason.
 import { computed } from "vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 
@@ -66,16 +67,15 @@ function give(row) {
         <template v-else>{{ initialOf(row) }}</template>
       </span>
       <span class="holdings-strip__name">{{ nameOf(row) }}<span v-if="!combat && row.equipped" class="holdings-strip__tag">裝備中</span></span>
-      <span class="holdings-strip__count" data-testid="holdings-strip__count" :aria-label="`持有 ${row.held}`">{{ row.held }}</span>
+      <span class="holdings-strip__count"><span class="holdings-strip__sr">持有 </span><span data-testid="holdings-strip__count">{{ row.held }}</span></span>
       <template v-if="!combat">
         <span
           v-if="row.delta && row.delta.equippable === false"
           class="holdings-strip__delta holdings-strip__delta--none"
           data-testid="holdings-strip__delta"
-          :title="row.delta.reason"
-        >無法裝備</span>
+        >無法裝備<span class="holdings-strip__why" data-testid="holdings-strip__delta-reason">{{ row.delta.reason }}</span></span>
         <span
-          v-else-if="row.delta && row.delta.changes.length"
+          v-else-if="row.delta?.changes?.length"
           class="holdings-strip__delta"
           data-testid="holdings-strip__delta"
         >
@@ -86,9 +86,11 @@ function give(row) {
             :class="change.amount < 0 ? 'is-down' : 'is-up'"
           >{{ changeText(change) }}</span>
         </span>
-        <span v-if="isOwner(row)" class="holdings-strip__foot holdings-strip__foot--owner">持有者</span>
+      </template>
+      <span v-if="isOwner(row)" class="holdings-strip__foot holdings-strip__foot--owner">持有者</span>
+      <template v-if="!combat && !isOwner(row)">
         <button
-          v-else-if="canGive(row)"
+          v-if="canGive(row)"
           type="button"
           class="holdings-strip__give"
           :data-testid="`holdings-strip__give--${row.member_id}`"
@@ -191,7 +193,20 @@ function give(row) {
 }
 
 .holdings-strip__delta--none {
+  color: var(--paper-500);
+}
+
+.holdings-strip__why {
   color: var(--paper-700);
+}
+
+.holdings-strip__sr {
+  position: absolute;
+  width: calc(1px * var(--ui-scale));
+  height: calc(1px * var(--ui-scale));
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .holdings-strip__change.is-up {

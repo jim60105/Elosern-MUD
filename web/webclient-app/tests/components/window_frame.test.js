@@ -121,6 +121,24 @@ describe("WindowFrame (webclient-window-primitives)", () => {
     expect(wrapper.emitted("update:modelValue")).toEqual([["bag"]]);
   });
 
+  it("names the modal dialog by its header title", () => {
+    mountFrame();
+    const dialog = wrapper.get('[data-testid="hud-drawer"]');
+    expect(dialog.attributes("role")).toBe("dialog");
+    const labelledBy = dialog.attributes("aria-labelledby");
+    expect(labelledBy).toBeTruthy();
+    expect(document.getElementById(labelledBy).textContent).toBe("隊伍");
+  });
+
+  it("forceClose closes past a refusing guard and still restores focus to the opener", async () => {
+    mountFrame({ closeGuard: () => false });
+    await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+    expect(wrapper.emitted("close")).toBeUndefined();
+    wrapper.vm.forceClose();
+    expect(wrapper.emitted("close")).toHaveLength(1);
+    expect(document.activeElement).toBe(opener);
+  });
+
   it("renders no tab strip or extras when none are given", () => {
     mountFrame({ tabs: [] }, { extras: undefined });
     expect(wrapper.find('[data-testid="window-frame__tabs"]').exists()).toBe(false);

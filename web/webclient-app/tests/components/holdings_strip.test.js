@@ -42,7 +42,7 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(cells.map((c) => c.get('[data-testid="holdings-strip__count"]').text())).toEqual(["5", "2", "0"]);
     expect(wrapper.find('[data-testid="holdings-strip__delta"]').exists()).toBe(false);
     // Count, name and the fixed owner/give/reason line only: no delta text.
-    expect(cell(12).text()).toBe("艾拉2交給艾拉");
+    expect(cell(12).text()).toBe("艾拉持有 2交給艾拉");
   });
 
   it("offers a give control only for an enabled receive fact, never on the owner, and shows a disabled reason", async () => {
@@ -71,8 +71,8 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(changes.map((c) => c.text())).toEqual(["▲ 攻擊 +6", "▼ 敏捷 −1"]);
     expect(changes.map((c) => c.classes()[1])).toEqual(["is-up", "is-down"]);
     const none = cell(13).get('[data-testid="holdings-strip__delta"]');
-    expect(none.text()).toBe("無法裝備");
-    expect(none.attributes("title")).toBe("卡恩無法使用這類武器。");
+    expect(none.text()).toBe("無法裝備卡恩無法使用這類武器。");
+    expect(none.get('[data-testid="holdings-strip__delta-reason"]').text()).toBe("卡恩無法使用這類武器。");
   });
 
   it("an equipped row shows its tag and no invented delta text", () => {
@@ -87,7 +87,7 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(cell(11).text()).not.toMatch(/±|0$/);
   });
 
-  it("shows counts only in combat: no delta, give, reason or tag", async () => {
+  it("shows counts only in combat: no delta, give, reason or tag; the owner stays named", async () => {
     const rows = ITEM_HOLDINGS_EQUIPMENT.rows.map((row, index) => ({
       ...row,
       equipped: index === 0 ? false : row.equipped,
@@ -97,12 +97,13 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(wrapper.get('[data-testid="holdings-strip"]').attributes("data-combat")).toBe("true");
     expect(wrapper.findAll("button")).toHaveLength(0);
     expect(wrapper.find('[data-testid="holdings-strip__delta"]').exists()).toBe(false);
-    expect(wrapper.findAll('[role="listitem"]').map((c) => c.text())).toEqual(["莉瑟1", "艾拉0", "卡卡恩0"]);
+    expect(wrapper.findAll('[role="listitem"]').map((c) => c.text())).toEqual(["莉瑟持有 1持有者", "艾拉持有 0", "卡卡恩持有 0"]);
 
     mountStrip(ITEM_HOLDINGS_COMBAT, { combat: true });
     expect(wrapper.find('[data-testid="holdings-strip__reason"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("戰鬥中無法交換物品");
-    expect(wrapper.text()).not.toContain("持有者");
+    // The owner stays named in text, never by colour alone.
+    expect(wrapper.get('[data-testid="holdings-strip__cell--11"]').text()).toContain("持有者");
   });
 
   it("falls back to the member id when no name is known", () => {

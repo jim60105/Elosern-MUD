@@ -110,6 +110,8 @@ Reuse them for any new window instead of copying markup:
   Escape, motion unchanged) with the quest drawer's head row under it: the
   first-level `IconTabs` (`v-model`) and an `extras` slot (purse, quota).
   The body is one tabpanel; mount the frame only while the window is open.
+  The dialog is named by its title, and the frame re-exposes HudDrawer's
+  `forceClose()` for a host's confirmed discard past `closeGuard`.
   The prototype draws one header row; the frame keeps HudDrawer's header and
   puts the tabs and extras in the second row, as the quest drawer does.
 - `MemberRail` — plain props (`members[]` with `id`, `name`, `portrait`
@@ -127,7 +129,7 @@ Reuse them for any new window instead of copying markup:
 - `HoldingsStrip` — `item_holdings` v1 `rows` verbatim plus `members` for
   names, `giverId` and `combat`; emits `give(memberId)` only for an enabled
   receive fact. It computes no count or delta; in combat it shows counts
-  only.
+  only (the owner's cell keeps its 持有者 text).
 
 Every primitive size is `calc(<n>px * var(--ui-scale))` or a token, text
 uses `--text-*` tokens (never below `--text-xs`), and durations use

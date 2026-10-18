@@ -40,6 +40,8 @@ describe("window primitive styles (webclient-window-primitives)", () => {
       const tokens = [...value.matchAll(/var\((--text-[a-z0-9]+)\)/g)].map((match) => match[1]);
       expect(tokens, `${name}: ${property}: ${value}`).toHaveLength(1);
       expect(TEXT_TOKENS, `${name}: ${property}: ${value}`).toContain(tokens[0]);
+      // A token scaled by calc() could render below --text-xs.
+      expect(value, `${name}: ${property}: ${value}`).not.toMatch(/calc\([^)]*--text-/);
     }
   });
 

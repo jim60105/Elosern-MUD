@@ -9,7 +9,7 @@
 // tab body is one tabpanel and owns no scrolling of its own (ListDetail
 // does). The parent mounts the frame only while the window is open, exactly
 // as AppClient mounts HudDrawer.
-import { computed, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import HudDrawer from "./HudDrawer.vue";
 import IconTabs from "./IconTabs.vue";
 
@@ -28,7 +28,15 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "close"]);
 
-const panelId = `window-frame-${useId()}-panel`;
+const uid = useId();
+const panelId = `window-frame-${uid}-panel`;
+// The dialog is named by its header title (HudDrawer's aria-labelledby).
+const titleId = `window-frame-${uid}-title`;
+
+// The host's confirmed discard: close past the close guard while still
+// restoring focus to the opener (HudDrawer's forceClose).
+const drawer = ref(null);
+defineExpose({ forceClose: () => drawer.value?.forceClose() });
 
 const frameTabs = computed(() => props.tabs.map((tab) => (tab.controls ? tab : { ...tab, controls: panelId })));
 const selectedTab = computed(() => props.tabs.find((tab) => tab.key === props.modelValue) ?? null);
@@ -36,11 +44,13 @@ const selectedTab = computed(() => props.tabs.find((tab) => tab.key === props.mo
 
 <template>
   <HudDrawer
+    ref="drawer"
     :open="true"
     :title="title"
     :icon="seal"
     :drawer-key="drawerKey"
     :close-guard="closeGuard"
+    :title-id="titleId"
     body-flush
     @close="emit('close')"
   >
