@@ -715,10 +715,13 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             # Attribution compares captured effective/stored contexts; it
             # never reads or writes canonical exposure itself.
             Path("world/rules/status_query/provenance.py"),
-            Path("web/webclient/presentation/character.py"),
+            # The shared persona/intimate section serializers publish the
+            # effective exposure label for both panels; the character panel
+            # itself no longer reads sexual state.
+            Path("web/webclient/presentation/persona_sections.py"),
             # The GM character reader renders the same intimate read model as
-            # the webclient presentation (``build_character_read_model``), so
-            # it consumes the effective overlay, never the stored ordinal.
+            # the webclient presentation (``read_intimate_view``), so it
+            # consumes the effective overlay, never the stored ordinal.
             Path("web/gm/readers/characters.py"),
         }
     )

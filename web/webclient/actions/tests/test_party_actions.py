@@ -268,7 +268,7 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                 "outcome": "success",
                 "code": "viewing_member",
                 "message": "已選擇檢視的隊伍成員。",
-                "affected_panels": ("party",),
+                "affected_panels": ("party", "party_member", "character"),
             },
         )
         self.assertEqual(

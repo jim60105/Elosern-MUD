@@ -351,7 +351,12 @@ class PossessionPresentationTests(EvenniaTest):
             stack.enter_context(patch("world.rules.combat_modifiers._RULES", [
                 Rule("t_exposure", {"field": "exposure", "gte": "高"}, {"defense": -15}),
             ]))
-            stack.enter_context(patch("world.rules.status_query.status.display_for", return_value=SimpleNamespace(label="合成警告", severity="warning")))
+            stack.enter_context(
+                patch(
+                    "world.rules.status_query.conditions.display_for",
+                    return_value=SimpleNamespace(label="合成警告", severity="warning"),
+                )
+            )
             panel = status_presenter(PresentationContext(self.npc, 1))
         self.assertEqual(panel["actor"]["identity"], str(self.npc.pk))
         self.assertEqual(panel["conditions"][0]["provenance"], {

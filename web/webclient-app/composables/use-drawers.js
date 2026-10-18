@@ -98,7 +98,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
     if (!servicesAvailable || inventorySection === null) {
       return null;
     }
-    const character = controlledCharacterPanel.value;
+    const character = commanderCharacterPanel.value;
     const wallet = character?.wallet;
     if (typeof wallet !== "number" || !Number.isInteger(wallet) || wallet < 0) {
       return null;
@@ -158,6 +158,27 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return character;
   });
 
+  // The drawer-layer purse belongs to the commander (the player), so the
+  // character panel's wallet is only presented while its viewed member is the
+  // party's commander row. A companion's own balance is never shown as the
+  // player's purse; when the party panel cannot answer, the character panel's
+  // own wallet stands (the viewed member defaults to the commander).
+  const commanderCharacterPanel = computed(() => {
+    const character = panel("character");
+    if (!character || character.available === false) {
+      return null;
+    }
+    const party = panel("party");
+    const commanderId =
+      party && party.available !== false && Array.isArray(party.slots) && party.slots.length
+        ? party.slots[0]?.identity
+        : null;
+    if (Number.isSafeInteger(commanderId) && character.member_id !== commanderId) {
+      return { ...character, wallet: null };
+    }
+    return character;
+  });
+
   const partyReason = computed(() => {
     const p = panel("party");
     return p?.reason?.message || "隊伍資訊目前無法顯示";
@@ -172,6 +193,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
     SKILL_BOOK_KEY_HINT,
     controlledActorId,
     controlledCharacterPanel,
+    commanderCharacterPanel,
     drawerTitle,
     drawerIcon,
     drawerHasArt,

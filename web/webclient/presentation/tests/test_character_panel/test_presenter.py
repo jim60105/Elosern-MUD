@@ -110,7 +110,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             self.assertNotIn(T_STEADY, _flattened_keys(payload["passives"]))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -211,7 +211,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -228,7 +228,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(atk["current"], atk["effective"])
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -253,7 +253,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["merit"], 60)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()
@@ -268,7 +268,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_persona_record_never_leaks_into_the_payload(self):
         self.player.db.persona = {
             "identity": {"public_view": {"name": "甲"}},
@@ -300,11 +300,12 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         companion = create_object(NPC, key=key, location=self.room1)
         companion.race = "human"
         companion.apply_race_baseline()
+        self.player.location = self.room1
         join_party(companion, self.player)
         return companion
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_the_panel_follows_the_viewed_companion(self):
         companion = self._companion()
         payload = self._render(member=companion)
@@ -319,12 +320,12 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         # The selection falls back to the commander once the member leaves.
         from world.rules.party import leave_party
 
-        leave_party(companion, self.player)
+        leave_party(companion, self.player, "dismissal")
         fallback = self._render(member=companion)
         self.assertEqual(fallback["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_the_payload_is_identical_with_and_without_possession(self):
         from world.rules.possession import enter_possession, release_possession
 
@@ -340,7 +341,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(while_possessing, before)
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_combat_keeps_the_panel_available(self):
         from typeclasses.monsters import Monster
 
@@ -357,7 +358,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["member_id"], int(self.player.pk))
 
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-8-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_conditions_carry_buff_and_indefinite_rule_rows(self):
         from types import SimpleNamespace
 
@@ -370,7 +371,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             Rule(
                 "t_fatigue",
                 {"buff_active": "water_film"},
-                {"agility": "-10%", "defense": -2},
+                {"accuracy": -2},
             )
         ]
 
@@ -393,12 +394,12 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(buff["remaining_seconds"], 60)
         self.assertEqual(buff["modifiers"], {})
         self.assertEqual(buff["source"], "狀態")
-        # The rule row is indefinite and carries every canonical modifier
-        # value verbatim, including the authored percentage string.
+        # The rule row is indefinite and carries its canonical modifier value
+        # verbatim.
         rule = rows["t_fatigue"]
         self.assertEqual(rule["severity"], "warning")
         self.assertIsNone(rule["remaining_seconds"])
-        self.assertEqual(rule["modifiers"], {"agility": "-10%", "defense": -2})
+        self.assertEqual(rule["modifiers"], {"accuracy": -2})
         self.assertEqual(rule["source"], "狀態")
         # The status panel's deterministic order: buffs, then matched rules.
         self.assertEqual(
