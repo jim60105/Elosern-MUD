@@ -354,7 +354,6 @@ def build_production_action_registry() -> ActionRegistry:
                 "objectives",
                 "quest_log",
                 "item_holdings",
-                "party_inventory",
             ),
         )
     )
@@ -369,7 +368,6 @@ def build_production_action_registry() -> ActionRegistry:
                 "objectives",
                 "quest_log",
                 "item_holdings",
-                "party_inventory",
             ),
         )
     )
