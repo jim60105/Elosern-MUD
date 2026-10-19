@@ -55,6 +55,8 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/ObjectiveTracker",
     # webclient-party-window-member-tab replaced the party drawer.
     "Overlays/PartyWindow",
+    # webclient-party-bag-tab added the party window's 背包 tab.
+    "Overlays/PartyBagTab",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -85,6 +87,10 @@ OVERLAYS_STORY_IDS = {
     "overlays-partywindow--knocked-out-full-hd",
     "overlays-partywindow--empty-slot-reference",
     "overlays-partywindow--empty-slot-full-hd",
+    "overlays-partybagtab--consumable-reference",
+    "overlays-partybagtab--consumable-full-hd",
+    "overlays-partybagtab--equipment-reference",
+    "overlays-partybagtab--equipment-full-hd",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -386,7 +392,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyWindow",
+                "ObjectiveTracker", "PartyWindow", "PartyBagTab",
             )},
         )
 
