@@ -179,5 +179,29 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
 - The rail draws initials, not portraits: only the shared attempt lifecycle
   resolves an artwork descriptor, so the viewed member's portrait is the
   成員 nameplate's `AvatarArtwork`.
-- The 背包/狀態/技能/系譜 tabs land in the next changes; until then each shows
+- `PartyBagTab` (webclient-party-bag-tab; design §6.2) is the 背包 tab,
+  backed by `party_inventory` (the viewed member's doll and rows) and
+  `item_holdings` (the selected item's answer); `components/party-bag-model.js`
+  holds its pure projections. A doll slot filters the rows locally. A row
+  selection is server state: the window emits `view-item` and
+  `use-party-window.js` sends one `party.view_member {member_id, tab: "bag",
+  skill_key: null, item_key}`; the requested row shows (`aria-busy`) only while
+  that request id is the store's in-flight dispatch (a refused click keeps the
+  in-flight row; a request made for another member shows nothing), after
+  which the committed `item_holdings.item_key` is the selection; an
+  unavailable `item_holdings` states its reason for the last admitted row. The strip renders only an answer
+  for exactly the shown item and viewed member. The stepper is bounded by the
+  row's `give.max_quantity` (and the `party.transfer` wire limit of 99;
+  equipment gives one) and resets with the member or item. Every intent leaves
+  as `bag-action` through `intents.js` `onPartyBagAction` and names the
+  viewed member: the `party.transfer` giver, the `inventory.use` /
+  `inventory.toggle_equip` `actor_id`. 使用… opens a labelled confirmation
+  drawn inside the window (its keys never reach the window's trap, the content
+  behind it is `inert`, a close attempt cancels it); 裝備 names the replaced
+  singleton occupant (`裝備（替換 X）`), never an accessory. In combat the
+  strip shows counts only, no give control or stepper is offered, the bar shows
+  the committed give reason, and the combat-draft use is not offered (it lands
+  with webclient-party-bag-retire; until then the old bag drawer still owns the
+  in-combat use); toggles keep their committed descriptors.
+- The 狀態/技能/系譜 tabs land in the next changes; until then each shows
   its backing panel's committed unavailable reason or its (empty) scoped slot.

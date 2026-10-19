@@ -61,6 +61,7 @@
     "Overlays/CreationOverlay",
     "Core/CompanionLineup",
     "Overlays/PartyWindow",
+    "Overlays/PartyBagTab",
     "Overlays/ObjectiveTracker",
     "Feedback/ToastQueue",
     "Data/GalleryPanel",

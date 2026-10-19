@@ -511,6 +511,42 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings",
+        "webclient-party-window::giving-from-the-bag-uses-the-committed-receive-facts",
+        "webclient-party-window::the-bag-action-bar-uses-or-equips-for-the-viewed-member",
+    )
+    def test_party_bag_tab_vitest_evidence_passes(self):
+        """The party window's 背包 tab (webclient-party-bag-tab): the doll's
+        slot filter, the item selection's one party.view_member and its
+        in-flight row, holdings rendered only from the committed answer,
+        the stepper bounded by the committed give count, the party.transfer,
+        inventory.use (after confirmation) and inventory.toggle_equip
+        payloads naming the viewed member, the replaced-item label, and the
+        committed disabled reasons."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_bag_tab.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_party_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/components/holdings_strip.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "party-bag-tab Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )
     def test_foe_lineup_vitest_evidence_passes(self):

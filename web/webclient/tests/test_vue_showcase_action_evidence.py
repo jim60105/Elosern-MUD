@@ -166,6 +166,8 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/OverlayHost",
                 "Core/CompanionLineup",
                 "Overlays/PartyWindow",
+                # The party window's 背包 tab (webclient-party-bag-tab).
+                "Overlays/PartyBagTab",
                 # The shared window primitives (webclient-window-primitives) joined the
                 # frozen set; this change pins them with the party window.
                 "Core/WindowFrame",

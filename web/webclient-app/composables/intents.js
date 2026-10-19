@@ -57,6 +57,18 @@ export function useIntentHandlers(store, dispatchIntent) {
     dispatchIntent(intent.action_id, intent.payload);
   }
 
+  // The party window's 背包 tab (webclient-party-bag-tab): its give, use and
+  // equip intents, each naming the viewed member (the giver or `actor_id`)
+  // for the server to reauthorize. Only the closed set leaves; the tab offers
+  // no exploration use in combat, and this seam never sends one either (the
+  // member's combat-draft route lands with webclient-party-bag-retire).
+  const PARTY_BAG_ACTIONS = new Set(["party.transfer", "inventory.use", "inventory.toggle_equip"]);
+  function onPartyBagAction(intent) {
+    if (!intent || !PARTY_BAG_ACTIONS.has(intent.action_id)) return;
+    if (intent.action_id === "inventory.use" && store.view.mode === "combat") return;
+    dispatchIntent(intent.action_id, intent.payload);
+  }
+
   // The pending 異名提名 ballot (title-epithet-nomination): the menu's
   // accept/decline intents ride the same single dispatch entry as the shop
   // and quest surfaces.
@@ -124,6 +136,7 @@ export function useIntentHandlers(store, dispatchIntent) {
     onCreationRequestReset,
     onCreateCharacter,
     onInventoryItemAction,
+    onPartyBagAction,
     onPersonaEdit,
     onQuestAction,
     onShopBuy,

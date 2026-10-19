@@ -94,7 +94,7 @@ const {
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
-  onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
+  onShopBuy, onShopSell, onInventoryItemAction, onPartyBagAction, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
@@ -112,9 +112,16 @@ const {
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The party window (webclient-party-window-member-tab): its openers, the one
-// `party.view_member` per rail selection and the pending entry.
-const { memoryScope: partyWindowScope, pendingMemberId: partyPendingMemberId, onViewMember, openPartyWindow } =
-  usePartyWindow(store, dispatchIntent, { panel });
+// `party.view_member` per rail or bag item selection (webclient-party-bag-
+// tab) and the pending entry or item.
+const {
+  memoryScope: partyWindowScope,
+  pendingMemberId: partyPendingMemberId,
+  pendingItemKey: partyPendingItemKey,
+  onViewMember,
+  onViewItem,
+  openPartyWindow,
+} = usePartyWindow(store, dispatchIntent, { panel });
 // A companion figure on the stage lineup opens 成員 with that companion
 // (design §8): exploration only, outside the stage target step, and never
 // the commander's own figure.
@@ -1204,13 +1211,18 @@ const rootStyle = computed(() => {
       :party="panel('party')"
       :party-member="panel('party_member')"
       :party-inventory="panel('party_inventory')"
+      :item-holdings="panel('item_holdings')"
       :character="panel('character')"
       :lineage="panel('lineage')"
       :art-panel="panel('art')"
       :interact-targets="store.explorationInteract"
       :pending-member-id="partyPendingMemberId"
+      :pending-item-key="partyPendingItemKey"
+      :combat="store.view.mode === 'combat'"
       :memory-scope="partyWindowScope"
       @view-member="onViewMember"
+      @view-item="onViewItem"
+      @bag-action="onPartyBagAction"
       @action="onAction"
       @open-npc-persona="(npcId) => store.openNpcPersonaEditor(npcId)"
       @persona-edit="onPersonaEdit"

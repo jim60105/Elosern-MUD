@@ -16,9 +16,9 @@ export const PARTY_WINDOW_TABS = Object.freeze([
 
 export const PARTY_WINDOW_TAB_KEYS = new Set(PARTY_WINDOW_TABS.map((tab) => tab.key));
 
-// The panel each not-yet-built tab reads (the next changes fill them).
+// The panel each not-yet-built tab reads (the next changes fill them; the
+// 背包 tab is PartyBagTab, which states its own panel's reason).
 export const TAB_BACKING_PANEL = Object.freeze({
-  bag: "party_inventory",
   status: "character",
   skills: "character",
   lineage: "lineage",
