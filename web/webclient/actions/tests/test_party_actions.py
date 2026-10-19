@@ -361,6 +361,8 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                     "character",
                     "party_inventory",
                     "item_holdings",
+                    "lineage",
+                    "services",
                 ),
             },
         )
@@ -489,6 +491,7 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                 "character",
                 "party_inventory",
                 "item_holdings",
+                "services",
             ),
         )
 

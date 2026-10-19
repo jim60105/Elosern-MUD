@@ -219,5 +219,7 @@ def _party_view_member_adapter(
             "party_inventory",
             "item_holdings",
             "lineage",
+            # The shop rows follow the viewed member (services v7).
+            "services",
         ),
     )

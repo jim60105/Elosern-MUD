@@ -293,6 +293,7 @@ class PossessionPresentationTests(EvenniaTest):
         self.player.traits.hp.current = 37
         self.npc.traits.hp.current = 81
         status_before = status_presenter(ctx_player)
+        services_before = services_presenter(ctx_player)
 
         # Enter possession
         enter_possession(self.player, self.npc)
@@ -304,15 +305,15 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(char_panel["wallet"], 5000)
         self.assertEqual(char_panel["wallet"], wallet_before)
 
-        # 2. services_presenter: player.wallet is A's; inventory.rows are B's
+        # 2. services_presenter: player.wallet is A's and the payload is
+        # identical to the unpossessed one (services v7 carries no personal
+        # inventory; party_inventory owns the bag rows).
         serv_panel = services_presenter(ctx_npc)
         self.assertTrue(serv_panel["available"])
         self.assertEqual(serv_panel["player"]["wallet"], 5000)
-        self.assertEqual(serv_panel["inventory"]["wallet"], 5000)
-        item_keys = [row["item_key"] for row in serv_panel["inventory"]["rows"]]
-        self.assertIn("t_possession_draught", item_keys)
-        self.assertIn("t_possession_ration", item_keys)
-        self.assertNotIn("t_possession_blade", item_keys)
+        self.assertNotIn("inventory", serv_panel)
+        self.assertIsNone(serv_panel["shop"])
+        self.assertEqual(serv_panel, services_before)
 
         # 3. status_presenter: name and status belong to A
         stat_panel = status_presenter(ctx_npc)

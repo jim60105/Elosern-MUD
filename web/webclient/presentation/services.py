@@ -1,4 +1,4 @@
-"""Exact schema-version-5 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-7 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact
@@ -9,6 +9,12 @@ summary) cannot be read without mutation, it raises
 form; a failure confined to one surface is serialized as that surface's
 ``null`` while the rest of the panel stays available.
 
+Version 7 (services-shop-structured-rows) carries no personal inventory (the
+``party_inventory`` panel owns it): the shop section names the session's
+viewed party member, stock rows carry the registry presentation, the buy price
+only, and that member's held count and server equipment delta, and sellable
+rows list that member's unequipped copies with the sell price only.
+
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
 dual-direction parity test.
@@ -17,6 +23,11 @@ dual-direction parity test.
 from typing import Any
 
 from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.item_holdings import (
+    serialize_equipment_delta,
+    validate_equipment_delta,
+)
+from web.webclient.presentation.party_view_selection import resolve_viewed_member
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -36,8 +47,6 @@ from world.rules.service_view import (
     ActionDescriptorView,
     BoardRowView,
     GuildSectionView,
-    InventoryRowView,
-    InventorySectionView,
     PlayerSummaryView,
     QuestRowView,
     RankView,
@@ -50,14 +59,13 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 6
+SERVICES_SCHEMA_VERSION = 7
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
 MAX_QUEST_ROWS = 12
 MAX_STOCK_ROWS = 12
 MAX_SELLABLE_ROWS = 12
-MAX_INVENTORY_ROWS = 32
 MAX_KEY_CODE_POINTS = 64
 MAX_DISPLAY_NAME_CODE_POINTS = 128
 MAX_SUMMARY_CODE_POINTS = 128
@@ -86,8 +94,6 @@ TRACK_ACTION = "guild.quest_track"
 EXAM_ACTION = "guild.exam_request"
 BUY_ACTION = "shop.buy"
 SELL_ACTION = "shop.sell"
-INVENTORY_USE_ACTION = "inventory.use"
-INVENTORY_TOGGLE_ACTION = "inventory.toggle_equip"
 _SERVICE_ACTIONS = frozenset(
     {
         REGISTER_ACTION,
@@ -98,8 +104,6 @@ _SERVICE_ACTIONS = frozenset(
         EXAM_ACTION,
         BUY_ACTION,
         SELL_ACTION,
-        INVENTORY_USE_ACTION,
-        INVENTORY_TOGGLE_ACTION,
     }
 )
 
@@ -420,33 +424,61 @@ def _validate_guild(value: Any) -> dict[str, Any]:
     return {"branch_label": branch_label, "rank_ladder": list(ladder), "registration": registration, "board": board, "quests": quests, "rank": rank}
 
 
+def _validate_row_identity(value: Any, row: str) -> tuple[str, str]:
+    item_key = _require_str(value, "item_key", maximum=MAX_KEY_CODE_POINTS)
+    if not item_key.strip():
+        raise ProtocolValidationError(f"{row} item_key must be non-empty")
+    display_name = _require_str(
+        value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS
+    )
+    if not display_name.strip():
+        raise ProtocolValidationError(f"{row} display_name must be non-empty")
+    return item_key, display_name
+
+
+def _validate_viewed(value: Any) -> dict[str, Any]:
+    """The viewed member's held count and server equipment delta for one row."""
+    _require_exact_fields(value, "stock viewed", {"held", "delta"}, {})
+    held = _require_int(value, "held", minimum=0, maximum=MAX_SAFE_INTEGER)
+    return {
+        "held": held,
+        "delta": validate_equipment_delta(value["delta"], "stock viewed.delta"),
+    }
+
+
 def _validate_stock_row(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "stock row",
-        {"item_key", "display_name", "buy_copper", "sell_copper", "stock", "max_stock", "buy"},
+        {
+            "item_key",
+            "display_name",
+            "presentation",
+            "buy_copper",
+            "stock",
+            "max_stock",
+            "viewed",
+            "buy",
+        },
         {},
     )
-    item_key = _require_str(value, "item_key", maximum=MAX_KEY_CODE_POINTS)
-    if not item_key.strip():
-        raise ProtocolValidationError("stock item_key must be non-empty")
-    display_name = _require_str(
-        value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS
-    )
+    item_key, display_name = _validate_row_identity(value, "stock")
+    presentation = _validate_presentation(value["presentation"])
     buy_copper = _require_int(value, "buy_copper", minimum=0, maximum=MAX_SAFE_INTEGER)
-    sell_copper = _require_int(value, "sell_copper", minimum=0, maximum=MAX_SAFE_INTEGER)
     stock = _require_int(value, "stock", minimum=0, maximum=MAX_SAFE_INTEGER)
     max_stock = _require_int(value, "max_stock", minimum=1, maximum=MAX_SAFE_INTEGER)
+    viewed = _validate_viewed(value["viewed"])
     buy = _validate_action(value["buy"])
     if buy["action_id"] != BUY_ACTION:
         raise ProtocolValidationError("stock buy must be shop.buy")
     return {
         "item_key": item_key,
         "display_name": display_name,
+        "presentation": presentation,
         "buy_copper": buy_copper,
-        "sell_copper": sell_copper,
         "stock": stock,
         "max_stock": max_stock,
+        "viewed": viewed,
         "buy": buy,
     }
 
@@ -455,13 +487,11 @@ def _validate_sellable_row(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "sellable row",
-        {"item_key", "display_name", "sell_copper", "held", "sell"},
+        {"item_key", "display_name", "presentation", "sell_copper", "held", "sell"},
         {},
     )
-    item_key = _require_str(value, "item_key", maximum=MAX_KEY_CODE_POINTS)
-    display_name = _require_str(
-        value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS
-    )
+    item_key, display_name = _validate_row_identity(value, "sellable")
+    presentation = _validate_presentation(value["presentation"])
     sell_copper = _require_int(value, "sell_copper", minimum=0, maximum=MAX_SAFE_INTEGER)
     held = _require_int(value, "held", minimum=1, maximum=MAX_SAFE_INTEGER)
     sell = _validate_action(value["sell"])
@@ -470,6 +500,7 @@ def _validate_sellable_row(value: Any) -> dict[str, Any]:
     return {
         "item_key": item_key,
         "display_name": display_name,
+        "presentation": presentation,
         "sell_copper": sell_copper,
         "held": held,
         "sell": sell,
@@ -477,8 +508,9 @@ def _validate_sellable_row(value: Any) -> dict[str, Any]:
 
 
 def _validate_shop(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "shop", {"open", "stock", "sellable"}, {})
+    _require_exact_fields(value, "shop", {"open", "member_id", "stock", "sellable"}, {})
     open_now = _require_bool(value, "open")
+    member_id = _require_int(value, "member_id", minimum=1, maximum=MAX_SAFE_INTEGER)
     stock = value["stock"]
     if not isinstance(stock, list) or len(stock) > MAX_STOCK_ROWS:
         raise ProtocolValidationError(f"stock must be a list of at most {MAX_STOCK_ROWS} rows")
@@ -489,7 +521,7 @@ def _validate_shop(value: Any) -> dict[str, Any]:
             f"sellable must be a list of at most {MAX_SELLABLE_ROWS} rows"
         )
     sellable = [_validate_sellable_row(row) for row in sellable]
-    return {"open": open_now, "stock": stock, "sellable": sellable}
+    return {"open": open_now, "member_id": member_id, "stock": stock, "sellable": sellable}
 
 
 def _validate_presentation_identifier(value: dict[str, Any], field: str) -> str:
@@ -524,59 +556,11 @@ def _validate_presentation(value: Any) -> dict[str, Any] | None:
     return {"kind": kind, "icon_key": icon_key, "rarity": rarity, "summary": summary}
 
 
-def _validate_inventory(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "inventory", {"rows", "wallet"}, {})
-    rows = value["rows"]
-    if not isinstance(rows, list) or len(rows) > MAX_INVENTORY_ROWS:
-        raise ProtocolValidationError(
-            f"inventory rows must be a list of at most {MAX_INVENTORY_ROWS} entries"
-        )
-    wallet = _require_int(value, "wallet", minimum=0, maximum=MAX_SAFE_INTEGER)
-    row_views = []
-    for row in rows:
-        _require_exact_fields(
-            row,
-            "inventory row",
-            {
-                "item_key",
-                "display_name",
-                "held",
-                "equipped",
-                "presentation",
-                "action",
-            },
-            {},
-        )
-        item_key = _require_str(row, "item_key", maximum=MAX_KEY_CODE_POINTS)
-        display_name = _require_str(
-            row, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS
-        )
-        held = _require_int(row, "held", minimum=1, maximum=MAX_SAFE_INTEGER)
-        equipped = _require_bool(row, "equipped")
-        presentation = _validate_presentation(row["presentation"])
-        action = row["action"]
-        if action is not None:
-            action = _validate_action(action)
-            if action["action_id"] not in (INVENTORY_USE_ACTION, INVENTORY_TOGGLE_ACTION):
-                raise ProtocolValidationError("inventory row action id is not allowed")
-        row_views.append(
-            {
-                "item_key": item_key,
-                "display_name": display_name,
-                "held": held,
-                "equipped": equipped,
-                "presentation": presentation,
-                "action": action,
-            }
-        )
-    return {"rows": row_views, "wallet": wallet}
-
-
 def _validate_pagination(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "pagination",
-        {"board_total", "quest_total", "stock_total", "sellable_total", "inventory_total"},
+        {"board_total", "quest_total", "stock_total", "sellable_total"},
         {},
     )
     totals = {}
@@ -585,7 +569,6 @@ def _validate_pagination(value: Any) -> dict[str, Any]:
         ("quest_total", MAX_QUEST_ROWS),
         ("stock_total", MAX_STOCK_ROWS),
         ("sellable_total", MAX_SELLABLE_ROWS),
-        ("inventory_total", MAX_INVENTORY_ROWS),
     ):
         totals[field] = _require_int(value, field, minimum=0, maximum=ceiling)
     return totals
@@ -608,7 +591,6 @@ def validate_services(payload: Any) -> dict[str, Any]:
             "player",
             "guild",
             "shop",
-            "inventory",
             "pagination",
         },
         {},
@@ -663,11 +645,8 @@ def validate_services(payload: Any) -> dict[str, Any]:
 
     guild = None if payload["guild"] is None else _validate_guild(payload["guild"])
     shop = None if payload["shop"] is None else _validate_shop(payload["shop"])
-    inventory = (
-        None if payload["inventory"] is None else _validate_inventory(payload["inventory"])
-    )
     pagination = _validate_pagination(payload["pagination"])
-    _validate_pagination_totals(pagination, guild, shop, inventory)
+    _validate_pagination_totals(pagination, guild, shop)
 
     result = {
         "schema_version": SERVICES_SCHEMA_VERSION,
@@ -684,7 +663,6 @@ def validate_services(payload: Any) -> dict[str, Any]:
         },
         "guild": guild,
         "shop": shop,
-        "inventory": inventory,
         "pagination": pagination,
     }
     # Envelope guarantee (design D4): a conforming payload must serialize within
@@ -700,7 +678,6 @@ def _validate_pagination_totals(
     pagination: dict[str, Any],
     guild: dict[str, Any] | None,
     shop: dict[str, Any] | None,
-    inventory: dict[str, Any] | None,
 ) -> None:
     if guild is None:
         if pagination["board_total"] != 0 or pagination["quest_total"] != 0:
@@ -722,16 +699,6 @@ def _validate_pagination_totals(
             raise ProtocolValidationError("pagination stock_total must match shipped rows")
         if pagination["sellable_total"] != len(shop["sellable"]):
             raise ProtocolValidationError("pagination sellable_total must match shipped rows")
-    if inventory is None:
-        if pagination["inventory_total"] != 0:
-            raise ProtocolValidationError(
-                "pagination inventory_total must be zero when inventory is null"
-            )
-    else:
-        if pagination["inventory_total"] != len(inventory["rows"]):
-            raise ProtocolValidationError(
-                "pagination inventory_total must match shipped rows"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -823,10 +790,14 @@ def _serialize_stock_row(row: StockRowView) -> dict[str, Any]:
     return {
         "item_key": row.item_key,
         "display_name": row.display_name,
+        "presentation": serialize_item_presentation(row.presentation),
         "buy_copper": row.buy_copper,
-        "sell_copper": row.sell_copper,
         "stock": row.stock,
         "max_stock": row.max_stock,
+        "viewed": {
+            "held": row.viewed.held,
+            "delta": serialize_equipment_delta(row.viewed.delta),
+        },
         "buy": _serialize_action(row.buy),
     }
 
@@ -835,6 +806,7 @@ def _serialize_sellable_row(row: SellableRowView) -> dict[str, Any]:
     return {
         "item_key": row.item_key,
         "display_name": row.display_name,
+        "presentation": serialize_item_presentation(row.presentation),
         "sell_copper": row.sell_copper,
         "held": row.held,
         "sell": _serialize_action(row.sell),
@@ -844,6 +816,7 @@ def _serialize_sellable_row(row: SellableRowView) -> dict[str, Any]:
 def _serialize_shop(shop: ShopSectionView) -> dict[str, Any]:
     return {
         "open": shop.open,
+        "member_id": shop.member_id,
         "stock": [_serialize_stock_row(row) for row in shop.stock],
         "sellable": [_serialize_sellable_row(row) for row in shop.sellable],
     }
@@ -863,31 +836,6 @@ def serialize_item_presentation(presentation: Any) -> dict[str, Any] | None:
         "icon_key": presentation.icon_key.value,
         "rarity": presentation.rarity.value,
         "summary": presentation.summary_zh,
-    }
-
-
-def _serialize_presentation(row: InventoryRowView) -> dict[str, Any] | None:
-    return serialize_item_presentation(row.presentation)
-
-
-def _serialize_inventory(inventory: InventorySectionView) -> dict[str, Any]:
-    return {
-        "rows": [
-            {
-                "item_key": row.item_key,
-                "display_name": row.display_name,
-                "held": row.held,
-                "equipped": row.equipped,
-                "presentation": _serialize_presentation(row),
-                "action": (
-                    None
-                    if row.action is None
-                    else _serialize_action(row.action)
-                ),
-            }
-            for row in inventory.rows
-        ],
-        "wallet": inventory.wallet,
     }
 
 
@@ -915,15 +863,11 @@ def _serialize(view: ServicesView) -> dict[str, Any]:
         "player": _serialize_player(view.player),
         "guild": None if view.guild is None else _serialize_guild(view.guild),
         "shop": None if view.shop is None else _serialize_shop(view.shop),
-        "inventory": (
-            None if view.inventory is None else _serialize_inventory(view.inventory)
-        ),
         "pagination": {
             "board_total": view.pagination.board_total,
             "quest_total": view.pagination.quest_total,
             "stock_total": view.pagination.stock_total,
             "sellable_total": view.pagination.sellable_total,
-            "inventory_total": view.pagination.inventory_total,
         },
     }
 
@@ -932,15 +876,17 @@ def services_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``services`` panel for the authenticated puppet.
 
     Exploration mode ships every surface normally; an active combat session
-    keeps the canonical player and personal inventory data while the
-    read model itself forces host, guild, and shop null. Creation-pending
-    puppets and read-model failures use the common unavailable form.
+    keeps the canonical player summary while the read model itself forces
+    host, guild, and shop null. The shop rows follow the session's viewed
+    party member (``party.view_member``), falling back to the commander.
+    Creation-pending puppets and read-model failures use the common
+    unavailable form.
     """
     actor = context.actor
     if bool(getattr(actor, "creation_pending", False)):
         raise PanelUnavailableError
     try:
-        view = build_services_view(actor)
+        view = build_services_view(actor, viewed=resolve_viewed_member(context))
     except ServicesViewError:
         raise PanelUnavailableError
     return validate_services(_serialize(view))
@@ -951,13 +897,10 @@ __all__ = [
     "ACCEPT_ACTION",
     "BUY_ACTION",
     "EXAM_ACTION",
-    "INVENTORY_TOGGLE_ACTION",
-    "INVENTORY_USE_ACTION",
     "MAX_BOARD_ROWS",
     "MAX_DETAIL_CODE_POINTS",
     "MAX_DISPLAY_NAME_CODE_POINTS",
     "MAX_HOST_DISPLAY_NAME_CODE_POINTS",
-    "MAX_INVENTORY_ROWS",
     "MAX_KEY_CODE_POINTS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_QUEST_ROWS",

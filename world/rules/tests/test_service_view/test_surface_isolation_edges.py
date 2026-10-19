@@ -104,7 +104,6 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
         self.assertIsNone(view.guild)
         self.assertEqual(view.guild_unavailable_reason, "malformed_quest_log")
         self.assertIsNotNone(view.shop)
-        self.assertIsNotNone(view.inventory)
         self.assertEqual(view.pagination.board_total, 0)
         self.assertEqual(view.pagination.stock_total, 3)
 
@@ -127,7 +126,6 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
         self.assertIsNone(view.shop)
         self.assertEqual(view.shop_unavailable_reason, "malformed_stock")
         self.assertIsNotNone(view.guild)
-        self.assertIsNotNone(view.inventory)
 
     def test_corrupt_registration_degrades_the_guild_surface(self):
         room = FakeRoom(FakeHost("g", 1, guild_staff(), location=None))
@@ -167,7 +165,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
         self.assertEqual(view.pagination.quest_total, 1)
         self.assertEqual(view.pagination.stock_total, 3)
         self.assertEqual(view.pagination.sellable_total, 1)
-        self.assertEqual(view.pagination.inventory_total, 1)
+        self.assertFalse(hasattr(view.pagination, "inventory_total"))
 
 
 class MeritAndRankEdgeTests(ServiceRegistryIsolation):
@@ -259,7 +257,6 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
         self.assertIsNone(view.shop)
         self.assertIsNone(view.host)
         self.assertIsNotNone(view.player)
-        self.assertIsNotNone(view.inventory)
 
 
 class GuildCorruptionEdgeTests(ServiceRegistryIsolation):
@@ -429,23 +426,24 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         self.assertTrue(sellable[T_FANG].sell.enabled)
         self.assertEqual(sellable[T_FANG].sell.quantity_max, 2)
 
-    def test_malformed_equipment_degrades_inventory(self):
-        room = FakeRoom()
+    def test_malformed_equipment_degrades_the_shop(self):
+        room = FakeRoom(FakeHost("m", 2, merchant(), location=None))
         player = actor(location=room, wallet=5, inventory=[T_APPLE], equipment="corrupt")
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        self.assertIsNone(view.inventory)
-        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "malformed_equipment")
+        self.assertIsNotNone(view.player)
 
     def test_accessories_not_a_list_fails_closed_unavailable(self):
         # The services rows normalize through the shared fail-closed
         # equipment layer (add-inventory-item-actions rubber-duck fix): a
         # malformed accessories value is never partially trusted — the
-        # inventory section is unavailable, not partially equipped.
-        room = FakeRoom()
+        # shop's sellable rows are unavailable, not partially equipped.
+        room = FakeRoom(FakeHost("m", 2, merchant(), location=None))
         player = actor(
             location=room,
             wallet=5,
@@ -462,13 +460,14 @@ class ShopEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        self.assertIsNone(view.inventory)
-        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "malformed_equipment")
+        self.assertIsNotNone(view.player)
 
     def test_cross_slot_duplicate_fails_closed_unavailable(self):
         # One key stored in two slots is malformed for the shared equipment
         # layer, so the panel never publishes a partial equipped truth.
-        room = FakeRoom()
+        room = FakeRoom(FakeHost("m", 2, merchant(), location=None))
         player = actor(
             location=room,
             wallet=5,
@@ -485,5 +484,6 @@ class ShopEdgeTests(ServiceRegistryIsolation):
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
-        self.assertIsNone(view.inventory)
-        self.assertEqual(view.inventory_unavailable_reason, "malformed_equipment")
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "malformed_equipment")
+        self.assertIsNotNone(view.player)

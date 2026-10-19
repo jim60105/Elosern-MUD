@@ -149,7 +149,9 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         spray = next(row for row in payload["shop"]["stock"] if row["item_key"] == _T_SPRAY)
         floor, _ceiling = price_band(_T_SPRAY)
         self.assertEqual(spray["buy_copper"], floor + 2)
-        self.assertEqual(spray["sell_copper"], floor)
+        self.assertNotIn("sell_copper", spray)
+        self.assertEqual(payload["shop"]["member_id"], int(self.player.pk))
+        self.assertEqual(spray["viewed"], {"held": 0, "delta": None})
         self.assertEqual(spray["stock"], 20)
         self.assertIsNotNone(spray["buy"]["quantity"])
         self.assertIsNone(payload["guild"])
@@ -167,7 +169,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
-    def test_combat_mode_ships_personal_inventory_only(self):
+    def test_combat_mode_ships_the_player_summary_only(self):
         from evennia.utils.create import create_object as co
         from typeclasses.monsters import Monster
 
@@ -184,14 +186,12 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(payload["guild"])
         self.assertIsNone(payload["shop"])
         self.assertIsNotNone(payload["player"])
-        self.assertIsNotNone(payload["inventory"])
-        self.assertEqual(payload["pagination"]["board_total"], 0)
-        self.assertEqual(payload["pagination"]["quest_total"], 0)
-        self.assertEqual(payload["pagination"]["stock_total"], 0)
-        self.assertEqual(payload["pagination"]["sellable_total"], 0)
-        row = payload["inventory"]["rows"][0]
-        self.assertEqual(row["item_key"], _T_SPRAY)
-        self.assertEqual(row["action"]["action_id"], "inventory.use")
+        # Personal inventory is published by party_inventory, never here.
+        self.assertNotIn("inventory", payload)
+        self.assertEqual(
+            payload["pagination"],
+            {"board_total": 0, "quest_total": 0, "stock_total": 0, "sellable_total": 0},
+        )
 
 
     def test_creation_pending_renders_unavailable_form(self):
@@ -205,7 +205,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["guild"])
-        self.assertIsNotNone(payload["inventory"])
+        self.assertIsNotNone(payload["player"])
         self.assertEqual(payload["pagination"]["board_total"], 0)
         self.assertEqual(payload["pagination"]["quest_total"], 0)
 
@@ -217,14 +217,20 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["shop"])
-        self.assertIsNotNone(payload["inventory"])
+        self.assertIsNotNone(payload["player"])
+
+
+    def _render_in_store(self):
+        self.player.location = self.store
+        get_world_clock()._persist(12 * 3600)
+        return self._render()
 
 
     @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
-    def test_registered_inventory_projects_registry_presentation(self):
-        self.player.db.inventory = [_T_SPRAY, _T_SPRAY, _T_THORN]
-        payload = self._render()
-        rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
+    def test_stock_rows_project_registry_presentation_and_viewed_held(self):
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
+        payload = self._render_in_store()
+        rows = {row["item_key"]: row for row in payload["shop"]["stock"]}
         kit_row = SYNTH_ITEMS["t_ember_spray"]
         self.assertEqual(
             rows[_T_SPRAY]["presentation"],
@@ -235,25 +241,35 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 "summary": kit_row.presentation.summary_zh,
             },
         )
-        self.assertEqual(rows[_T_SPRAY]["held"], 2)
+        self.assertEqual(rows[_T_SPRAY]["viewed"]["held"], 2)
         self.assertEqual(
             rows[_T_THORN]["presentation"]["rarity"],
             SYNTH_ITEMS["t_thorn_knife"].presentation.rarity.value,
         )
+        # Equipment carries the server delta; a consumable carries none.
+        self.assertIsNotNone(rows[_T_THORN]["viewed"]["delta"])
+        self.assertIsNone(rows[_T_SPRAY]["viewed"]["delta"])
 
 
     @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
-    def test_unknown_inventory_key_projects_null_presentation(self):
-        self.player.db.inventory = ["mystery_relic", "mystery_relic", _T_SPRAY]
-        payload = self._render()
-        rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
-        self.assertIsNone(rows["mystery_relic"]["presentation"])
-        self.assertEqual(rows["mystery_relic"]["display_name"], "mystery_relic")
-        self.assertIsNotNone(rows[_T_SPRAY]["presentation"])
+    def test_sellable_rows_skip_unknown_and_worn_copies(self):
+        self.player.db.inventory = ["mystery_relic", "mystery_relic", _T_SPRAY, _T_THORN]
+        self.player.db.equipment = {
+            "weapon_main": _T_THORN,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        payload = self._render_in_store()
+        sellable = {row["item_key"]: row for row in payload["shop"]["sellable"]}
+        self.assertNotIn("mystery_relic", sellable)
+        self.assertNotIn(_T_THORN, sellable)
+        self.assertEqual(sellable[_T_SPRAY]["held"], 1)
+        self.assertNotIn("buy_copper", sellable[_T_SPRAY])
 
 
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
-    def test_rendering_inventory_never_mutates_canonical_state(self):
+    def test_rendering_shop_rows_never_mutates_canonical_state(self):
         self.player.db.inventory = [_T_SPRAY, _T_SPRAY, "mystery_relic", _T_THORN]
         self.player.db.equipment = {
             "weapon_main": _T_THORN,
@@ -266,14 +282,17 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "equipment": dict(self.player.db.equipment or {}),
             "wallet": self.player.db.wallet,
             "quest_log": list(self.player.db.quest_log or []),
+            "stock": dict(self.merchant.merchant_stock),
         }
-        payload = self._render()
+        payload = self._render_in_store()
         self.assertEqual(list(self.player.db.inventory or []), before["inventory"])
         self.assertEqual(dict(self.player.db.equipment or {}), before["equipment"])
         self.assertEqual(self.player.db.wallet, before["wallet"])
         self.assertEqual(list(self.player.db.quest_log or []), before["quest_log"])
-        row = next(r for r in payload["inventory"]["rows"] if r["item_key"] == _T_THORN)
-        self.assertTrue(row["equipped"])
+        self.assertEqual(dict(self.merchant.merchant_stock), before["stock"])
+        thorn = next(r for r in payload["shop"]["stock"] if r["item_key"] == _T_THORN)
+        # The worn item compares as no change.
+        self.assertEqual(thorn["viewed"], {"held": 1, "delta": {"equippable": True, "changes": []}})
 
 
     def test_unregistered_presenter_is_honest(self):

@@ -314,6 +314,13 @@ def _serialize_delta(delta: Any) -> dict[str, Any] | None:
     }
 
 
+#: Public aliases shared with the ``services`` shop rows, whose ``viewed.delta``
+#: is the same server equipment delta for the viewed member
+#: (services-shop-structured-rows).
+validate_equipment_delta = _validate_delta
+serialize_equipment_delta = _serialize_delta
+
+
 def item_holdings_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``item_holdings`` panel for the selection."""
     actor = context.actor
@@ -372,5 +379,7 @@ __all__ = [
     "MAX_REASON_CODE_POINTS",
     "MAX_ROWS",
     "item_holdings_presenter",
+    "serialize_equipment_delta",
+    "validate_equipment_delta",
     "validate_item_holdings",
 ]

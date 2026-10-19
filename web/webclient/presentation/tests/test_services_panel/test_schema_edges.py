@@ -1,9 +1,9 @@
-"""Services panel schema edge tests: prerequisite, quest-row, and inventory-row actions."""
+"""Services panel schema edge tests: prerequisite, quest-row, and shop-row branches."""
 import unittest
 from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.services import ServicesPanelError, validate_services
-from ._support import UNREGISTERED_PLAYER, _T_MEAL, _T_MEAL_DISPLAY, _valid_payload
+from ._support import UNREGISTERED_PLAYER, _MEMBER_ID, _T_MEAL, _T_MEAL_DISPLAY, _sellable_row, _stock_row, _valid_payload
 
 
 class ServicesSchemaEdgeTests(unittest.TestCase):
@@ -54,15 +54,6 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         return value
 
 
-    def _inventory_row_action_payload(self, action, *, drop_action=False):
-        payload = _valid_payload()
-        if drop_action:
-            del payload["inventory"]["rows"][0]["action"]
-        else:
-            payload["inventory"]["rows"][0]["action"] = action
-        return payload
-
-
     def test_action_branch_rejections(self):
         cases = [
             {"label": "   "},
@@ -84,40 +75,18 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
                 )
 
 
-    def test_inventory_row_action_acceptance_and_rejections(self):
-        good = self._action(
-            "inventory.use",
-            enabled=False,
-            disabled_reason={"code": "hp_full", "message": "你的體力已經全滿。"},
-        )
-        payload = validate_services(self._inventory_row_action_payload(good))
-        self.assertEqual(
-            payload["inventory"]["rows"][0]["action"]["disabled_reason"]["code"],
-            "hp_full",
-        )
-        bad = [
-            self._action("mystery.action"),
-            # Cross-service allowlisted ids are never valid row actions.
-            self._action("shop.buy"),
-            self._action("guild.register"),
-            self._action("inventory.toggle_equip", quantity={"min": 1, "max": 2}),
-            self._action("inventory.use", enabled=False),
-            self._action(
-                "inventory.use",
-                enabled=True,
-                disabled_reason={"code": "hp_full", "message": "你的體力已經全滿。"},
-            ),
-        ]
-        for action in bad:
-            with self.subTest(action_id=action["action_id"]):
+    def test_personal_item_actions_are_not_service_descriptors(self):
+        # services v7 ships no inventory rows, so the personal item actions
+        # left the services descriptor allowlist.
+        for action_id in ("inventory.use", "inventory.toggle_equip", "mystery.action"):
+            with self.subTest(action_id=action_id):
                 with self.assertRaises(ProtocolValidationError):
                     validate_services(
-                        self._inventory_row_action_payload(action)
+                        _valid_payload(
+                            shop={"open": True, "member_id": _MEMBER_ID, "stock": [_stock_row(buy=self._action(action_id))], "sellable": []},
+                            pagination={**_valid_payload()["pagination"], "stock_total": 1},
+                        )
                     )
-        with self.assertRaises(ProtocolValidationError):
-            validate_services(
-                self._inventory_row_action_payload(None, drop_action=True)
-            )
 
 
     def test_disabled_reason_branch_rejections(self):
@@ -262,58 +231,28 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
 
 
     def test_shop_row_branch_rejections(self):
-        stock = [
-            {
-                "item_key": "",
-                "display_name": _T_MEAL_DISPLAY,
-                "buy_copper": 10,
-                "sell_copper": 5,
-                "stock": 20,
-                "max_stock": 20,
-                "buy": self._action("shop.buy", quantity={"min": 1, "max": 20}),
-            }
-        ]
-        with self.assertRaises(ProtocolValidationError):
-            validate_services(
-                _valid_payload(
-                    shop={"open": True, "stock": stock, "sellable": []},
-                    pagination={**_valid_payload()["pagination"], "stock_total": 1},
-                )
-            )
-        stock = [
-            {
-                "item_key": _T_MEAL,
-                "display_name": _T_MEAL_DISPLAY,
-                "buy_copper": 10,
-                "sell_copper": 5,
-                "stock": 20,
-                "max_stock": 20,
-                "buy": self._action("guild.register"),
-            }
-        ]
-        with self.assertRaises(ProtocolValidationError):
-            validate_services(
-                _valid_payload(
-                    shop={"open": True, "stock": stock, "sellable": []},
-                    pagination={**_valid_payload()["pagination"], "stock_total": 1},
-                )
-            )
-        sellable = [
-            {
-                "item_key": _T_MEAL,
-                "display_name": _T_MEAL_DISPLAY,
-                "sell_copper": 5,
-                "held": 1,
-                "sell": self._action("guild.register"),
-            }
-        ]
-        with self.assertRaises(ProtocolValidationError):
-            validate_services(
-                _valid_payload(
-                    shop={"open": True, "stock": [], "sellable": sellable},
-                    pagination={**_valid_payload()["pagination"], "sellable_total": 1},
-                )
-            )
+        cases = (
+            ("blank key", {"stock": [_stock_row(item_key="")]}),
+            ("blank name", {"stock": [_stock_row(display_name=" ")]}),
+            ("wrong buy id", {"stock": [_stock_row(buy=self._action("guild.register"))]}),
+            ("bad presentation", {"stock": [_stock_row(presentation={"kind": "food"})]}),
+            ("wrong sell id", {"sellable": [_sellable_row(sell=self._action("guild.register"))]}),
+            ("blank sellable key", {"sellable": [_sellable_row(item_key="")]}),
+        )
+        for name, changes in cases:
+            with self.subTest(name=name):
+                shop = {"open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": [], **changes}
+                with self.assertRaises(ProtocolValidationError):
+                    validate_services(
+                        _valid_payload(
+                            shop=shop,
+                            pagination={
+                                **_valid_payload()["pagination"],
+                                "stock_total": len(shop["stock"]),
+                                "sellable_total": len(shop["sellable"]),
+                            },
+                        )
+                    )
 
 
     def test_panel_level_branch_rejections(self):
@@ -351,22 +290,21 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_services(
                 _valid_payload(
-                    shop={"open": True, "stock": [], "sellable": []},
+                    shop={"open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
                     pagination={**_valid_payload()["pagination"], "stock_total": 1},
                 )
             )
         with self.assertRaises(ProtocolValidationError):
             validate_services(
                 _valid_payload(
-                    shop={"open": True, "stock": [], "sellable": []},
+                    shop={"open": True, "member_id": _MEMBER_ID, "stock": [], "sellable": []},
                     pagination={**_valid_payload()["pagination"], "sellable_total": 1},
                 )
             )
         with self.assertRaises(ProtocolValidationError):
             validate_services(
                 _valid_payload(
-                    inventory={"rows": [], "wallet": 0},
-                    pagination={**_valid_payload()["pagination"], "inventory_total": 1},
+                    pagination={**_valid_payload()["pagination"], "stock_total": 1},
                 )
             )
 

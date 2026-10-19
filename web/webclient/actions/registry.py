@@ -542,13 +542,15 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_party_view_member_adapter,
             # A selection republishes the roster and every viewed-member
             # surface: the member-tab facts, the character panel and the bag
-            # tab's inventory panel.
+            # tab's inventory panel, and the shop rows (services v7), which
+            # follow the same viewed member.
             affected_panels=(
                 "party",
                 "party_member",
                 "character",
                 "party_inventory",
                 "item_holdings",
+                "services",
             ),
         )
     )
