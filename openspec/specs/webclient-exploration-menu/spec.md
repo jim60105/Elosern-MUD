@@ -843,7 +843,7 @@ The managed localhost Playwright suite SHALL exercise the exploration surface us
 
 #### Scenario: The suite covers the full exploration journey
 - **WHEN** the suite exercises the exploration surface
-- **THEN** it covers grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; the 任務 and 背包 ‧ 裝備 drawers reachable through Quests/Inventory without a service submenu frame; and reconnect retention
+- **THEN** it covers grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; the 任務 drawer and the party window's 背包 tab reachable through Quests/Inventory without a service submenu frame; and reconnect retention
 
 #### Scenario: The suite asserts the absence of forbidden controls and portrait artifacts
 - **WHEN** an acceptance test inspects the rendered surface

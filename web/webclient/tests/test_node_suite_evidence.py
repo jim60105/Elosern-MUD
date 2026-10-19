@@ -546,14 +546,10 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
-    # Temporary traceability (the repository convention while a change is
-    # applied): the main specs do not yet carry the combat bag requirement
-    # this evidence covers. The archive adds
-    # `webclient-party-window::in-combat-the-bag-shows-counts-and-saves-draft-item-use`
-    # to this annotation.
     @covers_requirement(
         "inventory-item-actions::inventory-tiles-confirm-use-and-directly-toggle-equipment",
         "webclient-party-window::the-bag-action-bar-uses-or-equips-for-the-viewed-member",
+        "webclient-party-window::in-combat-the-bag-shows-counts-and-saves-draft-item-use",
     )
     def test_party_bag_retire_vitest_evidence_passes(self):
         """The in-combat 背包 tab and the old openers (webclient-party-bag-

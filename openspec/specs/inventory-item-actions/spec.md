@@ -74,15 +74,15 @@ source.
 - **THEN** 艾拉's potion is consumed and her MP rises, and the same payload naming the commander is rejected because the commander holds none
 
 ### Requirement: Inventory tiles confirm use and directly toggle equipment
-The combat dock root SHALL add one client-local `背包` row that opens the frameless inventory
-drawer without dispatching, inventing a gameplay action, pushing a router frame, or changing
+The combat dock root SHALL add one client-local `背包` row that opens the party window on its 背包 tab
+without dispatching, inventing a gameplay action, pushing a router frame, or changing
 server-authored combat actions. In exploration an enabled `inventory.use` SHALL open a labelled modal
 confirmation naming the item; confirm SHALL dispatch exactly once, while cancel, close, or
 Escape SHALL dispatch nothing and restore focus to the originating tile.
 
 #### Scenario: Combat root opens the frameless bag locally
 - **WHEN** the player activates `背包` from the combat dock root
-- **THEN** the inventory drawer opens with no `ui_action`, no router frame push, and no change to the committed combat action list
+- **THEN** the party window opens on 背包 with no `ui_action` other than the read-only viewed-member selection, no router frame push, and no change to the committed combat action list
 
 #### Scenario: Healing potion asks before use
 - **WHEN** an eligible healing-potion tile is activated in exploration
@@ -94,7 +94,7 @@ Escape SHALL dispatch nothing and restore focus to the originating tile.
 
 #### Scenario: Equipment toggles without confirmation
 - **WHEN** an enabled equipment tile is activated by pointer or keyboard
-- **THEN** one `inventory.toggle_equip` request carrying only its item key is dispatched immediately and no confirmation dialog opens
+- **THEN** one `inventory.toggle_equip` request carrying the viewed member's `actor_id` and the item key is dispatched immediately and no confirmation dialog opens
 
 #### Scenario: Full accessory set warns without dispatch
 - **WHEN** five accessories are equipped and the player activates a disabled unequipped accessory tile
@@ -118,17 +118,17 @@ Escape SHALL dispatch nothing and restore focus to the originating tile.
 - **THEN** both activation paths produce the same dispatch behavior
 
 #### Scenario: Combat use belongs to the commanded member
-- **WHEN** a usable item is chosen through the in-combat drawer
-- **THEN** it uses that actor canonical choices and the same target/review/combat.command flow, never actorless inventory.use; inspection and commander equipment toggles remain free and no companion equipment-management surface is introduced
+- **WHEN** a usable item is chosen through the in-combat bag tab as 設為 X 本回合的行動…
+- **THEN** it uses the viewed member's canonical combat choices and the same target/review/combat.command flow, never `inventory.use`; inspection and every member's equipment toggles remain free, and transfer controls are absent
 
 ### Requirement: Item dialogs and dispatch state fail closed across replacement and transport changes
 The confirmation dialog and tile-local action state SHALL be client-local and SHALL never mutate
-committed panel data. A services-panel replacement, drawer close, mode change, epoch change, or
+committed panel data. A `party_inventory` replacement, viewed-member change, window close, mode change, epoch change, or
 transport reset SHALL close the dialog and discard its pending local intent. While any mutation
 is in flight, repeated tile activation SHALL emit no second request.
 
 #### Scenario: Replaced inventory retires an open confirmation
-- **WHEN** an item-use confirmation is open and a new services panel commits
+- **WHEN** an item-use confirmation is open and a new `party_inventory` panel commits
 - **THEN** the dialog closes, its old item key cannot be confirmed, and only the new committed rows are actionable
 
 #### Scenario: Rapid activation emits one request

@@ -519,8 +519,8 @@ shop, and inventory sections from canonical persistence even when its revision i
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
 The managed localhost browser suite SHALL exercise, using keyboard controls at 1451x790 and 2560x1440, all
 existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus
-item-use confirmation at both acceptance viewports, full-HP refusal, combat item use through the frameless
-combat bag drawer, and direct equipment toggle.
+item-use confirmation at both acceptance viewports, full-HP refusal, combat item use through the party
+window's 背包 tab, and direct equipment toggle for a named member.
 
 #### Scenario: Guild board journey completes in Chromium
 - **WHEN** a seeded registered member opens the quest drawer from the guild clerk's navigate row and uses Tab and Enter to reach and activate an eligible board offer's accept control
@@ -535,20 +535,20 @@ combat bag drawer, and direct equipment toggle.
 - **THEN** no mutation is sent, cancel or Escape returns without abandoning, and confirm is the only submit path
 
 #### Scenario: Item use requires confirmation at both viewports
-- **WHEN** an eligible potion tile is activated by keyboard at 1451x790 or 2560x1440
-- **THEN** the accessible confirmation remains fully operable, no request precedes confirm, and focus returns to the tile on cancel
+- **WHEN** an eligible potion row's 使用… is activated by keyboard in the party window's 背包 tab at 1451x790 or 2560x1440
+- **THEN** the accessible confirmation remains fully operable, no request precedes confirm, and focus returns to the control on cancel
 
 #### Scenario: Equipment and cap behavior are enforced deterministically
 - **WHEN** rule and adapter tests drive a singleton replacement and fill the accessory slots to the cap
 - **THEN** singleton replacement dispatches once, five accessories can be equipped, a sixth refuses with the committed warning without dispatch, and the showcase renders the capped state
 
 #### Scenario: Minimum viewport retains service essentials
-- **WHEN** shop, quest, or bag is open at the 1451x790 reference viewport with a disabled action focused
+- **WHEN** shop, quest, or the party window's 背包 tab is open at the 1451x790 reference viewport with a disabled action focused
 - **THEN** committed values, disabled reason, controls, and close path remain readable and operable without overlap
 
 #### Scenario: No service surface is mounted while its drawer is closed
 - **WHEN** every reference drawer is closed in exploration or combat
-- **THEN** no shop, quest-board, lore, or inventory surface exists in the DOM or tab order and no fabricated row renders
+- **THEN** no shop, quest-board, lore, or party window surface exists in the DOM or tab order and no fabricated row renders
 
 #### Scenario: Registry gaps move to rule tests and the showcase
 - **WHEN** singleton replacement and the five-accessory cap with its sixth-accessory warning are validated

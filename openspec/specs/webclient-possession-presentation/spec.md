@@ -53,11 +53,11 @@ the integer identities in `party.slots` after decimal-string normalization.
 
 #### Scenario: Inventory shows the possessed NPC's pack
 - **WHEN** the client requests inventory presentation mid-possession
-- **THEN** the rows come from the possessed NPC's own inventory keys, not A's
+- **THEN** the party window's bag rows come from the session's viewed member's own inventory keys (A by default), exactly as without possession, and the wallet shown is A's purse
 
 #### Scenario: Inventory uses the existing item-key surface
 - **WHEN** the inventory/equipment panels render while possessing
-- **THEN** they render from the possessed NPC's own attributes through the existing `toggle_equipment`/item-key surface
+- **THEN** `party_inventory` renders the viewed member's own attributes through the existing `toggle_equipment`/item-key surface, identical to the non-possessed payload
 
 #### Scenario: The status identity addresses the controlled figure
 - **WHEN** the player A possesses companion B

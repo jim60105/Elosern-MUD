@@ -88,17 +88,7 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
             "reference drawers present no router frame and never host a dock row region",
         )
 
-    # Temporary traceability (the repository convention while a change is
-    # applied): webclient-party-bag-retire deleted the old bag drawer and its
-    # doll, and its delta REMOVES these two webclient-contextual-hud
-    # requirements in favour of the party window's 背包 tab. Until the archive
-    # syncs that removal, the bag tab suite — the committed doll above the
-    # viewed member's bounded rows, no invented total, rarity or control —
-    # carries them; the archive drops the two removed IDs and keeps
-    # `webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings`.
     @covers_requirement(
-        "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
-        "webclient-contextual-hud::the-equipment-doll-renders-only-server-authored-slots-and-drops-nothing",
         "webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings",
     )
     def test_bag_tab_rows_and_doll(self):
@@ -125,11 +115,8 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
             "character-status drawer section degradation",
         )
 
-    # Temporary traceability: webclient-party-bag-retire RENAMES this
-    # requirement; the archive re-points the annotation to
-    # `webclient-contextual-hud::the-party-purse-renders-exactly-once-per-window`.
     @covers_requirement(
-        "webclient-contextual-hud::the-drawer-layer-renders-the-wallet-exactly-once"
+        "webclient-contextual-hud::the-party-purse-renders-exactly-once-per-window"
     )
     def test_drawer_layer_single_wallet(self):
         # Across the whole drawer layer the party purse renders exactly once
