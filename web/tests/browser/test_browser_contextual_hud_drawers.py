@@ -38,13 +38,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "shop-panel",
         "quest-drawer",
         "lore-codex-drawer",
-        "character-status-drawer",
+        "party-status-tab",
     ]
 
-    def _open_status_drawer(self, page):
+    def _open_reference_drawer(self, page):
+        # The skill book stands for any framed reference drawer (the
+        # character-status drawer retired into the party window's 狀態 tab,
+        # webclient-party-status-tab).
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
-            "if (s) s.openHudDrawer('status'); }"
+            "if (s) s.openHudDrawer('skill'); }"
         )
         page.wait_for_selector('[data-testid="hud-drawer"]', timeout=15000)
 
@@ -89,7 +92,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 # preserved #action-dock holds focus, so Escape returns focus
                 # there (the opener is the dock, not <body>).
                 focus_action_dock(page)
-                self._open_status_drawer(page)
+                self._open_reference_drawer(page)
                 stage = page.locator('[data-testid="elosern-stage"]')
 
                 # The open drawer recesses the stage (task 9.6 assertion inline).
@@ -160,7 +163,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # Open the drawer while #action-dock holds focus so the opener (the
         # element focused when the drawer opened) is the preserved dock.
         focus_action_dock(page)
-        self._open_status_drawer(page)
+        self._open_reference_drawer(page)
         self.assertEqual(
             stage.get_attribute("data-menu-open"), "true",
             "the open reference drawer recesses the stage",
@@ -245,17 +248,17 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        # Drawer-vs-drawer: the status drawer is open (the public test seam
+        # Drawer-vs-drawer: the skill drawer is open (the public test seam
         # the H4 journeys use), then the codex opens through the same single
         # store entry point the utility-strip control routes to.
-        self._open_status_drawer(page)
+        self._open_reference_drawer(page)
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('lore'); }"
         )
         page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="character-status-drawer"]').count(),
+            page.locator('[data-testid="skill-book"]').count(),
             0,
             "opening the codex drawer closes the open reference drawer",
         )
@@ -347,128 +350,111 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         page.close()
 
-    def test_status_drawer_tiles_and_pills_fit_with_no_overlap(self):
-        """The re-chromed 角色狀態 drawer: the stat tiles and condition pills
-        wrap without overlap or horizontal overflow at both viewports, and
-        every tile and pill stays reachable inside the drawer's bounded
-        scroll (the design's card-tile / pill-badge presentation; the drawer
-        body is the bounded, vertically scrollable surface).
+    @covers_requirement("webclient-party-window::the-status-tab-shows-conditions-and-an-honest-disguise")
+    def test_status_tab_rows_fit_with_no_overlap(self):
+        """The party window's 狀態 tab (webclient-party-status-tab): the
+        hero, gauges, trait rows and condition rows fit the list column with
+        no overlap or horizontal overflow at both viewports, and every row
+        stays reachable inside the column's bounded scroll.
 
-        Exercises a low-HP resource (the 危險 marker case) and a 9-condition
-        roster spanning all five severities (more than the H2 island's 6-item
-        cap), including a multi-modifier condition and several durations.
+        Exercises a low-HP member row and a 9-condition roster spanning all
+        five severities, including a multi-modifier condition and several
+        durations.
         """
+        def condition(code, label, severity, remaining=None, modifiers=None):
+            return {
+                "code": code, "label": label, "severity": severity,
+                "remaining_seconds": remaining, "modifiers": modifiers or {}, "source": "狀態",
+            }
+
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 focus_action_dock(page)
-                status = valid_status_panel("艾倫‧灰誓", "char-42")
-                status["resources"]["hp"] = {"current": 12, "maximum": 405}
-                # The signed modifier values mirror the deterministic
-                # combat_modifiers.yaml (defense -15, agility -10, hp -3):
-                # the global JSON-safety bound now spans the full
-                # JavaScript-safe range, so the roster reaches the drawer.
-                status["conditions"] = [
-                    {"code": "regen", "label": "再生", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "beneficial", "remaining_seconds": 30},
-                    {"code": "fog_veil", "label": "霧隱", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "informational"},
-                    {
-                        "code": "focus",
-                        "label": "專注",
-                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "warning",
-                        "remaining_seconds": 10,
-                        "modifiers": {"atk_phys": 5},
-                    },
-                    {
-                        "code": "exposure",
-                        "label": "高露出",
-                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful",
-                        "modifiers": {"defense": -15, "agility": -10},
-                    },
-                    {
-                        "code": "bleed",
-                        "label": "出血",
-                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful",
-                        "remaining_seconds": 20,
-                        "modifiers": {"hp": -3},
-                    },
-                    {"code": "paralyze", "label": "癱瘓", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "critical"},
-                    {"code": "shield", "label": "護盾", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "beneficial", "remaining_seconds": 15},
-                    {"code": "chill", "label": "失溫", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful", "remaining_seconds": 8},
-                    {"code": "lucky", "label": "幸運", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "informational", "remaining_seconds": 60},
-                ]
-                character = valid_character_panel()
-                _inject_snapshot(page, {"status": status, "character": character}, mode="exploration")
+                character = valid_character_panel(
+                    member_id=42,
+                    conditions=[
+                        condition("regen", "再生", "beneficial", 30),
+                        condition("fog_veil", "霧隱", "informational"),
+                        condition("focus", "專注", "warning", 10, {"atk_phys": 5}),
+                        condition("exposure", "高露出", "harmful", None, {"defense": -15, "agility": -10}),
+                        condition("bleed", "出血", "harmful", 20, {"heal_gain": -3}),
+                        condition("paralyze", "癱瘓", "critical"),
+                        condition("shield", "護盾", "beneficial", 15),
+                        condition("chill", "失溫", "harmful", 8),
+                        condition("lucky", "幸運", "informational", 3725),
+                    ],
+                )
+                party = {
+                    "schema_version": 3, "available": True,
+                    "general_quota": {"used": 0, "limit": 4}, "viewed_member_id": 42,
+                    "slots": [{
+                        "identity": 42, "display_name": "艾倫‧灰誓", "portrait_ref": None,
+                        "hp_current": 12, "hp_maximum": 405, "mp_current": 50, "mp_maximum": 50,
+                        "sp_current": 40, "sp_maximum": 40, "role": "commander", "knocked_out": False,
+                        "unread": False, "bond_stage": None, "membership": None,
+                    }],
+                }
+                _inject_snapshot(
+                    page,
+                    {"status": valid_status_panel("艾倫‧灰誓", "42"), "character": character, "party": party},
+                    mode="exploration",
+                )
                 _wait_mode(page, "exploration")
-                self._open_status_drawer(page)
-                page.wait_for_selector('[data-testid="character-status-drawer__condition--regen"]', timeout=15000)
+                page.evaluate(
+                    "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+                    "if (s) s.openHudDrawer('status'); }"
+                )
+                page.wait_for_selector('[data-testid="party-status-tab__condition--regen"]', timeout=15000)
 
                 fit = page.evaluate(
                     """() => {
-                      const body = document.querySelector('.hud-drawer__body');
-                      if (!body) return { ok: false, reason: 'drawer body missing' };
-                      const bodyRect = body.getBoundingClientRect();
-                      const tiles = Array.from(document.querySelectorAll(
-                        '[data-testid^="character-status-drawer__vital--"], ' +
-                        '[data-testid^="character-status-drawer__trait--"], ' +
-                        '[data-testid="character-status-drawer__guild-rank"], ' +
-                        '[data-testid="character-status-drawer__guild-merit"]'));
-                      const pills = Array.from(document.querySelectorAll('.character-status-drawer__pill'));
-                      const els = [...tiles, ...pills];
-                      // Per-element overflow: a tile or pill whose text content
-                      // is wider than its own box would scroll internally.
-                      for (const el of els) {
+                      const column = document.querySelector('[data-testid="party-status-tab"] [data-testid="list-detail__list"]');
+                      if (!column) return { ok: false, reason: 'list column missing' };
+                      const colRect = column.getBoundingClientRect();
+                      const rows = Array.from(column.querySelectorAll(
+                        '[data-testid^="party-status-tab__gauge--"], [role="option"]'));
+                      for (const el of rows) {
                         if (el.scrollWidth > el.clientWidth + 1) {
-                          return { ok: false, reason: 'element content overflows its box' };
+                          return { ok: false, reason: 'row content overflows its box: ' + el.dataset.testid };
                         }
                       }
-                      const boxes = els.map((el) => el.getBoundingClientRect());
-                      // Non-intersection pattern (fix-webclient-local-map-node-crowding):
-                      // no two tiles/pills may overlap.
+                      const boxes = rows.map((el) => el.getBoundingClientRect());
                       for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
                           const a = boxes[i], b = boxes[j];
-                          const overlap = !(
-                            a.right <= b.left || b.right <= a.left ||
-                            a.bottom <= b.top || b.bottom <= a.top
-                          );
-                          if (overlap) return { ok: false, reason: 'tile/pill pair overlaps' };
+                          const overlap = !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+                          if (overlap) return { ok: false, reason: 'row pair overlaps' };
                         }
                       }
-                      // Boundary: no tile/pill spills past the drawer's horizontal
-                      // content box.
                       for (const box of boxes) {
-                        if (box.left < bodyRect.left || box.right > bodyRect.right) {
-                          return { ok: false, reason: 'box outside drawer horizontal bounds' };
+                        if (box.left < colRect.left - 1 || box.right > colRect.right + 1) {
+                          return { ok: false, reason: 'row outside the column horizontally' };
                         }
                       }
-                      // The drawer body is the design's bounded, vertically
-                      // scrollable surface (HudDrawer.vue .hud-drawer__body
-                      // overflow-y: auto), so a roster taller than the body
-                      // is reached by scrolling — the horizontal bounds and
-                      // the no-overlap rule above carry the fit contract.
-                      // What must never happen is unreachable content: each
-                      // element scrolled into view must become fully visible
-                      // inside the body's visible box.
-                      for (const el of els) {
+                      for (const el of rows) {
                         el.scrollIntoView({ block: 'nearest' });
                         const b = el.getBoundingClientRect();
-                        if (b.top < bodyRect.top - 1 || b.bottom > bodyRect.bottom + 1) {
-                          return { ok: false, reason: 'box unreachable inside the scrollable drawer body' };
+                        if (b.top < colRect.top - 1 || b.bottom > colRect.bottom + 1) {
+                          return { ok: false, reason: 'row unreachable inside the scrollable column' };
                         }
                       }
-                      // No unexpected horizontal overflow in the drawer body.
-                      if (body.scrollWidth > body.clientWidth + 1) {
-                        return { ok: false, reason: 'drawer body has horizontal overflow' };
+                      if (column.scrollWidth > column.clientWidth + 1) {
+                        return { ok: false, reason: 'list column has horizontal overflow' };
                       }
-                      return { ok: true, tileCount: tiles.length, pillCount: pills.length };
+                      const options = rows.filter((el) => el.getAttribute('role') === 'option');
+                      return {
+                        ok: true,
+                        gaugeCount: rows.length - options.length,
+                        conditionCount: options.filter((el) => el.dataset.severity).length,
+                        traitCount: options.filter((el) => !el.dataset.severity).length,
+                      };
                     }"""
                 )
-                self.assertTrue(fit["ok"], f"status drawer tiles and pills fit at {viewport}: {fit}")
-                self.assertEqual(fit["pillCount"], 9, "all 9 conditions render as pills")
-                self.assertEqual(fit["tileCount"], 6, "3 vitals + 1 trait + 2 guild tiles render")
-                # Visual evidence for the design-alignment check (task 6.5).
-                if viewport == (1451, 790):
-                    page.screenshot(path=f"tmp/status_drawer_{viewport[0]}x{viewport[1]}.png")
+                self.assertTrue(fit["ok"], f"status tab rows fit at {viewport}: {fit}")
+                self.assertEqual(fit["conditionCount"], 9, "all 9 conditions render as rows")
+                self.assertEqual(fit["gaugeCount"], 3, "the three gauges render")
+                self.assertEqual(fit["traitCount"], 1, "the one static trait renders")
                 page.close()
 
     # ------------------------------------------------------------------
@@ -537,9 +523,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 page.locator('[data-testid="command-line-toggle"]').click()
                 page.wait_for_selector('[data-testid="anchor-command-line"][data-expanded="true"]', timeout=15000)
 
-                self._open_status_drawer(page)
+                self._open_reference_drawer(page)
                 probe = page.evaluate(self._FRAME_PROBE, '[data-testid="hud-drawer"]')
-                self._assert_workspace_frame(probe, "the status drawer", viewport)
+                self._assert_workspace_frame(probe, "the skill drawer", viewport)
                 self.assertEqual(probe["stripTestid"], "hud-drawer-scrim",
                                  "the drawer scrim covers the band's exposed strip")
                 page.keyboard.press("Escape")

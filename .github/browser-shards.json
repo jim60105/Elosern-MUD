@@ -366,7 +366,7 @@
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_quest_drawer_offers_no_codex_control",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
-        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap",
+        "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_status_tab_rows_fit_with_no_overlap",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_command_window_scrolls_its_rows_and_details_the_current_frame",
         "web.tests.browser.test_browser_contextual_hud_drawers.ContextualHudBrowserTest.test_reference_surfaces_share_one_opaque_workspace_frame"
       ]
@@ -443,7 +443,7 @@
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_preset_selection_confirm_activate_reaches_exploration",
         "web.tests.browser.test_browser_creation_preset.PresetCreationJourneys.test_rejected_preset_save_stays_on_the_list_without_confirmation",
         "web.tests.browser.test_browser_layout.ContextualHudStandingJourneyTest",
-        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_only_character_drawers_stand_a_bounded_portrait_beside_the_hero"
+        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_status_opens_the_party_window_hero_and_no_drawer_stands_art"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_from_reset_confirm_returns_to_form_without_mutation",

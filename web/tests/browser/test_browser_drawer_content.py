@@ -1,5 +1,5 @@
 """Drawer content acceptance (webclient-drawer-content-polish): honest art
-placement and the character-status hero, the shared empty guidance giving way
+placement and the party window's 狀態 hero, the shared empty guidance giving way
 to an unavailable reason, and lineage rows identified by their supplied root
 names with progress beside them.
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest, ui_scale
+from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     inject_update,
     valid_character_panel,
@@ -52,6 +52,22 @@ _ART_PROBE = """() => {
   };
 }"""
 
+def _commander_party_panel() -> dict:
+    """A committed party v3 panel of the commander alone, the viewed member."""
+    return {
+        "schema_version": 3,
+        "available": True,
+        "general_quota": {"used": 0, "limit": 4},
+        "viewed_member_id": 42,
+        "slots": [{
+            "identity": 42, "display_name": "燼行者", "portrait_ref": None,
+            "hp_current": 100, "hp_maximum": 100, "mp_current": 50, "mp_maximum": 50,
+            "sp_current": 40, "sp_maximum": 40, "role": "commander", "knocked_out": False,
+            "unread": False, "bond_stage": None, "membership": None,
+        }],
+    }
+
+
 _LINEAGE_NODE = {
     "owned": True, "usable": True, "ready": False, "level": 1,
     "xp_into_level": 3.0, "xp_to_next_level": 7.0, "capped": False,
@@ -91,151 +107,56 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::drawer-art-and-identity-match-the-subject",
-        "webclient-contextual-hud::the-character-status-drawer-degrades-section-by-section-and-never-substitutes-a-disguise",
+        "webclient-party-window::the-status-tab-shows-true-values-with-a-trait-waterfall",
     )
-    def test_only_character_drawers_stand_a_bounded_portrait_beside_the_hero(self):
-        """The status drawer bounds its portrait column and names the
-        committed character; the quest and codex drawers carry no art and
-        use the whole workspace width; the stat cards share equal tracks."""
+    def test_status_opens_the_party_window_hero_and_no_drawer_stands_art(self):
+        """The 狀態 opener opens the party window on its 狀態 tab, whose hero
+        names the viewed member with the supplied title and guild rank; the
+        quest and codex drawers carry no art and use the whole workspace
+        width (webclient-party-status-tab)."""
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
-                portrait_url = "/art/t_drawer_full_figure.svg"
-                page.route(
-                    "**" + portrait_url,
-                    lambda route: route.fulfill(
-                        content_type="image/svg+xml",
-                        body='<svg xmlns="http://www.w3.org/2000/svg" width="300" height="1200">'
-                        '<rect width="300" height="1200" fill="seagreen"/>'
-                        '<rect width="300" height="100" fill="goldenrod"/></svg>',
-                    ),
-                )
-                status = valid_status_panel("燼行者", "42")
-                status["actor"]["full_title"] = "見習冒險者　灰燼旅人"
                 _inject_snapshot(
                     page,
                     {
                         "local_map": valid_local_map_panel(),
-                        "status": status,
-                        "character": valid_character_panel(),
+                        "status": valid_status_panel("燼行者", "42"),
+                        "character": valid_character_panel(member_id=42, full_title="見習冒險者　灰燼旅人"),
+                        "party": _commander_party_panel(),
                         "lore_codex": valid_lore_codex_panel(),
-                        "roster": {
-                            "schema_version": 3,
-                            "available": True,
-                            "characters": [{
-                                "identity": 42, "name": "燼行者", "current": True, "pending": False,
-                                # The row's portrait IS the complete canonical
-                                # descriptor: a resolved candidate with its own
-                                # geometry and no terminal of its own here.
-                                "portrait": {
-                                    "subject_id": "portrait:character:42",
-                                    "revision": "4" * 64,
-                                    "generation_subject": "portrait:character:42",
-                                    "generation_state": "done",
-                                    "attempts": [{
-                                        "type": "image",
-                                        "source_id": "portrait.classic:portrait:character:42",
-                                        "rank": 40,
-                                        "resource": {
-                                            "resource_id": portrait_url,
-                                            "version": "5" * 64,
-                                            "url": portrait_url,
-                                            "origin": "runtime",
-                                            "geometry": {
-                                                "image_size": None,
-                                                "face_rect": {"x": 0.25, "y": 0.0, "w": 0.5, "h": 0.1},
-                                                "stage": {"scale": 0.6, "x": 0.0, "y": 0.0},
-                                                "aspect_ratio": "3:4",
-                                            },
-                                        },
-                                    }],
-                                    "terminal": None,
-                                    "retention_sources": [],
-                                },
-                            }],
-                            "can_create": False, "max_characters": 3,
-                            "switch_locked": False, "lock_reason": None,
-                        },
                     },
                     mode="exploration",
                 )
                 _wait_mode(page, "exploration")
 
-                _open_drawer(page, "status")
-                page.wait_for_function(
-                    """() => {
-                      const image = document.querySelector('.hud-drawer__art .reference-artwork--stage img');
-                      return image && image.naturalWidth === 300 && image.naturalHeight === 1200;
-                    }"""
+                page.evaluate(
+                    "() => { const s = window.__elosernBridge && window.__elosernBridge.store; if (s) s.openHudDrawer('status'); }"
                 )
-                # Object fitting happens before the saved transform. Recover
-                # the painted bounds from the transformed box, not the box
-                # alone: a cover-cropped image can have an in-bounds box.
-                painted = page.evaluate(
-                    """() => {
-                      const art = document.querySelector('.hud-drawer__art').getBoundingClientRect();
-                      const image = document.querySelector('.hud-drawer__art .reference-artwork--stage img');
-                      const box = image.getBoundingClientRect();
-                      const style = getComputedStyle(image);
-                      const fit = (style.objectFit === 'contain' ? Math.min : Math.max)(
-                        image.clientWidth / image.naturalWidth,
-                        image.clientHeight / image.naturalHeight);
-                      const width = image.naturalWidth * fit * box.width / image.clientWidth;
-                      const height = image.naturalHeight * fit * box.height / image.clientHeight;
-                      return {
-                        top: box.bottom - height, bottom: box.bottom,
-                        left: (box.left + box.right - width) / 2,
-                        right: (box.left + box.right + width) / 2,
-                        artTop: art.top, artBottom: art.bottom,
-                        artLeft: art.left, artRight: art.right,
-                        position: style.objectPosition,
-                      };
-                    }"""
-                )
-                self.assertEqual(painted["position"], "50% 100%")
-                self.assertGreaterEqual(painted["top"], painted["artTop"] - 1, painted)
-                self.assertLessEqual(painted["bottom"], painted["artBottom"] + 1, painted)
-                self.assertGreaterEqual(painted["left"], painted["artLeft"] - 1, painted)
-                self.assertLessEqual(painted["right"], painted["artRight"] + 1, painted)
-                probe = page.evaluate(_ART_PROBE)
-                # `.hud-drawer__art` is `flex: 0 0 min(360px * var(--ui-scale), 28%)`,
-                # so the bound scales with the chrome factor at every size. The
-                # scaled literal is rounded to a subpixel: the layout engine
-                # rounds 360px * 1.4 to 504, and the float product's tail must
-                # not decide the assertion.
-                bound = min(
-                    round(360 * ui_scale(viewport), 3),
-                    0.28 * probe["workspaceWidth"],
-                )
-                self.assertIsNotNone(probe["artWidth"], "the status drawer stands its portrait column")
-                self.assertLessEqual(probe["artWidth"], bound + 1)
-                self.assertNotIn("肖像生成中", probe["artText"] or "")
-                hero = page.locator('[data-testid="character-status-drawer__hero"]')
-                self.assertEqual(hero.locator('[data-testid="character-status-drawer__name"]').inner_text(), "燼行者")
+                page.wait_for_selector('[data-testid="party-status-tab"]', timeout=15000)
                 self.assertEqual(
-                    hero.locator('[data-testid="character-status-drawer__full-title"]').inner_text(),
+                    page.locator('[data-testid="hud-drawer"]').get_attribute("data-drawer-key"), "party"
+                )
+                self.assertIsNone(page.evaluate(_ART_PROBE)["artWidth"], "the party window stands no art column")
+                hero = page.locator('[data-testid="party-status-tab__hero"]')
+                self.assertEqual(hero.locator('[data-testid="party-status-tab__name"]').inner_text(), "燼行者")
+                self.assertEqual(
+                    hero.locator('[data-testid="party-status-tab__title"]').inner_text(),
                     "見習冒險者　灰燼旅人",
                 )
                 self.assertEqual(
-                    hero.locator('[data-testid="character-status-drawer__hero-rank"]').inner_text(),
+                    hero.locator('[data-testid="party-status-tab__guild"] [role="img"]').get_attribute("aria-label"),
                     "公會階級 銀牌",
                 )
-                # The secondary openers sit in the hero's one action row (the
-                # party opener joins it only while a party panel is present).
+                self.assertIn("120", hero.locator('[data-testid="party-status-tab__merit"]').inner_text())
+                # The true trait and its waterfall are on screen; the gauges
+                # carry their numbers.
                 self.assertEqual(
-                    hero.locator('[role="group"] [data-testid="character-status-drawer__open-skill"]').count(), 1
+                    page.locator('[data-testid="party-status-tab__effective--magic_power"]').inner_text(), "27"
                 )
-                # The drawer title renders once, in the shared header only.
-                body_text = page.locator('[data-testid="character-status-drawer"]').inner_text()
-                self.assertNotIn("角色狀態", body_text)
-                # The vitals cards share equal-width tracks.
-                widths = page.evaluate(
-                    """() => Array.from(document.querySelectorAll(
-                        '[data-testid="character-status-drawer__vitals"] .character-status-drawer__statrow'
-                    )).map((el) => Math.round(el.getBoundingClientRect().width))"""
+                self.assertIn(
+                    "100 / 100", page.locator('[data-testid="party-status-tab__gauge--hp"]').inner_text()
                 )
-                self.assertEqual(len(widths), 3)
-                self.assertLessEqual(max(widths) - min(widths), 1, widths)
                 _close_drawer(page)
 
                 for name in ("quest", "lore"):

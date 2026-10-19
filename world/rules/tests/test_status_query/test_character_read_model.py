@@ -491,8 +491,8 @@ class CharacterReadModelTests(EvenniaTestCase):
 
     def test_trait_key_union_matches_the_client_attribute_allowlist(self):
         # Pinned contract: the four true-attribute keys the WebClient's
-        # CharacterStatusDrawer.vue ATTRIBUTE_KEYS allowlist hardcodes
-        # (web/webclient-app/components/CharacterStatusDrawer.vue). If a
+        # 狀態 tab STATUS_TRAIT_KEYS allowlist hardcodes
+        # (web/webclient-app/components/party-status-model.js). If a
         # fifth key is ever added to _STATIC_KEYS or _COUNTER_KEYS, this
         # test fails by name and forces a conscious, lockstep update of the
         # client allowlist rather than a silent gap in the 屬性 section.
