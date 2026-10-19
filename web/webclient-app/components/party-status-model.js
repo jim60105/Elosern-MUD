@@ -36,11 +36,23 @@ export function defaultSelection(traits, conditions, wanted = null) {
   return null;
 }
 
-// Whether a selection still names a committed row.
+// Whether a selection still names a committed row (conditions by their
+// local key, see conditionKeys).
 export function selectionExists(selection, traits, conditions) {
   if (!selection) return false;
   if (selection.type === "trait") return traits.some((row) => row.key === selection.key);
   return conditions.some((row) => row.code === selection.key);
+}
+
+// The condition rows with a local key each: the code, suffixed `#n` from
+// the second occurrence of the same code, so two rows never share a key.
+export function conditionKeys(conditions) {
+  const seen = new Map();
+  return (Array.isArray(conditions) ? conditions : []).map((condition) => {
+    const count = seen.get(condition.code) ?? 0;
+    seen.set(condition.code, count + 1);
+    return { code: count ? `${condition.code}#${count + 1}` : condition.code, condition };
+  });
 }
 
 const MINUS = "−";

@@ -282,6 +282,40 @@ describe("PartyStatusTab (webclient-party-status-tab)", () => {
     expect(wrapper.text()).not.toMatch(/你|自己|操控中/);
   });
 
+  it("selects the first layered trait when the payload arrives after the member", async () => {
+    mountTab({ character: null, initialTrait: "defense" });
+    expect(findTestId("party-status-tab__listbox").exists()).toBe(false);
+    await wrapper.setProps({ character: CHARACTER_STATUS_COMPANION_SAMPLE });
+    // The first selection still honours the requested trait.
+    expect(byTestId("party-status-tab__trait--defense").attributes("aria-selected")).toBe("true");
+    // A later payload that drops the selected row falls back to the first
+    // layered trait, not to the requested one again.
+    await byTestId("party-status-tab__condition--moon_blessing").trigger("click");
+    await wrapper.setProps({ character: { ...CHARACTER_STATUS_COMPANION_SAMPLE, conditions: [] } });
+    expect(byTestId("party-status-tab__trait--agility").attributes("aria-selected")).toBe("true");
+  });
+
+  it("keeps two rows of the same condition code apart", async () => {
+    const twice = CHARACTER_STATUS_COMPANION_SAMPLE.conditions[1];
+    mountTab({ character: { ...CHARACTER_STATUS_COMPANION_SAMPLE, conditions: [twice, { ...twice, source: "裝備", remaining_seconds: 60 }] } });
+    await byTestId("party-status-tab__condition--light_fatigue#2").trigger("click");
+    expect(wrapper.findAll('[role="option"][aria-selected="true"]')).toHaveLength(1);
+    expect(byTestId("party-status-tab__fact--source").text()).toBe("裝備");
+  });
+
+  it("renders no empty 狀態 group inside the listbox without conditions", () => {
+    mountTab({ member: COMMANDER, character: CHARACTER_PANEL_UNDISGUISED_SAMPLE });
+    const groups = byTestId("party-status-tab__listbox").findAll('[role="group"]');
+    expect(groups.map((node) => node.attributes("aria-label"))).toEqual(["屬性"]);
+    expect(byTestId("party-status-tab__no-conditions").text()).toBe("無");
+  });
+
+  it("pairs each gauge with an icon shape besides its label", () => {
+    mountTab();
+    const paths = ["hp", "mp", "sp"].map((key) => byTestId(`party-status-tab__gauge--${key}`).get("svg path").attributes("d"));
+    expect(new Set(paths).size).toBe(3);
+  });
+
   it("falls back to the first trait, then the first condition", () => {
     const traits = statusTraits(CHARACTER_PANEL_UNDISGUISED_SAMPLE);
     expect(defaultSelection(traits, [])).toEqual({ type: "trait", key: "atk_phys" });

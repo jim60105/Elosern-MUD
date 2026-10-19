@@ -5,7 +5,7 @@
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the party window's `PartyStatusTab`, and the `SkillBook`
 components SHALL present the `status` panel payload (schema version 1), the `character` panel
-payload (schema version 3), and the character's skill data, each surface rendering only its
+payload (schema version 9), and the character's skill data, each surface rendering only its
 OOB-backed payload and inventing no field.
 
 #### Scenario: Status is never color-only

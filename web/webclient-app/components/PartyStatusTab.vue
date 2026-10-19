@@ -32,6 +32,7 @@ import {
   NO_MODIFIER_TEXT,
   TREND_GLYPHS,
   activeDisguise,
+  conditionKeys,
   defaultSelection,
   formatLayerAmount,
   formatRemaining,
@@ -72,6 +73,9 @@ const detail = computed(() => {
 });
 const traits = computed(() => statusTraits(detail.value));
 const conditions = computed(() => statusConditions(detail.value));
+// Each condition row's local key: its code, suffixed by its occurrence when
+// the payload lists the same code twice (the wire does not forbid it).
+const conditionRows = computed(() => conditionKeys(conditions.value));
 const guild = computed(() => guildStanding(detail.value));
 const title = computed(() => fullTitle(detail.value));
 const disguise = computed(() => activeDisguise(detail.value));
@@ -79,35 +83,43 @@ const disguise = computed(() => activeDisguise(detail.value));
 const portrait = computed(() => (props.member ? portraitFor(props.artPanel, props.member.portrait_ref) : null));
 const hasReference = computed(() => props.member?.portrait_ref !== null && props.member?.portrait_ref !== undefined);
 
+// The vitals dock's gauge icons (VitalsTrack): a heart, a star and a bolt,
+// so each gauge pairs a shape and a text label with its numbers.
+const GAUGE_ICONS = Object.freeze({
+  hp: "M12 21s-8-5.5-8-11a4.5 4.5 0 0 1 8-2 4.5 4.5 0 0 1 8 2c0 5.5-8 11-8 11z",
+  mp: "M12 2l2.7 6.3 6.3 2.7-6.3 2.7L12 20l-2.7-6.3L3 11l6.3-2.7L12 2z",
+  sp: "M13 2L4.5 13H11l-1 9L19 10h-6.5L13 2z",
+});
 const gauges = computed(() => {
   const row = props.member;
   if (!row) return [];
   return [
-    { key: "hp", label: "HP", name: "生命", tone: "hp", current: row.hp_current, maximum: row.hp_maximum },
-    { key: "mp", label: "MP", name: "魔力", tone: "mp", current: row.mp_current, maximum: row.mp_maximum },
-    { key: "sp", label: "SP", name: "耐力", tone: "sp", current: row.sp_current, maximum: row.sp_maximum },
+    { key: "hp", label: "HP", name: "生命", tone: "hp", icon: GAUGE_ICONS.hp, current: row.hp_current, maximum: row.hp_maximum },
+    { key: "mp", label: "MP", name: "魔力", tone: "mp", icon: GAUGE_ICONS.mp, current: row.mp_current, maximum: row.mp_maximum },
+    { key: "sp", label: "SP", name: "耐力", tone: "sp", icon: GAUGE_ICONS.sp, current: row.sp_current, maximum: row.sp_maximum },
   ];
 });
 
 // ---------------------------------------------------------------- selection
 
 const selection = ref(null);
-function reselect() {
-  selection.value = defaultSelection(traits.value, conditions.value, props.initialTrait);
+// The requested trait applies to a first selection only; a later payload
+// that drops the selected row falls back to the first layered trait.
+function reselect(first) {
+  selection.value = defaultSelection(traits.value, conditionRows.value, first ? props.initialTrait : null);
 }
-watch(() => props.member?.identity ?? null, reselect, { immediate: true });
-// A new payload that drops the selected row (or the first one arriving)
-// falls back to the same default.
-watch([traits, conditions], () => {
-  if (!selectionExists(selection.value, traits.value, conditions.value)) reselect();
+watch(() => props.member?.identity ?? null, () => reselect(true), { immediate: true });
+watch([traits, conditionRows], () => {
+  if (!selectionExists(selection.value, traits.value, conditionRows.value)) reselect(selection.value === null);
 });
 
 const selectedTrait = computed(() =>
   selection.value?.type === "trait" ? (traits.value.find((row) => row.key === selection.value.key) ?? null) : null,
 );
 const selectedCondition = computed(() =>
-  selection.value?.type === "condition" ? (conditions.value.find((row) => row.code === selection.value.key) ?? null) : null,
+  selection.value?.type === "condition" ? (conditionRows.value.find((row) => row.code === selection.value.key)?.condition ?? null) : null,
 );
+const selectedConditionKey = computed(() => (selectedCondition.value ? selection.value.key : null));
 function isSelected(type, key) {
   return selection.value?.type === type && selection.value.key === key;
 }
@@ -121,9 +133,9 @@ function select(type, key) {
 const listbox = ref(null);
 const tabStop = computed(() => {
   if (selectedTrait.value) return `trait:${selectedTrait.value.key}`;
-  if (selectedCondition.value) return `condition:${selectedCondition.value.code}`;
+  if (selectedCondition.value) return `condition:${selectedConditionKey.value}`;
   if (traits.value.length) return `trait:${traits.value[0].key}`;
-  return conditions.value.length ? `condition:${conditions.value[0].code}` : null;
+  return conditionRows.value.length ? `condition:${conditionRows.value[0].code}` : null;
 });
 function onListKeydown(event) {
   const options = [...(listbox.value?.querySelectorAll('[role="option"]') ?? [])];
@@ -193,6 +205,7 @@ function summaryText(condition) {
               :class="`party-status-tab__gauge--${gauge.tone}`"
               :data-testid="`party-status-tab__gauge--${gauge.key}`"
             >
+              <svg class="party-status-tab__gauge-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="gauge.icon" fill="currentColor" /></svg>
               <span class="party-status-tab__gauge-label" :title="gauge.name">{{ gauge.label }}</span>
               <span class="party-status-tab__track" aria-hidden="true"><i :style="{ width: `${gaugePercent(gauge.current, gauge.maximum)}%` }"></i></span>
               <span class="party-status-tab__gauge-value">{{ gauge.current }}<small> / {{ gauge.maximum }}</small></span>
@@ -240,20 +253,20 @@ function summaryText(condition) {
               </button>
             </div>
 
-            <div class="party-status-tab__group" role="group" aria-label="狀態">
-              <div class="party-status-tab__sech" aria-hidden="true">狀態<span class="party-status-tab__sech-count">{{ conditions.length }}</span></div>
+            <div v-if="conditionRows.length" class="party-status-tab__group" role="group" aria-label="狀態">
+              <div class="party-status-tab__sech" aria-hidden="true">狀態<span class="party-status-tab__sech-count">{{ conditionRows.length }}</span></div>
               <button
-                v-for="condition in conditions"
-                :key="condition.code"
+                v-for="{ code: rowKey, condition } in conditionRows"
+                :key="rowKey"
                 type="button"
                 role="option"
                 class="party-status-tab__row party-status-tab__condition"
-                :class="{ 'is-selected': isSelected('condition', condition.code) }"
-                :aria-selected="isSelected('condition', condition.code) ? 'true' : 'false'"
-                :tabindex="tabStop === `condition:${condition.code}` ? 0 : -1"
+                :class="{ 'is-selected': isSelected('condition', rowKey) }"
+                :aria-selected="isSelected('condition', rowKey) ? 'true' : 'false'"
+                :tabindex="tabStop === `condition:${rowKey}` ? 0 : -1"
                 :data-severity="condition.severity"
-                :data-testid="`party-status-tab__condition--${condition.code}`"
-                @click="select('condition', condition.code)"
+                :data-testid="`party-status-tab__condition--${rowKey}`"
+                @click="select('condition', rowKey)"
               >
                 <span class="party-status-tab__sev" :class="`party-status-tab__sev--${condition.severity}`" aria-hidden="true">{{ severityOf(condition).glyph }}</span>
                 <span class="party-status-tab__row-name">
@@ -264,7 +277,10 @@ function summaryText(condition) {
               </button>
             </div>
           </div>
-          <p v-if="detail && !conditions.length" class="party-status-tab__empty" data-testid="party-status-tab__no-conditions">無</p>
+          <template v-if="detail && !conditionRows.length">
+            <h4 class="party-status-tab__sech">狀態<span class="party-status-tab__sech-count">0</span></h4>
+            <p class="party-status-tab__empty" data-testid="party-status-tab__no-conditions">無</p>
+          </template>
         </template>
       </template>
 
@@ -450,10 +466,17 @@ function summaryText(condition) {
 
 .party-status-tab__gauge {
   display: grid;
-  grid-template-columns: calc(30px * var(--ui-scale)) 1fr auto;
+  grid-template-columns: calc(14px * var(--ui-scale)) calc(26px * var(--ui-scale)) 1fr auto;
   gap: var(--sp-2);
   align-items: center;
   font-size: var(--text-xs);
+}
+
+.party-status-tab__gauge-icon {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+  color: var(--gauge);
+  filter: drop-shadow(0 0 calc(4px * var(--ui-scale)) color-mix(in srgb, var(--gauge) 45%, transparent));
 }
 
 .party-status-tab__gauge--hp { --gauge: var(--vit-hp); }
@@ -507,7 +530,7 @@ function summaryText(condition) {
   gap: var(--sp-2);
   margin: var(--sp-5) 0 var(--sp-2);
   color: var(--gold-300);
-  font: var(--text-base) var(--f-display);
+  font: 400 var(--text-base) var(--f-display);
   letter-spacing: 0.06em;
 }
 
