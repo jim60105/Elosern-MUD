@@ -829,7 +829,10 @@ class ExamRequestTests(ServiceActionBase):
         result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "exam_started")
-        self.assertEqual(result["affected_panels"], ("status", "services", "context_actions"))
+        self.assertEqual(
+            result["affected_panels"],
+            ("status", "services", "context_actions", "item_holdings"),
+        )
         session = read_session(self.player)
         self.assertIsNotNone(session)
         self.assertEqual(session.mode, "guild_exam")
