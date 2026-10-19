@@ -70,6 +70,10 @@ AFFECTED_PANELS = (
     "quest_log",
     "combat_beats",
     "item_holdings",
+    # webclient-party-bag-retire: the party window's 背包 tab is the only bag,
+    # so a round that consumes a member's item republishes the viewed
+    # member's `party_inventory` in the same update.
+    "party_inventory",
 )
 
 

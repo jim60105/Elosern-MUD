@@ -483,6 +483,27 @@ process.stdout.write(JSON.stringify(results));
         self.assertEqual(MAX_ROWS, MAX_MEMBER_INVENTORY_ROWS)
 
 
+class PartyInventoryPublicationTests(unittest.TestCase):
+    """The bag tab's panel rides every update that flips or spends a bag.
+
+    webclient-party-bag-retire made the party window's 背包 tab the only bag:
+    a dock engagement must republish its combat descriptors and a combat
+    round that consumes a member's item must republish its counts, in the
+    same partial update as the holdings strip.
+    """
+
+    @covers_requirement(
+        "webclient-party-inventory-panel::bag-rows-carry-presentation-and-server-authored-descriptors"
+    )
+    def test_engagement_and_rounds_republish_the_bag(self):
+        from web.webclient.actions.exploration_actions import AFFECTED_ENGAGE
+        from world.rules.combat_result import AFFECTED_PANELS
+
+        for name, panels in (("engage", AFFECTED_ENGAGE), ("round", AFFECTED_PANELS)):
+            self.assertIn("party_inventory", panels, name)
+            self.assertIn("item_holdings", panels, name)
+
+
 class PartyInventoryPresenterTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         open_synthetic_scope(self, "items", extra=_SCOPE_EXTRA)
