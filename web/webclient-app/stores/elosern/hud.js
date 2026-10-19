@@ -23,6 +23,7 @@
 // the drawer teardown in `syncHudDrawer`).
 
 import { ref } from "vue";
+import { rememberPartyWindowTab } from "../../components/party-window-memory.js";
 
 export function applyHud(ctx) {
   // The active sub-dock surface (null | "character"): which re-homed
@@ -39,14 +40,23 @@ export function applyHud(ctx) {
     ctx.publishView();
   };
 
-  const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party", "npc_persona", "letters"]);
+  const HUD_DRAWER_NAMES = new Set(["skill", "shop", "quest", "lore", "status", "party", "npc_persona", "letters"]);
   // `npc_persona` (the NPC author editor) never hosts a router frame either:
   // the verb card that opened it stays open (exploration-presence-rail).
-  const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "quest", "shop", "npc_persona", "letters"]);
+  const FRAMELESS_DRAWER_NAMES = new Set(["party", "quest", "shop", "npc_persona", "letters"]);
   const hudDrawer = ref(null);
   ctx.hudDrawer = hudDrawer;
 
   ctx.openHudDrawer = function openHudDrawer(name) {
+    // The retired bag drawer's name stays an opener (webclient-party-bag-
+    // retire): the top navigation's 背包 entry, the exploration 背包 row and
+    // the combat root's client-local 背包 row all open the party window on
+    // its 背包 tab. "inventory" is never stored as the open drawer.
+    if (name === "inventory") {
+      const view = ctx.view.value || {};
+      rememberPartyWindowTab(`${view.generation}|${view.epoch}`, "bag");
+      name = "party";
+    }
     if (!HUD_DRAWER_NAMES.has(name)) {
       console.warn(`openHudDrawer: unknown drawer "${name}" rejected (not coerced)`);
       return false;

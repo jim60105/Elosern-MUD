@@ -146,13 +146,11 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/EquipmentDoll",
     "Data/CharacterStatusDrawer",
     "World/LocalMap",
     "World/ShopPanel",
     "World/QuestDrawer",
     "World/LoreCodexDrawer",
-    "World/InventoryPanel",
     "World/MapLattice",
     # The client-local action-feedback toast queue joined the frozen set
     # when add-action-feedback-toasts refroze the manifest at 42.

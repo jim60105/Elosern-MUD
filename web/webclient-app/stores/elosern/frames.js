@@ -268,20 +268,45 @@ export function applyFrames(ctx) {
     return ctx.submitCombatEnvelope(ctx.buildCombatCommand(command), display);
   };
 
-  // The in-combat drawer's item use (webclient-party-items-tactics): a usable
+  // The in-combat bag's item use (webclient-party-items-tactics): a usable
   // item chosen from the bag is the commanded actor's own round choice, so it
   // enters the canonical item review/target step — the same frame the 道具
   // row opens — and never the actorless `inventory.use`. Refused for an item
   // outside the actor's current usable stock or while a mutation, a played
   // round or the cross-side question holds the dock.
-  ctx.useCombatItem = function useCombatItem(itemKey) {
+  //
+  // The party window's 背包 tab names the member whose round it sets
+  // (webclient-party-bag-retire): when that member is not the commanded one,
+  // the same read-only `combat.actor_choices` query the actor selector sends
+  // switches the card to them first, and the item frame opens only once their
+  // canonical choices committed (`followCombatItem`).
+  ctx.pendingCombatItem = null;
+  ctx.useCombatItem = function useCombatItem(itemKey, actorId) {
     const rs = ctx.reducer.getState();
     const panel = committedCombat(rs);
     if (!panel || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return false;
     }
+    if (typeof itemKey !== "string") {
+      return false;
+    }
+    if (actorId !== null && actorId !== undefined && String(actorId) !== String(commandedActorId(panel))) {
+      const actor = (panel.actors || []).find((row) => String(row.identity) === String(actorId));
+      if (!actor || !actor.commandable || !ctx.requestCombatActor(actor.identity)) {
+        return false;
+      }
+      ctx.pendingCombatItem = {
+        actorId: actor.identity,
+        itemKey,
+        requestId: ctx.pendingActorSelection.requestId,
+        generation: rs.generation,
+        sessionId: panel.session ? panel.session.session_id : null,
+      };
+      ctx.publishView();
+      return true;
+    }
     const combat = ctx.frameResolver.combatModel();
-    if (!combat || typeof itemKey !== "string") {
+    if (!combat) {
       return false;
     }
     const item = combat.itemByKey ? combat.itemByKey[itemKey] : null;
@@ -521,9 +546,10 @@ export function applyFrames(ctx) {
         ctx.publishView();
         return;
       }
-      // The client-local 背包 drawer row (add-inventory-item-actions, task
-      // 6.3): activation opens the frameless inventory drawer without a
-      // dispatch, an invented gameplay action, or a router frame.
+      // The client-local 背包 row (add-inventory-item-actions, task 6.3;
+      // webclient-party-bag-retire): activation opens the party window on its
+      // 背包 tab without a dispatch, an invented gameplay action, or a router
+      // frame (`openHudDrawer` aliases the retired drawer name).
       if (item.openDrawer === "inventory") {
         ctx.openHudDrawer("inventory");
         return;
@@ -1167,6 +1193,52 @@ export function applyFrames(ctx) {
       ctx.crossSideConfirm = null;
       ctx.pendingCombatAdvance = null;
       ctx.lastCombatIdentity = identity;
+    }
+  };
+
+  // The bag's held cross-member item (see `useCombatItem`), run at the very
+  // end of a publication like `autoAdvanceCombatActor`: the view is already
+  // published, so the nested publish of the item frame is the newest one.
+  // It waits while its own actor query is in flight, then opens the item
+  // frame for the now-commanded member, or drops the intent — visibly — when
+  // the switch was refused, rejected or superseded. Any other actor query,
+  // a changed viewed member, a closed party window, a reconnect or a
+  // finished session drops it silently, because the player moved on.
+  ctx.followCombatItem = function followCombatItem(rs) {
+    const held = ctx.pendingCombatItem;
+    if (!held) {
+      return;
+    }
+    const panel = committedCombat(rs);
+    const party = rs.panels ? rs.panels.party : null;
+    const viewed = party && party.available === true ? party.viewed_member_id : null;
+    const otherQuery = !!ctx.pendingActorSelection && ctx.pendingActorSelection.requestId !== held.requestId;
+    if (
+      !panel ||
+      rs.generation !== held.generation ||
+      !panel.session ||
+      panel.session.session_id !== held.sessionId ||
+      ctx.hudDrawer.value !== "party" ||
+      (viewed !== null && viewed !== undefined && String(viewed) !== String(held.actorId)) ||
+      otherQuery
+    ) {
+      ctx.pendingCombatItem = null;
+      return;
+    }
+    if ((ctx.inFlight && ctx.inFlight.requestId === held.requestId) || ctx.pendingActorSelection) {
+      return;
+    }
+    if (String(commandedActorId(panel)) !== String(held.actorId)) {
+      ctx.pendingCombatItem = null;
+      ctx.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
+      return;
+    }
+    if (ctx.inFlight || ctx.beatLocked()) {
+      return;
+    }
+    ctx.pendingCombatItem = null;
+    if (!ctx.useCombatItem(held.itemKey)) {
+      ctx.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
     }
   };
 

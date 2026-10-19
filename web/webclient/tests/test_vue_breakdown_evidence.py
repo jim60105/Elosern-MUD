@@ -48,8 +48,10 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # "<Family>/<Component>", deterministic story names).
 BREAKDOWN_STORY_IDS = {
     "data-characterstatusdrawer--breakdown-chips",
-    "data-equipmentdoll--adjustment-bearing-slots",
-    "world-inventorypanel--joined-adjustment",
+    # webclient-party-bag-retire: the bag tab replaced the doll and the
+    # inventory panel; its equipment story renders the server's per-member
+    # adjustment strings (the `item_holdings` delta changes).
+    "overlays-partybagtab--equipment-reference",
 }
 
 
@@ -144,8 +146,7 @@ class VueBreakdownEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         )["required"]
         for key in (
             "Data/CharacterStatusDrawer",
-            "Data/EquipmentDoll",
-            "World/InventoryPanel",
+            "Overlays/PartyBagTab",
         ):
             self.assertIn(key, required)
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

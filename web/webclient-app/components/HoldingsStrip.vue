@@ -11,7 +11,9 @@
 // receive fact; a disabled receive shows its committed reason, and the
 // viewed member's own cell is marked 持有者 (in combat too, so the owner is
 // never told by colour alone). In combat the strip shows counts only: no
-// delta, no give control, no reason.
+// delta, no give control, no reason; every cell is one line, so the owner's
+// 持有者 rides beside the name and the cells flow into as many columns as
+// fit (webclient-party-bag-retire).
 import { computed } from "vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 
@@ -66,7 +68,10 @@ function give(row) {
         <img v-if="portraitOf(row)" :src="portraitOf(row)" alt="" />
         <template v-else>{{ initialOf(row) }}</template>
       </span>
-      <span class="holdings-strip__name">{{ nameOf(row) }}<span v-if="!combat && row.equipped" class="holdings-strip__tag">裝備中</span></span>
+      <span class="holdings-strip__name"><span class="holdings-strip__label">{{ nameOf(row) }}</span><span v-if="!combat && row.equipped" class="holdings-strip__tag">裝備中</span><span
+        v-if="combat && isOwner(row)"
+        class="holdings-strip__tag holdings-strip__tag--owner"
+      >持有者</span></span>
       <span class="holdings-strip__count"><span class="holdings-strip__sr">持有 </span><span data-testid="holdings-strip__count">{{ row.held }}</span></span>
       <template v-if="!combat">
         <span
@@ -87,7 +92,7 @@ function give(row) {
           >{{ changeText(change) }}</span>
         </span>
       </template>
-      <span v-if="isOwner(row)" class="holdings-strip__foot holdings-strip__foot--owner">持有者</span>
+      <span v-if="!combat && isOwner(row)" class="holdings-strip__foot holdings-strip__foot--owner">持有者</span>
       <template v-if="!combat && !isOwner(row)">
         <button
           v-if="canGive(row)"
@@ -120,6 +125,11 @@ function give(row) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-2);
+}
+
+/* Counts only: compact one-line cells, as many per row as fit. */
+.holdings-strip[data-combat="true"] {
+  grid-template-columns: repeat(auto-fit, minmax(calc(150px * var(--ui-scale)), 1fr));
 }
 
 .holdings-strip__cell {
@@ -163,21 +173,36 @@ function give(row) {
 }
 
 .holdings-strip__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(2px * var(--ui-scale)) 0;
   min-width: 0;
-  overflow: hidden;
   color: var(--paper-100);
   font-size: var(--text-sm);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The name yields first; a state tag beside it is never clipped. */
+.holdings-strip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .holdings-strip__tag {
+  flex: none;
   margin-left: var(--sp-1);
   padding: 0 var(--sp-1);
   color: var(--gold-400);
   font-size: var(--text-xs);
   border: calc(1px * var(--ui-scale)) solid var(--gold-600);
   border-radius: calc(2px * var(--ui-scale));
+}
+
+.holdings-strip__tag--owner {
+  color: var(--seal-400);
+  border-color: var(--seal-700);
 }
 
 .holdings-strip__count {

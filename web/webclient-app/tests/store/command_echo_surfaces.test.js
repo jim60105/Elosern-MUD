@@ -231,7 +231,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       ids: ["inventory.use"],
       prepare() {
         openExploration();
-        // The drawer row intent path (AppClient.onInventoryItemAction forwards
+        // The drawer row intent path (AppClient.onPartyBagAction forwards
         // the panel's {action_id, payload}; the catalog resolves the key).
         // The use names the controlled figure (companion-field-item-use); the
         // echoed line still replays the typed `use <item_key>`.

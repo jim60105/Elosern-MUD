@@ -318,11 +318,16 @@ describe("party items and tactics (store)", () => {
     });
     const handlers = useIntentHandlers(store, (actionId, payload) => store.dispatchAction(actionId, payload));
     store.openHudDrawer("inventory");
-    expect(store.view.hudDrawer).toBe("inventory");
+    expect(store.view.hudDrawer).toBe("party");
 
-    handlers.onInventoryItemAction({
-      action_id: "inventory.use",
-      payload: { item_key: "t_bomb", actor_id: PLAYER },
+    // webclient-party-bag-retire: the bag tab's 設為 X 本回合的行動… for the
+    // already-commanded member opens its item frame at once.
+    handlers.onPartyBagCombatItem({ memberId: PLAYER, itemKey: "t_bomb" });
+    // A stray exploration use or give from the bag never leaves in combat.
+    handlers.onPartyBagAction({ action_id: "inventory.use", payload: { item_key: "t_bomb", actor_id: PLAYER } });
+    handlers.onPartyBagAction({
+      action_id: "party.transfer",
+      payload: { giver_id: PLAYER, receiver_id: ALLY, item_key: "t_bomb", quantity: 1 },
     });
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.view.hudDrawer).toBeNull();
@@ -351,7 +356,7 @@ describe("party items and tactics (store)", () => {
       {},
     );
     store.openHudDrawer("inventory");
-    handlers.onInventoryItemAction({
+    handlers.onPartyBagAction({
       action_id: "inventory.toggle_equip",
       payload: { item_key: "synth_sword", actor_id: PLAYER },
     });
@@ -361,6 +366,81 @@ describe("party items and tactics (store)", () => {
       item_key: "synth_sword",
       actor_id: PLAYER,
     });
+  });
+
+  // webclient-party-bag-retire: the bag tab sets the VIEWED member's round.
+  // A member other than the commanded one is first switched to through the
+  // actor selector's own read-only query; the item frame opens only after
+  // that member's canonical choices committed.
+  function bagHandlers() {
+    return useIntentHandlers(store, (actionId, payload) => store.dispatchAction(actionId, payload));
+  }
+  const ALLY_ITEM = () => item({ item_key: "t_ember_spray", label: "餘燼噴霧", quantity: 1 });
+
+  it("switches to the viewed member before opening its item frame", () => {
+    enterCombat({ items: [item()] });
+    store.openHudDrawer("inventory");
+    bagHandlers().onPartyBagCombatItem({ memberId: ALLY, itemKey: "t_ember_spray" });
+    const query = sender.sent.actions.at(-1);
+    expect(query.action_id).toBe("combat.actor_choices");
+    expect(query.payload).toEqual({ session_id: "s-1", round_revision: 0, actor_id: ALLY });
+    // Nothing opens before the member's own choices commit.
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+
+    const rev = commit({ actorId: ALLY, items: [ALLY_ITEM()] });
+    store.receive(gen, "ui_action_result", [fx.actionResult({ request_id: query.request_id, code: "actor_choices", presentation_revision: rev })], {});
+    expect(store.view.hudDrawer).toBeNull();
+    expect(store.router.currentDescriptor()).toEqual({ source: "combat.item", params: { itemKey: "t_ember_spray" } });
+    expect(store.view.dockDepth).toBe(2);
+    expect(sent("combat.actor_choices")).toHaveLength(1);
+    expect(sent("inventory.use")).toHaveLength(0);
+    expect(sent("party.transfer")).toHaveLength(0);
+    expect(sent("combat.command")).toHaveLength(0);
+  });
+
+  it("drops the held item visibly when the member switch is rejected", () => {
+    enterCombat({ items: [item()] });
+    store.openHudDrawer("inventory");
+    bagHandlers().onPartyBagCombatItem({ memberId: ALLY, itemKey: "t_ember_spray" });
+    const query = sender.sent.actions.at(-1);
+    store.receive(
+      gen,
+      "ui_action_result",
+      [fx.actionResult({ request_id: query.request_id, outcome: "rejected", code: "not_commandable", message: "無法指揮。", presentation_revision: revision })],
+      {},
+    );
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(store.view.toasts.some((toast) => toast.title === "這件物品目前無法由這名成員使用。")).toBe(true);
+    // A later commit of that member never opens the dropped item.
+    commit({ actorId: ALLY, items: [ALLY_ITEM()] });
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(sent("inventory.use")).toHaveLength(0);
+  });
+
+  it("drops the held item when the party window closes before the switch commits", () => {
+    enterCombat({ items: [item()] });
+    store.openHudDrawer("inventory");
+    bagHandlers().onPartyBagCombatItem({ memberId: ALLY, itemKey: "t_ember_spray" });
+    const query = sender.sent.actions.at(-1);
+    store.closeHudDrawer();
+    const rev = commit({ actorId: ALLY, items: [ALLY_ITEM()] });
+    store.receive(gen, "ui_action_result", [fx.actionResult({ request_id: query.request_id, code: "actor_choices", presentation_revision: rev })], {});
+    // The member switch itself is the server's; no item frame follows it.
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(sent("combat.actor_choices")).toHaveLength(1);
+  });
+
+  it("refuses a member outside the commandable allies without sending anything", () => {
+    enterCombat({ items: [item()] });
+    store.openHudDrawer("inventory");
+    expect(store.useCombatItem("t_tonic", FOE)).toBe(false);
+    expect(store.useCombatItem("t_tonic", 999)).toBe(false);
+    expect(sender.sent.actions).toHaveLength(0);
+    // The commanded member's own item opens at once.
+    expect(store.useCombatItem("t_tonic", PLAYER)).toBe(true);
+    expect(store.router.currentDescriptor()).toEqual({ source: "combat.item", params: { itemKey: "t_tonic" } });
   });
 
   it("useCombatItem refuses an item outside the committed stock and pushes nothing", () => {

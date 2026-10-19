@@ -1,10 +1,10 @@
 // render-equipment-breakdown-webclient (task 3.2): the breakdown-rendering
-// contract for the three manifest components. The chip block is a pure
+// contract for the manifest components. The chip block is a pure
 // projection of the v5 payload — payload order, verbatim names, kind-
 // formatted signed amounts, ALL layers (≤ 16) rendered, no sorting, no
 // recomputation, no truncation; layer-free rows render no breakdown element
 // at all. Equipment adjustment strings print verbatim where equipment is
-// listed (doll rows and the inventory inspector joined on item_key). An
+// listed (the bag tab's per-member server deltas). An
 // unknown layer source/kind is wire-rejected; the neutral 其他 chip is
 // direct-render defense only, proven here by mounting hand-built props.
 import { mount } from "@vue/test-utils";
@@ -12,13 +12,12 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import CharacterStatusDrawer from "../../components/CharacterStatusDrawer.vue";
-import EquipmentDoll from "../../components/EquipmentDoll.vue";
-import InventoryPanel from "../../components/InventoryPanel.vue";
+import PartyBagTab from "../../components/PartyBagTab.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
-  SERVICES_PANEL_SAMPLE,
   STATUS_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
+import { PARTY_BAG_HOLDINGS_EQUIPMENT, PARTY_BAG_INVENTORY_SAMPLE } from "../../stories/fixtures/party_panels.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
 
@@ -242,198 +241,35 @@ describe("CharacterStatusDrawer breakdown chips", () => {
   });
 });
 
-describe("EquipmentDoll adjustment rendering", () => {
+describe("PartyBagTab adjustment rendering (webclient-party-bag-retire)", () => {
+  // The bag tab replaced the doll and the inventory inspector: an equipment
+  // row's adjustment strings are the server's `item_holdings` delta changes,
+  // printed verbatim per member (label and signed amount with a shape
+  // prefix), never recomputed or reordered.
   let wrapper;
-
   afterEach(() => {
     wrapper?.unmount();
-    wrapper = null;
+    wrapper = undefined;
   });
 
-  it("prints the armor adjustment verbatim in the description row", () => {
-    wrapper = mount(EquipmentDoll, { props: { character: CHARACTER_PANEL_SAMPLE } });
-    // The U+2212 minus must survive verbatim (no ASCII replacement).
-    expect(
-      wrapper.get('[data-testid="equipment-doll__adjustment--armor"]').text(),
-    ).toBe("攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15");
-  });
-
-  it("renders nothing for an empty adjustment", () => {
-    wrapper = mount(EquipmentDoll, { props: { character: CHARACTER_PANEL_SAMPLE } });
-    expect(wrapper.find('[data-testid="equipment-doll__adjustment--weapon_main"]').exists()).toBe(false);
-  });
-
-  it("prints accessory adjustments verbatim", () => {
-    wrapper = mount(EquipmentDoll, { props: { character: CHARACTER_PANEL_SAMPLE } });
-    expect(
-      wrapper.get('[data-testid="equipment-doll__adjustment--sister_vestments"]').text(),
-    ).toBe("治療 +10%");
-  });
-
-  it("prints duplicate and other-slot row adjustments verbatim", () => {
-    wrapper = mount(EquipmentDoll, {
+  it("prints every member's server delta in payload order", () => {
+    wrapper = mount(PartyBagTab, {
       props: {
-        character: {
-          ...CHARACTER_PANEL_SAMPLE,
-          equipment: [
-            { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣", adjustment: "防禦 +3" },
-            { slot: "armor", item_key: "spare_mail", display_name: "備用鏈甲", adjustment: "防禦 +5" },
-            { slot: "mount", item_key: "mount_ash", display_name: "灰驛", adjustment: "敏捷 +10%" },
-          ],
-        },
+        partyInventory: PARTY_BAG_INVENTORY_SAMPLE,
+        itemHoldings: PARTY_BAG_HOLDINGS_EQUIPMENT,
+        members: [
+          { id: 42, name: "影行者" },
+          { id: 101, name: "蕾娜" },
+          { id: 102, name: "幽" },
+          { id: 103, name: "蓋文" },
+        ],
+        memberId: 101,
       },
     });
-    expect(wrapper.get('[data-testid="equipment-doll__adjustment--spare_mail"]').text()).toBe("防禦 +5");
-    expect(wrapper.get('[data-testid="equipment-doll__adjustment--mount_ash"]').text()).toBe("敏捷 +10%");
-  });
-});
-
-describe("InventoryPanel joined adjustment", () => {
-  let wrapper;
-
-  afterEach(() => {
-    wrapper?.unmount();
-    wrapper = null;
-  });
-
-  function mountPanel(props = {}) {
-    wrapper = mount(InventoryPanel, {
-      props: {
-        services: SERVICES_PANEL_SAMPLE,
-        character: CHARACTER_PANEL_SAMPLE,
-        wallet: CHARACTER_PANEL_SAMPLE.wallet,
-        ...props,
-      },
-    });
-    return wrapper;
-  }
-
-  function hover(key) {
-    return wrapper.get(`[data-testid="inventory-panel__tile--${key}"]`).trigger("focus");
-  }
-
-  it("joins the same server string on item_key for an equipped bag row", async () => {
-    // A bag listing whose row shares the character row's item_key.
-    const services = {
-      ...SERVICES_PANEL_SAMPLE,
-      inventory: {
-        ...SERVICES_PANEL_SAMPLE.inventory,
-        rows: [
-          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
-        ],
-      },
-    };
-    // The character equipment row shares the synthetic key so the join is
-    // exercised on test-owned rows (the shipped-name pair carried no behavior).
-    mountPanel({
-      services,
-      character: {
-        ...CHARACTER_PANEL_SAMPLE,
-        equipment: [
-          {
-            slot: "armor",
-            item_key: "t_bulwark_plate",
-            display_name: "壁衛板甲",
-            quantity: 1,
-            category_label: "鎧甲",
-            condition_label: "良好",
-            adjustment: "攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15",
-          },
-        ],
-      },
-    });
-    await hover("t_bulwark_plate");
-    expect(
-      wrapper.get('[data-testid="inventory-panel__inspector-adjustment"]').text(),
-    ).toBe("攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15");
-  });
-
-  it("renders no adjustment line for a bag-only item or an empty string", async () => {
-    const services = {
-      ...SERVICES_PANEL_SAMPLE,
-      inventory: {
-        ...SERVICES_PANEL_SAMPLE.inventory,
-        rows: [
-          { item_key: "loose_rope", display_name: "繩索", held: 1, equipped: false, presentation: null, action: null },
-        ],
-      },
-    };
-    mountPanel({ services });
-    await hover("loose_rope");
-    expect(wrapper.find('[data-testid="inventory-panel__inspector-adjustment"]').exists()).toBe(false);
-    // An equipped item whose character row carries an EMPTY adjustment.
-    const empty = {
-      ...SERVICES_PANEL_SAMPLE,
-      inventory: {
-        ...SERVICES_PANEL_SAMPLE.inventory,
-        rows: [
-          { item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true, presentation: null, action: null },
-        ],
-      },
-    };
-    wrapper.unmount();
-    mountPanel({ services: empty });
-    await hover("short_sword_lost");
-    expect(wrapper.find('[data-testid="inventory-panel__inspector-adjustment"]').exists()).toBe(false);
-  });
-
-  it("renders no adjustment line when the character panel is unavailable", async () => {
-    const services = {
-      ...SERVICES_PANEL_SAMPLE,
-      inventory: {
-        ...SERVICES_PANEL_SAMPLE.inventory,
-        rows: [
-          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
-        ],
-      },
-    };
-    mountPanel({
-      services,
-      character: { schema_version: 5, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } },
-    });
-    await hover("t_bulwark_plate");
-    expect(wrapper.find('[data-testid="inventory-panel__inspector-adjustment"]').exists()).toBe(false);
-  });
-
-  it("keeps the FIRST character row's adjustment for a duplicate item_key", async () => {
-    // Ambiguity policy: first row wins (never last-row-wins).
-    const duplicate = characterWith(
-      CHARACTER_PANEL_SAMPLE.traits,
-      [
-        {
-          slot: "body",
-          item_key: "t_bulwark_plate",
-          display_name: "壁衛板甲",
-          quantity: 1,
-          category_label: "鎧甲",
-          condition_label: "良好",
-          adjustment: "第一條",
-        },
-        {
-          slot: "cloak",
-          item_key: "t_bulwark_plate",
-          display_name: "壁衛板甲",
-          quantity: 1,
-          category_label: "鎧甲",
-          condition_label: "良好",
-          adjustment: "第二條",
-        },
-      ],
-    );
-    const services = {
-      ...SERVICES_PANEL_SAMPLE,
-      inventory: {
-        ...SERVICES_PANEL_SAMPLE.inventory,
-        rows: [
-          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
-        ],
-      },
-    };
-    mountPanel({ services, character: duplicate });
-    await hover("t_bulwark_plate");
-    expect(
-      wrapper.get('[data-testid="inventory-panel__inspector-adjustment"]').text(),
-    ).toBe("第一條");
+    const cell = (id) => wrapper.get(`[data-testid="holdings-strip__cell--${id}"]`);
+    expect(cell(42).findAll(".holdings-strip__change").map((node) => node.text())).toEqual(["▲ 攻擊 +6"]);
+    expect(cell(101).findAll(".holdings-strip__change").map((node) => node.text())).toEqual(["▼ 攻擊 −2", "▲ 敏捷 +3"]);
+    expect(cell(102).get('[data-testid="holdings-strip__delta-reason"]').text()).toBe("幽無法使用這類武器。");
   });
 });
 

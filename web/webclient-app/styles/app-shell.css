@@ -424,20 +424,6 @@ body {
 .elosern-root .inputsend { background: linear-gradient(#4e463a, #242327); color: var(--gold-400); border-color: #c5a76f80; }
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-anchor:not(.stage-band > .stage-anchor),
 .elosern-root .elosern-stage[data-menu-open="true"] .stage-band { filter: brightness(.45); }
-.elosern-root .inventory-panel { display: grid; grid-template-columns: calc(140px * var(--ui-scale)) minmax(calc(180px * var(--ui-scale)), 1fr) minmax(calc(220px * var(--ui-scale)), .85fr); gap: calc(20px * var(--ui-scale)); min-height: 100%; align-content: start; }
-.elosern-root .inventory-panel__block { margin: 0; min-width: 0; }
-.elosern-root .inventory-panel__heading,
-.elosern-root .equipment-doll__title { font: var(--text-lg) var(--f-serif); color: var(--gold-400); margin-bottom: calc(18px * var(--ui-scale)); }
-.inventory-panel__details { grid-column: 3; grid-row: 1 / 3; min-width: 0; padding: calc(16px * var(--ui-scale)); border: var(--line); border-radius: var(--radius); background: #0e1015b8; min-height: calc(360px * var(--ui-scale)); }
-.inventory-panel__details-empty { font: var(--text-md)/1.9 var(--f-serif); color: var(--paper-300); }
-.inventory-panel__detail-icon { display: block; width: calc(100px * var(--ui-scale)); height: calc(100px * var(--ui-scale)); margin: 0 auto calc(20px * var(--ui-scale)); padding: calc(16px * var(--ui-scale)); border: 1px solid #c7ad7380; border-radius: var(--radius); color: var(--gold-400); background: radial-gradient(#9f815438, transparent); }
-.elosern-root .inventory-panel__inspector { border: 0; box-shadow: none; background: none; padding: 0; }
-.elosern-root .inventory-panel__inspector-name { font: var(--text-xl) var(--f-serif); color: var(--gold-400); }
-.elosern-root .inventory-panel__inspector-summary { font: var(--text-base)/1.9 var(--f-serif); margin: calc(18px * var(--ui-scale)) 0; }
-.elosern-root .equipment-doll__doll { flex-direction: column; gap: calc(18px * var(--ui-scale)); }
-.elosern-root .equipment-doll__slots { grid-template-columns: repeat(2, minmax(calc(60px * var(--ui-scale)), 1fr)); width: 100%; }
-.elosern-root .equipment-doll__box { width: 100%; border-radius: var(--radius-sm); }
-.elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1 / 3; padding: calc(14px * var(--ui-scale)); border: var(--line); border-radius: var(--radius-sm); }
 
 @media (max-width: 1350px) {
   /* 278px keeps the map anchor (right column - 28px) exactly as wide as the
@@ -448,13 +434,8 @@ body {
   /* The brand row fits the 216px column (design D1). */
   .topbar-wordmark { font-size: var(--text-base); letter-spacing: .14em; margin-right: -.14em; }
   .elosern-root .topbar-brand { padding-inline: calc(16px * var(--ui-scale)); gap: calc(10px * var(--ui-scale)); }
-  .elosern-root .inventory-panel { grid-template-columns: calc(120px * var(--ui-scale)) minmax(calc(170px * var(--ui-scale)), 1fr) minmax(calc(200px * var(--ui-scale)), .9fr); gap: calc(12px * var(--ui-scale)); }
-  .inventory-panel__details { padding: calc(12px * var(--ui-scale)); }
 }
 @media (max-width: 1000px) {
   :root { --left-column: calc(190px * var(--ui-scale)); --right-column: calc(200px * var(--ui-scale)); }
   .elosern-root .topbar-right { right: calc(8px * var(--ui-scale)); max-width: calc(160px * var(--ui-scale)); }
-  .elosern-root .inventory-panel { grid-template-columns: 1fr; }
-  .inventory-panel__details { grid-column: 1; grid-row: auto; }
-  .elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1; }
 }

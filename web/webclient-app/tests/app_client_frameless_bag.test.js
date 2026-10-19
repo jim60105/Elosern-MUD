@@ -1,5 +1,6 @@
-// make-inventory-drawer-frameless (task 3.4): the composition contract. With
-// the bag drawer open — including after hosted-style navigation — no hosted
+// make-inventory-drawer-frameless (task 3.4), retargeted by
+// webclient-party-bag-retire to the party window's 背包 tab: the composition
+// contract. With the bag open — including after hosted-style navigation — no hosted
 // row container or detail pane renders inside the drawer body. Each of the
 // three close routes — Escape, the close control, the scrim — restores
 // focus to the 背包 entry that opened it with the router untouched.
@@ -11,6 +12,8 @@ import AppClient from "../AppClient.vue";
 import { CHARACTER_PANEL_SAMPLE, SERVICES_PANEL_SAMPLE } from "../stories/fixtures.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { resetPartyWindowMemory } from "../components/party-window-memory.js";
+import { PARTY_BAG_INVENTORY_SAMPLE, PARTY_WINDOW_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
 
 describe("frameless 背包 drawer (composition contract)", () => {
   let store;
@@ -38,6 +41,8 @@ describe("frameless 背包 drawer (composition contract)", () => {
             context_actions: fx.explorationActions(),
             services: SERVICES_PANEL_SAMPLE,
             character: CHARACTER_PANEL_SAMPLE,
+            party: PARTY_WINDOW_PANEL_SAMPLE,
+            party_inventory: PARTY_BAG_INVENTORY_SAMPLE,
           },
         }),
       ],
@@ -61,6 +66,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     setActivePinia(createPinia());
     store = useElosernStore();
     store.setSender(fx.createFakeSender());
+    resetPartyWindowMemory();
   });
 
   it("keeps the reference entries on the top bar and no row in the exploration dock", async () => {
@@ -104,8 +110,8 @@ describe("frameless 背包 drawer (composition contract)", () => {
       await openBagFromNavigation();
       await wrapper.vm.$nextTick();
       const drawer = wrapper.get('[data-testid="hud-drawer"]');
-      // The bag body is only its own committed-panel stack.
-      expect(drawer.find('[data-testid="inventory-panel"]').exists(), name).toBe(true);
+      // The bag is the party window's 背包 tab, and only its own panels.
+      expect(drawer.find('[data-testid="party-bag-tab"]').exists(), name).toBe(true);
       expect(drawer.findAll('[data-testid="dock-menu"]').length, name).toBe(0);
       expect(drawer.findAll('[data-testid="dock-detail"]').length, name).toBe(0);
       expect(store.router.depth(), name).toBe(1);
@@ -143,7 +149,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     await openBagFromNavigation();
     await wrapper.vm.$nextTick();
     drawer = wrapper.get('[data-testid="hud-drawer"]');
-    expect(drawer.find('[data-testid="inventory-panel"]').exists()).toBe(true);
+    expect(drawer.find('[data-testid="party-bag-tab"]').exists()).toBe(true);
     expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
     expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
     expect(store.router.depth()).toBe(depthBeforeBag);

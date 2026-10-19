@@ -18,7 +18,6 @@ import ExplorationReadout from "./components/ExplorationReadout.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
 import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
 import HudDrawer from "./components/HudDrawer.vue";
-import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapOverlay from "./components/MapOverlay.vue";
@@ -88,13 +87,13 @@ const {
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  controlledActorId, controlledCharacterPanel, inventoryWalletCopper, inventoryWalletSubtitle, SKILL_BOOK_KEY_HINT,
+  controlledActorId, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
-  onShopBuy, onShopSell, onInventoryItemAction, onPartyBagAction, onTitleBallotAction, onTitleCodexAction,
+  onShopBuy, onShopSell, onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
@@ -1223,6 +1222,7 @@ const rootStyle = computed(() => {
       @view-member="onViewMember"
       @view-item="onViewItem"
       @bag-action="onPartyBagAction"
+      @combat-item="onPartyBagCombatItem"
       @action="onAction"
       @open-npc-persona="(npcId) => store.openNpcPersonaEditor(npcId)"
       @persona-edit="onPersonaEdit"
@@ -1232,7 +1232,7 @@ const rootStyle = computed(() => {
       v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party'"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : '')"
+      :subtitle="store.view.hudDrawer === 'skill' ? skillBookSubtitle : ''"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       :body-flush="store.view.hudDrawer === 'quest'"
@@ -1264,16 +1264,6 @@ const rootStyle = computed(() => {
         @practice="onPractice"
         @use="onSkillUse"
         @select-skill="onViewSkill"
-      />
-      <InventoryPanel
-        v-else-if="store.view.hudDrawer === 'inventory'"
-        :services="panel('services') || {}"
-        :character="controlledCharacterPanel"
-        :wallet="inventoryWalletCopper"
-        :actor-id="controlledActorId"
-        :combat="store.view.mode === 'combat'"
-        @use="onInventoryItemAction"
-        @toggle-equip="onInventoryItemAction"
       />
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"

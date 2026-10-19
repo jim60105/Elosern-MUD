@@ -2,17 +2,14 @@
 // layer contract. Asserts (1) no reference surface is in the DOM while every
 // drawer is closed, (2) each reference surface is reachable in at most two
 // actions from the dock root (the store's single openHudDrawer call is one
-// action), and (3) across the whole drawer layer the wallet renders exactly
-// twice per opening of the inventory drawer — its shared header subtitle and
-// the single row of its `金錢` body section, both from the committed
-// character panel — and nowhere else (relocate-inventory-drawer-essentials;
-// realign-inventory-drawer-layout).
+// action), and (3) across the whole drawer layer the party purse renders
+// exactly once — the party window's header, from the committed
+// `party_inventory` panel — and nowhere else (webclient-party-bag-retire).
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
-import InventoryPanel from "../components/InventoryPanel.vue";
 import StatusPanel from "../components/StatusPanel.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
@@ -31,6 +28,8 @@ import {
   PARTY_PANEL_EMPTY_SAMPLE,
   PARTY_PANEL_FULL_SAMPLE,
   PARTY_PANEL_SAMPLE,
+  PARTY_BAG_INVENTORY_SAMPLE,
+  PARTY_WINDOW_PANEL_SAMPLE,
 } from "../stories/fixtures/party_panels.js";
 
 describe("H4 reference-drawer layer (task 7.7)", () => {
@@ -55,7 +54,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // The closed reference-drawer name -> the body's root testid.
   const REFERENCE_SURFACES = {
     skill: "skill-book",
-    inventory: "inventory-panel",
     shop: "shop-panel",
     quest: "quest-drawer",
     lore: "lore-codex-drawer",
@@ -85,113 +83,63 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     }
   });
 
-  it("renders the wallet exactly once per inventory-drawer opening — subtitle + 金錢 row — and nowhere else", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    // Prime the transport and commit both panels: the character panel owns
-    // the wallet (3240 copper); the services panel's own inventory wallet
-    // carries a different value (1200), proving both drawer-layer renderings
-    // are sourced only from the committed character panel — the services-side
-    // wallet is never rendered anywhere (realign-inventory-drawer-layout D3:
-    // head and body read one figure and can never disagree).
+  // webclient-party-bag-retire: the retired bag drawer's wallet became the
+  // party purse, rendered once in the party window's header from the
+  // committed `party_inventory` panel and nowhere else in the drawer layer.
+  function commitPurse(partyInventory) {
     store.beginTransport(1);
     store.setConnected(true);
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            character: CHARACTER_PANEL_SAMPLE,
-            party: PARTY_PANEL_SAMPLE,
-            services: {
-              ...SERVICES_PANEL_SAMPLE,
-              inventory: { ...SERVICES_PANEL_SAMPLE.inventory, wallet: 1200 },
-            },
-          },
-        }),
-      ],
-    );
+    store.receive(1, "ui_snapshot", [
+      fx.snapshot({
+        panels: {
+          character: CHARACTER_PANEL_SAMPLE,
+          party: PARTY_WINDOW_PANEL_SAMPLE,
+          party_inventory: partyInventory,
+          services: SERVICES_PANEL_SAMPLE,
+        },
+      }),
+    ]);
+  }
+
+  it("renders the party purse exactly once, in the party window header, and nowhere else", async () => {
+    mountAppClient();
     await wrapper.vm.$nextTick();
+    commitPurse(PARTY_BAG_INVENTORY_SAMPLE);
+    await wrapper.vm.$nextTick();
+    // The 背包 opener lands on the party window's bag tab.
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    // Location 1 — the shared head subtitle (relocate-inventory-drawer-
-    // essentials): thousands-grouped integer copper from the character panel
-    // (3,240 — never the services-side 1,200).
-    const subtitles = wrapper.findAll(".drawer-header__subtitle");
-    expect(subtitles).toHaveLength(1);
-    expect(subtitles[0].text()).toBe("錢袋 3,240 銅");
-    // Location 2 — the single row of the `金錢` body section: the exact same
-    // committed figure, grouped integer copper.
-    const drawer = wrapper.get('[data-testid="hud-drawer"]');
-    const walletNodes = drawer.findAll('[data-testid="inventory-panel__wallet-value"]');
-    expect(walletNodes).toHaveLength(1);
-    expect(walletNodes[0].text()).toBe("3,240");
-    // Nothing else in the drawer carries a wallet-classed node, and the
-    // services-side figure is never rendered.
-    expect(drawer.findAll("[class*='__wallet']")).toHaveLength(1);
-    expect(wrapper.text()).not.toContain("1,200");
-    // Every other drawer renders no balance of its own — neither a wallet
-    // node nor a `錢袋` line (the character-status drawer included).
-    for (const name of ["skill", "shop", "quest", "lore", "status", "party"]) {
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.find('[data-testid="party-bag-tab"]').exists()).toBe(true);
+    const purses = wrapper.findAll('[data-testid="party-window__purse"]');
+    expect(purses).toHaveLength(1);
+    expect(purses[0].text()).toBe("1,240 銅");
+    // The tab body carries no balance of its own (no 金錢 row).
+    expect(wrapper.get('[data-testid="party-bag-tab"]').text()).not.toContain("1,240");
+    expect(wrapper.get('[data-testid="party-bag-tab"]').text()).not.toContain("金錢");
+    expect(wrapper.text()).not.toContain("錢袋");
+    // Every other drawer renders no balance of its own.
+    for (const name of ["skill", "shop", "quest", "lore", "status"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       const other = wrapper.get('[data-testid="hud-drawer"]');
-      expect(other.findAll('[data-testid="inventory-panel__wallet-value"]').length, name).toBe(0);
+      expect(other.findAll('[data-testid="party-window__purse"]').length, name).toBe(0);
       expect(other.findAll("[class*='__wallet']").length, name).toBe(0);
       expect(other.text(), name).not.toContain("錢袋");
+      expect(other.text(), name).not.toContain("1,240");
     }
   });
 
-  it("passes the controlled figure's numeric identity to the inventory drawer", async () => {
-    // party-member-equipment: the equipment toggle names the member whose
-    // equipment changes. The committed status panel serializes the identity
-    // as a string; the drawer receives the positive integer the exact payload
-    // requires, and no other identity is ever substituted.
+  it("renders no purse and no zero when the party_inventory panel is unavailable", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
-    store.beginTransport(1);
-    store.setConnected(true);
-    store.receive(1, "ui_snapshot", [
-      fx.snapshot({
-        panels: {
-          status: fx.statusPanel({ actor: { identity: "123" } }),
-          character: CHARACTER_PANEL_SAMPLE,
-          services: SERVICES_PANEL_SAMPLE,
-        },
-      }),
-    ]);
+    commitPurse({ schema_version: 1, available: false, reason: { code: "inventory_unavailable", message: "背包目前無法顯示。" } });
     await wrapper.vm.$nextTick();
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(123);
-  });
-
-  it("passes no member identity when the status panel is absent", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    store.beginTransport(1);
-    store.setConnected(true);
-    store.receive(1, "ui_snapshot", [
-      fx.snapshot({
-        panels: {
-          status: {
-            schema_version: 3,
-            available: false,
-            reason: { code: "no_puppet", message: "目前沒有可顯示的角色。" },
-          },
-          character: CHARACTER_PANEL_SAMPLE,
-          services: SERVICES_PANEL_SAMPLE,
-        },
-      }),
-    ]);
-    await wrapper.vm.$nextTick();
-    store.openHudDrawer("inventory");
-    await wrapper.vm.$nextTick();
-    // The bag still renders, but the toggle has no member to name and stays
-    // unavailable (never the commander, never a fabricated id).
-    expect(wrapper.find('[data-testid="inventory-panel"]').exists()).toBe(true);
-    expect(wrapper.findComponent(InventoryPanel).props("actorId")).toBe(null);
+    expect(wrapper.find('[data-testid="party-window__purse"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="party-window__tab-unavailable"]').text()).toBe("背包目前無法顯示。");
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
   });
 
   // The character panel is an exact-schema v9 payload: the
@@ -266,17 +214,13 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("cast <技法>");
     expect(wrapper.get('[data-testid="skill-book-key-hint"]').text()).toContain("Enter 前往動作");
-    // The inventory drawer carries the reference's `inventory` backpack glyph
-    // (align-drawer-chrome-symbols; the string shared with `items`) and its
-    // header wallet subtitle (relocate-inventory-drawer-essentials); the
-    // remaining four drawers keep the icon-less / footer-less chrome.
+    // The retired bag drawer's opener lands on the party window
+    // (webclient-party-bag-retire), whose own frame carries no drawer
+    // subtitle and no skill-book footer.
     store.openHudDrawer("inventory");
     await wrapper.vm.$nextTick();
-    const invIcon = wrapper.find(".drawer-header__icon");
-    expect(invIcon.exists()).toBe(true);
-    expect(invIcon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
-    expect(wrapper.find('[data-testid="hud-drawer__title"].drawer-header__title').exists()).toBe(true);
-    expect(wrapper.get(".drawer-header__subtitle").text()).toBe("錢袋 3,240 銅");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
     expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(false);
   });
 
@@ -354,103 +298,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       skill_key: "firebolt",
       item_key: null,
     });
-  });
-
-  it("leaves the inventory drawer subtitle blank when the character panel is unavailable", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    // Prime the transport and commit the character panel in its registry-
-    // owned unavailable form (a bounded reason, no wallet field).
-    store.beginTransport(1);
-    store.setConnected(true);
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            character: {
-              schema_version: 9,
-              available: false,
-              reason: { code: "no_puppet", message: "你已離開角色" },
-            },
-            services: SERVICES_PANEL_SAMPLE,
-          },
-        }),
-      ],
-    );
-    await wrapper.vm.$nextTick();
-    store.openHudDrawer("inventory");
-    await wrapper.vm.$nextTick();
-    // No balance and no zero: the header keeps the reference `inventory`
-    // backpack glyph but renders no wallet subtitle
-    // (relocate-inventory-drawer-essentials: an unavailable panel renders no
-    // balance at all), and the body renders no `金錢` row either
-    // (realign-inventory-drawer-layout).
-    const icon = wrapper.find(".drawer-header__icon");
-    expect(icon.exists()).toBe(true);
-    expect(icon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
-    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
-    expect(wrapper.find('[data-testid="inventory-panel__wallet-value"]').exists()).toBe(false);
-  });
-
-  it("renders no wallet subtitle when the services panel is unavailable", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    // The services panel commits its registry-owned unavailable form (no
-    // inventory section, no wallet): the bag fabricates no wallet.
-    store.beginTransport(1);
-    store.setConnected(true);
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            services: SERVICES_PANEL_UNAVAILABLE_SAMPLE,
-            character: CHARACTER_PANEL_SAMPLE,
-          },
-        }),
-      ],
-    );
-    await wrapper.vm.$nextTick();
-    store.openHudDrawer("inventory");
-    await wrapper.vm.$nextTick();
-    // The bag body renders only the registry-owned reason; the header keeps
-    // the bag glyph but renders no wallet subtitle (no balance, no zero).
-    expect(wrapper.find('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
-    const icon = wrapper.find(".drawer-header__icon");
-    expect(icon.exists()).toBe(true);
-    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
-  });
-
-  it("renders no wallet subtitle when the services inventory section is absent", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    // The reduced services payload (SERVICES_PANEL_MINIMAL_SAMPLE) carries no
-    // inventory section: the bag shows its honest absent message and the
-    // header renders no wallet subtitle.
-    store.beginTransport(1);
-    store.setConnected(true);
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            services: SERVICES_PANEL_MINIMAL_SAMPLE,
-            character: CHARACTER_PANEL_SAMPLE,
-          },
-        }),
-      ],
-    );
-    await wrapper.vm.$nextTick();
-    store.openHudDrawer("inventory");
-    await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-testid="inventory-panel__absent"]').exists()).toBe(true);
-    const icon = wrapper.find(".drawer-header__icon");
-    expect(icon.exists()).toBe(true);
-    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
   });
 
   // add-persona-edit-surface, moved to the party window's 成員 tab by

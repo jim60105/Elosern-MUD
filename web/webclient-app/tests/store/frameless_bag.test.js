@@ -11,6 +11,11 @@ import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
 import { SERVICES_PANEL_SAMPLE } from "../../stories/fixtures.js";
+import {
+  rememberPartyWindowTab,
+  resetPartyWindowMemory,
+  usePartyWindowMemory,
+} from "../../components/party-window-memory.js";
 import * as fx from "./protocol_fixtures.js";
 
 function snapshotWithServices(revision = 1, wallet = 3240) {
@@ -39,6 +44,7 @@ function trailTitles(router) {
 
 describe("frameless 背包 drawer (store contract)", () => {
   let store;
+  let sender;
 
   function openSession() {
     store.beginTransport(1);
@@ -50,8 +56,12 @@ describe("frameless 背包 drawer (store contract)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     store = useElosernStore();
-    store.setSender(fx.createFakeSender());
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+    resetPartyWindowMemory();
   });
+
+  const memoryTab = () => usePartyWindowMemory(`${store.view.generation}|${store.view.epoch}`).tab;
 
   it("keeps top navigation subject to both submission and revision locks", () => {
     openSession();
@@ -72,13 +82,16 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.hudDrawer).toBe("status");
   });
 
-  it("the top-navigation 背包 entry opens the bag drawer with the router unchanged", () => {
+  it("the top-navigation 背包 entry opens the party window on 背包 with the router unchanged", () => {
     openSession();
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
     const currentBefore = store.router.currentMenu();
     store.tabToRootAndConfirm("inventory", "pointer");
-    expect(store.view.hudDrawer).toBe("inventory");
+    // webclient-party-bag-retire: the retired drawer name is only an opener.
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("bag");
+    expect(sender.sent.actions).toHaveLength(0);
     // The open touched nothing: no push, no sub-dock switch, no surface.
     expect(store.router.depth()).toBe(depthBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
@@ -87,6 +100,17 @@ describe("frameless 背包 drawer (store contract)", () => {
     // identity — the drawer-open row must not mutate the frame.
     expect(store.router.currentMenu()).toEqual(currentBefore);
     expect(store.view.activeSubDock).toBe(null);
+  });
+
+  it("switches an open party window to 背包 and never stores the retired drawer name", () => {
+    openSession();
+    rememberPartyWindowTab(`${store.view.generation}|${store.view.epoch}`, "member");
+    expect(store.openHudDrawer("party")).toBe(true);
+    expect(memoryTab()).toBe("member");
+    expect(store.openHudDrawer("inventory")).toBe(true);
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("bag");
+    expect(sender.sent.actions).toHaveLength(0);
   });
 
   it("activating the service-guild navigate row on the verb card opens the quest drawer with router unchanged", () => {
@@ -186,7 +210,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
     store.tabToRootAndConfirm("inventory", "pointer");
-    expect(store.view.hudDrawer).toBe("inventory");
+    expect(store.view.hudDrawer).toBe("party");
     // The single close entry (every HudDrawer route funnels here with
     // popFrame: true) pops nothing and restores nothing to change.
     expect(store.closeHudDrawer()).toBe(true);
@@ -222,7 +246,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
     store.tabToRootAndConfirm("inventory", "pointer");
-    expect(store.view.hudDrawer).toBe("inventory");
+    expect(store.view.hudDrawer).toBe("party");
     // The overlay's mutual-exclusion close (closeHudDrawer({}) from
     // openOverlay) funnels through the same frameless early return.
     expect(store.openOverlay("help")).toBe(true);
