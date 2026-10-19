@@ -1,6 +1,6 @@
 <script setup>
 // SkillUseDock (skillbook-authoritative-casting D8): the dock pane for the
-// SkillBook casting flow. It renders the keyboard router's current
+// 技能-tab casting flow. It renders the keyboard router's current
 // `skilluse.*` frame — the use frame (威力 opener, NONE/SELF confirmation,
 // target rows, AREA toggles and their confirm, the 開戰 divider and monster
 // openings), the 威力 frame, and the opening confirmation — beside a detail

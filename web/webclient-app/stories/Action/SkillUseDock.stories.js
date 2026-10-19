@@ -3,7 +3,7 @@ import SkillUseDock from "../../components/SkillUseDock.vue";
 import SkillUseMenu from "../../lib/skill_use_menu.js";
 
 // SkillUseDock (skillbook-authoritative-casting D8): the dock pane of the
-// SkillBook casting flow, rendered from the same menu model the router
+// 技能-tab casting flow, rendered from the same menu model the router
 // resolves. Synthetic, deterministic offline panels only.
 
 function panel(spec, skill = {}) {

@@ -25,13 +25,7 @@ function renderDrawer(args) {
   const slots = {
     default: () => h("pre", { style: "margin: 0; font-family: var(--f-mono); font-size: 0.85em; color: var(--paper-100); white-space: pre-wrap;" }, [bodyContent]),
   };
-  if (args.skillDrawer) {
-    // The skill drawer's composed chrome: the `skills` head icon, the
-    // skill-count subtitle, and the book's keyboard-guidance footer — the
-    // same combination AppClient wires for `hudDrawer === 'skill'`.
-    slots.foot = () =>
-      h("p", { class: "hud-drawer__key-hint" }, "↑↓ 選擇 ‧ ←→ 收合／展開 ‧ Enter 前往動作 ‧ / 搜尋 ‧ Esc 關閉");
-  } else if (args.hasFooter) {
+  if (args.hasFooter) {
     slots.foot = () => h("span", { class: "hud-drawer__foot-text" }, "Drawer footer");
   }
   return {
@@ -43,7 +37,7 @@ function renderDrawer(args) {
             open: args.open,
             title: args.title,
             subtitle: args.subtitle || "",
-            icon: args.skillDrawer ? "skills" : (args.icon || null),
+            icon: args.icon || null,
             drawerKey: args.drawerKey || "",
             onClose: () => {},
           },
@@ -91,16 +85,3 @@ export const OpenWithFooter = {
   args: { open: true, title: "商店", drawerKey: "shop", hasFooter: true },
 };
 
-// The skill drawer's composed chrome (the offline showcase): the `skills`
-// head icon, the active/passive skill-count subtitle, and the static
-// cast-syntax footer hint — the combination AppClient now wires.
-export const SkillDrawer = {
-  render: renderDrawer,
-  args: {
-    open: true,
-    title: "技能書",
-    subtitle: "主動 91 ‧ 被動 23",
-    drawerKey: "skill",
-    skillDrawer: true,
-  },
-};

@@ -24,7 +24,7 @@
 // session. Nothing here decides availability: the capability line restates
 // the static `usable_out_of_combat` flag, and whether a cast is possible now,
 // and at whom, is the server preview's answer once 施放 is pressed.
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import ActionBar from "./ActionBar.vue";
 import ListDetail from "./ListDetail.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
@@ -76,6 +76,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["practice", "use", "lineage"]);
+
+// Element ids: each category treeitem owns its group of skill rows.
+const uid = useId();
+const groupId = (category) => `party-skill-tab-${uid}-group-${category}`;
 
 // ---------------------------------------------------------------- data
 
@@ -173,9 +177,14 @@ watch(query, () => {
     focusedId.value = first ? `skill:${first.row.key}` : (nodes.value[0]?.id ?? null);
   }
 });
-// A republished payload that drops the selected row falls back to the first.
+// A republished payload that drops the selected row falls back to the
+// first visible row; the player's collapses hold.
 watch(visibleSkills, () => {
-  if (selectedKey.value !== null && !entryFor(selectedKey.value) && !searching.value) reselect(false);
+  if (selectedKey.value !== null && !entryFor(selectedKey.value)) {
+    const first = visibleSkills.value[0] ?? null;
+    selectedKey.value = first ? first.row.key : null;
+    focusedId.value = first ? `skill:${first.row.key}` : (nodes.value[0]?.id ?? null);
+  }
 });
 
 const selected = computed(() => entryFor(selectedKey.value));
@@ -436,19 +445,17 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
         >{{ characterReason.message }}</p>
 
         <template v-else-if="detail">
-          <div class="party-skill-tab__seg" role="tablist" aria-label="技能種類" data-testid="party-skill-tab__segment">
+          <div class="party-skill-tab__seg" role="group" aria-label="技能種類" data-testid="party-skill-tab__segment">
             <button
               type="button"
-              role="tab"
-              :aria-selected="isActive ? 'true' : 'false'"
+              :aria-pressed="isActive ? 'true' : 'false'"
               :class="{ 'is-active': isActive }"
               data-testid="party-skill-tab__segment--active"
               @click="segment = 'active'"
             >主動 <b>{{ activeCount }}</b></button>
             <button
               type="button"
-              role="tab"
-              :aria-selected="!isActive ? 'true' : 'false'"
+              :aria-pressed="!isActive ? 'true' : 'false'"
               :class="{ 'is-active': !isActive }"
               data-testid="party-skill-tab__segment--passive"
               @click="segment = 'passive'"
@@ -489,6 +496,7 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
             <section
               v-for="category in visibleCategories"
               :key="category.category"
+              role="none"
               class="party-skill-tab__category"
               data-testid="party-skill-tab__category"
               :data-category="category.category"
@@ -500,6 +508,7 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                 aria-level="1"
                 class="party-skill-tab__sech"
                 :aria-expanded="String(isOpen(category.category))"
+                :aria-owns="isOpen(category.category) ? groupId(category.category) : undefined"
                 :tabindex="focusedId === `cat:${category.category}` ? 0 : -1"
                 :data-node-id="`cat:${category.category}`"
                 data-testid="party-skill-tab__category-head"
@@ -510,15 +519,16 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                 <span class="party-skill-tab__sech-rule" aria-hidden="true"></span>
                 <span class="party-skill-tab__sech-count" data-testid="party-skill-tab__category-count">{{ category.groups.reduce((n, g) => n + g.skills.length, 0) }}</span>
               </button>
-              <div v-if="isOpen(category.category)" role="group" :aria-label="category.label">
+              <div v-if="isOpen(category.category)" :id="groupId(category.category)" role="group" :aria-label="category.label">
                 <div
                   v-for="group in category.groups"
                   :key="group.group ?? `${category.category}-ungrouped`"
+                  role="none"
                   class="party-skill-tab__group"
                   :class="{ 'party-skill-tab__group--bare': !group.label }"
                   :data-group="group.group ?? ''"
                 >
-                  <p v-if="group.label" class="party-skill-tab__group-label" data-testid="party-skill-tab__group-label">
+                  <p v-if="group.label" role="none" class="party-skill-tab__group-label" data-testid="party-skill-tab__group-label">
                     <span
                       v-if="groupDot(category.category, group.group)"
                       class="party-skill-tab__dot"

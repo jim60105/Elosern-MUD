@@ -164,7 +164,7 @@ const emit = defineEmits(["action", "back", "skip", "target-pointer", "open-acto
 // exactly one `#action-dock` persists across every mode change. Every other
 // mode keeps the crumb, even over the exploration root, whose router menu is
 // empty (exploration-room-actions): a pushed child frame there (the
-// SkillBook casting flow) still names its trail.
+// 技能-tab casting flow) still names its trail.
 const showChrome = computed(() => props.mode !== "creation");
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);

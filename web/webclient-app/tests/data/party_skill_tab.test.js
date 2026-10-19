@@ -108,6 +108,35 @@ describe("PartySkillTab (webclient-party-skill-tab)", () => {
     expect(first.get('[data-testid="party-skill-tab__category-head"]').attributes("aria-expanded")).toBe("true");
   });
 
+  it("keeps the player's collapses when a republished payload drops the selected row", async () => {
+    const w = mountTab({ character: { ...PANEL, selected_skill: null } });
+    await categories(w)[1].get('[data-testid="party-skill-tab__category-head"]').trigger("click");
+    expect(categories(w)[1].attributes("data-open")).toBe("false");
+    const [first, second] = FIRST_CATEGORY.groups[0].skills;
+    expect(row(w, first.key).attributes("aria-selected")).toBe("true");
+    const dropped = {
+      ...PANEL,
+      selected_skill: null,
+      actives: PANEL.actives.map((c, i) =>
+        i === 0 ? { ...c, groups: [{ ...c.groups[0], skills: [second] }] } : c,
+      ),
+    };
+    await w.setProps({ character: dropped });
+    await nextTick();
+    expect(row(w, second.key).attributes("aria-selected")).toBe("true");
+    expect(categories(w)[1].attributes("data-open")).toBe("false");
+  });
+
+  it("exposes the segment as pressed toggles and each open category owns its group", () => {
+    const w = mountTab();
+    expect(w.get('[data-testid="party-skill-tab__segment--active"]').attributes("aria-pressed")).toBe("true");
+    expect(w.get('[data-testid="party-skill-tab__segment--passive"]').attributes("aria-pressed")).toBe("false");
+    const head = w.get('[data-testid="party-skill-tab__category-head"]');
+    const owned = head.attributes("aria-owns");
+    expect(owned).toBeTruthy();
+    expect(w.get(`[id="${owned}"]`).attributes("role")).toBe("group");
+  });
+
   it("moves selection with the arrow keys and Enter goes to the actions without casting", async () => {
     const w = mountTab({ character: { ...PANEL, selected_skill: null } });
     const tree = w.get('[data-testid="party-skill-tab__tree"]');

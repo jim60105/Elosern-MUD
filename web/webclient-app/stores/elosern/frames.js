@@ -410,7 +410,7 @@ export function applyFrames(ctx) {
     if (ctx.creation && ctx.handleCreationItem(item)) {
       return;
     }
-    // The SkillBook use flow owns its own frames (skillbook-authoritative-
+    // The 技能-tab use flow owns its own frames (skillbook-authoritative-
     // casting D6): local rows (AREA toggles, the scale and opening steps)
     // never reach the generic exploration dispatch below.
     if (ctx.handleSkillUseItem(name, item)) {
