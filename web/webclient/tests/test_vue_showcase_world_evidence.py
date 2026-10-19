@@ -140,7 +140,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/CharacterStatusDrawer",
     "Overlays/CreationOverlay",
     "Overlays/HelpOverlay",
     "Overlays/MapOverlay",
@@ -157,6 +156,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/PartyWindow",
     # The party window's 背包 tab (webclient-party-bag-tab).
     "Overlays/PartyBagTab",
+    # The party window\'s 狀態 tab (webclient-party-status-tab).
+    "Overlays/PartyStatusTab",
     # The shared window primitives (webclient-window-primitives) joined the
     # frozen set; this change pins them with the party window.
     "Core/WindowFrame",

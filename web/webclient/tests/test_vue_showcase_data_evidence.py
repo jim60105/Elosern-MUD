@@ -148,7 +148,6 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Action/RestForm",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
-                "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ShopPanel",
                 "World/QuestDrawer", "World/LoreCodexDrawer",
                 "World/MapLattice",
@@ -162,6 +161,8 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/PartyWindow",
                 # The party window's 背包 tab (webclient-party-bag-tab).
                 "Overlays/PartyBagTab",
+                # The party window\'s 狀態 tab (webclient-party-status-tab).
+                "Overlays/PartyStatusTab",
                 # The shared window primitives (webclient-window-primitives) joined the
                 # frozen set; this change pins them with the party window.
                 "Core/WindowFrame",
