@@ -156,12 +156,11 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
 - 空位 is the only local selection (it has no member id): it shows on every
   tab while the general quota has room, opens 成員 and sends nothing.
 - The tab is session memory (`components/party-window-memory.js`, scoped to
-  `<generation>|<epoch>` like the quest drawer's). The current openers — the
-  character-status drawer's 隊伍 button and a companion figure on the stage
-  lineup (exploration only, outside the stage target step, never the
-  commander's figure) — open on 成員; every 背包 opener opens on 背包 (see
-  Bag routing below); a bare `openHudDrawer('party')` reopens on the
-  remembered tab. The lineup hit is a pointer convenience over the
+  `<generation>|<epoch>` like the quest drawer's). A companion figure on the
+  stage lineup (exploration only, outside the stage target step, never the
+  commander's figure) opens on 成員; every 背包 opener opens on 背包 (see
+  Bag routing below) and every 角色狀態 opener on 狀態 (see the status tab
+  below); a bare `openHudDrawer('party')` reopens on the remembered tab. The lineup hit is a pointer convenience over the
   decorative `aria-hidden` layer; keyboard users reach every member through
   the rail.
 - `PartyMemberTab` renders only the `party_member` panel's descriptors
@@ -169,8 +168,7 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   through `ActionBar`; 請其離隊 takes two steps and any close attempt while
   armed (Escape, ✕, scrim, via the window's `closeGuard`) cancels it instead.
   The commander's persona editor lives here (`composables/
-  use-member-persona.js`); the character-status drawer shows the prose
-  read-only until it is retired. 人物卡 opens `NpcPersonaEditor` through
+  use-member-persona.js`). 人物卡 opens `NpcPersonaEditor` through
   `store.openNpcPersonaEditor`.
 - The window has no possession input: it renders identically while
   possessing, with no "you" marker. It shows values, states and committed
@@ -227,5 +225,23 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   the 背包 tab and opens `party` instead; `inventory` is never the stored
   drawer name. The party purse in the window header is the only balance in
   the drawer layer.
-- The 狀態/技能/系譜 tabs land in the next changes; until then each shows
-  its backing panel's committed unavailable reason or its (empty) scoped slot.
+- `PartyStatusTab` (webclient-party-status-tab; design §6.3) is the 狀態
+  tab, in every mode, for the viewed member: the hero (rail-row name and
+  portrait, `character.full_title`, a `GradeGem` with merit only while
+  `guild.rank` is set), HP/MP/SP gauges from the `party` row, one listbox of
+  the four static traits (`components/party-status-model.js`
+  `STATUS_TRAIT_KEYS`, fail-closed) and the conditions, a selected trait's
+  waterfall (base → each payload layer with source bar, glyph and 裝備/技能/
+  狀態 label → effective) or a condition's 來源/剩餘/修正, and an active
+  disguise pinned at the detail's foot as 對外顯示 values; every row keeps the
+  true value. Raised/lowered totals carry ▲/▼ and a sign besides colour, and
+  each severity its own glyph. The selection is local (first layered trait on
+  open, reset with the viewed member); the `character` payload renders only
+  while its `member_id` is the viewed member. `CharacterStatusDrawer` and its
+  composables are gone: `openHudDrawer("status")` remembers 狀態 and opens
+  `party` (an open window switches tab live), the 角色狀態 row no longer sets
+  the `character` sub-dock, no `HudDrawer` drawer stands an art column, and
+  the top navigation marks the entry of the window's live tab
+  (`party:<tab>`).
+- The 技能/系譜 tabs land in the next changes; until then each shows its
+  backing panel's committed unavailable reason or its (empty) scoped slot.
