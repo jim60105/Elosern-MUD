@@ -66,14 +66,6 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         panel = store_state(page)["panels"].get("party_inventory") or {}
         return {row["item_key"]: row for row in panel.get("rows") or []}
 
-    def _wait_bag(self, page, predicate, timeout=30000):
-        def _bag_ready(state):
-            panel = (state.get("panels") or {}).get("party_inventory") or {}
-            if panel.get("available") is not True:
-                return False
-            return bool(predicate({row["item_key"]: row for row in panel.get("rows") or []}))
-        wait_for_store_state(page, _bag_ready, timeout=timeout)
-
     def _dock_mode(self, page):
         return page.locator("#action-dock").get_attribute("data-mode")
 

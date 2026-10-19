@@ -359,3 +359,36 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTestCase):
         leave_party(self.aila, self.commander, "dismissed")
         self.assertEqual(self._render(selection)["shop"]["member_id"], int(self.commander.pk))
         self.assertEqual(self._render()["shop"]["member_id"], int(self.commander.pk))
+
+    def test_unexpected_delta_failure_degrades_only_the_shop(self):
+        with patch(
+            "world.rules.service_view.equipment_delta", side_effect=RuntimeError("boom")
+        ):
+            view = build_services_view(self.commander, viewed=self.aila)
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "equipment_delta_unavailable")
+        self.assertEqual(view.player.wallet, 1000)
+
+    @covers_requirement(
+        "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
+    )
+    def test_oversized_payload_drops_only_the_shop_surface(self):
+        from web.webclient.presentation import services as presenter
+        from web.webclient.presentation.protocol import (
+            MAX_CANONICAL_JSON_BYTES,
+            json_byte_size,
+        )
+
+        sizes = iter([MAX_CANONICAL_JSON_BYTES + 1])
+
+        def first_measure_overflows(payload):
+            return next(sizes, None) or json_byte_size(payload)
+
+        with patch.object(presenter, "json_byte_size", side_effect=first_measure_overflows):
+            payload = self._render()
+        self.assertTrue(payload["available"])
+        self.assertIsNone(payload["shop"])
+        self.assertEqual(payload["pagination"]["stock_total"], 0)
+        self.assertEqual(payload["pagination"]["sellable_total"], 0)
+        self.assertEqual(payload["player"]["wallet"], 1000)
+

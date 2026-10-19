@@ -700,6 +700,10 @@ def _viewed_delta(member: Any, definition: Any, item_key: str) -> EquipmentDelta
         raise ServicesSectionError("malformed_equipment") from error
     except StatusQueryError as error:
         raise ServicesSectionError("malformed_traits") from error
+    except Exception as error:
+        # Any other failure of the comparison is confined to the shop
+        # surface: guild and the player summary must stay available.
+        raise ServicesSectionError("equipment_delta_unavailable") from error
 
 
 def _build_shop(

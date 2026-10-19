@@ -207,11 +207,12 @@ class ShopJourneys(ServicesBrowserTest):
             payload,
             {"item_key": potion, "quantity": 1, "seller_id": actor_id},
         )
-        # The trade republishes the bag panel beside the shop rows.
-        self._wait_bag(page, lambda bag: potion not in bag)
-        rows = self._bag_rows(page)
-        self.assertNotIn(potion, rows)
-        self.assertEqual(rows[staple]["held"], 2)
+        # The republished shop rows report the seller's remaining copies: the
+        # potion left the sellable list and the staple count is untouched.
+        shop = self._services_panel(page)["shop"]
+        self.assertNotIn(potion, {row["item_key"] for row in shop["sellable"]})
+        staple_stock = next(row for row in shop["stock"] if row["item_key"] == staple)
+        self.assertEqual(staple_stock["viewed"]["held"], 2)
 
         # Close the shop drawer (frameless close)
         page.locator('[data-testid="hud-drawer-close"]').click()
@@ -421,11 +422,12 @@ class ShopJourneys(ServicesBrowserTest):
             payload,
             {"item_key": potion, "quantity": 1, "seller_id": actor_id},
         )
-        # The trade republishes the bag panel beside the shop rows.
-        self._wait_bag(page, lambda bag: potion not in bag)
-        rows = self._bag_rows(page)
-        self.assertNotIn(potion, rows)
-        self.assertEqual(rows[staple]["held"], 2)
+        # The republished shop rows report the seller's remaining copies: the
+        # potion left the sellable list and the staple count is untouched.
+        shop = self._services_panel(page)["shop"]
+        self.assertNotIn(potion, {row["item_key"] for row in shop["sellable"]})
+        staple_stock = next(row for row in shop["stock"] if row["item_key"] == staple)
+        self.assertEqual(staple_stock["viewed"]["held"], 2)
 
         # Close the shop drawer (frameless close)
         page.locator('[data-testid="hud-drawer-close"]').click()

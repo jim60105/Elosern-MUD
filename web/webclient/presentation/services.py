@@ -20,6 +20,7 @@ validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
 dual-direction parity test.
 """
 
+from dataclasses import replace
 from typing import Any
 
 from web.webclient.presentation.context import PresentationContext
@@ -889,7 +890,19 @@ def services_presenter(context: PresentationContext) -> dict[str, Any]:
         view = build_services_view(actor, viewed=resolve_viewed_member(context))
     except ServicesViewError:
         raise PanelUnavailableError
-    return validate_services(_serialize(view))
+    payload = _serialize(view)
+    if view.shop is not None and json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
+        # A full guild board beside twelve rich shop rows can exceed the OOB
+        # envelope; the shop surface degrades alone (like any other surface
+        # failure) instead of taking the guild and summary down with it.
+        view = replace(
+            view,
+            shop=None,
+            shop_unavailable_reason="shop_too_large",
+            pagination=replace(view.pagination, stock_total=0, sellable_total=0),
+        )
+        payload = _serialize(view)
+    return validate_services(payload)
 
 
 __all__ = [
