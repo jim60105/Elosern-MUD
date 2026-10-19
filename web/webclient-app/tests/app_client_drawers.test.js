@@ -57,7 +57,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     shop: "shop-panel",
     quest: "quest-drawer",
     lore: "lore-codex-drawer",
-    status: "character-status-drawer",
     party: "party-window",
   };
 
@@ -81,6 +80,13 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       expect(store.view.hudDrawer).toBe(name);
       expect(wrapper.find(`[data-testid="${testid}"]`).exists(), name).toBe(true);
     }
+    // The retired character-status drawer's name opens the party window on
+    // its 狀態 tab (webclient-party-status-tab) in the same one action.
+    store.closeHudDrawer();
+    store.openHudDrawer("status");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("status");
   });
 
   // webclient-party-bag-retire: the retired bag drawer's wallet became the
@@ -119,7 +125,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.get('[data-testid="party-bag-tab"]').text()).not.toContain("金錢");
     expect(wrapper.text()).not.toContain("錢袋");
     // Every other drawer renders no balance of its own.
-    for (const name of ["skill", "shop", "quest", "lore", "status"]) {
+    // The 狀態 tab body carries no balance either (webclient-party-status-tab).
+    store.openHudDrawer("status");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid="party-status-tab"]').text()).not.toContain("1,240");
+    expect(wrapper.findAll('[data-testid="party-window__purse"]')).toHaveLength(1);
+    for (const name of ["skill", "shop", "quest", "lore"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       const other = wrapper.get('[data-testid="hud-drawer"]');
@@ -327,11 +338,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       ],
     );
     await wrapper.vm.$nextTick();
-    // The character-status drawer shows the prose read-only.
+    // The 狀態 tab carries no persona; the 成員 tab owns the editor.
     store.openHudDrawer("status");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-testid^="character-status-drawer__persona-edit"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="character-status-drawer__open-party"]').trigger("click");
+    expect(wrapper.find('[data-testid="party-status-tab"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="action-bar__btn--persona-edit"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="icon-tabs__tab--member"]').trigger("click");
     await wrapper.vm.$nextTick();
     await wrapper.get('[data-testid="action-bar__btn--persona-edit"]').trigger("click");
     await wrapper.get('[data-testid="party-member-tab__persona-edit--life_story"]').trigger("click");
@@ -964,7 +976,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.findAll('[data-testid="companion-figure"]')).toHaveLength(1);
   });
 
-  it("with an empty party, opens the status drawer, activates the open-party button, and opens party drawer", async () => {
+  it("with an empty party, the 角色狀態 opener opens the party window on the commander's 狀態 tab", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -980,6 +992,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             party: PARTY_PANEL_EMPTY_SAMPLE,
+            exploration: fx.explorationPanel(),
+            context_actions: fx.explorationActions(),
             status: fx.statusPanel(),
             character: fx.characterPanel ? fx.characterPanel() : CHARACTER_PANEL_SAMPLE,
           },
@@ -989,16 +1003,20 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     await wrapper.vm.$nextTick();
 
-    // Open status drawer
-    store.openHudDrawer("status");
+    // The 角色狀態 opener (webclient-party-status-tab).
+    store.tabToRootAndConfirm("character", "pointer");
     await wrapper.vm.$nextTick();
-    expect(store.view.hudDrawer).toBe("status");
-
-    const openPartyBtn = wrapper.get('[data-testid="character-status-drawer__open-party"]');
-    await openPartyBtn.trigger("click");
-    await wrapper.vm.$nextTick();
-
     expect(store.view.hudDrawer).toBe("party");
-    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="hud-drawer"][data-drawer-key="status"]').exists()).toBe(false);
+    const tab = wrapper.get('[data-testid="party-status-tab"]');
+    expect(tab.attributes("data-member")).toBe(String(CHARACTER_PANEL_SAMPLE.member_id));
+    expect(tab.get('[data-testid="party-status-tab__name"]').text()).toBe("影行者");
+    expect(tab.find('[data-testid="party-status-tab__trait--defense"]').exists()).toBe(true);
+    // Only the 角色狀態 entry is current while the window shows 狀態.
+    const current = wrapper.findAll('.desktop-navigation [aria-current="page"]').map((node) => node.text());
+    expect(current).toEqual(["角色狀態"]);
+    await wrapper.get('[data-testid="icon-tabs__tab--bag"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll('.desktop-navigation [aria-current="page"]').map((node) => node.text())).toEqual(["背包"]);
   });
 });

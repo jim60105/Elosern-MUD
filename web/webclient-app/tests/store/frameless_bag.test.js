@@ -79,7 +79,8 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.router.depth()).toBe(2);
     store.router.setAwaitingRevision(null);
     store.tabToRootAndConfirm("character", "pointer");
-    expect(store.view.hudDrawer).toBe("status");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("status");
   });
 
   it("the top-navigation 背包 entry opens the party window on 背包 with the router unchanged", () => {
@@ -257,17 +258,33 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.activeSubDock).toBe(null);
   });
 
-  it("the frameless 狀態 drawer close keeps clearing its character sub-dock (regression)", () => {
+  it("the 角色狀態 entry opens the party window on 狀態 with no sub-dock and the router unchanged", () => {
     openSession();
-    // The 角色狀態 navigation entry opens the status drawer with the character
-    // sub-dock active; its close still clears the sub-dock and re-homes.
+    // webclient-party-status-tab: the retired status drawer's opener opens
+    // the frameless party window on its 狀態 tab; it switches no sub-dock and
+    // pushes no frame, and its close pops nothing.
+    const depthBefore = store.router.depth();
     store.tabToRootAndConfirm("character", "pointer");
-    expect(store.view.hudDrawer).toBe("status");
-    expect(store.view.activeSubDock).toBe("character");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("status");
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.router.depth()).toBe(depthBefore);
     expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.depth()).toBe(1);
+    expect(store.router.depth()).toBe(depthBefore);
     expect(store.router.currentMenu().title).toBe("場景");
+  });
+
+  it("switches an already open party window to 狀態 and back to 背包", () => {
+    openSession();
+    store.tabToRootAndConfirm("inventory", "pointer");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("bag");
+    store.tabToRootAndConfirm("character", "pointer");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(memoryTab()).toBe("status");
+    store.tabToRootAndConfirm("inventory", "pointer");
+    expect(memoryTab()).toBe("bag");
   });
 });

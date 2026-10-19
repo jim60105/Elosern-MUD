@@ -21,8 +21,10 @@
 // exists. The 背包 tab is PartyBagTab (webclient-party-bag-tab): a row
 // selection emits `view-item` ({memberId, itemKey}) — AppClient dispatches
 // one `party.view_member` with that `item_key` — and its give, use and equip
-// intents leave as `bag-action`. The 狀態/技能/系譜 tabs land in the next
-// changes; until then each shows only its backing panel's committed
+// intents leave as `bag-action`. The 狀態 tab is PartyStatusTab
+// (webclient-party-status-tab): the viewed member's committed `character`
+// values with the trait waterfall, in every mode. The 技能/系譜 tabs land in
+// the next changes; until then each shows only its backing panel's committed
 // unavailable reason, or whatever the host passes through the tab's scoped
 // slot, and invents nothing.
 import { computed, ref, watch } from "vue";
@@ -30,6 +32,7 @@ import ListDetail from "./ListDetail.vue";
 import MemberRail, { EMPTY_SLOT } from "./MemberRail.vue";
 import PartyBagTab from "./PartyBagTab.vue";
 import PartyMemberTab from "./PartyMemberTab.vue";
+import PartyStatusTab from "./PartyStatusTab.vue";
 import WindowFrame from "./WindowFrame.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { usePartyWindowMemory, PARTY_WINDOW_DEFAULT_TAB } from "./party-window-memory.js";
@@ -70,6 +73,9 @@ const props = defineProps({
   combat: { type: Boolean, default: false },
   // `<generation>|<epoch>`: the session memory's scope.
   memoryScope: { type: String, default: "" },
+  // A trait key the 狀態 tab selects on open (a story seam; the app's
+  // openers never pass it, so the first layered trait is selected).
+  statusTrait: { type: String, default: null },
 });
 
 const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "combat-item", "open-npc-persona", "persona-edit"]);
@@ -256,6 +262,18 @@ function closeGuard() {
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
         </template>
       </PartyBagTab>
+
+      <PartyStatusTab
+        v-else-if="tab === 'status'"
+        :member="selectedRow"
+        :character="character"
+        :art-panel="artPanel"
+        :initial-trait="statusTrait"
+      >
+        <template #rail>
+          <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
+        </template>
+      </PartyStatusTab>
 
       <ListDetail v-else :list-label="PARTY_WINDOW_TABS.find((t) => t.key === tab)?.label">
         <template #rail>

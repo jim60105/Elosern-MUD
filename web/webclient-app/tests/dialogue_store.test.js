@@ -18,6 +18,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { useElosernStore } from "../stores/elosern.js";
 import { createFrameResolver } from "../stores/frame-resolvers.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { partyWindowTab } from "../components/party-window-memory.js";
 
 const DIALOGUE_PANEL = {
   schema_version: 2,
@@ -424,11 +425,11 @@ describe("dialogue store mode lifecycle", () => {
   it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    // The 狀態 drawer owns the character sub-dock (the frameless-drawer
-    // precedent): closing it while talking must clear the sub-dock and
-    // re-home the exploration root — the widened close guard (align-11 D8).
+    // A framed reference drawer (the codex) closing over a character
+    // sub-dock while talking must clear the sub-dock and re-home the
+    // exploration root — the widened close guard (align-11 D8).
     store.setActiveSubDock("character");
-    expect(store.openHudDrawer("status")).toBe(true);
+    expect(store.openHudDrawer("lore")).toBe(true);
     expect(store.closeHudDrawer()).toBe(true);
     // The widened non-hosted close guard (align-11 D8): the sub-dock dies
     // with the drawer and the root frame re-homes, exactly as in exploration.
@@ -474,11 +475,14 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null)).not.toBe(null);
   });
 
-  it("closeHudDrawer() on the status drawer opened from Character entry clears character sub-dock and re-homes root", () => {
+  it("the 角色狀態 entry opens the party window on 狀態 with no sub-dock, and its close leaves the root", () => {
     openSession();
     store.tabToRootAndConfirm("character", "pointer");
-    expect(store.view.hudDrawer).toBe("status");
-    expect(store.view.activeSubDock).toBe("character");
+    // webclient-party-status-tab: the frameless party window opens on its
+    // 狀態 tab and, like every reference drawer, switches no sub-dock.
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("status");
+    expect(store.view.activeSubDock).toBe(null);
     expect(store.closeHudDrawer()).toBe(true);
     expect(store.view.hudDrawer).toBe(null);
     expect(store.view.activeSubDock).toBe(null);

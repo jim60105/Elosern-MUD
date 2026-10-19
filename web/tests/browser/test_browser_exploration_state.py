@@ -120,10 +120,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 self.assertFalse(intersects(box, foe), boxes)
         page.locator('[data-testid="dialogue-exit"]').click()
         wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
-        page.evaluate("window.__elosernBridge.store.openHudDrawer('status')")
-        page.locator('[data-testid="character-status-drawer__open-party"]').click()
-        # The party window (webclient-party-window-member-tab) opens on 成員;
-        # the rail selects the companion through the server, and 附身 is its
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
+        page.locator('[data-testid="icon-tabs__tab--member"]').click()
+        # The party window (webclient-party-window-member-tab) on 成員: the
+        # rail selects the companion through the server, and 附身 is its
         # committed descriptor.
         self._select_party_member(page, target_id)
         page.locator('[data-testid="action-bar__btn--possess"]').click()
@@ -563,18 +563,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # capability-driven [move, look, interact, wait, suggestions];
         # 角色狀態 opens from the DesktopNavigation entry — the nav click
         # routes the same store confirm the dock row carried).
+        # Since webclient-party-status-tab the entry opens the frameless
+        # party window on its 狀態 tab and switches no sub-dock.
         page.locator('.desktop-navigation button', has_text="角色狀態").click()
-        self.assertEqual(
-            page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
-            "character",
-            "the character panel must own the action dock",
-        )
-        _press(page, "Escape")
-        page.wait_for_timeout(120)
+        page.wait_for_selector('[data-testid="party-status-tab"]', timeout=15000)
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
             None,
-            "Escape must leave the character panel",
+            "the party window switches no sub-dock",
+        )
+        _press(page, "Escape")
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.view.hudDrawer === null", timeout=15000
         )
 
         activate_first_compass_exit(page)  # the compass's first exit

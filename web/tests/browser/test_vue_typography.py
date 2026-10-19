@@ -66,7 +66,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             ("core-appshell--populated-hud", ".vitals"),
             ("core-appshell--combat-five-foes", ".figure-plate"),
             ("core-appshell--dialogue-selector", ".dialogue-choices__row"),
-            ("data-characterstatusdrawer--full", ".character-status-drawer"),
+            ("overlays-partystatustab--trait-breakdown-reference", ".party-status-tab"),
             ("overlays-creationoverlay--custom-draft", ".creation-overlay"),
             # The map chrome joined the floor with webclient-map-legibility;
             # only the drawn SVG map (node labels, marker names) stays outside.

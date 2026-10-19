@@ -205,9 +205,10 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       // The shared reference-surface header (webclient-drawer-frame-unification).
       "Core/DrawerHeader",
       "Core/EmptyState",
-      "Data/CharacterStatusDrawer",
       // The bag is the party window's 背包 tab (webclient-party-bag-retire).
       "Overlays/PartyBagTab",
+      // The character status is its 狀態 tab (webclient-party-status-tab).
+      "Overlays/PartyStatusTab",
       "World/MapLattice",
      "Feedback/ToastQueue",
       // The AVG stage series adds the stage place card.

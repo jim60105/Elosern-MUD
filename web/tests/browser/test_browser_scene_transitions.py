@@ -344,14 +344,9 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
             "() => getComputedStyle(document.querySelector('[data-testid=\"status-panel\"]')).display === 'none'",
             timeout=15000,
         )
-        page.evaluate("window.__elosernBridge.store.openHudDrawer('status')")
-        row = page.locator('[data-testid="character-status-drawer__condition--t_equipment_warning"]')
-        row.wait_for(state="visible", timeout=15000)
-        self.assertIn("裝備來源：合成護符", row.inner_text())
-        self.assertIn("defense -15", row.inner_text())
+        # The full roster lived in the retired character-status drawer; the
+        # island chip below carries the equipment provenance in its name.
         self.assertEqual(page.locator('[data-testid="status-panel"]').is_visible(), False)
-        page.keyboard.press("Escape")
-        page.wait_for_selector('[data-testid="hud-drawer"]', state="hidden", timeout=15000)
         inject_update(page, {"status": _status(60, equipment)})
         entering = page.wait_for_function(
             """() => {

@@ -13,7 +13,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     shop: "商店",
     quest: "任務",
     lore: "世界圖鑑",
-    status: "角色狀態",
   };
   const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
   // The drawer head glyph (webclient-drawer-frame-unification): a
@@ -25,18 +24,13 @@ export function useDrawers(store, { panel, panelAvailable }) {
     shop: "shop",
     quest: "quests",
     lore: "lore",
-    status: "character",
   };
   const drawerIcon = computed(() => DRAWER_ICONS[store.view.hudDrawer] || null);
-  // The drawer art column (webclient-drawer-content-polish): only a drawer
-  // whose subject is the current character stands its portrait beside the
-  // content. The codex, the quest log, the skill book and the shop are not
-  // the player, so they take the whole workspace width instead of borrowing
-  // an unrelated portrait or a stand-in illustration. The party window
-  // (webclient-party-window-member-tab) owns its own WindowFrame chrome and
-  // carries its art in the 成員 nameplate, so it is not a HudDrawer here.
-  const DRAWER_ART_KEYS = new Set(["status"]);
-  const drawerHasArt = computed(() => DRAWER_ART_KEYS.has(store.view.hudDrawer));
+  // No reference drawer stands an art column (webclient-party-status-tab):
+  // the codex, the quest log, the skill book and the shop are not the
+  // player, so they take the whole workspace width, and the character's
+  // status moved into the party window, which owns its WindowFrame chrome
+  // and carries portraits in its rail, nameplate and status hero.
 
   // The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
   // opens the codex reference drawer through the store's single open-drawer
@@ -97,7 +91,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     shopMemberName,
     drawerTitle,
     drawerIcon,
-    drawerHasArt,
     onHudDrawerClose,
     onOpenDrawer,
     skillBookSubtitle,

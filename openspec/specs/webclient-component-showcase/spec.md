@@ -42,7 +42,7 @@ events/actions it emits, and its primary states.
 - **THEN** the required manifest SHALL enumerate at minimum: the header; the place card; the
   message window; the command line; the action dock with its menu and submenu frames and its exploration
   root pane; the presence rail, the centred choice card, and the question card; the status panel with its gauges and
-  conditions; the character status drawer; the party window with its 背包 tab (including the equipment doll); the skill book; the
+  conditions; the party window with its 背包 tab (including the equipment doll) and its 狀態 tab; the skill book; the
   local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait
   on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice
   list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
@@ -153,9 +153,9 @@ exact server-authored suggestion card shape on the centred suggestions card.
   readout
 
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
-The `StatusPanel`, the `CharacterStatusDrawer`, and the `SkillBook`
+The `StatusPanel`, the party window's `PartyStatusTab`, and the `SkillBook`
 components SHALL present the `status` panel payload (schema version 1), the `character` panel
-payload (schema version 3), and the character's skill data, each surface rendering only its
+payload (schema version 9), and the character's skill data, each surface rendering only its
 OOB-backed payload and inventing no field.
 
 #### Scenario: Status is never color-only
@@ -164,7 +164,7 @@ OOB-backed payload and inventing no field.
 
 #### Scenario: Disguised stats are display-only and distinct from true traits
 - **WHEN** the character payload carries disguised statistics
-- **THEN** the drawer shows them as display values distinct from the true traits, every true trait row keeps its true value, and no disguised value alters combat resolution
+- **THEN** the status tab shows them as display values distinct from the true traits, every true trait row keeps its true value, and no disguised value alters combat resolution
 
 #### Scenario: Only backed fields render
 - **WHEN** the status, character, or skill surface renders
@@ -183,8 +183,8 @@ OOB-backed payload and inventing no field.
 - **THEN** it is absent from the accessibility tree, shows only a previously committed ratio of that same gauge, and the numerals already carry the same information
 
 #### Scenario: The character status drawer presents only the backed character fields
-- **WHEN** the character status drawer renders with the `character` panel available
-- **THEN** it presents the character details, disguise, guild rank/merit, and persona, and no field the payload does not carry is rendered; equipped items are presented by the party window's bag tab
+- **WHEN** the party window's status tab renders with the `character` panel available
+- **THEN** it presents the viewed member's hero row, gauges, trait waterfall, conditions, disguise and guild rank/merit, and no field the payload does not carry is rendered; equipped items are presented by the bag tab and persona by the member tab
 
 #### Scenario: An active skill row carries its registry-backed descriptor detail
 - **WHEN** the character panel's presenter serializes an active skill row whose key resolves in the skill registry
@@ -246,7 +246,7 @@ OOB-backed payload and inventing no field.
 #### Scenario: Identity fields belong to the drawers, not the HUD
 - **WHEN** identity information is presented
 - **THEN** the display name, full title, true traits, guild rank and merit, and disguise are
-  presented by the character status drawer and the wallet only by the inventory drawer, and no
+  presented by the party window's status tab and the purse only by the party window's header, and no
   race, subrace, class, or faction line is rendered anywhere, because no such field exists in
   either payload
 
@@ -414,7 +414,7 @@ manifest-listed overlay that nothing imports is not complete.
 
 #### Scenario: The intimate/adult status collapsible is no longer deferred
 - **WHEN** the complete component set and its deferred-surface assertion are enumerated
-- **THEN** the intimate/adult status collapsible is absent from the deferred-surface list, because it now has a backing OOB read model (`character.intimate`), and its presence/absence behaviour is asserted by `webclient-contextual-hud`'s character-status drawer requirement instead
+- **THEN** the intimate/adult status collapsible is absent from the deferred-surface list, because it now has a backing OOB read model (`character.intimate`), and its presence/absence behaviour is asserted by `webclient-party-window`'s member-tab requirement (the `party_member` panel's intimate section) instead
 
 #### Scenario: The held-item bag is built from its backing section
 - **WHEN** the `party_inventory` panel commits the viewed member's bag
@@ -507,8 +507,8 @@ manifest-listed overlay that nothing imports is not complete.
   action-feedback toast queue
 - **THEN** the intimate collapsible is backed by the `character` panel's `intimate` field
   (`webclient-exploration-menu`'s version-4 character-panel requirement) with completeness and
-  absence-when-`null` behaviour governed by `webclient-contextual-hud`'s character-status drawer
-  requirement; the party surfaces by the `party` panel (`webclient-party-panel`) with rendering
+  absence-when-`null` behaviour governed by `webclient-party-window`'s member-tab requirement (the
+  `party_member` panel's intimate section); the party surfaces by the `party` panel (`webclient-party-panel`) with rendering
   and mutation behaviour governed by `webclient-contextual-hud`'s party quickbar and party drawer
   requirements; the objective tracker by the `objectives` panel
   (`webclient-objectives-panel`) with rendering governed by `webclient-contextual-hud`'s
@@ -612,18 +612,27 @@ or by a committed action-result read model.
 
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 
-Storybook SHALL provide breakdown-state stories for the character drawer and the
-party window's bag tab, driven by a version-5 character fixture and a
-`party_inventory` fixture mirroring the server contract's serialized sample. The
-fixture MUST carry a worn bias-bearing item whose stored-base exposure differs
-from its effective ordinal, a row at the 16-layer bound, and an
-adjustment-bearing item, and the component coverage check SHALL pass.
+Storybook SHALL provide breakdown-state stories for the party window's status
+tab and bag tab. The status tab stories SHALL be driven by a `character`
+fixture mirroring the server contract's serialized sample. The bag tab's
+breakdown story SHALL be driven by a `party_inventory` fixture and an
+`item_holdings` answer. The component coverage check SHALL pass against the
+UNCHANGED frozen required-set manifest.
+
+#### Scenario: The status tab fixture carries the boundary rows
+- **WHEN** the status tab breakdown stories are driven
+- **THEN** the `character` fixture carries a worn bias-bearing equipment row whose stored-base exposure differs from its effective ordinal, at least one trait row at the 16-layer bound, and at least one adjustment-bearing equipment row
+
+#### Scenario: The bag tab story uses the server's adjustment strings
+- **WHEN** the bag tab breakdown story is driven
+- **THEN** the `item_holdings` answer's per-member deltas are the server's adjustment strings, because the `party_inventory` v1 panel carries no trait layers
 
 #### Scenario: v5 breakdown stories build
 
 - **WHEN** `pnpm run build-storybook` builds the updated stories
-- **THEN** the drawer and bag tab stories render their fixtures' layers (including the 16-layer-bound row, all rendered without
-  truncation) and adjustment strings
+- **THEN** the status tab story renders the selected trait's waterfall layers
+  (including the 16-layer-bound row, all rendered without truncation) and the
+  bag tab story renders its holdings' adjustment strings
 
 #### Scenario: Coverage gate stays clean
 

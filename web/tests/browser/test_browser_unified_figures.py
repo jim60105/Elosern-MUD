@@ -60,7 +60,6 @@ FACE_RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
 STANDEE = '[data-anchor="actor-right"] [data-testid="stage-actor"]:not([inert])'
 PLAYER_FIGURE = '[data-anchor="actor-left"] [data-testid="stage-actor"]:not([inert])'
 MEDALLION = '[data-anchor="presence"] [data-testid="presence-entry-face"]'
-DRAWER_ART = '[data-testid="hud-drawer"] [data-testid="reference-artwork"]'
 ALPHA = '[data-testid="artwork-alpha"]'
 ALPHA_FILL = '[data-testid="artwork-alpha-fill"]'
 FAILURE = '[data-testid="artwork-failure"]'
@@ -314,8 +313,9 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
     )
     def test_exploration_dialogue_combat_and_drawer_share_descriptor(self):
         """One descriptor, every surface: the player's roster figure, the
-        focused target's standee, the presence medallion, the party drawer row
-        and the drawer art slot all present the SAME descriptor's candidate,
+        focused target's standee, the presence medallion and the party row
+        all present the SAME descriptor's candidate (the status drawer's art
+        slot retired with webclient-party-status-tab),
         and when that candidate disappears they all fall back to the
         descriptor's own committed alpha terminal rather than to a per-surface
         copy of the old flat fields or to a solid rectangle."""
@@ -323,18 +323,10 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         self._serve_media(page)
         self._commit(page)
         _wait_mode(page, "exploration")
-        # Focus the admitted target so the actor-right standee stands, then
-        # open the status drawer so its art slot renders the roster figure too.
+        # Focus the admitted target so the actor-right standee stands.
         page.wait_for_selector('[data-anchor="presence"] [data-entry-key="target-8"]', timeout=15000)
         open_verb_card(page, 8)
         page.wait_for_selector(STANDEE, timeout=15000)
-        page.evaluate(
-            "() => window.__elosernBridge.store.openHudDrawer('status')"
-        )
-        page.wait_for_selector(
-            '[data-testid="hud-drawer"][data-drawer-key="status"] [data-testid="reference-artwork"]',
-            timeout=15000,
-        )
 
         # The committed wire shape is the canonical one: the catalog value is
         # exactly {artwork, context} and the roster portrait is the descriptor.
@@ -370,7 +362,6 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector(f'{STANDEE} img[src$="{SHARED_URL}"]', timeout=15000)
         self.assertEqual(self._image_src(page, PLAYER_FIGURE), SHARED_URL)
         self.assertEqual(self._image_src(page, MEDALLION), SHARED_URL)
-        self.assertEqual(self._image_src(page, DRAWER_ART), SHARED_URL)
         self.assertEqual(page.locator(f"{STANDEE} {ALPHA}").count(), 0, "a real image stands alone")
 
         # The candidate disappears from the committed descriptor: every surface
@@ -382,8 +373,7 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         # terminal, only after that same resource loaded.
         page.wait_for_selector(f"{STANDEE} {ALPHA_FILL}", timeout=15000)
         page.wait_for_selector(f"{PLAYER_FIGURE} {ALPHA_FILL}", timeout=15000)
-        page.wait_for_selector(f"{DRAWER_ART} {ALPHA_FILL}", timeout=15000)
-        for surface in (STANDEE, PLAYER_FIGURE, DRAWER_ART):
+        for surface in (STANDEE, PLAYER_FIGURE):
             with self.subTest(surface=surface):
                 self.assertEqual(
                     self._mask_url(page, f"{surface} {ALPHA_FILL}"),

@@ -26,8 +26,10 @@ const props = defineProps({
 });
 const emit = defineEmits(["navigate", "overlay", "drawer"]);
 // The 背包 entries open the party window on its 背包 tab
-// (webclient-party-bag-retire).
-const drawerKeys = { character: "status", inventory: "party", bag: "party", quests: "quest" };
+// (webclient-party-bag-retire) and 角色狀態 on its 狀態 tab
+// (webclient-party-status-tab). The host names the open party window with
+// its live tab (`party:<tab>`), so only the entry of the open tab is current.
+const drawerKeys = { character: "party:status", inventory: "party:bag", bag: "party:bag", quests: "quest" };
 // The glyph count of each primary concept's label sizes its control, so the
 // region's width is the same whichever entries the mode supplies.
 const GLYPHS = { character: 4, quests: 2, inventory: 2, bag: 2, map: 2, settings: 2 };

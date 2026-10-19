@@ -87,8 +87,7 @@ const deltaOf = (row) => row?.viewed?.delta ?? null;
 const heldOf = (row) => (Number.isSafeInteger(row?.viewed?.held) ? row.viewed.held : null);
 
 // H4 (task 7.1): the shop drawer no longer renders the wallet line; the
-// wallet now lives in the CharacterStatusDrawer (the single wallet rendering
-// across the drawer layer, task 7.7).
+// party purse renders once, in the party window's header.
 
 // One quantity entry per item_key, defaulted to the action's own lower
 // bound (an invented default is a fabricated value); stock and sellable

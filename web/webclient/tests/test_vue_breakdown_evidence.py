@@ -47,7 +47,10 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # Storybook index.json entry id for every story this change adds (title
 # "<Family>/<Component>", deterministic story names).
 BREAKDOWN_STORY_IDS = {
-    "data-characterstatusdrawer--breakdown-chips",
+    # webclient-party-status-tab: the party window's 狀態 tab replaced the
+    # character-status drawer; its 16-layer story renders every layer of
+    # the fixture's bound row in the waterfall.
+    "overlays-partystatustab--sixteen-layers-reference",
     # webclient-party-bag-retire: the bag tab replaced the doll and the
     # inventory panel; its equipment story renders the server's per-member
     # adjustment strings (the `item_holdings` delta changes).
@@ -75,16 +78,17 @@ class VueBreakdownEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         adjustments, the inventory item_key join with the bag-only,
         empty-string and duplicate-key cases, the direct-render
         unknown-enum 其他 defense, and the store-path v5-accept /
-        v4-reject wire claim — plus the drawer suite
-        (``character_status_drawer.test.js``), which carries the
-        effective-exposure pin with the stored base asserted absent.
+        v4-reject wire claim — plus the party window's 狀態 tab suite
+        (``party_status_tab.test.js``, webclient-party-status-tab), which
+        carries the waterfall's payload order, source labels and 16-layer
+        bound.
         """
         result = run_npm(
             [
                 "test",
                 "--",
                 "web/webclient-app/tests/data/breakdown_rendering.test.js",
-                "web/webclient-app/tests/data/character_status_drawer.test.js",
+                "web/webclient-app/tests/data/party_status_tab.test.js",
             ],
             timeout=600,
         )
@@ -145,7 +149,7 @@ class VueBreakdownEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
         )["required"]
         for key in (
-            "Data/CharacterStatusDrawer",
+            "Overlays/PartyStatusTab",
             "Overlays/PartyBagTab",
         ):
             self.assertIn(key, required)

@@ -492,9 +492,9 @@ describe("store dispatch + focus", () => {
         {},
       );
       store.tabToRootAndConfirm("character", "pointer");
-      // The character entry re-homes the character sub-dock; no OOB action is
-      // invented (the surface intent is client-local).
-      expect(store.view.activeSubDock).toBe("character");
+      // The character entry opens the party window (its 狀態 tab); no OOB
+      // action is invented (the surface intent is client-local).
+      expect(store.view.hudDrawer).toBe("party");
       expect(sender.sent.actions.length).toBe(0);
     });
 

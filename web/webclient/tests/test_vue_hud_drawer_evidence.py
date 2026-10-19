@@ -103,16 +103,22 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-character-status-drawer-degrades-section-by-section-and-never-substitutes-a-disguise"
+        "webclient-party-window::the-status-tab-shows-true-values-with-a-trait-waterfall",
+        "webclient-party-window::the-status-tab-shows-conditions-and-an-honest-disguise",
     )
-    def test_character_status_drawer_section_degradation(self):
-        # The character-status drawer renders vitals + conditions from the
-        # ``status`` panel in every mode, marks the ``character`` sections with the
-        # registry-owned reason when unavailable, and presents a disguise as a
-        # labelled comparison beside the true trait rows (never a substitution).
+    def test_party_status_tab_waterfall_conditions_and_disguise(self):
+        # The party window's 狀態 tab (webclient-party-status-tab) selects the
+        # first layered trait, lists the waterfall layers in payload order
+        # with their source labels, signs raised and lowered totals, shows no
+        # gem without a rank, details a condition's source, remaining time
+        # and modifiers, keeps every true row under an active disguise, and
+        # renders the committed values in combat.
         _assert_vitest_passes(
-            _run_vitest(TESTS_DIR / "data" / "character_status_drawer.test.js"),
-            "character-status drawer section degradation",
+            _run_vitest(
+                TESTS_DIR / "data" / "party_status_tab.test.js",
+                TESTS_DIR / "data" / "breakdown_rendering.test.js",
+            ),
+            "party window status tab",
         )
 
     @covers_requirement(

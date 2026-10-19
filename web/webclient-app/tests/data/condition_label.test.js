@@ -1,7 +1,6 @@
 // webclient-frontend-utils: the ONE condition label rule extracted from
-// ConditionChips.vue and CharacterStatusDrawer.vue. The accessible chip name
-// and the drawer roster prose MUST agree — this util now guards the single
-// copy: label (or code fallback), the verbatim remaining duration (only when
+// ConditionChips.vue (the party window's 狀態 tab names the same modifier
+// pairs through it). This util guards the single copy of the chip name: label (or code fallback), the verbatim remaining duration (only when
 // the payload supplies numeric `remaining_seconds`), every derived modifier
 // pair, joined with `，`.
 

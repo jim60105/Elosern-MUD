@@ -7,6 +7,7 @@ import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
+import { partyWindowTab } from "../../components/party-window-memory.js";
 
 // A minimal services panel exposing a guild quest log.
 function servicesPanel() {
@@ -116,8 +117,11 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.view.hudDrawer).toBe("skill");
     expect(store.openHudDrawer("bogus")).toBe(false);
     expect(store.view.hudDrawer).toBe("skill");
+    // The retired character-status drawer's name opens the party window on
+    // its 狀態 tab (webclient-party-status-tab); "status" is never stored.
     expect(store.openHudDrawer("status")).toBe(true);
-    expect(store.view.hudDrawer).toBe("status");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("status");
     expect(store.openHudDrawer("lore")).toBe(true);
     expect(store.view.hudDrawer).toBe("lore");
     expect(store.openHudDrawer("party")).toBe(true);
@@ -206,9 +210,10 @@ describe("H4 store reference-drawer controller", () => {
     expect(result.accepted).toBe(true);
     // The services-backed quest drawer closed on the mode change…
     expect(store.view.hudDrawer).toBe(null);
-    // …and the status drawer is still openable in combat.
+    // …and the 狀態 opener still opens the party window in combat.
     expect(store.openHudDrawer("status")).toBe(true);
-    expect(store.view.hudDrawer).toBe("status");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("status");
     // …and the party drawer is still openable in combat.
     expect(store.openHudDrawer("party")).toBe(true);
     expect(store.view.hudDrawer).toBe("party");

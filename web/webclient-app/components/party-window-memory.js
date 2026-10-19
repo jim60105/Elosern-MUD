@@ -41,6 +41,12 @@ export function rememberPartyWindowTab(scope, tab) {
   memory.tab = tab;
 }
 
+// The live tab of the shared memory (the open window writes it), read by
+// the top navigation to mark the entry of the open tab.
+export function partyWindowTab() {
+  return memory.tab;
+}
+
 // Test seam: forget everything, as on a reload.
 export function resetPartyWindowMemory() {
   clear();

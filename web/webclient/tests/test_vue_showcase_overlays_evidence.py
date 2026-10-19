@@ -57,6 +57,8 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/PartyWindow",
     # webclient-party-bag-tab added the party window's 背包 tab.
     "Overlays/PartyBagTab",
+    # The party window\'s 狀態 tab (webclient-party-status-tab).
+    "Overlays/PartyStatusTab",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -91,6 +93,14 @@ OVERLAYS_STORY_IDS = {
     "overlays-partybagtab--consumable-full-hd",
     "overlays-partybagtab--equipment-reference",
     "overlays-partybagtab--equipment-full-hd",
+    "overlays-partystatustab--trait-breakdown-reference",
+    "overlays-partystatustab--trait-breakdown-full-hd",
+    "overlays-partystatustab--sixteen-layers-reference",
+    "overlays-partystatustab--sixteen-layers-full-hd",
+    "overlays-partystatustab--no-guild-reference",
+    "overlays-partystatustab--no-guild-full-hd",
+    "overlays-partystatustab--in-combat-reference",
+    "overlays-partystatustab--in-combat-full-hd",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -146,7 +156,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/CharacterStatusDrawer",
     "World/LocalMap",
     "World/ShopPanel",
     "World/QuestDrawer",
@@ -390,7 +399,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyWindow", "PartyBagTab",
+                "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab",
             )},
         )
 

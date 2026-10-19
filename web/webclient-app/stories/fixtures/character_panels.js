@@ -214,3 +214,91 @@ export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   wallet: 0,
   conditions: [],
 };
+// webclient-party-status-tab: the committed `character` v9 panel for the
+// viewed companion 蕾娜 (member 101 of PARTY_WINDOW_PANEL_SAMPLE), the 狀態
+// tab's trait-breakdown story. Her 魔力 is 18 base and 27 effective through
+// four layers (two worn items, a skill and a blessing); a fatigue condition
+// lowers her 敏捷; she is disguised as a travelling herbalist, so the
+// displayed values differ from every true row; she holds guild rank F.
+export const CHARACTER_STATUS_COMPANION_SAMPLE = {
+  schema_version: 9,
+  available: true,
+  kind: "character",
+  member_id: 101,
+  full_title: "F級冒險者　月下藥師",
+  traits: [
+    { key: "hp", label: "生命", base: 220, current: 180, max: 220, effective: 220, layers: [] },
+    { key: "mp", label: "魔力", base: 80, current: 60, max: 80, effective: 80, layers: [] },
+    { key: "sp", label: "耐力", base: 40, current: 24, max: 40, effective: 40, layers: [] },
+    { key: "atk_phys", label: "攻擊", base: 6, current: 6, max: null, effective: 6, layers: [] },
+    {
+      key: "agility",
+      label: "敏捷",
+      base: 12,
+      current: 10,
+      max: null,
+      effective: 10,
+      layers: [{ source: "condition", name: "輕微疲勞", kind: "flat", amount: -2 }],
+    },
+    {
+      key: "defense",
+      label: "防禦",
+      base: 5,
+      current: 9,
+      max: null,
+      effective: 9,
+      layers: [{ source: "equipment", name: "亞麻長袍", kind: "flat", amount: 4 }],
+    },
+    {
+      key: "magic_power",
+      label: "魔力",
+      base: 18,
+      current: 27,
+      max: null,
+      effective: 27,
+      layers: [
+        { source: "equipment", name: "樺木法杖", kind: "flat", amount: 4 },
+        { source: "equipment", name: "月石墜", kind: "flat", amount: 2 },
+        { source: "skill", name: "冥想", kind: "flat", amount: 1 },
+        { source: "condition", name: "月之祝福", kind: "pct", amount: 8 },
+      ],
+    },
+    { key: "guild_merit", label: "功績", base: 20, current: 20, max: null, effective: 20, layers: [] },
+  ],
+  conditions: [
+    {
+      code: "moon_blessing",
+      label: "月之祝福",
+      severity: "beneficial",
+      remaining_seconds: 7200,
+      modifiers: { mp_cost: "-10%" },
+      source: "狀態",
+    },
+    {
+      code: "light_fatigue",
+      label: "輕微疲勞",
+      severity: "harmful",
+      remaining_seconds: 2400,
+      modifiers: { agility_flat: -2 },
+      source: "狀態",
+    },
+  ],
+  actives: [],
+  passives: [],
+  equipment: [
+    { slot: "weapon_main", item_key: "birch_staff", display_name: "樺木法杖", adjustment: "魔力 +4" },
+    { slot: "armor", item_key: "linen_robe", display_name: "亞麻長袍", adjustment: "防禦 +4" },
+    { slot: "accessory", item_key: "moonstone_pendant", display_name: "月石墜", adjustment: "魔力 +2" },
+  ],
+  disguise: {
+    active: true,
+    description: "以旅行的藥草師示人",
+    displayed: [
+      { key: "magic_power", label: "魔力", value: 12 },
+      { key: "atk_phys", label: "攻擊", value: 8 },
+    ],
+  },
+  guild: { rank: "F", merit: 20 },
+  wallet: 0,
+  selected_skill: null,
+};

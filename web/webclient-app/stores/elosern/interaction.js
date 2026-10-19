@@ -49,11 +49,10 @@ export function applyInteraction(ctx) {
       return true;
     }
     if (item.openCharacter) {
-      ctx.setActiveSubDock("character");
-      // H4 (task 4.2): the Character root opens the character-status drawer
-      // (the re-homed character surface). The sub-dock flag is kept so the
-      // dock's routing stays intact; the drawer is the new home of the
-      // surface.
+      // The 角色狀態 row opens the party window on its 狀態 tab
+      // (webclient-party-status-tab). The window is frameless, so like every
+      // reference drawer the open switches no sub-dock (closing it would
+      // never clear one).
       ctx.openHudDrawer("status");
       return true;
     }
