@@ -419,6 +419,21 @@ describe("party items and tactics (store)", () => {
     expect(sent("inventory.use")).toHaveLength(0);
   });
 
+  it("states the refusal when the switched member's choices lack the item", () => {
+    enterCombat({ items: [item()] });
+    store.openHudDrawer("inventory");
+    bagHandlers().onPartyBagCombatItem({ memberId: ALLY, itemKey: "t_ember_spray" });
+    const query = sender.sent.actions.at(-1);
+    const rev = commit({ actorId: ALLY, items: [] });
+    store.receive(gen, "ui_action_result", [fx.actionResult({ request_id: query.request_id, code: "actor_choices", presentation_revision: rev })], {});
+    // The member switch is the server's; the item frame never opens and the
+    // refusal is visible, with the window left open.
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.view.toasts.some((toast) => toast.title === "這件物品目前無法由這名成員使用。")).toBe(true);
+    expect(sent("inventory.use")).toHaveLength(0);
+  });
+
   it("drops the held item when the party window closes before the switch commits", () => {
     enterCombat({ items: [item()] });
     store.openHudDrawer("inventory");

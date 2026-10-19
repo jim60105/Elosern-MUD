@@ -1233,9 +1233,9 @@ export function applyFrames(ctx) {
       ctx.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
       return;
     }
-    if (ctx.inFlight || ctx.beatLocked()) {
-      return;
-    }
+    // The switch committed: the item frame opens now or never, so a dock
+    // still held by another request or a playing round can never open it
+    // later, under whatever the player turned to meanwhile.
     ctx.pendingCombatItem = null;
     if (!ctx.useCombatItem(held.itemKey)) {
       ctx.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
