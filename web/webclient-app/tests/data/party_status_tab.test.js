@@ -130,7 +130,7 @@ describe("PartyStatusTab (webclient-party-status-tab)", () => {
   });
 
   it("labels an unknown layer source or kind as 其他", () => {
-    expect(layerSource({ source: "relic", kind: "flat" }).label).toBe("其他");
+    expect(layerSource({ source: "unregistered", kind: "flat" }).label).toBe("其他");
     expect(layerSource({ source: "skill", kind: "exp" }).label).toBe("其他");
     expect(layerSource({ source: "skill", kind: "flat" }).label).toBe("技能");
   });
