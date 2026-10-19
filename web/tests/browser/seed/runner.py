@@ -382,6 +382,23 @@ def main() -> None:
             # companion's own, so grant the kit's SELF buff through the same
             # lineage gate activation uses.
             grant_lineage(companion, ["t_moss_veil"])
+    if synth and os.environ.get("ELOSERN_BROWSER_COMPANION_FIELD_CAST") == "1":
+        # The party window 技能 tab's companion cast (webclient-party-skill-
+        # tab): the bound kit companion owns the kit's out-of-combat SINGLE
+        # heal through the same lineage gate activation uses, and the
+        # commander starts wounded so healing the commander is a legal
+        # field target in the companion's own preview.
+        from evennia.objects.models import ObjectDB
+
+        from world.rules.party import party_ids
+
+        for companion_id in party_ids(character)[:1]:
+            companion = ObjectDB.objects.filter(pk=companion_id).first()
+            if companion is None:
+                continue
+            grant_lineage(companion, ["t_hush_mend"])
+            character.traits.hp.current = max(1, int(character.traits.hp.max) - 30)
+            character.save()
     if synth and os.environ.get("ELOSERN_BROWSER_COMBAT_SEAL") == "1":
         # Disabled-row journey seed: persist a synthetic examination seal
         # that excludes exactly the identity-ELIGIBLE martial combat-panel

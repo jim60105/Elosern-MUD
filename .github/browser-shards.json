@@ -466,7 +466,8 @@
         "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest",
         "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest",
         "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_keyboard_self_none_and_single_utility_casts",
-        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off"
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off",
+        "web.tests.browser.test_browser_skillbook_casting.CompanionFieldCastJourneyTest.test_companion_casts_a_field_heal_from_the_skill_tab"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",

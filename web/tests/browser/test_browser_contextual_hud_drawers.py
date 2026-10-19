@@ -32,7 +32,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     # ------------------------------------------------------------------
 
     REFERENCE_SURFACE_TESTIDS = [
-        "skill-book",
+        "party-skill-tab",
         "party-window",
         "party-bag-tab",
         "shop-panel",
@@ -42,9 +42,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     ]
 
     def _open_reference_drawer(self, page):
-        # The skill book stands for any framed reference drawer (the
-        # character-status drawer retired into the party window's 狀態 tab,
-        # webclient-party-status-tab).
+        # The retired skill-book drawer name stands for any framed
+        # reference drawer: it opens the party window on its 技能 tab
+        # (webclient-party-skill-tab), the way the character-status drawer
+        # retired into the 狀態 tab (webclient-party-status-tab).
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('skill'); }"
@@ -248,7 +249,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
 
-        # Drawer-vs-drawer: the skill drawer is open (the public test seam
+        # Drawer-vs-drawer: the party window is open on 技能 (the public test seam
         # the H4 journeys use), then the codex opens through the same single
         # store entry point the utility-strip control routes to.
         self._open_reference_drawer(page)
@@ -258,7 +259,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="skill-book"]').count(),
+            page.locator('[data-testid="party-window"]').count(),
             0,
             "opening the codex drawer closes the open reference drawer",
         )
@@ -525,7 +526,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
                 self._open_reference_drawer(page)
                 probe = page.evaluate(self._FRAME_PROBE, '[data-testid="hud-drawer"]')
-                self._assert_workspace_frame(probe, "the skill drawer", viewport)
+                self._assert_workspace_frame(probe, "the party window", viewport)
                 self.assertEqual(probe["stripTestid"], "hud-drawer-scrim",
                                  "the drawer scrim covers the band's exposed strip")
                 page.keyboard.press("Escape")
