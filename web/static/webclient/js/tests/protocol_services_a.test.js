@@ -11,7 +11,6 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
-const { T_MEAL, T_MEAL_LABEL } = require("./protocol_support.js");
 const { validServicesAction, validServicesBoardRow, validServicesPanel, validServicesQuestRow, validServicesStockRow } = require("./protocol_fixtures.js");
 
 
@@ -22,7 +21,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 6,
+    schema_version: 7,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
@@ -65,6 +64,7 @@ test("services panel enforces quantity bounds and unknown-node-style rejection",
   const panel = validServicesPanel({
     shop: {
       open: true,
+      member_id: 7,
       stock: [validServicesStockRow({ buy: validServicesAction({ action_id: "shop.buy" }) })],
       sellable: [],
     },
@@ -74,6 +74,7 @@ test("services panel enforces quantity bounds and unknown-node-style rejection",
   const panel2 = validServicesPanel({
     shop: {
       open: true,
+      member_id: 7,
       stock: [
         validServicesStockRow({
           buy: validServicesAction({
@@ -90,6 +91,7 @@ test("services panel enforces quantity bounds and unknown-node-style rejection",
   const booleanQuantity = validServicesPanel({
     shop: {
       open: true,
+      member_id: 7,
       stock: [
         validServicesStockRow({
           buy: validServicesAction({ action_id: "shop.buy", quantity: { min: 1, max: true } }),
@@ -115,15 +117,15 @@ test("services panel enforces row ceilings for every surface", () => {
       })
     )
   );
-  const inventory = [];
-  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS + 1; i++) {
-    inventory.push({ item_key: T_MEAL, display_name: T_MEAL_LABEL, held: 1, equipped: false });
+  const stock = [];
+  for (let i = 0; i < Protocol.SERVICES_MAX_STOCK_ROWS + 1; i++) {
+    stock.push(validServicesStockRow());
   }
   assert.throws(() =>
     Protocol.validateServicesPanel(
       validServicesPanel({
-        inventory: { rows: inventory, wallet: 0 },
-        pagination: { ...validServicesPanel().pagination, inventory_total: inventory.length },
+        shop: { open: true, member_id: 7, stock, sellable: [] },
+        pagination: { ...validServicesPanel().pagination, stock_total: stock.length },
       })
     )
   );

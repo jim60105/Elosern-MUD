@@ -3,6 +3,7 @@
 var C = require("../constants.js");
 var core = require("../core.js");
 var questFacts = require("./quest_log.js");
+var itemHoldings = require("./item_holdings.js");
 
 var isPlainObject = core.isPlainObject;
 var codePoints = core.codePoints;
@@ -19,7 +20,6 @@ var SERVICES_MAX_BOARD_ROWS = C.SERVICES_MAX_BOARD_ROWS;
 var SERVICES_MAX_QUEST_ROWS = C.SERVICES_MAX_QUEST_ROWS;
 var SERVICES_MAX_STOCK_ROWS = C.SERVICES_MAX_STOCK_ROWS;
 var SERVICES_MAX_SELLABLE_ROWS = C.SERVICES_MAX_SELLABLE_ROWS;
-var SERVICES_MAX_INVENTORY_ROWS = C.SERVICES_MAX_INVENTORY_ROWS;
 var SERVICES_MAX_KEY = C.SERVICES_MAX_KEY;
 var SERVICES_MAX_DISPLAY_NAME = C.SERVICES_MAX_DISPLAY_NAME;
 var SERVICES_MAX_SUMMARY = C.SERVICES_MAX_SUMMARY;
@@ -310,25 +310,38 @@ function validateServicesGuild(value) {
   return value;
 }
 
+function validateServicesRowIdentity(value, row) {
+  var itemKey = requireString(value.item_key, "item_key", SERVICES_MAX_KEY);
+  if (!itemKey.trim()) {
+    throw new Error(row + " item_key must be non-empty");
+  }
+  var displayName = requireString(value.display_name, "display_name", SERVICES_MAX_DISPLAY_NAME);
+  if (!displayName.trim()) {
+    throw new Error(row + " display_name must be non-empty");
+  }
+}
+
+// The viewed member's held count and server equipment delta for one row.
+function validateServicesViewed(value) {
+  requireExactFields(value, "stock viewed", ["held", "delta"], []);
+  requireInt(value.held, "viewed.held", 0, MAX_SAFE_INTEGER);
+  itemHoldings.validateEquipmentDelta(value.delta, "stock viewed.delta");
+  return value;
+}
+
 function validateServicesStockRow(value) {
   requireExactFields(
     value,
     "stock row",
-    ["item_key", "display_name", "buy_copper", "sell_copper", "stock", "max_stock", "buy"],
+    ["item_key", "display_name", "presentation", "buy_copper", "stock", "max_stock", "viewed", "buy"],
     []
   );
-  var stockItemKey = requireString(value.item_key, "item_key", SERVICES_MAX_KEY);
-  if (!stockItemKey.trim()) {
-    throw new Error("stock item_key must be non-empty");
-  }
-  var stockDisplayName = requireString(value.display_name, "display_name", SERVICES_MAX_DISPLAY_NAME);
-  if (!stockDisplayName.trim()) {
-    throw new Error("stock display_name must be non-empty");
-  }
+  validateServicesRowIdentity(value, "stock");
+  requirePresentation(value.presentation, "stock row.presentation");
   requireInt(value.buy_copper, "buy_copper", 0, MAX_SAFE_INTEGER);
-  requireInt(value.sell_copper, "sell_copper", 0, MAX_SAFE_INTEGER);
   requireInt(value.stock, "stock", 0, MAX_SAFE_INTEGER);
   requireInt(value.max_stock, "max_stock", 1, MAX_SAFE_INTEGER);
+  validateServicesViewed(value.viewed);
   var buy = validateServicesAction(value.buy);
   if (buy.action_id !== SERVICES_BUY) {
     throw new Error("stock buy must be shop.buy");
@@ -340,17 +353,11 @@ function validateServicesSellableRow(value) {
   requireExactFields(
     value,
     "sellable row",
-    ["item_key", "display_name", "sell_copper", "held", "sell"],
+    ["item_key", "display_name", "presentation", "sell_copper", "held", "sell"],
     []
   );
-  var sellableItemKey = requireString(value.item_key, "item_key", SERVICES_MAX_KEY);
-  if (!sellableItemKey.trim()) {
-    throw new Error("sellable item_key must be non-empty");
-  }
-  var sellableDisplayName = requireString(value.display_name, "display_name", SERVICES_MAX_DISPLAY_NAME);
-  if (!sellableDisplayName.trim()) {
-    throw new Error("sellable display_name must be non-empty");
-  }
+  validateServicesRowIdentity(value, "sellable");
+  requirePresentation(value.presentation, "sellable row.presentation");
   requireInt(value.sell_copper, "sell_copper", 0, MAX_SAFE_INTEGER);
   requireInt(value.held, "held", 1, MAX_SAFE_INTEGER);
   var sell = validateServicesAction(value.sell);
@@ -361,8 +368,9 @@ function validateServicesSellableRow(value) {
 }
 
 function validateServicesShop(value) {
-  requireExactFields(value, "shop", ["open", "stock", "sellable"], []);
+  requireExactFields(value, "shop", ["open", "member_id", "stock", "sellable"], []);
   requireBool(value.open, "open");
+  requireInt(value.member_id, "member_id", 1, MAX_SAFE_INTEGER);
   if (!Array.isArray(value.stock) || value.stock.length > SERVICES_MAX_STOCK_ROWS) {
     throw new Error("stock must be a list of at most " + SERVICES_MAX_STOCK_ROWS + " rows");
   }
@@ -416,69 +424,22 @@ function requirePresentation(value, field) {
   return value;
 }
 
-function validateServicesInventory(value) {
-  requireExactFields(value, "inventory", ["rows", "wallet"], []);
-  var rows = value.rows;
-  if (!Array.isArray(rows) || rows.length > SERVICES_MAX_INVENTORY_ROWS) {
-    throw new Error(
-      "inventory rows must be a list of at most " + SERVICES_MAX_INVENTORY_ROWS + " entries"
-    );
-  }
-  requireInt(value.wallet, "wallet", 0, MAX_SAFE_INTEGER);
-  rows.forEach(function (row) {
-    requireExactFields(
-      row,
-      "inventory row",
-      [
-        "item_key",
-        "display_name",
-        "held",
-        "equipped",
-        "presentation",
-        "action",
-      ],
-      []
-    );
-    var inventoryItemKey = requireString(row.item_key, "item_key", SERVICES_MAX_KEY);
-    if (!inventoryItemKey.trim()) {
-      throw new Error("inventory item_key must be non-empty");
-    }
-    var inventoryDisplayName = requireString(row.display_name, "display_name", SERVICES_MAX_DISPLAY_NAME);
-    if (!inventoryDisplayName.trim()) {
-      throw new Error("inventory display_name must be non-empty");
-    }
-    requireInt(row.held, "held", 1, MAX_SAFE_INTEGER);
-    requireBool(row.equipped, "equipped");
-    requirePresentation(row.presentation, "inventory row.presentation");
-    if (row.action !== null) {
-      validateServicesAction(row.action);
-      if (
-        row.action.action_id !== "inventory.use" &&
-        row.action.action_id !== "inventory.toggle_equip"
-      ) {
-        throw new Error("inventory row action id is not allowed");
-      }
-    }
-  });
-  return value;
-}
-
 function validateServicesPagination(value) {
   requireExactFields(
     value,
     "pagination",
-    ["board_total", "quest_total", "stock_total", "sellable_total", "inventory_total"],
+    ["board_total", "quest_total", "stock_total", "sellable_total"],
     []
   );
   requireInt(value.board_total, "board_total", 0, SERVICES_MAX_BOARD_ROWS);
   requireInt(value.quest_total, "quest_total", 0, SERVICES_MAX_QUEST_ROWS);
   requireInt(value.stock_total, "stock_total", 0, SERVICES_MAX_STOCK_ROWS);
   requireInt(value.sellable_total, "sellable_total", 0, SERVICES_MAX_SELLABLE_ROWS);
-  requireInt(value.inventory_total, "inventory_total", 0, SERVICES_MAX_INVENTORY_ROWS);
   return value;
 }
 
-// Exact available services panel v2 schema (design D4).
+// Exact available services panel v7 schema (design D4; services-shop-
+// structured-rows: no inventory section, viewed-member shop rows).
 function validateServicesPanel(payload) {
   requireExactFields(
     payload,
@@ -491,13 +452,12 @@ function validateServicesPanel(payload) {
       "player",
       "guild",
       "shop",
-      "inventory",
       "pagination",
     ],
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 6) {
+  if (payload.schema_version !== 7) {
     throw new Error("unsupported services schema_version");
   }
   if (payload.available !== true || payload.kind !== "services") {
@@ -554,21 +514,17 @@ function validateServicesPanel(payload) {
 
   var guild = payload.guild;
   var shop = payload.shop;
-  var inventory = payload.inventory;
   if (guild !== null) {
     validateServicesGuild(guild);
   }
   if (shop !== null) {
     validateServicesShop(shop);
   }
-  if (inventory !== null) {
-    validateServicesInventory(inventory);
-  }
   var pagination = validateServicesPagination(payload.pagination);
-  validateServicesPaginationTotals(pagination, guild, shop, inventory);
+  validateServicesPaginationTotals(pagination, guild, shop);
 
   var result = {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "services",
     host: payload.host,
@@ -582,7 +538,6 @@ function validateServicesPanel(payload) {
     },
     guild: guild,
     shop: shop,
-    inventory: inventory,
     pagination: pagination,
   };
   // Envelope guarantee (design D4): per-field bounds are ceilings, not a
@@ -594,7 +549,7 @@ function validateServicesPanel(payload) {
   return result;
 }
 
-function validateServicesPaginationTotals(pagination, guild, shop, inventory) {
+function validateServicesPaginationTotals(pagination, guild, shop) {
   if (guild === null) {
     if (pagination.board_total !== 0 || pagination.quest_total !== 0) {
       throw new Error(
@@ -622,15 +577,6 @@ function validateServicesPaginationTotals(pagination, guild, shop, inventory) {
     if (pagination.sellable_total !== shop.sellable.length) {
       throw new Error("pagination sellable_total must match shipped rows");
     }
-  }
-  if (inventory === null) {
-    if (pagination.inventory_total !== 0) {
-      throw new Error(
-        "pagination inventory_total must be zero when inventory is null"
-      );
-    }
-  } else if (pagination.inventory_total !== inventory.rows.length) {
-    throw new Error("pagination inventory_total must match shipped rows");
   }
 }
 

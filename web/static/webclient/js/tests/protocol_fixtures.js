@@ -245,10 +245,11 @@ function validServicesStockRow(overrides) {
     {
       item_key: T_MEAL,
       display_name: T_MEAL_LABEL,
+      presentation: { kind: "food", icon_key: "food", rarity: "common", summary: T_MEAL_SUMMARY },
       buy_copper: 10,
-      sell_copper: 5,
       stock: 20,
       max_stock: 20,
+      viewed: { held: 1, delta: null },
       buy: validServicesAction({ action_id: "shop.buy", label: "購買", quantity: { min: 1, max: 20 } }),
     },
     overrides || {}
@@ -260,6 +261,7 @@ function validServicesSellableRow(overrides) {
     {
       item_key: T_MEAL,
       display_name: T_MEAL_LABEL,
+      presentation: { kind: "food", icon_key: "food", rarity: "common", summary: T_MEAL_SUMMARY },
       sell_copper: 5,
       held: 2,
       sell: validServicesAction({ action_id: "shop.sell", label: "販賣", quantity: { min: 1, max: 2 } }),
@@ -271,7 +273,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "services",
       host: null,
@@ -295,38 +297,11 @@ function validServicesPanel(overrides) {
         rank: null,
       },
       shop: null,
-      inventory: {
-        rows: [
-          {
-            item_key: T_MEAL,
-            display_name: T_MEAL_LABEL,
-            held: 1,
-            equipped: false,
-            action: null,
-            presentation: {
-              kind: "food",
-              icon_key: "food",
-              rarity: "common",
-              summary: T_MEAL_SUMMARY,
-            },
-          },
-          {
-            item_key: "mystery_relic",
-            display_name: "mystery_relic",
-            held: 2,
-            equipped: false,
-            action: null,
-            presentation: null,
-          },
-        ],
-        wallet: 1000,
-      },
       pagination: {
         board_total: 0,
         quest_total: 0,
         stock_total: 0,
         sellable_total: 0,
-        inventory_total: 2,
       },
     },
     overrides || {}
