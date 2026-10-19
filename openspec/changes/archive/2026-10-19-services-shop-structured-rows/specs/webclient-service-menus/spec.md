@@ -80,11 +80,10 @@ The presenter SHALL strictly read canonical records and registries through the n
 
 ### Requirement: The shop surface covers stock, quantity, buy, sell, and sellable inventory
 The `shop` section SHALL contain exactly `open`, `member_id`, `stock`, and `sellable` and SHALL be present only in
-exploration mode when exactly one local `Merchant` host resolves. `member_id` SHALL be the session's viewed party
-member (falling back to the commander), the default recipient and seller. Copper values SHALL be exact integer
-catalog values, stock rows SHALL carry only the buy price and sellable rows only the sell price, and `buy`/`sell`
-SHALL be enabled only when the shop is open and the trade is legal for that member and the party purse,
-otherwise carrying a stable disabled reason.
+exploration mode when exactly one local `Merchant` host resolves. `member_id` SHALL be the viewed member (else the
+commander), the default recipient and seller. Prices SHALL be exact integer copper, buy-only on stock rows and
+sell-only on sellable rows, and `buy`/`sell` SHALL be enabled only when the shop is open and the trade is legal,
+else carrying a stable disabled reason.
 
 #### Scenario: Open shop lists exact integer stock and prices
 - **WHEN** the merchant is open during opening hours
