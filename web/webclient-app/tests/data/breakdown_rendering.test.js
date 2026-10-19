@@ -1,25 +1,25 @@
-// render-equipment-breakdown-webclient (task 3.2): the breakdown-rendering
-// contract for the manifest components. The chip block is a pure
-// projection of the v5 payload — payload order, verbatim names, kind-
+// render-equipment-breakdown-webclient (task 3.2), retargeted by
+// webclient-party-status-tab: the breakdown-rendering contract for the
+// manifest components. The party window's 狀態 waterfall is a pure
+// projection of the v9 payload — payload order, verbatim names, kind-
 // formatted signed amounts, ALL layers (≤ 16) rendered, no sorting, no
-// recomputation, no truncation; layer-free rows render no breakdown element
-// at all. Equipment adjustment strings print verbatim where equipment is
-// listed (the bag tab's per-member server deltas). An
-// unknown layer source/kind is wire-rejected; the neutral 其他 chip is
-// direct-render defense only, proven here by mounting hand-built props.
+// recomputation, no truncation; a layer-free trait renders only its base and
+// effective steps. Equipment adjustment strings print verbatim where
+// equipment is listed (the bag tab's per-member server deltas). An unknown
+// layer source/kind is wire-rejected; the neutral 其他 step is direct-render
+// defense only, proven here by mounting hand-built props.
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import CharacterStatusDrawer from "../../components/CharacterStatusDrawer.vue";
 import PartyBagTab from "../../components/PartyBagTab.vue";
-import {
-  CHARACTER_PANEL_SAMPLE,
-  STATUS_PANEL_SAMPLE,
-} from "../../stories/fixtures.js";
+import PartyStatusTab from "../../components/PartyStatusTab.vue";
+import { CHARACTER_PANEL_SAMPLE, PARTY_PANEL_EMPTY_SAMPLE } from "../../stories/fixtures.js";
 import { PARTY_BAG_HOLDINGS_EQUIPMENT, PARTY_BAG_INVENTORY_SAMPLE } from "../../stories/fixtures/party_panels.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
+
+const COMMANDER = PARTY_PANEL_EMPTY_SAMPLE.slots[0];
 
 // A trait row builder with the closed breakdown shape.
 function trait(overrides) {
@@ -29,35 +29,19 @@ function trait(overrides) {
   );
 }
 
-function characterWith(traits, equipment) {
-  return {
-    ...CHARACTER_PANEL_SAMPLE,
-    traits: traits ?? CHARACTER_PANEL_SAMPLE.traits,
-    equipment: equipment ?? CHARACTER_PANEL_SAMPLE.equipment,
-  };
+function characterWith(traits) {
+  return { ...CHARACTER_PANEL_SAMPLE, traits: traits ?? CHARACTER_PANEL_SAMPLE.traits };
 }
 
-function mountDrawer(props = {}) {
-  return mount(CharacterStatusDrawer, {
-    props: {
-      // The gauge-layer guard only attaches the character breakdown when both
-      // panels name the same member, so this suite pins the status actor to
-      // the character fixture's member_id.
-      status: {
-        ...STATUS_PANEL_SAMPLE,
-        actor: {
-          ...STATUS_PANEL_SAMPLE.actor,
-          identity: String(CHARACTER_PANEL_SAMPLE.member_id),
-        },
-      },
-      character: CHARACTER_PANEL_SAMPLE,
-      lowHp: false,
-      ...props,
-    },
-  });
+function mountTab(character = CHARACTER_PANEL_SAMPLE) {
+  return mount(PartyStatusTab, { props: { member: COMMANDER, character, initialTrait: "defense" } });
 }
 
-describe("CharacterStatusDrawer breakdown chips", () => {
+const steps = (wrapper) => wrapper.findAll('[data-testid^="party-status-tab__layer--"]');
+const stepText = (node) =>
+  `${node.find(".party-status-tab__step-name").element.firstChild.textContent}${node.find(".party-status-tab__amt").text()}`;
+
+describe("PartyStatusTab breakdown waterfall", () => {
   let wrapper;
 
   afterEach(() => {
@@ -65,9 +49,9 @@ describe("CharacterStatusDrawer breakdown chips", () => {
     wrapper = null;
   });
 
-  it("renders one chip per layer in payload order with verbatim names and kind-formatted amounts", () => {
-    wrapper = mountDrawer({
-      character: characterWith([
+  it("renders one step per layer in payload order with verbatim names and kind-formatted amounts", () => {
+    wrapper = mountTab(
+      characterWith([
         trait({
           layers: [
             { source: "skill", name: "防衛本能（2/3）", kind: "mult", amount: 1.5 },
@@ -76,26 +60,18 @@ describe("CharacterStatusDrawer breakdown chips", () => {
           ],
         }),
       ]),
-    });
-    const chips = wrapper.findAll('[data-testid^="character-status-drawer__layer--defense--"]');
-    expect(chips).toHaveLength(3);
-    // Payload order, verbatim names, formatting by kind only (re-signed for
-    // display, never recomputed): mult ×1.2-style, flat ±N, pct ±N%.
-    expect(chips[0].text()).toBe("防衛本能（2/3）×1.5");
-    expect(chips[0].attributes("data-source")).toBe("skill");
-    expect(chips[1].text()).toBe("護盾+4");
-    expect(chips[1].attributes("data-source")).toBe("condition");
-    expect(chips[2].text()).toBe("壁衛板甲−2");
-    expect(chips[2].attributes("data-source")).toBe("equipment");
-    // The value line keeps the existing static text (total-display field).
-    expect(
-      wrapper.get('[data-testid="character-status-drawer__trait--defense"]').text(),
-    ).toContain("12");
+    );
+    const rows = steps(wrapper);
+    expect(rows.map(stepText)).toEqual(["防衛本能（2/3）×1.5", "護盾+4", "壁衛板甲−2"]);
+    expect(rows.map((node) => node.attributes("data-source"))).toEqual(["skill", "condition", "equipment"]);
+    // The base and the effective total stay the committed values.
+    expect(wrapper.get('[data-testid="party-status-tab__step--base"]').text()).toContain("10");
+    expect(wrapper.get('[data-testid="party-status-tab__step--total"]').text()).toContain("12");
   });
 
   it("strips mult trailing zeros and formats pct with the U+2212 minus", () => {
-    wrapper = mountDrawer({
-      character: characterWith([
+    wrapper = mountTab(
+      characterWith([
         trait({
           layers: [
             { source: "skill", name: "巨型化", kind: "mult", amount: 2.5 },
@@ -107,118 +83,46 @@ describe("CharacterStatusDrawer breakdown chips", () => {
           ],
         }),
       ]),
-    });
-    const chips = wrapper.findAll('[data-testid^="character-status-drawer__layer--defense--"]');
-    expect(chips[0].text()).toBe("巨型化×2.5");
-    expect(chips[1].text()).toBe("高露出−15%");
-    expect(chips[2].text()).toBe("硬皮×1");
-    expect(chips[3].text()).toBe("腐蝕×−1.2");
+    );
+    expect(steps(wrapper).map(stepText)).toEqual(["巨型化×2.5", "高露出−15%", "硬皮×1", "腐蝕×−1.2"]);
   });
 
   it("renders ALL 16 layers at the payload bound with no truncation", () => {
-    const layers = Array.from({ length: 16 }, (_, i) => ({
-      source: "equipment",
-      name: `層${i + 1}`,
-      kind: "flat",
-      amount: i + 1,
-    }));
-    wrapper = mountDrawer({ character: characterWith([trait({ layers })]) });
-    const chips = wrapper.findAll('[data-testid^="character-status-drawer__layer--defense--"]');
-    expect(chips).toHaveLength(16);
-    expect(chips[15].text()).toBe("層16+16");
-    // Payload order preserved (no sorting).
-    expect(chips.map((c) => c.text())).toEqual(
-      layers.map((l) => `${l.name}+${l.amount}`),
-    );
+    const layers = Array.from({ length: 16 }, (_, i) => ({ source: "equipment", name: `層${i + 1}`, kind: "flat", amount: i + 1 }));
+    wrapper = mountTab(characterWith([trait({ layers })]));
+    const rows = steps(wrapper);
+    expect(rows).toHaveLength(16);
+    expect(rows.map(stepText)).toEqual(layers.map((l) => `${l.name}+${l.amount}`));
   });
 
-  it("renders no breakdown element at all for a layer-free row", () => {
-    wrapper = mountDrawer({ character: characterWith([trait({ layers: [] })]) });
-    expect(
-      wrapper.find('[data-testid="character-status-drawer__layers--defense"]').exists(),
-    ).toBe(false);
-    expect(
-      wrapper.find('[data-testid^="character-status-drawer__layer--defense"]').exists(),
-    ).toBe(false);
-    // The value row itself renders unchanged.
-    expect(wrapper.find('[data-testid="character-status-drawer__trait--defense"]').exists()).toBe(true);
+  it("renders only the base and effective steps for a layer-free trait", () => {
+    wrapper = mountTab(characterWith([trait({ layers: [] })]));
+    expect(steps(wrapper)).toHaveLength(0);
+    expect(wrapper.findAll('[data-testid="party-status-tab__waterfall"] > li')).toHaveLength(2);
   });
 
   it("keeps the fixture's 16-layer defense row fully rendered", () => {
-    // The showcase fixture itself must sit at the bound and render every
-    // layer (the D4 fixture contract).
-    wrapper = mountDrawer();
+    // The showcase fixture itself sits at the bound and renders every layer.
+    wrapper = mountTab();
     const layers = CHARACTER_PANEL_SAMPLE.traits.find((row) => row.key === "defense").layers;
     expect(layers).toHaveLength(16);
-    expect(
-      wrapper.findAll('[data-testid^="character-status-drawer__layer--defense--"]'),
-    ).toHaveLength(16);
+    expect(steps(wrapper)).toHaveLength(16);
   });
 
-  it("attaches gauge chips to the maximum only when both panels agree on it", () => {
-    // Agreement: the hp trait row's max equals status.resources.hp.maximum.
-    const hpTrait = trait({
-      key: "hp",
-      label: "生命",
-      base: 390,
-      current: 231,
-      max: STATUS_PANEL_SAMPLE.resources.hp.maximum,
-      effective: STATUS_PANEL_SAMPLE.resources.hp.maximum,
-      layers: [{ source: "equipment", name: "壁衛板甲", kind: "flat", amount: 15 }],
-    });
-    wrapper = mountDrawer({
-      character: characterWith(CHARACTER_PANEL_SAMPLE.traits.map((row) => (row.key === "hp" ? hpTrait : row))),
-    });
-    const chip = wrapper.get('[data-testid="character-status-drawer__layer--hp--0"]');
-    expect(chip.text()).toBe("壁衛板甲+15");
-    // The existing gauge text stays byte-identical (chips never replace it).
-    expect(
-      wrapper.get('[data-testid="character-status-drawer__vital-value--hp"]').text(),
-    ).toBe("231 / 405");
-    wrapper.unmount();
-
-    // Disagreement (a stale pair): no breakdown element on the vital row.
-    const disagree = trait({
-      ...hpTrait,
-      max: STATUS_PANEL_SAMPLE.resources.hp.maximum + 1,
-      effective: STATUS_PANEL_SAMPLE.resources.hp.maximum + 1,
-    });
-    wrapper = mountDrawer({
-      character: characterWith(CHARACTER_PANEL_SAMPLE.traits.map((row) => (row.key === "hp" ? disagree : row))),
-    });
-    expect(
-      wrapper.find('[data-testid="character-status-drawer__layers--hp"]').exists(),
-    ).toBe(false);
-    wrapper.unmount();
-
-    // A static trait row (null max) never attaches to a gauge.
-    const staticRow = trait({ key: "hp", label: "生命", current: 231, max: null, effective: 231 });
-    wrapper = mountDrawer({
-      character: characterWith(CHARACTER_PANEL_SAMPLE.traits.map((row) => (row.key === "hp" ? staticRow : row))),
-    });
-    expect(
-      wrapper.find('[data-testid="character-status-drawer__layers--hp"]').exists(),
-    ).toBe(false);
+  it("decomposes no gauge: the gauges render from the party row only", () => {
+    wrapper = mountTab();
+    // The hp trait carries a layer, but gauges are not trait rows.
+    expect(CHARACTER_PANEL_SAMPLE.traits.find((row) => row.key === "hp").layers.length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-testid="party-status-tab__trait--hp"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="party-status-tab__gauge--hp"]').text()).toContain(`${COMMANDER.hp_current} / ${COMMANDER.hp_maximum}`);
   });
 
-  it("renders no gauge chips when the character panel is unavailable", () => {
-    wrapper = mountDrawer({
-      character: { schema_version: 5, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } },
-    });
-    for (const key of ["hp", "mp", "sp"]) {
-      expect(wrapper.find(`[data-testid="character-status-drawer__layers--${key}"]`).exists()).toBe(false);
-    }
-    // The vitals still render from the status panel.
-    expect(wrapper.find('[data-testid="character-status-drawer__vitals"]').exists()).toBe(true);
-  });
-
-  it("renders a neutral 其他 chip for unknown enums while the value line stays correct", () => {
-    // Direct-render defense ONLY (task 1.4): the wire validators reject an
-    // unknown source/kind; a hand-built props object must still render a
-    // text-bearing neutral chip and an untouched value line — for an
-    // unknown source OR an unknown kind (design D1).
-    wrapper = mountDrawer({
-      character: characterWith([
+  it("renders a neutral 其他 step for unknown enums while the totals stay correct", () => {
+    // Direct-render defense ONLY: the wire validators reject an unknown
+    // source/kind; a hand-built props object must still render a
+    // text-bearing neutral step — for an unknown source OR an unknown kind.
+    wrapper = mountTab(
+      characterWith([
         trait({
           layers: [
             { source: "divine", name: "神恩", kind: "flat", amount: 3 },
@@ -226,18 +130,15 @@ describe("CharacterStatusDrawer breakdown chips", () => {
           ],
         }),
       ]),
-    });
-    const chips = wrapper.findAll('[data-testid^="character-status-drawer__layer--defense--"]');
-    expect(chips).toHaveLength(2);
-    // Unknown source → 其他 marker text (never colour alone).
-    expect(chips[0].text()).toContain("（其他）");
-    expect(chips[0].classes().join(" ")).toContain("character-status-drawer__layer--other");
-    // Unknown kind → neutral 其他 chip too (an unrecognised formatting
-    // rule is not a trusted skill chip) with the signed verbatim amount.
-    expect(chips[1].text()).toBe("未知形態（其他）+7");
-    expect(chips[1].classes().join(" ")).toContain("character-status-drawer__layer--other");
-    // The value line is untouched.
-    expect(wrapper.get('[data-testid="character-status-drawer__trait--defense"]').text()).toContain("12");
+    );
+    const rows = steps(wrapper);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].classes()).toContain("party-status-tab__step--other");
+    expect(wrapper.get('[data-testid="party-status-tab__layer-source--0"]').text()).toBe("其他 ‧ 固定值");
+    expect(rows[1].classes()).toContain("party-status-tab__step--other");
+    expect(wrapper.get('[data-testid="party-status-tab__layer-source--1"]').text()).toBe("其他 ‧ 其他");
+    expect(stepText(rows[1])).toBe("未知形態+7");
+    expect(wrapper.get('[data-testid="party-status-tab__effective--defense"]').text()).toBe("12");
   });
 });
 

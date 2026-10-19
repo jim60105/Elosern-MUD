@@ -66,6 +66,16 @@ describe("DesktopNavigation", () => {
     expect(wrapper.emitted("navigate")).toEqual([["quests"]]);
   });
 
+  it("marks only the entry of the party window's open tab (webclient-party-status-tab)", async () => {
+    const current = () => wrapper.findAll('[aria-current="page"]').map((button) => button.text());
+    mountNav({ drawer: "party:status" });
+    expect(current()).toEqual(["角色狀態"]);
+    await wrapper.setProps({ drawer: "party:bag" });
+    expect(current()).toEqual(["背包"]);
+    await wrapper.setProps({ drawer: "party:member" });
+    expect(current()).toEqual([]);
+  });
+
   it("drops the map control in combat and keeps settings", () => {
     mountNav();
     expect(labels(wrapper)).toEqual(["角色狀態", "任務", "背包", "地圖", "設定"]);

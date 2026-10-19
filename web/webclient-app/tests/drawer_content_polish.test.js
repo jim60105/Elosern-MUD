@@ -1,7 +1,7 @@
 // webclient-drawer-content-polish: drawer content hierarchy, honest art
-// placement and empty states. A drawer stands the current character's
-// portrait only when that character is its subject; the status hero names
-// the committed character from supplied fields only; an available-empty list
+// placement and empty states. No reference drawer stands a portrait column
+// (the character's status moved into the party window, whose 狀態 hero names
+// the viewed member from supplied fields only); an available-empty list
 // shows the shared EmptyState while an unavailable panel keeps its registry
 // reason; lineage rows carry their supplied root-node names; an unknown item
 // stays neutral.
@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
-import CharacterStatusDrawer from "../components/CharacterStatusDrawer.vue";
 import EmptyState from "../components/EmptyState.vue";
 import PartyBagTab from "../components/PartyBagTab.vue";
+import PartyStatusTab from "../components/PartyStatusTab.vue";
 import LineagePanel from "../components/LineagePanel.vue";
 import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
 import PartyWindow from "../components/PartyWindow.vue";
@@ -29,7 +29,7 @@ import {
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
   SERVICES_PANEL_SAMPLE,
-  STATUS_PANEL_TITLED_SAMPLE,
+  CHARACTER_PANEL_TITLED_SAMPLE,
 } from "../stories/fixtures.js";
 import { PARTY_BAG_INVENTORY_SAMPLE } from "../stories/fixtures/party_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
@@ -113,41 +113,36 @@ describe("available-empty versus unavailable drawer lists", () => {
   });
 });
 
-describe("the character-status hero", () => {
+describe("the 狀態 tab hero", () => {
+  const COMMANDER = PARTY_PANEL_EMPTY_SAMPLE.slots[0];
   const mountHero = (props) =>
-    mount(CharacterStatusDrawer, { props: { status: STATUS_PANEL_TITLED_SAMPLE, character: CHARACTER_PANEL_SAMPLE, ...props } });
+    mount(PartyStatusTab, { props: { member: COMMANDER, character: CHARACTER_PANEL_TITLED_SAMPLE, ...props } });
 
-  it("names the committed character with its title and rank above one action row", () => {
-    const w = mountHero({ partyAvailable: true });
-    const hero = w.get('[data-testid="character-status-drawer__hero"]');
-    expect(hero.get('[data-testid="character-status-drawer__name"]').text()).toBe(STATUS_PANEL_TITLED_SAMPLE.actor.name);
-    expect(hero.get('[data-testid="character-status-drawer__full-title"]').text()).toBe(STATUS_PANEL_TITLED_SAMPLE.actor.full_title);
-    expect(hero.get('[data-testid="character-status-drawer__hero-rank"]').text()).toBe(`公會階級 ${CHARACTER_PANEL_SAMPLE.guild.rank}`);
-    const actions = hero.get('[role="group"]');
-    expect(actions.findAll("button").map((b) => b.attributes("data-testid"))).toEqual([
-      "character-status-drawer__open-skill",
-      "character-status-drawer__open-party",
-    ]);
-    // The drawer title lives only in the shared header.
+  it("names the viewed member with its composed title and guild rank", () => {
+    const w = mountHero();
+    const hero = w.get('[data-testid="party-status-tab__hero"]');
+    expect(hero.get('[data-testid="party-status-tab__name"]').text()).toBe(COMMANDER.display_name);
+    expect(hero.get('[data-testid="party-status-tab__title"]').text()).toBe(CHARACTER_PANEL_TITLED_SAMPLE.full_title);
+    expect(hero.get('[role="img"]').attributes("aria-label")).toBe(`公會階級 ${CHARACTER_PANEL_TITLED_SAMPLE.guild.rank}`);
+    // The window title lives only in the shared header.
     expect(w.text()).not.toContain("角色狀態");
   });
 
   it("omits every value the payload does not supply", () => {
     const w = mountHero({
-      status: { ...STATUS_PANEL_TITLED_SAMPLE, actor: { ...STATUS_PANEL_TITLED_SAMPLE.actor, name: " ", full_title: undefined } },
       character: { ...CHARACTER_PANEL_SAMPLE, guild: { ...CHARACTER_PANEL_SAMPLE.guild, rank: null } },
     });
-    const hero = w.get('[data-testid="character-status-drawer__hero"]');
-    expect(hero.find('[data-testid="character-status-drawer__name"]').exists()).toBe(false);
-    expect(hero.find('[data-testid="character-status-drawer__full-title"]').exists()).toBe(false);
-    expect(hero.find('[data-testid="character-status-drawer__hero-rank"]').exists()).toBe(false);
-    expect(hero.find('[data-testid="character-status-drawer__open-skill"]').exists()).toBe(true);
+    const hero = w.get('[data-testid="party-status-tab__hero"]');
+    expect(hero.find('[data-testid="party-status-tab__title"]').exists()).toBe(false);
+    expect(hero.find('[data-testid="party-status-tab__guild"]').exists()).toBe(false);
+    expect(hero.get('[data-testid="party-status-tab__name"]').text()).toBe(COMMANDER.display_name);
   });
 
-  it("renders no identity from an unavailable status panel", () => {
-    const w = mountHero({ status: { schema_version: 2, available: false, kind: "status", reason: { code: "x", message: "狀態無法顯示" } } });
-    expect(w.find('[data-testid="character-status-drawer__name"]').exists()).toBe(false);
-    expect(w.find('[data-testid="character-status-drawer__full-title"]').exists()).toBe(false);
+  it("renders no character value from an unavailable character panel", () => {
+    const w = mountHero({ character: { schema_version: 9, available: false, kind: "character", reason: { code: "x", message: "角色無法顯示" } } });
+    expect(w.find('[data-testid="party-status-tab__title"]').exists()).toBe(false);
+    expect(w.find('[data-testid="party-status-tab__guild"]').exists()).toBe(false);
+    expect(w.get('[data-testid="party-window__tab-unavailable"]').text()).toBe("角色無法顯示");
   });
 });
 
@@ -219,7 +214,7 @@ describe("drawer art in the client", () => {
     document.body.replaceChildren();
   });
 
-  it("stands the portrait column only beside the character's own drawers", async () => {
+  it("stands no portrait column beside any reference drawer", async () => {
     const panels = { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.explorationActions() };
     expect(store.receive(1, "ui_snapshot", [fx.snapshot({ panels, revision: 1 })]).accepted).toBe(true);
     await wrapper.vm.$nextTick();
@@ -236,12 +231,13 @@ describe("drawer art in the client", () => {
       store.closeHudDrawer();
       await wrapper.vm.$nextTick();
     }
-    expect(seen.status).toBe(true);
-    expect(seen.quest).toBe(false);
-    // The party window (webclient-party-window-member-tab) carries the
-    // viewed member's portrait in its 成員 nameplate, not a drawer column.
+    // The party window (its own WindowFrame, reached by the "status" and
+    // "party" names) carries the viewed member's portrait in its rail,
+    // nameplate and 狀態 hero, never a drawer column; no other drawer is
+    // about the player (webclient-party-status-tab).
+    expect(Object.keys(seen).sort()).toEqual(["lore", "party", "quest", "shop", "skill", "status"]);
     for (const [name, hasArt] of Object.entries(seen)) {
-      expect(hasArt, name).toBe(name === "status");
+      expect(hasArt, name).toBe(false);
     }
   });
 });

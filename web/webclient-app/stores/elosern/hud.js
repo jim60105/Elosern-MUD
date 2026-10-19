@@ -4,7 +4,7 @@
 //
 // H4 (webclient-hud-04-reference-drawers, design D3): the reference
 // drawer controller. `view.hudDrawer` is the single open-drawer name
-// (null | skill | inventory | shop | quest | lore | status); at most one
+// (null | skill | shop | quest | lore | party | npc_persona | letters); at most one
 // drawer is open at a time (structural: a single value). Unknown names
 // are rejected, not coerced. The store is the single writer and owns the
 // teardown on a mode change, an epoch reset, or a transport loss.
@@ -40,7 +40,7 @@ export function applyHud(ctx) {
     ctx.publishView();
   };
 
-  const HUD_DRAWER_NAMES = new Set(["skill", "shop", "quest", "lore", "status", "party", "npc_persona", "letters"]);
+  const HUD_DRAWER_NAMES = new Set(["skill", "shop", "quest", "lore", "party", "npc_persona", "letters"]);
   // `npc_persona` (the NPC author editor) never hosts a router frame either:
   // the verb card that opened it stays open (exploration-presence-rail).
   const FRAMELESS_DRAWER_NAMES = new Set(["party", "quest", "shop", "npc_persona", "letters"]);
@@ -52,9 +52,12 @@ export function applyHud(ctx) {
     // retire): the top navigation's 背包 entry, the exploration 背包 row and
     // the combat root's client-local 背包 row all open the party window on
     // its 背包 tab. "inventory" is never stored as the open drawer.
-    if (name === "inventory") {
+    // The retired character-status drawer's name is aliased the same way
+    // (webclient-party-status-tab): every 角色狀態 opener opens the party
+    // window on its 狀態 tab, switching an already open window's live tab.
+    if (name === "inventory" || name === "status") {
       const view = ctx.view.value || {};
-      rememberPartyWindowTab(`${view.generation}|${view.epoch}`, "bag");
+      rememberPartyWindowTab(`${view.generation}|${view.epoch}`, name === "inventory" ? "bag" : "status");
       name = "party";
     }
     if (!HUD_DRAWER_NAMES.has(name)) {

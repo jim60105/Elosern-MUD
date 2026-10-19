@@ -1,8 +1,8 @@
 // The ONE condition label rule (webclient-frontend-utils): the accessible
-// chip name (ConditionChips) and the drawer roster prose (CharacterStatusDrawer)
-// MUST agree — label (or code fallback), the verbatim remaining duration when
-// the payload supplies numeric `remaining_seconds`, and every derived modifier
-// pair, joined with `，`. Both components delegate to this single copy.
+// chip name (ConditionChips) is the label (or code fallback), the verbatim
+// remaining duration when the payload supplies numeric `remaining_seconds`,
+// and every derived modifier pair, joined with `，`. The party window's 狀態
+// tab (PartyStatusTab) names the same modifier pairs through this copy.
 //
 // Modifier keys are the combat-modifier rulebook's adjustment fields
 // (world/rules/rulebook/combat_modifiers.yaml). They are named with the

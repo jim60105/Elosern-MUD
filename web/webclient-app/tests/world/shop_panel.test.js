@@ -290,7 +290,7 @@ describe("ShopPanel (B4 world / services family)", () => {
     expect(w.find('[data-testid="services-quantity"]').exists()).toBe(false);
   });
 
-  it("omits the wallet line (H4 task 7.1: the wallet now lives in CharacterStatusDrawer — the single wallet rendering)", () => {
+  it("omits the wallet line (H4 task 7.1: the party purse renders once, in the party window header)", () => {
     // The full and minimal payloads both carry a wallet value in
     // `player.wallet_copper`, but ShopPanel no longer renders it.
     expect(mountPanel().find('[data-testid="shop-panel__wallet"]').exists()).toBe(false);

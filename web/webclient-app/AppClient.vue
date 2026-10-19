@@ -16,7 +16,6 @@ import SkillDetailPane from "./components/SkillDetailPane.vue";
 import ExitCompass from "./components/ExitCompass.vue";
 import ExplorationReadout from "./components/ExplorationReadout.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
-import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
 import HudDrawer from "./components/HudDrawer.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
@@ -44,9 +43,9 @@ import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./compo
 import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
+import { partyWindowTab } from "./components/party-window-memory.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
-import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
 import FoeLineup from "./components/FoeLineup.vue";
 import { drawnFoes, fallenLook, foeStageLimit } from "./components/foe-lineup.js";
@@ -86,7 +85,7 @@ const {
   skipDisabled, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
-  drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
+  drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
   shopMemberName, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
@@ -121,6 +120,12 @@ const {
   onViewItem,
   openPartyWindow,
 } = usePartyWindow(store, dispatchIntent, { panel });
+// The top navigation marks the entry of the open surface: the party window
+// is named with its live tab (`party:status`, `party:bag`, ...), so only the
+// 角色狀態 or 背包 entry of the open tab is current.
+const navigationDrawer = computed(() =>
+  store.view.hudDrawer === "party" ? `party:${partyWindowTab()}` : store.view.hudDrawer,
+);
 // A companion figure on the stage lineup opens 成員 with that companion
 // (design §8): exploration only, outside the stage target step, and never
 // the commander's own figure.
@@ -694,7 +699,7 @@ const rootStyle = computed(() => {
           <DesktopNavigation
             :mode="store.view.mode"
             :items="navigationItems"
-            :drawer="store.view.hudDrawer"
+            :drawer="navigationDrawer"
             :gallery-available="panelAvailable('gallery')"
             @navigate="onTabClick"
             @overlay="onOpenOverlay"
@@ -1238,18 +1243,6 @@ const rootStyle = computed(() => {
       :body-flush="store.view.hudDrawer === 'quest'"
       @close="onHudDrawerClose"
     >
-      <!-- Only a drawer about the current character stands its portrait
-           beside the content (webclient-drawer-content-polish); the other
-           drawers provide no art slot and take the whole workspace. -->
-      <template v-if="drawerHasArt" #art>
-        <ReferenceArtwork
-          :artwork="currentArtwork"
-          :panel="panel('roster')"
-          :name="currentCharacter?.name || ''"
-          :initial-of="currentCharacter?.name || ''"
-          stage
-        />
-      </template>
       <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
       <SkillBook
         v-else-if="store.view.hudDrawer === 'skill'"
@@ -1280,17 +1273,6 @@ const rootStyle = computed(() => {
         @action="onQuestAction"
       />
       <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
-      <CharacterStatusDrawer
-        v-else-if="store.view.hudDrawer === 'status'"
-        :status="panel('status') || {}"
-        :character="panel('character') || {}"
-        :party-member="panel('party_member') || {}"
-        :low-hp="store.view.vitals.lowHp"
-        :party-available="store.partyAvailable"
-        :possessing="isControllingCompanion"
-        @open-party="() => openPartyWindow()"
-        @open-skill="() => store.openHudDrawer('skill')"
-      />
       <!-- The book's keyboard guidance is skill-drawer-only: a conditional
            named slot, so the other drawers provide no `foot` slot and render
            no footer. Booking opens no sub-screen, so it never hides. -->
