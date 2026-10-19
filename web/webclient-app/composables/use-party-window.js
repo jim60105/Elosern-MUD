@@ -1,6 +1,7 @@
 // The party window's AppClient wiring (webclient-party-window-member-tab,
 // design §6/§8): its openers, the one `party.view_member` dispatch per rail
-// selection, and the pending entry while that request is in flight.
+// selection or bag item selection (webclient-party-bag-tab), and the pending
+// entry or item while that request is in flight.
 //
 // Pending is correlated by request id with the store's in-flight dispatch,
 // so a refused dispatch (null request id), a rejected result, or a finished
@@ -15,22 +16,41 @@ export function usePartyWindow(store, dispatchIntent, { panel }) {
 
   const memoryScope = computed(() => `${store.view.generation}|${store.view.epoch}`);
 
-  const pendingMemberId = computed(() => {
+  // The one in-flight selection request, or null once it has ended.
+  const inFlight = computed(() => {
     const request = pending.value;
     if (!request) return null;
-    return store.view.dispatch?.inFlight?.requestId === request.requestId ? request.memberId : null;
+    return store.view.dispatch?.inFlight?.requestId === request.requestId ? request : null;
   });
+  const pendingMemberId = computed(() => (inFlight.value && inFlight.value.itemKey === null ? inFlight.value.memberId : null));
+  const pendingItemKey = computed(() => inFlight.value?.itemKey ?? null);
 
-  function viewMember(memberId, tab) {
-    if (!Number.isSafeInteger(memberId) || memberId <= 0) return null;
+  // Every selection replaces the previous pending one: a rail click after an
+  // item click leaves no item pending.
+  function select(memberId, tab, itemKey) {
     const requestId = dispatchIntent("party.view_member", {
       member_id: memberId,
       tab,
       skill_key: null,
-      item_key: null,
+      item_key: itemKey,
     });
-    pending.value = requestId === null ? null : { memberId, requestId };
+    pending.value = requestId === null ? null : { memberId, itemKey, requestId };
     return requestId;
+  }
+
+  function viewMember(memberId, tab) {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) return null;
+    return select(memberId, tab, null);
+  }
+
+  // A bag row selection for the viewed member (design §6.2): the server
+  // stores the item and republishes `item_holdings` for it.
+  function onViewItem(intent) {
+    const memberId = intent?.memberId;
+    const itemKey = intent?.itemKey;
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) return null;
+    if (typeof itemKey !== "string" || itemKey === "") return null;
+    return select(memberId, "bag", itemKey);
   }
 
   function onViewMember(intent) {
@@ -53,5 +73,5 @@ export function usePartyWindow(store, dispatchIntent, { panel }) {
     }
   }
 
-  return { memoryScope, pendingMemberId, onViewMember, openPartyWindow };
+  return { memoryScope, pendingMemberId, pendingItemKey, onViewMember, onViewItem, openPartyWindow };
 }

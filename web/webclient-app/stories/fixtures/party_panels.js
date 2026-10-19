@@ -448,3 +448,167 @@ export const PARTY_WINDOW_INVITE_DISABLED_TARGETS = [
     ],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// webclient-party-bag-tab: the party window's 背包 tab fixtures.
+// ---------------------------------------------------------------------------
+// The viewed companion 蕾娜 (101) wields an iron longsword, wears a
+// traveller's robe and one silver ring, and carries potions, bread, herbs and
+// a spare steel shortsword. Every descriptor is a committed server fact: an
+// equipped row cannot be given (`item_equipped`), the full-MP potion's use is
+// gated, and herbs have no use at all. Valid `party_inventory` v1.
+const present = (kind, icon_key, rarity, summary) => ({ kind, icon_key, rarity, summary });
+const fieldUse = (reason = null) => ({ route: "field_use", enabled: reason === null, reason });
+const toggle = (reason = null) => ({ route: "toggle", enabled: reason === null, reason });
+const give = (max_quantity, reason = null) => ({ enabled: reason === null, reason, max_quantity });
+const EQUIPPED_GIVE_REASON = "已裝備的物品無法交換；請先卸下。";
+export const TRANSFER_IN_COMBAT_REASON = "戰鬥中無法交換物品。";
+
+const bagRow = (row) => ({ equipped_count: 0, slot: null, use: null, toggle: null, ...row });
+
+export const PARTY_BAG_INVENTORY_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  kind: "party_inventory",
+  member_id: 101,
+  purse: 1240,
+  equipment: {
+    weapon_main: "iron_longsword",
+    weapon_off: null,
+    armor: "traveler_robe",
+    accessories: ["silver_ring"],
+    accessory_limit: 5,
+  },
+  rows: [
+    bagRow({
+      item_key: "potion_heal",
+      display_name: "苦艾藥水",
+      held: 5,
+      presentation: present("potion", "potion", "common", "以苦艾與蜂蜜調成的紅色藥水，飲下後傷口會慢慢癒合。"),
+      use: fieldUse(),
+      give: give(5),
+    }),
+    bagRow({
+      item_key: "potion_mana",
+      display_name: "魔力藥水",
+      held: 2,
+      presentation: present("potion", "potion", "uncommon", "泛著藍光的清澈藥水，能讓疲憊的心神重新聚起魔力。"),
+      use: fieldUse("魔力已經是滿的。"),
+      give: give(2),
+    }),
+    bagRow({
+      item_key: "rye_bread",
+      display_name: "黑麥麵包",
+      held: 3,
+      presentation: present("food", "food", "common", "旅店烤的黑麥麵包，耐放又頂飽。"),
+      use: fieldUse(),
+      give: give(3),
+    }),
+    bagRow({
+      item_key: "moon_herb",
+      display_name: "月光草",
+      held: 4,
+      presentation: present("material", "material", "common", "只在月夜綻放的藥草，藥師收購它來調配藥水。"),
+      give: give(4),
+    }),
+    bagRow({
+      item_key: "iron_longsword",
+      display_name: "鐵製長劍",
+      held: 1,
+      equipped_count: 1,
+      slot: "weapon_main",
+      presentation: present("weapon", "weapon", "common", "鐵匠鋪最常見的長劍，劍身厚重、用得順手。"),
+      toggle: toggle(),
+      give: give(0, EQUIPPED_GIVE_REASON),
+    }),
+    bagRow({
+      item_key: "steel_shortsword",
+      display_name: "鋼製短劍",
+      held: 1,
+      slot: "weapon_main",
+      presentation: present("weapon", "weapon", "uncommon", "以精鋼打造的短劍，輕巧鋒利，適合靈活的劍士。"),
+      toggle: toggle(),
+      give: give(1),
+    }),
+    bagRow({
+      item_key: "traveler_robe",
+      display_name: "旅人長袍",
+      held: 1,
+      equipped_count: 1,
+      slot: "armor",
+      presentation: present("armor", "armor", "common", "厚實的羊毛長袍，擋得住山路上的風雨。"),
+      toggle: toggle(),
+      give: give(0, EQUIPPED_GIVE_REASON),
+    }),
+    bagRow({
+      item_key: "silver_ring",
+      display_name: "銀月戒指",
+      held: 1,
+      equipped_count: 1,
+      slot: "accessory",
+      presentation: present("accessory", "accessory", "rare", "內側刻著月紋的銀戒，戴上時心神格外清明。"),
+      toggle: toggle(),
+      give: give(0, EQUIPPED_GIVE_REASON),
+    }),
+  ],
+};
+
+// The same bag during combat: every give carries the committed combat reason
+// and uses route to the member's combat draft.
+export const PARTY_BAG_INVENTORY_COMBAT_SAMPLE = {
+  ...PARTY_BAG_INVENTORY_SAMPLE,
+  rows: PARTY_BAG_INVENTORY_SAMPLE.rows.map((row) => ({
+    ...row,
+    use: row.use ? { ...row.use, route: "combat_draft" } : null,
+    give: { ...row.give, enabled: false, reason: TRANSFER_IN_COMBAT_REASON },
+  })),
+};
+
+const hold = (member_id, held, receive, extra = {}) => ({ member_id, held, equipped: false, delta: null, receive, ...extra });
+const canReceive = { enabled: true, reason: null };
+const ownRow = { enabled: false, reason: null };
+const absent = { enabled: false, reason: "對方不在這裡。" };
+
+// 苦艾藥水 selected on 蕾娜's bag: the commander and the knocked-out 幽 can
+// receive (transfer only reorganizes bags), the escort 蓋文 is elsewhere.
+export const PARTY_BAG_HOLDINGS_CONSUMABLE = {
+  schema_version: 1,
+  available: true,
+  kind: "item_holdings",
+  item_key: "potion_heal",
+  giver_id: 101,
+  rows: [hold(42, 2, canReceive), hold(101, 5, ownRow), hold(102, 0, canReceive), hold(103, 1, absent)],
+};
+
+// 鋼製短劍 selected: each member's delta against their own main-hand occupant.
+const delta = (...changes) => ({ equippable: true, changes: changes.map(([key, label, amount]) => ({ key, label, amount })) });
+export const PARTY_BAG_HOLDINGS_EQUIPMENT = {
+  schema_version: 1,
+  available: true,
+  kind: "item_holdings",
+  item_key: "steel_shortsword",
+  giver_id: 101,
+  rows: [
+    hold(42, 0, canReceive, { delta: delta(["atk_phys", "攻擊", 6]) }),
+    hold(101, 1, ownRow, { delta: delta(["atk_phys", "攻擊", -2], ["agility", "敏捷", 3]) }),
+    hold(102, 0, canReceive, { delta: { equippable: false, reason: "幽無法使用這類武器。" } }),
+    hold(103, 0, absent, { delta: delta(["atk_phys", "攻擊", 4]) }),
+  ],
+};
+
+export const PARTY_BAG_HOLDINGS_COMBAT = {
+  ...PARTY_BAG_HOLDINGS_CONSUMABLE,
+  rows: PARTY_BAG_HOLDINGS_CONSUMABLE.rows.map((row) =>
+    row.member_id === 101 ? row : { ...row, receive: { enabled: false, reason: TRANSFER_IN_COMBAT_REASON } },
+  ),
+};
+
+// No item selected yet.
+export const PARTY_BAG_HOLDINGS_NONE = {
+  schema_version: 1,
+  available: true,
+  kind: "item_holdings",
+  item_key: null,
+  giver_id: 101,
+  rows: [],
+};

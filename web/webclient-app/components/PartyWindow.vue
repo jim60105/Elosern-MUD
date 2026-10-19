@@ -18,12 +18,17 @@
 // The window remembers its last tab for the session (party-window-memory.js).
 // It has no possession input: the rail, the tabs and their content render
 // identically whether or not the player is possessing, and no "you" marker
-// exists. The 背包/狀態/技能/系譜 tabs land in the next changes; until then
-// each shows only its backing panel's committed unavailable reason, or
-// whatever the host passes through the tab's scoped slot, and invents nothing.
+// exists. The 背包 tab is PartyBagTab (webclient-party-bag-tab): a row
+// selection emits `view-item` ({memberId, itemKey}) — AppClient dispatches
+// one `party.view_member` with that `item_key` — and its give, use and equip
+// intents leave as `bag-action`. The 狀態/技能/系譜 tabs land in the next
+// changes; until then each shows only its backing panel's committed
+// unavailable reason, or whatever the host passes through the tab's scoped
+// slot, and invents nothing.
 import { computed, ref, watch } from "vue";
 import ListDetail from "./ListDetail.vue";
 import MemberRail, { EMPTY_SLOT } from "./MemberRail.vue";
+import PartyBagTab from "./PartyBagTab.vue";
 import PartyMemberTab from "./PartyMemberTab.vue";
 import WindowFrame from "./WindowFrame.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
@@ -47,6 +52,8 @@ const props = defineProps({
   partyMember: { type: Object, default: null },
   // The committed `party_inventory` v1 panel (the purse; the 背包 tab).
   partyInventory: { type: Object, default: null },
+  // The committed `item_holdings` v1 panel (the 背包 tab's selected item).
+  itemHoldings: { type: Object, default: null },
   // The committed `character` panel (the 狀態 and 技能 tabs).
   character: { type: Object, default: null },
   // The committed `lineage` panel (the 系譜 tab).
@@ -57,11 +64,15 @@ const props = defineProps({
   interactTargets: { type: Array, default: () => [] },
   // The member whose `party.view_member` is in flight, or null.
   pendingMemberId: { type: Number, default: null },
+  // The item key whose bag selection is in flight, or null.
+  pendingItemKey: { type: String, default: null },
+  // True in combat: the bag shows counts only and offers no give.
+  combat: { type: Boolean, default: false },
   // `<generation>|<epoch>`: the session memory's scope.
   memoryScope: { type: String, default: "" },
 });
 
-const emit = defineEmits(["close", "view-member", "action", "open-npc-persona", "persona-edit"]);
+const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "open-npc-persona", "persona-edit"]);
 
 const memory = usePartyWindowMemory(props.memoryScope);
 // The memory is one module-level reactive object: re-syncing the scope
@@ -129,6 +140,13 @@ function setItem(key) {
 function setQuantity(value) {
   quantity.value = Number.isSafeInteger(value) && value > 0 ? value : 1;
 }
+// A bag row selection: remembered locally as the request, sent as one
+// `party.view_member` for the viewed member with that `item_key`.
+function onSelectItem(key) {
+  if (viewedId.value === null) return;
+  setItem(key);
+  emit("view-item", { memberId: viewedId.value, itemKey: key });
+}
 
 // --------------------------------------------------------------- header
 
@@ -151,12 +169,15 @@ const tabReason = computed(() => {
   return name ? panelReason(backingPanels.value[name]) : null;
 });
 
-// The 成員 tab's armed leave and unsaved persona draft: a close attempt
-// (Escape, ✕, the scrim) first cancels the confirmation or warns about the
-// draft, sends nothing and keeps the window; the next attempt closes.
+// The 成員 tab's armed leave and unsaved persona draft, and the 背包 tab's
+// open use confirmation: a close attempt (Escape, ✕, the scrim) first
+// cancels the confirmation or warns about the draft, sends nothing and keeps
+// the window; the next attempt closes.
 const memberTab = ref(null);
+const bagTab = ref(null);
 function closeGuard() {
-  return !memberTab.value?.guardClose?.();
+  const held = memberTab.value?.guardClose?.() || bagTab.value?.guardClose?.();
+  return !held;
 }
 </script>
 
@@ -207,6 +228,26 @@ function closeGuard() {
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
         </template>
       </PartyMemberTab>
+
+      <PartyBagTab
+        v-else-if="tab === 'bag'"
+        ref="bagTab"
+        :party-inventory="partyInventory"
+        :item-holdings="itemHoldings"
+        :members="members"
+        :member-id="viewedId"
+        :selected-item-key="selectedItemKey"
+        :pending-item-key="pendingItemKey"
+        :quantity="quantity"
+        :combat="combat"
+        @select-item="onSelectItem"
+        @set-quantity="setQuantity"
+        @action="(intent) => emit('bag-action', intent)"
+      >
+        <template #rail>
+          <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
+        </template>
+      </PartyBagTab>
 
       <ListDetail v-else :list-label="PARTY_WINDOW_TABS.find((t) => t.key === tab)?.label">
         <template #rail>

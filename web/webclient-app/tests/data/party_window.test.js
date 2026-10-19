@@ -6,7 +6,6 @@
 // session, and it renders identically whether or not the player possesses.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { h, nextTick } from "vue";
 import PartyWindow from "../../components/PartyWindow.vue";
 import { rememberPartyWindowTab, resetPartyWindowMemory } from "../../components/party-window-memory.js";
 import {
@@ -16,6 +15,9 @@ import {
   PARTY_MEMBER_POSSESSED_SAMPLE,
   PARTY_PANEL_FULL_SAMPLE,
   PARTY_WINDOW_PANEL_SAMPLE,
+  PARTY_BAG_HOLDINGS_CONSUMABLE,
+  PARTY_BAG_HOLDINGS_NONE,
+  PARTY_BAG_INVENTORY_SAMPLE,
 } from "../../stories/fixtures/party_panels.js";
 
 const SCOPE = "1|1";
@@ -118,28 +120,45 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
 
   it("resets the local item and quantity when the server falls back to the commander", async () => {
     rememberPartyWindowTab(SCOPE, "bag");
-    let slotProps = null;
-    mountWindow({}, {
-      bag: (props) => {
-        slotProps = props;
-        return h("p", { "data-testid": "bag-probe" }, `${props.memberId}:${props.selectedItemKey}:${props.quantity}`);
-      },
-    });
-    expect(wrapper.get('[data-testid="bag-probe"]').text()).toBe("101:null:1");
-    slotProps.setItem("potion_heal");
-    slotProps.setQuantity(3);
-    await nextTick();
-    expect(wrapper.get('[data-testid="bag-probe"]').text()).toBe("101:potion_heal:3");
-    // 蕾娜 left the party: the server's next payload names the commander.
+    mountWindow({ partyInventory: PARTY_BAG_INVENTORY_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_CONSUMABLE });
+    // 苦艾藥水 is the committed selection; raise the give quantity to 3.
+    expect(wrapper.get('[data-testid="party-bag-tab__title"]').text()).toBe("苦艾藥水");
+    await wrapper.get('[data-testid="party-bag-tab__stepper-up"]').trigger("click");
+    await wrapper.get('[data-testid="party-bag-tab__stepper-up"]').trigger("click");
+    expect(wrapper.get('[data-testid="party-bag-tab__quantity"]').text()).toBe("3");
+    // A row selection sends one view-item for the viewed member.
+    await wrapper.get('[data-testid="party-bag-tab__row--rye_bread"]').trigger("click");
+    expect(wrapper.emitted("view-item")).toEqual([[{ memberId: 101, itemKey: "rye_bread" }]]);
+    // 蕾娜 left the party: the server's next payload names the commander and
+    // the commander's bag with no selected item.
     await wrapper.setProps({
       party: {
         ...PARTY_WINDOW_PANEL_SAMPLE,
         viewed_member_id: 42,
         slots: PARTY_WINDOW_PANEL_SAMPLE.slots.filter((row) => row.identity !== 101),
       },
+      partyInventory: { ...PARTY_BAG_INVENTORY_SAMPLE, member_id: 42 },
+      itemHoldings: { ...PARTY_BAG_HOLDINGS_NONE, giver_id: 42 },
+      pendingItemKey: "rye_bread",
     });
     expect(entry(42).attributes("aria-current")).toBe("true");
-    expect(wrapper.get('[data-testid="bag-probe"]').text()).toBe("42:null:1");
+    expect(wrapper.get('[data-testid="party-bag-tab"]').attributes("data-member")).toBe("42");
+    // The requested key was reset with the member, so the in-flight key no
+    // longer shows and nothing stays selected.
+    expect(wrapper.find('[data-testid="party-bag-tab__title"]').exists()).toBe(false);
+    expect(wrapper.findAll('[role="option"][aria-selected="true"]')).toHaveLength(0);
+  });
+
+  it("cancels the bag's open use confirmation on a close attempt before closing", async () => {
+    rememberPartyWindowTab(SCOPE, "bag");
+    mountWindow({ partyInventory: PARTY_BAG_INVENTORY_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_CONSUMABLE });
+    await wrapper.get('[data-testid="action-bar__btn--use"]').trigger("click");
+    expect(wrapper.find('[data-testid="party-bag-tab__confirm-dialog"]').exists()).toBe(true);
+    // ✕ while confirming cancels the confirmation and keeps the window.
+    await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+    expect(wrapper.emitted("close")).toBeUndefined();
+    expect(wrapper.find('[data-testid="party-bag-tab__confirm-dialog"]').exists()).toBe(false);
+    expect(wrapper.emitted("bag-action")).toBeUndefined();
   });
 
   it("selects 空位 locally, opening 成員, and sends nothing", async () => {
