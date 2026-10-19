@@ -510,10 +510,16 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    # Temporary traceability (the repository convention while a change is
+    # applied): the main specs do not yet carry the bag-tab requirements this
+    # evidence covers. The archive re-points the annotation to
+    # `webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings`,
+    # `webclient-party-window::giving-from-the-bag-uses-the-committed-receive-facts` and
+    # `webclient-party-window::the-bag-action-bar-uses-or-equips-for-the-viewed-member`.
     @covers_requirement(
-        "webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings",
-        "webclient-party-window::giving-from-the-bag-uses-the-committed-receive-facts",
-        "webclient-party-window::the-bag-action-bar-uses-or-equips-for-the-viewed-member",
+        "webclient-party-window::the-window-remembers-its-tab-and-member-for-the-session",
+        "webclient-party-inventory-panel::the-panel-follows-the-viewed-member-and-never-invents-rows",
+        "webclient-item-holdings-panel::the-selected-item-rides-the-viewed-member-selection",
     )
     def test_party_bag_tab_vitest_evidence_passes(self):
         """The party window's 背包 tab (webclient-party-bag-tab): the doll's
