@@ -140,7 +140,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/EquipmentDoll",
     "Data/CharacterStatusDrawer",
     "Overlays/CreationOverlay",
     "Overlays/HelpOverlay",
