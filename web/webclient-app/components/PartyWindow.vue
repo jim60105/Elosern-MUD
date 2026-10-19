@@ -23,15 +23,20 @@
 // one `party.view_member` with that `item_key` — and its give, use and equip
 // intents leave as `bag-action`. The 狀態 tab is PartyStatusTab
 // (webclient-party-status-tab): the viewed member's committed `character`
-// values with the trait waterfall, in every mode. The 技能/系譜 tabs land in
-// the next changes; until then each shows only its backing panel's committed
-// unavailable reason, or whatever the host passes through the tab's scoped
-// slot, and invents nothing.
+// values with the trait waterfall, in every mode. The 技能 tab is
+// PartySkillTab (webclient-party-skill-tab): the viewed member's skills with
+// growth, the selected skill's lineage position and ladder (its selection
+// rides `requestSkill`, one `party.view_member` with tab `skills`), and 施放 /
+// 排入修煉 leaving as `use-skill` / `practice`; its lineage link switches to
+// 系譜. The 系譜 tab lands in the next change; until then it shows only its
+// backing panel's committed unavailable reason, or whatever the host passes
+// through the tab's scoped slot, and invents nothing.
 import { computed, ref, watch } from "vue";
 import ListDetail from "./ListDetail.vue";
 import MemberRail, { EMPTY_SLOT } from "./MemberRail.vue";
 import PartyBagTab from "./PartyBagTab.vue";
 import PartyMemberTab from "./PartyMemberTab.vue";
+import PartySkillTab from "./PartySkillTab.vue";
 import PartyStatusTab from "./PartyStatusTab.vue";
 import WindowFrame from "./WindowFrame.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
@@ -76,9 +81,24 @@ const props = defineProps({
   // A trait key the 狀態 tab selects on open (a story seam; the app's
   // openers never pass it, so the first layered trait is selected).
   statusTrait: { type: String, default: null },
+  // The 技能 tab's host inputs: the committed mode, the shared booking lock
+  // and the server's booking line, the dispatch lock, the in-flight and
+  // refused 施放 (`{ actorId, skillKey[, message] }`), the dock return target,
+  // and the selection request (`({ member_id, skill_key }) => requestId | null`).
+  mode: { type: String, default: "exploration" },
+  practiceDisabled: { type: Boolean, default: false },
+  practiceFeedback: { type: String, default: "" },
+  useLocked: { type: Boolean, default: false },
+  usePending: { type: Object, default: null },
+  useNotice: { type: Object, default: null },
+  returnTarget: { type: Object, default: null },
+  requestSkill: { type: Function, default: null },
+  // Story seams: the 技能 tab's segment and skill selected on open.
+  skillSegment: { type: String, default: "active" },
+  initialSkill: { type: String, default: null },
 });
 
-const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "combat-item", "open-npc-persona", "persona-edit"]);
+const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "combat-item", "open-npc-persona", "persona-edit", "practice", "use-skill"]);
 
 const memory = usePartyWindowMemory(props.memoryScope);
 // The memory is one module-level reactive object: re-syncing the scope
@@ -274,6 +294,30 @@ function closeGuard() {
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
         </template>
       </PartyStatusTab>
+
+      <PartySkillTab
+        v-else-if="tab === 'skills'"
+        :member="selectedRow"
+        :character="character"
+        :combat="combat"
+        :mode="mode"
+        :practice-disabled="practiceDisabled"
+        :practice-feedback="practiceFeedback"
+        :use-locked="useLocked"
+        :use-pending="usePending"
+        :use-notice="useNotice"
+        :return-target="returnTarget"
+        :request-skill="requestSkill"
+        :initial-segment="skillSegment"
+        :initial-skill="initialSkill"
+        @practice="(intent) => emit('practice', intent)"
+        @use="(key) => emit('use-skill', key)"
+        @lineage="tab = 'lineage'"
+      >
+        <template #rail>
+          <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
+        </template>
+      </PartySkillTab>
 
       <ListDetail v-else :list-label="PARTY_WINDOW_TABS.find((t) => t.key === tab)?.label">
         <template #rail>

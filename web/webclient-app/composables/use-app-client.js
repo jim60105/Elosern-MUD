@@ -52,7 +52,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     // The NPC author editor (npc-persona-editor-window): its own correlated
     // read/update state machine over the single store dispatch entry.
     ...useNpcPersonaEditor(store, { shellRef }),
-    // The SkillBook 施放 hand-over to the dock (skillbook-authoritative-casting).
+    // The 技能 tab 施放 hand-over to the dock (skillbook-authoritative-casting).
     ...useSkillUse(store),
     // The exploration root pane's exit compass and shared readout
     // (exploration-exit-compass).

@@ -1,15 +1,17 @@
-// The SkillBook use group of the composed Elosern store
-// (skillbook-authoritative-casting D6/D7): the book's 施放 entry, the
-// hand-over of casting to the single dock router once the authoritative
-// preview commits, the dock-side skill-use interactions, the return to the
-// book on Escape, and the lifecycle that clears a flow the committed state
-// no longer supports.
+// The skill-use group of the composed Elosern store
+// (skillbook-authoritative-casting D6/D7, webclient-party-skill-tab): the
+// party window 技能 tab's 施放 entry for the viewed member, the hand-over of
+// casting to the single dock router once the authoritative preview commits
+// (the window closes first), the dock-side skill-use interactions, the
+// return to the tab on Escape, and the lifecycle that clears a flow the
+// committed state no longer supports.
 //
-// The book never hosts a router frame and the store never decides
+// The tab never hosts a router frame and the store never decides
 // availability: the committed `skill_use` panel (resolved through the frame
 // registry) is the only source of rows, payloads, and reasons.
 
 import SkillUseMenu from "../../lib/skill_use_menu.js";
+import { partyWindowTab } from "../../components/party-window-memory.js";
 
 const SKILL_USE_SOURCES = new Set(["skilluse.root", "skilluse.scale", "skilluse.opening"]);
 
@@ -21,26 +23,33 @@ export function applySkillUse(ctx) {
   // null | { phase: "pending" | "active", skillKey, requestId, epoch, generation }
   ctx.skillUse = null;
   // Set by the router's own Escape pop while the flow is active, consumed by
-  // the next settle: an Escape out of the flow returns to the book; a
+  // the next settle: an Escape out of the flow returns to the 技能 tab; a
   // settle-driven pop (cast committed, mode changed) does not.
   ctx.skillUseEscaped = false;
   // Monotonic DOM-focus requests the shell honours after the drawer unmounts.
   ctx.dockFocusRequest = 0;
-  // `{ skillKey, seq }` — the book reopens focused on this row's 施放.
+  // `{ actorId, skillKey, seq }` — the 技能 tab reopens focused on this
+  // member's row's 施放.
   ctx.bookReturn = null;
   ctx.bookReturnSeq = 0;
-  // The last refused book entry (`{ skillKey, message }`), shown in the book.
+  // The last refused entry (`{ actorId, skillKey, message }`), shown in the tab.
   ctx.skillUseNotice = null;
+
+  // True while the party window is open on its 技能 tab: the only surface a
+  // preview may hand over from.
+  function skillTabOpen() {
+    return ctx.hudDrawer.value === "party" && partyWindowTab() === "skills";
+  }
 
   function currentDescriptor() {
     return ctx.router.depth() > 0 ? ctx.router.currentDescriptor() : null;
   }
 
-  // The caster the book's skills belong to: the committed `character` panel's
+  // The caster the tab's skills belong to: the committed `character` panel's
   // `member_id` (the viewed party member). The `status` panel is deliberately
   // not consulted — it names the controlled figure, which may differ from the
-  // member whose skills the book lists. Null when the character panel is
-  // missing or unavailable; the book then refuses locally instead of naming an
+  // member whose skills the tab lists. Null when the character panel is
+  // missing or unavailable; the tab then refuses locally instead of naming an
   // invented caster or falling back to the commander.
   function controlledActorId(rs) {
     const character = rs.panels && rs.panels.character;
@@ -51,26 +60,23 @@ export function applySkillUse(ctx) {
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   }
 
-  // The book's 施放 entry. Exploration: request the authoritative preview
-  // (nothing else is sent until the player confirms in the dock). Combat:
-  // close the book and hand focus to the existing combat 技能 entry without
-  // any dispatch. Any other mode: refuse locally.
+  // The tab's 施放 entry. Exploration: request the authoritative preview
+  // for the viewed member (nothing else is sent until the player confirms in
+  // the dock). Any other mode, combat included, refuses locally and sends
+  // nothing: the tab disables 施放 in combat, where casting stays on the
+  // command card.
   ctx.beginSkillUse = function beginSkillUse(skillKey) {
     const rs = ctx.reducer.getState();
-    ctx.skillUseNotice = null;
     const contextActions = (rs.panels && rs.panels.context_actions) || null;
-    if (contextActions && contextActions.kind === "combat") {
-      ctx.skillUse = null;
-      ctx.closeHudDrawer();
-      ctx.resetFramesToRoot();
-      ctx.router.focusItemByKey("skills");
-      ctx.dockFocusRequest += 1;
-      ctx.publishView();
-      return { route: "combat" };
-    }
-    if (rs.mode !== "exploration" || typeof skillKey !== "string" || skillKey === "") {
+    if (
+      (contextActions && contextActions.kind === "combat") ||
+      rs.mode !== "exploration" ||
+      typeof skillKey !== "string" ||
+      skillKey === ""
+    ) {
       return { route: "refused" };
     }
+    ctx.skillUseNotice = null;
     const actorId = controlledActorId(rs);
     if (actorId === null) {
       return { route: "refused" };
@@ -103,8 +109,8 @@ export function applySkillUse(ctx) {
   function enterDock(flow) {
     entering = true;
     try {
-      // The book closes BEFORE the dock frame mounts (the drawer's own close
-      // teardown may re-home the exploration root first).
+      // The window closes BEFORE the dock frame mounts (the drawer's own
+      // close teardown may re-home the exploration root first).
       ctx.closeHudDrawer();
       ctx.pushFrame(
         { source: "skilluse.root", params: { skillKey: flow.skillKey, actorId: flow.actorId } },
@@ -152,6 +158,7 @@ export function applySkillUse(ctx) {
         rs.mode === "exploration";
       if (!ready) {
         ctx.skillUseNotice = {
+          actorId: flow.actorId,
           skillKey: flow.skillKey,
           message:
             typeof result.message === "string" && result.message.trim() !== ""
@@ -161,9 +168,9 @@ export function applySkillUse(ctx) {
         ctx.skillUse = null;
         return;
       }
-      if (ctx.hudDrawer.value !== "skill") {
-        // The player closed the book while the preview was in flight: the
-        // flow ends without taking over the dock.
+      if (!skillTabOpen()) {
+        // The player closed the window, or left its 技能 tab, while the
+        // preview was in flight: the flow ends without taking over the dock.
         ctx.skillUse = null;
         return;
       }
@@ -193,7 +200,8 @@ export function applySkillUse(ctx) {
     ctx.skillUse = null;
     if (escaped && rs.mode === "exploration" && ctx.hudDrawer.value === null) {
       ctx.bookReturnSeq += 1;
-      ctx.bookReturn = { skillKey: flow.skillKey, seq: ctx.bookReturnSeq };
+      ctx.bookReturn = { actorId: flow.actorId, skillKey: flow.skillKey, seq: ctx.bookReturnSeq };
+      // The retired drawer name opens the party window on 技能 (hud.js).
       ctx.openHudDrawer("skill");
     }
   };

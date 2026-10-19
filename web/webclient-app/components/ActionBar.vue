@@ -14,7 +14,8 @@ import { glyphAttrs, glyphPath } from "./dock-icons.js";
 
 const props = defineProps({
   // [{ key, label, enabled = true, reason?: string | null,
-  //    tone?: "primary" | "gold" | "ghost", glyph? }]
+  //    tone?: "primary" | "gold" | "ghost", glyph?, busy? }]
+  // `busy` marks a control whose request is in flight (aria-busy).
   actions: { type: Array, default: () => [] },
   // A committed reason shown on its own: a string or { code, message }.
   reason: { type: [String, Object], default: null },
@@ -76,6 +77,7 @@ function activate(action) {
       :data-testid="`action-bar__btn--${action.key}`"
       :aria-disabled="isEnabled(action) ? undefined : 'true'"
       :aria-describedby="describedBy(action)"
+      :aria-busy="action.busy ? 'true' : undefined"
       @click="activate(action)"
     >
       <svg v-if="action.glyph && glyphPath(action.glyph)" viewBox="0 0 24 24" fill="none" aria-hidden="true">
