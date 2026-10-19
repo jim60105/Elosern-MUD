@@ -75,24 +75,16 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return `主動 ${skillCount(character?.actives)} ‧ 被動 ${skillCount(character?.passives)}`;
   });
 
-  // The member reference the member-scoped drawer controls name
-  // (party-member-equipment, companion-field-item-use, party-practice-
-  // booking): the controlled figure's identity from the committed `status`
-  // panel, which serializes it as a string, converted to the positive safe
-  // integer the exact payloads require. Null when that panel is missing or
-  // unavailable — the item use, the equipment toggle and 修煉 then stay
-  // unavailable instead of naming an invented member, and no other identity
-  // (the commander included) is ever substituted.
-  const controlledActorId = computed(() => {
-    if (!panelAvailable("status")) {
+  // The shop drawer's section label: the committed `party` row naming the
+  // services shop's member (the viewed member the trades name), or null.
+  const shopMemberName = computed(() => {
+    const memberId = panel("services")?.shop?.member_id;
+    if (!Number.isSafeInteger(memberId) || !panelAvailable("party")) {
       return null;
     }
-    const identity = panel("status")?.actor?.identity;
-    if (typeof identity !== "string" || identity.trim() === "") {
-      return null;
-    }
-    const value = Number(identity);
-    return Number.isSafeInteger(value) && value > 0 ? value : null;
+    const slots = panel("party")?.slots;
+    const row = Array.isArray(slots) ? slots.find((slot) => slot?.identity === memberId) : null;
+    return typeof row?.display_name === "string" && row.display_name !== "" ? row.display_name : null;
   });
 
   // The skill drawer's footer: the book's keyboard guidance (client-local
@@ -102,7 +94,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
 
   return {
     SKILL_BOOK_KEY_HINT,
-    controlledActorId,
+    shopMemberName,
     drawerTitle,
     drawerIcon,
     drawerHasArt,

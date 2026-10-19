@@ -87,7 +87,7 @@ const {
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  controlledActorId, SKILL_BOOK_KEY_HINT,
+  shopMemberName, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -1268,7 +1268,7 @@ const rootStyle = computed(() => {
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"
         :services="panel('services') || {}"
-        :actor-id="controlledActorId"
+        :member-name="shopMemberName"
         @buy="onShopBuy"
         @sell="onShopSell"
       />

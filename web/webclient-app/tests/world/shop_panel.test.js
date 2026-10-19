@@ -4,6 +4,7 @@ import ShopPanel from "../../components/ShopPanel.vue";
 import {
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
+  SERVICES_PANEL_SHOP_ROWS_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
 
@@ -20,7 +21,6 @@ describe("ShopPanel (B4 world / services family)", () => {
     wrapper = mount(ShopPanel, {
       props: {
         services: SERVICES_PANEL_SAMPLE,
-        actorId: 7,
         ...props,
       },
     });
@@ -45,18 +45,19 @@ describe("ShopPanel (B4 world / services family)", () => {
     const w = mountPanel();
     const sword = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
     expect(sword.find(".shop-row__name").text()).toBe("鐵劍");
+    // One price per row kind: a stock row shows the buy price only.
     const swordPrices = sword.findAll(".shop-row__price");
-    expect(swordPrices[0].text()).toBe("購買 120 銅");
-    expect(swordPrices[1].text()).toBe("出賣 80 銅");
+    expect(swordPrices.map((p) => p.text())).toEqual(["120 銅"]);
     // Stock level cell renders "stock / max_stock" (no invented defaults).
-    expect(sword.find(".shop-row__stock").text()).toBe("8 / 24");
+    expect(sword.find(".shop-row__stock").text()).toBe("庫存 8 / 24");
+    expect(sword.find(".shop-row__icon").attributes("data-rarity")).toBe("uncommon");
+    // The rarity is spelled for assistive tech, never colour alone.
+    expect(sword.get('[data-testid="shop-row__rarity"]').text()).toBe("罕見");
 
     const potion = w.get('[data-testid="shop-panel__stock--item_heal_potion"]');
     expect(potion.find(".shop-row__name").text()).toBe("治療劑");
-    const potionPrices = potion.findAll(".shop-row__price");
-    expect(potionPrices[0].text()).toBe("購買 45 銅");
-    expect(potionPrices[1].text()).toBe("出賣 30 銅");
-    expect(potion.find(".shop-row__stock").text()).toBe("30 / 30");
+    expect(potion.findAll(".shop-row__price").map((p) => p.text())).toEqual(["45 銅"]);
+    expect(potion.find(".shop-row__stock").text()).toBe("庫存 30 / 30");
 
     expect(w.get('[data-testid="shop-panel__stock--item_iron_sword"]').exists()).toBe(true);
     expect(w.get('[data-testid="shop-panel__stock--item_heal_potion"]').exists()).toBe(true);
@@ -189,8 +190,9 @@ describe("ShopPanel (B4 world / services family)", () => {
     const w = mountPanel();
     const sellable = w.get('[data-testid="shop-panel__sellable--item_herb_moon"]');
     expect(sellable.find(".shop-row__name").text()).toBe("月光草");
-    expect(sellable.findAll(".shop-row__price")[0].text()).toBe("出賣 25 銅");
-    expect(sellable.find(".shop-row__held").text()).toBe("3");
+    // One price per row kind: a sellable row shows the sell price only.
+    expect(sellable.findAll(".shop-row__price").map((p) => p.text())).toEqual(["25 銅"]);
+    expect(sellable.find(".shop-row__held").text()).toBe("可售 3");
 
     const qty = sellable.find("input.shop-row__qty");
     expect(qty.attributes("min")).toBe("1");
@@ -215,11 +217,32 @@ describe("ShopPanel (B4 world / services family)", () => {
     ]);
   });
 
-  it("emits nothing when the controlled figure's identity is unavailable", async () => {
-    // A missing status identity never invents a member: both trades stay
-    // silent rather than naming the commander in the controlled figure's place.
-    for (const actorId of [null, 0, -1, 1.5]) {
-      const w = mountPanel({ actorId });
+  it("names shop.member_id as recipient and seller, never the controlled figure", async () => {
+    const services = SERVICES_PANEL_SHOP_ROWS_SAMPLE;
+    const w = mountPanel({ services, memberName: "艾拉" });
+    expect(w.get('[data-testid="shop-panel__stock-title"]').text()).toBe("為艾拉挑選");
+    expect(w.get('[data-testid="shop-panel__sellable-title"]').text()).toBe("艾拉可出售的物品");
+    await w.get('[data-testid="shop-panel__stock--steel_shortsword"]').find(".shop-row__buy").trigger("click");
+    await w.get('[data-testid="shop-panel__sellable--potion_heal"]').find(".shop-row__sell").trigger("click");
+    expect(w.emitted("buy")[0][0].payload).toEqual({ item_key: "steel_shortsword", quantity: 1, recipient_id: 102 });
+    expect(w.emitted("sell")[0][0].payload).toEqual({ item_key: "potion_heal", quantity: 1, seller_id: 102 });
+  });
+
+  it("ties each disabled action to its committed reason", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_SHOP_ROWS_SAMPLE });
+    const row = w.get('[data-testid="shop-panel__stock--warhammer"]');
+    const reason = row.get(".shop-row__reason");
+    expect(row.get(".shop-row__buy").attributes("aria-describedby")).toBe(reason.attributes("id"));
+    expect(w.get('[data-testid="shop-panel__stock--steel_shortsword"]').get(".shop-row__buy").attributes("aria-describedby")).toBeUndefined();
+    const sell = w.get('[data-testid="shop-panel__sellable--rusty_sword"]');
+    expect(sell.get(".shop-row__sell").attributes("aria-describedby")).toBe(sell.get(".shop-row__reason").attributes("id"));
+  });
+
+  it("emits nothing when shop.member_id is not a positive safe integer", async () => {
+    // A malformed member id never invents a member: both trades stay silent.
+    for (const memberId of [null, 0, -1, 1.5, "7"]) {
+      const services = { ...SERVICES_PANEL_SAMPLE, shop: { ...SERVICES_PANEL_SAMPLE.shop, member_id: memberId } };
+      const w = mountPanel({ services });
       const stockRow = w.get('[data-testid="shop-panel__stock--item_iron_sword"]');
       await stockRow.find(".shop-row__buy").trigger("click");
       expect(w.emitted("buy")).toBeUndefined();
@@ -229,6 +252,42 @@ describe("ShopPanel (B4 world / services family)", () => {
       w.unmount();
       wrapper = null;
     }
+  });
+
+  it("renders the viewed member's server delta or held count, never computing either", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_SHOP_ROWS_SAMPLE });
+    const facts = (key) => w.get(`[data-testid="shop-panel__stock--${key}"]`);
+    const deltas = (key) => facts(key).findAll('[data-testid="shop-row__delta"]').map((d) => d.text());
+    expect(deltas("steel_shortsword")).toEqual(["▲ 攻擊 +6"]);
+    // A mixed swap keeps the shape prefix and a true minus sign.
+    expect(deltas("iron_longsword")).toEqual(["▲ 攻擊 +4", "▼ 敏捷 −2"]);
+    expect(facts("iron_longsword").findAll(".shop-row__delta.is-down")).toHaveLength(1);
+    expect(deltas("moonstone_ring")).toEqual(["無法裝備"]);
+    // The worn copy compares as no change and still shows the held count.
+    expect(deltas("birch_staff")).toEqual(["±0"]);
+    expect(facts("birch_staff").get('[data-testid="shop-row__held"]').text()).toBe("持有 1");
+    // A consumable shows the held count and no delta.
+    expect(deltas("potion_heal")).toEqual([]);
+    expect(facts("potion_heal").get('[data-testid="shop-row__held"]').text()).toBe("持有 2");
+    expect(facts("steel_shortsword").find('[data-testid="shop-row__held"]').exists()).toBe(false);
+    // Sold out is spelled, not only dimmed.
+    expect(facts("shortbow").find(".shop-row__stock").text()).toBe("售完");
+    expect(facts("shortbow").classes()).toContain("is-sold-out");
+    // The sellable list's count is the unequipped count, labelled apart.
+    expect(w.get('[data-testid="shop-panel__sellable--potion_heal"]').find(".shop-row__held").text()).toBe("可售 2");
+  });
+
+  it("re-defaults every quantity entry when the services panel is replaced", async () => {
+    const w = mountPanel({ services: SERVICES_PANEL_SHOP_ROWS_SAMPLE });
+    const input = () => w.get('[data-testid="shop-panel__stock--potion_heal"]').find("input.shop-row__qty");
+    await input().setValue(5);
+    expect(input().element.value).toBe("5");
+    await input().trigger("focusin");
+    expect(w.find('[data-testid="services-quantity"]').exists()).toBe(true);
+    await w.setProps({ services: { ...SERVICES_PANEL_SHOP_ROWS_SAMPLE } });
+    expect(input().element.value).toBe("1");
+    // The row selection is discarded with the replaced panel too.
+    expect(w.find('[data-testid="services-quantity"]').exists()).toBe(false);
   });
 
   it("omits the wallet line (H4 task 7.1: the wallet now lives in CharacterStatusDrawer — the single wallet rendering)", () => {

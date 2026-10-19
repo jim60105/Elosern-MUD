@@ -1,5 +1,6 @@
 /*
- * services panel v3 presentation rows, versioned rejection, inventory actions, allowlist atomicity.
+ * services panel v7 shop rows (presentation, viewed facts, one price per row
+ * kind), versioned rejection, allowlist atomicity.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -11,10 +12,10 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
-const { T_MEAL, T_MEAL_LABEL, T_MEAL_SUMMARY, VALID_EPOCH, serverTime } = require("./protocol_support.js");
+const { T_MEAL_SUMMARY, VALID_EPOCH, serverTime } = require("./protocol_support.js");
 const { validServicesAction, validServicesBoardRow, validServicesPanel, validServicesQuestRow, validServicesSellableRow, validServicesStockRow } = require("./protocol_fixtures.js");
 
-test("services v6 rejects stale facts and reward overflow", () => {
+test("services v7 rejects stale facts and reward overflow", () => {
   const item = { item_key: "synthetic_item", display_name: "合成物品", quantity: 1 };
   for (const overrides of [
     { reward_summary: "舊獎勵" },
@@ -31,7 +32,7 @@ test("services v6 rejects stale facts and reward overflow", () => {
   }
 });
 
-test("services v6 validates ladder bounds and all section rank memberships", () => {
+test("services v7 validates ladder bounds and all section rank memberships", () => {
   for (const ladder of [[], ["F", "F"], ["E"], ["F", "x".repeat(9)], Array.from({ length: 17 }, (_, i) => String(i))]) {
     const panel = validServicesPanel();
     panel.guild.board = [validServicesBoardRow()];
@@ -47,33 +48,23 @@ test("a structurally maximal realistic services payload fits the envelope", () =
   const quests = [];
   const stock = [];
   const sellable = [];
-  const inventory = [];
   for (let i = 0; i < Protocol.SERVICES_MAX_BOARD_ROWS; i++) {
     board.push(validServicesBoardRow());
   }
   for (let i = 0; i < Protocol.SERVICES_MAX_QUEST_ROWS; i++) {
     quests.push(validServicesQuestRow());
   }
+  // Every stock row carries a delta on every canonical trait.
+  const traits = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"];
+  const delta = {
+    equippable: true,
+    changes: traits.map((key) => ({ key: key, label: "攻擊", amount: -12 })),
+  };
   for (let i = 0; i < Protocol.SERVICES_MAX_STOCK_ROWS; i++) {
-    stock.push(validServicesStockRow());
+    stock.push(validServicesStockRow({ viewed: { held: 2, delta: delta } }));
   }
   for (let i = 0; i < Protocol.SERVICES_MAX_SELLABLE_ROWS; i++) {
     sellable.push(validServicesSellableRow());
-  }
-  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
-    inventory.push({
-      item_key: T_MEAL,
-      display_name: T_MEAL_LABEL,
-      held: 2,
-      equipped: false,
-      action: null,
-      presentation: {
-        kind: "food",
-        icon_key: "food",
-        rarity: "common",
-        summary: T_MEAL_SUMMARY,
-      },
-    });
   }
   const panel = validServicesPanel({
     guild: {
@@ -91,14 +82,12 @@ test("a structurally maximal realistic services payload fits the envelope", () =
         exam_request: validServicesAction({ action_id: "guild.exam_request", label: "預約升等考核" }),
       },
     },
-    shop: { open: true, stock: stock, sellable: sellable },
-    inventory: { rows: inventory, wallet: 1000000 },
+    shop: { open: true, member_id: 12345, stock: stock, sellable: sellable },
     pagination: {
       board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
       quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
       stock_total: Protocol.SERVICES_MAX_STOCK_ROWS,
       sellable_total: Protocol.SERVICES_MAX_SELLABLE_ROWS,
-      inventory_total: Protocol.SERVICES_MAX_INVENTORY_ROWS,
     },
   });
   assert.doesNotThrow(() => Protocol.validateServicesPanel(panel));
@@ -116,7 +105,9 @@ test("services payload maximizing every string field fails the byte gate", () =>
   const quests = [];
   const stock = [];
   const sellable = [];
-  const inventory = [];
+  const presKey = "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY);
+  const presSummary = "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY);
+  const presentation = { kind: presKey, icon_key: presKey, rarity: presKey, summary: presSummary };
   for (let i = 0; i < Protocol.SERVICES_MAX_BOARD_ROWS; i++) {
     board.push({
       definition_key: max64,
@@ -156,10 +147,11 @@ test("services payload maximizing every string field fails the byte gate", () =>
     stock.push({
       item_key: max64,
       display_name: max128,
+      presentation: presentation,
       buy_copper: 10,
-      sell_copper: 5,
       stock: 20,
       max_stock: 20,
+      viewed: { held: 20, delta: { equippable: false, reason: max128 } },
       buy: validServicesAction({
         action_id: "shop.buy",
         enabled: false,
@@ -171,6 +163,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
     sellable.push({
       item_key: max64,
       display_name: max128,
+      presentation: presentation,
       sell_copper: 5,
       held: 20,
       sell: validServicesAction({
@@ -178,18 +171,6 @@ test("services payload maximizing every string field fails the byte gate", () =>
         enabled: false,
         disabled_reason: { code: "stock_overflow", message: max64 },
       }),
-    });
-  }
-  const presKey = "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY);
-  const presSummary = "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY);
-  for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
-    inventory.push({
-      item_key: max64,
-      display_name: max128,
-      held: 20,
-      equipped: false,
-      action: null,
-      presentation: { kind: presKey, icon_key: presKey, rarity: presKey, summary: presSummary },
     });
   }
   const panel = validServicesPanel({
@@ -230,147 +211,128 @@ test("services payload maximizing every string field fails the byte gate", () =>
         }),
       },
     },
-    shop: { open: false, stock: stock, sellable: sellable },
-    inventory: { rows: inventory, wallet: 0 },
+    shop: { open: false, member_id: 1, stock: stock, sellable: sellable },
     pagination: {
       board_total: Protocol.SERVICES_MAX_BOARD_ROWS,
       quest_total: Protocol.SERVICES_MAX_QUEST_ROWS,
       stock_total: Protocol.SERVICES_MAX_STOCK_ROWS,
       sellable_total: Protocol.SERVICES_MAX_SELLABLE_ROWS,
-      inventory_total: Protocol.SERVICES_MAX_INVENTORY_ROWS,
     },
   });
   assert.throws(() => Protocol.validateServicesPanel(panel), /envelope/);
 });
 
-test("services v3 accepts registered and unknown-key presentation rows", () => {
-  const panel = validServicesPanel();
+function shopPanel(stock, sellable) {
+  return validServicesPanel({
+    shop: { open: true, member_id: 7, stock: stock, sellable: sellable || [] },
+    pagination: {
+      ...validServicesPanel().pagination,
+      stock_total: stock.length,
+      sellable_total: (sellable || []).length,
+    },
+  });
+}
+
+test("services v7 accepts registered and unknown-key presentation rows", () => {
+  const panel = shopPanel(
+    [validServicesStockRow(), validServicesStockRow({ item_key: "mystery_relic", display_name: "mystery_relic", presentation: null })],
+    [validServicesSellableRow()]
+  );
   const validated = Protocol.validateServicesPanel(panel);
   assert.deepEqual(validated, panel);
-  const rows = validated.inventory.rows;
-  const registered = rows.find((r) => r.item_key === T_MEAL);
-  assert.deepEqual(registered.presentation, {
+  assert.deepEqual(validated.shop.stock[0].presentation, {
     kind: "food",
     icon_key: "food",
     rarity: "common",
     summary: T_MEAL_SUMMARY,
   });
-  const unknown = rows.find((r) => r.item_key === "mystery_relic");
-  assert.equal(unknown.presentation, null);
+  assert.equal(validated.shop.stock[1].presentation, null);
+  assert.equal(validated.shop.member_id, 7);
 
   // The 240-code-point summary bound is inclusive on a small payload.
-  const boundary = validServicesPanel();
-  boundary.inventory.rows = [
-    {
-      item_key: T_MEAL,
-      display_name: T_MEAL_LABEL,
-      held: 1,
-      equipped: false,
-      action: null,
-      presentation: {
-        kind: "food",
-        icon_key: "food",
-        rarity: "common",
-        summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY),
-      },
-    },
-  ];
-  boundary.pagination.inventory_total = 1;
+  const boundary = shopPanel([
+    validServicesStockRow({
+      presentation: { kind: "food", icon_key: "food", rarity: "common", summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY) },
+    }),
+  ]);
   assert.doesNotThrow(() => Protocol.validateServicesPanel(boundary));
 });
 
-test("services v3 rejects invalid presentation fields", () => {
-  const mutate = (row) => {
-    const p = validServicesPanel();
-    p.inventory.rows = [row];
-    p.pagination.inventory_total = 1;
-    return p;
-  };
-  const missing = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: { kind: "food", icon_key: "food", summary: T_MEAL_SUMMARY },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(missing)), /rarity/);
+test("services v7 rejects invalid presentation fields", () => {
+  const mutate = (presentation) => shopPanel([validServicesStockRow({ presentation: presentation })]);
+  assert.throws(() => Protocol.validateServicesPanel(mutate({ kind: "food", icon_key: "food", summary: T_MEAL_SUMMARY })), /rarity/);
+  assert.throws(
+    () => Protocol.validateServicesPanel(mutate({ kind: "food", icon_key: "food", rarity: "common", summary: T_MEAL_SUMMARY, color: "red" })),
+    /unknown fields/
+  );
+  assert.throws(
+    () => Protocol.validateServicesPanel(mutate({ kind: "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY + 1), icon_key: "food", rarity: "common", summary: T_MEAL_SUMMARY })),
+    /kind/
+  );
+  assert.throws(() => Protocol.validateServicesPanel(mutate({ kind: "Potion", icon_key: "food", rarity: "common", summary: T_MEAL_SUMMARY })), /kind/);
+  assert.throws(
+    () => Protocol.validateServicesPanel(mutate({ kind: "food", icon_key: "food", rarity: "common", summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY + 1) })),
+    /summary/
+  );
+  assert.throws(() => Protocol.validateServicesPanel(mutate("food")), /JSON object or null/);
+  // Sellable rows validate their presentation the same way.
+  assert.throws(() =>
+    Protocol.validateServicesPanel(shopPanel([], [validServicesSellableRow({ presentation: "food" })]))
+  );
+});
 
-  const extra = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: {
-      kind: "food",
-      icon_key: "food",
-      rarity: "common",
-      summary: T_MEAL_SUMMARY,
-      color: "red",
-    },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(extra)), /unknown fields/);
+test("services v7 shop rows carry one price per row kind and the viewed member", () => {
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(shopPanel([validServicesStockRow()], [validServicesSellableRow()])));
+  const cases = [
+    shopPanel([validServicesStockRow({ sell_copper: 5 })]),
+    shopPanel([], [validServicesSellableRow({ buy_copper: 10 })]),
+    shopPanel([validServicesStockRow({ viewed: { held: 1 } })]),
+    shopPanel([validServicesStockRow({ viewed: { held: -1, delta: null } })]),
+    shopPanel([validServicesStockRow({ viewed: { held: 0, delta: { equippable: false } } })]),
+    shopPanel([validServicesStockRow({ viewed: { held: 0, delta: { equippable: true, changes: [], reason: "x" } } })]),
+    shopPanel([validServicesStockRow({ viewed: { held: 0, delta: { equippable: true, changes: [
+      { key: "defense", label: "防禦", amount: 2 },
+      { key: "atk_phys", label: "攻擊", amount: 6 },
+    ] } } })]),
+    shopPanel([], [validServicesSellableRow({ held: 0 })]),
+    shopPanel([validServicesStockRow({ buy: validServicesAction({ action_id: "inventory.use" }) })]),
+  ];
+  for (const panel of cases) {
+    assert.throws(() => Protocol.validateServicesPanel(panel));
+  }
+  for (const memberId of [0, -1, true, "7", null]) {
+    const panel = shopPanel([validServicesStockRow()]);
+    panel.shop.member_id = memberId;
+    assert.throws(() => Protocol.validateServicesPanel(panel));
+  }
+  const noMember = shopPanel([validServicesStockRow()]);
+  delete noMember.shop.member_id;
+  assert.throws(() => Protocol.validateServicesPanel(noMember));
+  const delta = { equippable: true, changes: [{ key: "atk_phys", label: "攻擊", amount: 6 }] };
+  const capped = { equippable: false, reason: "accessory_slots_full" };
+  assert.doesNotThrow(() =>
+    Protocol.validateServicesPanel(
+      shopPanel([
+        validServicesStockRow({ viewed: { held: 0, delta: delta } }),
+        validServicesStockRow({ viewed: { held: 5, delta: capped } }),
+      ])
+    )
+  );
+});
 
-  const overlong = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: {
-      kind: "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY + 1),
-      icon_key: "food",
-      rarity: "common",
-      summary: T_MEAL_SUMMARY,
-    },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(overlong)), /kind/);
-
-  const uppercase = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: {
-      kind: "Potion",
-      icon_key: "food",
-      rarity: "common",
-      summary: T_MEAL_SUMMARY,
-    },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(uppercase)), /kind/);
-
-  const longSummary = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: {
-      kind: "food",
-      icon_key: "food",
-      rarity: "common",
-      summary: "獎".repeat(Protocol.SERVICES_MAX_PRESENTATION_SUMMARY + 1),
-    },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(longSummary)), /summary/);
-
-  const notObject = {
-    item_key: T_MEAL,
-    display_name: T_MEAL_LABEL,
-    held: 1,
-    equipped: false,
-    action: null,
-    presentation: "food",
-  };
-  assert.throws(() => Protocol.validateServicesPanel(mutate(notObject)), /JSON object or null/);
+test("services v7 carries no inventory section or total", () => {
+  assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), inventory: null }));
+  assert.throws(() =>
+    Protocol.validateServicesPanel({
+      ...validServicesPanel(),
+      pagination: { ...validServicesPanel().pagination, inventory_total: 0 },
+    })
+  );
+  assert.throws(() => Protocol.validateServicesPanel({ ...validServicesPanel(), schema_version: 6 }), /schema_version/);
 });
 
 test("services v1 payload is rejected by the v3 validator", () => {
   const panel = { ...validServicesPanel(), schema_version: 1 };
-  panel.inventory.rows = panel.inventory.rows.map(({ presentation, ...rest }) => rest);
   assert.throws(() => Protocol.validateServicesPanel(panel), /schema_version/);
 });
 
@@ -379,62 +341,8 @@ test("services v2 payload is rejected by the v3 validator", () => {
   assert.throws(() => Protocol.validateServicesPanel(panel), /schema_version/);
 });
 
-test("services v3 validates inventory row actions exactly", () => {
-  const good = validServicesPanel();
-  good.inventory.rows[0].action = {
-    action_id: "inventory.use",
-    label: "使用",
-    enabled: false,
-    disabled_reason: { code: "hp_full", message: "你的體力已經全滿。" },
-    quantity: null,
-  };
-  assert.deepEqual(
-    Protocol.validateServicesPanel(good).inventory.rows[0].action,
-    good.inventory.rows[0].action
-  );
-  const withQuantity = validServicesPanel();
-  withQuantity.inventory.rows[0].action = {
-    action_id: "inventory.use",
-    label: "使用",
-    enabled: true,
-    disabled_reason: null,
-    quantity: { min: 1, max: 2 },
-  };
-  assert.throws(() => Protocol.validateServicesPanel(withQuantity));
-  const unknownId = validServicesPanel();
-  unknownId.inventory.rows[0].action = {
-    action_id: "inventory.drop",
-    label: "丟棄",
-    enabled: true,
-    disabled_reason: null,
-    quantity: null,
-  };
-  assert.throws(() => Protocol.validateServicesPanel(unknownId));
-  const crossServiceId = validServicesPanel();
-  crossServiceId.inventory.rows[0].action = {
-    action_id: "shop.buy",
-    label: "購買",
-    enabled: true,
-    disabled_reason: null,
-    quantity: null,
-  };
-  assert.throws(() => Protocol.validateServicesPanel(crossServiceId));
-  const toggleGood = validServicesPanel();
-  toggleGood.inventory.rows[0].action = {
-    action_id: "inventory.toggle_equip",
-    label: "裝備",
-    enabled: true,
-    disabled_reason: null,
-    quantity: null,
-  };
-  assert.doesNotThrow(() => Protocol.validateServicesPanel(toggleGood));
-  const missing = validServicesPanel();
-  delete missing.inventory.rows[0].action;
-  assert.throws(() => Protocol.validateServicesPanel(missing));
-});
-
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 7);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -476,9 +384,7 @@ function rankedServicesPanel(rank) {
       quest_total: 0,
       stock_total: 0,
       sellable_total: 0,
-      inventory_total: 0,
     },
-    inventory: null,
   });
 }
 

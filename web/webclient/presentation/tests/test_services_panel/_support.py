@@ -1,10 +1,11 @@
 """Shared module-level helpers for the ``services_panel`` test package."""
-from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_HOST_DISPLAY_NAME_CODE_POINTS, MAX_INVENTORY_ROWS, MAX_KEY_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_QUEST_ROWS, MAX_PRESENTATION_KEY_CODE_POINTS, MAX_PRESENTATION_SUMMARY_CODE_POINTS, MAX_RANK_KEY_CODE_POINTS, MAX_REASON_MESSAGE_CODE_POINTS, MAX_SELLABLE_ROWS, MAX_STOCK_ROWS, MAX_SUMMARY_CODE_POINTS, SERVICES_SCHEMA_VERSION
+from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_HOST_DISPLAY_NAME_CODE_POINTS, MAX_KEY_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_QUEST_ROWS, MAX_PRESENTATION_KEY_CODE_POINTS, MAX_PRESENTATION_SUMMARY_CODE_POINTS, MAX_RANK_KEY_CODE_POINTS, MAX_REASON_MESSAGE_CODE_POINTS, MAX_SELLABLE_ROWS, MAX_STOCK_ROWS, MAX_SUMMARY_CODE_POINTS, SERVICES_SCHEMA_VERSION
 from world.quests.tests._fixtures import quest, register_catalog_once
 from world.rules.tests._guild_service_probes import synthetic_branch_key
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
 from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS
-from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+from web.webclient.presentation.protocol import MAX_MESSAGE_CODE_POINTS, MAX_SAFE_INTEGER
+from world.rules.party_inventory import MAX_EQUIPMENT_DELTA_CHANGES
 
 
 # The shipped affinity rulebook cross-references one catalog quest by key, so
@@ -39,6 +40,22 @@ _T_MEAL = "t_panel_meal"
 _T_MEAL_DISPLAY = "合成餐食"
 
 
+_MEAL_PRESENTATION = {
+    "kind": "food",
+    "icon_key": "food",
+    "rarity": "common",
+    "summary": "供旅人充飢的普通餐食。",
+}
+
+
+# The viewed member's dbid in the pure validator fixtures.
+_MEMBER_ID = 7
+
+
+# The character panel's canonical breakdown order (the delta change keys).
+_TRAIT_ORDER = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit")
+
+
 UNREGISTERED_PLAYER = {
     "wallet": 0,
     "guild_registered": False,
@@ -70,30 +87,11 @@ def _valid_payload(**overrides):
         "player": dict(UNREGISTERED_PLAYER),
         "guild": None,
         "shop": None,
-        "inventory": {
-            "rows": [
-                {
-                    "item_key": _T_MEAL,
-                    "display_name": _T_MEAL_DISPLAY,
-                    "held": 1,
-                    "equipped": False,
-                    "action": None,
-                    "presentation": {
-                        "kind": "food",
-                        "icon_key": "food",
-                        "rarity": "common",
-                        "summary": "供旅人充飢的普通餐食。",
-                    },
-                }
-            ],
-            "wallet": 0,
-        },
         "pagination": {
             "board_total": 0,
             "quest_total": 0,
             "stock_total": 0,
             "sellable_total": 0,
-            "inventory_total": 1,
         },
     }
     value.update(overrides)
@@ -127,23 +125,39 @@ def _valid_guild(**overrides):
     return value
 
 
+def _stock_row(**overrides):
+    value = {
+        "item_key": _T_MEAL,
+        "display_name": _T_MEAL_DISPLAY,
+        "presentation": dict(_MEAL_PRESENTATION),
+        "buy_copper": 10,
+        "stock": 20,
+        "max_stock": 20,
+        "viewed": {"held": 2, "delta": None},
+        "buy": _action("shop.buy", quantity={"min": 1, "max": 20}),
+    }
+    value.update(overrides)
+    return value
+
+
+def _sellable_row(**overrides):
+    value = {
+        "item_key": _T_MEAL,
+        "display_name": _T_MEAL_DISPLAY,
+        "presentation": dict(_MEAL_PRESENTATION),
+        "sell_copper": 5,
+        "held": 1,
+        "sell": _action("shop.sell", quantity={"min": 1, "max": 1}),
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_shop(**overrides):
     value = {
         "open": True,
-        "stock": [
-            {
-                "item_key": _T_MEAL,
-                "display_name": _T_MEAL_DISPLAY,
-                "buy_copper": 10,
-                "sell_copper": 5,
-                "stock": 20,
-                "max_stock": 20,
-                "buy": _action(
-                    "shop.buy",
-                    quantity={"min": 1, "max": 20},
-                ),
-            }
-        ],
+        "member_id": _MEMBER_ID,
+        "stock": [_stock_row()],
         "sellable": [],
     }
     value.update(overrides)
@@ -200,14 +214,24 @@ def _all_ceilings_payload():
         }
         for _ in range(MAX_QUEST_ROWS)
     ]
+    max_presentation = {
+        "kind": "k" * MAX_PRESENTATION_KEY_CODE_POINTS,
+        "icon_key": "i" * MAX_PRESENTATION_KEY_CODE_POINTS,
+        "rarity": "r" * MAX_PRESENTATION_KEY_CODE_POINTS,
+        "summary": "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
+    }
     stock = [
         {
             "item_key": _max_string(MAX_KEY_CODE_POINTS),
             "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
+            "presentation": dict(max_presentation),
             "buy_copper": 10,
-            "sell_copper": 5,
             "stock": 20,
             "max_stock": 20,
+            "viewed": {
+                "held": MAX_SAFE_INTEGER,
+                "delta": {"equippable": False, "reason": "獎" * MAX_MESSAGE_CODE_POINTS},
+            },
             "buy": _action(
                 "shop.buy",
                 label=_max_string(MAX_LABEL_CODE_POINTS),
@@ -224,6 +248,7 @@ def _all_ceilings_payload():
         {
             "item_key": _max_string(MAX_KEY_CODE_POINTS),
             "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
+            "presentation": dict(max_presentation),
             "sell_copper": 5,
             "held": 20,
             "sell": _action(
@@ -237,22 +262,6 @@ def _all_ceilings_payload():
             ),
         }
         for _ in range(MAX_SELLABLE_ROWS)
-    ]
-    inventory = [
-        {
-            "item_key": _max_string(MAX_KEY_CODE_POINTS),
-            "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
-            "held": 20,
-            "equipped": False,
-            "action": None,
-            "presentation": {
-                "kind": "k" * MAX_PRESENTATION_KEY_CODE_POINTS,
-                "icon_key": "i" * MAX_PRESENTATION_KEY_CODE_POINTS,
-                "rarity": "r" * MAX_PRESENTATION_KEY_CODE_POINTS,
-                "summary": "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
-            },
-        }
-        for _ in range(MAX_INVENTORY_ROWS)
     ]
     return _valid_payload(
         host={"identity": "1" * MAX_KEY_CODE_POINTS, "display_name": _max_string(MAX_HOST_DISPLAY_NAME_CODE_POINTS)},
@@ -296,20 +305,28 @@ def _all_ceilings_payload():
                 ),
             },
         },
-        shop={"open": False, "stock": stock, "sellable": sellable},
-        inventory={"rows": inventory, "wallet": 0},
+        shop={"open": False, "member_id": MAX_SAFE_INTEGER, "stock": stock, "sellable": sellable},
         pagination={
             "board_total": MAX_BOARD_ROWS,
             "quest_total": MAX_QUEST_ROWS,
             "stock_total": MAX_STOCK_ROWS,
             "sellable_total": MAX_SELLABLE_ROWS,
-            "inventory_total": MAX_INVENTORY_ROWS,
         },
     )
 
 
-def _realistic_maximal_payload():
-    """Every row list at its ceiling with realistic bounded content."""
+# Representative shop-row content: a summary somewhat above the shipped
+# registry average (~28 code points) and a delta touching three traits.
+_REPRESENTATIVE_SUMMARY = "以合成鋼材鍛造、刃口泛著冷光的長劍，適合前線的劍士使用，重量適中。"
+
+
+def _realistic_maximal_payload(*, summary=_REPRESENTATIVE_SUMMARY, delta_traits=3):
+    """Every row list at its ceiling with realistic bounded content.
+
+    ``summary`` and ``delta_traits`` size the shop rows; the worst-case test
+    passes a summary longer than any shipped one and a delta on every
+    canonical trait.
+    """
     board = [
         {
             "definition_key": f"quest_key_{index}",
@@ -343,43 +360,37 @@ def _realistic_maximal_payload():
         }
         for index in range(MAX_QUEST_ROWS)
     ]
+    maximal_delta = {
+        "equippable": True,
+        "changes": [
+            {"key": key, "label": "攻擊", "amount": -12}
+            for key in _TRAIT_ORDER[: min(delta_traits, MAX_EQUIPMENT_DELTA_CHANGES)]
+        ],
+    }
     stock = [
-        {
-            "item_key": _T_MEAL,
-            "display_name": _T_MEAL_DISPLAY,
-            "buy_copper": 10,
-            "sell_copper": 5,
-            "stock": 20,
-            "max_stock": 20,
-            "buy": _action("shop.buy", label="購買", quantity={"min": 1, "max": 20}),
-        }
-        for _ in range(MAX_STOCK_ROWS)
+        _stock_row(
+            item_key=f"t_panel_blade_{index}",
+            display_name="合成鍛造長劍",
+            presentation={
+                "kind": "weapon",
+                "icon_key": "weapon",
+                "rarity": "legendary",
+                "summary": summary,
+            },
+            viewed={"held": 2, "delta": maximal_delta},
+            buy=_action("shop.buy", label="購買", quantity={"min": 1, "max": 20}),
+        )
+        for index in range(MAX_STOCK_ROWS)
     ]
     sellable = [
-        {
-            "item_key": _T_MEAL,
-            "display_name": _T_MEAL_DISPLAY,
-            "sell_copper": 5,
-            "held": 20,
-            "sell": _action("shop.sell", label="販賣", quantity={"min": 1, "max": 20}),
-        }
-        for _ in range(MAX_SELLABLE_ROWS)
-    ]
-    inventory = [
-        {
-            "item_key": _T_MEAL,
-            "display_name": _T_MEAL_DISPLAY,
-            "held": 2,
-            "equipped": False,
-            "action": None,
-            "presentation": {
-                "kind": "food",
-                "icon_key": "food",
-                "rarity": "common",
-                "summary": "供旅人充飢的普通餐食。",
-            },
-        }
-        for _ in range(MAX_INVENTORY_ROWS)
+        _sellable_row(
+            item_key=f"t_panel_blade_{index}",
+            display_name="合成鍛造長劍",
+            presentation=dict(stock[0]["presentation"]),
+            held=20,
+            sell=_action("shop.sell", label="販賣", quantity={"min": 1, "max": 20}),
+        )
+        for index in range(MAX_SELLABLE_ROWS)
     ]
     return _valid_payload(
         host={"identity": "12345", "display_name": "合成公會測試分行"},
@@ -417,13 +428,11 @@ def _realistic_maximal_payload():
                 "exam_request": _action("guild.exam_request", label="預約升等考核"),
             },
         },
-        shop={"open": True, "stock": stock, "sellable": sellable},
-        inventory={"rows": inventory, "wallet": 1000000},
+        shop={"open": True, "member_id": 12345, "stock": stock, "sellable": sellable},
         pagination={
             "board_total": MAX_BOARD_ROWS,
             "quest_total": MAX_QUEST_ROWS,
             "stock_total": MAX_STOCK_ROWS,
             "sellable_total": MAX_SELLABLE_ROWS,
-            "inventory_total": MAX_INVENTORY_ROWS,
         },
     )

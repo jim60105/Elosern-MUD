@@ -6,14 +6,15 @@ The read-only version-2 `services` panel payload (host resolution, player summar
 
 ### Requirement: The services panel is an exact read-only exploration-mode panel
 
-The production presentation registry SHALL register `services` schema version 6. Its available payload SHALL
-contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and
-`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 6.
+The production presentation registry SHALL register `services` schema version 7. Its available payload SHALL
+contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, and
+`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 7.
+Personal inventory SHALL NOT appear; the `party_inventory` panel owns it.
 The presenter SHALL strictly read canonical records and registries through the no-mutation service read model.
 
 #### Scenario: Exploration snapshot carries the full services panel
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot
-- **THEN** `services` reports the display-only host, wallet/rank/merit summary, available guild, shop, and inventory sections, and pagination totals equal shipped row counts without mutating canonical state
+- **THEN** `services` reports the display-only host, wallet/rank/merit summary, and available guild and shop sections, and pagination totals equal shipped row counts without mutating canonical state
 
 #### Scenario: Pagination totals match shipped rows
 - **WHEN** the guild surface ships 1 board offer and 2 quest rows and the shop surface is null
@@ -21,15 +22,15 @@ The presenter SHALL strictly read canonical records and registries through the n
 
 #### Scenario: Combat snapshot carries personal inventory only
 - **WHEN** a puppeted WebClient in active combat receives a full snapshot
-- **THEN** `services` reports canonical player and inventory data while host, guild, and shop are null and all guild/shop pagination totals are zero
+- **THEN** `services` reports the canonical player summary while host, guild, and shop are null and all guild/shop pagination totals are zero; personal inventory is published by `party_inventory`
 
 #### Scenario: Creation does not receive fabricated services
 - **WHEN** the active puppet is creation-pending
-- **THEN** `services` uses its schema-valid unavailable form and contains no service or inventory row
+- **THEN** `services` uses its schema-valid unavailable form and contains no service row
 
 #### Scenario: Surface failure does not disable unrelated exploration surfaces
-- **WHEN** exploration merchant stock is malformed but the actor's quest log, wallet, and inventory are healthy
-- **THEN** the shop surface is unavailable with a stable reason while guild, inventory, and narrative still render
+- **WHEN** exploration merchant stock is malformed but the actor's quest log and wallet are healthy
+- **THEN** the shop surface is unavailable with a stable reason while guild and narrative still render
 
 #### Scenario: Presenter failure remains isolated
 - **WHEN** services presentation raises while status and narrative remain healthy
@@ -46,8 +47,7 @@ The presenter SHALL strictly read canonical records and registries through the n
 
 #### Scenario: Pagination totals are exact safe integers of shipped rows
 - **WHEN** any surface ships rows or is null
-- **THEN** `pagination` contains exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and
-  `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and
+- **THEN** `pagination` contains exactly `board_total`, `quest_total`, `stock_total`, and `sellable_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and
   equal to the number of rows shipped in that surface (zero when the surface is null)
 
 #### Scenario: Player summary carries its exact six fields
@@ -63,12 +63,12 @@ The presenter SHALL strictly read canonical records and registries through the n
 
 #### Scenario: Section fields are null or exact objects
 - **WHEN** an available services payload is built in exploration mode
-- **THEN** `guild`, `shop`, and `inventory` are each null or an exact section object, and all sections retain
-  their ordinary availability
+- **THEN** `guild` and `shop` are each null or an exact section object, and both retain their ordinary
+  availability
 
 #### Scenario: Combat keeps personal data with no remote service
 - **WHEN** the actor is in active combat
-- **THEN** canonical `player` plus `inventory` remain available so personal item actions expose no remote service
+- **THEN** the canonical `player` summary remains available and exposes no remote service; personal item actions read `party_inventory`
 
 #### Scenario: Presenter output leaks no internals
 - **WHEN** the presenter serializes any services payload
@@ -76,7 +76,7 @@ The presenter SHALL strictly read canonical records and registries through the n
   wallet, inventory, equipment, merchant stock, rank, merit, traits, location, combat, or world time
 
 #### Scenario: Unreadable summary triggers the common unavailable form
-- **WHEN** the actor/player/inventory summary cannot be read without mutation
+- **WHEN** the actor/player summary cannot be read without mutation
 - **THEN** the whole panel uses the registered common unavailable form, which is reserved for such global
   prerequisite failures
 
@@ -217,14 +217,15 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
   reason
 
 ### Requirement: The shop surface covers stock, quantity, buy, sell, and sellable inventory
-The `shop` section SHALL contain exactly `open`, `stock`, and `sellable` and SHALL be present only in exploration
-mode when exactly one local `Merchant` host resolves. Copper values SHALL be exact integer catalog values, and
-`buy`/`sell` SHALL be enabled only when the shop is open and the trade is legal, otherwise carrying a stable
-disabled reason. The `inventory` section SHALL be present in exploration and combat modes with at most 32 rows.
+The `shop` section SHALL contain exactly `open`, `member_id`, `stock`, and `sellable` and SHALL be present only in
+exploration mode when exactly one local `Merchant` host resolves. `member_id` SHALL be the viewed member (else the
+commander), the default recipient and seller. Prices SHALL be exact integer copper, buy-only on stock rows and
+sell-only on sellable rows, and `buy`/`sell` SHALL be enabled only when the shop is open and the trade is legal,
+else carrying a stable disabled reason.
 
 #### Scenario: Open shop lists exact integer stock and prices
 - **WHEN** the merchant is open during opening hours
-- **THEN** `open` is true and each stock row reports the exact catalog `buy_copper`/`sell_copper`, live `stock`, and `max_stock` with no float and no local path
+- **THEN** `open` is true and each stock row reports the exact catalog `buy_copper`, live `stock`, and `max_stock` with no float and no local path, and no stock row carries a sell price
 
 #### Scenario: Closed shop shows disabled purchases
 - **WHEN** the merchant is outside opening hours
@@ -235,20 +236,20 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
 - **THEN** its `buy` action carries `quantity` with minimum 1 and a server-advertised maximum no greater than 3, and no client value can authorize a larger purchase
 
 #### Scenario: Registered inventory projects visual identity and use action
-- **WHEN** an injured actor holds repeated `healing_potion` keys
-- **THEN** one aggregate row reports registry presentation, count, canonical equipped state, and an enabled `inventory.use` descriptor
+- **WHEN** the shop stocks `healing_potion` and the viewed member holds two
+- **THEN** its stock row reports registry presentation and `viewed.held == 2` with a null `viewed.delta`
 
 #### Scenario: Full HP disables potion use truthfully
-- **WHEN** an actor holds a healing potion at full HP
-- **THEN** its row retains real presentation and count while its `inventory.use` descriptor is disabled with `hp_full`
+- **WHEN** the shop stocks a steel shortsword and the viewed member wields a staff
+- **THEN** its stock row's `viewed.delta` is the server equipment delta for that member (for example attack +6), or `{equippable: false, reason}` when the member cannot equip it
 
 #### Scenario: Unknown inventory remains inspect-only
-- **WHEN** the actor holds a structurally valid key absent from `ITEM_REGISTRY`
-- **THEN** its aggregate row has a key-derived display name, `presentation` null, and `action` null without fabricated mechanics
+- **WHEN** a stocked key lacks registry presentation metadata
+- **THEN** its stock row has `presentation` null and no fabricated mechanics
 
 #### Scenario: Full accessory set advertises manual removal
-- **WHEN** five accessories are equipped and an additional held accessory is listed
-- **THEN** the additional item's toggle descriptor is disabled with the accessory-cap reason while each equipped accessory remains enabled for unequip
+- **WHEN** the viewed member has five accessories equipped and the shop stocks another accessory
+- **THEN** that row's `viewed.delta` is `{equippable: false}` with the accessory-cap reason, and buying it stays enabled when otherwise legal
 
 #### Scenario: Open flag is the world-clock boolean only
 - **WHEN** the `open` field is computed
@@ -257,44 +258,43 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
 #### Scenario: Stock rows carry exact fields in catalog offer order
 - **WHEN** the `stock` list ships
 - **THEN** it is a bounded list of at most 12 rows in catalog offer order, each containing exactly `item_key`,
-  `display_name`, `buy_copper`, `sell_copper`, `stock`, `max_stock`, and `buy`
+  `display_name`, `presentation`, `buy_copper`, `stock`, `max_stock`, `viewed` (exactly `held` and `delta`), and `buy`
 
 #### Scenario: Buy enablement requires open, offer, stock, and affordability
 - **WHEN** a stock row's `buy` descriptor is computed
 - **THEN** it is enabled only when the shop is open, the item is known and offered, stock is positive, and the
-  actor can afford at least one unit
+  party purse can afford at least one unit
 
 #### Scenario: Sellable rows carry exact fields and sell gates
 - **WHEN** the `sellable` list ships
-- **THEN** it is a bounded list of at most 12 rows in deterministic order, each containing exactly `item_key`,
-  `display_name`, `sell_copper`, `held`, and `sell`, and `sell` is enabled only when the shop is open, the item is
-  sellable and offered, the actor holds at least one, and the merchant's stock cap is not already at maximum
+- **THEN** it is a bounded list of at most 12 rows in deterministic order listing the viewed member's unequipped
+  items, each containing exactly `item_key`, `display_name`, `presentation`, `sell_copper`, `held` (unequipped
+  copies), and `sell`, and `sell` is enabled only when the shop is open, the item is sellable and offered, the
+  member holds at least one unequipped copy, and the merchant's stock cap is not already at maximum
 
 #### Scenario: Inventory section carries its exact two fields
-- **WHEN** the `inventory` section is built
-- **THEN** it contains exactly `rows` and `wallet`
+- **WHEN** a version-7 services payload is built
+- **THEN** it contains no `inventory` section; personal rows and the purse are published by `party_inventory`
 
 #### Scenario: Inventory rows preserve duplicates and aggregate honestly
-- **WHEN** the actor holds repeated copies of one item key
-- **THEN** each row contains exactly `item_key`, `display_name`, `held`, `equipped`, `presentation`, and `action`,
-  repeated item keys are preserved, and aggregate quantities appear as presentation only
+- **WHEN** the viewed member holds repeated copies of one sellable item key, one of them equipped
+- **THEN** one sellable row reports the unequipped count only, and aggregate quantities appear as presentation only
 
 #### Scenario: Presentation is verbatim registry data with bounded shape
-- **WHEN** a row's `presentation` is built for a registered item
+- **WHEN** a stock or sellable row's `presentation` is built for a registered item
 - **THEN** it contains exactly `kind`, `icon_key`, `rarity`, and `summary`, copied verbatim from the immutable
   item registry; each non-null presentation key is 1..32 lowercase ASCII letters or underscores and `summary` is
   1..240 Unicode code points
 
 #### Scenario: Action descriptors come from side-effect-free preflight
-- **WHEN** a row's `action` descriptor is computed
-- **THEN** it is null for unknown or inspect-only items; a usable item carries an `inventory.use` descriptor and
-  equipment carries an `inventory.toggle_equip` descriptor, each with current `enabled` state and a stable
-  disabled reason derived by side-effect-free deterministic preflight
+- **WHEN** a row's `buy` or `sell` descriptor is computed
+- **THEN** it carries current `enabled` state and a stable disabled reason derived by side-effect-free
+  deterministic preflight for the viewed member and the party purse
 
 #### Scenario: Inventory rows leak no mechanics or authority fields
-- **WHEN** any inventory row ships
-- **THEN** it exposes no effect amount, condition threshold, consumable flag, slot choice, actor, target, drag,
-  or drop action
+- **WHEN** any stock or sellable row ships
+- **THEN** it exposes no effect amount, condition threshold, consumable flag, slot choice, target, drag, or drop
+  action, and its only member reference is the panel's `member_id`
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
 The existing service action allowlist and exact bounded payloads SHALL remain. Party member references SHALL appear only in the exact member-scoped fields their owning capabilities define, reauthorized by the rules and never replaced by the commander. `guild.quest_abandon` SHALL revalidate the authenticated owner and record; private escort abandonment needs no host, while ordinary guild actions retain their gates. No other action ID or host field SHALL be added.
@@ -493,11 +493,11 @@ established affected-panel sets, and a read-only `exam_schedule` reply SHALL lea
 ### Requirement: Reconnect rebuilds services without replaying intent
 WebSocket loss SHALL preserve the last rendered services view under the foundation offline overlay and lock every
 service mutation. After reconnect, the first valid new-epoch snapshot SHALL rebuild host, player summary, guild,
-shop, and inventory sections from canonical persistence even when its revision is lower than the retired epoch.
+and shop sections from canonical persistence even when its revision is lower than the retired epoch.
 
 #### Scenario: Reconnect restores a shop view
-- **WHEN** the transport disconnects while the shop drawer holds a typed but unsubmitted quantity and reconnects without another game action
-- **THEN** the shop drawer closes on the transport loss, the unsubmitted quantity is discarded, the new snapshot renders the current stock, wallet, and inventory the next time the shop drawer opens, with every quantity entry back at its row action's own lower bound, and no automatic replacement purchase is sent
+- **WHEN** the transport disconnects while the shop surface holds a typed but unsubmitted quantity and reconnects without another game action
+- **THEN** the shop surface closes on the transport loss, the unsubmitted quantity is discarded, the new snapshot renders the current stock, purse and the viewed member's sellable rows the next time the shop surface opens, with every quantity entry back at its row action's own lower bound, and no automatic replacement purchase is sent
 
 #### Scenario: Disconnect after submit never retries
 - **WHEN** transport closes after sending `guild.quest_turnin` but before its result is observed

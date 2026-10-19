@@ -176,7 +176,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertIsNone(view.host)
         self.assertIsNone(view.guild)
         self.assertIsNone(view.shop)
-        self.assertIsNotNone(view.inventory)
+        self.assertFalse(hasattr(view, "inventory"))
         self.assertEqual(view.guild_unavailable_reason, "no_local_service_host")
 
     def test_co_located_guild_and_merchant_stay_independent(self):

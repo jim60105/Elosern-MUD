@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-6 services panel.
+"""Frozen no-mutation read model for the version-7 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -19,6 +19,12 @@ cross-class ambiguity. The rank surface never looks up the qualified
 persistent host: request availability is independent of the host's
 attendance and of the actor's merit (guild-exam-appointment-surface).
 
+The shop rows describe one viewed party member (services-shop-structured-rows):
+the held count and server equipment delta of each stock row, the member's
+unequipped sellable copies, and buy/sell enablement for that member with the
+party purse (the commander's wallet). Host resolution stays on the acting
+puppet's room, and personal inventory is published by ``party_inventory``.
+
 Each surface degrades independently: a corrupt quest log, malformed merchant
 stock, or unreadable equipment marks only that surface unavailable while the
 remaining surfaces stay healthy. A stable reason code accompanies every
@@ -27,7 +33,7 @@ the surface as ``null`` per the exact panel schema.
 """
 
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -64,9 +70,19 @@ from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.rules.targeting import RoomActionContext
-from world.skills.equipment import list_items
-from world.rules.equipment import normalized_equipment, preflight_equipment_toggle
-from world.rules.items import ItemUseRequest, preflight_item_use
+from world.rules.equipment import normalized_equipment
+from world.rules.party_inventory import (
+    EquipmentDelta,
+    PartyInventoryViewError,
+    equipment_delta,
+)
+from world.rules.party_scope import (
+    PARTY_SCOPE_MESSAGES,
+    PURPOSE_ORGANIZE,
+    PartyScopeError,
+    authorize_member,
+    resolve_commander,
+)
 from world.rules.wallet import read_wallet
 
 # Presentation bounds owned by the services view (equal or below the wire
@@ -75,7 +91,6 @@ MAX_BOARD_ROWS = 12
 MAX_QUEST_ROWS = 12
 MAX_STOCK_ROWS = 12
 MAX_SELLABLE_ROWS = 12
-MAX_INVENTORY_ROWS = 32
 MAX_QUANTITY = 1000
 
 # The three stable root action IDs this delivery unit registers.
@@ -87,10 +102,6 @@ ACTION_EXAM_REQUEST = "guild.exam_request"
 EXAM_REQUEST_LABEL = "預約升等考核"
 ACTION_BUY = "shop.buy"
 ACTION_SELL = "shop.sell"
-
-# Personal item actions available in exploration and combat alike.
-ACTION_USE = "inventory.use"
-ACTION_TOGGLE_EQUIP = "inventory.toggle_equip"
 
 
 class ServicesViewError(ValueError):
@@ -229,24 +240,42 @@ class GuildSectionView:
 
 
 @dataclass(frozen=True)
+class ViewedFactsView:
+    """The viewed member's facts for one stock row.
+
+    ``held`` counts every canonical copy the member carries (worn ones
+    included); ``delta`` is the server equipment delta against the member's
+    current slot occupant for equipment, and ``None`` for anything else.
+    """
+
+    held: int
+    delta: EquipmentDelta | None
+
+
+@dataclass(frozen=True)
 class StockRowView:
-    """One bounded catalog stock row in catalog offer order."""
+    """One bounded catalog stock row in catalog offer order (buy price only)."""
 
     item_key: str
     display_name: str
+    presentation: ItemPresentation | None
     buy_copper: int
-    sell_copper: int
     stock: int
     max_stock: int
+    viewed: ViewedFactsView
     buy: ActionDescriptorView
 
 
 @dataclass(frozen=True)
 class SellableRowView:
-    """One bounded held-and-offered sellable row in deterministic order."""
+    """One of the viewed member's unequipped, offered items (sell price only).
+
+    ``held`` counts the member's unequipped copies only.
+    """
 
     item_key: str
     display_name: str
+    presentation: ItemPresentation | None
     sell_copper: int
     held: int
     sell: ActionDescriptorView
@@ -254,41 +283,12 @@ class SellableRowView:
 
 @dataclass(frozen=True)
 class ShopSectionView:
-    """The shop surface (open state, stock, sellable inventory)."""
+    """The shop surface (open state, viewed member, stock, sellable rows)."""
 
     open: bool
+    member_id: int
     stock: tuple[StockRowView, ...]
     sellable: tuple[SellableRowView, ...]
-
-
-@dataclass(frozen=True)
-class InventoryRowView:
-    """One aggregated repeated-key inventory row.
-
-    ``presentation`` carries the immutable registry visual identity for a
-    registered item key; unknown but structurally valid keys carry ``None``
-    so the UI can render a neutral unknown-item state without a fabricated
-    category, icon, rarity, or summary. ``action`` is the single nullable
-    personal-item descriptor derived from the shared side-effect-free
-    preflight APIs: ``inventory.use`` for a usable item,
-    ``inventory.toggle_equip`` for equipment, and ``None`` for unknown or
-    inspect-only keys.
-    """
-
-    item_key: str
-    display_name: str
-    held: int
-    equipped: bool
-    presentation: ItemPresentation | None = None
-    action: ActionDescriptorView | None = None
-
-
-@dataclass(frozen=True)
-class InventorySectionView:
-    """The personal inventory surface (aggregated rows plus wallet)."""
-
-    rows: tuple[InventoryRowView, ...]
-    wallet: int
 
 
 @dataclass(frozen=True)
@@ -299,7 +299,6 @@ class PaginationView:
     quest_total: int
     stock_total: int
     sellable_total: int
-    inventory_total: int
 
 
 @dataclass(frozen=True)
@@ -314,11 +313,9 @@ class ServicesView:
     player: PlayerSummaryView
     guild: GuildSectionView | None
     shop: ShopSectionView | None
-    inventory: InventorySectionView | None
     pagination: PaginationView
     guild_unavailable_reason: str | None = None
     shop_unavailable_reason: str | None = None
-    inventory_unavailable_reason: str | None = None
 
 
 def _resolve_host(actor: Any, component_class: type) -> tuple[Any, str | None]:
@@ -627,14 +624,104 @@ def _build_guild(
     return section, None
 
 
+def _trade_descriptor(
+    action_id: str,
+    label: str,
+    reason: str | None,
+    maximum: int,
+    *,
+    message: str | None = None,
+) -> ActionDescriptorView:
+    """One buy/sell descriptor; an enabled one advertises ``1..maximum``."""
+    enabled = reason is None
+    return ActionDescriptorView(
+        action_id=action_id,
+        label=label,
+        enabled=enabled,
+        reason_code=reason,
+        reason_message=(
+            None
+            if enabled
+            else message if message is not None else SERVICE_REASON_MESSAGES[reason]
+        ),
+        quantity_min=1 if enabled else None,
+        quantity_max=maximum if enabled else None,
+    )
+
+
+def _member_scope(actor: Any, member: Any) -> tuple[str, str] | None:
+    """The trade rule's member boundary verdict as ``(code, message)``.
+
+    The same ``authorize_member`` call ``economy.buy``/``economy.sell`` make
+    first (organizing purpose, anchored on the acting puppet), so a viewed
+    member who is absent or no longer in the party disables every row instead
+    of advertising a trade the rule refuses.
+    """
+    try:
+        commander = resolve_commander(actor)
+        authorize_member(commander, int(member.pk), PURPOSE_ORGANIZE, anchor=actor)
+    except PartyScopeError as error:  # observability: ignore R2: the boundary verdict becomes the disabled descriptor's stable reason; no state or I/O is involved
+        return error.reason, PARTY_SCOPE_MESSAGES[error.reason]
+    return None
+
+
+def _member_holdings(member: Any) -> tuple[Counter, dict[str, int]]:
+    """The member's canonical copy counts and worn copy counts, read strictly."""
+    raw = member.db.inventory
+    if raw is None:
+        entries: list[str] = []
+    elif isinstance(raw, str) or not isinstance(raw, Sequence):
+        raise ServicesSectionError("malformed_inventory")
+    else:
+        entries = list(raw)
+    if not all(isinstance(entry, str) for entry in entries):
+        raise ServicesSectionError("malformed_inventory")
+    equipment = normalized_equipment(member)
+    if equipment is None:
+        raise ServicesSectionError("malformed_equipment")
+    worn: dict[str, int] = {}
+    for key in (equipment["weapon_main"], equipment["weapon_off"], equipment["armor"]):
+        if key is not None:
+            worn[key] = 1
+    for key in equipment["accessories"]:
+        worn[key] = 1
+    return Counter(entries), worn
+
+
+def _viewed_delta(member: Any, definition: Any, item_key: str) -> EquipmentDelta | None:
+    """The member's server equipment delta for equipment, else ``None``."""
+    from world.rules.status_query import StatusQueryError
+
+    if definition is None or definition.equipment_slot is None:
+        return None
+    try:
+        return equipment_delta(member, item_key)
+    except PartyInventoryViewError as error:
+        raise ServicesSectionError("malformed_equipment") from error
+    except StatusQueryError as error:
+        raise ServicesSectionError("malformed_traits") from error
+    except Exception as error:
+        # Any other failure of the comparison is confined to the shop
+        # surface: guild and the player summary must stay available.
+        raise ServicesSectionError("equipment_delta_unavailable") from error
+
+
 def _build_shop(
     actor: Any,
+    member: Any,
     merchant_host: Any,
     merchant_reason: str | None,
     catalog: Any,
     tick: int,
     wallet: int,
 ) -> tuple[ShopSectionView | None, str | None]:
+    """Build the shop rows for ``member`` paying from the party purse ``wallet``.
+
+    Reasons follow the trade rule's refusals for one unit, with the closed
+    shop first so a closed shop disables every row with the same reason;
+    an enabled descriptor never advertises a trade ``economy.buy`` or
+    ``economy.sell`` would refuse.
+    """
     if merchant_host is None:
         return None, merchant_reason or "no_local_service_host"
     merchant = merchant_host.components.get(Merchant.get_component_slot())
@@ -649,214 +736,145 @@ def _build_shop(
         stock = parse_merchant_stock(merchant)
     except TradeError:
         return None, "malformed_stock"
+    try:
+        counts, worn = _member_holdings(member)
+    except ServicesSectionError as error:
+        return None, str(error.args[0])
+    scope = _member_scope(actor, member)
 
-    stock_rows: list[StockRowView] = []
+    try:
+        stock_rows = _stock_rows(member, config, stock, counts, open_now, scope, wallet)
+    except ServicesSectionError as error:
+        return None, str(error.args[0])
+    sellable_rows = _sellable_rows(config, stock, counts, worn, open_now, scope)
+    return (
+        ShopSectionView(
+            open=open_now,
+            member_id=int(member.pk),
+            stock=stock_rows,
+            sellable=sellable_rows,
+        ),
+        None,
+    )
+
+
+def _stock_rows(
+    member: Any,
+    config: Any,
+    stock: dict[str, int],
+    counts: Counter,
+    open_now: bool,
+    scope: tuple[str, str] | None,
+    wallet: int,
+) -> tuple[StockRowView, ...]:
+    rows: list[StockRowView] = []
     for offer in config.offers:
         item_key = offer.item_key
-        held = stock.get(item_key, 0)
-        affordable = wallet >= offer.buy_copper
-        enabled = open_now and held > 0 and affordable
-        if enabled:
-            reason = None
-            maximum = min(held, wallet // offer.buy_copper, MAX_QUANTITY)
-        elif not open_now:
+        definition = ITEM_REGISTRY.get(item_key)
+        available = stock.get(item_key, 0)
+        message = None
+        maximum = 0
+        if not open_now:
             reason = "closed"
-        elif held <= 0:
+        elif scope is not None:
+            reason, message = scope
+        elif definition is None:
+            reason = "unknown_item"
+        elif not definition.sellable:
+            reason = "unsellable"
+        elif available <= 0:
             reason = "insufficient_stock"
-        else:
+        elif wallet < offer.buy_copper:
             reason = "insufficient_funds"
-        stock_rows.append(
+        else:
+            reason = None
+            affordable = wallet // offer.buy_copper if offer.buy_copper > 0 else MAX_QUANTITY
+            maximum = min(available, affordable, MAX_QUANTITY)
+        rows.append(
             StockRowView(
                 item_key=item_key,
-                display_name=ITEM_REGISTRY[item_key].display_name_zh,
-                buy_copper=offer.buy_copper,
-                sell_copper=offer.sell_copper,
-                stock=held,
-                max_stock=offer.max_stock,
-                buy=ActionDescriptorView(
-                    action_id=ACTION_BUY,
-                    label="購買",
-                    enabled=enabled,
-                    reason_code=reason,
-                    reason_message=None if reason is None else SERVICE_REASON_MESSAGES[reason],
-                    quantity_min=1 if enabled else None,
-                    quantity_max=maximum if enabled else None,
+                display_name=(
+                    definition.display_name_zh if definition is not None else item_key
                 ),
+                presentation=definition.presentation if definition is not None else None,
+                buy_copper=offer.buy_copper,
+                stock=available,
+                max_stock=offer.max_stock,
+                viewed=ViewedFactsView(
+                    held=counts.get(item_key, 0),
+                    delta=_viewed_delta(member, definition, item_key),
+                ),
+                buy=_trade_descriptor(ACTION_BUY, "購買", reason, maximum, message=message),
             )
         )
-        if len(stock_rows) >= MAX_STOCK_ROWS:
+        if len(rows) >= MAX_STOCK_ROWS:
             break
+    return tuple(rows)
 
-    sellable_rows: list[SellableRowView] = []
+
+def _sellable_rows(
+    config: Any,
+    stock: dict[str, int],
+    counts: Counter,
+    worn: dict[str, int],
+    open_now: bool,
+    scope: tuple[str, str] | None,
+) -> tuple[SellableRowView, ...]:
+    rows: list[SellableRowView] = []
     offer_by_item = {offer.item_key: offer for offer in config.offers}
-    held_counts = Counter(list_items(actor))
-    for item_key in sorted(held_counts):
+    for item_key in sorted(counts):
         definition = ITEM_REGISTRY.get(item_key)
         if definition is None or not definition.sellable:
             continue
         offer = offer_by_item.get(item_key)
         if offer is None:
             continue
-        held = held_counts[item_key]
-        cap_full = stock.get(item_key, 0) >= offer.max_stock
-        enabled = open_now and held >= 1 and not cap_full
-        if enabled:
-            reason = None
-            remaining_capacity = offer.max_stock - stock.get(item_key, 0)
-            maximum = min(held, remaining_capacity, MAX_QUANTITY)
-        elif not open_now:
+        # Only unequipped copies are sellable: the planner refuses a removal
+        # that would drop a worn key's last held copy.
+        unequipped = counts[item_key] - worn.get(item_key, 0)
+        if unequipped < 1:
+            continue
+        remaining_capacity = offer.max_stock - stock.get(item_key, 0)
+        message = None
+        maximum = 0
+        if not open_now:
             reason = "closed"
-        elif held < 1:
-            reason = "insufficient_items"
-        else:
+        elif scope is not None:
+            reason, message = scope
+        elif remaining_capacity < 1:
             reason = "stock_overflow"
-        sellable_rows.append(
+        else:
+            reason = None
+            maximum = min(unequipped, remaining_capacity, MAX_QUANTITY)
+        rows.append(
             SellableRowView(
                 item_key=item_key,
                 display_name=definition.display_name_zh,
+                presentation=definition.presentation,
                 sell_copper=offer.sell_copper,
-                held=held,
-                sell=ActionDescriptorView(
-                    action_id=ACTION_SELL,
-                    label="販賣",
-                    enabled=enabled,
-                    reason_code=reason,
-                    reason_message=None if reason is None else SERVICE_REASON_MESSAGES[reason],
-                    quantity_min=1 if enabled else None,
-                    quantity_max=maximum if enabled else None,
-                ),
+                held=unequipped,
+                sell=_trade_descriptor(ACTION_SELL, "販賣", reason, maximum, message=message),
             )
         )
-        if len(sellable_rows) >= MAX_SELLABLE_ROWS:
+        if len(rows) >= MAX_SELLABLE_ROWS:
             break
-    return ShopSectionView(open=open_now, stock=tuple(stock_rows), sellable=tuple(sellable_rows)), None
+    return tuple(rows)
 
 
-def _equipped_keys(actor: Any) -> set[str]:
-    """Derive equipped truth from the shared fail-closed equipment layer.
-
-    The services rows and the only mutating API (``toggle_equipment``)
-    normalize storage through the same strict function, so a malformed
-    mapping is reported as ``malformed_equipment`` (section unavailable)
-    rather than presented as partially-trusted equipped flags.
-    """
-    equipment = normalized_equipment(actor)
-    if equipment is None:
-        raise ServicesSectionError("malformed_equipment")
-    keys = {
-        value
-        for value in (
-            equipment["weapon_main"],
-            equipment["weapon_off"],
-            equipment["armor"],
-        )
-        if value is not None
-    }
-    keys.update(equipment["accessories"])
-    return keys
-
-
-def _reason_message(code: str) -> str:
-    return SERVICE_REASON_MESSAGES.get(code, "此操作目前無法完成。")
-
-
-def _descriptor(
-    action_id: str,
-    label: str,
-    reason: str | None,
-) -> ActionDescriptorView:
-    """Build one personal-item descriptor with the shared reason-message map."""
-    enabled = reason is None
-    return ActionDescriptorView(
-        action_id=action_id,
-        label=label,
-        enabled=enabled,
-        reason_code=None if enabled else reason,
-        reason_message=None if enabled else _reason_message(str(reason)),
-        quantity_min=None,
-        quantity_max=None,
-    )
-
-
-def _inventory_row_action(
-    actor: Any,
-    item_key: str,
-    definition: Any,
-    equipped: bool,
-    in_combat: bool,
-) -> ActionDescriptorView | None:
-    """Derive the row's single personal-item action descriptor.
-
-    Enablement comes only from the shared side-effect-free deterministic
-    preflight APIs (``preflight_item_use`` / ``preflight_equipment_toggle``);
-    unknown and inspect-only registry keys carry no descriptor at all.
-    """
-    if definition is None:
-        return None
-    if definition.use_mechanics is not None:
-        # The descriptor rides the same target-aware preflight as a real
-        # use (add-item-effect-targeting): a single-scope row shows the
-        # stable no-target reason because the row carries no chosen
-        # target, and the room context resolves every other scope without
-        # touching state. The settlement re-validates against the live
-        # battlefield context, so descriptor enablement never over-grants.
-        preflight = preflight_item_use(
-            ItemUseRequest(actor=actor, item_key=item_key),
-            in_combat=in_combat,
-            context=RoomActionContext(actor.location),
-        )
-        reason = None if preflight.allowed else str(preflight.reason.value)
-        return _descriptor(ACTION_USE, "使用", reason)
-    if definition.equipment_slot is not None:
-        preflight = preflight_equipment_toggle(actor, item_key)
-        reason = None if preflight.allowed else str(preflight.reason.value)
-        return _descriptor(
-            ACTION_TOGGLE_EQUIP, "卸下" if equipped else "裝備", reason
-        )
-    return None
-
-
-def _build_inventory(
-    actor: Any, wallet: int, *, in_combat: bool
-) -> tuple[InventorySectionView | None, str | None]:
-    try:
-        items = list_items(actor)
-        equipped = _equipped_keys(actor)
-    except ServicesSectionError:
-        return None, "malformed_equipment"
-    counts = Counter(items)
-    rows: list[InventoryRowView] = []
-    for item_key in sorted(counts):
-        definition = ITEM_REGISTRY.get(item_key)
-        display_name = definition.display_name_zh if definition is not None else item_key
-        row_equipped = item_key in equipped
-        rows.append(
-            InventoryRowView(
-                item_key=item_key,
-                display_name=display_name,
-                held=counts[item_key],
-                equipped=row_equipped,
-                presentation=definition.presentation if definition is not None else None,
-                action=_inventory_row_action(
-                    actor, item_key, definition, row_equipped, in_combat
-                ),
-            )
-        )
-        if len(rows) >= MAX_INVENTORY_ROWS:
-            break
-    return InventorySectionView(rows=tuple(rows), wallet=wallet), None
-
-
-def build_services_view(actor: Any) -> ServicesView:
+def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
     """Build the frozen services view for ``actor`` or raise ``ServicesViewError``.
+
+    ``viewed`` is the session's viewed party member (the presenter resolves
+    it through ``resolve_viewed_member``); ``None`` means the commander. It
+    chooses only whose facts the shop rows present and never authorizes.
 
     A missing world-clock singleton or an unreadable player summary raises
     ``ServicesViewError`` so the caller can choose the whole-panel unavailable
     form; a failure confined to one surface is recorded as that surface's
     stable reason while the rest of the panel stays healthy. During an active
     combat session the remote service surfaces (host, guild, shop) are forced
-    null with zero pagination totals while the canonical player and personal
-    inventory surfaces stay available with combat-mode preflight state.
+    null with zero pagination totals while the canonical player summary
+    stays available.
     """
     from world.rules.combat_session import is_in_active_session
 
@@ -889,26 +907,28 @@ def build_services_view(actor: Any) -> ServicesView:
             actor, staff, staff_reason, examiner, catalog, tick
         )
         shop, shop_reason = _build_shop(
-            actor, merchant_host, merchant_reason, catalog, tick, wallet
+            actor,
+            viewed if viewed is not None else actor,
+            merchant_host,
+            merchant_reason,
+            catalog,
+            tick,
+            wallet,
         )
-    inventory, inventory_reason = _build_inventory(actor, wallet, in_combat=in_combat)
 
     return ServicesView(
         host=host,
         player=player,
         guild=guild,
         shop=shop,
-        inventory=inventory,
         pagination=PaginationView(
             board_total=len(guild.board) if guild is not None else 0,
             quest_total=len(guild.quests) if guild is not None else 0,
             stock_total=len(shop.stock) if shop is not None else 0,
             sellable_total=len(shop.sellable) if shop is not None else 0,
-            inventory_total=len(inventory.rows) if inventory is not None else 0,
         ),
         guild_unavailable_reason=guild_reason,
         shop_unavailable_reason=shop_reason,
-        inventory_unavailable_reason=inventory_reason,
     )
 
 
@@ -920,18 +940,13 @@ __all__ = [
     "EXAM_REQUEST_LABEL",
     "ACTION_REGISTER",
     "ACTION_SELL",
-    "ACTION_TOGGLE_EQUIP",
     "ACTION_TURNIN",
-    "ACTION_USE",
     "ActionDescriptorView",
     "BoardRowView",
     "GuildSectionView",
     "HostView",
-    "InventoryRowView",
-    "InventorySectionView",
     "ItemPresentation",
     "MAX_BOARD_ROWS",
-    "MAX_INVENTORY_ROWS",
     "MAX_QUEST_ROWS",
     "MAX_QUANTITY",
     "MAX_SELLABLE_ROWS",
@@ -947,5 +962,6 @@ __all__ = [
     "ServicesViewError",
     "ShopSectionView",
     "StockRowView",
+    "ViewedFactsView",
     "build_services_view",
 ]

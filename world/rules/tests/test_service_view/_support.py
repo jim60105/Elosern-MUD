@@ -363,6 +363,12 @@ class ServiceRegistryIsolation(unittest.TestCase):
         install_synthetic_catalog(
             self, synth_catalog(shop_configs={T_SHOP: _shop_config()})
         )
+        # Fake members carry no dbid, so the party boundary is admitted for
+        # the fake-host slices; the boundary itself runs on real objects in
+        # ``test_viewed_member_shop``.
+        scope = patch("world.rules.service_view._member_scope", return_value=None)
+        scope.start()
+        self.addCleanup(scope.stop)
         # Two invented board quests (F and E ladder ranks) with rewards inside
         # the live rank bands; the F quest is this suite's default log row.
         self.board_reward = QuestReward(

@@ -20,6 +20,7 @@ See proposal.md. `service_view.build_services_view(actor)` builds host, player, 
 ## Risks / Trade-offs
 
 - [QuestDrawer reads `services`] → It reads guild sections only; a Vitest regression run covers it.
+- [Composite byte ceiling] → Twelve shop rows with the longest shipped-scale summaries and full deltas fit well under the envelope beside a realistic maximal guild, but twelve all-ceiling board rows plus such a shop can exceed 65,536 bytes. The presenter then drops only the shop surface (`shop_too_large`), like any other surface failure, instead of failing the whole panel.
 
 ## Migration Plan
 

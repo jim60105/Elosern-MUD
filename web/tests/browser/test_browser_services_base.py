@@ -58,6 +58,14 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         panels = store_state(page)["panels"]
         return panels["services"]
 
+    def _bag_rows(self, page):
+        """The viewed member's committed bag rows (``party_inventory``).
+
+        services v7 carries no personal inventory; the bag panel owns it.
+        """
+        panel = store_state(page)["panels"].get("party_inventory") or {}
+        return {row["item_key"]: row for row in panel.get("rows") or []}
+
     def _dock_mode(self, page):
         return page.locator("#action-dock").get_attribute("data-mode")
 

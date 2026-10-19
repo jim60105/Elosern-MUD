@@ -4,9 +4,15 @@ from tools.spec_traceability import covers_requirement
 from copy import deepcopy
 from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS, MAX_RANK_LADDER
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
-from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_POINTS, MAX_HOST_DISPLAY_NAME_CODE_POINTS, MAX_INVENTORY_ROWS, MAX_KEY_CODE_POINTS, MAX_QUEST_ROWS, MAX_PRESENTATION_KEY_CODE_POINTS, MAX_PRESENTATION_SUMMARY_CODE_POINTS, MAX_QUANTITY, MAX_SELLABLE_ROWS, MAX_STOCK_ROWS, SERVICES_SCHEMA_VERSION, ServicesPanelError, validate_services
+from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_POINTS, MAX_HOST_DISPLAY_NAME_CODE_POINTS, MAX_KEY_CODE_POINTS, MAX_QUEST_ROWS, MAX_PRESENTATION_KEY_CODE_POINTS, MAX_PRESENTATION_SUMMARY_CODE_POINTS, MAX_QUANTITY, MAX_SELLABLE_ROWS, MAX_STOCK_ROWS, SERVICES_SCHEMA_VERSION, ServicesPanelError, validate_services
 from world.quests.tests._fixtures import quest
-from ._support import UNREGISTERED_PLAYER, _T_MEAL, _T_MEAL_DISPLAY, _action, _all_ceilings_payload, _realistic_maximal_payload, _valid_guild, _valid_payload, _valid_shop
+from ._support import UNREGISTERED_PLAYER, _MEMBER_ID, _T_MEAL, _T_MEAL_DISPLAY, _action, _all_ceilings_payload, _realistic_maximal_payload, _sellable_row, _stock_row, _valid_guild, _valid_payload, _valid_shop
+
+
+# The measured canonical byte size of the realistic maximal payload with twelve
+# all-ceiling board rows (services v7: twelve three-trait-delta stock rows and
+# twelve sellable rows of representative content, no inventory section).
+BOARD_CEILING_BYTES = 63749
 
 
 class ServicesSchemaTests(unittest.TestCase):
@@ -17,7 +23,7 @@ class ServicesSchemaTests(unittest.TestCase):
         payload = _realistic_maximal_payload()
         payload["guild"]["board"] = _all_ceilings_payload()["guild"]["board"]
         payload["guild"]["rank_ladder"].append(payload["guild"]["board"][0]["rank"])
-        self.assertEqual(json_byte_size(payload), 63784)
+        self.assertEqual(json_byte_size(payload), BOARD_CEILING_BYTES)
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
         self.assertEqual(len(validate_services(payload)["guild"]["board"]), MAX_BOARD_ROWS)
 
@@ -81,20 +87,10 @@ class ServicesSchemaTests(unittest.TestCase):
 
 
     def _inventory_payload(self, presentation):
+        """One stock row carrying ``presentation`` (the v7 presentation seat)."""
         return _valid_payload(
-            inventory={
-                "rows": [
-                    {
-                        "item_key": _T_MEAL,
-                        "display_name": _T_MEAL_DISPLAY,
-                        "held": 1,
-                        "equipped": False,
-                        "action": None,
-                        "presentation": presentation,
-                    }
-                ],
-                "wallet": 0,
-            }
+            shop=_valid_shop(stock=[_stock_row(presentation=presentation)]),
+            pagination={**_valid_payload()["pagination"], "stock_total": 1},
         )
 
 
@@ -165,26 +161,80 @@ class ServicesSchemaTests(unittest.TestCase):
             validate_services(_valid_payload(shop=shop))
 
 
-    def test_inventory_row_cap_enforced(self):
-        row = {
-            "item_key": _T_MEAL,
-            "display_name": _T_MEAL_DISPLAY,
-            "held": 1,
-            "equipped": False,
-            "action": None,
-            "presentation": {
-                "kind": "food",
-                "icon_key": "food",
-                "rarity": "common",
-                "summary": "供旅人充飢的普通餐食。",
-            },
-        }
-        inventory = {
-            "rows": [row for _ in range(MAX_INVENTORY_ROWS + 1)],
-            "wallet": 0,
-        }
+    @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
+    def test_version_seven_carries_no_inventory_section_or_total(self):
+        payload = _valid_payload()
+        self.assertEqual(validate_services(payload)["schema_version"], 7)
+        for extra in (
+            {"inventory": None},
+            {"inventory": {"rows": [], "wallet": 0}},
+        ):
+            with self.subTest(extra=extra):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_services({**payload, **extra})
         with self.assertRaises(ProtocolValidationError):
-            validate_services(_valid_payload(inventory=inventory))
+            validate_services(
+                {**payload, "pagination": {**payload["pagination"], "inventory_total": 0}}
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_services({**payload, "schema_version": 6})
+
+    @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
+    def test_shop_rows_carry_one_price_per_row_kind_and_the_viewed_member(self):
+        payload = _valid_payload(
+            shop=_valid_shop(sellable=[_sellable_row()]),
+            pagination={**_valid_payload()["pagination"], "stock_total": 1, "sellable_total": 1},
+        )
+        shop = validate_services(payload)["shop"]
+        self.assertEqual(set(shop), {"open", "member_id", "stock", "sellable"})
+        self.assertEqual(shop["member_id"], _MEMBER_ID)
+        self.assertEqual(
+            set(shop["stock"][0]),
+            {"item_key", "display_name", "presentation", "buy_copper", "stock", "max_stock", "viewed", "buy"},
+        )
+        self.assertEqual(
+            set(shop["sellable"][0]),
+            {"item_key", "display_name", "presentation", "sell_copper", "held", "sell"},
+        )
+        rejected = (
+            ("stock sell price", {"stock": [_stock_row(sell_copper=5)]}),
+            ("sellable buy price", {"sellable": [_sellable_row(buy_copper=10)]}),
+            ("missing member", {"member_id": None}),
+            ("zero member", {"member_id": 0}),
+            ("bool member", {"member_id": True}),
+            ("viewed extra", {"stock": [_stock_row(viewed={"held": 1, "delta": None, "x": 1})]}),
+            ("viewed negative", {"stock": [_stock_row(viewed={"held": -1, "delta": None})]}),
+            ("delta reasonless", {"stock": [_stock_row(viewed={"held": 0, "delta": {"equippable": False}})]}),
+            ("delta blank reason", {"stock": [_stock_row(viewed={"held": 0, "delta": {"equippable": False, "reason": " "}})]}),
+            ("delta extra", {"stock": [_stock_row(viewed={"held": 0, "delta": {"equippable": True, "changes": [], "reason": "x"}})]}),
+            ("delta order", {"stock": [_stock_row(viewed={"held": 0, "delta": {"equippable": True, "changes": [
+                {"key": "defense", "label": "防禦", "amount": 2},
+                {"key": "atk_phys", "label": "攻擊", "amount": 6},
+            ]}})]}),
+            ("delta zero", {"stock": [_stock_row(viewed={"held": 0, "delta": {"equippable": True, "changes": [
+                {"key": "atk_phys", "label": "攻擊", "amount": 0},
+            ]}})]}),
+            ("sellable zero held", {"sellable": [_sellable_row(held=0)]}),
+        )
+        for name, changes in rejected:
+            with self.subTest(name=name):
+                shop = _valid_shop(**{"sellable": [_sellable_row()], **changes})
+                candidate = {**payload, "shop": shop}
+                if "member_id" in changes and changes["member_id"] is None:
+                    del candidate["shop"]["member_id"]
+                with self.assertRaises(ProtocolValidationError):
+                    validate_services(candidate)
+        accepted = _valid_shop(
+            stock=[
+                _stock_row(viewed={"held": 0, "delta": {"equippable": True, "changes": [
+                    {"key": "atk_phys", "label": "攻擊", "amount": 6},
+                    {"key": "defense", "label": "防禦", "amount": -2},
+                ]}}),
+                _stock_row(viewed={"held": 0, "delta": {"equippable": False, "reason": "accessory_slots_full"}}),
+            ]
+        )
+        validated = validate_services({**payload, "shop": accepted, "pagination": {**payload["pagination"], "stock_total": 2, "sellable_total": 0}})
+        self.assertEqual(validated["shop"]["stock"][1]["viewed"]["delta"]["reason"], "accessory_slots_full")
 
 
     def test_string_ceilings_enforced(self):
@@ -314,6 +364,17 @@ class ServicesSchemaTests(unittest.TestCase):
         self.assertLess(size, 48 * 1024)
 
 
+    @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
+    def test_worst_case_shop_rows_fit_beside_maximal_realistic_sections(self):
+        """Twelve stock and twelve sellable rows with a 110-code-point summary
+        (above the longest shipped item summary) and a delta on every
+        canonical trait still fit, measured with the real serializer."""
+        payload = _realistic_maximal_payload(summary="獎" * 110, delta_traits=8)
+        validated = validate_services(payload)
+        self.assertEqual(len(validated["shop"]["stock"]), MAX_STOCK_ROWS)
+        self.assertEqual(len(validated["shop"]["sellable"]), MAX_SELLABLE_ROWS)
+        self.assertLess(json_byte_size(validated), 48 * 1024)
+
     def test_all_ceilings_payload_is_rejected_by_the_byte_gate(self):
         """A payload maximizing every string field simultaneously fails closed
         on serialized size even though each field is individually in bounds."""
@@ -324,7 +385,7 @@ class ServicesSchemaTests(unittest.TestCase):
 
     def test_presentation_null_for_unknown_key_passes(self):
         validated = validate_services(self._inventory_payload(None))
-        self.assertIsNone(validated["inventory"]["rows"][0]["presentation"])
+        self.assertIsNone(validated["shop"]["stock"][0]["presentation"])
 
 
     def test_presentation_object_passes(self):
@@ -335,7 +396,7 @@ class ServicesSchemaTests(unittest.TestCase):
             "summary": "供旅人充飢的普通餐食。",
         }
         validated = validate_services(self._inventory_payload(presentation))
-        self.assertEqual(validated["inventory"]["rows"][0]["presentation"], presentation)
+        self.assertEqual(validated["shop"]["stock"][0]["presentation"], presentation)
 
 
     def test_presentation_missing_field_rejected(self):
@@ -403,7 +464,7 @@ class ServicesSchemaTests(unittest.TestCase):
         }
         validated = validate_services(self._inventory_payload(presentation))
         self.assertEqual(
-            validated["inventory"]["rows"][0]["presentation"]["summary"],
+            validated["shop"]["stock"][0]["presentation"]["summary"],
             "獎" * MAX_PRESENTATION_SUMMARY_CODE_POINTS,
         )
 

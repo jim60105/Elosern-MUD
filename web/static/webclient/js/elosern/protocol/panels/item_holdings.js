@@ -278,6 +278,9 @@ function validateItemHoldingsPanel(payload) {
 
 module.exports = {
   validateItemHoldingsPanel: validateItemHoldingsPanel,
+  // Shared with the services shop rows (services-shop-structured-rows): the
+  // stock row's viewed.delta is the same server equipment delta.
+  validateEquipmentDelta: validateDelta,
   ITEM_HOLDINGS_SCHEMA_VERSION: ITEM_HOLDINGS_SCHEMA_VERSION,
   ITEM_HOLDINGS_MAX_ROWS: ITEM_HOLDINGS_MAX_ROWS,
   ITEM_HOLDINGS_MAX_CHANGES: ITEM_HOLDINGS_MAX_CHANGES,

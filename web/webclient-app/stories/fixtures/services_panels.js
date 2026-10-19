@@ -1,10 +1,11 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The full `services` v6 payload (guild, shop, and inventory sections all
-// present). Every entry mirrors the exact bounded schema; the integer
+// The full `services` v7 payload (guild and shop sections present; personal
+// inventory is published by `party_inventory`). The shop rows describe the
+// viewed party member `shop.member_id`. Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -111,23 +112,26 @@ export const SERVICES_PANEL_SAMPLE = {
   },
   shop: {
     open: true,
+    member_id: 7,
     stock: [
       {
         item_key: "item_iron_sword",
         display_name: "鐵劍",
+        presentation: { kind: "weapon", icon_key: "weapon", rarity: "uncommon", summary: "鍛造紮實的單手鐵劍。" },
         buy_copper: 120,
-        sell_copper: 80,
         stock: 8,
         max_stock: 24,
+        viewed: { held: 0, delta: { equippable: true, changes: [{ key: "atk_phys", label: "攻擊", amount: 6 }] } },
         buy: { action_id: "shop.buy", label: "購買鐵劍", enabled: true, disabled_reason: null, quantity: { min: 1, max: 8 } },
       },
       {
         item_key: "item_heal_potion",
         display_name: "治療劑",
+        presentation: { kind: "potion", icon_key: "potion", rarity: "common", summary: "回復少量生命的藥劑。" },
         buy_copper: 45,
-        sell_copper: 30,
         stock: 30,
         max_stock: 30,
+        viewed: { held: 2, delta: null },
         buy: { action_id: "shop.buy", label: "購買治療劑", enabled: false, disabled_reason: { code: "insufficient_funds", message: "錢包餘額不足" }, quantity: { min: 1, max: 30 } },
       },
     ],
@@ -135,188 +139,80 @@ export const SERVICES_PANEL_SAMPLE = {
       {
         item_key: "item_herb_moon",
         display_name: "月光草",
+        presentation: { kind: "material", icon_key: "material", rarity: "rare", summary: "只在月夜綻放的藥草。" },
         sell_copper: 25,
         held: 3,
         sell: { action_id: "shop.sell", label: "賣出月光草", enabled: true, disabled_reason: null, quantity: { min: 1, max: 3 } },
       },
     ],
   },
-  inventory: {
-    rows: [
-      { item_key: "item_iron_sword", display_name: "鐵劍", held: 1, equipped: true, presentation: null, action: null },
-      { item_key: "item_leather_armor", display_name: "皮甲", held: 1, equipped: true, presentation: null, action: null },
-      { item_key: "item_heal_potion", display_name: "治療劑", held: 4, equipped: false, presentation: null, action: null },
-      {
-        item_key: "healing_potion",
-        display_name: "治療藥水",
-        held: 2,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "potion",
-          icon_key: "potion",
-          rarity: "rare",
-          summary: "盛裝於小瓶中的治療藥水。",
-        },
-      },
-    ],
-    wallet: 3240,
-  },
   pagination: {
     board_total: 4,
     quest_total: 1,
     stock_total: 2,
     sellable_total: 1,
-    inventory_total: 4,
   },
 };
 
-// The services v2 panel whose inventory rows all carry committed
-// presentation metadata (redesign-inventory-item-grid): the row set originally
-// covered every closed `ItemIconKey`/`ItemKind` value (food, potion, weapon, armor,
-// accessory, ammunition, tool, material, misc) and every closed rarity
-// (common, uncommon, rare, epic, legendary). The presentation objects mirror
-// the server's registry (`world/lore/items.py`).
-export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
+// A shop of one kind of goods for the viewed companion 艾拉 (the approved
+// prototype's buy and sell views): equipment rows carry the server delta
+// (gains, a mixed swap, a no-change worn copy, and 無法裝備 for a full
+// accessory set), a consumable carries
+// the held count, one row is sold out and one disabled for the purse, every
+// rarity frame appears, and the sellable rows list her unequipped copies.
+const shopRow = (item_key, display_name, presentation, buy_copper, stock, max_stock, viewed, buy) => ({
+  item_key, display_name, presentation, buy_copper, stock, max_stock, viewed, buy,
+});
+const buyAction = (max) => ({ action_id: "shop.buy", label: "購買", enabled: true, disabled_reason: null, quantity: { min: 1, max } });
+const blockedBuy = (code, message) => ({ action_id: "shop.buy", label: "購買", enabled: false, disabled_reason: { code, message }, quantity: null });
+const gain = (label, key, amount) => ({ key, label, amount });
+
+export const SERVICES_PANEL_SHOP_ROWS_SAMPLE = {
   ...SERVICES_PANEL_SAMPLE,
-  inventory: {
-    rows: [
-      {
-        item_key: "meal",
-        display_name: "普通餐食",
-        held: 5,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "food",
-          icon_key: "food",
-          rarity: "common",
-          summary: "供旅人充飢的普通餐食。",
-        },
-      },
-      {
-        item_key: "healing_potion",
-        display_name: "治療藥水",
-        held: 3,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "potion",
-          icon_key: "potion",
-          rarity: "rare",
-          summary: "盛裝於小瓶中的治療藥水。",
-        },
-      },
-      {
-        item_key: "plain_sword",
-        display_name: "普通劍",
-        held: 1,
-        equipped: true,
-        action: null,
-        presentation: {
-          kind: "weapon",
-          icon_key: "weapon",
-          rarity: "common",
-          summary: "鍛鐵打造的普通劍。",
-        },
-      },
-      {
-        item_key: "leather_armor",
-        display_name: "皮甲",
-        held: 1,
-        equipped: true,
-        action: null,
-        presentation: {
-          kind: "armor",
-          icon_key: "armor",
-          rarity: "uncommon",
-          summary: "縫製的皮革盔甲。",
-        },
-      },
-      {
-        item_key: "mist_amulet",
-        display_name: "霧隱護符",
-        held: 2,
-        equipped: true,
-        action: null,
-        presentation: {
-          kind: "accessory",
-          icon_key: "accessory",
-          rarity: "epic",
-          summary: "可短暫隱形的小型護符。",
-        },
-      },
-      {
-        item_key: "leather_arrows",
-        display_name: "皮箭",
-        held: 12,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "ammunition",
-          icon_key: "ammunition",
-          rarity: "common",
-          summary: "基本遠程箭矢。",
-        },
-      },
-      {
-        item_key: "candle",
-        display_name: "燭",
-        held: 4,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "tool",
-          icon_key: "tool",
-          rarity: "common",
-          summary: "供照明的蠟燭。",
-        },
-      },
-      {
-        item_key: "iron_ingot",
-        display_name: "鐵錠",
-        held: 2,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "material",
-          icon_key: "material",
-          rarity: "uncommon",
-          summary: "可鍛造的鐵材。",
-        },
-      },
-      {
-        item_key: "travel_pack",
-        display_name: "行囊",
-        held: 1,
-        equipped: false,
-        action: null,
-        presentation: {
-          kind: "misc",
-          icon_key: "misc",
-          rarity: "legendary",
-          summary: "旅人的多用途行囊。",
-        },
-      },
+  host: { identity: "smith_ottar", display_name: "鐵砧鍛造鋪" },
+  guild: null,
+  shop: {
+    open: true,
+    member_id: 102,
+    stock: [
+      shopRow("steel_shortsword", "鋼製短劍", { kind: "weapon", icon_key: "weapon", rarity: "uncommon", summary: "輕巧的鋼製短劍。" }, 320, 3, 5,
+        { held: 0, delta: { equippable: true, changes: [gain("攻擊", "atk_phys", 6)] } }, buyAction(3)),
+      shopRow("iron_longsword", "鐵製長劍", { kind: "weapon", icon_key: "weapon", rarity: "common", summary: "厚重的鐵製長劍。" }, 280, 2, 4,
+        { held: 0, delta: { equippable: true, changes: [gain("攻擊", "atk_phys", 4), gain("敏捷", "agility", -2)] } }, buyAction(2)),
+      shopRow("warhammer", "戰鎚", { kind: "weapon", icon_key: "weapon", rarity: "rare", summary: "需要雙手揮舞的重鎚。" }, 540, 1, 2,
+        { held: 0, delta: { equippable: true, changes: [gain("攻擊", "atk_phys", 10), gain("敏捷", "agility", -3)] } }, blockedBuy("insufficient_funds", "你的銅幣不足。")),
+      shopRow("shortbow", "短弓", { kind: "weapon", icon_key: "ammunition", rarity: "common", summary: "獵人常用的短弓。" }, 260, 0, 3,
+        { held: 0, delta: { equippable: true, changes: [gain("攻擊", "atk_phys", 3)] } }, blockedBuy("insufficient_stock", "商店庫存不足。")),
+      shopRow("birch_staff", "白樺法杖", { kind: "weapon", icon_key: "weapon", rarity: "epic", summary: "注入月光的白樺法杖。" }, 140, 2, 2,
+        { held: 1, delta: { equippable: true, changes: [] } }, buyAction(2)),
+      shopRow("moonstone_ring", "月石戒指", { kind: "accessory", icon_key: "accessory", rarity: "legendary", summary: "鑲著月石的戒指。" }, 260, 1, 1,
+        { held: 0, delta: { equippable: false, reason: "accessory_slots_full" } }, buyAction(1)),
+      shopRow("potion_heal", "治療藥水", { kind: "potion", icon_key: "potion", rarity: "common", summary: "回復少量生命。" }, 30, 12, 20,
+        { held: 2, delta: null }, buyAction(12)),
     ],
-    wallet: 3240,
+    sellable: [
+      { item_key: "potion_heal", display_name: "治療藥水", presentation: { kind: "potion", icon_key: "potion", rarity: "common", summary: "回復少量生命。" },
+        sell_copper: 15, held: 2, sell: { action_id: "shop.sell", label: "出售", enabled: true, disabled_reason: null, quantity: { min: 1, max: 2 } } },
+      { item_key: "rusty_sword", display_name: "生鏽的劍", presentation: { kind: "weapon", icon_key: "weapon", rarity: "common", summary: "刃口滿是鏽斑的舊劍。" },
+        sell_copper: 45, held: 1, sell: { action_id: "shop.sell", label: "出售", enabled: false, disabled_reason: { code: "stock_overflow", message: "商店收購上限已滿。" }, quantity: null } },
+    ],
   },
-  pagination: { ...SERVICES_PANEL_SAMPLE.pagination, inventory_total: 9 },
+  pagination: { board_total: 0, quest_total: 0, stock_total: 7, sellable_total: 2 },
 };
 
 // The registry-owned unavailable form for the services panel: the common
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
 
-// The reduced services payload: no host, no guild/shop/inventory sections
-// (all null with zero pagination totals), a bare player summary.
+// The reduced services payload: no host, no guild/shop sections (both null
+// with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: true,
   kind: "services",
   host: null,
@@ -330,16 +226,14 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
   },
   guild: null,
   shop: null,
-  inventory: null,
     pagination: {
       board_total: 0,
       quest_total: 0,
       stock_total: 0,
       sellable_total: 0,
-      inventory_total: 0,
     },
 };
-// Guild rank-block variants (services v6): each swaps only the guild
+// Guild rank-block variants (services v7): each swaps only the guild
 // section's `rank` object (and, for the unregistered holder, the
 // registration row) on top of the full sample. `merit_qualified` is the
 // merit verdict; `exam_request.enabled` is independent of it.
