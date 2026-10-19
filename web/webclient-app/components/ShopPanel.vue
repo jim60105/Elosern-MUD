@@ -125,7 +125,16 @@ resetQuantities();
 // every entry to its action's own lower bound.
 const selectedKey = ref(null);
 
-watch(() => props.services, resetQuantities);
+watch(
+  () => props.services,
+  () => {
+    resetQuantities();
+    selectedKey.value = null;
+  },
+);
+
+// The id tying a disabled action to its committed reason.
+const reasonId = (list, row) => `shop-reason-${list}-${row.item_key}`;
 
 function activateRow(row) {
   selectedKey.value = row.item_key;
@@ -209,6 +218,7 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
             <svg viewBox="0 0 24 24" fill="none"><path :d="iconPath(row)" stroke="currentColor" stroke-width="1.5" v-bind="iconAttrs(row)" /></svg>
           </span>
           <span class="shop-row__name">{{ row.display_name }}</span>
+          <span v-if="rarityWord(row)" class="shop-row__sr" data-testid="shop-row__rarity">{{ rarityWord(row) }}</span>
           <span class="shop-row__sub">
             <span v-if="row.stock > 0" class="shop-row__stock">庫存 {{ row.stock }} / {{ row.max_stock }}</span>
             <span v-else class="shop-row__stock shop-row__stock--out">售完</span>
@@ -257,12 +267,14 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
             type="button"
             class="shop-row__buy"
             :disabled="!(row.buy && row.buy.enabled)"
+            :aria-describedby="row.buy?.disabled_reason?.message ? reasonId('stock', row) : undefined"
             @click.stop="buyNow(row)"
           >
             {{ row.buy?.label ?? "購買" }}
           </button>
           <span
             v-if="row.buy?.disabled_reason?.message"
+            :id="reasonId('stock', row)"
             class="shop-row__reason"
           >{{ row.buy.disabled_reason.message }}</span>
         </div>
@@ -286,6 +298,7 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
             <svg viewBox="0 0 24 24" fill="none"><path :d="iconPath(row)" stroke="currentColor" stroke-width="1.5" v-bind="iconAttrs(row)" /></svg>
           </span>
           <span class="shop-row__name">{{ row.display_name }}</span>
+          <span v-if="rarityWord(row)" class="shop-row__sr" data-testid="shop-row__rarity">{{ rarityWord(row) }}</span>
           <span class="shop-row__sub">
             <span class="shop-row__held">可售 {{ row.held }}</span>
           </span>
@@ -314,12 +327,14 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
             type="button"
             class="shop-row__sell"
             :disabled="!(row.sell && row.sell.enabled)"
+            :aria-describedby="row.sell?.disabled_reason?.message ? reasonId('sellable', row) : undefined"
             @click.stop="sellNow(row)"
           >
             {{ row.sell?.label ?? "賣出" }}
           </button>
           <span
             v-if="row.sell?.disabled_reason?.message"
+            :id="reasonId('sellable', row)"
             class="shop-row__reason"
           >{{ row.sell.disabled_reason.message }}</span>
         </div>
@@ -443,6 +458,7 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
 }
 
 .shop-row {
+  position: relative;
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
@@ -585,7 +601,9 @@ const sellNow = (row) => trade(row, row.sell, "seller_id", "sell");
 }
 
 /* The committed quantity readout stays in the DOM for assistive and
-   browser-test reads, while the input itself shows the value. */
+   browser-test reads, while the input itself shows the value; the rarity
+   word is spelled for assistive tech (the frame carries it visually). */
+.shop-row__sr,
 .shop-row__qty-value {
   position: absolute;
   width: 1px;

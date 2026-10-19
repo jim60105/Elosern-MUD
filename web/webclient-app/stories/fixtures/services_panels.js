@@ -233,7 +233,7 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
       sellable_total: 0,
     },
 };
-// Guild rank-block variants (services v6): each swaps only the guild
+// Guild rank-block variants (services v7): each swaps only the guild
 // section's `rank` object (and, for the unregistered holder, the
 // registration row) on top of the full sample. `merit_qualified` is the
 // merit verdict; `exam_request.enabled` is independent of it.

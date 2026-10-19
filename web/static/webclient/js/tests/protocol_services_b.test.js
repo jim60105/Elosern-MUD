@@ -15,7 +15,7 @@ const Protocol = require("../elosern/protocol.js");
 const { T_MEAL_SUMMARY, VALID_EPOCH, serverTime } = require("./protocol_support.js");
 const { validServicesAction, validServicesBoardRow, validServicesPanel, validServicesQuestRow, validServicesSellableRow, validServicesStockRow } = require("./protocol_fixtures.js");
 
-test("services v6 rejects stale facts and reward overflow", () => {
+test("services v7 rejects stale facts and reward overflow", () => {
   const item = { item_key: "synthetic_item", display_name: "合成物品", quantity: 1 };
   for (const overrides of [
     { reward_summary: "舊獎勵" },
@@ -32,7 +32,7 @@ test("services v6 rejects stale facts and reward overflow", () => {
   }
 });
 
-test("services v6 validates ladder bounds and all section rank memberships", () => {
+test("services v7 validates ladder bounds and all section rank memberships", () => {
   for (const ladder of [[], ["F", "F"], ["E"], ["F", "x".repeat(9)], Array.from({ length: 17 }, (_, i) => String(i))]) {
     const panel = validServicesPanel();
     panel.guild.board = [validServicesBoardRow()];

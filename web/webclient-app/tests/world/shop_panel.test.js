@@ -51,6 +51,8 @@ describe("ShopPanel (B4 world / services family)", () => {
     // Stock level cell renders "stock / max_stock" (no invented defaults).
     expect(sword.find(".shop-row__stock").text()).toBe("庫存 8 / 24");
     expect(sword.find(".shop-row__icon").attributes("data-rarity")).toBe("uncommon");
+    // The rarity is spelled for assistive tech, never colour alone.
+    expect(sword.get('[data-testid="shop-row__rarity"]').text()).toBe("罕見");
 
     const potion = w.get('[data-testid="shop-panel__stock--item_heal_potion"]');
     expect(potion.find(".shop-row__name").text()).toBe("治療劑");
@@ -226,6 +228,16 @@ describe("ShopPanel (B4 world / services family)", () => {
     expect(w.emitted("sell")[0][0].payload).toEqual({ item_key: "potion_heal", quantity: 1, seller_id: 102 });
   });
 
+  it("ties each disabled action to its committed reason", () => {
+    const w = mountPanel({ services: SERVICES_PANEL_SHOP_ROWS_SAMPLE });
+    const row = w.get('[data-testid="shop-panel__stock--warhammer"]');
+    const reason = row.get(".shop-row__reason");
+    expect(row.get(".shop-row__buy").attributes("aria-describedby")).toBe(reason.attributes("id"));
+    expect(w.get('[data-testid="shop-panel__stock--steel_shortsword"]').get(".shop-row__buy").attributes("aria-describedby")).toBeUndefined();
+    const sell = w.get('[data-testid="shop-panel__sellable--rusty_sword"]');
+    expect(sell.get(".shop-row__sell").attributes("aria-describedby")).toBe(sell.get(".shop-row__reason").attributes("id"));
+  });
+
   it("emits nothing when shop.member_id is not a positive safe integer", async () => {
     // A malformed member id never invents a member: both trades stay silent.
     for (const memberId of [null, 0, -1, 1.5, "7"]) {
@@ -270,8 +282,12 @@ describe("ShopPanel (B4 world / services family)", () => {
     const input = () => w.get('[data-testid="shop-panel__stock--potion_heal"]').find("input.shop-row__qty");
     await input().setValue(5);
     expect(input().element.value).toBe("5");
+    await input().trigger("focusin");
+    expect(w.find('[data-testid="services-quantity"]').exists()).toBe(true);
     await w.setProps({ services: { ...SERVICES_PANEL_SHOP_ROWS_SAMPLE } });
     expect(input().element.value).toBe("1");
+    // The row selection is discarded with the replaced panel too.
+    expect(w.find('[data-testid="services-quantity"]').exists()).toBe(false);
   });
 
   it("omits the wallet line (H4 task 7.1: the wallet now lives in CharacterStatusDrawer — the single wallet rendering)", () => {
