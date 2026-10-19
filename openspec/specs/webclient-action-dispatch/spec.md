@@ -78,7 +78,7 @@ validator and deterministic adapter
 
 #### Scenario: Skill preview is not a cast
 
-- **WHEN** the two SkillBook action IDs are resolved through the production registry
+- **WHEN** the two skill-use action IDs (`explore.skill_preview`, `explore.cast`) are resolved through the production registry
 - **THEN** each has its own exact validator/adapter, preview selection makes no canonical gameplay mutation, and field casting executes only through its deterministic entry
 
 #### Scenario: Production registry composition is fixed
