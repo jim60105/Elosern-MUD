@@ -53,11 +53,16 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         # --command-line-h top inset over a bottom edge at the stage bottom
         # with the whole-stage scrim, and the reference's 20px / .04em head
         # title with the 11px subtitle — are pinned selector-level by the
-        # drawer component suite's CSS-rule-block test.
+        # drawer component suite's CSS-rule-block test. The 技能-tab
+        # scenarios (webclient-party-skill-tab: the tab's glyph and honest
+        # 主動/被動 counts, one window title, no cast-syntax footer, and the
+        # companion cast closing the window before the dock) are asserted by
+        # the AppClient drawer-layer suite.
         _assert_vitest_passes(
             _run_vitest(
                 TESTS_DIR / "hud_drawer.test.js",
                 TESTS_DIR / "focus_trap.test.js",
+                TESTS_DIR / "app_client_drawers.test.js",
             ),
             "reference-drawer modal contract",
         )

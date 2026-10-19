@@ -47,16 +47,12 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # manifest (extend, don't restructure — B5 freezes the manifest; design D5).
 DATA_FAMILY_KEYS = (
     "Data/StatusPanel",
-    "Data/SkillBook",
 )
 
 # The exact showcase story registration for the data family: the built
 # Storybook index.json entry id for every story exported by this change
 # (title "Data/<Component>", deterministic story names).
 DATA_FAMILY_STORY_IDS = {
-    "data-skillbook--active-tab",
-    "data-skillbook--passive-tab",
-    "data-skillbook--search-filtered",
     "data-statuspanel--combat-rounds",
     "data-statuspanel--full-payload",
     "data-statuspanel--hidden-at-full-health",
@@ -135,7 +131,6 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
         )["required"]
         self.assertIn("Data/StatusPanel", required)
-        self.assertIn("Data/SkillBook", required)
         self.assertEqual(
             set(required) - set(DATA_FAMILY_KEYS),
             {
@@ -163,6 +158,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/PartyBagTab",
                 # The party window\'s 狀態 tab (webclient-party-status-tab).
                 "Overlays/PartyStatusTab",
+                # The party window's 技能 tab replaced the skill book
+                # (webclient-party-skill-tab).
+                "Overlays/PartySkillTab",
                 # The shared window primitives (webclient-window-primitives) joined the
                 # frozen set; this change pins them with the party window.
                 "Core/WindowFrame",
@@ -299,6 +297,6 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         self.assertEqual(
             family_titles,
             {f"Data/{component}" for component in (
-                "StatusPanel", "SkillBook",
+                "StatusPanel",
             )},
         )

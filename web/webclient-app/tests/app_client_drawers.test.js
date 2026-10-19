@@ -31,6 +31,7 @@ import {
   PARTY_BAG_INVENTORY_SAMPLE,
   PARTY_WINDOW_PANEL_SAMPLE,
 } from "../stories/fixtures/party_panels.js";
+import { CHARACTER_SKILL_COMPANION_SAMPLE } from "../stories/fixtures/skill_tab_panels.js";
 
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
@@ -53,7 +54,6 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
 
   // The closed reference-drawer name -> the body's root testid.
   const REFERENCE_SURFACES = {
-    skill: "skill-book",
     shop: "shop-panel",
     quest: "quest-drawer",
     lore: "lore-codex-drawer",
@@ -87,6 +87,14 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
     expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("status");
+    // The retired skill-book drawer's name opens it on 技能
+    // (webclient-party-skill-tab) in the same one action.
+    store.closeHudDrawer();
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("skills");
+    expect(wrapper.find('[data-testid="skill-book"]').exists()).toBe(false);
   });
 
   // webclient-party-bag-retire: the retired bag drawer's wallet became the
@@ -130,7 +138,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.get('[data-testid="party-status-tab"]').text()).not.toContain("1,240");
     expect(wrapper.findAll('[data-testid="party-window__purse"]')).toHaveLength(1);
-    for (const name of ["skill", "shop", "quest", "lore"]) {
+    // Nor does the 技能 tab body (webclient-party-skill-tab).
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid="party-skill-tab"]').text()).not.toContain("1,240");
+    expect(wrapper.findAll('[data-testid="party-window__purse"]')).toHaveLength(1);
+    for (const name of ["shop", "quest", "lore"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       const other = wrapper.get('[data-testid="hud-drawer"]');
@@ -186,129 +199,156 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     };
   }
 
-  it("gives the skill drawer its skill glyph, skill-count subtitle, and cast-syntax footer", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    // Prime the transport so the snapshot's generation 1 is the current one
-    // (mirrors the resync test's `connect()`); without it the reducer
-    // rejects the snapshot as `stale_generation`.
+  // The commander viewed (the empty party's viewed member is the character
+  // panel's member), optionally unread.
+  function commanderParty(unread = false) {
+    return {
+      ...PARTY_PANEL_EMPTY_SAMPLE,
+      slots: PARTY_PANEL_EMPTY_SAMPLE.slots.map((row) => ({ ...row, unread })),
+    };
+  }
+
+  function commitSkills(party = commanderParty(), character = characterPanelWithSkillSlice()) {
     store.beginTransport(1);
     store.setConnected(true);
-    // Populate the character panel with the deterministic skill fixture
-    // (actives=11, passives=3 per SKILLS_SLICE_SAMPLE).
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            character: characterPanelWithSkillSlice(),
-            services: SERVICES_PANEL_SAMPLE,
-            party: PARTY_PANEL_SAMPLE,
-          },
-        }),
-      ],
-    );
+    store.receive(1, "ui_snapshot", [fx.snapshot({ panels: { character, services: SERVICES_PANEL_SAMPLE, party } })]);
+  }
+
+  it("opens the 技能 tab with its glyph and honest counts, one window title, and no cast-syntax footer", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    commitSkills();
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
-    // The composed drawer head: the `skills` glyph + the 主動 11 ‧ 被動 3
-    // subtitle (the fixture's own row counts, not invented data).
-    const icon = wrapper.find(".drawer-header__icon");
-    expect(icon.exists()).toBe(true);
-    expect(icon.find("path").attributes("d")).toBe(
+    // The 技能 tab carries the `skills` glyph; the segment states the
+    // panel's own active/passive row counts (主動 11 ‧ 被動 3).
+    const skillTab = wrapper.get('[data-testid="icon-tabs__tab--skills"]');
+    expect(skillTab.find("path").attributes("d")).toBe(
       "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     );
-    expect(wrapper.get(".drawer-header__subtitle").text()).toBe("主動 11 ‧ 被動 3");
-    // The retired cast-syntax footer is gone (skillbook-authoritative-
-    // casting): the footer carries the book's keyboard guidance instead, and
-    // graphical 施放 / 修煉 live in the book itself.
-    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("cast <技法>");
-    expect(wrapper.get('[data-testid="skill-book-key-hint"]').text()).toContain("Enter 前往動作");
-    // The retired bag drawer's opener lands on the party window
-    // (webclient-party-bag-retire), whose own frame carries no drawer
-    // subtitle and no skill-book footer.
-    store.openHudDrawer("inventory");
-    await wrapper.vm.$nextTick();
-    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.get('[data-testid="party-skill-tab__segment--active"]').text()).toBe("主動 11");
+    expect(wrapper.get('[data-testid="party-skill-tab__segment--passive"]').text()).toBe("被動 3");
+    expect(wrapper.findAll(".drawer-header__title")).toHaveLength(1);
     expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
+    // The retired cast-syntax footer and the book's key hint are gone;
+    // graphical 施放 / 排入修煉 live in the tab's action bar.
+    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("cast <技法>");
+    expect(wrapper.find('[data-testid="action-bar__btn--practice"]').exists()).toBe(true);
   });
 
-  it("leaves the skill drawer subtitle empty when the character panel is missing or unavailable", async () => {
+  it("states the unavailable character panel's reason and invents no counts", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
-    // Panel missing: the drawer opens before any snapshot commits, so the
-    // subtitle is empty (the degrade-without-inventing-data contract).
+    commitSkills(commanderParty(), {
+      schema_version: 9,
+      available: false,
+      reason: { code: "character_missing", message: "character not created" },
+    });
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
-    // A committed `ui_snapshot` (an epoch/mode change) tears down the open
-    // drawer, so close it, commit the unavailable panel, then re-open.
-    store.closeHudDrawer({});
-    store.beginTransport(1);
-    store.setConnected(true);
-    // The exact unavailable form: schema_version + available:false + a
-    // bounded reason.
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            character: {
-              schema_version: 9,
-              available: false,
-              reason: { code: "character_missing", message: "character not created" },
-            },
-          },
-        }),
-      ],
-    );
-    await wrapper.vm.$nextTick();
-    store.openHudDrawer("skill");
-    await wrapper.vm.$nextTick();
-    // Panel unavailable: still no subtitle, but the head icon and the
-    // static footer hint are client-local chrome — they render regardless
-    // of the panel's availability.
-    expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
-    expect(wrapper.find(".drawer-header__icon").exists()).toBe(true);
-    expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="party-window__tab-unavailable"]').text()).toBe("character not created");
+    expect(wrapper.find('[data-testid="party-skill-tab__segment"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="action-bar"]').exists()).toBe(false);
   });
 
-  it("asks the server for the selected skill's detail when the book opens", async () => {
+  it("opening the 技能 tab on an unread member sends one party.view_member with tab skills", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    commitSkills(commanderParty(true));
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    const requests = () => sender.sent.actions.filter((envelope) => envelope.action_id === "party.view_member");
+    // The committed selection is on screen, so the one request names it.
+    expect(requests()).toHaveLength(1);
+    expect(requests()[0].payload).toEqual({
+      member_id: SKILLS_SLICE_SAMPLE.member_id,
+      tab: "skills",
+      skill_key: SKILLS_SLICE_SAMPLE.selected_skill.key,
+      item_key: null,
+    });
+  });
+
+  it("sends nothing on opening when the member is read and the selection is committed", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    commitSkills(commanderParty(false));
+    store.openHudDrawer("skill");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(sender.sent.actions.filter((envelope) => envelope.action_id === "party.view_member")).toHaveLength(0);
+  });
+
+  it("casts for the viewed companion: one preview with its actor_id, then the window hands over to the dock", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     const sender = fx.createFakeSender();
     store.setSender(sender);
     store.beginTransport(1);
     store.setConnected(true);
-    store.receive(
-      1,
-      "ui_snapshot",
-      [
-        fx.snapshot({
-          panels: {
-            character: characterPanelWithSkillSlice(),
-            services: SERVICES_PANEL_SAMPLE,
-            party: PARTY_PANEL_SAMPLE,
-          },
-        }),
-      ],
-    );
+    store.receive(1, "ui_snapshot", [
+      fx.snapshot({
+        mode: "exploration",
+        panels: {
+          status: fx.statusPanel(),
+          exploration: fx.explorationPanel(),
+          context_actions: fx.explorationActions(),
+          local_map: fx.localMapPanel(),
+          party: PARTY_WINDOW_PANEL_SAMPLE,
+          character: CHARACTER_SKILL_COMPANION_SAMPLE,
+        },
+      }),
+    ]);
     store.openHudDrawer("skill");
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    const requests = () =>
-      sender.sent.actions.filter((envelope) => envelope.action_id === "party.view_member");
-    // The book's initial row is not the committed selection: one request.
-    expect(requests()).toHaveLength(1);
-    expect(requests()[0].payload).toEqual({
-      member_id: SKILLS_SLICE_SAMPLE.member_id,
-      tab: "skills",
-      skill_key: "firebolt",
-      item_key: null,
-    });
+    const companion = CHARACTER_SKILL_COMPANION_SAMPLE.member_id;
+    const heal = CHARACTER_SKILL_COMPANION_SAMPLE.selected_skill.key;
+    expect(wrapper.get('[data-testid="party-skill-tab__row"][aria-selected="true"]').attributes("data-key")).toBe(heal);
+    await wrapper.get('[data-testid="action-bar__btn--cast"]').trigger("click");
+    const preview = sender.sent.actions.at(-1);
+    expect(preview.action_id).toBe("explore.skill_preview");
+    expect(preview.payload).toEqual({ actor_id: companion, skill_key: heal });
+    // The preview commits for that caster: the window closes before the
+    // dock-owned flow mounts.
+    store.receive(1, "ui_update", [
+      fx.update({
+        revision: 2,
+        panels: {
+          skill_use: {
+            schema_version: 2,
+            available: true,
+            kind: "skill_use",
+            actor_id: companion,
+            scale: 1,
+            skill: {
+              key: heal,
+              label: "治癒之光",
+              description: "合成用的治療技能。",
+              target_spec: "single",
+              usable_out_of_combat: true,
+              cost: { mp: 8 },
+              enabled: true,
+              disabled_reason: null,
+              targets: [{ identity: companion, label: "蕾娜", enabled: true, disabled_reason: null }],
+              openings: [],
+            },
+          },
+        },
+      }),
+    ]);
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: preview.request_id, presentation_revision: 2 })]);
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe(null);
+    expect(wrapper.find('[data-testid="party-window"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="skill-use-dock"]').exists()).toBe(true);
+    expect(sender.sent.actions.filter((envelope) => envelope.action_id === "explore.cast")).toHaveLength(0);
   });
 
   // add-persona-edit-surface, moved to the party window's 成員 tab by

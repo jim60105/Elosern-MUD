@@ -903,16 +903,30 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-skill-book-offers-a-practice-booking-control",
+        "webclient-party-window::the-skill-tab-browses-the-viewed-member-s-skills-with-growth",
+        "webclient-party-window::the-skill-detail-shows-lineage-position-and-the-freeform-ladder",
+        "webclient-party-window::the-skill-tab-casts-and-books-for-the-viewed-member",
+        "webclient-skillbook-casting::skill-tab-use-shares-one-keyboard-owner-and-preserves-practice",
+        "webclient-skillbook-casting::the-skill-tab-follows-the-approved-prototype-and-availability-is-truthful",
     )
-    def test_practice_booking_control_vitest_evidence_passes(self):
+    def test_party_skill_tab_vitest_evidence_passes(self):
+        # webclient-party-skill-tab: the party window's 技能 tab (segment,
+        # search and tree in payload order; meters, levels, 新 and booked
+        # tags; the ladder and lineage position only from the committed
+        # selected_skill; the opening selection with tab skills and its
+        # retry; 施放 / 排入修煉 for the viewed member with the committed combat
+        # reasons), the store's hand-over that closes the window before the
+        # dock, the companion cast through AppClient, and the retired
+        # drawer name's alias.
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/data/skill_book.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_skill_tab.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/skill_use_flow.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_drawers.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -922,7 +936,7 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "practice-booking-control Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "party skill tab Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

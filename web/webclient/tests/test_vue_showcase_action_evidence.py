@@ -148,11 +148,11 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 *ACTION_FAMILY_KEYS,
                 "Action/RestForm", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",
-                # The SkillBook casting flow's dock pane joined with
+                # The 技能-tab casting flow's dock pane joined with
                 # skillbook-authoritative-casting.
                 "Action/SkillUseDock",
                 "Data/StatusPanel",
-                "Data/VitalsTrack", "Data/SkillBook",
+                "Data/VitalsTrack",
                 "Data/ConditionChips",
                 "World/LocalMap", "World/ShopPanel",
                 "World/QuestDrawer", "World/LoreCodexDrawer",
@@ -169,6 +169,8 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Overlays/PartyBagTab",
                 # The party window\'s 狀態 tab (webclient-party-status-tab).
                 "Overlays/PartyStatusTab",
+                # The party window's 技能 tab (webclient-party-skill-tab).
+                "Overlays/PartySkillTab",
                 # The shared window primitives (webclient-window-primitives) joined the
                 # frozen set; this change pins them with the party window.
                 "Core/WindowFrame",
