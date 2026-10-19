@@ -177,26 +177,47 @@ describe("the party window in AppClient (webclient-party-window-member-tab)", ()
     store.receive(1, "ui_action_result", [fx.actionResult({ request_id: viewRequests()[0].request_id, outcome: "rejected", code: "nope", message: "不行。", presentation_revision: 1 })]);
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll('[data-testid="party-bag-tab"] [role="option"][aria-selected="true"]')).toHaveLength(0);
-    // Busy: a second click is refused with the busy toast and selects nothing.
+    // Busy: while 黑麥麵包 is in flight a click on another row is refused with
+    // the busy toast, and the in-flight row stays the selection.
     await row("rye_bread").trigger("click");
     await row("potion_heal").trigger("click");
     expect(viewRequests()).toHaveLength(2);
     expect(row("potion_heal").attributes("aria-selected")).toBe("false");
+    expect(row("rye_bread").attributes("aria-selected")).toBe("true");
+    expect(row("rye_bread").attributes("aria-busy")).toBe("true");
     expect(store.view.toasts.some((toast) => toast.title === "目前無法執行此操作，請稍後再試。")).toBe(true);
   });
 
-  it("a rail selection after an item click replaces the pending item", async () => {
+  it("keeps the requested row through the gap between the result and the update", async () => {
+    await openBag();
+    await row("rye_bread").trigger("click");
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: viewRequests()[0].request_id, presentation_revision: 2 })]);
+    await wrapper.vm.$nextTick();
+    expect(row("rye_bread").attributes("aria-selected")).toBe("true");
+    store.receive(1, "ui_update", [fx.update({ revision: 2, panels: { item_holdings: { ...PARTY_BAG_HOLDINGS_CONSUMABLE, item_key: "rye_bread" } } })]);
+    await wrapper.vm.$nextTick();
+    expect(row("rye_bread").attributes("aria-selected")).toBe("true");
+    expect(row("rye_bread").attributes("aria-busy")).toBeUndefined();
+  });
+
+  it("a rail selection replaces the pending item, and a late item result re-marks nothing", async () => {
     await openBag();
     await row("potion_heal").trigger("click");
-    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: viewRequests()[0].request_id, outcome: "rejected", code: "nope", message: "不行。", presentation_revision: 1 })]);
-    await wrapper.vm.$nextTick();
-    await row("rye_bread").trigger("click");
-    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: viewRequests()[1].request_id, outcome: "rejected", code: "nope", message: "不行。", presentation_revision: 1 })]);
+    const itemRequest = viewRequests()[0];
+    expect(row("potion_heal").attributes("aria-busy")).toBe("true");
+    // The single dispatch slot admits the rail selection only once the item
+    // request settles; the rail's request then owns the pending mark.
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: itemRequest.request_id, outcome: "rejected", code: "nope", message: "不行。", presentation_revision: 1 })]);
     await wrapper.vm.$nextTick();
     await entry(42).trigger("click");
     expect(viewRequests().at(-1).payload).toEqual({ member_id: 42, tab: "bag", skill_key: null, item_key: null });
     expect(entry(42).attributes("aria-busy")).toBe("true");
     expect(wrapper.findAll('[data-testid="party-bag-tab"] [role="option"][aria-busy="true"]')).toHaveLength(0);
+    // A duplicate late result for the old item request changes nothing.
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: itemRequest.request_id, outcome: "rejected", code: "nope", message: "不行。", presentation_revision: 1 })]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll('[data-testid="party-bag-tab"] [role="option"][aria-busy="true"]')).toHaveLength(0);
+    expect(entry(42).attributes("aria-busy")).toBe("true");
   });
 
   it("dispatches the give with the viewed member as giver and the use with its actor", async () => {

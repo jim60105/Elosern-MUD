@@ -186,8 +186,10 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   selection is server state: the window emits `view-item` and
   `use-party-window.js` sends one `party.view_member {member_id, tab: "bag",
   skill_key: null, item_key}`; the requested row shows (`aria-busy`) only while
-  that request id is the store's in-flight dispatch, after which the committed
-  `item_holdings.item_key` is the selection. The strip renders only an answer
+  that request id is the store's in-flight dispatch (a refused click keeps the
+  in-flight row; a request made for another member shows nothing), after
+  which the committed `item_holdings.item_key` is the selection; an
+  unavailable `item_holdings` states its reason for the last admitted row. The strip renders only an answer
   for exactly the shown item and viewed member. The stepper is bounded by the
   row's `give.max_quantity` (and the `party.transfer` wire limit of 99;
   equipment gives one) and resets with the member or item. Every intent leaves

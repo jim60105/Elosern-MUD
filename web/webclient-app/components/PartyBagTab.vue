@@ -99,10 +99,18 @@ const committedKey = computed(() => {
   if (!inventory.value || !holdings || holdings.available !== true || holdings.giver_id !== props.memberId) return null;
   return rowByKey(inventory.value, holdings.item_key) ? holdings.item_key : null;
 });
-const activeKey = computed(() => {
+// The requested row while its request is in flight; then the committed
+// answer's item; and, when the holdings panel itself is unavailable, the
+// last admitted request (so its committed reason can be stated).
+const requestPending = computed(() => {
   const requested = props.selectedItemKey;
-  if (requested !== null && requested === props.pendingItemKey && rowByKey(inventory.value, requested)) return requested;
-  return committedKey.value;
+  return requested !== null && requested === props.pendingItemKey && !!rowByKey(inventory.value, requested);
+});
+const activeKey = computed(() => {
+  if (requestPending.value) return props.selectedItemKey;
+  if (committedKey.value !== null) return committedKey.value;
+  if (props.itemHoldings?.available === false && rowByKey(inventory.value, props.selectedItemKey)) return props.selectedItemKey;
+  return null;
 });
 const activeRow = computed(() => rowByKey(inventory.value, activeKey.value));
 const isEquipment = computed(() => activeRow.value?.slot != null);
@@ -134,7 +142,8 @@ function onListKeydown(event) {
 // ---------------------------------------------------------------- detail
 
 const holdingsRows = computed(() => holdingsFor(props.itemHoldings, props.memberId, activeKey.value));
-const holdingsReason = computed(() => panelReason(props.itemHoldings));
+// An unavailable answer's reason, never while a newer request is waiting.
+const holdingsReason = computed(() => (requestPending.value ? null : panelReason(props.itemHoldings)));
 
 // The row's glyph: the bag's local glyph for its committed icon key, else
 // the shared item icon (or the neutral unknown icon).
@@ -249,9 +258,18 @@ function openConfirm(row) {
 
 function closeConfirm(restoreFocus = true) {
   if (!confirming.value) return;
+  const focusInside = !!dialogEl.value?.contains(document.activeElement);
   confirming.value = null;
-  if (!restoreFocus) return;
-  nextTick(() => root.value?.querySelector('[data-testid="action-bar__btn--use"]')?.focus());
+  // A retired confirmation (its member, item or descriptor changed) hands
+  // focus to the list's tab stop, so focus never drops out of the window.
+  if (!restoreFocus && !focusInside) return;
+  nextTick(() => {
+    const target =
+      (restoreFocus && root.value?.querySelector('[data-testid="action-bar__btn--use"]:not([aria-disabled="true"])')) ||
+      root.value?.querySelector('[role="option"][tabindex="0"]') ||
+      root.value?.querySelector('[data-testid="party-bag-tab__slot--weapon_main"]');
+    target?.focus();
+  });
 }
 
 function confirmUse() {

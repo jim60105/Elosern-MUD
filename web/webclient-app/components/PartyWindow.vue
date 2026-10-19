@@ -140,13 +140,20 @@ function setItem(key) {
 function setQuantity(value) {
   quantity.value = Number.isSafeInteger(value) && value > 0 ? value : 1;
 }
-// A bag row selection: remembered locally as the request, sent as one
-// `party.view_member` for the viewed member with that `item_key`.
+// A bag row selection: sent as one `party.view_member` for the viewed
+// member with that `item_key`. Only an admitted request (one the host marks
+// in flight) becomes the local selection, so a refused click never replaces
+// the row already requested or committed.
 function onSelectItem(key) {
   if (viewedId.value === null) return;
-  setItem(key);
   emit("view-item", { memberId: viewedId.value, itemKey: key });
 }
+watch(
+  () => props.pendingItemKey,
+  (key) => {
+    if (key !== null) setItem(key);
+  },
+);
 
 // --------------------------------------------------------------- header
 

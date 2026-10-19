@@ -23,10 +23,17 @@ export function usePartyWindow(store, dispatchIntent, { panel }) {
     return store.view.dispatch?.inFlight?.requestId === request.requestId ? request : null;
   });
   const pendingMemberId = computed(() => (inFlight.value && inFlight.value.itemKey === null ? inFlight.value.memberId : null));
-  const pendingItemKey = computed(() => inFlight.value?.itemKey ?? null);
+  // An item request counts only for the member it was made for: a viewed
+  // member that changed meanwhile (a server fallback) shows no pending row.
+  const pendingItemKey = computed(() => {
+    const request = inFlight.value;
+    if (!request || request.itemKey === null) return null;
+    return panel("party")?.viewed_member_id === request.memberId ? request.itemKey : null;
+  });
 
-  // Every selection replaces the previous pending one: a rail click after an
-  // item click leaves no item pending.
+  // Every admitted selection replaces the previous pending one (a rail click
+  // after an item click leaves no item pending); a refused one leaves the
+  // request still in flight marked.
   function select(memberId, tab, itemKey) {
     const requestId = dispatchIntent("party.view_member", {
       member_id: memberId,
@@ -34,7 +41,7 @@ export function usePartyWindow(store, dispatchIntent, { panel }) {
       skill_key: null,
       item_key: itemKey,
     });
-    pending.value = requestId === null ? null : { memberId, itemKey, requestId };
+    if (requestId !== null) pending.value = { memberId, itemKey, requestId };
     return requestId;
   }
 

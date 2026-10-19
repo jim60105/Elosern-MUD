@@ -128,12 +128,36 @@ describe("PartyBagTab (webclient-party-bag-tab)", () => {
     await wrapper.setProps({ selectedItemKey: "rye_bread", pendingItemKey: "rye_bread" });
     expect(get("party-bag-tab__title").text()).toBe("黑麥麵包");
     expect(find("holdings-strip").exists()).toBe(false);
-    // An unavailable holdings panel states its registry reason only.
+    // An unavailable holdings panel: while the request still waits, the
+    // wait state shows rather than a stale reason; once it ends, the
+    // requested row states the registry reason only.
     await wrapper.setProps({
       itemHoldings: { schema_version: 1, available: false, reason: { code: "holdings_unavailable", message: "持有量目前無法顯示。" } },
     });
+    expect(find("party-bag-tab__holdings-unavailable").exists()).toBe(false);
+    expect(find("party-bag-tab__holdings-wait").exists()).toBe(true);
+    await wrapper.setProps({ pendingItemKey: null });
+    expect(get("party-bag-tab__title").text()).toBe("黑麥麵包");
     expect(get("party-bag-tab__holdings-unavailable").text()).toBe("持有量目前無法顯示。");
     expect(find("holdings-strip").exists()).toBe(false);
+  });
+
+  it("keeps focus in the window when a changed descriptor retires the confirmation", async () => {
+    mountTab();
+    await get("action-bar__btn--use").trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(get("party-bag-tab__confirm-ok").element);
+    const gated = {
+      ...PARTY_BAG_INVENTORY_SAMPLE,
+      rows: PARTY_BAG_INVENTORY_SAMPLE.rows.map((row) =>
+        row.item_key === "potion_heal" ? { ...row, use: { route: "field_use", enabled: false, reason: "現在不需要。" } } : row,
+      ),
+    };
+    await wrapper.setProps({ partyInventory: gated });
+    await wrapper.vm.$nextTick();
+    expect(find("party-bag-tab__confirm-dialog").exists()).toBe(false);
+    expect(wrapper.element.contains(document.activeElement)).toBe(true);
+    expect(actions()).toEqual([]);
   });
 
   it("shows equipment deltas verbatim from the server", () => {

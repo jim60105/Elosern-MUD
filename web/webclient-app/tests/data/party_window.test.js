@@ -129,6 +129,11 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
     // A row selection sends one view-item for the viewed member.
     await wrapper.get('[data-testid="party-bag-tab__row--rye_bread"]').trigger("click");
     expect(wrapper.emitted("view-item")).toEqual([[{ memberId: 101, itemKey: "rye_bread" }]]);
+    // Not admitted yet (no pending request): the committed potion stays.
+    expect(wrapper.get('[data-testid="party-bag-tab__title"]').text()).toBe("苦艾藥水");
+    // Admitted: the requested row shows while it is in flight.
+    await wrapper.setProps({ pendingItemKey: "rye_bread" });
+    expect(wrapper.get('[data-testid="party-bag-tab__title"]').text()).toBe("黑麥麵包");
     // 蕾娜 left the party: the server's next payload names the commander and
     // the commander's bag with no selected item.
     await wrapper.setProps({
@@ -139,12 +144,11 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
       },
       partyInventory: { ...PARTY_BAG_INVENTORY_SAMPLE, member_id: 42 },
       itemHoldings: { ...PARTY_BAG_HOLDINGS_NONE, giver_id: 42 },
-      pendingItemKey: "rye_bread",
+      pendingItemKey: null,
     });
     expect(entry(42).attributes("aria-current")).toBe("true");
     expect(wrapper.get('[data-testid="party-bag-tab"]').attributes("data-member")).toBe("42");
-    // The requested key was reset with the member, so the in-flight key no
-    // longer shows and nothing stays selected.
+    // The local selection was reset with the member: nothing stays selected.
     expect(wrapper.find('[data-testid="party-bag-tab__title"]').exists()).toBe(false);
     expect(wrapper.findAll('[role="option"][aria-selected="true"]')).toHaveLength(0);
   });
