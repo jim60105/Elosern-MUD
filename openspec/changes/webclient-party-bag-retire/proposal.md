@@ -20,11 +20,12 @@ None.
 ### Modified Capabilities
 
 - `webclient-party-window`: adds the combat bag requirement.
-- `webclient-contextual-hud`: removes the bag and doll requirements, renames the wallet requirement to the party purse, updates empty guidance.
+- `webclient-contextual-hud`: removes the bag and doll requirements, renames the wallet requirement to the party purse, updates empty guidance and the reference-drawer frame requirement's bag scenarios.
 - `inventory-item-actions`: tile and dialog requirements move to the bag tab.
-- `webclient-component-showcase`: surfaces and breakdown-story requirements name the bag tab.
+- `webclient-component-showcase`: surfaces, breakdown-story, required-component and held-item bag requirements name the bag tab.
 - `webclient-service-menus`: browser acceptance names the bag tab.
 - `webclient-possession-presentation`: the inventory hybrid scenarios read `party_inventory` for the viewed member.
+- `webclient-exploration-menu`: the browser acceptance names the party window's 背包 tab.
 
 ## Impact
 
