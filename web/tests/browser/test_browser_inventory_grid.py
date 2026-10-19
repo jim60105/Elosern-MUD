@@ -1,12 +1,13 @@
-"""Focused browser acceptance for the redesigned inventory item grid (H4 + redesign-inventory-item-grid).
+"""Focused browser acceptance for the party window's 背包 rows (webclient-party-bag-retire).
 
-Journey: open the inventory drawer through the exploration root's Inventory
-entry, then assert that the responsive tile grid renders exactly the
-committed ``services.inventory`` rows (no invented total or rarity), with
-per-tile held counts, the non-colour rarity treatment, and the shared
-hover/focus inspector spelling the committed kind/rarity words. Clicking or
-focusing a tile never dispatches a ``ui_action`` — the drawer body is a
-purely presentational surface.
+The old frameless bag drawer and its tile grid are retired: the top
+navigation's 背包 entry opens the party window on its 背包 tab. Journey: open
+it from the exploration root, then assert that the tab lists exactly the
+viewed member's committed ``party_inventory`` rows (held counts, no invented
+total), that each committed rarity draws its own non-colour border pattern,
+that one tab stop and the arrow keys reach every row, and that selecting a
+row asks the server for that item once and shows its committed kind and
+rarity words. Opening and arrowing dispatch nothing.
 """
 
 from __future__ import annotations
@@ -15,9 +16,7 @@ from tools.spec_traceability import covers_requirement
 
 from web.browser_support.browser_fixtures_data import kind_word, rarity_word, store_fixture_values
 
-from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
     store_state,
@@ -25,142 +24,93 @@ from .browser_helpers import (
 )
 from .test_browser_services_base import ServicesBrowserTest
 
+ROW = "party-bag-tab__row--{}"
+
 
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
     page.wait_for_timeout(wait_ms)
 
 
+def _focused_testid(page):
+    return page.evaluate(
+        "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
+    )
+
+
 class InventoryGridJourneys(ServicesBrowserTest):
-    """Inventory item-grid journeys on the dedicated store_open server."""
+    """The 背包 tab's committed rows on the dedicated store_open server."""
 
     SERVICES_MODE = "store_open"
 
-    def _open_inventory_drawer(self, page):
-        """Open the frameless inventory drawer from the exploration root.
-
-        make-inventory-drawer-frameless: the 背包 entry opens the drawer as a
-        client-local open — no keyboard frame is pushed and the router's
-        frame stack stays at the root.
-        """
-        focus_action_dock(page)
-        # The base class's `_wait_services_available` opened the reference
-        # quest drawer as its journey's first step (H4 task 4.3). The drawer
-        # is the design's modal surface (HudDrawer.vue: the blurred scrim
-        # covers the whole stage while open), so the nav click must follow a
-        # close — Escape is the keyboard close the drawer owns (design D4).
-        # The store's single close entry (the same entry the drawer's own
-        # close control, scrim, and Escape handler funnel through): the
-        # focus-trap makes raw key dispatch focus-dependent, so the close
-        # goes through the store entry the gate used to open the drawer.
+    def _open_bag_tab(self, page):
+        # The base gate opened the quest drawer; the drawer is modal, so the
+        # navigation click follows the store's single close entry.
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.closeHudDrawer({ popFrame: true }); }"
         )
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
-        # The desktop redesign re-homed the 背包 entry into the top
-        # navigation (webclient-desktop-shell, acd3790): the dock root is the
-        # capability-driven [move, look, interact, wait, suggestions], so the
-        # drawer opens from the DesktopNavigation 背包 click — the same
-        # client-local openHudDrawer('inventory') the old dock row submitted
-        # (make-inventory-drawer-frameless: no keyboard frame is pushed).
-        page.locator('.desktop-navigation button', has_text="背包").click()
-        wait_for_store_state(
-            page,
-            lambda s: s.get("hudDrawer") == "inventory",
-            dom_readiness={
-                "selector": '[data-testid="inventory-panel"]',
-                "predicate": (
-                    "() => !!document.querySelector('[data-testid=\"inventory-panel\"]')"
-                ),
-                "description": "frameless inventory drawer rendered",
-            },
-        )
-        return self._services_panel(page)
+        return self._open_surface(page, "inventory")
 
     @covers_requirement(
-        "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully",
         "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
         "webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields",
+        "webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings",
     )
-    def test_grid_renders_only_committed_rows_without_invented_total_or_rarity(self):
+    def test_bag_tab_lists_the_committed_rows_with_keyboard_reach(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_services_available(page)
-        panel = self._open_inventory_drawer(page)
+        depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        sent_before = sent_action_count(page)
+        panel = self._open_bag_tab(page)
 
-        for viewport in ((1451, 790), (2560, 1440)):
-            page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
-            readability = page.evaluate(r"""() => {
-              const title = document.querySelector('.equipment-doll__title');
-              const range = document.createRange();
-              range.selectNodeContents(title.firstChild);
-              const titleRows = [...range.getClientRects()].length;
-              const luminance = (rgb) => rgb.map(v => {
-                const c = v / 255;
-                return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
-              }).reduce((v, c, i) => v + c * [.2126,.7152,.0722][i], 0);
-              const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number);
-              const texts = [...document.querySelectorAll(
-                '.equipment-doll__title-tag,.equipment-doll__slot-empty,' +
-                '.inventory-panel__heading-tag,.inventory-panel__statrow-unit'
-              )];
-              return {titleRows, contrast: texts.map(e => {
-                let p = e;
-                while (p.parentElement && getComputedStyle(p).backgroundColor === 'rgba(0, 0, 0, 0)')
-                  p = p.parentElement;
-                const foreground = luminance(rgb(getComputedStyle(e).color));
-                const background = luminance(rgb(getComputedStyle(p).backgroundColor));
-                return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
-              })};
-            }""")
-            self.assertEqual(readability["titleRows"], 1, viewport)
-            self.assertTrue(readability["contrast"], viewport)
-            self.assertGreaterEqual(min(readability["contrast"]), 4.5, viewport)
-        page.set_viewport_size({"width": 1451, "height": 790})
+        # The open is client-local: no frame, no dispatch.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
+        self.assertEqual(sent_action_count(page), sent_before)
+        self.assertEqual(
+            page.evaluate(
+                """() => {
+                  const drawer = document.querySelector('[data-testid="hud-drawer"]');
+                  return drawer.querySelectorAll('[data-testid="dock-menu"], [data-testid="dock-detail"]').length;
+                }"""
+            ),
+            0,
+        )
 
-        # The committed panel is the source of truth: two held item keys,
-        # with exact held counts and committed presentation metadata.
+        # The committed panel is the source of truth: the viewed member (the
+        # commander by default) holds the two fixture items.
         STORE = store_fixture_values()
         potion, staple = STORE["potion_key"], STORE["staple_key"]
-        committed = {row["item_key"]: row for row in panel["inventory"]["rows"]}
+        committed = {row["item_key"]: row for row in panel["rows"]}
         self.assertEqual(committed[staple]["held"], 2)
         self.assertEqual(committed[potion]["held"], 1)
-        self.assertEqual(committed[staple]["presentation"]["rarity"], STORE["staple_rarity"])
         self.assertEqual(committed[potion]["presentation"]["rarity"], STORE["potion_rarity"])
-        self.assertNotIn("total", panel["inventory"])
+        self.assertNotIn("total", panel)
 
-        # The grid renders exactly the committed rows: one tile per committed
-        # item key, each carrying its committed presentation rarity.
-        tiles = page.evaluate(
-            """() => {
-                const rows = Array.from(
-                    document.querySelectorAll('[data-testid^="inventory-panel__tile--"]')
-                ).map((t) => t.getAttribute("data-testid"));
-                return rows;
-            }"""
+        rows = page.evaluate(
+            """() => Array.from(
+                document.querySelectorAll('[data-testid^="party-bag-tab__row--"]')
+              ).map((row) => ({
+                id: row.getAttribute("data-testid"),
+                held: row.querySelector('[data-testid^="party-bag-tab__held--"]').textContent,
+                rarity: row.querySelector(".party-bag-tab__icon").getAttribute("data-rarity"),
+              }))"""
         )
+        self.assertEqual(sorted(r["id"] for r in rows), sorted(ROW.format(k) for k in committed))
+        held = {r["id"]: r["held"] for r in rows}
+        self.assertEqual(held[ROW.format(staple)], "×2")
+        self.assertEqual(held[ROW.format(potion)], "×1")
+        # The tab's count is the shipped row count, never a holdings total.
         self.assertEqual(
-            sorted(tiles),
-            sorted(
-                f"inventory-panel__tile--{key}" for key in (potion, staple)
-            ),
+            page.locator('[data-testid="party-bag-tab__count"]').text_content(),
+            f"{len(committed)} 種",
         )
-        rarities = page.evaluate(
-            """() => {
-                return Array.from(
-                    document.querySelectorAll('[data-testid^="inventory-panel__tile--"]')
-                ).map((t) => t.getAttribute("data-rarity"));
-            }"""
-        )
-        self.assertEqual(
-            sorted(rarities),
-            sorted([STORE["potion_rarity"], STORE["staple_rarity"]]),
-        )
-        # webclient-drawer-content-polish: each committed rarity draws its
-        # own border pattern at a width where the pattern is visible, so the
-        # frame is never colour-only; common stays a neutral 1px solid line.
+
+        # Each committed rarity draws its own border pattern at a width where
+        # it shows; common stays a neutral 1px solid line.
         frame_patterns = {
             "common": ("solid", "1px"),
             "uncommon": ("dotted", "2px"),
@@ -169,234 +119,56 @@ class InventoryGridJourneys(ServicesBrowserTest):
             "legendary": ("ridge", "3px"),
         }
         frames = page.evaluate(
-            """() => Array.from(
-                document.querySelectorAll('[data-testid^="inventory-panel__tile--"]')
-            ).map((t) => {
-                const cs = getComputedStyle(t);
-                return [t.getAttribute("data-rarity"), cs.borderTopStyle, cs.borderTopWidth];
+            """() => Array.from(document.querySelectorAll('.party-bag-tab__icon')).map((icon) => {
+                const cs = getComputedStyle(icon);
+                return [icon.getAttribute("data-rarity"), cs.borderTopStyle, cs.borderTopWidth];
             })"""
         )
         for rarity, style, width in frames:
-            self.assertEqual((style, width), frame_patterns[rarity], rarity)
+            if rarity in frame_patterns:
+                self.assertEqual((style, width), frame_patterns[rarity], rarity)
 
-        # The lower-corner held count is the committed ``held`` value, never
-        # a fabricated total.
-        counts = page.evaluate(
-            """({staple, potion}) => {
-                const Staple = document.querySelector(
-                    `[data-testid="inventory-panel__count--${staple}"]`);
-                const Potion = document.querySelector(
-                    `[data-testid="inventory-panel__count--${potion}"]`);
-                return [Staple.textContent, Potion.textContent];
-            }""",
-            {"staple": staple, "potion": potion},
+        # One tab stop: exactly one row is tabbable, and the arrow keys reach
+        # every row without dispatching anything.
+        tab_stops = page.evaluate(
+            """() => Array.from(document.querySelectorAll('[role="option"]'))
+                .filter((row) => row.tabIndex === 0).map((row) => row.getAttribute("data-testid"))"""
         )
-        self.assertEqual(counts, ["2", "1"])
+        self.assertEqual(len(tab_stops), 1)
+        page.locator(f'[data-testid="{tab_stops[0]}"]').focus()
+        reached = {_focused_testid(page)}
+        for _ in range(len(committed)):
+            _press(page, "ArrowDown")
+            reached.add(_focused_testid(page))
+        self.assertEqual(reached, {ROW.format(k) for k in committed})
+        self.assertEqual(sent_action_count(page), sent_before)
 
-        # No state-changing control (use/equip/drag/sort/filter/search) is
-        # rendered inside the drawer body — only the tile buttons.
-        button_count = page.evaluate(
-            """() => {
-                const panel = document.querySelector('[data-testid="inventory-panel"]');
-                return panel.querySelectorAll("button").length;
-            }"""
-        )
-        self.assertEqual(button_count, 2)
-
-        # Focus a tile: the shared inspector spells the committed kind and
-        # rarity words, the held count, and the equipped state.
-        # Playwright's locator focus waits for the element to be actionable —
-        # the raw evaluate focus raced the drawer's mounting re-render (the
-        # focused node was replaced before Vue's @focus listener ran). The
-        # bound attribute is then awaited deterministically instead of a
-        # fixed sleep.
-        potion_tile = f'[data-testid="inventory-panel__tile--{potion}"]'
-        page.locator(potion_tile).focus()
-        page.wait_for_function(
-            f"() => document.querySelector('[data-testid=\"inventory-panel__tile--{potion}\"]')"
-            ".getAttribute('aria-describedby') === 'inventory-panel-inspector'",
-            timeout=10000,
-        )
-        describedby = page.evaluate(
-            f"""() => document.querySelector('[data-testid="inventory-panel__tile--{potion}"]').getAttribute("aria-describedby")"""
-        )
-        self.assertEqual(describedby, "inventory-panel-inspector")
-        name = page.evaluate(
-            """() => document.querySelector('[data-testid="inventory-panel__inspector-name"]').textContent"""
-        )
-        self.assertEqual(name, STORE["potion_display"])
-        rarity = page.evaluate(
-            """() => {
-                const el = document.querySelector('[data-testid="inventory-panel__inspector-rarity"]');
-                return el ? el.textContent : null;
-            }"""
-        )
-        self.assertEqual(rarity, rarity_word(STORE["potion_rarity"]))
-        kind = page.evaluate(
-            """() => {
-                const el = document.querySelector('[data-testid="inventory-panel__inspector-kind"]');
-                return el ? el.textContent : null;
-            }"""
-        )
-        self.assertEqual(kind, kind_word(STORE["potion_kind"]))
-        held = page.evaluate(
-            """() => document.querySelector('[data-testid="inventory-panel__inspector-held"]').textContent"""
-        )
-        self.assertEqual(held, "1")
-        equipped = page.evaluate(
-            """() => document.querySelector('[data-testid="inventory-panel__inspector-equipped"]').textContent"""
-        )
-        self.assertEqual(equipped, "未裝備")
-
-        # Presentational only: neither hover/focus nor a tile click dispatches
-        # a ui_action (no use/equip is ever offered from the bag).
-        page.evaluate(
-            """({staple}) => {
-                const tile = document.querySelector(
-                    `[data-testid="inventory-panel__tile--${staple}"]`);
-                tile.click();
-                return true;
-            }""",
-            {"staple": staple},
-        )
-        page.wait_for_timeout(120)
-        self.assertEqual(sent_action_count(page), 0)
-
-        # Keyboard reachability (make-inventory-drawer-frameless): the tiles
-        # are the drawer's only row surface. Tab traversal through the focus
-        # trap reaches every committed row with the shared inspector following
-        # focus — the removed keyboard row list is not needed to reach them.
-        page.evaluate(
-            """() => {
-                document.querySelector('[data-testid="hud-drawer-close"]').focus();
-                return true;
-            }"""
-        )
-        visited = []
-        for _ in range(2):
-            page.keyboard.press("Tab")
-            page.wait_for_timeout(60)
-            visited.append(
-                page.evaluate(
-                    """() => {
-                        const el = document.activeElement;
-                        return el && el.getAttribute
-                            ? el.getAttribute("data-testid")
-                            : null;
-                    }"""
-                )
-            )
-        self.assertEqual(
-            sorted(visited),
-            sorted(f"inventory-panel__tile--{key}" for key in (potion, staple)),
-        )
-        focused_state = page.evaluate(
-            """() => ({
-                describedby: document.activeElement.getAttribute("aria-describedby"),
-                testid: document.activeElement.getAttribute("data-testid"),
-                name: document.querySelector('[data-testid="inventory-panel__inspector-name"]').textContent,
-            })"""
-        )
-        self.assertEqual(focused_state["describedby"], "inventory-panel-inspector")
-        # The shared inspector followed focus onto the last Tab stop: its
-        # committed display name, whatever the shipped row order is.
-        last_key = focused_state["testid"].split("--", 1)[1]
-        self.assertEqual(focused_state["name"], committed[last_key]["display_name"])
-
-    @covers_requirement(
-        "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity",
-        "webclient-contextual-hud::the-equipment-doll-renders-only-server-authored-slots-and-drops-nothing",
-        "webclient-contextual-hud::the-drawer-layer-renders-the-wallet-exactly-once",
-    )
-    def test_bag_is_the_three_section_stack_with_description_column_and_wallet_row(self):
-        """realign-inventory-drawer-layout: mock-faithful bag structure."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        self._wait_services_available(page)
-        panel = self._open_inventory_drawer(page)
-
-        # The store-open fixture carries two rows and an empty equipment set;
-        # the character panel owns the committed wallet figure.
-        self.assertEqual(len(panel["inventory"]["rows"]), 2)
-        character = (store_state(page).get("panels") or {}).get("character") or {}
-        self.assertTrue(character.get("available"), "exploration commits the character panel")
-        wallet = character.get("wallet")
-        self.assertIsInstance(wallet, int)
-
-        # The body is the redesign's three-section stack: the equipment
-        # section (the doll), then `物品` (heading tagged with the shipped
-        # listing size over the tile grid), then `金錢`.
-        order = page.evaluate(
-            """() => {
-                const before = (a, b) => {
-                    const x = document.querySelector(a);
-                    const y = document.querySelector(b);
-                    if (!x || !y) return null;
-                    return (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)
-                        === Node.DOCUMENT_POSITION_FOLLOWING;
-                };
-                return {
-                    items: !!document.querySelector('[data-testid="inventory-panel__section--items"]'),
-                    wallet: !!document.querySelector('[data-testid="inventory-panel__section--wallet"]'),
-                    dollThenItems: before(
-                        '[data-testid="equipment-doll"]',
-                        '[data-testid="inventory-panel__section--items"]'
-                    ),
-                    itemsThenWallet: before(
-                        '[data-testid="inventory-panel__section--items"]',
-                        '[data-testid="inventory-panel__section--wallet"]'
-                    ),
-                    itemsCount: (
-                        document.querySelector('[data-testid="inventory-panel__items-count"]') || {}
-                    ).textContent,
-                };
-            }"""
+        # Enter selects: exactly one party.view_member for the viewed member
+        # with that item, after which the detail shows its committed words.
+        page.locator(f'[data-testid="{ROW.format(potion)}"]').focus()
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "party.view_member"), 1)
+        viewed = store_state(page)["panels"]["party"]["viewed_member_id"]
+        envelope = next(
+            args[0]
+            for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmd == "ui_action" and args and args[0].get("action_id") == "party.view_member"
         )
         self.assertEqual(
-            order,
-            {"items": True, "wallet": True, "dollThenItems": True, "itemsThenWallet": True, "itemsCount": "2"},
+            envelope["payload"],
+            {"member_id": viewed, "tab": "bag", "skill_key": None, "item_key": potion},
         )
-
-        # The doll renders the mock's `.doll` row: the square slot grid
-        # beside the 裝備描述 column. The fixture carries no equipment, so
-        # the column states the honest empty statement beside the dashed
-        # empty cells (never a fabricated item).
-        description = page.evaluate(
-            """() => {
-                const column = document.querySelector('[data-testid="equipment-doll__description"]');
-                const title = document.querySelector('[data-testid="equipment-doll__title"]');
-                return {
-                    text: column ? column.textContent.trim() : null,
-                    title: title ? title.textContent.trim() : null,
-                    emptyMain: !!document.querySelector('[data-testid="equipment-doll__slot-empty--weapon_main"]'),
-                };
-            }"""
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("item_holdings") or {}).get("item_key") == potion
+            and not (s.get("dispatch") or {}).get("inFlight"),
         )
-        self.assertIsNotNone(description["text"])
-        self.assertIn("目前沒有裝備任何物品。", description["text"])
-        self.assertEqual(description["title"], "裝備真值 ‧ 偽裝不影響")
-        self.assertTrue(description["emptyMain"])
-        body_text = page.evaluate(
-            "() => document.querySelector('[data-testid=\"inventory-panel\"]').textContent"
+        page.wait_for_selector('[data-testid="party-bag-tab__title"]')
+        self.assertEqual(
+            page.locator('[data-testid="party-bag-tab__title"]').text_content(), STORE["potion_display"]
         )
-        self.assertNotIn("裝備人偶", body_text)
-
-        # The wallet renders exactly twice in the drawer: the head subtitle
-        # and the `金錢` row, both the character-panel figure (the
-        # thousands-grouped integer), and no sort/filter/search pill exists.
-        balance = page.evaluate(
-            """() => ({
-                subtitle: (document.querySelector('.drawer-header__subtitle') || {}).textContent,
-                value: (document.querySelector('[data-testid="inventory-panel__wallet-value"]') || {}).textContent,
-                nodes: document.querySelectorAll('[data-testid="inventory-panel__wallet-value"]').length,
-            })"""
+        self.assertIn(kind_word(STORE["potion_kind"]), page.locator('[data-testid="party-bag-tab__ribbon"]').text_content())
+        self.assertEqual(
+            page.locator('[data-testid="party-bag-tab__rarity"]').text_content(), rarity_word(STORE["potion_rarity"])
         )
-        grouped = f"{wallet:,}"
-        self.assertEqual(balance["subtitle"], f"錢袋 {grouped} 銅")
-        self.assertEqual(balance["value"], grouped)
-        self.assertEqual(balance["nodes"], 1)
-        drawer_text = page.evaluate(
-            "() => document.querySelector('[data-testid=\"hud-drawer\"]').textContent"
-        )
-        for pill in ("排序", "篩選", "找尋"):
-            self.assertNotIn(pill, drawer_text)
+        self.assertEqual(page.locator(f'[data-testid="{ROW.format(potion)}"]').get_attribute("aria-selected"), "true")

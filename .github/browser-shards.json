@@ -180,8 +180,7 @@
       "files_b": [
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
-        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_is_the_three_section_stack_with_description_column_and_wallet_row",
-        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_grid_renders_only_committed_rows_without_invented_total_or_rarity"
+        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach"
       ]
     },
     {
@@ -411,6 +410,7 @@
         "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_official_and_synthetic_rows_carry_their_own_truth",
         "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_failed_original_never_saves",
         "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
+        "web.tests.browser.test_browser_inventory_actions.PartyBagTransferJourney.test_give_and_equip_a_companion_then_combat_disables_transfer",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan"
