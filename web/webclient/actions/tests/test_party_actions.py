@@ -516,3 +516,22 @@ class PartyViewMemberAdapterTests(EvenniaTestCase):
                     "item_holdings",
                     registry.spec(action_id).affected_panels,
                 )
+
+
+class TradeRepublishesBagTests(unittest.TestCase):
+    """services v7 carries no inventory, so a trade republishes the bag panel."""
+
+    @covers_requirement(
+        "webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative"
+    )
+    def test_trades_republish_the_party_inventory_beside_the_shop_rows(self):
+        from web.webclient.actions.service_actions import AFFECTED_TRADE
+
+        registry = build_production_action_registry()
+        for action_id in ("shop.buy", "shop.sell"):
+            with self.subTest(action=action_id):
+                panels = registry.spec(action_id).affected_panels
+                self.assertEqual(panels, AFFECTED_TRADE)
+                self.assertIn("party_inventory", panels)
+                self.assertIn("services", panels)
+
