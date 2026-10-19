@@ -20,6 +20,8 @@ None.
 
 - `skill-lineage-panel`: the window requirement becomes the 系譜 tab (renamed).
 - `webclient-party-window`: adds the lineage tab requirements.
+- `webclient-desktop-shell`: the tool group's 技能系譜 control opens the party window on 系譜 instead of the retired lineage overlay.
+- `webclient-contextual-hud`: the lineage row identity scenario describes the 系譜 tab's list row instead of the retired collapsed chain row.
 
 ## Impact
 
