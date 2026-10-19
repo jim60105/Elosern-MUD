@@ -16,7 +16,7 @@ const SURFACES = [
   { icon: "character", heading: "角色狀態" },
   { icon: "quests", heading: "任務" },
   { icon: "inventory", heading: "背包 ‧ 裝備", sub: "錢袋 3,240 銅" },
-  { icon: "skills", heading: "技能書", sub: "主動 11 ‧ 被動 3" },
+  { icon: "skills", heading: "技能", sub: "主動 11 ‧ 被動 3" },
   { icon: "party", heading: "同伴 ‧ 隊伍", sub: "1 / 4" },
   { icon: "shop", heading: "商店" },
   { icon: "lore", heading: "世界圖鑑" },

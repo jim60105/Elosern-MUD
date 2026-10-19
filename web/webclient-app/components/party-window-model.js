@@ -16,11 +16,10 @@ export const PARTY_WINDOW_TABS = Object.freeze([
 
 export const PARTY_WINDOW_TAB_KEYS = new Set(PARTY_WINDOW_TABS.map((tab) => tab.key));
 
-// The panel each not-yet-built tab reads (the next changes fill them; the
-// 背包 and 狀態 tabs are PartyBagTab and PartyStatusTab, which state their own
-// panel's reason).
+// The panel each not-yet-built tab reads (the next change fills it; the
+// 背包, 狀態 and 技能 tabs are PartyBagTab, PartyStatusTab and PartySkillTab,
+// which state their own panel's reason).
 export const TAB_BACKING_PANEL = Object.freeze({
-  skills: "character",
   lineage: "lineage",
 });
 

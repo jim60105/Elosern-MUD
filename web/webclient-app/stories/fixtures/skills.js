@@ -1,6 +1,6 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The character's skill data as the SkillBook consumes it: the character
+// The character's skill data as the party window's 技能 tab consumes it: the character
 // payload's actives/passives grouping, with the rows the C1 getter backs from
 // the character presenter's registry enrichment — `cost` (a bounded object,
 // the empty object being the free form), `target_spec`, the

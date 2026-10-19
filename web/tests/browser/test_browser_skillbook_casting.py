@@ -1,4 +1,6 @@
-"""SkillBook graphical skill use (skillbook-authoritative-casting): live-client journeys.
+"""技能-tab graphical skill use (skillbook-authoritative-casting,
+webclient-party-skill-tab): live-client journeys through the party window's
+技能 tab, which replaced the SkillBook drawer.
 
 Isolated localhost managed servers with every external service blocked. The
 read-only journeys (book hierarchy and geometry at both acceptance viewports,
@@ -44,8 +46,10 @@ class _SkillBookJourney:
         page.wait_for_timeout(wait)
 
     def _open_book(self, page):
+        # The retired skill-book drawer name opens the party window on 技能.
         page.evaluate("() => window.__elosernBridge.store.openHudDrawer('skill')")
-        page.wait_for_selector('[data-testid="skill-book"]', timeout=15000)
+        page.wait_for_selector('[data-testid="party-skill-tab"]', timeout=15000)
+        page.wait_for_selector('[data-testid="party-skill-tab__tree"]', timeout=15000)
 
     def _select_by_search(self, page, label):
         """Keyboard-only: `/` → search → ↓ into the tree → Enter to the actions."""
@@ -103,9 +107,9 @@ class _SkillBookJourney:
 
 
 class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
-    """Read-only SkillBook journeys on the shared managed server."""
+    """Read-only 技能-tab journeys on the shared managed server."""
 
-    @covers_requirement("webclient-skillbook-casting::skillbook-redesign-is-apply-owned-and-availability-is-truthful")
+    @covers_requirement("webclient-skillbook-casting::the-skill-tab-follows-the-approved-prototype-and-availability-is-truthful")
     def test_book_hierarchy_geometry_and_focus_at_both_viewports(self):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
@@ -116,73 +120,77 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
                 geometry = page.evaluate(
                     """() => {
                       const r = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect().toJSON() : null; };
-                      const body = document.querySelector('.skill-book');
+                      const body = document.querySelector('[data-testid="party-skill-tab"]');
                       return {
                         drawer: r('[data-testid="hud-drawer"]'),
-                        list: r('.skill-book__list'),
-                        detail: r('[data-testid="skill-book__detail"]'),
-                        use: r('[data-testid="skill-book__use"]'),
-                        practice: r('[data-testid="skill-book__practice"]'),
+                        list: r('[data-testid="party-skill-tab"] [data-testid="list-detail__list"]'),
+                        detail: r('[data-testid="party-skill-tab"] [data-testid="list-detail__detail"]'),
+                        use: r('[data-testid="action-bar__btn--cast"]'),
+                        practice: r('[data-testid="action-bar__btn--practice"]'),
                         overflowX: body.scrollWidth - body.clientWidth,
                         footer: !!document.querySelector('[data-testid="skill-book-cast-hint"]'),
-                        hint: (document.querySelector('[data-testid="skill-book-key-hint"]') || {}).textContent || '',
+                        titles: document.querySelectorAll('.drawer-header__title').length,
                         combatBadge: /\\bcombat\\b/.test(body.textContent),
-                        chevronMs: getComputedStyle(document.querySelector('.skill-book__category-chevron')).transitionDuration,
+                        chevronMs: getComputedStyle(document.querySelector('.party-skill-tab__chevron')).transitionDuration,
                       };
                     }"""
                 )
                 drawer, list_, detail = geometry["drawer"], geometry["list"], geometry["detail"]
-                self.assertLessEqual(geometry["overflowX"], 1, "the book must not scroll horizontally")
+                self.assertLessEqual(geometry["overflowX"], 1, "the tab must not scroll horizontally")
                 # Master–detail: the card sits beside the list, inside the drawer.
                 self.assertLessEqual(list_["right"], detail["left"])
                 self.assertGreaterEqual(detail["left"], drawer["left"])
                 self.assertLessEqual(detail["right"], drawer["right"])
-                # The two actions sit side by side inside the card, never overlapping.
-                self.assertLessEqual(geometry["use"]["right"], geometry["practice"]["left"])
-                self.assertLessEqual(geometry["practice"]["right"], detail["right"])
+                # The two actions sit side by side in the bar, never overlapping.
+                self.assertLessEqual(geometry["practice"]["right"], geometry["use"]["left"])
+                self.assertLessEqual(geometry["use"]["right"], detail["right"])
                 self.assertFalse(geometry["footer"], "the retired cast-syntax footer must be gone")
-                self.assertIn("Enter 前往動作", geometry["hint"])
+                self.assertEqual(geometry["titles"], 1, "the window title renders once")
                 self.assertFalse(geometry["combatBadge"], "no literal `combat` badge")
                 # The suite runs at the `off` motion level: no transition plays.
                 self.assertIn(geometry["chevronMs"], ("0s", "0ms"))
                 # Keyboard: the tree holds a single tab stop and Enter goes to 施放.
-                page.locator('[data-testid="skill-book__tree"] [tabindex="0"]').focus()
+                page.locator('[data-testid="party-skill-tab__tree"] [tabindex="0"]').focus()
                 self._press(page, "Enter")
                 active = page.evaluate("() => document.activeElement.getAttribute('data-testid')")
-                self.assertIn(active, ("skill-book__use", "skill-book__practice"))
+                self.assertIn(active, ("action-bar__btn--cast", "action-bar__btn--practice"))
                 ring = page.evaluate("() => getComputedStyle(document.activeElement).boxShadow")
                 self.assertNotEqual(ring, "none", "the focused action carries a visible focus ring")
 
-    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice")
+    @covers_requirement("webclient-skillbook-casting::skill-tab-use-shares-one-keyboard-owner-and-preserves-practice")
     def test_cancel_back_returns_to_the_book_without_casting(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._open_book(page)
         self._select_by_search(page, self._skill_label(page, UTILITY_SINGLE))
-        self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-testid')"), "skill-book__use")
+        self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-testid')"), "action-bar__btn--cast")
         self._press(page, "Enter")
         self._wait_flow(page, UTILITY_SINGLE)
         page.wait_for_selector('[data-testid="skill-use-dock"]', timeout=15000)
         page.wait_for_timeout(150)
         self.assertTrue(
             page.evaluate("() => document.activeElement && document.activeElement.id === 'action-dock'"),
-            "the dock owns focus once the book hands over",
+            "the dock owns focus once the window hands over",
         )
         self.assertEqual(page.locator('[data-testid="hud-drawer-scrim"]').count(), 0)
         # Navigate, then back out.
         self._press(page, "ArrowDown")
         self._press(page, "Escape")
-        page.wait_for_selector('[data-testid="skill-book"]', timeout=15000)
+        page.wait_for_selector('[data-testid="party-skill-tab"]', timeout=15000)
         page.wait_for_timeout(200)
         self.assertEqual(
             page.evaluate("() => document.activeElement.getAttribute('data-testid')"),
-            "skill-book__use",
+            "action-bar__btn--cast",
         )
-        selected = page.locator('[data-testid="skill-book__skill"][aria-selected="true"]').get_attribute("data-key")
+        selected = page.locator('[data-testid="party-skill-tab__row"][aria-selected="true"]').get_attribute("data-key")
         self.assertEqual(selected, UTILITY_SINGLE)
         self.assertEqual(len(self._actions(page, "explore.cast")), 0)
         self.assertEqual(len(self._actions(page, "explore.skill_preview")), 1)
-        self.assertEqual(sent_action_count(page), 1, "only the read-only preview was sent")
+        # Besides the tab's read-only selection requests (party.view_member,
+        # tab skills), only the read-only preview was sent.
+        selections = self._actions(page, "party.view_member")
+        self.assertTrue(all(a["payload"]["tab"] == "skills" for a in selections))
+        self.assertEqual(sent_action_count(page) - len(selections), 1, "only the read-only preview was sent")
 
     def test_monster_openings_disclose_the_whole_line_up(self):
         page = self.logged_in_page()
@@ -268,7 +276,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
             what,
         )
 
-    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice")
+    @covers_requirement("webclient-skillbook-casting::skill-tab-use-shares-one-keyboard-owner-and-preserves-practice")
     def test_keyboard_self_none_and_single_utility_casts(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -284,7 +292,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
             self._actions(page, "explore.cast")[-1]["payload"],
             {"actor_id": actor, "skill_key": SELF_BUFF},
         )
-        # The committed cast retires the flow without reopening the book.
+        # The committed cast retires the flow without reopening the window.
         self.assertIsNone(state["hudDrawer"])
 
         # SINGLE ordinary: the server identity of the chosen row, nothing else.
@@ -308,7 +316,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         self.assertEqual(store_state(page)["mode"], "exploration")
         self.assertEqual(len(self._actions(page, "explore.cast")), 3)
 
-    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
+    @covers_requirement("webclient-skillbook-casting::skill-tab-use-shares-one-keyboard-owner-and-preserves-practice", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -366,19 +374,108 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         self.assertEqual(foes, monsters, "the AREA opening engaged the whole disclosed line-up")
         self.assertIsNone(state["skillUse"])
 
-        # In combat the book's action only hands focus to the combat 技能 entry.
-        sent_before = sent_action_count(page)
+        # In combat the 技能 tab keeps the committed rows, but 施放 and
+        # 排入修煉 are disabled with their committed reasons and send
+        # nothing: combat casting stays on the command card.
+        self._wait_idle(page)
         self._open_book(page)
-        # The character panel is withheld in combat: the book states the
-        # server reason and offers only the hand-off.
-        self.assertTrue(page.locator('[data-testid="skill-book__unavailable"]').is_visible())
-        button = page.locator('[data-testid="skill-book__combat-handoff"]')
-        self.assertEqual(button.inner_text(), "改用戰鬥指令")
+        sent_before = sent_action_count(page)
+        cast = page.locator('[data-testid="action-bar__btn--cast"]')
+        practice = page.locator('[data-testid="action-bar__btn--practice"]')
+        self.assertEqual(cast.get_attribute("aria-disabled"), "true")
+        self.assertEqual(practice.get_attribute("aria-disabled"), "true")
+        reasons = page.locator('[data-testid="action-bar__reason"]').all_inner_texts()
+        self.assertIn("戰鬥中請使用指令卡", reasons)
+        self.assertIn("戰鬥中無法排入修煉。", reasons)
         self._shot(page, "book-combat")
-        button.click()
+        # aria-disabled controls keep focus but refuse activation; force the
+        # pointer through Playwright's actionability check.
+        cast.click(force=True)
+        practice.click(force=True)
         page.wait_for_timeout(300)
+        self.assertEqual(store_state(page)["hudDrawer"], "party")
+        self.assertEqual(sent_action_count(page), sent_before, "the disabled actions send nothing")
+
+
+class CompanionFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixin, BrowserAcceptanceTest):
+    """A companion casts a field heal from the party window's 技能 tab.
+
+    Its own isolated server with the companion-field-cast seed: the bound
+    kit companion owns the out-of-combat SINGLE heal and the commander
+    starts wounded.
+    """
+
+    HEAL = "t_hush_mend"
+
+    def setUp(self) -> None:
+        from .harness import ManagedServer
+
+        self.server = ManagedServer()
+        self.server.runtime.env["ELOSERN_BROWSER_COMPANION_FIELD_CAST"] = "1"
+        self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
+        super().setUp()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    @covers_requirement(
+        "webclient-party-window::the-skill-tab-casts-and-books-for-the-viewed-member",
+        "webclient-skillbook-casting::skill-tab-use-shares-one-keyboard-owner-and-preserves-practice",
+    )
+    def test_companion_casts_a_field_heal_from_the_skill_tab(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
         state = store_state(page)
+        commander = int(state["panels"]["status"]["actor"]["identity"])
+        companions = [
+            row["identity"] for row in state["panels"]["party"]["slots"] if row["identity"] != commander
+        ]
+        self.assertTrue(companions, "the seed binds a companion")
+        companion = companions[0]
+
+        # Open the window on 技能 and select the companion on the rail.
+        self._open_book(page)
+        page.locator(f'[data-testid="member-rail__entry--{companion}"]').click()
+        self._wait(
+            page,
+            lambda s: (s["panels"].get("character") or {}).get("member_id") == companion
+            and not s["dispatch"]["inFlight"],
+            "the companion's character panel",
+        )
+        selection = self._actions(page, "party.view_member")[-1]["payload"]
+        self.assertEqual(selection["member_id"], companion)
+        self.assertEqual(selection["tab"], "skills")
+        page.locator(f'[data-testid="party-skill-tab__row"][data-key="{self.HEAL}"]').wait_for(timeout=15000)
+        page.locator(f'[data-testid="party-skill-tab__row"][data-key="{self.HEAL}"]').click()
+        self._wait_idle(page)
+        self._shot(page, "skill-tab-companion")
+
+        # 施放: one preview for the companion; the window closes before the dock.
+        page.locator('[data-testid="action-bar__btn--cast"]').click()
+        state = self._wait_flow(page, self.HEAL)
+        previews = self._actions(page, "explore.skill_preview")
+        self.assertEqual(len(previews), 1)
+        self.assertEqual(previews[0]["payload"], {"actor_id": companion, "skill_key": self.HEAL})
         self.assertIsNone(state["hudDrawer"])
-        self.assertEqual(state["focus"]["key"], "skills")
-        self.assertTrue(page.evaluate("() => document.activeElement && document.activeElement.id === 'action-dock'"))
-        self.assertEqual(sent_action_count(page), sent_before, "the hand-off sends nothing")
+        self.assertEqual(state["panels"]["skill_use"]["actor_id"], companion)
+        page.wait_for_selector('[data-testid="skill-use-dock"]', timeout=15000)
+
+        # The dock's target flow continues for the companion: heal the commander.
+        self._focus_dock_key(page, lambda key: key == f"target-{commander}")
+        self._press(page, "Enter")
+        state = self._wait(
+            page,
+            lambda s: s.get("skillUse") is None and not s["dispatch"]["inFlight"],
+            "the companion's heal",
+        )
+        self.assertEqual(state["lastActionResult"]["outcome"], "success", state["lastActionResult"])
+        casts = self._actions(page, "explore.cast")
+        self.assertEqual(len(casts), 1)
+        self.assertEqual(
+            casts[0]["payload"],
+            {"actor_id": companion, "skill_key": self.HEAL, "target_ids": [commander]},
+        )
+        self.assertEqual(state["mode"], "exploration")

@@ -798,9 +798,11 @@ const renderPlayer = (args) => ({
         }
       }
       if (args.practice) {
+        // The retired skill-book name opens the party window on 技能; its
+        // 排入修煉 books the viewed member's practice.
         store.openHudDrawer("skill");
         await nextTick();
-        host.value?.querySelector('button[aria-label^="修煉"]')?.click();
+        host.value?.ownerDocument?.querySelector('[data-testid="action-bar__btn--practice"]')?.click();
       }
     });
     onBeforeUnmount(() => {
@@ -846,8 +848,9 @@ export const DialogueHostPending = { render: renderPlayer, args: { dialogue: "pe
 // The host is not in the catalog: the name's initial and the name.
 export const DialogueHostMissing = { render: renderPlayer, args: { dialogue: "missing" } };
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
-// 修煉 books the controlled figure's practice in place: one dispatch from the
-// detail card, no duration sub-screen, and the drawer keeps its own head.
+// 排入修煉 books the viewed member's practice in place from the party window's
+// 技能 tab: one dispatch from the action bar, no duration sub-screen, and the
+// window keeps its own head.
 export const PracticeBooking = { render: renderPlayer, args: { practice: true } };
 // The island anchors populated (webclient-avg-stage-hud-anchors): vitals,
 // a harmful condition, and the standing party at the left; the place

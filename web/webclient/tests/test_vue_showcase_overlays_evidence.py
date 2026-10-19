@@ -59,6 +59,8 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/PartyBagTab",
     # The party window\'s 狀態 tab (webclient-party-status-tab).
     "Overlays/PartyStatusTab",
+    # The party window's 技能 tab (webclient-party-skill-tab).
+    "Overlays/PartySkillTab",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -101,6 +103,15 @@ OVERLAYS_STORY_IDS = {
     "overlays-partystatustab--no-guild-full-hd",
     "overlays-partystatustab--in-combat-reference",
     "overlays-partystatustab--in-combat-full-hd",
+    # webclient-party-skill-tab: the 技能 tab at both viewports.
+    "overlays-partyskilltab--book-reference",
+    "overlays-partyskilltab--book-full-hd",
+    "overlays-partyskilltab--freeform-scales-reference",
+    "overlays-partyskilltab--freeform-scales-full-hd",
+    "overlays-partyskilltab--no-mastery-reference",
+    "overlays-partyskilltab--no-mastery-full-hd",
+    "overlays-partyskilltab--in-combat-reference",
+    "overlays-partyskilltab--in-combat-full-hd",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -149,12 +160,11 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/RestForm",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
-    # The SkillBook casting flow's dock pane joined with
+    # The 技能-tab casting flow's dock pane joined with
     # skillbook-authoritative-casting.
     "Action/SkillUseDock",
     "Data/StatusPanel",
     "Data/VitalsTrack",
-    "Data/SkillBook",
     "Data/ConditionChips",
     "World/LocalMap",
     "World/ShopPanel",
@@ -399,7 +409,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab",
+                "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab", "PartySkillTab",
             )},
         )
 

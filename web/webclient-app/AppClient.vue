@@ -26,7 +26,6 @@ import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
 import TitleBallotMenu from "./components/TitleBallotMenu.vue";
-import SkillBook from "./components/SkillBook.vue";
 import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
@@ -85,8 +84,8 @@ const {
   skipDisabled, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
-  drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
-  shopMemberName, SKILL_BOOK_KEY_HINT,
+  drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose,
+  shopMemberName,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -1150,9 +1149,9 @@ const rootStyle = computed(() => {
                 />
               </div>
             </div>
-            <!-- The SkillBook casting flow (skillbook-authoritative-casting):
-                 the book handed casting to the dock; its frames render here
-                 with their own detail card. -->
+            <!-- The 技能-tab casting flow (skillbook-authoritative-casting):
+                 the party window handed casting to the dock; its frames
+                 render here with their own detail card. -->
             <SkillUseDock
               v-else-if="skillUseDockShown"
               :menu="store.view.combatMenu"
@@ -1224,6 +1223,14 @@ const rootStyle = computed(() => {
       :pending-item-key="partyPendingItemKey"
       :combat="store.view.mode === 'combat'"
       :memory-scope="partyWindowScope"
+      :mode="store.view.mode || 'exploration'"
+      :practice-disabled="skipDisabled"
+      :practice-feedback="practiceFeedback"
+      :use-locked="skillUseLocked"
+      :use-pending="store.view.skillUsePending"
+      :use-notice="store.view.skillUseNotice"
+      :return-target="store.view.bookReturn"
+      :request-skill="onViewSkill"
       @view-member="onViewMember"
       @view-item="onViewItem"
       @bag-action="onPartyBagAction"
@@ -1231,33 +1238,20 @@ const rootStyle = computed(() => {
       @action="onAction"
       @open-npc-persona="(npcId) => store.openNpcPersonaEditor(npcId)"
       @persona-edit="onPersonaEdit"
+      @practice="onPractice"
+      @use-skill="onSkillUse"
       @close="onHudDrawerClose"
     />
     <HudDrawer
       v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party'"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'skill' ? skillBookSubtitle : ''"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       :body-flush="store.view.hudDrawer === 'quest'"
       @close="onHudDrawerClose"
     >
       <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
-      <SkillBook
-        v-else-if="store.view.hudDrawer === 'skill'"
-        :skills="panel('character') || {}"
-        :practice-disabled="skipDisabled"
-        :practice-feedback="practiceFeedback"
-        :mode="store.view.mode || 'exploration'"
-        :use-locked="skillUseLocked"
-        :use-pending-key="store.view.skillUsePendingKey"
-        :use-notice="store.view.skillUseNotice"
-        :return-target="store.view.bookReturn"
-        @practice="onPractice"
-        @use="onSkillUse"
-        @select-skill="onViewSkill"
-      />
       <ShopPanel
         v-else-if="store.view.hudDrawer === 'shop'"
         :services="panel('services') || {}"
@@ -1273,12 +1267,6 @@ const rootStyle = computed(() => {
         @action="onQuestAction"
       />
       <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
-      <!-- The book's keyboard guidance is skill-drawer-only: a conditional
-           named slot, so the other drawers provide no `foot` slot and render
-           no footer. Booking opens no sub-screen, so it never hides. -->
-      <template v-if="store.view.hudDrawer === 'skill'" #foot>
-        <p class="hud-drawer__key-hint" data-testid="skill-book-key-hint">{{ SKILL_BOOK_KEY_HINT }}</p>
-      </template>
     </HudDrawer>
 
     <!-- H5 (tasks 5.4/6.4): the single shared full-screen overlay surface.

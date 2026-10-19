@@ -226,7 +226,7 @@ export const useElosernStore = defineStore("elosern", () => {
     activateWaitRow: ctx.activateWaitRow,
     activateSuggestion: ctx.activateSuggestion,
     chooseScale: ctx.chooseScale,
-    // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
+    // The 技能-tab 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,
     chooseShorthand: ctx.chooseShorthand,
     // The stage target step (webclient-combat-stage-target-picking): the

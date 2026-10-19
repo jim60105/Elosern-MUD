@@ -344,7 +344,7 @@ export function createFrameResolver(deps) {
 
   // --- skill-use family helpers -----------------------------------------------
 
-  // The SkillBook use model (skillbook-authoritative-casting D6): the second
+  // The 技能-tab use model (skillbook-authoritative-casting D6): the second
   // declared model-state home, holding only the client-local AREA selection
   // for the committed `skill_use` preview. It follows the committed panel
   // through `createModel` (vanished or disabled selections drop), keyed on
@@ -590,7 +590,7 @@ export function createFrameResolver(deps) {
     // Drop the held combat model (the commanded-actor switch): the store's
     // selection home is the registry's, so only the registry can clear it.
     resetCombatSelection,
-    // The SkillBook use model accessor (the second declared selection home):
+    // The 技能-tab use model accessor (the second declared selection home):
     // the store's AREA toggle and confirm read this one instance. Null unless
     // an exploration `skill_use` preview for `skillKey` is committed.
     skillUseModel,

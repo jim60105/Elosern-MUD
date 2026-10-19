@@ -113,10 +113,15 @@ describe("H4 store reference-drawer controller", () => {
 
   it("opens the named drawer and rejects an unknown drawer name (task 4.1)", () => {
     openSession();
-    expect(store.openHudDrawer("skill")).toBe(true);
-    expect(store.view.hudDrawer).toBe("skill");
+    expect(store.openHudDrawer("lore")).toBe(true);
+    expect(store.view.hudDrawer).toBe("lore");
     expect(store.openHudDrawer("bogus")).toBe(false);
-    expect(store.view.hudDrawer).toBe("skill");
+    expect(store.view.hudDrawer).toBe("lore");
+    // The retired skill-book drawer's name opens the party window on its
+    // 技能 tab (webclient-party-skill-tab); "skill" is never stored.
+    expect(store.openHudDrawer("skill")).toBe(true);
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("skills");
     // The retired character-status drawer's name opens the party window on
     // its 狀態 tab (webclient-party-status-tab); "status" is never stored.
     expect(store.openHudDrawer("status")).toBe(true);

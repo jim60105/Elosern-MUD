@@ -1,7 +1,8 @@
-// The SkillBook use surface (skillbook-authoritative-casting D6): the book's
-// 施放 binding, its lock, and the DOM-focus hand-over to the action dock once
-// the store has closed the book and mounted the dock-owned casting flow. The
-// store owns every state transition; this group only binds them to the view.
+// The 技能-tab use surface (skillbook-authoritative-casting D6,
+// webclient-party-skill-tab): the tab's 施放 binding, its lock, its selection
+// request, and the DOM-focus hand-over to the action dock once the store has
+// closed the party window and mounted the dock-owned casting flow. The store
+// owns every state transition; this group only binds them to the view.
 import { computed, nextTick, watch } from "vue";
 
 export function useSkillUse(store) {
@@ -19,23 +20,26 @@ export function useSkillUse(store) {
   }
 
   // The 技能 tab's selection rides `party.view_member` (the one selection
-  // action): the server stores it for the viewed member and republishes the
-  // character panel with that skill's lineage and ladder. The book never
-  // computes detail itself.
+  // action): the server stores it for the viewed member, clears that
+  // member's unread dot (tab `skills`), and republishes the character panel
+  // with that skill's lineage and ladder. `skill_key` is null when no
+  // registered active row is selected. Returns the admitted request id, or
+  // null when the shared dispatch gate refused it (the tab retries).
   function onViewSkill(payload) {
-    if (!payload || !Number.isSafeInteger(payload.member_id) || !payload.skill_key) {
-      return;
+    if (!payload || !Number.isSafeInteger(payload.member_id) || payload.member_id <= 0) {
+      return null;
     }
-    store.dispatchAction("party.view_member", {
+    const skillKey = typeof payload.skill_key === "string" && payload.skill_key !== "" ? payload.skill_key : null;
+    return store.dispatchAction("party.view_member", {
       member_id: payload.member_id,
       tab: "skills",
-      skill_key: payload.skill_key,
+      skill_key: skillKey,
       item_key: null,
     });
   }
 
-  // The dock flow (or the combat 技能 entry) takes DOM focus after the book's
-  // drawer has unmounted, so focus never lands on <body> or behind a trap.
+  // The dock flow takes DOM focus after the party window has unmounted, so
+  // focus never lands on <body> or behind a trap.
   watch(
     () => store.view.dockFocusRequest,
     async (request, previous) => {

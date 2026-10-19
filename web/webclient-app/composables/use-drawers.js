@@ -1,5 +1,5 @@
 // The reference-drawer layer (H4): the drawer chrome's derived head copy, the
-// skill subtitle, the member reference, and the drawer close route.
+// shop's member reference, and the drawer close route.
 // The quest drawer's counter honesty rules live in quest-drawer-model.js. Extracted verbatim from AppClient.vue so
 // the SFC stays a passive renderer.
 import { computed } from "vue";
@@ -9,7 +9,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // derived from the single open-drawer name the store publishes.
   const DRAWER_TITLES = {
     letters: "信件",
-    skill: "技能書",
     shop: "商店",
     quest: "任務",
     lore: "世界圖鑑",
@@ -20,14 +19,13 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // control that opens it draws, so the header and its opener agree.
   const DRAWER_ICONS = {
     letters: "letters",
-    skill: "skills",
     shop: "shop",
     quest: "quests",
     lore: "lore",
   };
   const drawerIcon = computed(() => DRAWER_ICONS[store.view.hudDrawer] || null);
   // No reference drawer stands an art column (webclient-party-status-tab):
-  // the codex, the quest log, the skill book and the shop are not the
+  // the codex, the quest log and the shop are not the
   // player, so they take the whole workspace width, and the character's
   // status moved into the party window, which owns its WindowFrame chrome
   // and carries portraits in its rail, nameplate and status hero.
@@ -46,29 +44,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     store.closeHudDrawer();
   }
 
-  // The skill drawer's head subtitle: the owner's active/passive skill counts,
-  // counted from the `character` panel exactly the way `SkillBook` counts its
-  // rows (the counting logic moved up one level so the drawer head is the
-  // single place the counts render). Empty when the drawer is not the skill
-  // drawer or the `character` panel is missing/unavailable (degrade without
-  // inventing data).
-  function skillCount(rows) {
-    let count = 0;
-    for (const category of rows ?? []) {
-      for (const group of category.groups ?? []) {
-        count += (group.skills ?? []).length;
-      }
-    }
-    return count;
-  }
-  const skillBookSubtitle = computed(() => {
-    if (store.view.hudDrawer !== "skill" || !panelAvailable("character")) {
-      return "";
-    }
-    const character = panel("character");
-    return `主動 ${skillCount(character?.actives)} ‧ 被動 ${skillCount(character?.passives)}`;
-  });
-
   // The shop drawer's section label: the committed `party` row naming the
   // services shop's member (the viewed member the trades name), or null.
   const shopMemberName = computed(() => {
@@ -81,18 +56,11 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return typeof row?.display_name === "string" && row.display_name !== "" ? row.display_name : null;
   });
 
-  // The skill drawer's footer: the book's keyboard guidance (client-local
-  // presentation copy). The retired cast-syntax footer is gone: graphical
-  // use and practice live in the book itself (skillbook-authoritative-casting).
-  const SKILL_BOOK_KEY_HINT = "↑↓ 選擇 ‧ ←→ 收合／展開 ‧ Enter 前往動作 ‧ / 搜尋 ‧ Esc 關閉";
-
   return {
-    SKILL_BOOK_KEY_HINT,
     shopMemberName,
     drawerTitle,
     drawerIcon,
     onHudDrawerClose,
     onOpenDrawer,
-    skillBookSubtitle,
   };
 }

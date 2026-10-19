@@ -1551,7 +1551,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
               });
             })"""
         )
-        self.assertEqual(drawer["view"], "skill", "the store commits at once")
+        # The retired skill-book name opens the party window on 技能.
+        self.assertEqual(drawer["view"], "party", "the store commits at once")
         self.assertEqual(
             drawer["open"], "true", "the committed state reaches the DOM in one frame"
         )

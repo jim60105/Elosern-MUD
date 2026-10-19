@@ -1,14 +1,18 @@
-// skillbook-authoritative-casting D6/D7: the SkillBook → dock hand-over in the
-// composed store. The book's 施放 sends only the read-only preview; the dock
-// takes the single router once the matching preview revision commits; local
-// AREA selection, the scale re-preview, the opening confirmation, Escape back
-// to the book, the combat hand-off, a refused preview, and lifecycle retirement
-// all run through the one store and the one keyboard router.
+// skillbook-authoritative-casting D6/D7, webclient-party-skill-tab: the party
+// window 技能 tab → dock hand-over in the composed store. The tab's 施放 sends
+// only the read-only preview for the viewed member; the dock takes the single
+// router once the matching preview revision commits (the window closes
+// first); local AREA selection, the scale re-preview, the opening
+// confirmation, Escape back to the tab, the combat refusal, a refused
+// preview, and lifecycle retirement all run through the one store and the one
+// keyboard router. The retired "skill" drawer name opens the party window on
+// 技能 (hud.js), so the tests open the tab through it.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
+import { partyWindowTab, rememberPartyWindowTab } from "../../components/party-window-memory.js";
 
 const KEY = "t_soft_mend";
 
@@ -50,7 +54,7 @@ function skillUsePanel(spec, overrides = {}) {
   return panel;
 }
 
-describe("SkillBook use hand-over", () => {
+describe("技能 tab use hand-over", () => {
   let store;
   let sender;
   let revision;
@@ -63,7 +67,7 @@ describe("SkillBook use hand-over", () => {
     revision = 1;
   });
 
-  // The book's caster is the committed character panel's viewed member.
+  // The tab's caster is the committed character panel's viewed member.
   function characterPanel(memberId = 42) {
     return {
       schema_version: 9,
@@ -134,8 +138,10 @@ describe("SkillBook use hand-over", () => {
     openExploration();
     store.openHudDrawer("skill");
     store.beginSkillUse(KEY);
-    // Pending: the book is still open, nothing but the preview was sent.
-    expect(store.view.hudDrawer).toBe("skill");
+    // Pending: the window is still open on 技能, nothing but the preview was sent.
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("skills");
+    expect(store.view.skillUsePending).toEqual({ actorId: 42, skillKey: KEY });
     expect(store.view.skillUsePendingKey).toBe(KEY);
     expect(sender.sent.actions.map((a) => a.action_id)).toEqual(["explore.skill_preview"]);
     const focusBefore = store.view.dockFocusRequest;
@@ -250,16 +256,17 @@ describe("SkillBook use hand-over", () => {
     });
   });
 
-  it("Escape from the flow root returns to the book focused on the skill", () => {
+  it("Escape from the flow root returns to the 技能 tab focused on the caster's skill", () => {
     beginPreview("single");
     store.focusEscape();
-    expect(store.view.hudDrawer).toBe("skill");
-    expect(store.view.bookReturn.skillKey).toBe(KEY);
+    expect(store.view.hudDrawer).toBe("party");
+    expect(partyWindowTab()).toBe("skills");
+    expect(store.view.bookReturn).toMatchObject({ actorId: 42, skillKey: KEY });
     expect(source()).toBe("exploration.root");
     expect(sender.sent.actions.map((a) => a.action_id)).toEqual(["explore.skill_preview"]);
   });
 
-  it("a committed cast retires the flow without reopening the book", () => {
+  it("a committed cast retires the flow without reopening the window", () => {
     beginPreview("none");
     store.focusConfirm("keyboard");
     resolve({ skill_use: { schema_version: 2, available: false, reason: { code: "skill_use_unavailable", message: "技能施放預覽目前無法顯示" } } });
@@ -268,17 +275,17 @@ describe("SkillBook use hand-over", () => {
     expect(store.view.skillUsePhase).toBe(null);
   });
 
-  it("a refused preview keeps the book open with the server message", () => {
+  it("a refused preview keeps the 技能 tab open with the server message for that caster", () => {
     openExploration();
     store.openHudDrawer("skill");
     store.beginSkillUse(KEY);
     resolve({}, { outcome: "rejected", code: "unknown_skill", message: "你沒有可施放的這項技能。" });
-    expect(store.view.hudDrawer).toBe("skill");
-    expect(store.view.skillUseNotice).toEqual({ skillKey: KEY, message: "你沒有可施放的這項技能。" });
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.view.skillUseNotice).toEqual({ actorId: 42, skillKey: KEY, message: "你沒有可施放的這項技能。" });
     expect(source()).toBe("exploration.root");
   });
 
-  it("closing the book while the preview is pending never takes over the dock", () => {
+  it("closing the window while the preview is pending never takes over the dock", () => {
     openExploration();
     store.openHudDrawer("skill");
     store.beginSkillUse(KEY);
@@ -288,13 +295,25 @@ describe("SkillBook use hand-over", () => {
     expect(store.view.skillUsePhase).toBe(null);
   });
 
-  it("in combat the book hands focus to the combat Skills entry without sending anything", () => {
+  it("leaving the 技能 tab while the preview is pending never takes over the dock", () => {
+    openExploration();
+    store.openHudDrawer("skill");
+    store.beginSkillUse(KEY);
+    rememberPartyWindowTab(`${store.view.generation}|${store.view.epoch}`, "status");
+    resolve({ skill_use: skillUsePanel("single") });
+    expect(store.view.hudDrawer).toBe("party");
+    expect(source()).toBe("exploration.root");
+    expect(store.view.skillUsePhase).toBe(null);
+  });
+
+  it("in combat 施放 is refused locally: nothing is sent and casting stays on the command card", () => {
     openExploration("combat", fx.combatActions());
     store.openHudDrawer("skill");
     const outcome = store.beginSkillUse(KEY);
-    expect(outcome.route).toBe("combat");
-    expect(store.view.hudDrawer).toBe(null);
-    expect(store.router.currentItem().key).toBe("skills");
+    expect(outcome.route).toBe("refused");
+    // The window stays as it was; no preview, cast or combat command leaves.
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.view.skillUsePhase).toBe(null);
     expect(sender.sent.actions).toEqual([]);
   });
 
@@ -389,7 +408,7 @@ describe("SkillBook use hand-over", () => {
 
   it("names the character member, not the controlled figure, as the caster", () => {
     // A conflicting status identity (the controlled figure) never selects the
-    // caster: the book lists the viewed member's skills, so the preview and
+    // caster: the tab lists the viewed member's skills, so the preview and
     // every later booking name that member.
     openExploration(
       "exploration",
