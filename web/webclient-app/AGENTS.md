@@ -243,5 +243,31 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   the `character` sub-dock, no `HudDrawer` drawer stands an art column, and
   the top navigation marks the entry of the window's live tab
   (`party:<tab>`).
-- The 技能/系譜 tabs land in the next changes; until then each shows its
-  backing panel's committed unavailable reason or its (empty) scoped slot.
+- `PartySkillTab` (webclient-party-skill-tab; design §6.4) is the 技能 tab
+  for the viewed member, after the prototype's `tabs/SkillTab.vue`; its pure
+  projections live in `components/party-skill-model.js`. It keeps the old
+  book's browsing (主動/被動 segment with the payload's counts, search, the
+  keyboard tree in payload order, every category open on a reset) and adds
+  per-row growth: meter and `Lv n` / 見頂 from the v9 growth facts
+  (`xp_to_next_level` is the remainder, so the band is the pair's sum), 新
+  from `fresh`, 修煉中 from `booked`. Rows carry no per-skill icon (the
+  payload has none): actives draw the `skills` glyph, passives `buff`. The
+  ladder (威力×label, `MP n` or `需 Lv n`, verbatim) and the lineage position
+  render only while `character.selected_skill.key` is the row on screen;
+  在系譜中檢視 emits `lineage` and the window switches to 系譜. The
+  selection is server state: the tab calls the `requestSkill` prop
+  (AppClient's `onViewSkill`, one `party.view_member {tab: "skills"}`), which
+  returns the request id or null; opening the tab sends one only while the
+  rail row is `unread` or the committed key differs, never while the
+  dispatch lock is closed, and a refused one is retried when it opens. The
+  `ActionBar` offers 排入修煉 (`practice` → `explore.practice {actor_id,
+  skill}`) and 施放 (`use-skill` → `store.beginSkillUse`, the viewed member's
+  `explore.skill_preview`); in combat both are disabled with
+  戰鬥中無法排入修煉。 / 戰鬥中請使用指令卡 and `beginSkillUse` refuses
+  without a hand-off. No local knocked-out gate: the preview's refusal is
+  shown as 無法施放：… for that caster only. `SkillBook` is gone:
+  `openHudDrawer("skill")` remembers 技能 and opens `party`; the store hands
+  a preview over only while the window is open on 技能 (it closes the window
+  first) and its Escape return carries `{actorId, skillKey}`.
+- The 系譜 tab lands in the next change; until then it shows its backing
+  panel's committed unavailable reason or its (empty) scoped slot.

@@ -15,7 +15,9 @@ See proposal.md. `SkillBook.vue` (1,017 lines) renders active/passive segments, 
 - **Port, not rewrite**: segment/search/tree logic moves from `SkillBook.vue` into the tab (or small child components) so existing ordering and search tests carry over.
 - **Ladder** renders `freeform_ladder` entries verbatim (`mp_cost` or `需 Lv {unlock_level}`); no scale arithmetic in the client.
 - **Casting handoff** reuses the existing skill-use store with the viewed member's `actor_id`; the window closes before the dock takes focus (same owner rule as the book).
-- **Unread** clearing rides the selection dispatch on tab open; 新 tags read `fresh`.
+- **Unread** clearing rides the selection dispatch on tab open; 新 tags read `fresh`. The tab sends that one selection only while the rail row is `unread` or the committed `selected_skill` differs from the row it shows, never while the shared dispatch lock is closed, and retries a refused request when the lock opens.
+- **No local knocked-out gate**: the prototype's `{name}倒地中` reason would restate a rule the server preview already decides; a knocked-out caster's 施放 shows the preview's refusal as the caster-scoped notice instead.
+- **Every category opens** on a selection reset, matching the prototype's flat list; the tree's collapse controls still work.
 
 ## Risks / Trade-offs
 
