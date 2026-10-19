@@ -109,11 +109,9 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         The standalone Services root no longer exists: guild/shop are reached
         through Interact -> the local host -> its navigate-kind service entry,
-        and inventory through the DesktopNavigation 背包 click (the desktop
-        redesign re-homed the entry into the top navigation,
-        webclient-desktop-shell acd3790) — which opens the 背包 drawer
-        frameless (make-inventory-drawer-frameless): no keyboard frame is
-        pushed and the router's stack is unchanged.
+        and inventory through the DesktopNavigation 背包 click, which opens
+        the party window on its 背包 tab (webclient-party-bag-retire): no
+        keyboard frame is pushed and the router's stack is unchanged.
 
         The host's verb card (exploration-presence-rail) carries its single
         交談 `explore.talk_open` row followed by its navigate-kind service
@@ -131,25 +129,25 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         focus_action_dock(page)
         if surface_key == "inventory":
-            # The desktop redesign re-homed the 背包 entry into the top
-            # navigation (webclient-desktop-shell, acd3790): the dock root is
-            # the capability-driven [move, look, interact, wait,
-            # suggestions], so the drawer opens from the DesktopNavigation
-            # 背包 click — the same client-local openHudDrawer('inventory')
-            # the old dock row submitted (no keyboard frame is pushed).
+            # The top navigation's 背包 entry (webclient-desktop-shell) opens
+            # the party window on its 背包 tab (webclient-party-bag-retire):
+            # the store aliases the retired bag drawer's name, so no keyboard
+            # frame is pushed and the router's stack is unchanged. Returns the
+            # committed `party_inventory` panel the tab renders.
             page.locator('.desktop-navigation button', has_text="背包").click()
             wait_for_store_state(
                 page,
-                lambda s: s.get("hudDrawer") == "inventory",
+                lambda s: s.get("hudDrawer") == "party"
+                and ((s.get("panels") or {}).get("party_inventory") or {}).get("available") is True,
                 dom_readiness={
-                    "selector": '[data-testid="inventory-panel"]',
+                    "selector": '[data-testid="party-bag-tab"]',
                     "predicate": (
-                        "() => !!document.querySelector('[data-testid=\"inventory-panel\"]')"
+                        "() => !!document.querySelector('[data-testid=\"party-bag-tab\"]')"
                     ),
-                    "description": "frameless inventory drawer rendered",
+                    "description": "party window 背包 tab rendered",
                 },
             )
-            return self._services_panel(page)
+            return store_state(page)["panels"]["party_inventory"]
         # guild/shop: the host's medallion on the presence rail -> the
         # host's verb card -> the navigate-kind service row
         # (exploration-presence-rail). Both hops are addressed by their stable

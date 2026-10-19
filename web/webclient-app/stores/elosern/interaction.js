@@ -7,6 +7,9 @@ import KeyboardRouter from "../../lib/keyboard_router.js";
 import { dialogueViewModel } from "../dialogue-view.js";
 import { ARROW_KEYS, arrowTarget } from "./stage_targets.js";
 
+// "inventory" stays: it is the exploration 背包 row's opener name, which
+// `openHudDrawer` aliases to the party window's 背包 tab
+// (webclient-party-bag-retire).
 const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
 
 export function applyInteraction(ctx) {

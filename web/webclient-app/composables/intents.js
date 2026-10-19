@@ -32,41 +32,33 @@ export function useIntentHandlers(store, dispatchIntent) {
     dispatchIntent(intent.action_id, intent.payload);
   }
 
-  // Inventory row-action intents (add-inventory-item-actions, task 6.3): both
-  // the confirmed item use and the direct equipment toggle route through the
-  // single store dispatch entry — one deliberate activation, one dispatch.
-  // In combat the item use belongs to the commanded actor
-  // (webclient-party-items-tactics): the drawer's activation enters the same
-  // item review/target/combat.command flow the card's 道具 frame opens, so the
-  // `inventory.use` is never dispatched there. Inspection and the drawer's
-  // equipment toggles stay free and unchanged; both the use and the toggle
-  // carry the controlled figure's `actor_id` (companion-field-item-use,
-  // party-member-equipment), which this seam forwards untouched for the
-  // server to reauthorize.
-  function onInventoryItemAction(intent) {
-    if (intent.action_id === "inventory.use" && store.view.mode === "combat") {
-      // The bag shows the controlled player's own items, which diverge from
-      // the commanded member's server stock whenever a companion is
-      // commanded; a refusal is a deliberate activation that reached nothing,
-      // so it gets the same visible feedback the busy-drop contract gives.
-      if (!store.useCombatItem(intent.payload && intent.payload.item_key)) {
-        store.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
-      }
-      return;
-    }
+  // The party window's 背包 tab (webclient-party-bag-tab): its give, use and
+  // equip intents, each naming the viewed member (the giver or `actor_id`)
+  // for the server to reauthorize. Only the closed set leaves. In combat
+  // (webclient-party-bag-retire) neither a give nor an exploration use ever
+  // leaves — the tab offers neither, and this seam drops both — while the
+  // free equipment toggle does.
+  const PARTY_BAG_ACTIONS = new Set(["party.transfer", "inventory.use", "inventory.toggle_equip"]);
+  const COMBAT_BLOCKED_BAG_ACTIONS = new Set(["party.transfer", "inventory.use"]);
+  function onPartyBagAction(intent) {
+    if (!intent || !PARTY_BAG_ACTIONS.has(intent.action_id)) return;
+    if (store.view.mode === "combat" && COMBAT_BLOCKED_BAG_ACTIONS.has(intent.action_id)) return;
     dispatchIntent(intent.action_id, intent.payload);
   }
 
-  // The party window's 背包 tab (webclient-party-bag-tab): its give, use and
-  // equip intents, each naming the viewed member (the giver or `actor_id`)
-  // for the server to reauthorize. Only the closed set leaves; the tab offers
-  // no exploration use in combat, and this seam never sends one either (the
-  // member's combat-draft route lands with webclient-party-bag-retire).
-  const PARTY_BAG_ACTIONS = new Set(["party.transfer", "inventory.use", "inventory.toggle_equip"]);
-  function onPartyBagAction(intent) {
-    if (!intent || !PARTY_BAG_ACTIONS.has(intent.action_id)) return;
-    if (intent.action_id === "inventory.use" && store.view.mode === "combat") return;
-    dispatchIntent(intent.action_id, intent.payload);
+  // The in-combat bag's 設為 X 本回合的行動… (webclient-party-bag-retire):
+  // the viewed member's item enters the existing combat item review/target
+  // flow (`store.useCombatItem`, switching the commanded member first when
+  // needed) and never the actorless `inventory.use`. A refusal is a
+  // deliberate activation that reached nothing, so it gets the busy-drop
+  // contract's visible feedback.
+  function onPartyBagCombatItem(intent) {
+    const memberId = intent && intent.memberId;
+    const itemKey = intent && intent.itemKey;
+    if (store.view.mode !== "combat" || !Number.isSafeInteger(memberId) || typeof itemKey !== "string") return;
+    if (!store.useCombatItem(itemKey, memberId)) {
+      store.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
+    }
   }
 
   // The pending 異名提名 ballot (title-epithet-nomination): the menu's
@@ -135,8 +127,8 @@ export function useIntentHandlers(store, dispatchIntent) {
     onCreationDispatch,
     onCreationRequestReset,
     onCreateCharacter,
-    onInventoryItemAction,
     onPartyBagAction,
+    onPartyBagCombatItem,
     onPersonaEdit,
     onQuestAction,
     onShopBuy,

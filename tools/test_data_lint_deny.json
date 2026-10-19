@@ -43,8 +43,8 @@
       "token": "S"
     },
     {
-      "evidence": "web/webclient-app/stories/Data/EquipmentDoll.stories.js:22",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/Data/EquipmentDoll.stories.js:22); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient-app/stories/fixtures/party_panels.js:538",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/party_panels.js:538); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "armor"
     },
@@ -235,8 +235,8 @@
       "token": "options"
     },
     {
-      "evidence": "web/webclient-app/stories/World/InventoryPanel.stories.js:193",
-      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/World/InventoryPanel.stories.js:193); collides with generic test vocabulary, not shipped-content coupling",
+      "evidence": "web/webclient-app/stories/fixtures/party_panels.js:487",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures/party_panels.js:487); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
       "token": "potion"
     },

@@ -205,8 +205,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       // The shared reference-surface header (webclient-drawer-frame-unification).
       "Core/DrawerHeader",
       "Core/EmptyState",
-      "Data/EquipmentDoll",
       "Data/CharacterStatusDrawer",
+      // The bag is the party window's 背包 tab (webclient-party-bag-retire).
+      "Overlays/PartyBagTab",
       "World/MapLattice",
      "Feedback/ToastQueue",
       // The AVG stage series adds the stage place card.
@@ -298,14 +299,16 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     }
   });
 
-  it("documents the bag is now backed by services.inventory (world/rules/service_view.py:695-720), so the \bBag\b deferred pattern is retired", () => {
-    // H4 (task 8.3): the full inventory bag is NO LONGER deferred — the
-    // `services.inventory` read model (world/rules/service_view.py:695-720)
-    // backs the bounded 32-row bag listing. `World/InventoryPanel` renders
-    // that listing, so the `\bBag\b` pattern is removed from
-    // DEFERRED_TITLE_PATTERNS and the equipped-only case is retired.
-    expect(manifest.required).toContain("World/InventoryPanel");
-    // The bag now has a backing read model; no *Bag surface remains deferred.
+  it("documents the bag is backed by party_inventory, so the \bBag\b deferred pattern stays retired", () => {
+    // H4 (task 8.3) retired the `\bBag\b` deferred pattern when the old bag
+    // drawer gained a backing read model. webclient-party-bag-retire replaced
+    // that drawer with the party window's 背包 tab, backed by the
+    // `party_inventory` panel: `Overlays/PartyBagTab` is manifest-listed and
+    // the retired `World/InventoryPanel` / `Data/EquipmentDoll` are gone.
+    expect(manifest.required).toContain("Overlays/PartyBagTab");
+    expect(manifest.required).not.toContain("World/InventoryPanel");
+    expect(manifest.required).not.toContain("Data/EquipmentDoll");
+    // The bag has a backing read model; no *Bag surface remains deferred.
     const titles = collectStoryTitles(APP_ROOT);
     expect(titles.filter((title) => /\bBag\b/i.test(title))).toEqual([]);
   });

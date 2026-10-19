@@ -36,7 +36,6 @@ MIGRATED_FILES = (
     "web/static/webclient/js/tests/hud_dock_menus.test.js",
     "web/static/webclient/js/tests/protocol.test.js",
     "web/webclient-app/tests/data/breakdown_rendering.test.js",
-    "web/webclient-app/tests/data/equipment_doll.test.js",
     "web/webclient-app/tests/data/skill_book.test.js",
     "web/webclient-app/tests/frame-resolvers.test.js",
     "web/webclient-app/tests/overlays/creation_overlay.test.js",
@@ -46,7 +45,6 @@ MIGRATED_FILES = (
     "web/webclient-app/tests/store/command_echo_surfaces.test.js",
     "web/webclient-app/tests/store/declarative_surfaces.test.js",
     "web/webclient-app/tests/store/store_dispatch_focus.test.js",
-    "web/webclient-app/tests/world/inventory_panel.test.js",
     "web/webclient-app/tests/world/item_icons.test.js",
 )
 

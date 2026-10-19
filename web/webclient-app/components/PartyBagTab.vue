@@ -25,6 +25,7 @@
 // descriptors. The tab has no possession input.
 import { computed, nextTick, ref, watch } from "vue";
 import ActionBar from "./ActionBar.vue";
+import EmptyState from "./EmptyState.vue";
 import HoldingsStrip from "./HoldingsStrip.vue";
 import ListDetail from "./ListDetail.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
@@ -60,7 +61,7 @@ const props = defineProps({
   combat: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["select-item", "set-quantity", "action"]);
+const emit = defineEmits(["select-item", "set-quantity", "action", "combat-item"]);
 
 const root = ref(null);
 
@@ -199,6 +200,12 @@ function onGive(receiverId) {
 // ---------------------------------------------------------------- actions
 
 const useOffered = computed(() => !props.combat && activeRow.value?.use?.route === "field_use");
+// In combat 使用 becomes the viewed member's round choice: the committed
+// `combat_draft` descriptor (that member's own battlefield item choice)
+// decides it, and activation hands the item to the existing combat item
+// review/target flow instead of sending anything from here.
+const draftOffered = computed(() => props.combat && activeRow.value?.use?.route === "combat_draft");
+const memberName = computed(() => props.members.find((entry) => entry.id === props.memberId)?.name ?? null);
 
 const barActions = computed(() => {
   const row = activeRow.value;
@@ -208,6 +215,15 @@ const barActions = computed(() => {
     list.push({
       key: "use",
       label: "使用…",
+      tone: row.toggle ? "gold" : "primary",
+      enabled: row.use.enabled === true,
+      reason: row.use.enabled === true ? null : row.use.reason,
+    });
+  }
+  if (draftOffered.value) {
+    list.push({
+      key: "draft",
+      label: memberName.value ? `設為 ${memberName.value} 本回合的行動…` : "設為本回合的行動…",
       tone: row.toggle ? "gold" : "primary",
       enabled: row.use.enabled === true,
       reason: row.use.enabled === true ? null : row.use.reason,
@@ -238,6 +254,8 @@ function onBarAction(key) {
     emit("action", { action_id: "inventory.toggle_equip", payload: { item_key: row.item_key, actor_id: props.memberId } });
   } else if (key === "use" && useOffered.value && row.use.enabled === true) {
     openConfirm(row);
+  } else if (key === "draft" && draftOffered.value && row.use.enabled === true) {
+    emit("combat-item", { memberId: props.memberId, itemKey: row.item_key });
   }
 }
 
@@ -379,7 +397,18 @@ defineExpose({ guardClose });
               <span class="party-bag-tab__row-held" :data-testid="`party-bag-tab__held--${row.item_key}`">×{{ row.held }}</span>
             </button>
           </div>
-          <p v-else class="party-bag-tab__empty" data-testid="party-bag-tab__empty">{{ filterLabel ? `沒有${filterLabel}的物品。` : "背包裡沒有物品。" }}</p>
+          <!-- An available but empty bag shows the shared empty guidance
+               (webclient-contextual-hud); a slot filter with no match is
+               only a one-line state. -->
+          <EmptyState
+            v-else-if="allRows.length === 0"
+            class="party-bag-tab__empty"
+            data-testid="party-bag-tab__empty"
+            glyph="inventory"
+            headline="背包裡沒有物品"
+            guidance="取得的物品會列在這裡。"
+          />
+          <p v-else class="party-bag-tab__filter-empty" data-testid="party-bag-tab__filter-empty">沒有{{ filterLabel }}的物品。</p>
         </template>
       </template>
 
@@ -703,10 +732,23 @@ defineExpose({ guardClose });
   height: calc(20px * var(--ui-scale));
 }
 
-.party-bag-tab__icon[data-rarity="uncommon"] { border: calc(1px * var(--ui-scale)) dotted var(--rarity-uncommon); }
-.party-bag-tab__icon[data-rarity="rare"] { border: calc(1px * var(--ui-scale)) dashed var(--rarity-rare); }
-.party-bag-tab__icon[data-rarity="epic"] { border: calc(3px * var(--ui-scale)) double var(--rarity-epic); }
-.party-bag-tab__icon[data-rarity="legendary"] { border: calc(2px * var(--ui-scale)) ridge var(--rarity-legendary); }
+/* Each rarity draws its own border pattern at a width where the pattern
+   shows (uncommon dotted and rare dashed at 2px, epic double and legendary
+   ridge at 3px) over a faint tint of its colour; common and unknown stay
+   neutral (webclient-contextual-hud: rarity borders stay visible without
+   colour). */
+.party-bag-tab__icon[data-rarity="uncommon"],
+.party-bag-tab__icon[data-rarity="rare"],
+.party-bag-tab__icon[data-rarity="epic"],
+.party-bag-tab__icon[data-rarity="legendary"] {
+  background:
+    radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--icon-rarity) 18%, transparent), rgba(0, 0, 0, 0.3) 75%);
+}
+
+.party-bag-tab__icon[data-rarity="uncommon"] { --icon-rarity: var(--rarity-uncommon); border: calc(2px * var(--ui-scale)) dotted var(--rarity-uncommon); }
+.party-bag-tab__icon[data-rarity="rare"] { --icon-rarity: var(--rarity-rare); border: calc(2px * var(--ui-scale)) dashed var(--rarity-rare); }
+.party-bag-tab__icon[data-rarity="epic"] { --icon-rarity: var(--rarity-epic); border: calc(3px * var(--ui-scale)) double var(--rarity-epic); }
+.party-bag-tab__icon[data-rarity="legendary"] { --icon-rarity: var(--rarity-legendary); border: calc(3px * var(--ui-scale)) ridge var(--rarity-legendary); }
 
 .party-bag-tab__row-name {
   overflow: hidden;
@@ -734,6 +776,10 @@ defineExpose({ guardClose });
 }
 
 .party-bag-tab__empty {
+  margin-top: var(--sp-3);
+}
+
+.party-bag-tab__filter-empty {
   margin: var(--sp-3) 0 0;
   color: var(--paper-500);
   font-size: var(--text-sm);
@@ -769,6 +815,12 @@ defineExpose({ guardClose });
 .party-bag-tab__hero[data-rarity="rare"] { --hero-rarity: var(--rarity-rare); }
 .party-bag-tab__hero[data-rarity="epic"] { --hero-rarity: var(--rarity-epic); }
 .party-bag-tab__hero[data-rarity="legendary"] { --hero-rarity: var(--rarity-legendary); }
+
+/* The hero frame repeats the row's rarity pattern at its larger size. */
+.party-bag-tab__hero[data-rarity="uncommon"] .party-bag-tab__hero-icon { border-width: calc(2px * var(--ui-scale)); border-style: dotted; }
+.party-bag-tab__hero[data-rarity="rare"] .party-bag-tab__hero-icon { border-width: calc(2px * var(--ui-scale)); border-style: dashed; }
+.party-bag-tab__hero[data-rarity="epic"] .party-bag-tab__hero-icon { border-width: calc(3px * var(--ui-scale)); border-style: double; }
+.party-bag-tab__hero[data-rarity="legendary"] .party-bag-tab__hero-icon { border-width: calc(3px * var(--ui-scale)); border-style: ridge; }
 
 .party-bag-tab__hero-text {
   display: flex;

@@ -84,7 +84,7 @@ describe("PartyBagTab (webclient-party-bag-tab)", () => {
     // An empty slot filters to nothing, stated as a state.
     await get("party-bag-tab__slot--weapon_off").trigger("click");
     expect(rowKeys()).toEqual([]);
-    expect(get("party-bag-tab__empty").text()).toBe("沒有副手的物品。");
+    expect(get("party-bag-tab__filter-empty").text()).toBe("沒有副手的物品。");
     // Pressing the slot again clears the filter; filtering sent nothing.
     await get("party-bag-tab__slot--weapon_off").trigger("click");
     expect(rowKeys()).toHaveLength(8);
@@ -305,16 +305,66 @@ describe("PartyBagTab (webclient-party-bag-tab)", () => {
     expect(find("party-bag-tab__stepper").exists()).toBe(true);
   });
 
-  it("shows counts only in combat, with the committed reason and no give or use", async () => {
+  it("shows counts only in combat, with the committed reason and no give or exploration use", async () => {
     mountTab({ partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_COMBAT, combat: true });
     expect(get("holdings-strip").attributes("data-combat")).toBe("true");
     expect(wrapper.findAll('[data-testid^="holdings-strip__give--"]')).toHaveLength(0);
+    expect(wrapper.findAll('[data-testid="holdings-strip__delta"]')).toHaveLength(0);
     expect(find("party-bag-tab__stepper").exists()).toBe(false);
     expect(find("action-bar__btn--use").exists()).toBe(false);
     expect(get("action-bar__reason").text()).toBe(TRANSFER_IN_COMBAT_REASON);
-    // Toggles keep their committed descriptors.
-    await wrapper.setProps({ itemHoldings: { ...PARTY_BAG_HOLDINGS_COMBAT, item_key: "steel_shortsword" } });
-    expect(get("action-bar__btn--toggle").attributes("aria-disabled")).toBeUndefined();
+    // Every member's committed count stays readable.
+    expect(wrapper.findAll('[data-testid="holdings-strip__count"]').map((node) => node.text())).toEqual(["2", "5", "0", "1"]);
+  });
+
+  it("turns 使用 into the viewed member's round choice and sends nothing itself", async () => {
+    mountTab({ partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_COMBAT, combat: true });
+    const draft = get("action-bar__btn--draft");
+    expect(draft.text()).toBe("設為 蕾娜 本回合的行動…");
+    expect(draft.attributes("aria-disabled")).toBeUndefined();
+    await draft.trigger("click");
+    expect(wrapper.emitted("combat-item")).toEqual([[{ memberId: 101, itemKey: "potion_heal" }]]);
+    // No confirmation opens: the combat item review/target step is the confirmation.
+    expect(find("party-bag-tab__confirm").exists()).toBe(false);
+    expect(actions()).toEqual([]);
+  });
+
+  it("keeps a disabled round choice's committed reason and emits nothing", async () => {
+    mountTab({
+      partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE,
+      itemHoldings: { ...PARTY_BAG_HOLDINGS_COMBAT, item_key: "potion_mana" },
+      combat: true,
+    });
+    const draft = get("action-bar__btn--draft");
+    expect(draft.attributes("aria-disabled")).toBe("true");
+    expect(wrapper.findAll('[data-testid="action-bar__reason"]').map((node) => node.text())).toContain("魔力已經是滿的。");
+    await draft.trigger("click");
+    expect(wrapper.emitted("combat-item")).toBeUndefined();
+    expect(actions()).toEqual([]);
+  });
+
+  it("keeps every member's equipment toggle free in combat", async () => {
+    mountTab({
+      partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE,
+      itemHoldings: { ...PARTY_BAG_HOLDINGS_COMBAT, item_key: "steel_shortsword" },
+      combat: true,
+    });
+    expect(find("action-bar__btn--draft").exists()).toBe(false);
+    const toggle = get("action-bar__btn--toggle");
+    expect(toggle.attributes("aria-disabled")).toBeUndefined();
+    await toggle.trigger("click");
+    expect(actions()).toEqual([{ action_id: "inventory.toggle_equip", payload: { item_key: "steel_shortsword", actor_id: 101 } }]);
+  });
+
+  it("never offers the round choice outside combat or a field use in combat", async () => {
+    // A transient disagreement between the mode and the descriptor route
+    // offers neither control.
+    mountTab({ partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_COMBAT, combat: false });
+    expect(find("action-bar__btn--draft").exists()).toBe(false);
+    expect(find("action-bar__btn--use").exists()).toBe(false);
+    await wrapper.setProps({ partyInventory: PARTY_BAG_INVENTORY_SAMPLE, combat: true });
+    expect(find("action-bar__btn--draft").exists()).toBe(false);
+    expect(find("action-bar__btn--use").exists()).toBe(false);
   });
 
   it("states the bag panel's reason and invents no rows", () => {
@@ -372,10 +422,46 @@ describe("onPartyBagAction (webclient-party-bag-tab)", () => {
     expect(sent.map((entry) => entry.actionId)).toEqual(["party.transfer", "inventory.use", "inventory.toggle_equip"]);
   });
 
-  it("never sends an exploration use in combat", () => {
+  it("never sends an exploration use or a give in combat", () => {
     const { onPartyBagAction, sent } = handlers("combat");
     onPartyBagAction({ action_id: "inventory.use", payload: { item_key: "potion_heal", actor_id: 101 } });
+    onPartyBagAction({ action_id: "party.transfer", payload: { giver_id: 101, receiver_id: 42, item_key: "potion_heal", quantity: 1 } });
     onPartyBagAction({ action_id: "inventory.toggle_equip", payload: { item_key: "steel_shortsword", actor_id: 101 } });
     expect(sent.map((entry) => entry.actionId)).toEqual(["inventory.toggle_equip"]);
+  });
+});
+
+describe("onPartyBagCombatItem (webclient-party-bag-retire)", () => {
+  function handlers(mode, result = true) {
+    const calls = [];
+    const toasts = [];
+    const store = {
+      view: { mode },
+      pushToast: (entry) => toasts.push(entry),
+      useCombatItem: (itemKey, actorId) => {
+        calls.push({ itemKey, actorId });
+        return result;
+      },
+    };
+    const { onPartyBagCombatItem } = useIntentHandlers(store, () => {
+      throw new Error("the round choice never dispatches from the bag");
+    });
+    return { onPartyBagCombatItem, calls, toasts };
+  }
+
+  it("hands the viewed member's item to the combat item flow", () => {
+    const { onPartyBagCombatItem, calls, toasts } = handlers("combat");
+    onPartyBagCombatItem({ memberId: 101, itemKey: "potion_mana" });
+    expect(calls).toEqual([{ itemKey: "potion_mana", actorId: 101 }]);
+    expect(toasts).toEqual([]);
+  });
+
+  it("states a refusal and ignores the intent outside combat", () => {
+    const refused = handlers("combat", false);
+    refused.onPartyBagCombatItem({ memberId: 101, itemKey: "potion_mana" });
+    expect(refused.toasts.map((toast) => toast.title)).toEqual(["這件物品目前無法由這名成員使用。"]);
+    const outside = handlers("exploration");
+    outside.onPartyBagCombatItem({ memberId: 101, itemKey: "potion_mana" });
+    expect(outside.calls).toEqual([]);
   });
 });

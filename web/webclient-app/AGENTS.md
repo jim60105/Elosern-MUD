@@ -46,11 +46,11 @@ prototypes; the real app differs too much for a prototype to be useful).
   `{kind:"tactic", payload:{key[, target_id]}}` — the literal wire kind is
   `tactic`; the panel echoes admitted entries back as `tactical`). A hostile
   item on an ally asks through the same actor-bound cross-side question. In
-  combat the bag's 使用 routes to that same flow (`store.useCombatItem`) and
-  never dispatches `inventory.use`; inspection and the commander's equipment
-  toggles stay free, and there is no companion equipment surface. Both the
-  exploration use and the toggle name the controlled figure's `actor_id`
-  (companion-field-item-use), which the server reauthorizes.
+  combat the party window's 背包 tab routes 設為 X 本回合的行動… to that same
+  flow (`store.useCombatItem(itemKey, memberId)`) and never dispatches
+  `inventory.use`; inspection and every member's equipment toggles stay
+  free. Both the exploration use and the toggle name the viewed member's
+  `actor_id`, which the server reauthorizes.
 - A cast across sides asks first (`stores/elosern/cross_side.js`, held in
   the store as `crossSideConfirm`, published as `view.crossSideConfirm`): a
   target-step submission whose skill is `hostile` and reaches a `party`
@@ -159,8 +159,9 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   `<generation>|<epoch>` like the quest drawer's). The current openers — the
   character-status drawer's 隊伍 button and a companion figure on the stage
   lineup (exploration only, outside the stage target step, never the
-  commander's figure) — open on 成員; a bare `openHudDrawer('party')` reopens
-  on the remembered tab. The lineup hit is a pointer convenience over the
+  commander's figure) — open on 成員; every 背包 opener opens on 背包 (see
+  Bag routing below); a bare `openHudDrawer('party')` reopens on the
+  remembered tab. The lineup hit is a pointer convenience over the
   decorative `aria-hidden` layer; keyboard users reach every member through
   the rail.
 - `PartyMemberTab` renders only the `party_member` panel's descriptors
@@ -198,10 +199,33 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   `inventory.toggle_equip` `actor_id`. 使用… opens a labelled confirmation
   drawn inside the window (its keys never reach the window's trap, the content
   behind it is `inert`, a close attempt cancels it); 裝備 names the replaced
-  singleton occupant (`裝備（替換 X）`), never an accessory. In combat the
-  strip shows counts only, no give control or stepper is offered, the bar shows
-  the committed give reason, and the combat-draft use is not offered (it lands
-  with webclient-party-bag-retire; until then the old bag drawer still owns the
-  in-combat use); toggles keep their committed descriptors.
+  singleton occupant (`裝備（替換 X）`), never an accessory. An available but
+  empty bag shows the shared `EmptyState`; a slot filter with no match is a
+  one-line state. Rarity frames use the non-colour border patterns (uncommon
+  dotted and rare dashed at 2px, epic double and legendary ridge at 3px).
+- In combat (webclient-party-bag-retire) the strip shows counts only in
+  one-line cells (the owner's 持有者 rides beside the name), no give control
+  or stepper is offered, and the bar shows the committed give reason
+  (戰鬥中無法交換物品。). A `use` descriptor routed `combat_draft` becomes
+  設為 X 本回合的行動…, which emits `combat-item` (no confirmation: the card's
+  item review/target step is the confirmation) and `intents.js`
+  `onPartyBagCombatItem` calls `store.useCombatItem(itemKey, memberId)`. When
+  that member is not the commanded one, the store first sends the actor
+  selector's read-only `combat.actor_choices` and `followCombatItem` (run at
+  the end of `publishView`, like the automatic advance) opens the item frame
+  once that member's choices committed; the card then stays on that member.
+  A refused or rejected switch toasts; a closed window, another viewed member
+  or another actor query drops the intent. `onPartyBagAction` drops
+  `party.transfer` and `inventory.use` in combat; toggles keep their committed
+  descriptors. The server republishes `party_inventory` on engagement and on
+  every settled round so the tab never shows stale combat descriptors or
+  counts.
+- Bag routing: `InventoryPanel` and `EquipmentDoll` are gone. Every old bag
+  opener — the top navigation's 背包 entry, the exploration 背包 row and the
+  combat root's client-local 背包 row — still asks for the `inventory`
+  drawer, and `stores/elosern/hud.js` `openHudDrawer("inventory")` remembers
+  the 背包 tab and opens `party` instead; `inventory` is never the stored
+  drawer name. The party purse in the window header is the only balance in
+  the drawer layer.
 - The 狀態/技能/系譜 tabs land in the next changes; until then each shows
   its backing panel's committed unavailable reason or its (empty) scoped slot.

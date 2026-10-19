@@ -42,7 +42,7 @@ events/actions it emits, and its primary states.
 - **THEN** the required manifest SHALL enumerate at minimum: the header; the place card; the
   message window; the command line; the action dock with its menu and submenu frames and its exploration
   root pane; the presence rail, the centred choice card, and the question card; the status panel with its gauges and
-  conditions; the character status drawer (including the equipment doll); the skill book; the
+  conditions; the character status drawer; the party window with its 背包 tab (including the equipment doll); the skill book; the
   local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait
   on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice
   list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
@@ -153,7 +153,7 @@ exact server-authored suggestion card shape on the centred suggestions card.
   readout
 
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
-The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`
+The `StatusPanel`, the `CharacterStatusDrawer`, and the `SkillBook`
 components SHALL present the `status` panel payload (schema version 1), the `character` panel
 payload (schema version 3), and the character's skill data, each surface rendering only its
 OOB-backed payload and inventing no field.
@@ -184,7 +184,7 @@ OOB-backed payload and inventing no field.
 
 #### Scenario: The character status drawer presents only the backed character fields
 - **WHEN** the character status drawer renders with the `character` panel available
-- **THEN** it presents the character details, the equipment doll's equipped items, disguise, guild rank/merit, and persona, and no field the payload does not carry is rendered
+- **THEN** it presents the character details, disguise, guild rank/merit, and persona, and no field the payload does not carry is rendered; equipped items are presented by the party window's bag tab
 
 #### Scenario: An active skill row carries its registry-backed descriptor detail
 - **WHEN** the character panel's presenter serializes an active skill row whose key resolves in the skill registry
@@ -278,7 +278,8 @@ OOB-backed payload and inventing no field.
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
 The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`,
-`QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data.
+`QuestBoard`, and `LoreDrawer`) and the party window's `PartyBagTab` (backed by `party_inventory` and
+`item_holdings`) SHALL render only committed OOB data.
 
 #### Scenario: Art degrades to a truthful placeholder
 - **WHEN** the art asset is missing, pending without a prior image, failed, invalid, or unavailable
@@ -313,8 +314,8 @@ The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels 
 - **THEN** committed equipped markers and the five-item accessory summary render without a locally inferred slot or replacement
 
 #### Scenario: Services unavailable surfaces render only the registered reason
-- **WHEN** the services OOB channel is unavailable
-- **THEN** shop, quest, lore, and inventory stories render only the registered reason with no fabricated values or controls
+- **WHEN** the services OOB channel or the `party_inventory` panel is unavailable
+- **THEN** shop, quest and lore stories, and the bag tab story respectively, render only the registered reason with no fabricated values or controls
 
 #### Scenario: Local map stories pass the explicit variant and show no layout control
 - **WHEN** the local map's showcase stories render
@@ -338,9 +339,10 @@ The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels 
 - **THEN** it renders only its services payload
 
 #### Scenario: The inventory renders its committed fields together
-- **WHEN** the `InventoryPanel` renders
-- **THEN** it renders committed inventory display name, held count, equipped flag, nullable
-  presentation, and nullable action descriptor together with committed character equipment rows
+- **WHEN** the `PartyBagTab` renders
+- **THEN** it renders committed `party_inventory` display name, held count, equipped count, nullable
+  presentation, and the use, toggle and give descriptors together with the committed equipment doll
+  and the selected item's committed holdings
 
 #### Scenario: Presentation and action come only from committed descriptors
 - **WHEN** an inventory row renders its icon map usage or action behavior
@@ -351,8 +353,9 @@ The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels 
 - **WHEN** the inventory provides inspection and activation (keyboard-equivalent), confirmation for
   usable items, direct equipment toggle, and committed disabled-reason states
 - **THEN** it does so without inventing an effect, recovery amount, condition, consumable flag,
-  equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or
-  drop behavior
+  equipment slot, statistic, requirement, set bonus, client-computed comparison, sort, search,
+  drag, or drop behavior; its only comparison is the server's `item_holdings` delta and its only
+  filter is the selected doll slot
 
 #### Scenario: No surface invents data, party panel included
 - **WHEN** any map, art, or services surface renders
@@ -414,8 +417,8 @@ manifest-listed overlay that nothing imports is not complete.
 - **THEN** the intimate/adult status collapsible is absent from the deferred-surface list, because it now has a backing OOB read model (`character.intimate`), and its presence/absence behaviour is asserted by `webclient-contextual-hud`'s character-status drawer requirement instead
 
 #### Scenario: The held-item bag is built from its backing section
-- **WHEN** the `services` panel commits an `inventory` section
-- **THEN** the bag renders that section's rows with their display names, held counts and equipped flags, bounded by the payload's row cap, and states the cap in words when the listing reaches it
+- **WHEN** the `party_inventory` panel commits the viewed member's bag
+- **THEN** the party window's 背包 tab renders that panel's rows with their display names, held counts and equipped counts, bounded by the payload's row cap
 
 #### Scenario: The manifest is re-frozen at the redesign set
 - **WHEN** the contextual HUD redesign completes
@@ -492,12 +495,11 @@ manifest-listed overlay that nothing imports is not complete.
   panel carries it
 
 #### Scenario: The held-item bag's total never claims untruncated holdings
-- **WHEN** the held-item bag renders from `services.inventory.rows`
-- **THEN** the listing is bounded by the payload's row cap and `pagination.inventory_total` is
-  surfaced only as the count of rows actually shipped and never as a claim about untruncated
-  holdings
-- **AND** the bag's backing is the `services` panel's `inventory` section, which the server builds
-  for any actor in exploration mode independently of any service host
+- **WHEN** the 背包 tab renders from `party_inventory.rows`
+- **THEN** the listing is bounded by the payload's row cap and the tab's count is only the count
+  of rows actually shipped, never a claim about untruncated holdings
+- **AND** the bag's backing is the `party_inventory` panel, which the server builds for the
+  viewed member in exploration and in combat independently of any service host
 
 #### Scenario: The deferred list's not-deferred exclusions name their governing specs
 - **WHEN** the deferred-surface assertion excludes the intimate/adult status collapsible, the
@@ -610,23 +612,21 @@ or by a committed action-result read model.
 
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 
-Storybook SHALL provide breakdown-state stories for the character drawer,
-equipment doll, and inventory panel driven by a version-5 character fixture
-mirroring the server contract's serialized sample — the fixture MUST carry
-a worn bias-bearing item whose stored-base exposure differs from its
-effective ordinal, at least one row at the 16-layer bound, and at least
-one adjustment-bearing item — and the component coverage check SHALL pass
-against the UNCHANGED frozen required-set manifest.
+Storybook SHALL provide breakdown-state stories for the character drawer and the
+party window's bag tab, driven by a version-5 character fixture and a
+`party_inventory` fixture mirroring the server contract's serialized sample. The
+fixture MUST carry a worn bias-bearing item whose stored-base exposure differs
+from its effective ordinal, a row at the 16-layer bound, and an
+adjustment-bearing item, and the component coverage check SHALL pass.
 
 #### Scenario: v5 breakdown stories build
 
 - **WHEN** `pnpm run build-storybook` builds the updated stories
-- **THEN** the drawer, doll, and inventory stories render the version-5
-  fixture's layers (including the 16-layer-bound row, all rendered without
+- **THEN** the drawer and bag tab stories render their fixtures' layers (including the 16-layer-bound row, all rendered without
   truncation) and adjustment strings
 
 #### Scenario: Coverage gate stays clean
 
 - **WHEN** `pnpm run showcase-coverage` runs after the change
-- **THEN** the frozen required-set manifest is unchanged and coverage
-  passes
+- **THEN** the required-set manifest differs only by this series' governed
+  additions and deletions and coverage passes

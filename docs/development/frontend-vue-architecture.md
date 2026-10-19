@@ -256,11 +256,13 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
   的道具與技能一樣先問一次。持有中的問題綁定成員、session／round／draft 版本與框架
   主體，任何一項變動（含道具消失或停用、裝備變更導致重新提交）都直接取消且不送出。
   基本戰術無極性事實，永不觸發此問題。
-- **戰鬥中的背包**：`InventoryPanel` 的 `combat` 屬性為真時，啟用中的 `inventory.use`
-  立刻發出意圖、不開本機確認視窗；`composables/intents.js` 把它轉成
-  `store.useCombatItem(item_key)`，也就是與 `道具` 列相同的檢視／目標／送出流程，
-  因此戰鬥中永不送出無成員的 `inventory.use`。該成員沒有這件物品時只留一則可見提示。
-  檢視與本人裝備切換維持免費、原樣。
+- **戰鬥中的背包**：背包是隊伍視窗的 背包 分頁（`PartyBagTab`）。戰鬥中已提交的
+  `use` 描述改走 `combat_draft`，動作列的 使用… 變成「設為 X 本回合的行動…」，不開本機
+  確認視窗；`composables/intents.js` 的 `onPartyBagCombatItem` 把它轉成
+  `store.useCombatItem(item_key, member_id)`，也就是與 `道具` 列相同的檢視／目標／送出流程。
+  檢視中的成員不是目前指揮的成員時，先送出與成員選擇相同的唯讀 `combat.actor_choices`，
+  該成員的選項提交後才開啟道具框架。戰鬥中永不送出 `inventory.use` 或 `party.transfer`；
+  切換失敗時只留一則可見提示。檢視與每位成員的裝備切換維持免費、原樣。
 - **重新驗證**：框架內容在每次讀取時由已提交面板重解；道具消失或停用時解析為
   `unresolvable` 標記並彈回上一層，裝備變更後不需要任何客戶端補救。
 

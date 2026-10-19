@@ -82,13 +82,16 @@ AFFECTED_FULL: tuple[str, ...] = ()
 # Engage clears any live dialogue session inside the deterministic core, so
 # the partial update must re-render ``dialogue`` too (webclient-align-10):
 # without it the pre-engage available panel stays committed under combat mode.
-# The holdings strip must flip to its combat transfer bar in the same update.
+# The holdings strip must flip to its combat transfer bar in the same update,
+# and the 背包 tab's descriptors to their combat form (gives refused, use
+# routed to the member's combat draft; webclient-party-bag-retire).
 AFFECTED_ENGAGE = (
     "status",
     "context_actions",
     "dialogue",
     "art",
     "item_holdings",
+    "party_inventory",
 )
 
 

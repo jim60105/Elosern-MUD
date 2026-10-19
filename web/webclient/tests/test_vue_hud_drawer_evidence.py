@@ -89,45 +89,17 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-bag-renders-the-bounded-inventory-rows-without-inventing-a-total-or-a-rarity"
+        "webclient-party-window::the-bag-tab-presents-the-viewed-member-s-doll-bag-and-holdings",
     )
-    def test_bag_bounded_inventory_rows(self):
-        # The bag renders the committed services inventory rows (name / held /
-        # equipped), states the row ceiling in words, and fabricates no total /
-        # rarity / use-equip control. Since realign-inventory-drawer-layout the
-        # available body is the mock's three-section stack (equipment doll,
-        # `物品` heading tagged with the shipped listing size over the tile
-        # grid, and a `金錢` section whose single row carries the committed
-        # grouped integer wallet) on the bare drawer body, with no sort /
-        # filter / search pill reproduced.
+    def test_bag_tab_rows_and_doll(self):
+        # The party window's 背包 tab renders the committed `party_inventory`
+        # doll (主手, 副手, 盔甲, 飾品 n/limit) above the viewed member's rows
+        # (name, held count, equipped tag), a doll slot filters the rows
+        # locally, rarity is the committed presentation's, and every control
+        # follows a committed descriptor.
         _assert_vitest_passes(
-            _run_vitest(TESTS_DIR / "world" / "inventory_panel.test.js"),
-            "bag bounded inventory rows",
-        )
-
-    @covers_requirement(
-        "webclient-contextual-hud::the-equipment-doll-renders-only-server-authored-slots-and-drops-nothing"
-    )
-    def test_equipment_doll_server_authored_slots(self):
-        # The equipment doll renders the server's three singleton slots and the
-        # accessory summary as four named positions in a compact two-column
-        # square layout (restyle-inventory-equipment-slots). Since
-        # realign-inventory-drawer-layout the section is titled `裝備` with the
-        # `真值 ‧ 偽裝不影響` tag (never `裝備人偶`) and the square grid sits in
-        # the mock's `.doll` flex row beside a 裝備描述 column whose labelled
-        # entries carry the committed display names (slot label + name; every
-        # accessory row groups under the 飾品 label), while the accessory
-        # summary still states the committed count (a duplicate committed row
-        # for a recognised singleton slot renders as a labelled overflow row)
-        # and any unrecognised slot key renders as a labelled fallback row
-        # rather than being discarded. Each position renders only a fixed local
-        # SVG selected by its server-authored slot role (the off-hand position
-        # is the iconless position); a vacant singleton slot renders its
-        # explicit dashed empty state. No item statistic, rarity, item icon,
-        # summary, or comparison is invented.
-        _assert_vitest_passes(
-            _run_vitest(TESTS_DIR / "data" / "equipment_doll.test.js"),
-            "equipment doll server-authored slots",
+            _run_vitest(TESTS_DIR / "data" / "party_bag_tab.test.js"),
+            "bag tab rows and doll",
         )
 
     @covers_requirement(
@@ -144,16 +116,14 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-drawer-layer-renders-the-wallet-exactly-once"
+        "webclient-contextual-hud::the-party-purse-renders-exactly-once-per-window"
     )
     def test_drawer_layer_single_wallet(self):
-        # Across the whole drawer layer the wallet renders in exactly two
-        # places per opening of the inventory drawer (realign-inventory-
-        # drawer-layout): the shared header subtitle and the single row of the
-        # `金錢` body section — both the same thousands-grouped integer copper
-        # read from the committed character panel, never the services-side
-        # figure; no other drawer or body element renders a balance, and an
-        # unavailable panel renders no balance (never a zero).
+        # Across the whole drawer layer the party purse renders exactly once
+        # (webclient-party-bag-retire): in the party window's header, from the
+        # committed `party_inventory` panel; the bag tab body renders no 金錢
+        # row, no other drawer renders a balance, and an unavailable panel
+        # renders no balance (never a zero).
         _assert_vitest_passes(
             _run_vitest(TESTS_DIR / "app_client_drawers.test.js"),
             "drawer-layer single wallet",

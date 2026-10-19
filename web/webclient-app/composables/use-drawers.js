@@ -1,9 +1,8 @@
 // The reference-drawer layer (H4): the drawer chrome's derived head copy, the
-// skill/inventory subtitles, the wallet figure, and the drawer close route.
+// skill subtitle, the member reference, and the drawer close route.
 // The quest drawer's counter honesty rules live in quest-drawer-model.js. Extracted verbatim from AppClient.vue so
 // the SFC stays a passive renderer.
 import { computed } from "vue";
-import { formatCopper } from "../components/character-identity.js";
 
 export function useDrawers(store, { panel, panelAvailable }) {
   // H4 (task 7.4): the reference drawer layer. The drawer title/subtitle is
@@ -11,7 +10,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   const DRAWER_TITLES = {
     letters: "信件",
     skill: "技能書",
-    inventory: "背包 ‧ 裝備",
     shop: "商店",
     quest: "任務",
     lore: "世界圖鑑",
@@ -24,7 +22,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   const DRAWER_ICONS = {
     letters: "letters",
     skill: "skills",
-    inventory: "inventory",
     shop: "shop",
     quest: "quests",
     lore: "lore",
@@ -38,7 +35,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // an unrelated portrait or a stand-in illustration. The party window
   // (webclient-party-window-member-tab) owns its own WindowFrame chrome and
   // carries its art in the 成員 nameplate, so it is not a HudDrawer here.
-  const DRAWER_ART_KEYS = new Set(["status", "inventory"]);
+  const DRAWER_ART_KEYS = new Set(["status"]);
   const drawerHasArt = computed(() => DRAWER_ART_KEYS.has(store.view.hudDrawer));
 
   // The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
@@ -78,49 +75,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return `主動 ${skillCount(character?.actives)} ‧ 被動 ${skillCount(character?.passives)}`;
   });
 
-  // The inventory drawer's committed wallet figure (relocate-inventory-drawer-
-  // essentials; realign-inventory-drawer-layout D3): the validated integer
-  // copper from the `character` panel, null when:
-  //  - the `services` panel is unavailable or its `inventory` section is
-  //    absent (when the bag is unavailable or the section is absent the bag
-  //    states its registry-owned reason / absent message and fabricates no
-  //    wallet),
-  //  - the `character` panel is unavailable or carries no valid non-negative
-  //    integer balance (a missing or unavailable panel yields null — no
-  //    balance, and never a zero).
-  // The head subtitle and the bag's `金錢` row are both derived from this one
-  // figure (`services.inventory.wallet` is never read), so the two renderings
-  // of the drawer-layer wallet can never disagree.
-  const inventoryWalletCopper = computed(() => {
-    const services = panel("services");
-    const servicesAvailable = !!services && services.available !== false;
-    const inventorySection = services ? (services.inventory ?? null) : null;
-    if (!servicesAvailable || inventorySection === null) {
-      return null;
-    }
-    const character = commanderCharacterPanel.value;
-    const wallet = character?.wallet;
-    if (typeof wallet !== "number" || !Number.isInteger(wallet) || wallet < 0) {
-      return null;
-    }
-    return wallet;
-  });
-
-  // The inventory drawer's head subtitle: the committed wallet figure above,
-  // formatted as thousands-grouped integer copper (the shared
-  // `character-identity.js` formatter, the same one the character head card
-  // uses); blank for any other drawer or when the figure is null.
-  const inventoryWalletSubtitle = computed(() => {
-    if (store.view.hudDrawer !== "inventory") {
-      return "";
-    }
-    const wallet = inventoryWalletCopper.value;
-    if (wallet === null) {
-      return "";
-    }
-    return `錢袋 ${formatCopper(wallet)} 銅`;
-  });
-
   // The member reference the member-scoped drawer controls name
   // (party-member-equipment, companion-field-item-use, party-practice-
   // booking): the controlled figure's identity from the committed `status`
@@ -141,53 +95,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   });
 
-  // The `character` panel follows the viewed party member while the inventory
-  // drawer's bag and mutation identity belong to the controlled figure. The
-  // drawer may only present the character panel's equipment and purse when
-  // both name the same member; otherwise it degrades to an empty doll and no
-  // purse rather than attributing one member's facts to another.
-  const controlledCharacterPanel = computed(() => {
-    const character = panel("character");
-    if (!character) {
-      return null;
-    }
-    // Keep the registry-owned unavailable form so the doll states its reason.
-    if (character.available === false) {
-      return character;
-    }
-    const subject = controlledActorId.value;
-    if (subject === null || character.member_id !== subject) {
-      // Unknown ownership is not "no equipment": omit the doll instead of
-      // presenting an authoritative empty slot set.
-      return null;
-    }
-    return character;
-  });
-
-  // The drawer-layer purse belongs to the commander (the player), so the
-  // character panel's wallet is only presented while its viewed member is the
-  // party's commander row. A companion's own balance is never shown as the
-  // player's purse; when the party panel cannot answer, the character panel's
-  // own wallet stands (the viewed member defaults to the commander).
-  const commanderCharacterPanel = computed(() => {
-    const character = panel("character");
-    if (!character || character.available === false) {
-      return null;
-    }
-    const party = panel("party");
-    const commanderId =
-      party && party.available !== false && Array.isArray(party.slots) && party.slots.length
-        ? party.slots[0]?.identity
-        : null;
-    // The purse is only presented once the viewed member is proven to be the
-    // commander; an unavailable party panel withholds it rather than risking
-    // a companion's balance being read as the player's.
-    if (!Number.isSafeInteger(commanderId) || character.member_id !== commanderId) {
-      return { ...character, wallet: null };
-    }
-    return character;
-  });
-
   // The skill drawer's footer: the book's keyboard guidance (client-local
   // presentation copy). The retired cast-syntax footer is gone: graphical
   // use and practice live in the book itself (skillbook-authoritative-casting).
@@ -196,13 +103,9 @@ export function useDrawers(store, { panel, panelAvailable }) {
   return {
     SKILL_BOOK_KEY_HINT,
     controlledActorId,
-    controlledCharacterPanel,
-    commanderCharacterPanel,
     drawerTitle,
     drawerIcon,
     drawerHasArt,
-    inventoryWalletCopper,
-    inventoryWalletSubtitle,
     onHudDrawerClose,
     onOpenDrawer,
     skillBookSubtitle,

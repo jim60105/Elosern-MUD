@@ -438,9 +438,12 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         result = _engage_adapter(self.player, {"monster_id": int(monster.pk)})
         self.assertEqual(result["outcome"], "success")
         # Engage clears the dialogue session inside the deterministic core, so
-        # the partial update must re-render ``dialogue`` too (webclient-align-10).
+        # the partial update must re-render ``dialogue`` too (webclient-align-10);
+        # the holdings strip and the 背包 tab flip to their combat form in the
+        # same update (webclient-party-bag-retire).
         self.assertEqual(
-            result["affected_panels"], ("status", "context_actions", "dialogue", "art")
+            result["affected_panels"],
+            ("status", "context_actions", "dialogue", "art", "item_holdings", "party_inventory"),
         )
         self.assertTrue(is_in_active_session(self.player))
 

@@ -547,6 +547,43 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "inventory-item-actions::inventory-tiles-confirm-use-and-directly-toggle-equipment",
+        "webclient-party-window::the-bag-action-bar-uses-or-equips-for-the-viewed-member",
+        "webclient-party-window::in-combat-the-bag-shows-counts-and-saves-draft-item-use",
+    )
+    def test_party_bag_retire_vitest_evidence_passes(self):
+        """The in-combat 背包 tab and the old openers (webclient-party-bag-
+        retire): counts only, no give control or stepper, the committed
+        戰鬥中無法交換物品 reason, 設為 X 本回合的行動… handing the viewed
+        member's item to useCombatItem (switching the commanded member
+        first), free toggles, no inventory.use or party.transfer leaving in
+        combat, and every 背包 opener landing on the party window's 背包 tab
+        without a dispatch."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_bag_tab.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/party_items_tactics.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/store/frameless_bag.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_frameless_bag.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "party-bag-retire Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )
     def test_foe_lineup_vitest_evidence_passes(self):

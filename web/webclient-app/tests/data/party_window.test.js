@@ -18,6 +18,8 @@ import {
   PARTY_BAG_HOLDINGS_CONSUMABLE,
   PARTY_BAG_HOLDINGS_NONE,
   PARTY_BAG_INVENTORY_SAMPLE,
+  PARTY_BAG_HOLDINGS_COMBAT,
+  PARTY_BAG_INVENTORY_COMBAT_SAMPLE,
 } from "../../stories/fixtures/party_panels.js";
 
 const SCOPE = "1|1";
@@ -163,6 +165,26 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
     expect(wrapper.emitted("close")).toBeUndefined();
     expect(wrapper.find('[data-testid="party-bag-tab__confirm-dialog"]').exists()).toBe(false);
     expect(wrapper.emitted("bag-action")).toBeUndefined();
+  });
+
+  // webclient-party-bag-retire: the in-combat bag.
+  it("forwards the bag's round choice for the viewed member and sends no bag action", async () => {
+    rememberPartyWindowTab(SCOPE, "bag");
+    mountWindow({ partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_COMBAT, combat: true });
+    await wrapper.get('[data-testid="action-bar__btn--draft"]').trigger("click");
+    expect(wrapper.emitted("combat-item")).toEqual([[{ memberId: 101, itemKey: "potion_heal" }]]);
+    expect(wrapper.emitted("bag-action")).toBeUndefined();
+  });
+
+  it("retires an open use confirmation when combat begins, sending nothing", async () => {
+    rememberPartyWindowTab(SCOPE, "bag");
+    mountWindow({ partyInventory: PARTY_BAG_INVENTORY_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_CONSUMABLE });
+    await wrapper.get('[data-testid="action-bar__btn--use"]').trigger("click");
+    expect(wrapper.find('[data-testid="party-bag-tab__confirm-dialog"]').exists()).toBe(true);
+    await wrapper.setProps({ combat: true, partyInventory: PARTY_BAG_INVENTORY_COMBAT_SAMPLE, itemHoldings: PARTY_BAG_HOLDINGS_COMBAT });
+    expect(wrapper.find('[data-testid="party-bag-tab__confirm-dialog"]').exists()).toBe(false);
+    expect(wrapper.emitted("bag-action")).toBeUndefined();
+    expect(wrapper.emitted("combat-item")).toBeUndefined();
   });
 
   it("selects 空位 locally, opening 成員, and sends nothing", async () => {

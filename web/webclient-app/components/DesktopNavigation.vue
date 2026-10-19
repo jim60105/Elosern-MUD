@@ -25,7 +25,9 @@ const props = defineProps({
   galleryAvailable: { type: Boolean, default: false },
 });
 const emit = defineEmits(["navigate", "overlay", "drawer"]);
-const drawerKeys = { character: "status", inventory: "inventory", bag: "inventory", quests: "quest" };
+// The 背包 entries open the party window on its 背包 tab
+// (webclient-party-bag-retire).
+const drawerKeys = { character: "status", inventory: "party", bag: "party", quests: "quest" };
 // The glyph count of each primary concept's label sizes its control, so the
 // region's width is the same whichever entries the mode supplies.
 const GLYPHS = { character: 4, quests: 2, inventory: 2, bag: 2, map: 2, settings: 2 };

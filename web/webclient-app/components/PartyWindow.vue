@@ -72,7 +72,7 @@ const props = defineProps({
   memoryScope: { type: String, default: "" },
 });
 
-const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "open-npc-persona", "persona-edit"]);
+const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "combat-item", "open-npc-persona", "persona-edit"]);
 
 const memory = usePartyWindowMemory(props.memoryScope);
 // The memory is one module-level reactive object: re-syncing the scope
@@ -250,6 +250,7 @@ function closeGuard() {
         @select-item="onSelectItem"
         @set-quantity="setQuantity"
         @action="(intent) => emit('bag-action', intent)"
+        @combat-item="(intent) => emit('combat-item', intent)"
       >
         <template #rail>
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />

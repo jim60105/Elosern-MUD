@@ -347,7 +347,7 @@ describe("store dispatch + focus", () => {
       expect(store.view.focus.key).toBe("surrender");
     });
 
-    it("the combat top-navigation 背包 entry opens inventory without any dispatch", () => {
+    it("the combat top-navigation 背包 entry opens the party window without any dispatch", () => {
       openSession();
       store.receive(
         1,
@@ -356,7 +356,8 @@ describe("store dispatch + focus", () => {
         {},
       );
       store.tabToRootAndConfirm("bag", "pointer");
-      expect(store.view.hudDrawer).toBe("inventory");
+      // webclient-party-bag-retire: the party window on its 背包 tab.
+      expect(store.view.hudDrawer).toBe("party");
       // No OOB packet, no router frame pushed (the frame stays the root).
       expect(sender.sent.actions.length).toBe(0);
       expect(store.view.dockDepth).toBe(1);

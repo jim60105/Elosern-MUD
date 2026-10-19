@@ -1281,7 +1281,7 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 No reference drawer SHALL present a keyboard router frame. Opening any reference drawer SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer.
 
 #### Scenario: Every drawer opener pushes nothing
-- **WHEN** the 背包 ‧ 裝備 drawer opens from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, or the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row
+- **WHEN** the party window opens on its 背包 tab from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, or the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row
 - **THEN** the opening pushes no frame, switches no sub-dock, and records no drawer-hosted service surface
 
 #### Scenario: No drawer body hosts dock chrome
@@ -1306,11 +1306,11 @@ No reference drawer SHALL present a keyboard router frame. Opening any reference
 
 #### Scenario: Opening the bag or the shop pushes no frame
 - **WHEN** the player activates the top navigation's 背包 entry at the exploration root, or a merchant's shop `navigate` affordance row inside an open target frame
-- **THEN** the matching drawer opens, the router's current frame is the frame that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
+- **THEN** the party window (on its 背包 tab) or the shop drawer opens, the router's current frame is the frame that was current before the open, no frame was pushed, no sub-dock switch occurred, and the breadcrumb is unchanged
 
 #### Scenario: Keyboard reachability does not depend on a hosted list
-- **WHEN** a keyboard-only player moves through the open bag drawer, or moves into a shop stock row, types a quantity within its advertised bounds, and activates its buy control
-- **THEN** every committed inventory row is reachable through the focusable item tiles with the shared inspector, the shop row becomes the selected row carrying the quantity hooks and exactly one `shop.buy` is emitted with that row's `item_key` and quantity, and no parallel navigation list of those rows exists to traverse
+- **WHEN** a keyboard-only player moves through the party window's open 背包 tab, or moves into a shop stock row, types a quantity within its advertised bounds, and activates its buy control
+- **THEN** every committed `party_inventory` row is reachable through the bag tab's single-tab-stop listbox, whose selected row drives the detail column, the shop row becomes the selected row carrying the quantity hooks and exactly one `shop.buy` is emitted with that row's `item_key` and quantity, and no parallel navigation list of those rows exists to traverse
 
 #### Scenario: Opening the quest drawer from the top navigation pushes no frame
 - **WHEN** the player activates the top navigation's 任務 entry at any dock depth
@@ -1327,161 +1327,6 @@ No reference drawer SHALL present a keyboard router frame. Opening any reference
 #### Scenario: A mode change closes the drawers it invalidates
 - **WHEN** the committed mode changes from exploration to combat while a services-backed drawer is open
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
-
-### Requirement: The bag renders the bounded inventory rows without inventing a total or a rarity
-The bag workspace SHALL use shared chrome for the `背包 ‧ 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section.
-
-#### Scenario: The available body keeps its authoritative sections
-- **WHEN** the bag body renders with available payloads
-- **THEN** it presents an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection
-
-#### Scenario: The listing never claims completeness
-- **WHEN** the shipped inventory nears or reaches the server row ceiling
-- **THEN** the listing remains bounded by that ceiling and states it in words when reached, and no shipped count claims to be the player's untruncated holdings
-
-#### Scenario: Registered rows render only their presentation
-- **WHEN** a registered row's non-null `presentation` renders
-- **THEN** it selects one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment, and its tile shows committed held count and a non-colour equipped marker
-
-#### Scenario: A null presentation stays neutral
-- **WHEN** a row carries a null presentation
-- **THEN** it renders only the neutral unknown-item SVG and visible unknown marker, and the browser derives no type, icon, rarity, summary, or mechanics from item key or display name
-
-#### Scenario: One inspector serves pointer and keyboard
-- **WHEN** the grid renders its tiles
-- **THEN** it uses native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths expose identical committed name, kind, rarity, count, equipped state, and summary; and the focused tile references the stable inspector through `aria-describedby`
-
-#### Scenario: Tiles follow only their action descriptor
-- **WHEN** a tile is inspect-only, unknown, disabled, an enabled usable item, or enabled equipment
-- **THEN** inspect-only and unknown tiles dispatch nothing; disabled tiles remain keyboard reachable, expose `aria-disabled`, and show the committed reason on activation without dispatch; enabled usable items open a labelled, focus-trapped inventory-use confirmation; and enabled equipment dispatches its toggle immediately
-
-#### Scenario: Selection state is client-local and resets
-- **WHEN** the panel is replaced, the drawer closes, the mode or epoch changes, or the transport is lost
-- **THEN** selection and dialog state — client-local — reset
-
-#### Scenario: The bag infers no mechanics or tools
-- **WHEN** the bag renders
-- **THEN** it renders or infers no numeric item statistics, recovery amounts, conditions, effects, consumable flags, slots, set bonuses, comparisons, sorting, filtering, search, drag, or drop behavior, and renders no static sort/filter/search pill
-
-#### Scenario: Availability degrades section by section
-- **WHEN** services v3 inventory is available in combat, when services commits its unavailable form or inventory is absent, or when inventory is available but character is unavailable
-- **THEN** the drawer remains available from its combat affordance while inventory is available; on unavailable services or absent inventory it renders only the registered reason and fabricates no wallet, equipment, row, count, action, or dialog; and with inventory available but character unavailable the grid remains available, the doll renders its registered unavailable state, and no wallet subtitle, wallet body value, or zero balance is invented
-
-#### Scenario: Bag transitions use the motion tokens
-- **WHEN** inspector, confirmation, or warning state changes under reduced motion
-- **THEN** all transitions use existing motion tokens so reduced motion makes them effectively instant
-
-#### Scenario: A registered actionable row preserves truthful inspection
-- **WHEN** a committed registered inventory row carries presentation and an enabled action descriptor
-- **THEN** its tile renders committed visual identity and inspector data, and deliberate activation follows the descriptor without deriving mechanics locally
-
-#### Scenario: An unknown row has a neutral truthful fallback
-- **WHEN** a committed inventory row has `presentation` null and `action` null
-- **THEN** its tile shows the neutral unknown state and real quantity with no inferred metadata or mutation
-
-#### Scenario: Keyboard inspection and activation match pointer behavior
-- **WHEN** keyboard and pointer users inspect and activate the same tile
-- **THEN** both receive identical committed inspector data and action behavior, and the focused tile references the inspector through `aria-describedby`
-
-#### Scenario: Eligible item use opens confirmation
-- **WHEN** the player activates an enabled usable-item tile
-- **THEN** the labelled confirmation dialog opens without dispatch and confirm is the only path that submits use
-
-#### Scenario: Equipment activates directly
-- **WHEN** the player activates an enabled equipment tile
-- **THEN** one equipment-toggle intent is emitted without opening a confirmation
-
-#### Scenario: Disabled item presents its reason
-- **WHEN** the player activates a full-HP potion or an unequipped accessory at the five-slot cap
-- **THEN** the committed reason is presented and no request is dispatched
-
-#### Scenario: Combat bag keeps personal items reachable
-- **WHEN** mode changes to active combat and services v3 commits canonical inventory
-- **THEN** the combat root's client-local `背包` row opens the frameless bag without dispatch or a router frame, and personal item tiles remain reachable while guild and shop surfaces are absent
-
-#### Scenario: The bag body retains its authoritative sections in a wide workspace
-- **WHEN** the bag is available with inventory, character equipment, and wallet
-- **THEN** it renders equipment, items, and money from their existing sources, with a reserved
-  non-interactive item-detail column, and invents no inventory total or additional holdings
-
-#### Scenario: Wallet renders only in the bag head and money row
-- **WHEN** the bag renders with available character and inventory panels
-- **THEN** the same integer copper wallet appears in the head subtitle and the single `金錢` row and nowhere else in the drawer
-
-#### Scenario: Ceiling is stated without inventing a total
-- **WHEN** the shipped inventory reaches its maximum row count
-- **THEN** the bag states the listing ceiling and never labels that count as complete holdings
-
-#### Scenario: Unavailable services fabricates nothing
-- **WHEN** the services panel commits its unavailable form
-- **THEN** the bag renders only the registered reason with no rows, wallet, equipment, count, heading, action, or dialog
-
-#### Scenario: Character unavailability preserves inventory without fabricating equipment
-- **WHEN** services inventory is available but the character panel is unavailable
-- **THEN** the bag renders held tiles, the equipment registered unavailable reason, and no wallet subtitle, wallet value, or zero balance
-
-#### Scenario: Reduced motion preserves action information
-- **WHEN** reduced motion is active and focus, inspector, confirmation, or warning state changes
-- **THEN** transitions are effectively instant while labels, reasons, focus, and committed item information remain available
-
-### Requirement: The equipment doll renders only server-authored slots and drops nothing
-The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 ‧ 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title.
-
-#### Scenario: The doll lays out as the redesign's equipment row
-- **WHEN** the equipment section renders
-- **THEN** the doll lays out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels
-
-#### Scenario: Four named positions, fixed slot SVGs
-- **WHEN** the square grid renders
-- **THEN** the doll renders the server's three singleton slots and one accessory summary as four named positions; the main-hand, armor, and accessory-summary positions each render a fixed local SVG selected by its server-authored slot role; the off-hand position is the iconless position; and the doll selects no item icon from an item key or display name
-
-#### Scenario: Empty and occupied singleton slots
-- **WHEN** a singleton slot carries no row, or carries rows
-- **THEN** an empty singleton slot renders a visible named empty state with a dashed outline; an occupied one renders its visible slot label in the grid and its committed display name in the 裝備描述 column
-
-#### Scenario: Duplicate, accessory, and unknown rows are never lost
-- **WHEN** committed rows carry more than one row for a recognised singleton slot, repeatable accessories, a slot key outside the recognised set, or no equipment at all
-- **THEN** the square position consumes only the first row of a duplicated singleton slot and every further row for that slot renders as a labelled overflow row; the accessory summary renders its visible label and committed item count while every repeatable accessory row renders in the 裝備描述 column's accessory group; an unrecognised slot key renders as a labelled fallback row rather than being discarded, so no row the payload sends is lost; and with no equipment at all the doll renders only its visible empty statement
-
-#### Scenario: The doll states true values only
-- **WHEN** the doll renders equipped items
-- **THEN** it renders no item statistic, attack or defence value, rarity, item icon, summary, or comparison against another item — the equipment rows carry none of those — and equipment is presented as true values that a disguise does not affect, which the section tag states exactly
-
-#### Scenario: The equipment section is titled 裝備 with the true-value tag
-- **WHEN** the bag renders its equipment section
-- **THEN** the section heading reads `裝備` with the tag `真值 ‧ 偽裝不影響` in the bag's shared section-heading style, and the string `裝備人偶` appears nowhere in the drawer
-
-#### Scenario: An empty slot is shown as empty
-- **WHEN** the committed equipment rows carry no row for a singleton slot
-- **THEN** that slot renders its visible name with a dashed explicit empty state, and no item is invented for it
-
-#### Scenario: An occupied singleton slot is identified without guessing its item type
-- **WHEN** the committed equipment rows carry one primary-hand item
-- **THEN** the square grid renders only that position's fixed slot SVG and visible slot name, the 裝備描述 column renders its committed display name under the `主手` label, and nothing is inferred about the item's icon, rarity, statistic, or comparison
-
-#### Scenario: An occupied off-hand position renders without an item icon
-- **WHEN** the committed equipment rows carry a `weapon_off` item
-- **THEN** the off-hand position stays the iconless position of the binding design, rendering its visible slot label in the grid and its committed display name in the 裝備描述 column with no item icon
-
-#### Scenario: The description column lists only committed rows
-- **WHEN** the committed equipment rows carry equipment
-- **THEN** the 裝備描述 column shows one labelled entry per primary row (slot label plus committed display name) — the first committed row of each recognised singleton slot and, in the accessory group, every accessory row — grouped by slot label, while duplicate and unrecognised-slot rows are rendered only by the doll's labelled fallback sections so each committed row appears exactly once, and with no committed row the column shows only the visible empty statement
-
-#### Scenario: Duplicate singleton rows are rendered, not discarded
-- **WHEN** the committed equipment rows carry more than one row for a recognised singleton slot
-- **THEN** the square position shows the first row for that slot and every additional row renders as a labelled overflow row, so the duplicate committed row is never dropped
-
-#### Scenario: Repeated accessories all render
-- **WHEN** the committed equipment rows carry more than one accessory row
-- **THEN** the accessory summary states the committed count and every accessory row renders in the description column's accessory group, and none is dropped for want of a fixed position
-
-#### Scenario: An unrecognised slot is rendered, not discarded
-- **WHEN** an equipment row carries a slot key outside the recognised set
-- **THEN** the row renders with its slot key as its label and its display name, and the doll drops no row
-
-#### Scenario: No statistics are invented for an equipped item
-- **WHEN** an equipped item renders in the doll
-- **THEN** it shows its display name and its slot only, with no attack, defence, rarity, item icon, summary, or comparison value
 
 ### Requirement: The character-status drawer degrades section by section and never substitutes a disguise
 The character-status drawer SHALL present the committed `status` panel's resources and its complete condition roster in every mode, and the committed `character` panel's true traits and guild standing plus the committed `party_member` panel's persona prose and intimate state for the viewed member. Each section SHALL carry the registry-owned reason when its panel is unavailable rather than hiding the drawer or inventing a value.
@@ -1558,32 +1403,36 @@ The character-status drawer SHALL present the committed `status` panel's resourc
 - **WHEN** the character-status drawer opens with a `status` panel carrying an actor name and full title and an available `character` panel carrying a guild rank
 - **THEN** the hero shows that name, that title and `公會階級 <rank>` above one row holding the 技能書 and 同伴 ‧ 隊伍 openers, and the drawer title appears only in the shared header
 
-### Requirement: The drawer layer renders the wallet exactly once
-Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer.
+### Requirement: The party purse renders exactly once per window
+The party purse (the commander's wallet, read from the committed `party_inventory` panel) SHALL be rendered exactly once in the party window, in its `WindowFrame` header extras, and nowhere else in the drawer layer apart from the shop window's own header.
 
 #### Scenario: No other drawer or body element carries a balance
-- **WHEN** the shop, the lore reference, the character-status drawer, or any other body element of the inventory drawer renders
+- **WHEN** the lore reference, the character-status drawer, or any tab body of the party window renders
 - **THEN** none of them renders a balance of its own
 
 #### Scenario: An unreadable wallet renders nothing rather than zero
-- **WHEN** a drawer's available character panel does not carry a committed non-negative integer wallet
-- **THEN** it renders no balance at all rather than a zero
+- **WHEN** the `party_inventory` panel is unavailable or carries no committed non-negative integer purse
+- **THEN** the party window renders no balance at all rather than a zero
 
 #### Scenario: The body row is gated with the inventory section
-- **WHEN** the bag's inventory section availability changes
-- **THEN** the `金錢` body row is additionally gated on the bag's available inventory section, because it renders only inside the bag's three-section stack and the two renderings must never disagree
+- **WHEN** the bag tab is open with an available `party_inventory` panel
+- **THEN** the bag tab body renders no 金錢 row; the header purse is the only balance
 
 #### Scenario: One wallet per drawer-layer opening
-- **WHEN** every drawer is opened in turn with the `services` and `character` panels available
-- **THEN** the only wallet values rendered across all of them are the inventory drawer's header subtitle and its `金錢` section row, both carrying the same integer copper value, and no other drawer or body element renders a balance
+- **WHEN** every drawer and the party window are opened in turn with their panels available
+- **THEN** the only balance in the party window is its header purse, carrying the commander's integer copper, and no other drawer body renders a balance
 
 #### Scenario: An unavailable panel renders no balance
-- **WHEN** the character panel that carries the wallet is unavailable
-- **THEN** no drawer renders a balance, and none renders a zero in its place
+- **WHEN** the panel that carries the purse is unavailable
+- **THEN** no balance and no zero is rendered in its place
 
 #### Scenario: A missing wallet field renders no body row
-- **WHEN** the inventory section is available but the character panel's wallet is not a committed non-negative integer
-- **THEN** the `金錢` section renders no balance row and the header subtitle renders no balance either, since both read the same validated character-panel figure; neither renders a zero
+- **WHEN** the purse field is not a committed non-negative integer
+- **THEN** neither the header nor any body renders a balance or a zero
+
+#### Scenario: Possession shows the same purse
+- **WHEN** the player possesses a companion
+- **THEN** the header purse still shows the commander's wallet
 
 ### Requirement: Mutations issued from a drawer keep the dispatch and confirmation contract
 Every affordance inside a drawer SHALL emit exactly the server-authored action identifier and payload its descriptor carries, through the client's single dispatch entry, and SHALL be governed by the same in-flight, epoch and revision gates as the same action issued from the dock.
@@ -2978,11 +2827,11 @@ A reference drawer SHALL show the current character's portrait column only when 
 - **THEN** the frame's single label reads `無肖像`, not `肖像生成中`
 
 ### Requirement: Empty drawer guidance preserves unavailable reasons
-An available but empty drawer list — the quest book with no rows, the world codex with nothing discovered, the bag's item section with no rows, and the party with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own.
+An available but empty list — the quest book with no rows, the world codex with nothing discovered, the party window bag tab with no rows, and the party window member rail with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own.
 
 #### Scenario: The party keeps its invite row
-- **WHEN** the party list is available and empty
-- **THEN** the empty guidance sits above the unchanged 空位 row, which keeps the only invite control
+- **WHEN** the party has no companions
+- **THEN** the member tab shows the empty guidance and the rail keeps the commander entry and the 空位 entry, which keeps the only invite descriptor
 
 #### Scenario: Unavailable is never merely empty
 - **WHEN** a panel is unavailable, or a section is absent
@@ -2993,8 +2842,8 @@ An available but empty drawer list — the quest book with no rows, the world co
 - **THEN** empty guidance is replaced by the registered reason with no invented quest/action
 
 #### Scenario: Every empty list shares one guidance form
-- **WHEN** the quest book, the codex, the bag's items, or the party is available and empty
-- **THEN** each renders the shared glyph, headline, and guidance card, and the empty party additionally keeps its 空位 row
+- **WHEN** the quest book, the codex, the bag tab, or the party is available and empty
+- **THEN** each renders the shared glyph, headline, and guidance card, and the empty party additionally keeps its 空位 entry
 
 ### Requirement: Lineage identity and inventory rarity use backed fields
 Lineage graph rows with the same element/style name SHALL be distinguished using their supplied root-node display names joined with ‧ and keep their owned/total count beside that identity. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label.

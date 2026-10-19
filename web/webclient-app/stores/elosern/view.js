@@ -516,6 +516,9 @@ export function applyView(ctx) {
     // `combat.actor_choices` envelope reads the freshly published
     // epoch/revision, never the previous one.
     ctx.autoAdvanceCombatActor(rs);
+    // The bag tab's held cross-member item (webclient-party-bag-retire) opens
+    // its frame last, after the publication, once its actor switch committed.
+    ctx.followCombatItem(ctx.reducer.getState());
   };
 
   const partyAvailable = computed(() => !!ctx.view.value.partyAvailable);

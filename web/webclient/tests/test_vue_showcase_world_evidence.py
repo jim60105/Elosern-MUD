@@ -62,7 +62,6 @@ WORLD_FAMILY_KEYS = (
     "World/ShopPanel",
     "World/QuestDrawer",
     "World/LoreCodexDrawer",
-    "World/InventoryPanel",
     "World/MapLattice",
 )
 
@@ -70,11 +69,6 @@ WORLD_FAMILY_KEYS = (
 # built Storybook index.json entry ids for every story exported by this
 # change (title "World/<Component>", deterministic story names).
 WORLD_FAMILY_STORY_IDS = {
-    "world-inventorypanel--empty-bag",
-    "world-inventorypanel--mixed-bag",
-    "world-inventorypanel--ceiling-bag",
-    "world-inventorypanel--section-absent",
-    "world-inventorypanel--unavailable",
     "world-localmap--full-lattice",
     "world-localmap--minimal",
     "world-localmap--unavailable",
@@ -146,7 +140,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/EquipmentDoll",
     "Data/CharacterStatusDrawer",
     "Overlays/CreationOverlay",
     "Overlays/HelpOverlay",
@@ -377,14 +370,14 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             "world + services family stories missing from the showcase: "
             + ", ".join(sorted(missing)),
         )
-        # Every family story title resolves to the family's six components,
+        # Every family story title resolves to the family's five components,
         # so the coverage gate and the showcase agree on the family surface.
         family_titles = {entries[story_id]["title"] for story_id in WORLD_FAMILY_STORY_IDS}
         self.assertEqual(
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ShopPanel",
-                "QuestDrawer", "LoreCodexDrawer", "InventoryPanel",
+                "QuestDrawer", "LoreCodexDrawer",
                 "MapLattice",
             )},
         )

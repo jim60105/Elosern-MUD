@@ -302,7 +302,7 @@ export function applyCreation(ctx) {
       // local selection, quantity, and confirmation state (the quantity
       // form is also nulled by the panel-replacement logic above).
       const d = ctx.hudDrawer.value;
-      if (d === "quest" || d === "shop" || d === "inventory") {
+      if (d === "quest" || d === "shop") {
         ctx.hudDrawer.value = null;
       }
       if (rs.mode === "creation" && d === "party") {

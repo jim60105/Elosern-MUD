@@ -13,7 +13,7 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import CharacterStatusDrawer from "../components/CharacterStatusDrawer.vue";
 import EmptyState from "../components/EmptyState.vue";
-import InventoryPanel from "../components/InventoryPanel.vue";
+import PartyBagTab from "../components/PartyBagTab.vue";
 import LineagePanel from "../components/LineagePanel.vue";
 import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
 import PartyWindow from "../components/PartyWindow.vue";
@@ -28,11 +28,10 @@ import {
   PARTY_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
-  SERVICES_PANEL_PRESENTATION_SAMPLE,
   SERVICES_PANEL_SAMPLE,
-  SERVICES_PANEL_UNAVAILABLE_SAMPLE,
   STATUS_PANEL_TITLED_SAMPLE,
 } from "../stories/fixtures.js";
+import { PARTY_BAG_INVENTORY_SAMPLE } from "../stories/fixtures/party_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 describe("EmptyState", () => {
@@ -75,15 +74,16 @@ describe("available-empty versus unavailable drawer lists", () => {
     );
   });
 
-  it("shows the bag's empty guidance in place of an empty grid, and only the reason when unavailable", () => {
-    const services = structuredClone(SERVICES_PANEL_SAMPLE);
-    services.inventory.rows = [];
-    const empty = mount(InventoryPanel, { props: { services, character: CHARACTER_PANEL_SAMPLE, wallet: CHARACTER_PANEL_SAMPLE.wallet } });
-    expect(empty.get('[data-testid="inventory-panel__empty"]').classes()).toContain("empty-state");
-    expect(empty.find('[data-testid="inventory-panel__grid"]').exists()).toBe(false);
-    const unavailable = mount(InventoryPanel, { props: { services: SERVICES_PANEL_UNAVAILABLE_SAMPLE, character: CHARACTER_PANEL_SAMPLE } });
+  // webclient-party-bag-retire: the bag is the party window's 背包 tab.
+  it("shows the bag tab's empty guidance in place of empty rows, and only the reason when unavailable", () => {
+    const empty = mount(PartyBagTab, { props: { partyInventory: { ...PARTY_BAG_INVENTORY_SAMPLE, rows: [] }, memberId: 101 } });
+    expect(empty.get('[data-testid="party-bag-tab__empty"]').classes()).toContain("empty-state");
+    expect(empty.find('[data-testid="party-bag-tab__rows"]').exists()).toBe(false);
+    const unavailable = mount(PartyBagTab, {
+      props: { partyInventory: { schema_version: 1, available: false, reason: { code: "inventory_unavailable", message: "背包目前無法顯示。" } }, memberId: 101 },
+    });
     expect(unavailable.find(".empty-state").exists()).toBe(false);
-    expect(unavailable.find('[data-testid="inventory-panel__unavailable"]').exists()).toBe(true);
+    expect(unavailable.get('[data-testid="party-window__tab-unavailable"]').text()).toBe("背包目前無法顯示。");
   });
 
   // webclient-party-window-member-tab: the party window replaced the party
@@ -189,16 +189,16 @@ describe("lineage identity", () => {
 
 describe("inventory rarity", () => {
   it("frames a committed rarity and keeps a null presentation neutral", () => {
-    const services = structuredClone(SERVICES_PANEL_PRESENTATION_SAMPLE);
-    const known = services.inventory.rows.find((r) => r.presentation?.rarity === "rare");
-    const unknown = { ...known, item_key: `${known.item_key}_unknown`, presentation: null, action: null };
-    services.inventory.rows = [known, unknown];
-    const w = mount(InventoryPanel, { props: { services, character: CHARACTER_PANEL_SAMPLE, wallet: CHARACTER_PANEL_SAMPLE.wallet } });
-    expect(w.get(`[data-testid="inventory-panel__tile--${known.item_key}"]`).attributes("data-rarity")).toBe("rare");
-    const tile = w.get(`[data-testid="inventory-panel__tile--${unknown.item_key}"]`);
-    expect(tile.attributes("data-rarity")).toBe("unknown");
-    expect(tile.attributes("data-unknown")).toBe("true");
-    expect(tile.text()).toContain("未知");
+    const known = PARTY_BAG_INVENTORY_SAMPLE.rows.find((row) => row.presentation?.rarity === "rare");
+    const unknown = { ...known, item_key: `${known.item_key}_unknown`, equipped_count: 0, slot: null, toggle: null, presentation: null };
+    const w = mount(PartyBagTab, {
+      props: { partyInventory: { ...PARTY_BAG_INVENTORY_SAMPLE, rows: [known, unknown] }, memberId: 101 },
+    });
+    const icon = (key) => w.get(`[data-testid="party-bag-tab__row--${key}"] .party-bag-tab__icon`);
+    expect(icon(known.item_key).attributes("data-rarity")).toBe("rare");
+    expect(icon(unknown.item_key).attributes("data-rarity")).toBe("unknown");
+    // The row keeps its committed name; no rarity or kind is inferred.
+    expect(w.get(`[data-testid="party-bag-tab__row--${unknown.item_key}"]`).text()).toContain(known.display_name);
   });
 });
 
@@ -224,7 +224,7 @@ describe("drawer art in the client", () => {
     expect(store.receive(1, "ui_snapshot", [fx.snapshot({ panels, revision: 1 })]).accepted).toBe(true);
     await wrapper.vm.$nextTick();
     const seen = {};
-    for (const name of ["skill", "inventory", "shop", "quest", "lore", "status", "party"]) {
+    for (const name of ["skill", "shop", "quest", "lore", "status", "party"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       if (!wrapper.find('[data-testid="hud-drawer"]').exists()) continue;
@@ -241,7 +241,7 @@ describe("drawer art in the client", () => {
     // The party window (webclient-party-window-member-tab) carries the
     // viewed member's portrait in its 成員 nameplate, not a drawer column.
     for (const [name, hasArt] of Object.entries(seen)) {
-      expect(hasArt, name).toBe(["status", "inventory"].includes(name));
+      expect(hasArt, name).toBe(name === "status");
     }
   });
 });

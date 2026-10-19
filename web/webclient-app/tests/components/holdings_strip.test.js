@@ -97,7 +97,7 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(wrapper.get('[data-testid="holdings-strip"]').attributes("data-combat")).toBe("true");
     expect(wrapper.findAll("button")).toHaveLength(0);
     expect(wrapper.find('[data-testid="holdings-strip__delta"]').exists()).toBe(false);
-    expect(wrapper.findAll('[role="listitem"]').map((c) => c.text())).toEqual(["莉瑟持有 1持有者", "艾拉持有 0", "卡卡恩持有 0"]);
+    expect(wrapper.findAll('[role="listitem"]').map((c) => c.text())).toEqual(["莉瑟持有者持有 1", "艾拉持有 0", "卡卡恩持有 0"]);
 
     mountStrip(ITEM_HOLDINGS_COMBAT, { combat: true });
     expect(wrapper.find('[data-testid="holdings-strip__reason"]').exists()).toBe(false);

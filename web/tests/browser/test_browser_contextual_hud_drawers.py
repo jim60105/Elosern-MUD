@@ -33,7 +33,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
     REFERENCE_SURFACE_TESTIDS = [
         "skill-book",
-        "inventory-panel",
+        "party-window",
+        "party-bag-tab",
         "shop-panel",
         "quest-drawer",
         "lore-codex-drawer",

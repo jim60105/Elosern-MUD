@@ -36,9 +36,8 @@ export function useStatusDrawerCharacter(props) {
     return row.max === null ? String(row.current) : `${row.current} / ${row.max}`;
   }
 
-  // The equipment section is now the EquipmentDoll component (task 6.3); the
-  // doll reads `character.equipment` itself, so the flat list's computed is
-  // retired.
+  // Equipment is presented by the party window's 背包 tab
+  // (webclient-party-bag-retire), so the flat list's computed is retired.
 
   // The disguise section (task 5.4): the `displayed[]` values paired with the
   // true trait they describe, shown as a 真值 / 顯示 side-by-side comparison,
