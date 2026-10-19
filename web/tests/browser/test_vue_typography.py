@@ -118,8 +118,9 @@ class VueTypographyBrowserTest(unittest.TestCase):
             self.assertEqual(after["text"], ["139 / 405", "888 / 999", "88 / 99"])
             for data in (before, after):
                 self.assertFalse(data["clipped"])
-                for column in range(2):
-                    self.assertAlmostEqual(data["prices"][0][column], data["prices"][1][column], delta=0.5)
+                # services v7: one price per stock row (the buy price).
+                self.assertEqual([len(row) for row in data["prices"]], [1, 1])
+                self.assertAlmostEqual(data["prices"][0][0], data["prices"][1][0], delta=0.5)
                 for font in data["fonts"]:
                     self.assertIn("Noto Sans TC", font["family"])
                     self.assertNotIn("monospace", font["family"])

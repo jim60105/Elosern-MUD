@@ -134,6 +134,9 @@ export const ChangingNumerals = {
             stock: SERVICES_PANEL_SAMPLE.shop.stock.map((row, index) => ({
               ...row,
               buy_copper: changed.value ? (index ? 888 : 1399) : (index ? 111 : 9),
+            })),
+            sellable: SERVICES_PANEL_SAMPLE.shop.sellable.map((row) => ({
+              ...row,
               sell_copper: changed.value ? 88 : 11,
             })),
           },

@@ -48,8 +48,12 @@ class ShopJourneys(ServicesBrowserTest):
         first_key, unit_buy = shelf["item_key"], shelf["buy_copper"]
         self.assertGreater(unit_buy, 0)
         expected_wallet = panel["player"]["wallet"] - 2 * unit_buy
-        # The transitional drawer names the controlled figure as the recipient.
-        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
+        # The transitional drawer names the viewed member (services v7
+        # shop.member_id), which falls back to the commander, as recipient.
+        actor_id = panel["shop"]["member_id"]
+        self.assertEqual(
+            actor_id, int(store_state(page)["panels"]["status"]["actor"]["identity"])
+        )
 
         frame_before = page.evaluate(
             "() => ({ depth: window.__elosernBridge.router.depth(), trail: window.__elosernBridge.router.trail() })"
@@ -134,19 +138,17 @@ class ShopJourneys(ServicesBrowserTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
-        rows = {row["item_key"]: row for row in panel["inventory"]["rows"]}
+        # services v7 carries no inventory: the bag rows are party_inventory's.
+        rows = self._bag_rows(page)
         STORE = store_fixture_values()
         potion, staple = STORE["potion_key"], STORE["staple_key"]
-        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
-        self.assertEqual(rows[staple]["held"], 2)
-        # services v3 ships a server-authored action on every inventory row;
-        # the full-HP store fixture refuses the potion with the stable
-        # hp_full reason.
-        self.assertEqual(rows[potion]["action"]["action_id"], "inventory.use")
-        self.assertFalse(rows[potion]["action"]["enabled"])
+        actor_id = panel["shop"]["member_id"]
         self.assertEqual(
-            rows[potion]["action"]["disabled_reason"]["code"], "hp_full"
+            actor_id, int(store_state(page)["panels"]["status"]["actor"]["identity"])
         )
+        self.assertEqual(rows[staple]["held"], 2)
+        # The full-HP store fixture refuses the potion's use descriptor.
+        self.assertFalse(rows[potion]["use"]["enabled"])
 
         # The merchant is at its staple stock cap, so the potion is the only
         # sellable offer (its held unit fits under the stock ceiling).
@@ -205,7 +207,9 @@ class ShopJourneys(ServicesBrowserTest):
             payload,
             {"item_key": potion, "quantity": 1, "seller_id": actor_id},
         )
-        rows = {row["item_key"]: row for row in self._services_panel(page)["inventory"]["rows"]}
+        # The trade republishes the bag panel beside the shop rows.
+        self._wait_bag(page, lambda bag: potion not in bag)
+        rows = self._bag_rows(page)
         self.assertNotIn(potion, rows)
         self.assertEqual(rows[staple]["held"], 2)
 
@@ -348,19 +352,17 @@ class ShopJourneys(ServicesBrowserTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
-        rows = {row["item_key"]: row for row in panel["inventory"]["rows"]}
+        # services v7 carries no inventory: the bag rows are party_inventory's.
+        rows = self._bag_rows(page)
         STORE = store_fixture_values()
         potion, staple = STORE["potion_key"], STORE["staple_key"]
-        actor_id = int(store_state(page)["panels"]["status"]["actor"]["identity"])
-        self.assertEqual(rows[staple]["held"], 2)
-        # services v3 ships a server-authored action on every inventory row;
-        # the full-HP store fixture refuses the potion with the stable
-        # hp_full reason.
-        self.assertEqual(rows[potion]["action"]["action_id"], "inventory.use")
-        self.assertFalse(rows[potion]["action"]["enabled"])
+        actor_id = panel["shop"]["member_id"]
         self.assertEqual(
-            rows[potion]["action"]["disabled_reason"]["code"], "hp_full"
+            actor_id, int(store_state(page)["panels"]["status"]["actor"]["identity"])
         )
+        self.assertEqual(rows[staple]["held"], 2)
+        # The full-HP store fixture refuses the potion's use descriptor.
+        self.assertFalse(rows[potion]["use"]["enabled"])
 
         # The merchant is at its staple stock cap, so the potion is the only
         # sellable offer (its held unit fits under the stock ceiling).
@@ -419,7 +421,9 @@ class ShopJourneys(ServicesBrowserTest):
             payload,
             {"item_key": potion, "quantity": 1, "seller_id": actor_id},
         )
-        rows = {row["item_key"]: row for row in self._services_panel(page)["inventory"]["rows"]}
+        # The trade republishes the bag panel beside the shop rows.
+        self._wait_bag(page, lambda bag: potion not in bag)
+        rows = self._bag_rows(page)
         self.assertNotIn(potion, rows)
         self.assertEqual(rows[staple]["held"], 2)
 

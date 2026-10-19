@@ -11,7 +11,7 @@ import * as fx from "./protocol_fixtures.js";
 // A minimal services panel exposing a guild quest log.
 function servicesPanel() {
   return {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "services",
     host: null,
@@ -68,13 +68,11 @@ function servicesPanel() {
       rank: null,
     },
     shop: null,
-    inventory: null,
     pagination: {
       board_total: 0,
       quest_total: 1,
       stock_total: 0,
       sellable_total: 0,
-      inventory_total: 0,
     },
   };
 }
