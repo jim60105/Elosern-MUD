@@ -21,7 +21,7 @@ Intentional matches remain in negative-presence tests (`deferred_surfaces_absent
 ## 3. Assembled acceptance (4h)
 
 - [ ] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, have 艾拉 open combat on a monster through the 開戰並施放 confirmation (cancel once, then confirm) and finish the encounter, possess 艾拉 and walk her through an exit confirming the player's body and 卡恩 follow, and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
-- [ ] 3.2 Exercise each text command once in a live session (`給`, `取回`, `裝備 = 成員`, `買`/`賣 = 成員`, `使用 = 成員`, `cast 由 成員`, `修煉 = 成員`, `狀態`, `技能`, `系譜`) and record the transcript lines.
+- [x] 3.2 Exercise each text command once in a live session (`給`, `取回`, `裝備 = 成員`, `買`/`賣 = 成員`, `使用 = 成員`, `cast 由 成員`, `修煉 = 成員`, `狀態`, `技能`, `系譜`) and record the transcript lines.
 
 ### Initial runtime evidence and unmet prerequisites (historical, before blocker fixes)
 
@@ -64,7 +64,7 @@ Additional exploratory commands using a display name and an incorrect guessed re
 
 ## 4. Integration (1h)
 
-- [ ] 4.1 Register the help browser method in `.github/browser-shards.json`, annotate canonical IDs for the added requirement, run `tests.test_evennia_test_optimization_contract`, `tests/test_command_docs.py`, `uv run --locked python -m tools.contract_gate` and `openspec validate party-management-acceptance --strict`.
+- [x] 4.1 Register the help browser method in `.github/browser-shards.json`, annotate canonical IDs for the added requirement, run `tests.test_evennia_test_optimization_contract`, `tests/test_command_docs.py`, `uv run --locked python -m tools.contract_gate` and `openspec validate party-management-acceptance --strict`.
 
 The real help method, `web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_help_party_rules_are_static_and_absent_from_the_bag`, is registered beside the existing help opener method in exactly one shard. It opens help through the actual navigation control, asserts every party-rule category and all seven keycaps, proves no action is dispatched by reading help, closes it, opens the real bag and checks that rule prose is absent. Its literal requirement ID was obtained with `tools.spec_traceability list --json-output` on a scratch equivalent tree with the proposed requirement deltas applied; no main spec was synchronized or edited.
 
@@ -95,3 +95,51 @@ That handoff had 1/5 verified tasks complete. The ordinary contract gate must be
 The feature branch was rebased without conflict onto primary `72f22a8523e0322ca5647d6221f04db5d54ec2aa`, incorporating all six archived owning fixes. The repeated residue sweep confirms that the stale current-contract Purpose, HUD scenario headings and action-dispatch wording have been corrected by their owner. Remaining name/selector matches identify explicit retirement assertions, historical routing comments or unrelated protocol capability names; no live retired component, story, manifest entry or CSS rule remains.
 
 Task 2.1 verification after rebase: Storybook build passed; showcase coverage passed for all 78 game and 33 GM components; `uv run --locked python -m unittest tests.test_webclient_frozen_contract` passed all 9 tests. The live client bundle was rebuilt for the resumed runtime journey.
+
+### Resumed task 3.1 graphical journey
+
+The dedicated `ELOSERN_BROWSER_PARTY_MANAGEMENT_ACCEPTANCE=1` synthetic runtime supplied commander 蒼雀 (`#1`), 艾拉 (`#12`), 卡恩 (`#13`), the merchant and monster (`#11`) in store room `#6`. Headless `agent-browser` operated the real shop, party window, skill-use card, combat card, possession action and exit compass. Committed snapshots, screenshots and read-only GM projections remain in ignored `tmp/`, not committed.
+
+| Step | Observed committed state |
+| --- | --- |
+| Buy three potions for 艾拉 | Activate 買給艾拉 with quantity 3. Her potion count increases `4 → 7`, merchant stock `18 → 15`, and purse `1000 → 976`; clock remains 12:00:00. |
+| Transfer two to 卡恩 | Use the quantity control and 交給卡恩. Settled holdings show 艾拉 `7 → 5`, 卡恩 `1 → 3`, with purse and clock unchanged. The immediately captured transfer snapshot preceded settlement; the subsequent bag and final holdings establish the committed counts. |
+| Re-equip 艾拉 | Select 燼微短刃 and 裝備（替換 荊刺小刀）. Subsequent committed rows show `t_cinder_dirk.equipped_count=1` and `t_thorn_knife.equipped_count=0`, with the clock still 12:00:00. |
+| Field heal as 艾拉 | Select 靜謐癒合, 施放, then 蒼雀. 艾拉 MP `90 → 80`; commander HP `95 → 114`; party regeneration also changes 艾拉 HP `85 → 91` and 卡恩 `80 → 86`. Clock reaches 12:00:06. These are observed totals, not an assertion that all recovered HP came from the spell. |
+| Cancel opening once | Select 燼火爆發 and 驗收燼蟲（開戰）, then 取消 in 開戰確認. Mode remains exploration, MP remains 80, clock remains 12:00:06, and no combat draft exists. |
+| Confirm opening | Reopen the same monster confirmation and activate 開戰並施放. Combat draft contains actor 12's `t_ember_burst` targeting 11; the other three members still require choices. 艾拉 remains at MP 80 until the round settles. |
+| Finish encounter | Confirm defense for the other members, settling the opening round and charging 艾拉 once (`80 → 69` MP). Then select party attacks through the real target step. Encounter ends in exploration at 12:00:18; 艾拉 MP remains 69 and purse 976. |
+| Possess and compare party/navigation | Activate 附身 for 艾拉; result is `possessed` / `你附身到了艾拉身上。`, controlled identity 12. Reopened party window retains its five tabs, ordered member rail, viewed 艾拉 and party purse 976; its action becomes 解除附身 and leave carries the possession restriction. Exploration navigation retains 隊伍／任務／地圖 and the same tools/settings. |
+| Possessed shop comparison | **Evidence gap remains.** In the same merchant room, the actual merchant card disables 商店 with `附身狀態下無法進行交易。`. Committed services v7 has `available:true`, `host:null`, `shop:null`, zero stock/sellable totals and wallet 976. Calling only the existing view-local shop opener for inspection renders the 商店 heading and 購買／出售 tabs, without the earlier member rail or stock. This does not establish the required unchanged shop presentation; no trade refusal or panel fact was bypassed. |
+| Traverse while possessed | Focus the real exit compass, select the exit and confirm movement through 後門. Controlled 艾拉 reaches 商鋪後院 (`#7`). Protected GM read endpoints independently show commander `#1`, 艾拉 `#12` and 卡恩 `#13` all located in room `#7`. |
+| In-combat companion re-equip and transfer restriction | Return possession and traverse back through the real exit. For a second encounter, use protected `set_gauge {target:"#11",gauge:"hp",value:40}`; it succeeds with `snapshot.taken=true`, save `20261020T092107-3df123`. Reopen combat through 艾拉's confirmation, then use the party bag to replace 燼微短刃 with 荊刺小刀. Settled rows show the replacement equipped while round revision remains 0 and clock remains 12:01:18. Select the potion: holdings remain 艾拉 5 / 卡恩 3, every receive descriptor is disabled, the visible bar states `戰鬥中無法交換物品。`, and no give controls or quantity stepper are offered. |
+
+Task 3.1 stays unchecked solely because the literal shop-presentation invariance has not been established. The possession trade refusal is expected; it is not evidence that the shop contents remain present. The existing design requires an owning follow-up for any actual defect, not a change to these acceptance criteria.
+
+### Resumed task 3.2 successful live text transcript
+
+A fresh dedicated runtime was used to retain the fixture's wounds and actor-owned skills without manual repairs. Commands traversed the actual authenticated Evennia text transport. An interruption required reconnecting the browser before the final two read commands; the same runtime and persistent character state were retained. The following nine earlier successful responses are in the tool transcript, and the final skill/lineage responses plus committed state were saved to ignored scratch space.
+
+| Command | Actual successful response |
+| --- | --- |
+| `給 熾焰噴射劑 = 艾拉` | `你把 1 個熾焰噴射劑交給了艾拉。` |
+| `取回 熾焰噴射劑 = 艾拉` | `你從艾拉那裡取回了 1 個熾焰噴射劑。` |
+| `裝備 t_cinder_dirk = 艾拉` | `艾拉裝備了 燼微短刃（魔力 +4｜施法消耗 −5%），原本的 荊刺小刀 已收回背包。` |
+| `買 t_ember_spray 1 = 艾拉` | `你買了 1 個 t_ember_spray，花費 8 銅，剩餘 992 銅。` |
+| `賣 t_ember_spray 1 = 艾拉` | `你賣了 1 個 t_ember_spray，獲得 6 銅，目前 998 銅。` |
+| `使用 t_ember_spray = 艾拉` | `你使用了「熾焰噴射劑」，恢復了 25 點生命值。` |
+| `cast t_hush_mend=蒼雀 由 艾拉` | `艾拉 對 蒼雀 恢復了 10 點生命。` followed by `艾拉 消耗了資源。`, `艾拉 的能力值發生了變化。`, `艾拉 累積了技能熟練度。` |
+| `修煉 t_hush_mend = 艾拉` | `艾拉將在下次休息時修煉「靜謐癒合」。` |
+| `狀態 艾拉` | `狀態：艾拉`, HP `110／110`, MP `80／90`, SP `105／105`, magic `10（基礎 6｜燼微短刃 ＋4）`, no conditions. |
+| `技能 艾拉` | `技能：艾拉`; `靜謐癒合 Lv.0（熟練 1/50）［修煉中］`, `燼火爆發 Lv.0（熟練 0/50）` with `解鎖：燼流星 Lv.3`, plus the innate/other owned actives. |
+| `系譜 艾拉` | `技能系譜：已完成 0 / 5 樹`; fire graph `火（1/2）根：燼火爆發` includes `燼流星 Lv.0　← 燼火爆發 Lv.3　需「燼火爆發 Lv.3」`; separate heal graph contains `靜謐癒合 Lv.0（本階 1/50）`; the other three owned singleton graphs also render. No unavailable response occurs. |
+
+Final committed member panel confirms purse 998, 艾拉 HP 110 / MP 80, three potions, equipped 燼微短刃, unequipped 荊刺小刀, and `t_hush_mend` with `booked:true`, `xp_into_level:1`, `xp_to_next_level:49`. This replaces the earlier refusal-only evidence for task 3.2. The interrupted launcher had left owned server processes running; cleanup reconstructed ownership from their runtime environment and matching pidfiles, then used `ManagedServer.stop()` to stop only that runtime and remove its private roots.
+
+The shop gap is also source-confirmed: `world/rules/service_view.py:897–900` forces `guild`, `shop` and `host` to `None` when `owner is not None`; `web/webclient/presentation/affordances.py:501–509` disables the merchant service entry under possession. `ShopWindow.vue` therefore follows its absent-shop branch. This was recorded for an owning follow-up; the acceptance implementation does not weaken possession trade authorization or fabricate shop facts.
+
+### Resumed task 4.1 integration evidence
+
+The existing help method registration and canonical annotation are unchanged and have exact shard ownership. Final focused Vitest execution passed **102 tests in five files** after the owning fixes. The managed help browser method passed against the rebased live runtime. `tests.test_evennia_test_optimization_contract` plus `tests.test_command_docs` passed **40 tests**, and strict OpenSpec validation passed.
+
+The required ordinary `uv run --locked python -m tools.contract_gate` was executed and returned nonzero solely for the expected pre-sync new requirement ID at the help method's decorator: **2,350 current main requirements covered, zero uncovered, one unknown-ID error**. Both lints, manifests and all **18 repository contracts** passed. The equivalent proposed-contract tree, rebuilt from the rebased main specs plus both complete deltas and current tests, passed canonical-ID listing and static checking with **2,351 requirements covered, zero uncovered, zero errors**. Task 4.1's registration, annotation and requested checks are performed; its checked box does not claim the ordinary pre-sync gate is green or replace the archive owner's mandatory post-sync gate.
