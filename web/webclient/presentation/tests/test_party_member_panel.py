@@ -891,5 +891,6 @@ class PartyMemberWiringTests(EvenniaTest):
                 "character",
                 "party_inventory",
                 "item_holdings",
+                "services",
             ),
         )

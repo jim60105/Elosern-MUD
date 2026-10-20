@@ -119,6 +119,7 @@ class RegistryTests(unittest.TestCase):
                     "dream.draft",
                     "dream.confirm",
                     "dream.awaken",
+                    "party.view_member",
                 }
             ),
         )

@@ -31,7 +31,7 @@ const material = computed(() => gradeMaterial(props.grade));
     :role="label ? 'img' : undefined"
     :aria-label="label || undefined"
   >
-    <span class="grade-gem__letter">{{ grade ?? "—" }}</span>
+    <span class="grade-gem__letter" aria-hidden="true">{{ grade ?? "—" }}</span>
   </span>
 </template>
 
