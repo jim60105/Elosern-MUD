@@ -34,7 +34,9 @@ No change in this batch fixes the ordinary pre-sync unknown-requirement-ID exit 
 
 ## Batch:
 
-```yaml
+The batch contract uses repeated line-oriented `depends-on: <change>` declarations. Each line is a separate prerequisite; this block is plain text, not a YAML mapping.
+
+```text
 depends-on: browser-console-save-isolation
 depends-on: seeded-lineage-readability
 ```
