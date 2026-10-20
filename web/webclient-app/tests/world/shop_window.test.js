@@ -28,6 +28,9 @@ import {
   SHOP_SERVICES_SELLER_SAMPLE,
 } from "../../stories/fixtures.js";
 
+// The potion row's committed display name, read from the fixture.
+const POTION_NAME = SHOP_SERVICES_SAMPLE.shop.stock.find((r) => r.item_key === "potion_heal").display_name;
+
 describe("ShopWindow (webclient-shop-window)", () => {
   let wrapper;
 
@@ -135,10 +138,10 @@ describe("ShopWindow (webclient-shop-window)", () => {
     // A refused request (nothing in flight) leaves no selection.
     expect(find("shop-window__idle").exists()).toBe(true);
     await wrapper.setProps({ pendingItemKey: "potion_heal" });
-    expect(get("shop-window__title").text()).toBe("治療藥水");
+    expect(get("shop-window__title").text()).toBe(POTION_NAME);
     expect(find("shop-window__holdings-wait").exists()).toBe(true);
     await wrapper.setProps({ pendingItemKey: null, itemHoldings: SHOP_HOLDINGS_POTION });
-    expect(get("shop-window__title").text()).toBe("治療藥水");
+    expect(get("shop-window__title").text()).toBe(POTION_NAME);
   });
 
   it("a row request that ends without its answer hands the selection back to the committed item", async () => {
@@ -148,7 +151,7 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("shop-window__title").text()).toBe("鋼製短劍");
     // Rejected: the request ends and item_holdings still answers the potion.
     await wrapper.setProps({ pendingItemKey: null });
-    expect(get("shop-window__title").text()).toBe("治療藥水");
+    expect(get("shop-window__title").text()).toBe(POTION_NAME);
   });
 
   it("an entry holding no valid count disables the trade and hides the preview", async () => {
