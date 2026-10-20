@@ -112,11 +112,18 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZR
 
     ``ObjectParent`` sits before ``XYZRoom`` in the MRO so the shared zh-tw
     frame and the scene-flavor paragraph hook apply to every grid room while
-    ``XYZRoom``'s own overrides (``return_appearance`` map display, builder
+    ``XYZRoom``'s own overrides (``return_appearance`` text-map gate, builder
     ``get_display_name``) are still reached first (scene-flavor-apply design D4
     correction; ``XYZRoom`` inherits ``DefaultRoom`` directly, so without this
     adoption a grid room would show evennia's stock English ``Exits:`` frame).
     """
+
+    # The automatic ASCII minimap is off for every client by default. Room look
+    # therefore emits only the ordinary appearance; the webclient's independent
+    # ``local_map`` widget carries the graphical map. Anchors and future maps
+    # using these typeclasses inherit this project default, which upstream's
+    # explicit call-site / map-option override can still supersede.
+    map_display = False
 
     def at_object_receive(self, obj, source_location, move_type="move", **kwargs):
         super().at_object_receive(obj, source_location, move_type=move_type, **kwargs)
