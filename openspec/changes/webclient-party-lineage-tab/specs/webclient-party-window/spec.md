@@ -16,6 +16,14 @@ The detail column SHALL draw the selected graph with nodes placed by `depth`, ea
 - **WHEN** the ice graph is selected and 冰晶風暴 requires 冰霜護甲 Lv 2 and 冰槍 Lv 2
 - **THEN** 冰晶風暴 is drawn once with two incoming edges labelled Lv 2
 
+#### Scenario: Node state follows ownership
+- **WHEN** a node is owned but its prerequisite is unmet, so it carries a non-empty `prereq_text_zh`
+- **THEN** it keeps the solid owned border and diamond and also shows its prerequisite line, so the diamonds agree with the graph's `owned_count`
+
+#### Scenario: A consumed graph says so
+- **WHEN** a graph's `consumed` is true
+- **THEN** its list row and its detail heading carry the text 已全數見頂 beside its owned/total
+
 #### Scenario: Selecting a node opens the skill
 - **WHEN** the player activates the 冰錐術 node
 - **THEN** the window switches to 技能 with 冰錐術 selected

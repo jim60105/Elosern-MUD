@@ -7,7 +7,7 @@ Lineage graph rows with the same element/style name SHALL be distinguished using
 
 #### Scenario: The collapsed chain row lays out its identity and meter
 - **WHEN** a graph row renders in the party window's 系譜 tab
-- **THEN** it names the graph by the graph's supplied root display names joined with ‧ under its element/style group heading and places its owned/total count in an end column shared by every row, with no chain meter, and no name is derived from a skill key
+- **THEN** it names the graph by the graph's supplied root display names joined with ‧ under its element/style group heading and places its owned/total count in an end column shared by every row (a consumed graph additionally marked 已全數見頂), with no chain meter, and no name is derived from a skill key
 
 #### Scenario: Rarity borders stay visible without colour
 - **WHEN** an item's rarity frame renders
