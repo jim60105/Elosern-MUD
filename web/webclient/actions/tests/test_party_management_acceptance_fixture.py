@@ -21,6 +21,8 @@ from unittest.mock import patch
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from web.browser_support.browser_fixtures_data.party_management_acceptance import (
     AIRA_NAME,
     AIRA_TAG,
@@ -163,6 +165,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
 
     # -- identity, membership and composition ------------------------------
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_exact_tagged_members_are_effective_and_co_located(self):
         from world.rules.party import has_general_membership, party_size
 
@@ -176,6 +182,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
             self.assertIs(entity.location, self.store)
         self.assertIs(self.store.location, None)
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_fixture_is_fresh_runtime_only_and_never_duplicates(self):
         counts_before = {tag: len(_tagged(tag)) for tag in FIXTURE_TAGS}
         for tag in FIXTURE_TAGS:
@@ -187,6 +197,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
             {tag: len(_tagged(tag)) for tag in FIXTURE_TAGS}, counts_before
         )
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_merchant_stock_and_purse_cover_the_required_purchase(self):
         from world.rules.economy import parse_merchant_stock, shop_is_open
 
@@ -203,6 +217,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
 
     # -- real preview consumers --------------------------------------------
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_member_owned_skills_and_item_previews_are_legal(self):
         from world.rules.action_preview import preview_skill
         from world.rules.combat_initiation import preview_field_opening
@@ -268,6 +286,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
 
         return RoomActionContext(self.commander.location, {})
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_both_members_have_a_readable_lineage(self):
         from world.rules.lineage_query import build_lineage_view
 
@@ -294,6 +316,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
 
     # -- the real physical journey prerequisites ---------------------------
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_buy_transfer_equip_and_sell_through_real_consumers(self):
         from world.rules.economy import buy, parse_merchant_stock, sell
         from world.rules.equipment import preflight_equipment_toggle
@@ -358,6 +384,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
         self.assertEqual(sold["quantity"], 1)
         self.assertGreater(int(self.commander.db.wallet), wallet_after_buy)
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_possessed_member_traverses_the_real_exit_with_followers(self):
         from world.rules.possession import enter_possession
 
@@ -375,6 +405,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
         self.assertIs(self.session.puppet, self.aira)
         self.assertIn(self.kahn, self.safe_room.contents)
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_seeded_monster_is_finishable_through_real_rounds(self):
         from world.rules.combat_initiation import initiate_field_combat
         from world.rules.combat_session import BASIC_ATTACK_KEY, read_session, submit_player_action
@@ -426,6 +460,10 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
 class FlaglessFixtureTests(EvenniaTest):
     """The fixture is inert when its option is absent."""
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_fixture_is_a_no_op_when_the_flag_is_absent(self):
         from evennia.utils.create import create_object
 
@@ -445,16 +483,28 @@ class FlaglessFixtureTests(EvenniaTest):
 class CompositionRuleTests(unittest.TestCase):
     """The fixture rejects invalid compositions with a named diagnostic."""
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_absent_flag_never_errors(self):
         self.assertIsNone(
             composition_error({"ELOSERN_BROWSER_SYNTH_CATALOGS": "0"})
         )
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_synthetic_runtime_is_required(self):
         error = composition_error({FIXTURE_FLAG: "1"})
         self.assertIsNotNone(error)
         self.assertIn("ELOSERN_BROWSER_SYNTH_CATALOGS", error)
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_incompatible_party_and_service_flags_are_rejected(self):
         for flag, value in (
             ("ELOSERN_BROWSER_PARTY_ACCEPTANCE", "1"),
@@ -476,6 +526,10 @@ class CompositionRuleTests(unittest.TestCase):
                 self.assertIsNotNone(error)
                 self.assertIn(flag, error)
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_compatible_base_settings_are_accepted(self):
         self.assertIsNone(
             composition_error(
@@ -488,6 +542,10 @@ class CompositionRuleTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
     def test_preconditions_reject_before_mutation_for_an_invalid_composition(self):
         with patch.dict(
             os.environ,
