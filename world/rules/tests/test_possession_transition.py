@@ -421,7 +421,8 @@ class PossessionTransitionTests(EvenniaTest):
             )
 
     @covers_requirement(
-        "companion-possession-transition::the-possessed-npc-carries-a-trimmed-character-act-cmdset"
+        "companion-possession-transition::the-possessed-npc-carries-a-trimmed-character-act-cmdset",
+        "webclient-possession-presentation::shop-access-does-not-delegate-other-npc-services-during-possession",
     )
     def test_shop_commands_survive_while_guild_and_church_stay_absent(self):
         """Shop commands remain; guild, church and exam commands do not."""

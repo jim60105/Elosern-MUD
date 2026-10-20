@@ -194,7 +194,7 @@ class PossessionPresentationTests(EvenniaTest):
         super().tearDown()
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_vocabulary_possess_and_release_states(self):
         """Possess entries mirror gates; release appears once while possessing; refusals stay visible."""
@@ -236,7 +236,7 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(engage_entries[0].disabled_reason[0], REASON_POSSESSED_ENGAGE)
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_possessed_actor_keeps_shop_navigation_and_omits_guild(self):
         """Shop navigation stays enabled; guild navigation is absent everywhere."""
@@ -450,7 +450,7 @@ class PossessionPresentationTests(EvenniaTest):
         })
 
     @covers_requirement(
-        "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results",
+        "webclient-possession-presentation::the-dispatcher-preserves-talk-and-engage-refusals-during-possession",
     )
     def test_possession_keeps_talk_and_engage_refusals_zero_write(self):
         """Talk opening and combat engagement stay refused while possessed."""
@@ -496,6 +496,7 @@ class PossessionPresentationTests(EvenniaTest):
         "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
         "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
         "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_shop_trades_settle_normally(self):
         """Web buy/sell use the puppet's bag and the commander's purse."""

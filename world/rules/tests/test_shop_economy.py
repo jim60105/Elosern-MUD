@@ -1163,6 +1163,7 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
     @covers_requirement(
         "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
         "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_text_purchase_defaults_to_the_acting_puppet(self):
         # A live possession authenticates the commander; the typed line names
@@ -1185,7 +1186,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
 
     @covers_requirement(
-        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_text_sale_defaults_to_the_acting_puppet(self):
         self._possess()
@@ -1205,7 +1207,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
 
     @covers_requirement(
-        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_text_trade_can_name_another_party_member(self):
         kahn = self._companion("卡恩")
@@ -1227,7 +1230,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         )
 
     @covers_requirement(
-        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_trade_refusals_change_nothing(self):
         self._possess()
@@ -1263,7 +1267,8 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
     @covers_requirement(
-        "shop-economy::text-shop-commands-name-the-recipient-or-seller"
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+        "shop-economy::text-inventory-reports-the-party-purse-independently-of-the-caller-s-bag",
     )
     def test_possessed_inventory_reports_the_party_purse_and_acting_bag(self):
         from world.rules.party_inventory import inventory_view

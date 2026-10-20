@@ -49,7 +49,7 @@ class AffordanceRuleTests(VocabularyTestCase):
             and entry.params.get("npc_id") == int(obj.pk)
         ]
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_scripted_host_emits_one_entry_per_authored_keyword(self):
         host = create_object(NPC, key="公會職員", location=self.room)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
@@ -61,7 +61,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         self.assertTrue(all(entry.enabled for entry in entries))
         self.assertFalse(any(entry.freeform for entry in entries))
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_generative_npc_emits_freeform_with_binding_only_params(self):
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.room)
         freeform = next(
@@ -163,7 +163,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         self.assertEqual(invite.disabled_reason, ("party_full", "你的隊伍已經滿了（最多 4 人）。"))
         self.assertEqual(invite.params, {"npc_id": int(npc.pk), "message": ""})
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_dead_monster_stays_a_disabled_engage_entry(self):
         monster = _monster()
         monster.location = self.room
@@ -187,7 +187,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         self.assertFalse(entry.enabled)
         self.assertEqual(entry.disabled_reason, ("target_dead", "目標已經死亡。"))
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_locked_exit_is_a_disabled_move_entry_with_normalized_params(self):
         destination = create_object(Room, key="密室", location=None)
         exit_obj = create_object(
@@ -212,7 +212,7 @@ class AffordanceRuleTests(VocabularyTestCase):
         )
         self.assertIsNotNone(entry.params["current_node"])
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_corrupt_dialogue_table_host_has_no_vocabulary_entries(self):
         # A host whose authored table cannot be resolved has no talk entries
         # in the vocabulary (no validator-normalized params exist for a
@@ -230,7 +230,7 @@ class AffordanceRuleTests(VocabularyTestCase):
             )
         )
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_service_entries_attach_to_the_exact_local_host(self):
         staff = create_object(NPC, key="公會職員", location=self.room)
         staff.components.add(
@@ -266,7 +266,7 @@ class AffordanceRuleTests(VocabularyTestCase):
             [entry.action_id for entry in suggestible_candidates(vocabulary)],
         )
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_combat_mode_yields_an_empty_vocabulary(self):
         monster = _monster()
         monster.location = self.room

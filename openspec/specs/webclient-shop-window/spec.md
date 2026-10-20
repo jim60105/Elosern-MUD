@@ -5,17 +5,6 @@ The shop window: a quest-drawer-styled window with 購買 and 出售 tabs whose 
 
 ## Requirements
 
-### Requirement: The shop window uses the frame with buy and sell tabs and the member rail
-The shop window SHALL be built on `WindowFrame` with first-level tabs 購買 and 出售, the purse in the header, and the shared `MemberRail` whose selection is the session's viewed member (shared with the party window); selecting a member SHALL dispatch `party.view_member` with `tab: shop`. No category rail SHALL be used.
-
-#### Scenario: The party window selection carries over
-- **WHEN** the player selected 艾拉 in the party window and then opens the shop
-- **THEN** the rail shows 艾拉 selected as the recipient
-
-#### Scenario: Possession keeps the existing refusal
-- **WHEN** the player opens the shop while possessing a companion
-- **THEN** the window renders the same rows and every buy or sell attempt returns the existing `possessed_shop` refusal message
-
 ### Requirement: The buy view shows one price and the recipient's facts
 Each 購買 row SHALL show icon, name, stock, buy price, and the recipient's committed delta (▲ 攻擊 +6, or 無法裝備) or held count for consumables; the detail SHALL show the item, a current-versus-after comparison for the recipient's slot, small delta chips for the other members from `item_holdings`, and the action bar with the quantity stepper (bounded by the committed maximum), the remaining purse and 買給 X, sending one `shop.buy` with the recipient's id.
 
@@ -48,3 +37,18 @@ The shop window SHALL render values, states and committed disabled reasons only,
 #### Scenario: A closed shop shows only its state
 - **WHEN** the merchant is closed
 - **THEN** the rows render with disabled controls carrying the committed closed reason and no prose about opening hours rules
+
+### Requirement: The shop window shares member selection and normal trades during possession
+The shop window SHALL be built on `WindowFrame` with first-level tabs 購買 and 出售, the purse in the header, and the shared `MemberRail` whose selection is the session's viewed member (shared with the party window); selecting a member SHALL dispatch `party.view_member` with `tab: shop`. No category rail SHALL be used.
+
+#### Scenario: The party window selection carries over
+- **WHEN** the player selected 艾拉 in the party window and then opens the shop
+- **THEN** the rail shows 艾拉 selected as the recipient
+
+#### Scenario: Possession keeps normal shop presentation and transactions
+- **WHEN** a player possessing a companion opens the shop at an available merchant with the same viewed member and canonical state as without possession
+- **THEN** the window renders the same member rail, purse, stock and sellable rows, and ordinary legal buy and sell attempts succeed under the unchanged named-member bag, commander purse, configured price and merchant-affinity rules
+
+#### Scenario: Possessed trades refresh committed values
+- **WHEN** a possessing client buys for or sells from the selected acting puppet through the shop window
+- **THEN** exactly one matching `shop.buy` or `shop.sell` names that member, and the committed services, item holdings and party-inventory panels update the rows and party purse without a `possessed_shop` refusal or client-invented balance

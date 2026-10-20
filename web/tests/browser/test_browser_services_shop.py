@@ -265,7 +265,7 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         return self._services_panel(page), service_entries
 
     @covers_requirement(
-        "webclient-shop-window::the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail",
+        "webclient-shop-window::the-shop-window-shares-member-selection-and-normal-trades-during-possession",
         "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
     )
     def test_buy_potions_for_a_companion(self):
@@ -410,7 +410,7 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         )
 
     @covers_requirement(
-        "webclient-shop-window::the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail",
+        "webclient-shop-window::the-shop-window-shares-member-selection-and-normal-trades-during-possession",
         "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
     )
     def test_possessed_shop_opens_at_the_large_acceptance_viewport(self):

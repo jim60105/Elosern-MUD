@@ -656,7 +656,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(list_items(self.player), [])
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_buy_adapter_fills_the_acting_puppet_from_the_party_purse(self):
         from world.skills.equipment import list_items
@@ -681,7 +682,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertFalse(self.merchant_npc.relations.has_record(companion))
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_buy_adapter_can_name_the_commander(self):
         from world.skills.equipment import list_items
@@ -704,7 +706,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(list_items(companion), [])
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_sell_adapter_sells_the_acting_puppet_and_credits_the_purse(self):
         from world.skills.equipment import list_items
@@ -730,7 +733,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(list_items(self.player), [])
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
     def test_possessed_trade_refusals_leave_every_surface_unchanged(self):
         from world.skills.equipment import list_items
@@ -772,7 +776,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
     @covers_requirement(
-        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "webclient-possession-presentation::shop-access-does-not-delegate-other-npc-services-during-possession",
     )
     def test_possessed_actor_cannot_delegate_guild_exam_or_quest_services(self):
         from world.quests.runtime import definition_for, fulfill_record, to_storage

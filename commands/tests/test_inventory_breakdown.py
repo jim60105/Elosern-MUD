@@ -120,7 +120,8 @@ class InventoryBreakdownHeaderTests(BattlefieldIsolation, EvenniaCommandTest):
         return companion
 
     @covers_requirement(
-        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only"
+        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only",
+        "shop-economy::text-inventory-reports-the-party-purse-independently-of-the-caller-s-bag",
     )
     def test_possessed_inventory_shows_the_party_purse_and_the_acting_bag(self):
         companion = self._possess_companion()
@@ -134,7 +135,8 @@ class InventoryBreakdownHeaderTests(BattlefieldIsolation, EvenniaCommandTest):
         self.assertNotIn(_GEAR_KEY, output)
 
     @covers_requirement(
-        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only"
+        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only",
+        "shop-economy::text-inventory-reports-the-party-purse-independently-of-the-caller-s-bag",
     )
     def test_ordinary_inventory_keeps_its_wallet_and_bag_presentation(self):
         self.char1.db.wallet = 77
