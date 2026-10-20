@@ -22,8 +22,10 @@ from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from world.lore.items import EquipmentModifierKey, EquipmentSlot
 from world.rules.affinity_config import AffinityConfig, AffinityStage
 from world.rules.buffs import apply_buff
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.rulebook.schema import Rule
 from world.rules.status_display import ConditionDisplay
 from world.rules.status_query import (
@@ -35,7 +37,12 @@ from world.rules.status_query import (
 from world.rules.traits import restore_gauges_to_full
 from world.skills.handler import ConferredSkillGrant
 from world.skills.registry import SkillCategory, SkillKind
-from world.tests.synthetic_data import SYNTH_BUFFS, SYNTH_RACES, make_skill
+from world.tests.synthetic_data import (
+    SYNTH_BUFFS,
+    SYNTH_RACES,
+    make_item,
+    make_skill,
+)
 
 from tools.spec_traceability import covers_requirement
 from web.gm.readers import characters
@@ -297,6 +304,25 @@ _MULT_GRANT = ConferredSkillGrant("t_gm_frac_source", _MULT_SKILL.key, 1.0)
 _MULT_LAYER_NAME = f"{_MULT_SKILL.label}（1）"
 _AGILITY_BASE = 40
 _ATTACK_BASE = 20
+#: One invented accessory contributes a flat defense layer, so the regression
+#: covers all three layer sources, not only ``skill`` and ``condition``.
+_GEAR_KEY = "t_gm_frac_gear"
+_GEAR_LABEL = "合成護符"
+_GEAR_MODIFIER = tuple(EquipmentModifierKey)[1]
+_GEAR_FLAT = 3
+_GEAR = make_item(
+    _GEAR_KEY,
+    display_name_zh=_GEAR_LABEL,
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_GEAR_MODIFIER,
+)
+_GEAR_RULE = EquipmentEffectRule(
+    adjustments={"defense": _GEAR_FLAT},
+    gauge_caps={},
+    immune=(),
+    attached_buffs=(),
+    exposure_bias=0,
+)
 #: 40 × (+12.5 − 2.5 + 10 − 10 → +10%) and round(20 × 1.5) + 2.5.
 _AGILITY_EFFECTIVE = 44.0
 _ATTACK_EFFECTIVE = 32.5
@@ -333,10 +359,12 @@ def _open_fractional_scope(case) -> None:
         "static_tiers",
         "subraces",
         "buffs",
+        "items",
         extra={
             "buffs": {
                 key: replace(SYNTH_BUFFS["t_moss_veil"], key=key) for key in _BUFF_KEYS
-            }
+            },
+            "items": {_GEAR.key: _GEAR},
         },
     )
     stack = ExitStack()
@@ -351,6 +379,12 @@ def _open_fractional_scope(case) -> None:
     )
     stack.enter_context(
         patch("world.rules.combat_modifiers._RULES", new=list(_FRACTIONAL_RULES))
+    )
+    stack.enter_context(
+        patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
+            {_GEAR_MODIFIER: _GEAR_RULE},
+        )
     )
     stack.enter_context(
         patch.dict("world.rules.status_display.STATUS_DISPLAY", _FRACTIONAL_DISPLAY)
@@ -370,7 +404,12 @@ def _fractional_player(case) -> PlayerCharacter:
     player.traits.atk_phys.base = _ATTACK_BASE
     player.db.wallet = 0
     player.db.inventory = []
-    player.db.equipment = {}
+    player.db.equipment = {
+        "weapon_main": None,
+        "weapon_off": None,
+        "armor": None,
+        "accessories": [_GEAR.key],
+    }
     player.db.skill_grants = [_MULT_GRANT]
     for key in _BUFF_KEYS:
         apply_buff(player, key)
@@ -404,8 +443,25 @@ def _assert_fractional_breakdown(case, detail, player) -> None:
     case.assertEqual(attack["rows"][0]["value"], _ATTACK_BASE)
     case.assertEqual(attack["note"], f"有效值 {_ATTACK_EFFECTIVE}")
 
-    # The rendered totals agree with the authoritative read model.
+    defense = groups["defense"]
+    gear = row_by_key(defense, f"defense:equipment:{_GEAR_LABEL}")
+    case.assertEqual(gear["label"], f"{_GEAR_LABEL}（equipment）")
+    case.assertEqual(gear["value"], f"+{_GEAR_FLAT}")
+
+    # Every rendered layer, in order, matches the authoritative read model,
+    # and the rendered totals agree with it.
     authoritative = {row.key: row for row in build_character_read_model(player).breakdown}
+    for key in ("agility", "atk_phys", "defense"):
+        rendered = groups[key]["rows"][1:]
+        layers = authoritative[key].layers
+        case.assertEqual(
+            [entry["key"] for entry in rendered],
+            [f"{key}:{layer.source}:{layer.name}" for layer in layers],
+        )
+        case.assertEqual(
+            [entry["label"] for entry in rendered],
+            [f"{layer.name}（{layer.source}）" for layer in layers],
+        )
     case.assertEqual(authoritative["agility"].effective, _AGILITY_EFFECTIVE)
     case.assertEqual(authoritative["atk_phys"].effective, _ATTACK_EFFECTIVE)
     case.assertEqual(agility["note"], f"有效值 {authoritative['agility'].effective}")

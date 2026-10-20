@@ -43,15 +43,15 @@
 
 搜尋的比對順序固定為精確 `#dbref`、物件鍵、任務編號、來源識別。同一筆查詢不會把不同層級的結果混成單一分數排序。
 
-## 屬性組成的數值顯示
+## Breakdown number display
 
-角色明細的「屬性組成」區塊逐層列出每個屬性的來源數值，只用於顯示，不會重新計算有效值。模型已以百分比點保存 `pct` 層，因此顯示時不再乘以 100，各層的形式如下。
+The character detail's 「屬性組成」 section lists each layer's authoritative amount for display only; it never recomputes an effective total. The model already stores `pct` layers in percentage points, so the display does not multiply them by 100.
 
-- `pct` 層帶著正負號與 `%`，例如 `+12.5%`、`-2.5%`；整數百分比維持 `+10%`、`-10%`。
-- `flat` 層帶著正負號，整數與小數都原樣保留，例如 `+2.5`。
-- `mult` 層以 `×` 開頭，例如 `×1.5`；整數倍率不顯示多餘的小數尾。
+- A `pct` layer keeps its sign and `%` suffix, for example `+12.5%` or `-2.5%`. Integral percentages stay `+10%` and `-10%`.
+- A `flat` layer keeps its sign and renders the exact integer or fraction, for example `+2.5`.
+- A `mult` layer is prefixed with `×`, for example `×1.5`; an integral factor shows no trailing fraction.
 
-每一列都標明層的來源（`skill`、`condition` 或 `equipment`）與顯示名稱，列的鍵值由屬性鍵、來源與名稱組成。小數不會被四捨五入或截斷，「有效值」仍直接取自權威讀取模型。
+Every row names the layer source (`skill`, `condition`, or `equipment`) and its display name, and the row key combines the trait key, the source, and the name. Fractions are neither rounded nor truncated, and 「有效值」 (effective) still comes straight from the authoritative read model.
 
 ## 召回的唯讀限制
 
