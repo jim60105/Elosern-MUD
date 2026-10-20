@@ -72,7 +72,7 @@ All rules below live under `world/rules/`. Each mutation validates fully before 
 
 - `shop.buy` carries a recipient. The price is debited from the party purse and the items enter the recipient's bag.
 - `shop.sell` carries a seller. Only the seller's unequipped items are sellable. Proceeds enter the party purse.
-- Buy and sell prices are unchanged. The sell price is always half the buy price, so the buy view shows only buy prices and the sell view shows only sell prices.
+- Buy and sell prices remain the independently configured authoritative integer-copper offer values. The buy view shows only buy prices, and the sell view shows only sell prices; no universal ratio is implied.
 - Equipment comparison deltas use the same breakdown arithmetic as the status tab and are computed server-side for each member.
 - Possession keeps the existing `possessed_shop` refusal.
 
