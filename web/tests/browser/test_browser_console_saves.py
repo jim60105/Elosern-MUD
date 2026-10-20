@@ -413,6 +413,9 @@ class _OwnedManagedServerTest(BrowserAcceptanceTest):
     def setUpClass(cls) -> None:
         cls.developer_fingerprint = _developer_fingerprint()
         cls.server = ManagedServer(runtime=cls._prepare_runtime())
+        # Owned teardown covers a class setup failure too: a fault installed
+        # after boot (or a failing readiness step) must never leak the server.
+        cls.addClassCleanup(cls.server.stop)
         cls.server.start()
         cls._after_start(cls.server.runtime)
         cls.base_url = f"http://127.0.0.1:{cls.server.runtime.http_port}"
@@ -436,6 +439,14 @@ class _OwnedManagedServerTest(BrowserAcceptanceTest):
 
 class ConsoleSaveIsolationBrowserTest(_OwnedManagedServerTest):
     """The first protected teleport owns a private, complete snapshot."""
+
+    @classmethod
+    def _prepare_runtime(cls) -> fixtures.BrowserRuntime:
+        runtime = super()._prepare_runtime()
+        # The regression asserts the production default retention; pin it so a
+        # supported developer override cannot change the meaning under it.
+        runtime.env["ELOSERN_BROWSER_AUTOSAVE_KEEP"] = "10"
+        return runtime
 
     @covers_requirement(
         "webclient-browser-verification::browser-acceptance-uses-an-isolated-managed-evennia-runtime"
