@@ -131,6 +131,27 @@ Before declaring the fix landed, the maintenance owner runs and records:
 
 The pre-sync unknown-requirement-ID exit from the still-open acceptance delta remains expected and receives no suppression or checker change.
 
-### Apply preparation status
+### Maintenance commit record (archive owner)
 
-This apply worker prepared the two complete deltas, the record above and this handoff, and left main specs untouched. Primary synchronization and the maintenance commit are pending under the archive and maintenance owner; this change is not landed until they finish and their results are recorded.
+Ordinary requirement synchronization ran in the feature worktree first (commit `8fc97a89`): only the `Action registries are allowlisted and duplicate-safe` WHEN phrase changed, because the HUD delta matched its main requirement line for line, so synchronization touched no HUD block.
+
+The wording-only spec-maintenance commit then landed on primary:
+
+- Commit: `54b612e1aab3b26cd562a356b0a385f6d7cac646`
+- Files: 3; insertions 5 / deletions 5, confirmed with `git diff --numstat` and `git diff --word-diff=porcelain`:
+  - `openspec/specs/webclient-skillbook-casting/spec.md` 1/1 - the Purpose line changes `SkillBook` to `the party window's skill tab`.
+  - `openspec/specs/webclient-contextual-hud/spec.md` 2/2 - the two `skill-book drawer` scenario headings become the `party skill tab` headings, and `cast syntax` becomes `graphical actions`.
+  - `openspec/changes/party-cutover-spec-maintenance/specs/webclient-contextual-hud/spec.md` 2/2 - the same two heading replacements mirrored in this change's delta.
+- No requirement name, requirement ID, scenario body, enumerated action ID, validator, adapter or other Purpose line changed.
+
+Observed results after that commit and the feature rebase:
+
+- Four-phrase sweep over `openspec/specs` and this change's delta: 0 occurrences.
+- `openspec validate --all --strict`: 358 passed, 0 failed (primary and feature worktree).
+- `openspec validate party-cutover-spec-maintenance --type change --strict`: valid.
+- Requirement names are byte-identical to the pre-change base: `webclient-contextual-hud` 67, `webclient-action-dispatch` 13, `webclient-skillbook-casting` 10; only the two HUD scenario headings differ.
+- The action allowlist still holds 67 unique backticked IDs, `account.character.create` through `party.view_member`, identical to the base.
+- `webclient-component-showcase` retains its `SkillBook` deletion assertion.
+- `uv run --locked python -m tools.contract_gate` passed: traceability, observability (0 violations), test-data (0 violations), manifests and 18 contract tests.
+- `uv run --locked python -m tools.spec_traceability check`: 2349 requirements, 10156 associations, 2349 covered, 0 uncovered, 0 errors.
+- No archived evidence and no `party-management-acceptance` artifact changed.
