@@ -209,6 +209,19 @@ describe("window hotkeys", () => {
     expect(store.view.hudDrawer).toBe("party");
     store.closeHudDrawer();
     question.remove();
+    // A confirmation drawn inside the party window (aria-modal, not a drawer
+    // frame) holds the tab keys too.
+    await press("b");
+    expect(partyTab()).toBe("bag");
+    const confirm = document.createElement("div");
+    confirm.setAttribute("role", "dialog");
+    confirm.setAttribute("aria-modal", "true");
+    wrapper.get('[data-testid="party-window"]').element.appendChild(confirm);
+    await press("c");
+    expect(partyTab()).toBe("bag");
+    confirm.remove();
+    store.closeHudDrawer();
+    await wrapper.vm.$nextTick();
     // An open overlay or another drawer keeps its own keys.
     store.openOverlay("help");
     await wrapper.vm.$nextTick();
@@ -257,8 +270,14 @@ describe("window hotkeys", () => {
   });
 
   it("reads the physical key, falling back to the character, and recognises text entries", () => {
+    // A non-Latin layout falls back to the physical key.
     expect(hotkeyCode({ code: "KeyP", key: "ㄣ" })).toBe("KeyP");
+    expect(hotkeyCode({ code: "KeyP", key: "з" })).toBe("KeyP");
     expect(hotkeyCode({ code: "", key: "B" })).toBe("KeyB");
+    // A Latin layout follows the typed letter: Dvorak types "p" on the
+    // physical R key, and the physical L key types "n", which is no hotkey.
+    expect(hotkeyCode({ code: "KeyR", key: "p" })).toBe("KeyP");
+    expect(hotkeyCode({ code: "KeyL", key: "n" })).toBeNull();
     expect(hotkeyCode({ code: "Digit1", key: "1" })).toBeNull();
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";

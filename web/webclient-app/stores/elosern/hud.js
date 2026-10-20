@@ -57,9 +57,10 @@ export function applyHud(ctx) {
     // window on its 狀態 tab, switching an already open window's live tab.
     // The retired skill-book drawer's name is aliased the same way
     // (webclient-party-skill-tab): the skill-use flow's Escape return opens
-    // the party window on its 技能 tab. The tool group's 技能系譜 opens the
-    // party window on its 系譜 tab the same way (webclient-party-lineage-
-    // tab); the lineage overlay is gone.
+    // the party window on its 技能 tab. The L window hotkey opens the party
+    // window on its 系譜 tab the same way (webclient-party-lineage-tab,
+    // webclient-main-navigation-hotkeys); the lineage overlay and the
+    // 技能系譜 tool are gone.
     const PARTY_TAB_ALIASES = { inventory: "bag", status: "status", skill: "skills", lineage: "lineage" };
     if (Object.prototype.hasOwnProperty.call(PARTY_TAB_ALIASES, name)) {
       const view = ctx.view.value || {};

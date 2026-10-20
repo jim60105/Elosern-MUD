@@ -26,13 +26,15 @@ import { onBeforeUnmount, onMounted } from "vue";
 const PARTY_KEYS = { KeyP: "party", KeyB: "inventory", KeyC: "status", KeyK: "skill", KeyL: "lineage" };
 const LETTER_CODES = { p: "KeyP", b: "KeyB", c: "KeyC", k: "KeyK", l: "KeyL", j: "KeyJ", m: "KeyM" };
 
-// `event.code` names the physical key whatever the layout (a Zhuyin or
-// Cyrillic layout still reports KeyP); `event.key` is the fallback for
-// synthetic events that carry no code.
+// The letter the player typed decides, so the chip's letter is the key on
+// any Latin layout (Dvorak, AZERTY, ...). Only when the layout types no
+// Latin letter (Cyrillic, a Zhuyin passthrough) does the physical key
+// (`event.code`) stand in.
 export function hotkeyCode(event) {
+  const key = typeof event.key === "string" ? event.key : "";
+  if (/^[a-zA-Z]$/.test(key)) return LETTER_CODES[key.toLowerCase()] ?? null;
   if (typeof event.code === "string" && /^Key[A-Z]$/.test(event.code)) return event.code;
-  const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
-  return LETTER_CODES[key] ?? null;
+  return null;
 }
 
 export function isTextEntry(el) {

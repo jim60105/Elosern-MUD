@@ -122,7 +122,8 @@ design §8 of the party member management design, after the prototype's
   (bubble phase, beside the keyboard bridge, which never claims letters).
   P B C K L open the party window (bare, `inventory`, `status`, `skill`,
   `lineage` aliases), J and M run the 任務 and 地圖 openers. It reads
-  `event.code` (layout-independent) and ignores consumed, repeated,
+  the typed Latin letter (so the chip's letter works on any Latin layout),
+  falling back to `event.code` on non-Latin layouts, and ignores consumed, repeated,
   modified (Shift included) and composing keys, text entries, the held
   cross-side / party-exit questions and any rendered alertdialog or
   aria-modal surface other than a drawer frame, creation, and every open
