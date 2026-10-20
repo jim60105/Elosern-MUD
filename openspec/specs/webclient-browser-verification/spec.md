@@ -66,6 +66,18 @@ The browser-test harness SHALL create a temporary SQLite database and temporary 
 - **WHEN** the managed browser command and the non-browser Evennia command are compared
 - **THEN** the explicit managed browser command is the sole quality-gate owner of `web/tests/browser/`, and the non-browser Evennia command retains `web.webclient` tests but SHALL NOT collect browser tests again
 
+#### Scenario: Protected console intervention owns a private undo snapshot
+- **WHEN** an authorized browser-runtime operator with valid CSRF performs the first teleport after process start
+- **THEN** a complete pre-intervention snapshot is created under that invocation's private save root, the response identifies it, and the target location commits only after snapshot success
+
+#### Scenario: Snapshot failure refuses before mutation
+- **WHEN** the managed runtime cannot create the required intervention snapshot
+- **THEN** the console returns `snapshot_failed`, the target location and snapshot baseline are unchanged, and no operation is executed
+
+#### Scenario: Save paths and retention remain isolated
+- **WHEN** two managed runtimes create automatic saves using configured retention
+- **THEN** each has distinct database, saves and art roots under its owned temporary directory, retention has production-equivalent meaning, developer persistence stays untouched, and teardown removes only the invocation's state
+
 ### Requirement: Browser tests are localhost-only and deterministic
 Playwright acceptance SHALL use Chromium installed through the locked uv environment, SHALL block or fail every non-local network request, and SHALL use deterministic placeholders without invoking an LLM, image generator, or other external service.
 
