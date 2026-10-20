@@ -12,6 +12,7 @@ from world.tests.synthetic_data.patching import (
     _dependency_order,
     _imported_modules,
     _late_binder_sweep,
+    _revalidate_skill_lineage,
     _resolve_import_time_derivations,
 )
 
@@ -70,6 +71,13 @@ def install_synthetic_catalogs(
                     )
                     setattr(consumer, binding_name, replacement)
     _INSTALL_STATE["installed"] = True
+    _INSTALL_STATE["skills"] = "skills" in names
+    if _INSTALL_STATE["skills"]:
+        # The kit swap replaces the live skill rows in place; the lineage
+        # reverse-edge caches were built for the shipped rows and would make a
+        # valid installed graph look cyclic to the topological sort. Rebuild
+        # them once here, at the catalog mutation boundary, never per read.
+        _revalidate_skill_lineage()
     return True
 
 
@@ -95,6 +103,9 @@ def uninstall_synthetic_catalogs() -> bool:
         target.clear()
         target.update(original)
     _INSTALLED_DICTS.clear()
+    if _INSTALL_STATE.pop("skills", False):
+        # Restore the caches to the shipped rows that are live again.
+        _revalidate_skill_lineage()
     _INSTALL_STATE["installed"] = False
     return True
 
