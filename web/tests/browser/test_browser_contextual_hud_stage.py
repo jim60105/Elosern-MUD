@@ -500,9 +500,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "虛線菱形表示未習得",
             "可解鎖",
             "購買頁只顯示買價，出售頁只顯示賣價",
-            "附身時無法交易",
+            "附身時仍可交易",
+            "購物由隊伍錢袋支付",
+            "出售所得也歸入隊伍錢袋",
         ):
             self.assertIn(text, party.inner_text())
+        self.assertNotIn("附身時無法交易", party.inner_text())
         self.assertEqual(party.locator("kbd").all_text_contents(), list("PBCKLJM"))
         self.assertEqual(party.locator("input,button,select").count(), 0)
         self.assertEqual(sent_action_count(page), before)
