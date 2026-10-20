@@ -393,7 +393,22 @@ class PartyManagementAcceptanceFixtureTests(EvenniaTest):
     def test_seeded_monster_is_finishable_through_real_rounds(self):
         from world.rules.combat_initiation import initiate_field_combat
         from world.rules.combat_session import BASIC_ATTACK_KEY, read_session, submit_player_action
-        from world.rules.field_cast import owned_active_skill
+        from world.rules.field_cast import cast_as_member, owned_active_skill
+
+        # The named sequence is one continuous state: 艾拉 heals the wounded
+        # commander, spending her own MP, and then opens and finishes the
+        # seeded encounter with the remaining resources.
+        hp_before = int(self.commander.traits.hp.current)
+        mp_before = int(self.aira.traits.mp.current)
+        healed = cast_as_member(
+            self.commander,
+            self.aira.pk,
+            HEAL_SKILL_KEY,
+            targets=[self.commander],
+        )
+        self.assertEqual(healed.route, "settlement", healed)
+        self.assertGreater(int(self.commander.traits.hp.current), hp_before)
+        self.assertLess(int(self.aira.traits.mp.current), mp_before)
 
         opener = owned_active_skill(self.aira, OPENER_SKILL_KEY)
         self.assertIsNotNone(opener)
