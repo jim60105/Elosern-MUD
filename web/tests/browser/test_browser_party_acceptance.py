@@ -21,7 +21,15 @@ import time
 
 from tools.spec_traceability import covers_requirement
 
-from web.browser_support.browser_fixtures_data import combat_journey_values
+from web.browser_support.browser_fixtures_data import (
+    AIRA_NAME,
+    FIXTURE_FLAG,
+    KAHN_NAME,
+    MERCHANT_NAME,
+    MINIMUM_PURCHASABLE_POTIONS,
+    POTION_KEY,
+    combat_journey_values,
+)
 
 from world.rules.item_effects import GaugeAdjustEffect, ItemStat
 from world.tests.synthetic_data import SYNTH_ITEM_EFFECT_PROFILES
@@ -31,11 +39,14 @@ from .browser_helpers import (
     evaluate_tolerating_navigation,
     focus_action_dock,
     install_outbound_recorder,
+    narrative_log_length,
+    narrative_log_text,
     outbound_messages,
     sent_action_count,
     store_state,
     store_state_or_none,
     suppress_one_shot_recovery_reload,
+    wait_for_narrative_settled,
     wait_for_presentation_settled,
     wait_for_store_state,
 )
@@ -773,3 +784,71 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             sent_action_count(page, "combat.exit_confirm"),
             len(confirms) + 1,
         )
+
+
+class PartyManagementFixtureSmokeBrowserTest(
+    ManagedServerTearDownMixin, BrowserAcceptanceTest
+):
+    """Managed panel/text smoke for the dedicated acceptance seed.
+
+    The original party-management acceptance journey stays owned by its own
+    change; this smoke only proves the seeded state survives the seed -> server
+    publication boundary and is readable through the authenticated panels and
+    text command surface, with no shell/raw patches and no external service.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        # Boot a dedicated runtime instead of the shared shipped-mode server.
+        pass
+
+    def setUp(self) -> None:
+        self.server = ManagedServer()
+        self.server.runtime.env[FIXTURE_FLAG] = "1"
+        self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
+        super().setUp()
+
+    @covers_requirement(
+        "webclient-browser-verification::"
+        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
+    )
+    def test_dedicated_fixture_publishes_members_merchant_and_lineage(self):
+        page = self.logged_in_page()
+        wait_for_store_state(
+            page,
+            lambda state: (
+                ((state.get("panels") or {}).get("party") or {}).get("available")
+                is True
+            ),
+            timeout=60000,
+        )
+        party = store_state(page)["panels"]["party"]
+        names = {slot["display_name"] for slot in party["slots"]}
+        self.assertIn(AIRA_NAME, names)
+        self.assertIn(KAHN_NAME, names)
+
+        wait_for_store_state(
+            page,
+            lambda state: (
+                ((state.get("panels") or {}).get("services") or {}).get("available")
+                is True
+            ),
+            timeout=60000,
+        )
+        services = store_state(page)["panels"]["services"]
+        self.assertTrue(services["shop"]["open"])
+        self.assertEqual(services["host"]["display_name"], MERCHANT_NAME)
+        stock = {row["item_key"]: row["stock"] for row in services["shop"]["stock"]}
+        self.assertGreaterEqual(stock.get(POTION_KEY, 0), MINIMUM_PURCHASABLE_POTIONS)
+
+        before = narrative_log_length(page)
+        page.evaluate(
+            "([name]) => Evennia.msg('text', [`系譜 ${name}`], {})",
+            [AIRA_NAME],
+        )
+        wait_for_narrative_settled(page, before)
+        text = narrative_log_text(page)
+        self.assertNotIn("無法閱讀", text)
+        self.assertIn("技能系譜", text)

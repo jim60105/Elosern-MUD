@@ -50,6 +50,9 @@ from web.tests.browser.seed.art_fixture import _art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
 from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
+from web.tests.browser.seed.party_management_acceptance_fixture import (
+    _acceptance_fixture as _party_management_acceptance_fixture,
+)
 from web.tests.browser.seed.services_fixture import _services_fixture
 from web.tests.browser.seed.services_synth import _services_fixture_synth
 from web.tests.browser.seed.titles_fixture import _titles_fixture

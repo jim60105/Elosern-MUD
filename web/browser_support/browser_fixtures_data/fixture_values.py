@@ -175,6 +175,7 @@ SYNTH_ITEM_DISPLAYS = MappingProxyType(
         "t_ember_spray": "熾焰噴射劑",
         "t_huskapple": "燼殼果",
         "t_thorn_knife": "荊刺小刀",
+        "t_cinder_dirk": "燼微短刃",
         "t_iron_fang": "鐵牙短刃",
     }
 )
