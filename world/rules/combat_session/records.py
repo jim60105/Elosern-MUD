@@ -446,7 +446,10 @@ def session_owner(acting: Any) -> Any:
 
     Read-only: it never writes, engages or advances anything.
     """
-    if read_session(acting) is not None:
+    try:
+        if read_session(acting) is not None:
+            return acting
+    except CombatSessionError:  # observability: ignore R2: an unreadable own record reports no own session; the caller's is_in_active_session predicate fails closed
         return acting
     from world.rules.party_scope import PartyScopeError, resolve_commander
 
@@ -456,4 +459,7 @@ def session_owner(acting: Any) -> Any:
         return acting
     if commander is acting:
         return acting
-    return commander if read_session(commander) is not None else acting
+    try:
+        return commander if read_session(commander) is not None else acting
+    except CombatSessionError:  # observability: ignore R2: an unreadable commander record reports no session; the caller's is_in_active_session predicate fails closed
+        return acting
