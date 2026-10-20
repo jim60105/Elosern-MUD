@@ -113,6 +113,10 @@ Stored truth and `disguised_stats` SHALL be shown side by side; disguise SHALL b
 - **WHEN** an art asset curated summary is rendered
 - **THEN** it includes subject key, status, prompt summary, source_hash, generated time, failure reason, and existing `/art/` thumbnail only when a file exists
 
+#### Scenario: Fractional percentage contributions remain readable
+- **WHEN** an authorized character-detail read contains authoritative percentage-point contributions of +12.5 and -2.5 together with integral percentage, multiplier and fractional flat controls
+- **THEN** the breakdown section is available with signed fractional percentages and their percent suffix, integral percentages retain their numeric meaning, all layer sources and effective totals agree with the authoritative read model, and the read mutates no state
+
 ### Requirement: Universal Evennia raw inspection
 Every Evennia object, including objects outside curated kinds, SHALL have a raw tab/route showing all Attributes with key/category/converted value, categorized tags, components, typeclass path, location, and creation date.
 
