@@ -39,6 +39,25 @@ def _env_path(name: str, default: str) -> str:
     return os.environ.get(name) or default
 
 
+def _positive_int(name: str, default: int) -> int:
+    """A positive integer override; an invalid value fails at import.
+
+    The production settings validate ``GM_AUTOSAVE_KEEP`` the same way, so a
+    managed runtime can never silently run with a retention count that would
+    prune every automatic save.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise ValueError(f"{name} expected a positive integer") from error
+    if value < 1:
+        raise ValueError(f"{name} expected a positive integer")
+    return value
+
+
 SERVERNAME = "Elosern Browser Test"
 
 # Account capacity: matches production default so multi-character fixtures can create characters
@@ -137,6 +156,20 @@ PORTAL_LOG_MAX_SIZE = 1000000
 HTTP_LOG_FILE = os.path.join(_LOG_DIR, "http_requests.log")
 LOCKWARNING_LOG_FILE = os.path.join(_LOG_DIR, "lockwarnings.log")
 CACHE_DIR = _env_path("ELOSERN_BROWSER_CACHE_DIR", CACHE_DIR)
+
+# World saves (gm-portal-s5-saves): the GM console snapshots the world before
+# its first intervention after process start. ``server/saves/snapshot.py``
+# derives its layout from the database, save and art roots on every call, so
+# the managed runtime binds the save root and the retention count to private
+# values with the same meaning as production. The database and art halves of
+# every save then live under this invocation's temporary root, never the
+# developer's ``server/db/saves`` or ``server/.art``. The fallback derives
+# from the resolved browser cache root above, so omitting only the save-root
+# override still stays inside the invocation's private tree.
+GM_SAVES_ROOT = _env_path(
+    "ELOSERN_BROWSER_SAVES_ROOT", os.path.join(CACHE_DIR, "saves")
+)
+GM_AUTOSAVE_KEEP = _positive_int("ELOSERN_BROWSER_AUTOSAVE_KEEP", 10)
 
 MEDIA_ROOT = _env_path("ELOSERN_BROWSER_MEDIA_ROOT", MEDIA_ROOT)
 STATIC_ROOT = _env_path("ELOSERN_BROWSER_STATIC_ROOT", STATIC_ROOT)
