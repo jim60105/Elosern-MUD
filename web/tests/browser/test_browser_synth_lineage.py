@@ -66,6 +66,52 @@ class SynthLineageBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         )
         return int(companion)
 
+    def _commander_id(self, state: dict) -> int:
+        party = state["panels"]["party"]
+        return int(
+            next(
+                row["identity"]
+                for row in party["slots"]
+                if row["role"] == "commander"
+            )
+        )
+
+    def _stored_snapshot(self, *identities: int) -> tuple:
+        """The committed object rows and attributes of these database objects.
+
+        The managed panel comparison only observes the client transport; this
+        reads the private runtime database so a write that emits no updated
+        panel is still caught. ``skill_proficiency`` and ``skills`` are member
+        attributes, so they ride the attribute rows.
+        """
+        import sqlite3
+
+        placeholders = ",".join("?" for _ in identities)
+        connection = sqlite3.connect(
+            str(self.server.runtime.database_path), timeout=10
+        )
+        try:
+            objects = connection.execute(
+                "SELECT id, db_key, db_typeclass_path, db_date_created, "
+                "db_lock_storage, db_sessid, db_cmdset_storage, db_account_id, "
+                "db_destination_id, db_home_id, db_location_id "
+                f"FROM objects_objectdb WHERE id IN ({placeholders}) ORDER BY id",
+                identities,
+            ).fetchall()
+            attributes = connection.execute(
+                "SELECT a.id, a.db_key, COALESCE(a.db_category, ''), "
+                "a.db_value, a.db_strvalue, a.db_lock_storage, a.db_model, "
+                "a.db_attrtype FROM typeclasses_attribute a "
+                "JOIN objects_objectdb_db_attributes m "
+                "ON m.attribute_id = a.id "
+                f"WHERE m.objectdb_id IN ({placeholders}) "
+                "ORDER BY m.objectdb_id, a.db_key, a.db_category",
+                identities,
+            ).fetchall()
+        finally:
+            connection.close()
+        return (objects, attributes)
+
     def _read_lineage_text(self, page) -> str:
         """Send the authenticated text command and return the settled log."""
         before = narrative_log_length(page)
@@ -162,9 +208,9 @@ class SynthLineageBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
     # -- the journey --------------------------------------------------------
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_synthetic_member_lineage_matches_text_and_panel(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -176,7 +222,10 @@ class SynthLineageBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             ),
             timeout=60000,
         )
-        companion = self._companion_id(store_state(page))
+        state = store_state(page)
+        companion = self._companion_id(state)
+        commander = self._commander_id(state)
+        stored_before = self._stored_snapshot(companion, commander)
 
         panel = self._view_companion_lineage(page, companion)
         self.assertEqual(panel["kind"], "lineage")
@@ -208,7 +257,31 @@ class SynthLineageBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         # panels are unchanged (no write, no repair).
         again = self._read_lineage_text(page)
         self._assert_text_matches_panel(again, panel)
+
+        # Re-request the viewed-member panel from the server by selecting
+        # another rail row and coming back.
+        for member in (commander, companion):
+            page.locator(
+                f'[data-testid="member-rail__entry--{member}"]'
+            ).click()
+            wait_for_store_state(
+                page,
+                lambda state: (
+                    ((state.get("panels") or {}).get("party") or {}).get(
+                        "viewed_member_id"
+                    )
+                    == member
+                    and ((state.get("panels") or {}).get("lineage") or {}).get(
+                        "available"
+                    )
+                    is True
+                ),
+                timeout=30000,
+            )
         state = store_state(page)
         self.assertEqual(state["panels"]["lineage"], lineage_first)
         self.assertEqual(state["panels"]["party"], party_before)
         self.assertEqual(state["panels"].get("character"), character_before)
+        self.assertEqual(
+            self._stored_snapshot(companion, commander), stored_before
+        )

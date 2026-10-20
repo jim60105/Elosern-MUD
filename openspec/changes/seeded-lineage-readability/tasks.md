@@ -35,7 +35,13 @@
   neither observation establishes general production impact, and shipped startup never
   installs the synthetic catalog.
 - **Traceability evidence.** `uv run --locked python -m tools.contract_gate` passed:
-  2349 requirements, 10143 associations, 2349 covered, 0 uncovered, 0 errors; observability,
+  2349 requirements, 10145 associations, 2349 covered, 0 uncovered, 0 errors; observability,
   test-data, manifest and contract gates all passed. `openspec validate
   seeded-lineage-readability --strict` reported the change valid. No merged-spec sync is
   claimed in this apply.
+- **Post-implementation review disposition.** The blocking finding (the managed journey did
+  not prove persistent-state non-mutation) was fixed: the journey now snapshots the private
+  runtime database's object and attribute rows for the companion and commander before and
+  after repeated text reads, and re-requests the viewed-member panel by selecting another
+  rail row and returning. The non-blocking findings were also adopted: failed scoped entry
+  and nested scopes now assert registry/index restoration after each unwind.

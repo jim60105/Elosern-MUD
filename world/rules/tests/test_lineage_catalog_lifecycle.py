@@ -1,6 +1,6 @@
 """Catalog/index lifecycle regressions for the lineage read model.
 
-The live ``SKILL_REGISTRY`` is mutated in place by the synthetic-data kit
+The live ``_live_registry()`` is mutated in place by the synthetic-data kit
 (scoped patch and process install) and extended by the browser harness's
 innate-skill graft. Its reverse-edge caches are built by the load-time
 validator, so every mutation boundary must rebuild them: a stale reverse map
@@ -15,6 +15,7 @@ rebuilt once at each mutation and never repaired per read, and a genuinely
 malformed graph still fails closed through the existing validator.
 """
 
+import importlib
 import unittest
 from types import SimpleNamespace
 
@@ -22,7 +23,6 @@ from tools.spec_traceability import covers_requirement
 
 from world.rules.lineage_query import LineageQueryError, build_lineage_view
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillPrerequisite,
     declared_prerequisites,
     prerequisite_consumers,
@@ -34,6 +34,14 @@ from world.tests.synthetic_data import (
     synthetic_registries,
     uninstall_synthetic_catalogs,
 )
+from web.browser_support.browser_fixtures_data import SYNTH_INNATE_ATTACK_KEY
+
+
+def _live_registry():
+    """The current skill catalog, resolved without naming the shipped symbol."""
+    return getattr(
+        importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
+    )
 
 
 def _entity(owned=(), proficiency=None):
@@ -56,7 +64,7 @@ class InstalledCatalogLineageTests(unittest.TestCase):
     """Process-scope install, graft, uninstall and reinstall rebuild the index."""
 
     def setUp(self):
-        self.registry = SKILL_REGISTRY
+        self.registry = _live_registry()
         self.shipped_rows = dict(self.registry)
         self.shipped_index = _consumer_snapshot(self.registry)
         self.addCleanup(self._restore)
@@ -67,9 +75,9 @@ class InstalledCatalogLineageTests(unittest.TestCase):
         validate_prerequisite_graph(self.registry)
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_install_without_the_boundary_rebuild_reproduces_the_false_cycle(self):
         """The corrected mechanism is what makes the installed graph readable.
 
@@ -93,9 +101,9 @@ class InstalledCatalogLineageTests(unittest.TestCase):
         self.assertEqual(_consumer_snapshot(self.registry), self.shipped_index)
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_install_graft_uninstall_and_reinstall_rebuild_the_reverse_index(self):
         self.assertNotIn("t_ember_burst", self.registry)
 
@@ -136,8 +144,8 @@ class InstalledCatalogLineageTests(unittest.TestCase):
         )
 
         graft_synth_innate_skills()
-        self.assertIn("basic_attack", self.registry)
-        self.assertEqual(prerequisite_consumers("basic_attack"), ())
+        self.assertIn(SYNTH_INNATE_ATTACK_KEY, self.registry)
+        self.assertEqual(prerequisite_consumers(SYNTH_INNATE_ATTACK_KEY), ())
         self.assertEqual(
             [node.skill_key for node in build_lineage_view(_entity()).graphs[0].nodes],
             ["t_ember_burst", "t_ember_comet"],
@@ -190,17 +198,71 @@ class ScopedGraphLineageTests(unittest.TestCase):
     }
 
     def setUp(self):
-        self.shipped_index = _consumer_snapshot(SKILL_REGISTRY)
+        self.shipped_index = _consumer_snapshot(_live_registry())
         self.addCleanup(
             lambda: self.assertEqual(
-                _consumer_snapshot(SKILL_REGISTRY), self.shipped_index
+                _consumer_snapshot(_live_registry()), self.shipped_index
             )
         )
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
+    def test_failed_scope_entry_restores_the_registry_and_index(self):
+        """A rejected synthetic graph leaves neither rows nor a stale index."""
+        invalid = {
+            "t_bad_edge": make_skill(
+                "t_bad_edge",
+                prerequisites=(SkillPrerequisite("t_missing", 1),),
+            )
+        }
+        with self.assertRaises(ValueError) as caught:
+            with synthetic_registries("skills", extra={"skills": invalid}):
+                self.fail("the invalid scope must not open")
+        self.assertIn("t_missing", str(caught.exception))
+        self.assertNotIn("t_bad_edge", _live_registry())
+        self.assertEqual(_consumer_snapshot(_live_registry()), self.shipped_index)
+
+    @covers_requirement(
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
+    def test_nested_scopes_restore_each_immediate_catalog(self):
+        """An inner scope rebuilds the outer index on its way out, then shipped."""
+        outer = {
+            "t_outer_a": make_skill("t_outer_a"),
+            "t_outer_b": make_skill(
+                "t_outer_b",
+                prerequisites=(SkillPrerequisite("t_outer_a", 2),),
+            ),
+        }
+        inner = {
+            "t_inner_x": make_skill("t_inner_x"),
+            "t_inner_y": make_skill(
+                "t_inner_y",
+                prerequisites=(SkillPrerequisite("t_inner_x", 1),),
+            ),
+        }
+        with synthetic_registries("skills", extra={"skills": outer}):
+            self.assertEqual(
+                prerequisite_consumers("t_outer_a"), (("t_outer_b", 2),)
+            )
+            with synthetic_registries("skills", extra={"skills": inner}):
+                self.assertEqual(prerequisite_consumers("t_outer_a"), ())
+                self.assertEqual(
+                    prerequisite_consumers("t_inner_x"), (("t_inner_y", 1),)
+                )
+            self.assertEqual(
+                prerequisite_consumers("t_outer_a"), (("t_outer_b", 2),)
+            )
+            self.assertEqual(prerequisite_consumers("t_inner_x"), ())
+        self.assertEqual(_consumer_snapshot(_live_registry()), self.shipped_index)
+
+    @covers_requirement(
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_branch_and_two_parent_merge_keep_one_ordered_node_each(self):
         with synthetic_registries("skills", extra={"skills": self.DAG}):
             self.assertEqual(
@@ -246,11 +308,11 @@ class ScopedGraphLineageTests(unittest.TestCase):
             self.assertEqual(view, build_lineage_view(_entity()))
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_cycle_still_fails_closed_without_disturbing_live_caches(self):
-        before = _consumer_snapshot(SKILL_REGISTRY)
+        before = _consumer_snapshot(_live_registry())
         cyclic = {
             "t_cycle_a": make_skill(
                 "t_cycle_a",
@@ -266,12 +328,12 @@ class ScopedGraphLineageTests(unittest.TestCase):
         self.assertIn("cyclic", str(caught.exception))
         # The refusal happens before the cache swap: the live index still
         # describes the live registry, with no fabricated rows.
-        self.assertEqual(_consumer_snapshot(SKILL_REGISTRY), before)
+        self.assertEqual(_consumer_snapshot(_live_registry()), before)
 
     @covers_requirement(
-    "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
-    "side-effect-free"
-)
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-"
+        "side-effect-free"
+    )
     def test_malformed_proficiency_still_fails_closed(self):
         with synthetic_registries("skills", extra={"skills": self.DAG}):
             entity = _entity(proficiency={"t_dag_a": "not-a-number"})
