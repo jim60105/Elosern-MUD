@@ -66,7 +66,7 @@ export const ClosedReference = {
 };
 export const RefusedTradeReference = {
   render,
-  args: { ...BUY_CONSUMABLE, tradeNotice: { code: "possessed_shop", message: "附身狀態下無法進行交易。" } },
+  args: { ...BUY_CONSUMABLE, tradeNotice: { code: "insufficient_funds", message: "你的銅幣不足。" } },
   ...atReference,
 };
 export const NoShopReference = { render, args: { services: SERVICES_PANEL_MINIMAL_SAMPLE, party: SHOP_PARTY_SAMPLE }, ...atReference };

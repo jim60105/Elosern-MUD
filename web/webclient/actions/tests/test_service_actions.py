@@ -771,6 +771,76 @@ class ServiceAdapterTests(ServiceActionBase):
         )
         self.assertFalse(self.merchant_npc.relations.has_record(self.player))
 
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
+    )
+    def test_possessed_actor_cannot_delegate_guild_exam_or_quest_services(self):
+        from world.quests.runtime import definition_for, fulfill_record, to_storage
+
+        self.player.location = self.hall
+        companion = self._possessed_companion("艾拉")
+        # The commander is fully eligible: registered with a real active board
+        # quest and the exam threshold met. Any accidental delegation would
+        # therefore succeed and change state, so the rejections below are
+        # genuine admission refusals, not incidental failures.
+        self._register()
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        active = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        active_id = active.quest_id
+
+        def _state(actor):
+            merit = getattr(getattr(actor, "traits", None), "guild_merit", None)
+            return {
+                "wallet": int(actor.db.wallet or 0),
+                "registration": actor.db.guild_registration,
+                "quest_log": list(actor.db.quest_log or []),
+                "claims": list(actor.db.guild_reward_claims or []),
+                "rank": getattr(actor, "guild_rank", None),
+                "merit": None if merit is None else int(merit.value),
+            }
+
+        commander_before = _state(self.player)
+        companion_before = _state(companion)
+        results = (
+            _guild_register_adapter(companion, {}),
+            _exam_request_adapter(companion, {"target_rank": _T_EXAM_RANK}),
+            _quest_accept_adapter(
+                companion, {"definition_key": _T_BOARD_QUEST}
+            ),
+            _quest_abandon_adapter(companion, {"quest_id": active_id}),
+            _quest_track_adapter(companion, {"quest_id": active_id, "tracked": True}),
+        )
+        self.assertEqual(
+            [result["code"] for result in results],
+            [
+                "not_a_player",
+                "not_a_player",
+                "board_access",
+                "quest_not_found",
+                "quest_not_found",
+            ],
+        )
+        for result in results:
+            self.assertEqual(result["outcome"], "rejected")
+        records = read_records(self.player)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].quest_id, active_id)
+        self.assertIs(records[0].state, QuestState.IN_PROGRESS)
+        self.assertEqual(_state(self.player), commander_before)
+        self.assertEqual(_state(companion), companion_before)
+
+        # A real completed quest on the commander: a delegated turn-in would
+        # claim it, so the possessed actor's rejection is load-bearing.
+        completed = fulfill_record(records[0], definition_for(records[0]))
+        self.player.db.quest_log = [to_storage(completed)]
+        fulfilled_before = _state(self.player)
+        turnin = _quest_turnin_adapter(companion, {"quest_id": active_id})
+        self.assertEqual(turnin["outcome"], "rejected")
+        self.assertEqual(turnin["code"], "not_a_player")
+        self.assertEqual(_state(self.player), fulfilled_before)
+        self.assertEqual(read_records(self.player)[0].quest_id, active_id)
+        self.assertEqual(_state(companion), companion_before)
+
 
     def test_validate_quest_track_payload(self):
         valid = validate_quest_track_payload({"quest_id": "q:1", "tracked": True})

@@ -368,14 +368,14 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(wrapper.text()).not.toMatch(/營業時間|開門|打烊時/);
   });
 
-  it("possession renders the same rows and states the committed possessed_shop refusal", async () => {
+  it("states the committed ordinary refusal without changing the rows", async () => {
     mountWindow({ itemHoldings: SHOP_HOLDINGS_POTION });
     const before = get("shop-rows").html();
-    await wrapper.setProps({ tradeNotice: { code: "possessed_shop", message: "附身狀態下無法進行交易。" } });
+    await wrapper.setProps({ tradeNotice: { code: "insufficient_funds", message: "你的銅幣不足。" } });
     expect(get("shop-rows").html()).toBe(before);
     const reason = get("action-bar__reason");
-    expect(reason.text()).toBe("附身狀態下無法進行交易。");
-    expect(reason.attributes("data-reason-code")).toBe("possessed_shop");
+    expect(reason.text()).toBe("你的銅幣不足。");
+    expect(reason.attributes("data-reason-code")).toBe("insufficient_funds");
     // The refusal belongs to that trade: another row drops it.
     await wrapper.setProps({ pendingItemKey: "steel_shortsword" });
     expect(wrapper.emitted("clear-notice")).toHaveLength(1);

@@ -247,7 +247,9 @@ class PossessionPresentationTests(EvenniaTest):
         staff = create_object(NPC, key="公會職員", location=self.room1)
         staff.components.add(
             GuildStaff.create(
-                staff, service_id="guild_staff", branch_key="t_possession_branch"
+                staff,
+                service_id="t_possession_staff",
+                branch_key="t_possession_branch",
             )
         )
         staff.components.add(

@@ -446,7 +446,7 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = No
         return blocked
     try:
         result = turn_in_quest(actor, staff, quest_id)
-    except (RewardClaimError, GuildDataError, QuestDataError) as error:
+    except (RewardClaimError, GuildDataError, GuildError, QuestDataError) as error:
         return _rejected(error)
     message = (
         f"你回報了任務 {result['quest_id']}，獲得 {result['copper']} 銅、"

@@ -39,7 +39,7 @@ The viewed member only chooses whose data is presented. It never authorizes anyt
 
 ### 3.2 Party-scoped presentation
 
-The party window, the shop, and the main navigation present the whole party. The member rail always lists the commander first, then companions in party order. No "you" marker exists. Possession changes only the stage figure the player controls and the existing possession banner; the party window and the shop look identical whether or not the player is possessing. The wallet shown is the party purse, which is the commander's `db.wallet`. The existing `possessed_shop` refusal stays.
+The party window, the shop, and the main navigation present the whole party. The member rail always lists the commander first, then companions in party order. No "you" marker exists. Possession changes only the stage figure the player controls and the existing possession banner; the party window and the shop look identical whether or not the player is possessing. The wallet shown is the party purse, which is the commander's `db.wallet`. Shop trades remain available through the possessed figure; every other NPC service stays refused.
 
 ### 3.3 Summaries for all, detail for one
 
@@ -74,7 +74,7 @@ All rules below live under `world/rules/`. Each mutation validates fully before 
 - `shop.sell` carries a seller. Only the seller's unequipped items are sellable. Proceeds enter the party purse.
 - Buy and sell prices remain the independently configured authoritative integer-copper offer values. The buy view shows only buy prices, and the sell view shows only sell prices; no universal ratio is implied.
 - Equipment comparison deltas use the same breakdown arithmetic as the status tab and are computed server-side for each member.
-- Possession keeps the existing `possessed_shop` refusal.
+- Possession keeps the same party-scoped trades: the acting or explicitly named member's bag with the commander's purse.
 
 ### 4.4 Companion field actions
 
@@ -109,7 +109,7 @@ The text client exposes every operation. Each new or changed command is document
 
 ### 4.9 Party co-location under possession
 
-While the player possesses a companion, the whole effective party, including the owner's original character, follows the possessed body through every exit traversal. Party members are therefore in the same room, with or without possession, and the commander's room is the one anchor for every party-scoped rule in this design; the same-room check stays only to exclude a member stranded by a failed follow or by movement that is not an exit traversal. A destination that refuses the owner's body is handled like any follower lost at an exit: that member stays behind. This amends how the existing follow behavior treats a possession: the follower set is derived from effective membership rather than from the puppet being the owner. Possession entry and exit rules and the `possessed_shop` refusal are unchanged.
+While the player possesses a companion, the whole effective party, including the owner's original character, follows the possessed body through every exit traversal. Party members are therefore in the same room, with or without possession, and the commander's room is the one anchor for every party-scoped rule in this design; the same-room check stays only to exclude a member stranded by a failed follow or by movement that is not an exit traversal. A destination that refuses the owner's body is handled like any follower lost at an exit: that member stays behind. This amends how the existing follow behavior treats a possession: the follower set is derived from effective membership rather than from the puppet being the owner. Possession entry and exit rules are unchanged; shop trades remain available through the possessed figure while every other NPC service remains refused.
 
 `修煉` is also a new command; the web action is `explore.practice` and only books. `給` keeps its existing behavior for a recipient who is not a party member, including quest delivery; for a party member it uses the transfer rule and advances no delivery. Whether buying for a companion counts toward an acquisition quest's progress is pinned by a test of the actual behavior and is not otherwise specified here.
 
@@ -322,6 +322,6 @@ Change 24 carries the post-archive manual edit of the `## Purpose` paragraph of 
 - No restyle of the letters, codex, title, gallery, settings, help, or remaining service windows in this batch. They adopt the shared primitives in a later design.
 - No affinity cost or bond gate on managing a companion's items.
 - No item transfer during combat, and no new combat command kind.
-- No change to buy or sell price formulas, to possession entry or exit rules, or to the `possessed_shop` refusal. Only the follow behavior under possession changes (§4.9).
+- No change to buy or sell price formulas or to possession entry or exit rules. Possession owes only the follow behavior (§4.9) and shop access; every other NPC service remains refused.
 - No companion wallets and no shared party inventory store.
 - No persistent unread-unlock record.

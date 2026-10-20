@@ -1,7 +1,7 @@
 // The shop window's trade seam (webclient-shop-window): one `shop.buy` /
 // `shop.sell` through the single dispatch entry, the request it made, and
 // that request's committed non-success result ({ code, message }) — for
-// example the unchanged `possessed_shop` refusal — so the window can state it
+// example the ordinary `insufficient_funds` refusal — so the window can state it
 // in its action bar while the modal covers the narrative. The narrative line
 // is unchanged; nothing here is retried. Like use-rest-wait.js, the request
 // is forgotten on an epoch or generation change.

@@ -423,6 +423,61 @@ class PossessionTransitionTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-transition::the-possessed-npc-carries-a-trimmed-character-act-cmdset"
     )
+    def test_shop_commands_survive_while_guild_and_church_stay_absent(self):
+        """Shop commands remain; guild, church and exam commands do not."""
+        from commands.church import (
+            CmdChurchJoin,
+            CmdChurchMerit,
+            CmdChurchOffer,
+            CmdChurchPray,
+            CmdChurchRedeem,
+        )
+        from commands.combat import CmdGuildExam
+        from commands.economy import CmdBuy, CmdInventory, CmdSell, CmdShopStock
+        from commands.guild import (
+            CmdGuildAccept,
+            CmdGuildAbandon,
+            CmdGuildList,
+            CmdGuildLog,
+            CmdGuildMerit,
+            CmdGuildRegister,
+            CmdGuildRequest,
+            CmdGuildShow,
+            CmdGuildTurnIn,
+        )
+
+        enter_possession(self.char1, self.npc)
+        current = list(self.npc.cmdset.current)
+        for shop_command in (CmdBuy, CmdSell, CmdShopStock, CmdInventory):
+            self.assertTrue(
+                any(isinstance(command, shop_command) for command in current),
+                f"{shop_command.key} must remain available while possessing",
+            )
+        for protected in (
+            CmdGuildExam,
+            CmdGuildRegister,
+            CmdGuildList,
+            CmdGuildAccept,
+            CmdGuildLog,
+            CmdGuildShow,
+            CmdGuildAbandon,
+            CmdGuildTurnIn,
+            CmdGuildMerit,
+            CmdGuildRequest,
+            CmdChurchJoin,
+            CmdChurchPray,
+            CmdChurchOffer,
+            CmdChurchRedeem,
+            CmdChurchMerit,
+        ):
+            self.assertFalse(
+                any(isinstance(command, protected) for command in current),
+                f"{protected.key} must stay absent while possessing",
+            )
+
+    @covers_requirement(
+        "companion-possession-transition::the-possessed-npc-carries-a-trimmed-character-act-cmdset"
+    )
     def test_release_restores_the_npcs_own_cmdset(self):
         """Scenario: Release restores the NPC's own cmdset."""
         enter_possession(self.char1, self.npc)

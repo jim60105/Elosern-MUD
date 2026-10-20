@@ -368,7 +368,7 @@ VitalsTrack changing-numerals story's price column).
   are the one display-only arithmetic. 買給 X / 出售 sends one `shop.buy
   {item_key, quantity, recipient_id}` / `shop.sell {..., seller_id}` naming
   `shop.member_id`, only while the rail agrees with it. `use-shop-trade.js`
-  states that trade's committed refusal (e.g. `possessed_shop`) in the bar;
+  states that trade's committed refusal (e.g. `insufficient_funds`) in the bar;
   a new member, tab or row drops it.
 - The server republishes `party_inventory` with every trade, so the party
   window's 背包 tab and header purse never lag a purchase.
