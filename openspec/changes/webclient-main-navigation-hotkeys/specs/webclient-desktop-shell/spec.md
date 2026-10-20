@@ -356,7 +356,7 @@ document.
 ## ADDED Requirements
 
 ### Requirement: Window hotkeys act only outside text inputs
-The client SHALL bind P (隊伍, last tab), B (背包), C (狀態), K (技能), L (系譜), J (任務) and M (地圖) to open their surfaces, and the keys SHALL act only while focus is outside any text input, textarea or contenteditable element and no modal question is open; an unavailable surface SHALL ignore its key.
+The client SHALL bind P 隊伍 (last tab), B 背包, C 狀態, K 技能, L 系譜, J 任務 and M 地圖 to their surfaces. A key SHALL act only outside text inputs and contenteditable elements, without modifiers or IME composition, with no modal question open, and for an available surface only; it SHALL NOT open a surface behind an open drawer, overlay or full log, except that P, B, C, K and L switch an open party window's tab.
 
 #### Scenario: A hotkey opens the bag tab
 - **WHEN** focus is on the stage and the player presses B
@@ -371,5 +371,9 @@ The client SHALL bind P (隊伍, last tab), B (背包), C (狀態), K (技能), 
 - **THEN** nothing opens, because the map entry is absent in combat
 
 #### Scenario: An open surface keeps its own keys
-- **WHEN** a drawer, an overlay or the full log is open, or the party window is open and the player presses J or M
-- **THEN** no hotkey opens another surface behind it; only while the party window itself is open do P, B, C, K and L switch it to their tab
+- **WHEN** a drawer other than the party window, an overlay or the full log is open and the player presses any of the hotkeys
+- **THEN** no hotkey opens another surface behind it
+
+#### Scenario: The party window switches its own tab
+- **WHEN** the party window is open on 成員 and the player presses B, then J or M
+- **THEN** B switches the window to 背包, and J and M open nothing behind it

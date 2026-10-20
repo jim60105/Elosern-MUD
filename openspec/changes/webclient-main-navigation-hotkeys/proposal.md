@@ -21,7 +21,7 @@ None.
 ### Modified Capabilities
 
 - `webclient-desktop-shell`: the tool-group, stable-placement, required-surfaces and keyboard-routing requirements, plus an added hotkey requirement.
-- `webclient-contextual-hud`: the reference-surfaces requirement names the party and shop windows.
+- `webclient-contextual-hud`: the reference-surfaces requirement names the party and shop windows, and the command-line requirement's list of absent openers names the current tools (信件 instead of the removed 技能系譜).
 
 ## Impact
 
