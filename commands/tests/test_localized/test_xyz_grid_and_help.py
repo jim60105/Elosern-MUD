@@ -43,6 +43,7 @@ from typeclasses.rooms import Room
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
 from world.quests.runtime import QuestState, read_records
+from world.rules.clock import CLOCK_YAML, get_world_clock
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
     accept,
@@ -153,6 +154,112 @@ class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_map_unknown_z_coordinate_zh_tw(self):
         output = self.call(CmdMap(), "z9")
         self.assertIn("找不到 XYMap", output)
+
+
+class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
+    """A synthetic two-step route stays reportable and walkable without a text map."""
+
+    def setUp(self):
+        super().setUp()
+        from world.tests.synthetic_grid_map import (
+            END_KEY,
+            load_synthetic_grid,
+            synthetic_rooms,
+        )
+
+        load_synthetic_grid()
+        self.start, self.anchor, self.end = synthetic_rooms()
+        self.destination_key = END_KEY
+        self.char1.location = self.start
+
+    @staticmethod
+    def _parts(call):
+        value = call.kwargs.get("text", call.args[0] if call.args else None)
+        metadata = {}
+        if isinstance(value, tuple):
+            value, metadata = value
+        return str(value), dict(metadata or {})
+
+    class _QueuedDelay:
+        """Deterministic delay seam: queue the callback, drain it afterwards.
+
+        Production stores the returned task before the callback runs, so the
+        seam must not re-enter the stepper inside the assignment; draining
+        after the command returns preserves that ordering and lets the test
+        assert the completed path-state cleanup.
+        """
+
+        class _Task:
+            @staticmethod
+            def active():
+                return False
+
+            @staticmethod
+            def cancel():
+                return None
+
+        def __init__(self):
+            self._queue = []
+
+        def __call__(self, _delay, func, *args, **kwargs):
+            self._queue.append((func, args, kwargs))
+            return self._Task()
+
+        def drain(self):
+            while self._queue:
+                func, args, kwargs = self._queue.pop(0)
+                func(*args, **kwargs)
+
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
+    def test_path_reports_the_known_two_step_route_without_moving(self):
+        output = self.call(CmdGoto(), self.destination_key, cmdstring="path")
+        self.assertIn("共有 2 步：", output)
+        # The authored synthetic map is a straight east-east line, so the
+        # reported route is two east steps in order.
+        route = output.split("共有 2 步：", 1)[1]
+        directions = [part.strip() for part in route.replace("，最後", "，").split("，")]
+        self.assertEqual(directions, ["e", "e"])
+        self.assertIs(self.char1.location, self.start)
+
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
+    def test_goto_walks_the_known_two_step_route_without_a_text_map(self):
+        for cmdstring in ("前往", "goto"):
+            with self.subTest(cmdstring=cmdstring):
+                self.char1.location = self.start
+                self.char1.ndb.xy_path_data = None
+                before = get_world_clock().tick
+                queued = self._QueuedDelay()
+                with (
+                    patch("commands.localized.xyzgrid.delay", queued),
+                    patch.object(self.char1, "msg") as recorder,
+                ):
+                    self.call(
+                        CmdGoto(),
+                        self.destination_key,
+                        caller=self.char1,
+                        receiver=self.char2,
+                        cmdstring=cmdstring,
+                    )
+                    queued.drain()
+
+                self.assertEqual(self.char1.location, self.end)
+                self.assertEqual(self.end.xyz, (2, 0, self.end.xyz[2]))
+                self.assertIsNone(self.char1.ndb.xy_path_data)
+                # Existing settlement: two real step traversals charge the
+                # ordinary move cost each.
+                self.assertEqual(
+                    get_world_clock().tick,
+                    before + 2 * CLOCK_YAML["command_defaults"]["move"],
+                )
+                messages = [self._parts(call) for call in recorder.call_args_list]
+                self.assertGreaterEqual(
+                    sum("出口：" in text for text, _ in messages),
+                    2,
+                    "each automatic step appearance must be emitted",
+                )
+                for text, metadata in messages:
+                    self.assertNotEqual(metadata.get("type"), "xymap", text)
+                    self.assertNotIn("~", text, "an ASCII map leaked into the step output")
 
 
 class LocalizedHelpCommandTests(EvenniaCommandTestMixin, EvenniaTest):
