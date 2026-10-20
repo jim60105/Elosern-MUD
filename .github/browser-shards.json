@@ -183,7 +183,8 @@
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
         "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach",
-        "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately"
+        "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately",
+        "web.tests.browser.test_browser_synth_lineage.SynthLineageBrowserTest.test_synthetic_member_lineage_matches_text_and_panel"
       ]
     },
     {

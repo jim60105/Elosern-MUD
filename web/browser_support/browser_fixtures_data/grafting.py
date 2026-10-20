@@ -88,6 +88,7 @@ def graft_synth_innate_skills() -> None:
         FactionConstraint,
         SkillCategory,
         TargetSpec,
+        validate_prerequisite_graph,
     )
     from world.tests.synthetic_data import SYNTH_SKILLS
 
@@ -118,6 +119,10 @@ def graft_synth_innate_skills() -> None:
             category=SkillCategory.MARTIAL_ARTS,
         ),
     )
+    # The graft mutates the live skill catalog after the install rebuilt the
+    # lineage caches. Rebuild them once for the extended catalog so the
+    # read model sees exactly the rows that are now registered.
+    validate_prerequisite_graph(SKILL_REGISTRY)
 
 
 def graft_synth_status_display() -> None:

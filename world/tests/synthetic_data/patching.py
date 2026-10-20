@@ -149,6 +149,15 @@ def _apply_target(
     shipped = getattr(module, attribute)
     content = dict(_CONTENT[logical]())
     content.update(extra.get(logical, {}))
+    # The skill registry carries load-time lineage caches (the reverse-edge
+    # map the lineage read model and the proficiency caps read). They describe
+    # the catalog contents, so every catalog swap MUST rebuild them for the
+    # installed content and again for the restored content. The callback is
+    # registered BEFORE the patch so ExitStack's LIFO unwind runs it after the
+    # catalog has been restored: a stale index is never visible to a reader.
+    revalidate = logical == "skills"
+    if revalidate:
+        stack.callback(_revalidate_skill_lineage)
     if not isinstance(shipped, MappingProxyType):
         if not isinstance(shipped, dict) or not isinstance(content, dict):
             raise TypeError(
@@ -156,6 +165,8 @@ def _apply_target(
             )
         # In-place: every consumer binding IS this dict object.
         stack.enter_context(unittest.mock.patch.dict(shipped, content, clear=True))
+        if revalidate:
+            _revalidate_skill_lineage()
         return
     # Frozen swap: resolve every consumer module BEFORE patching so each
     # patch.object captures the shipped object as its restore value. A
@@ -185,6 +196,20 @@ def _apply_target(
     # its own import, so rebind every still-synthetic discovered binding to
     # the pre-scope shipped object — the scope leaks nothing.
     stack.callback(_late_binder_sweep, logical, replacement, shipped)
+    if revalidate:
+        _revalidate_skill_lineage()
+
+
+def _revalidate_skill_lineage() -> None:
+    """Rebuild the skill registry's load-time lineage caches for the live rows."""
+    # The kit never names a shipped catalog symbol literally; resolve the live
+    # binding by attribute string, exactly as the discovery pass does.
+    from world.skills.registry import validate_prerequisite_graph
+
+    registry = getattr(
+        importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
+    )
+    validate_prerequisite_graph(registry)
 
 
 def _late_binder_sweep(logical: str, replacement: object, original: object) -> None:

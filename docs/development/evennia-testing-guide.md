@@ -1186,6 +1186,17 @@ runtime state），它維持原本的 late-import 語義，scope 結束時由 la
 完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。
 預設 off，shipped 行為不變。
 
+**Lineage index lifecycle**：`world.skills.registry` 在 import 時以
+`validate_prerequisite_graph` 建 reverse-edge cache；lineage 讀模型的 Kahn 排序同時讀
+live row 的 prerequisites 與這份 cache，兩者必須描述同一份 catalog。合成 kit 對 mutable
+skill registry 是原地替換（process install 的 `clear`＋`update`、scope 的
+`patch.dict`、browser harness 的 innate graft），因此每個 catalog mutation boundary
+都要重建一次 cache：install 完成後、graft 完成後、scope 進入時，以及 ExitStack 還原
+shipped rows 之後。漏掉任何一個邊界會讓 valid synthetic graph 的 indegree 無法 drain，
+`_topological_order` 便誤報「registry validator should have rejected」的 cycle；
+`系譜 艾拉` 與 GM 角色 lineage 區塊的 unavailable 即為此症状。修正只放在 mutation 邊界，
+read path 不做 query-time repair、也不新增第二份 cache。
+
 **Browser harness determinism contracts.** When `ELOSERN_BROWSER_SYNTH_CATALOGS=1`
 is set, the `at_server_init` wrapper runs the production `at_server_start` inside
 a *shipped-catalog scope*: the shipped registries are temporarily restored for
