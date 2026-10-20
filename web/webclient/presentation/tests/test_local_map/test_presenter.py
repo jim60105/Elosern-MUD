@@ -341,6 +341,7 @@ class GridLocalMapDisplayIndependenceTests(EvenniaTest):
             value, metadata = value
         return str(value), dict(metadata or {})
 
+    @covers_requirement("webclient-local-map::the-graphical-grid-map-is-independent-of-automatic-ascii-map-display")
     def test_disabled_text_map_default_leaves_the_payload_identical(self):
         for room in (self.start, self.anchor):
             with self.subTest(room=room.key):
@@ -380,6 +381,7 @@ class GridLocalMapDisplayIndependenceTests(EvenniaTest):
                         move["destination"], encode_grid(str(dz), dx, dy)
                     )
 
+    @covers_requirement("webclient-local-map::the-graphical-grid-map-is-independent-of-automatic-ascii-map-display")
     def test_explore_look_leaves_the_map_widget_input_intact(self):
         from web.webclient.actions.exploration_actions import AFFECTED_FULL, _look_adapter
 

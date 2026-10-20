@@ -256,6 +256,7 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(self._adapter_look(room), text)
         return text
 
+    @covers_requirement("localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_grid_room_text_look_emits_only_the_ordinary_appearance(self):
         self.assertTrue(self.start.xymap, "the fixture map must be loaded")
         self.assertIsInstance(self.start, GridRoom)
@@ -266,6 +267,7 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(metadata.get("type"), "look")
         self._assert_ordinary_appearance(text, self.start, self.start_object)
 
+    @covers_requirement("localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_anchor_room_text_look_emits_no_map_message(self):
         self.assertTrue(self.anchor.xymap, "the fixture map must be loaded")
         self.assertIsInstance(self.anchor, AnchorRoom)
@@ -274,6 +276,7 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(len(messages), 1)
         self._assert_ordinary_appearance(messages[0][0], self.anchor, self.anchor_object)
 
+    @covers_requirement("localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_english_look_alias_emits_no_map_message(self):
         for room, visible_object in self._rooms():
             with self.subTest(room=room.key):
@@ -282,12 +285,14 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertEqual(len(messages), 1)
                 self._assert_ordinary_appearance(messages[0][0], room, visible_object)
 
+    @covers_requirement("localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_direct_at_look_emits_no_map_side_message(self):
         for room, visible_object in self._rooms():
             with self.subTest(room=room.key):
                 appearance = self._at_look(room)
                 self._assert_ordinary_appearance(appearance, room, visible_object)
 
+    @covers_requirement("localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_browser_look_adapter_emits_no_map_message(self):
         for room, visible_object in self._rooms():
             with self.subTest(room=room.key):
@@ -298,7 +303,7 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertEqual(self._adapter_look(room), text_messages[0][0])
                 self._assert_ordinary_appearance(text_messages[0][0], room, visible_object)
 
-    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
+    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames", "localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map")
     def test_scene_flavor_and_ordinary_content_survive_without_a_map(self):
         for room, visible_object in self._rooms():
             with self.subTest(room=room.key, flavor=False):

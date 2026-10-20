@@ -210,6 +210,7 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
                 func, args, kwargs = self._queue.pop(0)
                 func(*args, **kwargs)
 
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
     def test_path_reports_the_known_two_step_route_without_moving(self):
         output = self.call(CmdGoto(), self.destination_key, cmdstring="path")
         self.assertIn("共有 2 步：", output)
@@ -220,6 +221,7 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(directions, ["e", "e"])
         self.assertIs(self.char1.location, self.start)
 
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
     def test_goto_walks_the_known_two_step_route_without_a_text_map(self):
         for cmdstring in ("前往", "goto"):
             with self.subTest(cmdstring=cmdstring):

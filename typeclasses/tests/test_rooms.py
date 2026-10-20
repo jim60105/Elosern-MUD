@@ -58,6 +58,7 @@ class GridRoomTypeclassTests(EvenniaTestCase):
         self.assertIsNone(room.scene_identity)
         self.assertFalse(hasattr(room, "anchor_key"))
 
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
     def test_grid_room_disables_the_automatic_text_map_by_default(self):
         # The shared grid default governs ordinary look on every client; the
         # coordinate contract the grid layer and navigation rely on is intact.
@@ -67,11 +68,13 @@ class GridRoomTypeclassTests(EvenniaTestCase):
         self.assertEqual(room.xyz, (7, 7, "test_map"))
         self.assertEqual(GridRoom.objects.get(id=room.id).xyz, room.xyz)
 
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
     def test_anchor_room_inherits_the_disabled_text_map_default(self):
         self.assertFalse(AnchorRoom.map_display)
         self.assertNotIn("map_display", AnchorRoom.__dict__)
         self.assertIs(AnchorRoom.map_display, GridRoom.map_display)
 
+    @covers_requirement("grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation")
     def test_unrelated_room_types_keep_their_own_text_map_behavior(self):
         # The override is scoped to the project grid room: evennia's contrib
         # default is untouched, and plain rooms carry no such gate at all.
