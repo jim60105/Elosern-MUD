@@ -442,10 +442,11 @@ adapter. A duplicate live request ID SHALL return its cached result without re-e
 
 ### Requirement: Service action completion updates canonical panels and preserves narrative
 
-After an admitted service or inventory action settles, the server SHALL emit every returned message through the
-ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before
-sending the matching safe `ui_action_result`. Existing guild, quest, and shop actions SHALL retain their
-established affected-panel sets, and a read-only `exam_schedule` reply SHALL leave mode and canonical state unchanged.
+After an admitted service or inventory action settles, the server SHALL emit every returned message as escaped
+text and SHALL publish canonical panel replacements at one newer revision before sending the matching safe
+`ui_action_result`. Guild and quest actions SHALL retain their established affected-panel
+sets, a settled `shop.buy` or `shop.sell` SHALL also republish the viewed member's `party_inventory`, and a read-only
+`exam_schedule` reply SHALL leave state unchanged.
 
 #### Scenario: Turn-in updates wallet and merit panels together
 - **WHEN** a completed quest is turned in successfully
@@ -485,6 +486,10 @@ established affected-panel sets, and a read-only `exam_schedule` reply SHALL lea
 - **THEN** exploration service menus and their local forms are unloaded, services v5 retains personal
   player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
   absent in combat
+
+#### Scenario: A trade republishes the viewed member's bag and purse
+- **WHEN** `shop.buy` or `shop.sell` settles successfully while the recipient or seller is the viewed member
+- **THEN** the same newer revision carries the refreshed `services` rows and wallet, the `item_holdings` answer and the viewed member's `party_inventory` with its new held count and party purse, so the party window's 背包 tab and header purse are never stale after a trade
 
 #### Scenario: Prose never drives panel state
 - **WHEN** any success or domain-rejection message is produced
@@ -527,8 +532,8 @@ window's 背包 tab, and direct equipment toggle for a named member.
 - **THEN** exactly one expected quest action is submitted, refreshed quest state appears in the quest book without typed input, and no `dock-menu` or `dock-detail` element renders inside the drawer at any step
 
 #### Scenario: Shop buy journey completes by keyboard in the frameless drawer
-- **WHEN** a player opens the shop drawer from the merchant's navigate row, Tabs to the first stock row's quantity entry, types a quantity above the row's advertised maximum and Tabs away, then replaces it with a quantity within bounds, Tabs to the row's buy control, and presses Enter
-- **THEN** leaving the entry clamps the out-of-bounds value to the advertised maximum and sends nothing, exactly one `shop.buy` is sent only on the buy control's activation with the row's `item_key`, the corrected quantity and the recipient's `recipient_id`, the wallet decreases by exactly that quantity times the row's `buy_copper`, and no `dock-menu` or `dock-detail` element renders inside the shop drawer at any step
+- **WHEN** a player opens the shop window from the merchant's navigate row, selects the first stock row, Tabs to the action bar's quantity entry, types a quantity above the row's advertised maximum and Tabs away, then replaces it with a quantity within bounds, Tabs to the 買給 control, and presses Enter
+- **THEN** leaving the entry clamps the out-of-bounds value to the advertised maximum and sends nothing, exactly one `shop.buy` is sent only on the buy control's activation with the row's `item_key`, the corrected quantity and the recipient's `recipient_id`, the wallet decreases by exactly that quantity times the row's `buy_copper`, and no `dock-menu` or `dock-detail` element renders inside the shop window at any step
 
 #### Scenario: Abandon requires confirmation
 - **WHEN** the player focuses or points to active-quest abandon before confirmation
@@ -558,8 +563,8 @@ window's 背包 tab, and direct equipment toggle for a named member.
 
 #### Scenario: Services ride the frameless drawers only
 - **WHEN** any acceptance journey opens guild services or the shop
-- **THEN** guild services are reached through the frameless quest drawer and the shop through the frameless shop
-  drawer, and neither drawer renders a `dock-menu` or `dock-detail` element in any journey
+- **THEN** guild services are reached through the frameless quest drawer and the shop through the shop window,
+  and neither renders a `dock-menu` or `dock-detail` element in any journey
 
 #### Scenario: Journeys assert the dispatch and layout invariants
 - **WHEN** any acceptance journey runs

@@ -157,7 +157,7 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
                  TESTS_DIR / "world" / "guild_rank_card.test.js",
                  TESTS_DIR / "world" / "quest_detail.test.js",
                  TESTS_DIR / "world" / "quest_drawer.test.js",
-                TESTS_DIR / "world" / "shop_panel.test.js",
+                TESTS_DIR / "world" / "shop_window.test.js",
                 TESTS_DIR / "store" / "store_dispatch_focus.test.js",
             ),
             "drawer mutations dispatch + confirmation",

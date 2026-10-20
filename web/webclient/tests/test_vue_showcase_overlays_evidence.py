@@ -176,7 +176,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/ConditionChips",
     "World/LocalMap",
-    "World/ShopPanel",
+    "World/ShopWindow",
     "World/QuestDrawer",
     "World/LoreCodexDrawer",
     "World/MapLattice",

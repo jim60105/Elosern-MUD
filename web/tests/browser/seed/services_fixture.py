@@ -151,6 +151,16 @@ def _services_fixture(character) -> None:
         ]
         get_world_clock()._persist(12 * 3600)
         character.save()
+    elif mode == "store_open_companion":
+        # webclient-shop-window: the open store with one co-located companion.
+        from web.tests.browser.seed.services_synth import seed_shop_companion
+
+        place(store)
+        character.db.wallet = 1000
+        character.db.inventory = [SHIPPED_MEAL_KEY, SHIPPED_POTION_KEY]
+        get_world_clock()._persist(12 * 3600)
+        character.save()
+        seed_shop_companion(character, store, race="human")
     elif mode == "store_closed":
         place(store)
         character.db.wallet = 1000

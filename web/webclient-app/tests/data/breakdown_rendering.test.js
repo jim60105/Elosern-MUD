@@ -170,7 +170,9 @@ describe("PartyBagTab adjustment rendering (webclient-party-bag-retire)", () => 
     const cell = (id) => wrapper.get(`[data-testid="holdings-strip__cell--${id}"]`);
     expect(cell(42).findAll(".holdings-strip__change").map((node) => node.text())).toEqual(["▲ 攻擊 +6"]);
     expect(cell(101).findAll(".holdings-strip__change").map((node) => node.text())).toEqual(["▼ 攻擊 −2", "▲ 敏捷 +3"]);
-    expect(cell(102).get('[data-testid="holdings-strip__delta-reason"]').text()).toBe("幽無法使用這類武器。");
+    const blocked = cell(102).get('[data-testid="holdings-strip__delta"]');
+    expect(blocked.text()).toBe("無法裝備");
+    expect(blocked.attributes("data-reason-code")).toBe("malformed_equipment");
   });
 });
 

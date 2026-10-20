@@ -1,6 +1,6 @@
 import { h, ref } from "vue";
 import VitalsTrack from "../../components/VitalsTrack.vue";
-import ShopPanel from "../../components/ShopPanel.vue";
+import ShopRows from "../../components/ShopRows.vue";
 import { SERVICES_PANEL_SAMPLE, STATUS_PANEL_SAMPLE } from "../fixtures.js";
 
 // VitalsTrack (H2, webclient-hud-02-status-islands, design D4/D5;
@@ -150,7 +150,9 @@ export const ChangingNumerals = {
           h("div", { style: `${DOCK_FRAME} margin: 16px 0;` }, [
             h(VitalsTrack, { status: statusWith(resources), revision: changed.value ? 2 : 1, epoch: 0 }),
           ]),
-          h(ShopPanel, { services }),
+          // The shop window's price column (webclient-shop-window): one
+          // buy price per stock row, right-aligned in tabular numerals.
+          h("div", { style: "max-width: 520px;" }, [h(ShopRows, { rows: services.shop.stock, view: "buy" })]),
         ]);
       };
     },

@@ -35,7 +35,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "party-skill-tab",
         "party-window",
         "party-bag-tab",
-        "shop-panel",
+        "shop-window",
         "quest-drawer",
         "lore-codex-drawer",
         "party-status-tab",

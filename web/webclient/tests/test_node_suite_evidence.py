@@ -583,6 +583,43 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    # Canonical webclient-shop-window IDs for the archive to re-point once the
+    # capability exists in the main specs: `the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail`, `the-buy-view-shows-one-price-and-the-recipient-s-facts`, `the-sell-view-lists-the-seller-s-unequipped-items-with-one-price`, `the-shop-window-explains-no-rules`.
+    @covers_requirement(
+        "webclient-contextual-hud::the-party-purse-renders-exactly-once-per-window",
+        "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully",
+    )
+    def test_shop_window_vitest_evidence_passes(self):
+        """The shop window (webclient-shop-window): the frame with 購買/出售
+        and the shared rail carrying the party window's selection, one price
+        per view, the recipient's delta or held count per row, the comparison
+        and the other members' chips from item_holdings, the stepper bounded
+        by the committed maximum, the labelled remaining purse beside the one
+        header purse, the shop.buy/shop.sell payloads naming the member, the
+        closed reasons, the possessed_shop refusal and no rule prose."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/world/shop_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_shop_window.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/components/holdings_strip.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_drawers.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "shop-window Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
     @covers_requirement(
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )

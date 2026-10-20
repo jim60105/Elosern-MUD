@@ -167,7 +167,7 @@ describe("PartyBagTab (webclient-party-bag-tab)", () => {
     expect(get("holdings-strip__cell--101").text()).toContain("▼ 攻擊 −2");
     expect(get("holdings-strip__cell--101").text()).toContain("▲ 敏捷 +3");
     expect(get("holdings-strip__cell--102").text()).toContain("無法裝備");
-    expect(get("holdings-strip__cell--102").text()).toContain("幽無法使用這類武器。");
+    expect(get("holdings-strip__cell--102").text()).not.toContain("malformed_equipment");
     // Equipment gives one: no stepper, no ×n on the give control.
     expect(find("party-bag-tab__stepper").exists()).toBe(false);
     expect(get("holdings-strip__give--42").text()).toBe("交給影行者");

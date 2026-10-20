@@ -1,5 +1,6 @@
-// The reference-drawer layer (H4): the drawer chrome's derived head copy, the
-// shop's member reference, and the drawer close route.
+// The reference-drawer layer (H4): the drawer chrome's derived head copy and
+// the drawer close route. The shop window (webclient-shop-window) owns its
+// WindowFrame chrome, like the party window.
 // The quest drawer's counter honesty rules live in quest-drawer-model.js. Extracted verbatim from AppClient.vue so
 // the SFC stays a passive renderer.
 import { computed } from "vue";
@@ -9,7 +10,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // derived from the single open-drawer name the store publishes.
   const DRAWER_TITLES = {
     letters: "信件",
-    shop: "商店",
     quest: "任務",
     lore: "世界圖鑑",
   };
@@ -19,7 +19,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // control that opens it draws, so the header and its opener agree.
   const DRAWER_ICONS = {
     letters: "letters",
-    shop: "shop",
     quest: "quests",
     lore: "lore",
   };
@@ -44,20 +43,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
     store.closeHudDrawer();
   }
 
-  // The shop drawer's section label: the committed `party` row naming the
-  // services shop's member (the viewed member the trades name), or null.
-  const shopMemberName = computed(() => {
-    const memberId = panel("services")?.shop?.member_id;
-    if (!Number.isSafeInteger(memberId) || !panelAvailable("party")) {
-      return null;
-    }
-    const slots = panel("party")?.slots;
-    const row = Array.isArray(slots) ? slots.find((slot) => slot?.identity === memberId) : null;
-    return typeof row?.display_name === "string" && row.display_name !== "" ? row.display_name : null;
-  });
-
   return {
-    shopMemberName,
     drawerTitle,
     drawerIcon,
     onHudDrawerClose,

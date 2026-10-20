@@ -6,8 +6,8 @@
 The party purse (the commander's wallet) SHALL be rendered exactly once per window: in the party window's `WindowFrame` header extras (read from `party_inventory`) and in the shop window's header (read from `services.player.wallet`). The shop action bar MAY show the after-trade remainder, labelled as the remaining purse, and nothing else in the drawer layer SHALL render a balance.
 
 #### Scenario: No other drawer or body element carries a balance
-- **WHEN** the lore reference, the character-status drawer, or any tab body of the party window renders
-- **THEN** none of them renders a balance of its own
+- **WHEN** the lore reference, the quest drawer, or any tab body of the party window renders
+- **THEN** none of them renders a balance of its own, and the shop window's body renders only its action bar's labelled remainder
 
 #### Scenario: An unreadable wallet renders nothing rather than zero
 - **WHEN** the `party_inventory` panel is unavailable or carries no committed non-negative integer purse

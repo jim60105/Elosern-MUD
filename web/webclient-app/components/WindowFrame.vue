@@ -15,6 +15,8 @@ import IconTabs from "./IconTabs.vue";
 
 const props = defineProps({
   title: { type: String, required: true },
+  // HudDrawer's muted header subtitle (the shop's 營業中 / 已打烊 state).
+  subtitle: { type: String, default: "" },
   // The seal: a `dock-icons.js` glyph key drawn in the header medallion.
   seal: { type: String, default: null },
   // IconTabs tabs ([{ key, label, glyph, disabled?, reason?, ... }]).
@@ -47,6 +49,7 @@ const selectedTab = computed(() => props.tabs.find((tab) => tab.key === props.mo
     ref="drawer"
     :open="true"
     :title="title"
+    :subtitle="subtitle"
     :icon="seal"
     :drawer-key="drawerKey"
     :close-guard="closeGuard"

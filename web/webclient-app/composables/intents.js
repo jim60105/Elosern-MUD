@@ -24,14 +24,6 @@ export function useDispatchIntent(store = useElosernStore()) {
 // Panel action intents (C4: every surface's emitted intent routes through
 // the single store dispatch entry — no component mutates state directly).
 export function useIntentHandlers(store, dispatchIntent) {
-  function onShopBuy(intent) {
-    dispatchIntent(intent.action_id, intent.payload);
-  }
-
-  function onShopSell(intent) {
-    dispatchIntent(intent.action_id, intent.payload);
-  }
-
   // The party window's 背包 tab (webclient-party-bag-tab): its give, use and
   // equip intents, each naming the viewed member (the giver or `actor_id`)
   // for the server to reauthorize. Only the closed set leaves. In combat
@@ -131,8 +123,6 @@ export function useIntentHandlers(store, dispatchIntent) {
     onPartyBagCombatItem,
     onPersonaEdit,
     onQuestAction,
-    onShopBuy,
-    onShopSell,
     onSwitchCharacter,
     onTitleBallotAction,
     onTitleCodexAction,

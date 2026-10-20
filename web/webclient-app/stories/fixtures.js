@@ -41,3 +41,4 @@ export * from './fixtures/quest_log_panels.js';
 export * from './fixtures/stage_journey.js';
 export * from './fixtures/combat_stage.js';
 export * from './fixtures/window_primitives.js';
+export * from './fixtures/shop_window_panels.js';
