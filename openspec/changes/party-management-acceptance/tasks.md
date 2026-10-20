@@ -10,7 +10,7 @@ Verified with `pnpm test web/webclient-app/tests/overlays/help_overlay.test.js w
 
 ## 2. Residue sweep (1h)
 
-- [ ] 2.1 Search for any remaining reference to the seven deleted components (code, stories, CSS, `.elosern-root` duplicates, tests, specs, manifest) and remove it in its owning change if found; verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `tests.test_webclient_frozen_contract`.
+- [x] 2.1 Search for any remaining reference to the seven deleted components (code, stories, CSS, `.elosern-root` duplicates, tests, specs, manifest) and remove it in its owning change if found; verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `tests.test_webclient_frozen_contract`.
 
 The exact-name and kebab-case selector sweep covered `web/webclient-app`, `web/static/webclient`, top-level tests, main specs and the actual manifest at `web/webclient-app/component-manifest.json`. No retired component files, imports, registered stories, manifest entries or production CSS selectors remain. Stale implementation comments and client instructions now name the current skill tab and party/shop windows.
 
@@ -23,7 +23,7 @@ Intentional matches remain in negative-presence tests (`deferred_surfaces_absent
 - [ ] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, have 艾拉 open combat on a monster through the 開戰並施放 confirmation (cancel once, then confirm) and finish the encounter, possess 艾拉 and walk her through an exit confirming the player's body and 卡恩 follow, and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
 - [ ] 3.2 Exercise each text command once in a live session (`給`, `取回`, `裝備 = 成員`, `買`/`賣 = 成員`, `使用 = 成員`, `cast 由 成員`, `修煉 = 成員`, `狀態`, `技能`, `系譜`) and record the transcript lines.
 
-### Observed runtime evidence and unmet prerequisites
+### Initial runtime evidence and unmet prerequisites (historical, before blocker fixes)
 
 An isolated localhost `ManagedServer` with existing `store_open_companion` and `COMPANION_FIELD_CAST` fixture flags was opened through headless `agent-browser`. It supplied commander 蒼雀 (`#1`), preset companion 燼雀 (`#3`, not co-located) and shop companion 艾拉 (`#110`). No 卡恩 exists. No state was injected into the client, and no Django shell or direct persistent-state repair was used.
 
@@ -88,4 +88,10 @@ The blocking review identified contradictory no-authored-help contracts. Complet
 
 The reviewer inspected the static implementation, tests, docs, proposed deltas and all 772 lines of the raw feature diff through `27a033bb`. Its initial inability to obtain a Git diff was resolved by supplying that complete read-only diff artifact to the same reviewer. The completed review found no blocking issues and no additional actionable non-blocking findings or suggestions. Approval covers only the static help/test/docs work; it explicitly leaves the documented runtime prerequisites, remaining task checkboxes, synchronization and archive unapproved. No finding was ignored or silently deferred.
 
-Handoff status remains 1/5 verified tasks complete. The ordinary contract gate must be reassessed after the owning synchronization, and the named assembled journey and successful text parity must be completed after their real fixture/runtime prerequisites are resolved. This change must not be archived as complete in its present state.
+That handoff had 1/5 verified tasks complete. The ordinary contract gate must be reassessed after the owning synchronization, and the named assembled journey and successful text parity must be completed after their real fixture/runtime prerequisites are resolved.
+
+## Resumed verification after owning blocker fixes
+
+The feature branch was rebased without conflict onto primary `72f22a8523e0322ca5647d6221f04db5d54ec2aa`, incorporating all six archived owning fixes. The repeated residue sweep confirms that the stale current-contract Purpose, HUD scenario headings and action-dispatch wording have been corrected by their owner. Remaining name/selector matches identify explicit retirement assertions, historical routing comments or unrelated protocol capability names; no live retired component, story, manifest entry or CSS rule remains.
+
+Task 2.1 verification after rebase: Storybook build passed; showcase coverage passed for all 78 game and 33 GM components; `uv run --locked python -m unittest tests.test_webclient_frozen_contract` passed all 9 tests. The live client bundle was rebuilt for the resumed runtime journey.
