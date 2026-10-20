@@ -3,7 +3,8 @@
 // shop-family descriptor is forced current -- no hosted row container
 // ([data-testid="dock-menu"]) or detail pane ([data-testid="dock-detail"])
 // renders inside the drawer and the body's only child surface is
-// [data-testid="shop-panel"]; no reference drawer hosts router rows.
+// [data-testid="shop-window"] (webclient-shop-window); no reference drawer
+// hosts router rows.
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -65,7 +66,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
-  it("renders only shop-panel and zero dock-menu/dock-detail inside drawer", async () => {
+  it("renders only the shop window and zero dock-menu/dock-detail inside drawer", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
@@ -78,7 +79,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
     await wrapper.vm.$nextTick();
 
     let drawer = wrapper.get('[data-testid="hud-drawer"]');
-    expect(drawer.find('[data-testid="shop-panel"]').exists()).toBe(true);
+    expect(drawer.find('[data-testid="shop-window"]').exists()).toBe(true);
     expect(drawer.findAll('[data-testid="dock-menu"]').length).toBe(0);
     expect(drawer.findAll('[data-testid="dock-detail"]').length).toBe(0);
   });

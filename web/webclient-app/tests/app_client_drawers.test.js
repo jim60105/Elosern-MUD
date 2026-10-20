@@ -54,7 +54,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
 
   // The closed reference-drawer name -> the body's root testid.
   const REFERENCE_SURFACES = {
-    shop: "shop-panel",
+    shop: "shop-window",
     quest: "quest-drawer",
     lore: "lore-codex-drawer",
     party: "party-window",
@@ -769,7 +769,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
      await wrapper.vm.$nextTick();
 
      expect(store.view.hudDrawer, name).toBe("shop");
-     expect(wrapper.find('[data-testid="shop-panel"]').exists(), name).toBe(true);
+     expect(wrapper.find('[data-testid="shop-window"]').exists(), name).toBe(true);
      expect(store.router.depth(), name).toBe(depthBefore);
      expect(store.view.activeSubDock, name).toBe(null);
 

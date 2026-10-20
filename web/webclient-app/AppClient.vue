@@ -24,7 +24,7 @@ import RestForm from "./components/RestForm.vue";
 import QuestDrawer from "./components/QuestDrawer.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
-import ShopPanel from "./components/ShopPanel.vue";
+import ShopWindow from "./components/ShopWindow.vue";
 import TitleBallotMenu from "./components/TitleBallotMenu.vue";
 import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
@@ -84,13 +84,13 @@ const {
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, onOpenDrawer, onHudDrawerClose,
-  shopMemberName,
   rootItems, navigationItems, dockItems, dockPaneKind,
   explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
-  onShopBuy, onShopSell, onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction, onTitleCodexAction,
+  tradeNotice, tradePending, onShopTrade, clearTradeNotice,
+  onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
@@ -116,6 +116,8 @@ const {
   pendingItemKey: partyPendingItemKey,
   onViewMember,
   onViewItem,
+  onViewShopMember,
+  onViewShopItem,
   openPartyWindow,
 } = usePartyWindow(store, dispatchIntent, { panel });
 // The top navigation marks the entry of the open surface: the party window
@@ -1241,8 +1243,27 @@ const rootStyle = computed(() => {
       @use-skill="onSkillUse"
       @close="onHudDrawerClose"
     />
+    <!-- The shop window (webclient-shop-window) owns its WindowFrame chrome
+         under the `shop` drawer key and shares the party window's viewed
+         member. -->
+    <ShopWindow
+      v-if="store.view.hudDrawer === 'shop'"
+      :services="panel('services')"
+      :party="panel('party')"
+      :item-holdings="panel('item_holdings')"
+      :character="panel('character')"
+      :pending-member-id="partyPendingMemberId"
+      :pending-item-key="partyPendingItemKey"
+      :trade-notice="tradeNotice"
+      :trade-pending="tradePending"
+      @view-member="onViewShopMember"
+      @view-item="onViewShopItem"
+      @trade="onShopTrade"
+      @clear-notice="clearTradeNotice"
+      @close="onHudDrawerClose"
+    />
     <HudDrawer
-      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party'"
+      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party' && store.view.hudDrawer !== 'shop'"
       :open="true"
       :title="drawerTitle"
       :icon="drawerIcon"
@@ -1251,13 +1272,6 @@ const rootStyle = computed(() => {
       @close="onHudDrawerClose"
     >
       <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
-      <ShopPanel
-        v-else-if="store.view.hudDrawer === 'shop'"
-        :services="panel('services') || {}"
-        :member-name="shopMemberName"
-        @buy="onShopBuy"
-        @sell="onShopSell"
-      />
       <QuestDrawer
         v-else-if="store.view.hudDrawer === 'quest'"
         :quest-log="panel('quest_log')"
