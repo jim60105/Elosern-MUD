@@ -19,6 +19,7 @@ from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.lineage import (
     LINEAGE_SCHEMA_VERSION,
+    MAX_LINEAGE_PANEL_BYTES,
     MAX_EDGES_PER_GRAPH,
     MAX_GRAPHS,
     MAX_NODES_PER_GRAPH,
@@ -316,6 +317,23 @@ class InjectedRegistryMixin(unittest.TestCase):
         registry.update(self.canonical)
         validate_prerequisite_graph(registry)
 
+    def _prepend_registry_skills(self, *keys: str) -> tuple[str, ...]:
+        """Put ``keys`` at the head of the registry, ahead of the baseline.
+
+        Truncation drops trailing graphs, so a fixture that must survive the
+        kept window has to sit at the head. ``tearDown`` restores the captured
+        canonical mapping regardless.
+        """
+        registry = _live_skill_registry()
+        baseline = {
+            key: value for key, value in registry.items() if key not in keys
+        }
+        registry.clear()
+        registry.update({key: _fake_skill(key) for key in keys})
+        registry.update(baseline)
+        validate_prerequisite_graph(registry)
+        return keys
+
 
 class PresenterTests(InjectedRegistryMixin):
     """Truncation order, full-view counts, and unavailable fail-closed.
@@ -448,26 +466,37 @@ class PresenterTests(InjectedRegistryMixin):
                 self.assertLessEqual(len(node["prereq_text_zh"]), MAX_TEXT_CODE_POINTS)
 
     def test_byte_budget_drops_further_trailing_graphs(self):
-        # Text-capped labels force stage three: even at the graph and node
-        # caps the payload exceeds the envelope, so trailing graphs drop.
-        # Labels sit 8 code points under the text cap so the derived prereq
-        # line (需「label Lv.1」 = 7 chars + label) also fits; node count and
-        # graph count do the byte pressure.
+        # Text-capped labels force stage three: the payload exceeds the
+        # panel's share of the envelope, so trailing graphs drop. Labels sit 8
+        # code points under the text cap so the derived prereq line
+        # (需「label Lv.1」 = 7 chars + label) also fits; node count and graph
+        # count do the byte pressure.
         keys = self._inject_ladder_graphs(
-            MAX_GRAPHS, MAX_NODES_PER_GRAPH, fat_text=MAX_TEXT_CODE_POINTS - 8
+            MAX_GRAPHS, 8, fat_text=MAX_TEXT_CODE_POINTS - 8
         )
         payload = lineage_presenter(_context(_entity(keys)))
         self.assertLess(len(payload["graphs"]), MAX_GRAPHS)
         self.assertEqual(payload["total_count"], MAX_GRAPHS + self.baseline_graphs)
+        self.assertLessEqual(json_byte_size(payload), MAX_LINEAGE_PANEL_BYTES)
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
         validate_lineage(payload)
+
+    def test_single_graph_over_the_panel_allocation_fails_closed(self):
+        # One legal graph at the text and node caps can exceed the panel's
+        # fixed share of the envelope. The presenter then fails closed instead
+        # of emitting an over-budget payload the client would drop whole.
+        from web.webclient.presentation.registry import PanelUnavailableError
+
+        self._inject_ladder_graphs(
+            1, MAX_NODES_PER_GRAPH, fat_text=MAX_TEXT_CODE_POINTS
+        )
+        with self.assertRaises(PanelUnavailableError):
+            lineage_presenter(_context(_entity(())))
 
     def test_panel_follows_the_viewed_member(self):
         # The presenter builds for the member the session resolves, never the
         # raw actor: a possession changes the actor, not the viewed member.
-        registry = _live_skill_registry()
-        registry["view_a"] = _fake_skill("view_a")
-        registry["view_b"] = _fake_skill("view_b")
+        self._prepend_registry_skills("view_a", "view_b")
         commander = _entity(("view_a",))
         viewed = _entity(("view_b",))
         context = _context(commander)
@@ -484,9 +513,7 @@ class PresenterTests(InjectedRegistryMixin):
         self.assertEqual(view_b["owned_count"], 1)
 
     def test_panel_falls_back_to_the_commander_without_a_selection(self):
-        registry = _live_skill_registry()
-        registry["view_a"] = _fake_skill("view_a")
-        registry["view_b"] = _fake_skill("view_b")
+        self._prepend_registry_skills("view_a", "view_b")
         payload = lineage_presenter(_context(_entity(("view_a",))))
         ids = [graph["graph_id"] for graph in payload["graphs"]]
         self.assertIn("view_a", ids)
@@ -494,7 +521,16 @@ class PresenterTests(InjectedRegistryMixin):
 
     def test_real_registry_payload_is_small(self):
         payload = lineage_presenter(_context(_entity()))
-        self.assertLess(json_byte_size(payload), 48 * 1024)
+        self.assertLessEqual(json_byte_size(payload), MAX_LINEAGE_PANEL_BYTES)
+        # The magnitude guard follows the shipped registry itself: with the
+        # full-envelope budget the untrimmed payload must stay well inside
+        # 65,536 bytes, so registry growth is caught here, not in production.
+        with patch(
+            "web.webclient.presentation.lineage.MAX_LINEAGE_PANEL_BYTES",
+            MAX_CANONICAL_JSON_BYTES,
+        ):
+            untrimmed = lineage_presenter(_context(_entity()))
+        self.assertLess(json_byte_size(untrimmed), 48 * 1024)
 
     def test_creation_pending_raises_panel_unavailable(self):
         from web.webclient.presentation.registry import PanelUnavailableError

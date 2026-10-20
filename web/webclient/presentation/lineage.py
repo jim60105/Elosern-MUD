@@ -49,6 +49,14 @@ MAX_KEY_CODE_POINTS = 64
 # reaches the validator, so a legal 128-code-point registry label can never
 # push the whole panel into the unavailable form (rubber-duck R2-1).
 MAX_TEXT_CODE_POINTS = 128
+# The lineage panel's fixed share of the 65,536-byte snapshot envelope. A
+# full snapshot carries every registered panel and this one is the largest:
+# reserving 28KiB leaves 36KiB for the other 24 panels, which measured ~15KiB
+# for a bare browser character and ~30KiB for the richest fixtures. The
+# allocation is a fixed constant (not a per-snapshot remainder) so the 系譜
+# command prints exactly the graphs the panel renders. Truncation keeps every
+# header count at its full-view value.
+MAX_LINEAGE_PANEL_BYTES = 28 * 1024
 
 
 class LineagePanelError(ProtocolValidationError):
@@ -324,9 +332,10 @@ def bounded_lineage_view(view: LineageView) -> LineageView | None:
     The one truncation both surfaces use, so the Telnet command prints exactly
     the graphs the panel renders. Trailing graphs drop first, then trailing
     nodes (and every edge touching them), then further trailing graphs until
-    the serialized payload fits. Counts keep their full-view values. ``None``
-    means even a single caps-bounded graph cannot fit, and the caller fails
-    closed.
+    the serialized payload fits ``MAX_LINEAGE_PANEL_BYTES``, the panel's fixed
+    share of the snapshot envelope. Counts keep their full-view values.
+    ``None`` means even a single caps-bounded graph cannot fit that share, and
+    the caller fails closed.
     """
     graphs = tuple(_truncate_graph_view(graph) for graph in view.graphs[:MAX_GRAPHS])
     while True:
@@ -339,11 +348,13 @@ def bounded_lineage_view(view: LineageView) -> LineageView | None:
             "total_count": bounded.total_count,
             "graphs": [_serialize_graph(graph) for graph in bounded.graphs],
         }
-        if json_byte_size(payload) <= MAX_CANONICAL_JSON_BYTES:
+        if json_byte_size(payload) <= MAX_LINEAGE_PANEL_BYTES:
             return bounded
         if len(graphs) <= 1:
-            # A single caps-bounded graph cannot exceed the envelope; anything
-            # else is a bug, and the caller fails closed rather than emitting.
+            # The first caps-bounded graph alone exceeds the panel's share of
+            # the envelope. Authored graphs never reach this (the per-graph
+            # caps bound them far below the allocation), so the caller fails
+            # closed rather than emitting an over-budget panel.
             return None
         graphs = graphs[:-1]
 
@@ -354,8 +365,8 @@ def lineage_presenter(context: PresentationContext) -> dict[str, Any]:
     Truncation (declared order, design §5): trailing graphs to the graph cap,
     then trailing nodes (and every edge touching them) to the per-graph cap,
     then further trailing graphs until the serialized payload fits the
-    envelope. Header counts and each graph's owned/total/consumed always come
-    from the FULL view.
+    envelope share. Header counts and each graph's owned/total/consumed always
+    come from the FULL view.
     """
     actor = getattr(context, "actor", None)
     if bool(getattr(actor, "creation_pending", False)):

@@ -19,6 +19,11 @@ from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.ingress import build_presentation_context, synchronize_session
+from web.webclient.presentation.lineage import MAX_LINEAGE_PANEL_BYTES
+from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES,
+    json_byte_size,
+)
 from web.webclient.presentation.registry import build_production_registry
 
 CARDS = [
@@ -200,6 +205,22 @@ class PublicationPathSnapshotTests(EvenniaTest):
         panel = snapshots[-1]["panels"]["context_actions"]
         self.assertEqual(panel["suggestions"]["status"], "ready")
         self.assertEqual(panel["suggestions"]["cards"], _wire_cards())
+
+    def test_full_snapshot_fits_the_client_envelope(self):
+        """The whole production snapshot must fit the transport bound.
+
+        The client drops any envelope over ``MAX_CANONICAL_JSON_BYTES`` whole,
+        leaving the store awaiting its initial snapshot, so the server may
+        never emit one. The largest panel also stays inside its declared share
+        of that envelope.
+        """
+        synchronize_session(self.session, self.player)
+        envelope = self.session._envelopes("ui_snapshot")[-1]
+        self.assertLessEqual(json_byte_size(envelope), MAX_CANONICAL_JSON_BYTES)
+        self.assertLessEqual(
+            json_byte_size(envelope["panels"]["lineage"]),
+            MAX_LINEAGE_PANEL_BYTES,
+        )
 
     def test_completion_publication_carries_the_ready_suggestions(self):
         coordinator = attach_coordinator(self.session, self.registry)
