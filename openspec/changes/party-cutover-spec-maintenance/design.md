@@ -116,7 +116,7 @@ Do not touch the dispatch WHEN phrase in this maintenance commit: ordinary synch
 
 ### Changed-line audit
 
-The maintenance commit diff must contain exactly five changed line occurrences: one Purpose line in `webclient-skillbook-casting`, and the two heading lines mirrored in the main HUD spec and this change's HUD delta. No requirement or scenario body may be added or removed. Confirm with `git show --stat` plus a word-level audit such as `git diff --word-diff=porcelain`.
+The maintenance commit diff must contain exactly five changed line occurrences: one Purpose line in `webclient-skillbook-casting`, and the two heading lines mirrored in the main HUD spec and this change's HUD delta. No requirement or scenario body may be added or removed. Confirm with `git show --stat` plus a word-level audit such as `git diff --word-diff=porcelain`. Record the maintenance commit SHA and the changed-line audit in this change's workflow evidence before archiving.
 
 ### Validation and post-sync checks
 
