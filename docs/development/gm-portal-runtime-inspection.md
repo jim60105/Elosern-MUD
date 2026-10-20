@@ -43,6 +43,16 @@
 
 搜尋的比對順序固定為精確 `#dbref`、物件鍵、任務編號、來源識別。同一筆查詢不會把不同層級的結果混成單一分數排序。
 
+## Breakdown number display
+
+The character detail's 「屬性組成」 section lists each layer's authoritative amount for display only; it never recomputes an effective total. The model already stores `pct` layers in percentage points, so the display does not multiply them by 100.
+
+- A `pct` layer keeps its sign and `%` suffix, for example `+12.5%` or `-2.5%`. Integral percentages stay `+10%` and `-10%`.
+- A `flat` layer keeps its sign and renders the exact integer or fraction, for example `+2.5`.
+- A `mult` layer is prefixed with `×`, for example `×1.5`; an integral factor shows no trailing fraction.
+
+Every row names the layer source (`skill`, `condition`, or `equipment`) and its display name, and the row key combines the trait key, the source, and the name. Fractions are neither rounded nor truncated, and 「有效值」 (effective) still comes straight from the authoritative read model.
+
 ## 召回的唯讀限制
 
 召回預覽以 NPC 自身作為擁有者與請求者，呼叫既有的 `fast_recall`，轉送 `thread_id`、`include_superseded` 與 `include_inactive`，並原樣輸出核心、工作與召回的入選項目、BM25 分數與記憶世代。它不重新排序，也不放寬敘事權限，未知或不可存取的故事線不會貢獻任何內容。

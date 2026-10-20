@@ -10,7 +10,11 @@ when the delta spec synced into the main spec at archive.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from copy import deepcopy
+from dataclasses import replace
+from types import SimpleNamespace
+from unittest import TestCase
 from unittest.mock import patch
 
 from django.test import Client
@@ -18,13 +22,32 @@ from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from world.lore.items import EquipmentModifierKey, EquipmentSlot
 from world.rules.affinity_config import AffinityConfig, AffinityStage
+from world.rules.buffs import apply_buff
+from world.rules.equipment_effects import EquipmentEffectRule
+from world.rules.rulebook.schema import Rule
+from world.rules.status_display import ConditionDisplay
+from world.rules.status_query import (
+    StatBreakdownRow,
+    StatLayer,
+    StatusQueryError,
+    build_character_read_model,
+)
 from world.rules.traits import restore_gauges_to_full
-from world.tests.synthetic_data import SYNTH_RACES
+from world.skills.handler import ConferredSkillGrant
+from world.skills.registry import SkillCategory, SkillKind
+from world.tests.synthetic_data import (
+    SYNTH_BUFFS,
+    SYNTH_RACES,
+    make_item,
+    make_skill,
+)
 
 from tools.spec_traceability import covers_requirement
 from web.gm.readers import characters
 from web.gm.readers._entities import (
+    attribute_rows,
     read_attr,
     stored_attribute_keys,
 )
@@ -39,6 +62,7 @@ from web.gm.tests._state_support import (
     section_keys,
     section_of,
 )
+from web.gm.tests._support import GmTestCase
 
 SYNTH_RACE = "t_duskmari"
 
@@ -245,3 +269,289 @@ class MissingStoredDefaultTests(EvenniaTest):
         self.assertNotIn("resources", failures)
         self.assertIsNone(read_attr(self.player, "wallet", default=None))
         self.assertEqual(stored_attribute_keys(self.player), before)
+
+
+# ---------------------------------------------------------------------------
+# Fractional percentage controls. Each invented buff activates exactly one
+# invented rule, so the real read model composes one named layer per authored
+# control; the multiplier comes from one invented passive skill. No shipped
+# catalog literal appears here.
+# ---------------------------------------------------------------------------
+
+#: ``(buff key, authored percentage, display label)`` — two fractions and two
+#: integral controls, positives and negatives.
+_PCT_CONTROLS = (
+    ("t_gm_frac_up", "+12.5%", "合成上揚"),
+    ("t_gm_frac_down", "-2.5%", "合成下調"),
+    ("t_gm_int_up", "+10%", "合成整數上揚"),
+    ("t_gm_int_down", "-10%", "合成整數下調"),
+)
+_FLAT_BUFF = "t_gm_frac_flat_source"
+_FLAT_RULE_ID = "t_gm_frac_flat_rule"
+_FLAT_LABEL = "合成小數固定值"
+_FLAT_AMOUNT = 2.5
+_MULT_SKILL = make_skill(
+    "t_gm_frac_mult",
+    label="合成倍率",
+    kind=SkillKind.PASSIVE,
+    effects=["stat_multiply:atk_phys:1.5"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_MULT_FACTOR = 1.5
+#: A conferred grant keeps the multiplier out of ``db.skills``, so the
+#: unrelated lineage section still reads its ordinary (empty) owning set.
+_MULT_GRANT = ConferredSkillGrant("t_gm_frac_source", _MULT_SKILL.key, 1.0)
+_MULT_LAYER_NAME = f"{_MULT_SKILL.label}（1）"
+_AGILITY_BASE = 40
+_ATTACK_BASE = 20
+#: One invented accessory contributes a flat defense layer, so the regression
+#: covers all three layer sources, not only ``skill`` and ``condition``.
+_GEAR_KEY = "t_gm_frac_gear"
+_GEAR_LABEL = "合成護符"
+_GEAR_MODIFIER = tuple(EquipmentModifierKey)[1]
+_GEAR_FLAT = 3
+_GEAR = make_item(
+    _GEAR_KEY,
+    display_name_zh=_GEAR_LABEL,
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_GEAR_MODIFIER,
+)
+_GEAR_RULE = EquipmentEffectRule(
+    adjustments={"defense": _GEAR_FLAT},
+    gauge_caps={},
+    immune=(),
+    attached_buffs=(),
+    exposure_bias=0,
+)
+#: 40 × (+12.5 − 2.5 + 10 − 10 → +10%) and round(20 × 1.5) + 2.5.
+_AGILITY_EFFECTIVE = 44.0
+_ATTACK_EFFECTIVE = 32.5
+_BUFF_KEYS = (*[key for key, _, _ in _PCT_CONTROLS], _FLAT_BUFF)
+
+_FRACTIONAL_RULES = [
+    Rule(f"{key}_rule", {"buff_active": key}, {"agility": pct})
+    for key, pct, _ in _PCT_CONTROLS
+] + [Rule(_FLAT_RULE_ID, {"buff_active": _FLAT_BUFF}, {"atk_phys": _FLAT_AMOUNT})]
+
+_FRACTIONAL_DISPLAY = {
+    entry.code: entry
+    for entry in (
+        *[
+            ConditionDisplay(
+                f"{key}_rule",
+                label,
+                "beneficial" if pct.startswith("+") else "harmful",
+            )
+            for key, pct, label in _PCT_CONTROLS
+        ],
+        ConditionDisplay(_FLAT_RULE_ID, _FLAT_LABEL, "beneficial"),
+        *[ConditionDisplay(key, label, "informational") for key, _, label in _PCT_CONTROLS],
+        ConditionDisplay(_FLAT_BUFF, "合成固定值來源", "informational"),
+    )
+}
+
+
+def _open_fractional_scope(case) -> None:
+    """Open the synthetic catalogs plus the invented rule and display tables."""
+    open_synthetic_scope(
+        case,
+        "races",
+        "static_tiers",
+        "subraces",
+        "buffs",
+        "items",
+        extra={
+            "buffs": {
+                key: replace(SYNTH_BUFFS["t_moss_veil"], key=key) for key in _BUFF_KEYS
+            },
+            "items": {_GEAR.key: _GEAR},
+        },
+    )
+    stack = ExitStack()
+    # The kit's prerequisite graph cycles when the whole synthetic skill
+    # catalog replaces the registry, which would fail the unrelated lineage
+    # section; the multiplier row only needs this one definition.
+    stack.enter_context(
+        patch(
+            "world.rules.status_query.breakdown.SKILL_REGISTRY",
+            {_MULT_SKILL.key: _MULT_SKILL},
+        )
+    )
+    stack.enter_context(
+        patch("world.rules.combat_modifiers._RULES", new=list(_FRACTIONAL_RULES))
+    )
+    stack.enter_context(
+        patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
+            {_GEAR_MODIFIER: _GEAR_RULE},
+        )
+    )
+    stack.enter_context(
+        patch.dict("world.rules.status_display.STATUS_DISPLAY", _FRACTIONAL_DISPLAY)
+    )
+    case.addCleanup(stack.close)
+
+
+def _fractional_player(case) -> PlayerCharacter:
+    """A player whose authoritative read model carries every authored control."""
+    player = create.create_object(
+        PlayerCharacter, key="t_reader_fractional", location=case.room1
+    )
+    player.race = SYNTH_RACE
+    player.apply_race_baseline()
+    restore_gauges_to_full(player)
+    player.traits.agility.base = _AGILITY_BASE
+    player.traits.atk_phys.base = _ATTACK_BASE
+    player.db.wallet = 0
+    player.db.inventory = []
+    player.db.equipment = {
+        "weapon_main": None,
+        "weapon_off": None,
+        "armor": None,
+        "accessories": [_GEAR.key],
+    }
+    player.db.skill_grants = [_MULT_GRANT]
+    for key in _BUFF_KEYS:
+        apply_buff(player, key)
+    return player
+
+
+def _assert_fractional_breakdown(case, detail, player) -> None:
+    """Every control reads with its true value, provenance and effective total."""
+    case.assertNotIn("breakdown", failed_sections(detail))
+    breakdown = section_of(detail, "breakdown")
+    case.assertEqual(breakdown["type"], "groups")
+    groups = {entry["key"]: entry for entry in breakdown["groups"]}
+
+    agility = groups["agility"]
+    for key, pct, label in _PCT_CONTROLS:
+        entry = row_by_key(agility, f"agility:condition:{label}")
+        case.assertEqual(entry["label"], f"{label}（condition）")
+        case.assertEqual(entry["value"], pct)
+        case.assertTrue(entry["mono"])
+    case.assertEqual(agility["rows"][0]["label"], "基礎")
+    case.assertEqual(agility["rows"][0]["value"], _AGILITY_BASE)
+    case.assertEqual(agility["note"], f"有效值 {_AGILITY_EFFECTIVE}")
+
+    attack = groups["atk_phys"]
+    multiplier = row_by_key(attack, f"atk_phys:skill:{_MULT_LAYER_NAME}")
+    case.assertEqual(multiplier["label"], f"{_MULT_LAYER_NAME}（skill）")
+    case.assertEqual(multiplier["value"], f"×{_MULT_FACTOR}")
+    flat = row_by_key(attack, f"atk_phys:condition:{_FLAT_LABEL}")
+    case.assertEqual(flat["label"], f"{_FLAT_LABEL}（condition）")
+    case.assertEqual(flat["value"], f"+{_FLAT_AMOUNT}")
+    case.assertEqual(attack["rows"][0]["value"], _ATTACK_BASE)
+    case.assertEqual(attack["note"], f"有效值 {_ATTACK_EFFECTIVE}")
+
+    defense = groups["defense"]
+    gear = row_by_key(defense, f"defense:equipment:{_GEAR_LABEL}")
+    case.assertEqual(gear["label"], f"{_GEAR_LABEL}（equipment）")
+    case.assertEqual(gear["value"], f"+{_GEAR_FLAT}")
+
+    # Every rendered layer, in order, matches the authoritative read model,
+    # and the rendered totals agree with it.
+    authoritative = {row.key: row for row in build_character_read_model(player).breakdown}
+    for key in ("agility", "atk_phys", "defense"):
+        rendered = groups[key]["rows"][1:]
+        layers = authoritative[key].layers
+        case.assertEqual(
+            [entry["key"] for entry in rendered],
+            [f"{key}:{layer.source}:{layer.name}" for layer in layers],
+        )
+        case.assertEqual(
+            [entry["label"] for entry in rendered],
+            [f"{layer.name}（{layer.source}）" for layer in layers],
+        )
+    case.assertEqual(authoritative["agility"].effective, _AGILITY_EFFECTIVE)
+    case.assertEqual(authoritative["atk_phys"].effective, _ATTACK_EFFECTIVE)
+    case.assertEqual(agility["note"], f"有效值 {authoritative['agility'].effective}")
+    case.assertEqual(attack["note"], f"有效值 {authoritative['atk_phys'].effective}")
+
+
+class FractionalBreakdownTests(EvenniaTest):
+    """Fractional and integral layer amounts through the real character reader."""
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        _open_fractional_scope(self)
+        super().setUp()
+        self.player = _fractional_player(self)
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_fractional_percentage_flat_and_multiplier_layers_are_readable(self):
+        detail = characters.character_detail(self.player)
+        _assert_fractional_breakdown(self, detail, self.player)
+
+
+class FormattingPrecisionTests(TestCase):
+    """The layer formatter keeps every authored fraction, not six digits."""
+
+    def test_percentage_keeps_precision_beyond_six_significant_digits(self):
+        row_fixture = StatBreakdownRow(
+            key="agility",
+            base=_AGILITY_BASE,
+            current=0.0,
+            effective=0.0,
+            layers=(StatLayer("condition", "合成精度", "pct", 12.3456789),),
+        )
+        model = SimpleNamespace(breakdown=(row_fixture,))
+        with patch(
+            "world.rules.status_query.build_character_read_model", return_value=model
+        ):
+            breakdown = characters.breakdown_section(object())
+        entry = row_by_key(breakdown["groups"][0], "agility:condition:合成精度")
+        self.assertEqual(entry["value"], "+12.3456789%")
+
+
+class FractionalBreakdownApiTests(GmTestCase):
+    """The protected character-detail endpoint serves and isolates the breakdown."""
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        _open_fractional_scope(self)
+        super().setUp()
+        self.player = _fractional_player(self)
+        self.url = f"/gm/api/state/characters/{self.player.pk}"
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_detail_api_serves_fractional_layers_without_mutating_state(self):
+        before = attribute_rows(self.player)
+        detail = self.assert_ok_envelope(self.client_for("developer").get(self.url))
+        _assert_fractional_breakdown(self, detail, self.player)
+        self.assertEqual(attribute_rows(self.player), before)
+
+    @covers_requirement("gm-runtime-state::protected-read-only-inspection-boundary")
+    def test_detail_api_keeps_the_protected_boundary(self):
+        self.assert_error_envelope(
+            self.client_for("anonymous").get(self.url), 401, "unauthenticated"
+        )
+        self.assert_error_envelope(
+            self.client_for("player").get(self.url), 403, "forbidden"
+        )
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_invalid_status_source_isolates_only_the_sections_that_use_it(self):
+        before = attribute_rows(self.player)
+        with patch(
+            "world.rules.status_query.build_character_read_model",
+            side_effect=StatusQueryError("synthetic invalid source"),
+        ):
+            detail = self.assert_ok_envelope(self.client_for("developer").get(self.url))
+        expected = {
+            "traits",
+            "disguise",
+            "breakdown",
+            "skills",
+            "equipment",
+            "wallet",
+            "guild",
+        }
+        failures = failed_sections(detail)
+        self.assertEqual(set(failures), expected)
+        self.assertEqual(set(failures.values()), {"source_unavailable"})
+        # The status source's failure never takes down an independent section.
+        for key in ("identity", "resources", "conditions", "lineage", "links"):
+            self.assertNotIn(key, failures)
+        self.assertEqual(attribute_rows(self.player), before)
