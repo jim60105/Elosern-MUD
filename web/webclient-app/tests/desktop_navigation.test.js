@@ -1,23 +1,35 @@
 // webclient-avg-place-card-top-bar (design D2): the top navigation carries
 // no home entry — no 探索 / 戰鬥 button names the screen the player is
-// already on; the drawer entries, the map/settings controls, and the
-// icon-only tool group (`工具`, webclient-collapsible-command-line D6) remain.
-// webclient-chrome-navigation-polish: the primary controls pack into a
-// fixed-width region (a missing entry is absent, never a stand-in), and the
-// tools disclose their labels in one shared tooltip on hover and Tab focus.
+// already on. webclient-chrome-navigation-polish: the primary controls pack
+// into a fixed-width region (a missing entry is absent, never a stand-in),
+// and the tools disclose their labels in one shared tooltip on hover and
+// Tab focus. webclient-main-navigation-hotkeys: the labelled entries are
+// 隊伍 / 任務 / 地圖 with their hotkey chips, the tools 信件 / 圖鑑 / 稱號冊 /
+// 角色肖像圖庫 / 說明, and 設定 ends the bar.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import DesktopNavigation from "../components/DesktopNavigation.vue";
-import { NAV_TOOLS, toolLabel } from "../components/nav-tools.js";
+import { NAV_SETTINGS, NAV_TOOLS, toolLabel } from "../components/nav-tools.js";
+import { NAV_PRIMARY, NAV_PRIMARY_GLYPHS, primaryEntries } from "../components/nav-primary.js";
 
+// The exploration panel's navigation rows: the bar reads only `quests`.
 const ITEMS = [
   { key: "character", label: "角色狀態", enabled: true },
   { key: "quests", label: "任務", enabled: true },
-  { key: "bag", label: "背包", enabled: true },
+  { key: "inventory", label: "背包", enabled: true },
 ];
+// The combat root's own navigation row (its client-local 背包).
+const COMBAT_ITEMS = [{ key: "bag", label: "背包", enabled: true }];
 
+function slots(wrapper) {
+  return wrapper.findAll('[data-testid="nav-primary"] > *').map((node) => node.attributes("data-nav-slot"));
+}
 function labels(wrapper) {
-  return wrapper.findAll('[data-testid="nav-primary"] > button').map((button) => button.text());
+  return wrapper.findAll(".desktop-navigation__label").map((node) => node.text());
+}
+// The bar's controls in DOM (and visual) order, by accessible name.
+function names(wrapper) {
+  return wrapper.findAll(".desktop-navigation button").map((button) => button.attributes("aria-label") ?? button.get(".desktop-navigation__label").text());
 }
 
 let wrapper;
@@ -32,7 +44,7 @@ function mountNav(props = {}) {
   document.body.appendChild(host);
   wrapper = mount(DesktopNavigation, {
     attachTo: host,
-    props: { mode: "exploration", items: ITEMS, ...props },
+    props: { mode: "exploration", items: ITEMS, partyAvailable: true, ...props },
   });
   return wrapper;
 }
@@ -46,75 +58,113 @@ async function tabTo(button) {
 }
 
 describe("DesktopNavigation", () => {
-  it.each(["exploration", "combat"])("carries no 探索 or 戰鬥 entry in %s mode", (mode) => {
-    mountNav({ mode });
-    const texts = labels(wrapper);
-    expect(texts).not.toContain("探索");
-    expect(texts).not.toContain("戰鬥");
-    expect(texts.slice(0, 3)).toEqual(["角色狀態", "任務", "背包"]);
+  it("orders the whole bar: 隊伍, 任務, 地圖, the tool group, then 設定", () => {
+    mountNav({ galleryAvailable: true });
+    expect(names(wrapper)).toEqual(["隊伍", "任務", "地圖", "信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明", "設定"]);
+    // 設定 stands after the tool group, outside it.
+    const settings = wrapper.get('[data-testid="nav-settings"]');
+    expect(wrapper.get('[data-testid="nav-tools"]').element.contains(settings.element)).toBe(false);
+    expect(wrapper.get('[data-testid="nav-primary"]').element.contains(settings.element)).toBe(false);
+    expect(settings.attributes("aria-label")).toBe("設定");
+  });
+
+  it.each([
+    ["exploration", ITEMS, ["party", "quests", "map"]],
+    ["dialogue", ITEMS, ["party", "quests", "map"]],
+    ["combat", COMBAT_ITEMS, ["party"]],
+  ])("carries the %s entries and no 探索, 戰鬥, 角色狀態 or 背包 entry", (mode, items, expected) => {
+    mountNav({ mode, items });
+    expect(slots(wrapper)).toEqual(expected);
+    for (const gone of ["探索", "戰鬥", "角色狀態", "背包", "技能系譜"]) {
+      expect(names(wrapper)).not.toContain(gone);
+    }
+  });
+
+  it("renders nothing in creation", () => {
+    mountNav({ mode: "creation" });
+    expect(wrapper.find("nav").exists()).toBe(false);
+    expect(primaryEntries({ mode: "creation", partyAvailable: true, items: ITEMS })).toEqual([]);
   });
 
   it("declares no home emit", () => {
     expect(DesktopNavigation.emits).toEqual(["navigate", "overlay", "drawer"]);
   });
 
-  it("opens a drawer entry in one activation and marks the open drawer", async () => {
-    mountNav({ drawer: "quest" });
-    const quests = wrapper.findAll("button").find((button) => button.text() === "任務");
-    expect(quests.attributes("aria-current")).toBe("page");
-    await quests.trigger("click");
-    expect(wrapper.emitted("navigate")).toEqual([["quests"]]);
+  it("draws each entry's hotkey as a decorative chip and exposes it as aria-keyshortcuts", () => {
+    mountNav();
+    const buttons = wrapper.findAll('[data-testid="nav-primary"] > button');
+    expect(buttons.map((b) => b.attributes("aria-keyshortcuts"))).toEqual(["P", "J", "M"]);
+    expect(buttons.map((b) => b.get("kbd").text())).toEqual(["P", "J", "M"]);
+    for (const button of buttons) expect(button.get("kbd").attributes("aria-hidden")).toBe("true");
+    expect(labels(wrapper)).toEqual(["隊伍", "任務", "地圖"]);
+    expect(NAV_PRIMARY.map((entry) => entry.hotkey)).toEqual(["P", "J", "M"]);
   });
 
-  it("marks only the entry of the party window's open tab (webclient-party-status-tab)", async () => {
-    const current = () => wrapper.findAll('[aria-current="page"]').map((button) => button.text());
-    mountNav({ drawer: "party:status" });
-    expect(current()).toEqual(["角色狀態"]);
-    await wrapper.setProps({ drawer: "party:bag" });
-    expect(current()).toEqual(["背包"]);
-    await wrapper.setProps({ drawer: "party:member" });
+  it("emits navigate for 隊伍 and 任務 and overlay for 地圖 and 設定", async () => {
+    mountNav();
+    await wrapper.get('[data-nav-slot="party"]').trigger("click");
+    await wrapper.get('[data-nav-slot="quests"]').trigger("click");
+    await wrapper.get('[data-nav-slot="map"]').trigger("click");
+    await wrapper.get('[data-testid="nav-settings"]').trigger("click");
+    expect(wrapper.emitted("navigate")).toEqual([["party"], ["quests"]]);
+    expect(wrapper.emitted("overlay")).toEqual([["map"], ["settings"]]);
+  });
+
+  it("marks 隊伍 current while the party window is open, whatever its tab, and 任務 for the quest board", async () => {
+    const current = () => wrapper.findAll('[aria-current="page"]').map((button) => button.attributes("data-nav-slot"));
+    mountNav({ drawer: "party" });
+    expect(current()).toEqual(["party"]);
+    await wrapper.setProps({ drawer: "quest" });
+    expect(current()).toEqual(["quests"]);
+    await wrapper.setProps({ drawer: "letters" });
     expect(current()).toEqual([]);
   });
 
-  it("drops the map control in combat and keeps settings", () => {
-    mountNav();
-    expect(labels(wrapper)).toEqual(["角色狀態", "任務", "背包", "地圖", "設定"]);
-    wrapper.unmount();
-    mountNav({ mode: "combat" });
-    expect(labels(wrapper)).toEqual(["角色狀態", "任務", "背包", "設定"]);
+  it("follows the committed party panel: no party panel, no 隊伍 and no placeholder", async () => {
+    mountNav({ partyAvailable: false });
+    expect(slots(wrapper)).toEqual(["quests", "map"]);
+    await wrapper.setProps({ partyAvailable: true });
+    expect(slots(wrapper)).toEqual(["party", "quests", "map"]);
   });
 
   it("renders a missing entry as nothing: no disabled, hidden, or aria-disabled stand-in", () => {
-    // The combat root supplies only its 背包 entry.
-    mountNav({ mode: "combat", items: [{ key: "bag", label: "背包", enabled: true }] });
-    const primary = wrapper.get('[data-testid="nav-primary"]');
-    expect(primary.findAll("*").filter((el) => el.element.parentElement === primary.element).map((el) => el.attributes("data-nav-slot"))).toEqual([
-      "inventory",
-      "settings",
-    ]);
+    // Combat: no quest row and no map; the quest surface unavailable outside it.
+    mountNav({ mode: "combat", items: COMBAT_ITEMS, partyAvailable: false });
+    expect(slots(wrapper)).toEqual([]);
     expect(wrapper.findAll("[aria-disabled], [hidden]")).toHaveLength(0);
+    expect(wrapper.findAll("button:disabled")).toHaveLength(0);
+    wrapper.unmount();
+    mountNav({ items: [{ key: "character", label: "角色狀態", enabled: true }] });
+    expect(slots(wrapper)).toEqual(["party", "map"]);
     expect(wrapper.findAll("button:disabled")).toHaveLength(0);
   });
 
-  it("sizes each primary control from its concept's glyph count inside a fixed-width region", () => {
+  it("sizes each entry from its label's glyph count inside a region sized for all three", () => {
     mountNav();
-    const slots = wrapper
+    const sized = wrapper
       .findAll('[data-testid="nav-primary"] > button')
       .map((b) => [b.attributes("data-nav-slot"), b.element.style.getPropertyValue("--nav-glyphs").trim()]);
-    expect(slots).toEqual([
-      ["character", "4"],
+    expect(sized).toEqual([
+      ["party", "2"],
       ["quests", "2"],
-      ["inventory", "2"],
       ["map", "2"],
-      ["settings", "2"],
     ]);
-    // The glyph counts are the shipped labels' lengths, so the region's
-    // fixed width (the sum of the five controls) fits them exactly; the
-    // browser suite measures the rendered widths.
-    for (const item of ITEMS) {
-      const button = wrapper.get(`[data-nav-slot="${item.key === "bag" ? "inventory" : item.key}"]`);
-      expect(Number(button.element.style.getPropertyValue("--nav-glyphs"))).toBe(Array.from(item.label).length);
-    }
+    // The region's fixed width in DesktopNavigation.vue is written for six
+    // glyphs and three control chromes: the sum of the three entries.
+    expect(NAV_PRIMARY_GLYPHS).toBe(6);
+  });
+
+  it("keeps the region width independent of the mode (the 1px stability input)", () => {
+    // Every mode lays out inside the same fixed region; only which entries
+    // render varies, never their individual widths, so the trailing edge
+    // (the tool group's and 設定's anchor) is mode-independent.
+    const widthOf = (mode, items, partyAvailable) =>
+      primaryEntries({ mode, partyAvailable, items }).map((entry) => [entry.key, entry.glyphs]);
+    const explore = Object.fromEntries(widthOf("exploration", ITEMS, true));
+    for (const [key, glyphs] of widthOf("combat", COMBAT_ITEMS, true)) expect(glyphs).toBe(explore[key]);
+    for (const [key, glyphs] of widthOf("dialogue", ITEMS, false)) expect(glyphs).toBe(explore[key]);
+    const sum = Object.values(explore).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(NAV_PRIMARY_GLYPHS);
   });
 
   it("renders the tool group from the shared tool model with accessible names and no native title", () => {
@@ -124,19 +174,20 @@ describe("DesktopNavigation", () => {
     expect(group.attributes("aria-label")).toBe("工具");
     const buttons = group.findAll("button");
     expect(buttons.map((b) => b.attributes("data-testid"))).toEqual([
-      "nav-tool-lineage",
-      "nav-tool-lore",
       "nav-tool-letters",
+      "nav-tool-lore",
       "nav-tool-codex",
       "nav-tool-help",
     ]);
-    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual(["技能系譜", "圖鑑", "信件", "稱號冊", "說明"]);
-    for (const button of buttons) {
+    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual(["信件", "圖鑑", "稱號冊", "說明"]);
+    for (const button of [...buttons, wrapper.get('[data-testid="nav-settings"]')]) {
       // The visible tooltip replaces the delayed, hover-only native one.
       expect(button.attributes("title")).toBeUndefined();
     }
-    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["技能系譜", "圖鑑", "信件", "稱號冊", "角色肖像圖庫", "說明"]);
+    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明"]);
     expect(toolLabel("gallery")).toBe("角色肖像圖庫");
+    expect(toolLabel("settings")).toBe(NAV_SETTINGS.label);
+    expect(toolLabel("lineage")).toBeNull();
     expect(toolLabel("map")).toBeNull();
     // The world codex (globe) and title codex (star book) carry distinct labels and glyphs.
     const lore = wrapper.get('[data-testid="nav-tool-lore"]');
@@ -145,8 +196,10 @@ describe("DesktopNavigation", () => {
   });
 
   it("keeps a disabled primary entry's reason as its title", () => {
-    mountNav({ items: [{ key: "character", label: "角色狀態", enabled: false, disabled_reason: { message: "尚未開放" } }] });
-    expect(wrapper.get('[data-nav-slot="character"]').attributes("title")).toBe("尚未開放");
+    mountNav({ items: [{ key: "quests", label: "任務", enabled: false, disabled_reason: { message: "尚未開放" } }] });
+    const quests = wrapper.get('[data-nav-slot="quests"]');
+    expect(quests.attributes("title")).toBe("尚未開放");
+    expect(quests.attributes("disabled")).toBeDefined();
   });
 
   it("renders gallery-opener in the tool group only when galleryAvailable is true", async () => {
@@ -156,9 +209,8 @@ describe("DesktopNavigation", () => {
     await wrapper.setProps({ galleryAvailable: true });
     const group = wrapper.get('[data-testid="nav-tools"]');
     expect(group.findAll("button").map((b) => b.attributes("data-testid"))).toEqual([
-      "nav-tool-lineage",
-      "nav-tool-lore",
       "nav-tool-letters",
+      "nav-tool-lore",
       "nav-tool-codex",
       "gallery-opener",
       "nav-tool-help",
@@ -166,18 +218,26 @@ describe("DesktopNavigation", () => {
     expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("角色肖像圖庫");
   });
 
-  it("emits overlay for settings/codex/gallery/help and drawer for lineage, lore and letters", async () => {
+  it("emits overlay for codex/gallery/help and drawer for letters and lore", async () => {
     mountNav({ galleryAvailable: true });
-    await wrapper.get('[data-testid="nav-settings"]').trigger("click");
-    await wrapper.get('[data-testid="nav-tool-lineage"]').trigger("click");
-    await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-letters"]').trigger("click");
+    await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
-    expect(wrapper.emitted("overlay")).toEqual([["settings"], ["codex"], ["gallery"], ["help"]]);
-    // 技能系譜 opens the party window on 系譜 (webclient-party-lineage-tab).
-    expect(wrapper.emitted("drawer")).toEqual([["lineage"], ["lore"], ["letters"]]);
+    expect(wrapper.emitted("overlay")).toEqual([["codex"], ["gallery"], ["help"]]);
+    expect(wrapper.emitted("drawer")).toEqual([["letters"], ["lore"]]);
+  });
+
+  it("renders identically with and without possession (the bar takes no possession input)", () => {
+    expect(Object.keys(DesktopNavigation.props).sort()).toEqual(["drawer", "galleryAvailable", "items", "mode", "partyAvailable"]);
+    mountNav();
+    const plain = wrapper.html();
+    wrapper.unmount();
+    // A possessed session commits the same panels to the bar.
+    mountNav();
+    expect(wrapper.html()).toBe(plain);
+    expect(wrapper.text()).not.toMatch(/附身|你/);
   });
 });
 
@@ -199,17 +259,17 @@ describe("DesktopNavigation tool tooltip", () => {
     const listener = (event) => seen.push(event.key);
     document.addEventListener("keydown", listener);
     try {
-      const lineage = wrapper.get('[data-testid="nav-tool-lineage"]');
-      await tabTo(lineage);
+      const letters = wrapper.get('[data-testid="nav-tool-letters"]');
+      await tabTo(letters);
       expect(wrapper.find('[data-testid="nav-tooltip"]').exists()).toBe(true);
 
-      await lineage.trigger("keydown", { key: "Escape" });
+      await letters.trigger("keydown", { key: "Escape" });
       expect(wrapper.find('[data-testid="nav-tooltip"]').exists()).toBe(false);
-      expect(document.activeElement).toBe(lineage.element);
+      expect(document.activeElement).toBe(letters.element);
       expect(seen).not.toContain("Escape");
 
       // With no tooltip showing, Escape reaches the document (the dock's router).
-      await lineage.trigger("keydown", { key: "Escape" });
+      await letters.trigger("keydown", { key: "Escape" });
       expect(seen).toContain("Escape");
     } finally {
       document.removeEventListener("keydown", listener);
@@ -249,8 +309,8 @@ describe("DesktopNavigation tool tooltip", () => {
 
   it("keeps pointer and keyboard sources apart: hovering B leaves A's focus tooltip to its own Escape", async () => {
     mountNav();
-    const lineage = wrapper.get('[data-testid="nav-tool-lineage"]');
-    await tabTo(lineage);
+    const letters = wrapper.get('[data-testid="nav-tool-letters"]');
+    await tabTo(letters);
     const codexTool = wrapper.get('[data-testid="nav-tool-codex"]').element.parentElement;
     codexTool.dispatchEvent(new MouseEvent("mouseenter"));
     await wrapper.vm.$nextTick();
@@ -258,8 +318,8 @@ describe("DesktopNavigation tool tooltip", () => {
     codexTool.dispatchEvent(new MouseEvent("mouseleave"));
     await wrapper.vm.$nextTick();
     // The focus tooltip of the focused control is back.
-    expect(wrapper.get('[data-testid="nav-tooltip"]').text()).toBe("技能系譜");
-    await lineage.trigger("keydown", { key: "Escape" });
+    expect(wrapper.get('[data-testid="nav-tooltip"]').text()).toBe("信件");
+    await letters.trigger("keydown", { key: "Escape" });
     expect(wrapper.find('[data-testid="nav-tooltip"]').exists()).toBe(false);
   });
 

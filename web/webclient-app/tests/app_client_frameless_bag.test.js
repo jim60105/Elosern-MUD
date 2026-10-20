@@ -5,7 +5,7 @@
 // three close routes — Escape, the close control, the scrim — restores
 // focus to the 背包 entry that opened it with the router untouched.
 import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
@@ -18,6 +18,12 @@ import { PARTY_BAG_INVENTORY_SAMPLE, PARTY_WINDOW_PANEL_SAMPLE } from "../storie
 describe("frameless 背包 drawer (composition contract)", () => {
   let store;
   let wrapper;
+  // One mounted client at a time: a leftover one would keep its document
+  // listeners (the window hotkeys) alive across tests.
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
 
   function mountAppClient() {
     const host = document.createElement("div");
@@ -51,15 +57,17 @@ describe("frameless 背包 drawer (composition contract)", () => {
     expect(result.accepted).toBe(true);
   }
 
+  // The bar's 隊伍 entry; its B hotkey opens the party window's 背包 tab
+  // (webclient-main-navigation-hotkeys), with the focused control as opener.
   function bagButton() {
-    return wrapper.get(".desktop-navigation").findAll("button")
-      .find((button) => button.text() === "背包");
+    return wrapper.get('.desktop-navigation [data-nav-slot="party"]');
   }
 
   async function openBagFromNavigation() {
     const button = bagButton();
     button.element.focus();
-    await button.trigger("click");
+    button.element.dispatchEvent(new KeyboardEvent("keydown", { key: "b", code: "KeyB", bubbles: true, cancelable: true }));
+    await wrapper.vm.$nextTick();
   }
 
   beforeEach(() => {
@@ -81,9 +89,8 @@ describe("frameless 背包 drawer (composition contract)", () => {
     expect(dock.findAll('[role="option"]')).toHaveLength(0);
     expect(dock.find('[data-item-key="inventory"]').exists()).toBe(false);
     expect(store.view.focus.key).toBeNull();
-    expect(wrapper.get(".desktop-navigation").text()).toContain("角色狀態");
-    expect(wrapper.get(".desktop-navigation").text()).toContain("任務");
-    expect(wrapper.get(".desktop-navigation").text()).toContain("背包");
+    const labels = wrapper.findAll(".desktop-navigation__label").map((node) => node.text());
+    expect(labels).toEqual(["隊伍", "任務", "地圖"]);
   });
 
   it("opens the bag frameless with no hosted row region and returns focus on every close route", async () => {
@@ -119,7 +126,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
       await closeRoute();
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-testid="hud-drawer"]').exists(), name).toBe(false);
-      // Focus returns to the 背包 entry that opened it; the router is what
+      // Focus returns to the 隊伍 entry it was opened from; the router is what
       // it was before the open.
       expect(document.activeElement, name).toBe(row.element);
       expect(store.router.depth(), name).toBe(1);

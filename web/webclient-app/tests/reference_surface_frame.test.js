@@ -8,6 +8,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
+import { PARTY_WINDOW_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
 import AppClient from "../AppClient.vue";
 import DrawerHeader from "../components/DrawerHeader.vue";
 import GalleryGenerateDrawer from "../components/GalleryGenerateDrawer.vue";
@@ -100,13 +101,15 @@ describe("reference surface headers in the client", () => {
     }
   }, 20000);
 
-  it("opens the party window on 系譜 from the 技能系譜 tool and returns focus on close", async () => {
-    // webclient-party-lineage-tab: the lineage overlay is gone; the tool
-    // opens the one party window (its own 隊伍 header) on its 系譜 tab.
-    await snapshot();
-    const opener = wrapper.get('[data-testid="nav-tool-lineage"]');
+  it("opens the party window on 系譜 with the L hotkey from 隊伍 and returns focus on close", async () => {
+    // webclient-party-lineage-tab: the lineage overlay is gone; since
+    // webclient-main-navigation-hotkeys no tool opens it — the L hotkey (or
+    // 隊伍 and the 系譜 tab) opens the one party window on its 系譜 tab.
+    await snapshot({ party: PARTY_WINDOW_PANEL_SAMPLE });
+    expect(wrapper.find('[data-testid="nav-tool-lineage"]').exists()).toBe(false);
+    const opener = wrapper.get('.desktop-navigation [data-nav-slot="party"]');
     opener.element.focus();
-    await opener.trigger("click");
+    opener.element.dispatchEvent(new KeyboardEvent("keydown", { key: "l", code: "KeyL", bubbles: true, cancelable: true }));
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
     expect(store.view.hudOverlay).toBeNull();
@@ -114,10 +117,8 @@ describe("reference surface headers in the client", () => {
     expect(wrapper.findAll(".drawer-header")).toHaveLength(1);
     await wrapper.get(".drawer-header__close").trigger("click");
     expect(document.activeElement).toBe(opener.element);
-    // With the window open on another tab, the tool switches it live.
-    store.openHudDrawer("status");
-    await wrapper.vm.$nextTick();
-    await wrapper.get('[data-testid="nav-tool-lineage"]').trigger("click");
+    // 隊伍 reopens it on the remembered 系譜 tab.
+    await opener.trigger("click");
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll('[data-testid="party-window"]')).toHaveLength(1);
     expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("lineage");

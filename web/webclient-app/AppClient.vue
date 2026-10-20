@@ -41,7 +41,7 @@ import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./compo
 import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
-import { partyWindowTab } from "./components/party-window-memory.js";
+import { useWindowHotkeys } from "./composables/use-window-hotkeys.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import StageActor from "./components/StageActor.vue";
@@ -120,12 +120,22 @@ const {
   onViewShopItem,
   openPartyWindow,
 } = usePartyWindow(store, dispatchIntent, { panel });
-// The top navigation marks the entry of the open surface: the party window
-// is named with its live tab (`party:status`, `party:bag`, ...), so only the
-// 角色狀態 or 背包 entry of the open tab is current.
-const navigationDrawer = computed(() =>
-  store.view.hudDrawer === "party" ? `party:${partyWindowTab()}` : store.view.hudDrawer,
-);
+// The top navigation (webclient-main-navigation-hotkeys): 隊伍 opens the
+// party window on its remembered tab — a reference surface, so it neither
+// pops the dock's frames nor waits on the submission lock — and 任務 keeps
+// the committed root's confirm path. The window hotkeys run the same
+// openers.
+function onNavigate(key) {
+  if (key === "party") store.openHudDrawer("party");
+  else onTabClick(key);
+}
+useWindowHotkeys(store, {
+  openParty: (name) => store.openHudDrawer(name),
+  openQuests: () => onTabClick("quests"),
+  openMap: () => openOverlayByName("map"),
+  questsEnabled: () => navigationItems.value.some((item) => item.key === "quests" && item.enabled !== false),
+  fullLogOpen: () => fullLogOpen.value,
+});
 // A companion figure on the stage lineup opens 成員 with that companion
 // (design §8): exploration only, outside the stage target step, and never
 // the commander's own figure.
@@ -699,9 +709,10 @@ const rootStyle = computed(() => {
           <DesktopNavigation
             :mode="store.view.mode"
             :items="navigationItems"
-            :drawer="navigationDrawer"
+            :drawer="store.view.hudDrawer"
+            :party-available="store.partyAvailable"
             :gallery-available="panelAvailable('gallery')"
-            @navigate="onTabClick"
+            @navigate="onNavigate"
             @overlay="onOpenOverlay"
             @drawer="onOpenDrawer"
           />
