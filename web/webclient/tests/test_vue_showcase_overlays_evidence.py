@@ -61,6 +61,8 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/PartyStatusTab",
     # The party window's 技能 tab (webclient-party-skill-tab).
     "Overlays/PartySkillTab",
+    # The party window's 系譜 tab (webclient-party-lineage-tab).
+    "Overlays/PartyLineageTab",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -112,6 +114,13 @@ OVERLAYS_STORY_IDS = {
     "overlays-partyskilltab--no-mastery-full-hd",
     "overlays-partyskilltab--in-combat-reference",
     "overlays-partyskilltab--in-combat-full-hd",
+    # webclient-party-lineage-tab: the 系譜 tab at both viewports.
+    "overlays-partylineagetab--graph-reference",
+    "overlays-partylineagetab--graph-full-hd",
+    "overlays-partylineagetab--single-node-reference",
+    "overlays-partylineagetab--single-node-full-hd",
+    "overlays-partylineagetab--ready-to-unlock-reference",
+    "overlays-partylineagetab--ready-to-unlock-full-hd",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -177,7 +186,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
     # desktop redesign, World/TitleBallotMenu from the dock-workspace
-    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel
+    # alignment, and the Overlays/LineagePanel (since retired) + Overlays/TitleCodexPanel
     # big windows from the obsidian-gold wave.
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
@@ -193,7 +202,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ArtworkAlpha",
     "Core/ArtworkFailure",
     "World/TitleBallotMenu",
-    "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
     # The gallery management surface refroze the manifest at 56:
     # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery
@@ -268,13 +276,13 @@ PREVIOUS_MANIFEST_KEYS = {
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
-# lineage and title-codex big windows joined the frozen manifest with the
+# title-codex big window (the lineage window retired with
+# webclient-party-lineage-tab) joined the frozen manifest with the
 # obsidian-gold wave, and the three gallery overlay drawers joined with the
 # gallery refreeze at 56; the settings reading preview joined with
 # webclient-settings-reading-preview. The story-count partition below asserts
 # the family files plus exactly these.
 OVERLAYS_KEYS_JOINED_AFTER_B5 = (
-    "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
@@ -409,7 +417,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab", "PartySkillTab",
+                "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab", "PartySkillTab", "PartyLineageTab",
             )},
         )
 

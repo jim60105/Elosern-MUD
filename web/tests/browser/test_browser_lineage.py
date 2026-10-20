@@ -1,11 +1,13 @@
-"""Skill-lineage big-window browser acceptance (skill-lineage-panel, task V6).
+"""Party window 系譜 tab browser acceptance (webclient-party-lineage-tab).
 
-Two deterministic journeys on the shared managed server: the committed
-``lineage`` panel renders its full ledger through the 技能系譜 icon (collapsed
-chain meter → expanded per-node levels, 見頂 marks, XP meters, and prerequisite
-lines, all read verbatim from the payload), and an unavailable payload renders
-only the registry reason with no invented chain. Fixed injected snapshots; no
-live LLM, Stable Diffusion, or other network service.
+Two deterministic journeys on the shared managed server: the 技能系譜 tool
+opens the party window on its 系譜 tab, where the committed ``lineage`` panel
+renders its graph list (root name, node diamonds, owned/total) and the
+selected graph drawn by depth (per-node levels, 見頂, XP meters, labelled
+edges and prerequisite lines, all read verbatim from the payload); and an
+unavailable payload renders only the registry reason with no invented graph.
+Fixed injected snapshots; no live LLM, Stable Diffusion, or other network
+service.
 """
 
 from __future__ import annotations
@@ -145,85 +147,123 @@ def _unavailable_lineage_panel() -> dict:
     }
 
 
-class LineagePanelBrowserTest(BrowserAcceptanceTest):
-    """The lineage window on the shared managed server."""
+def _commander_party_panel() -> dict:
+    """A committed party v3 panel of the commander alone, the viewed member."""
+    return {
+        "schema_version": 3,
+        "available": True,
+        "general_quota": {"used": 0, "limit": 4},
+        "viewed_member_id": 42,
+        "slots": [{
+            "identity": 42, "display_name": "燼行者", "portrait_ref": None,
+            "hp_current": 100, "hp_maximum": 100, "mp_current": 50, "mp_maximum": 50,
+            "sp_current": 40, "sp_maximum": 40, "role": "commander", "knocked_out": False,
+            "unread": False, "bond_stage": None, "membership": None,
+        }],
+    }
 
-    @covers_requirement("skill-lineage-panel::the-webclient-renders-the-lineage-window-from-the-view-alone")
-    def test_lineage_window_renders_the_committed_ledger_verbatim(self):
-        """Icon opens the window; collapsed count and expanded rows match the payload."""
-        page = self.logged_in_page()
-        _inject_snapshot(page, {"lineage": _available_lineage_panel()}, mode="exploration")
+
+class PartyLineageTabBrowserTest(BrowserAcceptanceTest):
+    """The party window's 系譜 tab on the shared managed server."""
+
+    @covers_requirement(
+        "skill-lineage-panel::the-party-window-lineage-tab-renders-the-graphs-from-the-view-alone",
+        "webclient-party-window::the-lineage-list-groups-graphs-with-node-diamonds",
+        "webclient-party-window::the-lineage-detail-draws-the-real-graph",
+    )
+    def test_lineage_tab_renders_the_committed_ledger_verbatim(self):
+        """The tool opens 系譜; the list row and the drawn graph match the payload."""
+        page = self.logged_in_page((1451, 790))
+        _inject_snapshot(
+            page,
+            {"party": _commander_party_panel(), "lineage": _available_lineage_panel()},
+            mode="exploration",
+        )
         _wait_mode(page, "exploration")
 
-        # The 技能系譜 icon in the top navigation bar's tool group opens the big window.
-        page.locator('[data-testid="nav-tool-lineage"]').click()
-        page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
-
-        # Header counts come straight from the payload.
+        # The 技能系譜 tool opens the party window on its 系譜 tab.
+        opener = page.locator('[data-testid="nav-tool-lineage"]')
+        opener.click()
+        page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="lineage-panel-header"]').inner_text(),
+            page.locator('[data-testid="party-window"]').get_attribute("data-tab"), "lineage"
+        )
+        self.assertEqual(
+            page.locator('[data-testid="party-lineage-tab__summary"]').inner_text(),
             "已完成 0 / 1 樹",
         )
 
-        # Collapsed by default: the graph head shows its owned/total count only.
-        root_key = CHAIN_ROOT[0]
-        mid_key = CHAIN_MID[0]
-        leaf_key = CHAIN_LEAF[0]
-        toggle = page.locator(f'[data-testid="lineage-graph-toggle-{root_key}"]')
-        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        root_key, root_name = CHAIN_ROOT
+        mid_key, _mid_name = CHAIN_MID
+        leaf_key, _leaf_name = CHAIN_LEAF
+        row = page.locator(f'[data-testid="party-lineage-tab__row"][data-graph="{root_key}"]')
+        self.assertEqual(row.locator('[data-testid="party-lineage-tab__row-name"]').inner_text(), root_name)
+        self.assertEqual(row.locator('[data-testid="party-lineage-tab__count"]').inner_text(), "2 / 3")
         self.assertEqual(
-            page.locator(f'[data-testid="lineage-graph-count-{root_key}"]').inner_text(),
-            "2/3",
-        )
-        self.assertEqual(
-            page.locator(f'[data-testid="lineage-graph-nodes-{root_key}"]').count(), 0
+            [
+                row.locator('[data-testid="party-lineage-tab__pip"]').nth(i).get_attribute("data-state")
+                for i in range(3)
+            ],
+            ["owned", "capped", "locked"],
         )
 
-        # Expanding renders the per-node rows with payload-owned values.
-        toggle.click()
-        page.wait_for_selector(f'[data-testid="lineage-graph-nodes-{root_key}"]', timeout=15000)
-        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        def node(key):
+            return page.locator(f'[data-testid="party-lineage-tab__node"][data-key="{key}"]')
+
         self.assertEqual(
-            page.locator(f'[data-testid="lineage-node-meter-{root_key}"]').inner_text(),
+            node(root_key).locator('[data-testid="party-lineage-tab__node-meter"]').inner_text(),
             "23/50 → 下一階",
         )
         self.assertEqual(
-            page.locator('[data-testid="lineage-node-tip"]').count(),
-            1,
-            "only the capped node carries the 見頂 mark",
-        )
-        self.assertIn(
-            "（見頂）",
-            page.locator(f'[data-testid="lineage-node-{mid_key}"]').inner_text(),
+            node(mid_key).locator('[data-testid="party-lineage-tab__node-growth"]').inner_text(), "見頂"
         )
         self.assertEqual(
-            page.locator(f'[data-testid="lineage-node-prereq-{leaf_key}"]').inner_text(),
+            node(leaf_key).locator('[data-testid="party-lineage-tab__node-prereq"]').inner_text(),
             f"需「{CHAIN_MID[1]} Lv.3」",
         )
+        self.assertEqual(node(leaf_key).get_attribute("data-state"), "locked")
+        self.assertEqual(
+            page.locator('[data-testid="party-lineage-tab__edge-label"]').all_inner_texts(),
+            ["Lv 1", "Lv 3"],
+        )
+        # The nodes stand one depth row apart, top to bottom, inside the canvas.
+        tops = [node(key).bounding_box()["y"] for key in (root_key, mid_key, leaf_key)]
+        self.assertLess(tops[0], tops[1])
+        self.assertLess(tops[1], tops[2])
+        self.assertEqual(page.evaluate("() => document.querySelectorAll('.lineage-chain__meter').length"), 0)
 
-        # Closing the shared overlay host retires the window.
-        page.locator('[data-testid="overlay-host-close"]').click()
+        # Closing the window returns focus to the tool.
+        page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"lineage-panel\"]') === null",
+            "() => document.querySelector('[data-testid=\"party-window\"]') === null",
             timeout=15000,
         )
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "nav-tool-lineage",
+        )
 
-    @covers_requirement("skill-lineage-panel::the-webclient-renders-the-lineage-window-from-the-view-alone")
+    @covers_requirement("skill-lineage-panel::the-party-window-lineage-tab-renders-the-graphs-from-the-view-alone")
     def test_unavailable_lineage_renders_only_the_registry_reason(self):
-        """The unavailable payload renders its reason line and no placeholder tree."""
-        page = self.logged_in_page()
-        _inject_snapshot(page, {"lineage": _unavailable_lineage_panel()}, mode="exploration")
+        """The unavailable payload renders its reason line and no placeholder graph."""
+        page = self.logged_in_page((1451, 790))
+        _inject_snapshot(
+            page,
+            {"party": _commander_party_panel(), "lineage": _unavailable_lineage_panel()},
+            mode="exploration",
+        )
         _wait_mode(page, "exploration")
 
         page.locator('[data-testid="nav-tool-lineage"]').click()
-        page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
+        page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="lineage-panel-unavailable"]').inner_text(),
+            page.locator('[data-testid="party-window__tab-unavailable"]').inner_text(),
             "技能系譜目前無法顯示",
         )
         self.assertEqual(
-            page.locator('[data-testid^="lineage-graph-"]').count(),
+            page.locator('[data-testid="party-lineage-tab__row"]').count(),
             0,
             "the client invents no placeholder graph",
         )
-        self.assertEqual(page.locator('[data-testid="lineage-panel-header"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="party-lineage-tab__node"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="party-lineage-tab__summary"]').count(), 0)

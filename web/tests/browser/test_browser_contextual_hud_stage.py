@@ -1638,7 +1638,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # opens its surface and Escape returns focus to that tool.
         page.locator('[data-testid="nav-settings"]').focus()
         expected_tools = (
-            ("nav-tool-lineage", '[data-testid="overlay-host"][data-elosern-overlay="lineage"]'),
+            ("nav-tool-lineage", '[data-testid="party-window"][data-tab="lineage"]'),
             ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
             ("nav-tool-letters", '[data-testid="letters-panel"]'),
             ("nav-tool-codex", '[data-testid="overlay-host"][data-elosern-overlay="codex"]'),
