@@ -5,6 +5,12 @@ Every identifier and prose value is invented with the reserved ``t_`` prefix
 declares only the closed visual-range options the grid layer adapter consumes
 and deliberately carries no text-map display override: the room typeclass
 default is the only gate under test.
+
+Isolation: ``add_maps``/``reload``/``spawn`` run inside the caller's Django
+``TestCase`` transaction, so the persisted ``db.map_data`` and the spawned
+objects roll back. ``reload()`` also replaces the process-local ``ndb.grid``,
+which no rollback restores; every caller therefore loads this map itself and
+must not assume a prior test left a grid behind.
 """
 
 from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid

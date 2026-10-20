@@ -180,10 +180,35 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
             value, metadata = value
         return str(value), dict(metadata or {})
 
-    @staticmethod
-    def _immediate_delay(_delay, func, *args, **kwargs):
-        """Deterministic delay seam: run the scheduled step now."""
-        return func(*args, **kwargs)
+    class _QueuedDelay:
+        """Deterministic delay seam: queue the callback, drain it afterwards.
+
+        Production stores the returned task before the callback runs, so the
+        seam must not re-enter the stepper inside the assignment; draining
+        after the command returns preserves that ordering and lets the test
+        assert the completed path-state cleanup.
+        """
+
+        class _Task:
+            @staticmethod
+            def active():
+                return False
+
+            @staticmethod
+            def cancel():
+                return None
+
+        def __init__(self):
+            self._queue = []
+
+        def __call__(self, _delay, func, *args, **kwargs):
+            self._queue.append((func, args, kwargs))
+            return self._Task()
+
+        def drain(self):
+            while self._queue:
+                func, args, kwargs = self._queue.pop(0)
+                func(*args, **kwargs)
 
     def test_path_reports_the_known_two_step_route_without_moving(self):
         output = self.call(CmdGoto(), self.destination_key, cmdstring="path")
@@ -191,8 +216,8 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
         # The authored synthetic map is a straight east-east line, so the
         # reported route is two east steps in order.
         route = output.split("共有 2 步：", 1)[1]
-        self.assertEqual(route.count("e"), 2)
-        self.assertLess(route.index("e"), route.index("最後"))
+        directions = [part.strip() for part in route.replace("，最後", "，").split("，")]
+        self.assertEqual(directions, ["e", "e"])
         self.assertIs(self.char1.location, self.start)
 
     def test_goto_walks_the_known_two_step_route_without_a_text_map(self):
@@ -201,8 +226,9 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.char1.location = self.start
                 self.char1.ndb.xy_path_data = None
                 before = get_world_clock().tick
+                queued = self._QueuedDelay()
                 with (
-                    patch("commands.localized.xyzgrid.delay", self._immediate_delay),
+                    patch("commands.localized.xyzgrid.delay", queued),
                     patch.object(self.char1, "msg") as recorder,
                 ):
                     self.call(
@@ -212,9 +238,11 @@ class LocalizedSyntheticRouteTests(EvenniaCommandTestMixin, EvenniaTest):
                         receiver=self.char2,
                         cmdstring=cmdstring,
                     )
+                    queued.drain()
 
                 self.assertEqual(self.char1.location, self.end)
                 self.assertEqual(self.end.xyz, (2, 0, self.end.xyz[2]))
+                self.assertIsNone(self.char1.ndb.xy_path_data)
                 # Existing settlement: two real step traversals charge the
                 # ordinary move cost each.
                 self.assertEqual(

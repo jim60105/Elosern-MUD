@@ -196,6 +196,66 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("Exits:", text)
         self.assertLess(text.index(self.descriptions[room.key]), text.index("出口："))
 
+    def _rooms(self):
+        return ((self.start, self.start_object), (self.anchor, self.anchor_object))
+
+    def _assert_appearance(self, text, room, visible_object, *, flavor):
+        self._assert_ordinary_appearance(text, room, visible_object)
+        if flavor:
+            self.assertLess(
+                text.index(self.descriptions[room.key]), text.index(self._FLAVOR)
+            )
+            self.assertLess(text.index(self._FLAVOR), text.index("出口："))
+        else:
+            self.assertNotIn(self._FLAVOR, text)
+
+    def _at_look(self, room):
+        with (
+            patch.object(XYMap, "get_visual_range") as visual_range,
+            patch.object(self.char1, "msg") as recorder,
+        ):
+            appearance = self.char1.at_look(room)
+        visual_range.assert_not_called()
+        recorder.assert_not_called()
+        return appearance
+
+    def _adapter_look(self, room):
+        from web.webclient.actions.exploration_actions import (
+            AFFECTED_FULL,
+            _look_adapter,
+        )
+
+        self.char1.location = room
+        with (
+            patch.object(XYMap, "get_visual_range") as visual_range,
+            patch.object(self.char1, "msg") as recorder,
+        ):
+            result = _look_adapter(self.char1, {"room": True})
+        visual_range.assert_not_called()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "looked")
+        self.assertEqual(result["affected_panels"], AFFECTED_FULL)
+        messages = [self._parts(call) for call in recorder.call_args_list]
+        self._assert_no_automatic_map(messages)
+        self.assertEqual(len(messages), 1)
+        return messages[0][0]
+
+    def _appearance_on_every_path(self, room, visible_object, *, flavor):
+        """Return the appearance all three entry paths agree on."""
+        text_messages = self._text_look_messages(room)
+        self._assert_no_automatic_map(text_messages)
+        self.assertEqual(len(text_messages), 1)
+        text = text_messages[0][0]
+        self._assert_appearance(text, room, visible_object, flavor=flavor)
+
+        # Direct hook and browser action carry the same ordinary appearance;
+        # the command alone wraps it in the `type: look` envelope.
+        appearance = self._at_look(room)
+        self.assertEqual(appearance, text)
+        self._assert_appearance(appearance, room, visible_object, flavor=flavor)
+        self.assertEqual(self._adapter_look(room), text)
+        return text
+
     def test_grid_room_text_look_emits_only_the_ordinary_appearance(self):
         self.assertTrue(self.start.xymap, "the fixture map must be loaded")
         self.assertIsInstance(self.start, GridRoom)
@@ -215,95 +275,52 @@ class GridLookTextMapTests(EvenniaCommandTestMixin, EvenniaTest):
         self._assert_ordinary_appearance(messages[0][0], self.anchor, self.anchor_object)
 
     def test_english_look_alias_emits_no_map_message(self):
-        messages = self._text_look_messages(self.start, cmdstring="look")
-        self._assert_no_automatic_map(messages)
-        self.assertEqual(len(messages), 1)
-        self._assert_ordinary_appearance(messages[0][0], self.start, self.start_object)
+        for room, visible_object in self._rooms():
+            with self.subTest(room=room.key):
+                messages = self._text_look_messages(room, cmdstring="look")
+                self._assert_no_automatic_map(messages)
+                self.assertEqual(len(messages), 1)
+                self._assert_ordinary_appearance(messages[0][0], room, visible_object)
 
     def test_direct_at_look_emits_no_map_side_message(self):
-        with (
-            patch.object(XYMap, "get_visual_range") as visual_range,
-            patch.object(self.char1, "msg") as recorder,
-        ):
-            appearance = self.char1.at_look(self.start)
-        visual_range.assert_not_called()
-        recorder.assert_not_called()
-        self._assert_ordinary_appearance(appearance, self.start, self.start_object)
+        for room, visible_object in self._rooms():
+            with self.subTest(room=room.key):
+                appearance = self._at_look(room)
+                self._assert_ordinary_appearance(appearance, room, visible_object)
 
     def test_browser_look_adapter_emits_no_map_message(self):
-        from web.webclient.actions.exploration_actions import AFFECTED_FULL, _look_adapter
-
-        text_messages = self._text_look_messages(self.start)
-        self.char1.location = self.start
-        with (
-            patch.object(XYMap, "get_visual_range") as visual_range,
-            patch.object(self.char1, "msg") as recorder,
-        ):
-            result = _look_adapter(self.char1, {"room": True})
-        visual_range.assert_not_called()
-        self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "looked")
-        self.assertEqual(result["affected_panels"], AFFECTED_FULL)
-        messages = [self._parts(call) for call in recorder.call_args_list]
-        self._assert_no_automatic_map(messages)
-        self.assertEqual(len(messages), 1)
-        # The envelope differs (command metadata vs. a plain string); the
-        # appearance itself must be the same ordinary room text.
-        self.assertEqual(messages[0][0], text_messages[0][0])
+        for room, visible_object in self._rooms():
+            with self.subTest(room=room.key):
+                text_messages = self._text_look_messages(room)
+                self._assert_no_automatic_map(text_messages)
+                # The envelope differs (command metadata vs. a plain string);
+                # the appearance itself must be the same ordinary room text.
+                self.assertEqual(self._adapter_look(room), text_messages[0][0])
+                self._assert_ordinary_appearance(text_messages[0][0], room, visible_object)
 
     @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
     def test_scene_flavor_and_ordinary_content_survive_without_a_map(self):
-        from web.webclient.actions.exploration_actions import _look_adapter
-
-        for room, visible_object in (
-            (self.start, self.start_object),
-            (self.anchor, self.anchor_object),
-        ):
-            with self.subTest(room=room.key):
-                self._assert_flavor_parity(room, visible_object)
-
+        for room, visible_object in self._rooms():
+            with self.subTest(room=room.key, flavor=False):
+                room.db.scene_flavor = None
+                flavorless = self._appearance_on_every_path(
+                    room, visible_object, flavor=False
+                )
+            with self.subTest(room=room.key, flavor=True):
                 room.db.scene_flavor = self._FLAVOR
-                messages = self._text_look_messages(room)
-                self._assert_no_automatic_map(messages)
-                flavored = messages[0][0]
-                self.assertLess(
-                    flavored.index(self.descriptions[room.key]),
-                    flavored.index(self._FLAVOR),
+                flavored = self._appearance_on_every_path(
+                    room, visible_object, flavor=True
                 )
-                self.assertLess(flavored.index(self._FLAVOR), flavored.index("出口："))
-
-                with (
-                    patch.object(XYMap, "get_visual_range") as visual_range,
-                    patch.object(self.char1, "msg") as recorder,
-                ):
-                    appearance = self.char1.at_look(room)
-                visual_range.assert_not_called()
-                recorder.assert_not_called()
-                self.assertLess(
-                    appearance.index(self.descriptions[room.key]),
-                    appearance.index(self._FLAVOR),
+                # The flavor paragraph is the only difference between the two
+                # appearances: contents, exit frame and ordering are intact.
+                self.assertEqual(
+                    [
+                        line
+                        for line in flavored.splitlines()
+                        if line.strip() and self._FLAVOR not in line
+                    ],
+                    [line for line in flavorless.splitlines() if line.strip()],
                 )
-                self.assertLess(appearance.index(self._FLAVOR), appearance.index("出口："))
-
-                self.char1.location = room
-                with (
-                    patch.object(XYMap, "get_visual_range") as visual_range,
-                    patch.object(self.char1, "msg") as recorder,
-                ):
-                    _look_adapter(self.char1, {"room": True})
-                visual_range.assert_not_called()
-                self._assert_no_automatic_map(
-                    [self._parts(call) for call in recorder.call_args_list]
-                )
-
-    def _assert_flavor_parity(self, room, visible_object):
-        """The flavor-less appearance omits only the flavor paragraph."""
-        room.db.scene_flavor = None
-        messages = self._text_look_messages(room)
-        self._assert_no_automatic_map(messages)
-        flavorless = messages[0][0]
-        self._assert_ordinary_appearance(flavorless, room, visible_object)
-        self.assertNotIn(self._FLAVOR, flavorless)
 
     def test_loaded_map_would_emit_an_ascii_map_under_an_explicit_override(self):
         # Positive control: the fixture really is a loaded map and the class

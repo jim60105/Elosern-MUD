@@ -7,6 +7,7 @@ from unittest.mock import patch
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS
+from web.webclient.presentation.local_map.builder import _exit_ref, _traversable
 from web.webclient.presentation.registry import PanelUnavailableError, build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.clock import get_world_clock
@@ -367,8 +368,17 @@ class GridLocalMapDisplayIndependenceTests(EvenniaTest):
                 self.assertTrue(moves, "a genuine adjacent move descriptor is required")
                 for move in moves:
                     self.assertEqual(move["kind"], "move")
-                    self.assertTrue(move["exit_ref"])
-                    self.assertTrue(move["destination"].startswith("grid:"))
+                    moved_exit = next(
+                        exit_obj
+                        for exit_obj in room.exits
+                        if _exit_ref(exit_obj) == move["exit_ref"]
+                    )
+                    self.assertTrue(_traversable(moved_exit, self.char1))
+                    destination = moved_exit.destination
+                    dx, dy, dz = destination.xyz
+                    self.assertEqual(
+                        move["destination"], encode_grid(str(dz), dx, dy)
+                    )
 
     def test_explore_look_leaves_the_map_widget_input_intact(self):
         from web.webclient.actions.exploration_actions import AFFECTED_FULL, _look_adapter
