@@ -71,8 +71,9 @@ describe("HoldingsStrip (webclient-window-primitives)", () => {
     expect(changes.map((c) => c.text())).toEqual(["▲ 攻擊 +6", "▼ 敏捷 −1"]);
     expect(changes.map((c) => c.classes()[1])).toEqual(["is-up", "is-down"]);
     const none = cell(13).get('[data-testid="holdings-strip__delta"]');
-    expect(none.text()).toBe("無法裝備卡恩無法使用這類武器。");
-    expect(none.get('[data-testid="holdings-strip__delta-reason"]').text()).toBe("卡恩無法使用這類武器。");
+    // The stable reason code is data, never printed (webclient-shop-window).
+    expect(none.text()).toBe("無法裝備");
+    expect(none.attributes("data-reason-code")).toBe("malformed_equipment");
   });
 
   it("an equipped row shows its tag and no invented delta text", () => {

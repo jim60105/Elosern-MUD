@@ -591,7 +591,7 @@ export const PARTY_BAG_HOLDINGS_EQUIPMENT = {
   rows: [
     hold(42, 0, canReceive, { delta: delta(["atk_phys", "攻擊", 6]) }),
     hold(101, 1, ownRow, { delta: delta(["atk_phys", "攻擊", -2], ["agility", "敏捷", 3]) }),
-    hold(102, 0, canReceive, { delta: { equippable: false, reason: "幽無法使用這類武器。" } }),
+    hold(102, 0, canReceive, { delta: { equippable: false, reason: "malformed_equipment" } }),
     hold(103, 0, absent, { delta: delta(["atk_phys", "攻擊", 4]) }),
   ],
 };

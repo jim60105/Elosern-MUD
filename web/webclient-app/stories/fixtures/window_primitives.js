@@ -58,7 +58,7 @@ export const ITEM_HOLDINGS_EQUIPMENT = {
       delta: { equippable: true, changes: [{ key: "atk_phys", label: "攻擊", amount: 6 }, { key: "agility", label: "敏捷", amount: -1 }] },
       receive: receive(true),
     },
-    { member_id: 13, held: 0, equipped: false, delta: { equippable: false, reason: "卡恩無法使用這類武器。" }, receive: receive(true) },
+    { member_id: 13, held: 0, equipped: false, delta: { equippable: false, reason: "malformed_equipment" }, receive: receive(true) },
   ],
 };
 
