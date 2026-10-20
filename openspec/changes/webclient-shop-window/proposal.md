@@ -10,6 +10,8 @@ Design §4.3 and §7 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 - Merchant navigation affordances (`surface: "shop"`) open the shop window.
 - **BREAKING (pre-release)** delete `ShopPanel.vue`, its story `World/ShopPanel`, tests and `.elosern-root` duplicate rules.
 - The purse rule admits exactly one balance per window plus the labelled remainder.
+- `shop.buy`/`shop.sell` also republish `party_inventory`, so the bag tab and purse are not stale after a trade.
+- `HoldingsStrip` gains a compact chips variant and stops printing raw delta reason codes.
 
 ## Capabilities
 
@@ -21,7 +23,7 @@ Design §4.3 and §7 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 - `webclient-contextual-hud`: the party purse requirement covers the shop window header and remainder.
 - `webclient-component-showcase`: the services surfaces requirement names `ShopWindow`.
-- `webclient-service-menus`: browser acceptance journeys use the shop window.
+- `webclient-service-menus`: browser acceptance journeys use the shop window; trade completion republishes `party_inventory`.
 
 ## Impact
 

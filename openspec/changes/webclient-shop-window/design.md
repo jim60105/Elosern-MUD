@@ -16,6 +16,9 @@ See proposal.md. `ShopPanel.vue` renders `services.shop` stock/sellable rows wit
 - **Row facts** come from `viewed` (recipient) and the chips from `item_holdings` rows (other members); the comparison panel shows the recipient's delta changes only (server), never recomputed.
 - **Remaining purse** = header purse minus price × quantity, a display-only preview labelled as remaining; the server's result is authoritative.
 - **Stepper** bounds from the committed buy/sell descriptor quantity maximum.
+- **Comparison without a committed slot**: a stock row carries no equipment slot, so the window never names the replaced occupant (that would infer a slot). The 目前 box lists the recipient's committed effective values for the traits the server delta changes (from the `character` panel, only while it names the recipient); the 換上後變化 box lists the item and the server delta lines verbatim. No after value is added up.
+- **Trade republishes the bag**: `shop.buy`/`shop.sell` add `party_inventory` to their affected panels so the party window's 背包 tab and header purse match the trade (the viewed member's panel; the window disables trades while the rail and `shop.member_id` disagree).
+- **無法裝備 codes stay data**: the delta's stable reason code is carried as `data-reason-code`, never shown as text, in the shop rows, chips and `HoldingsStrip`.
 
 ## Risks / Trade-offs
 

@@ -2,6 +2,63 @@
 
 ## MODIFIED Requirements
 
+### Requirement: Service action completion updates canonical panels and preserves narrative
+
+After an admitted service or inventory action settles, the server SHALL emit every returned message through the
+ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before
+sending the matching safe `ui_action_result`. Existing guild and quest actions SHALL retain their
+established affected-panel sets; a settled `shop.buy` or `shop.sell` SHALL additionally republish the viewed member's
+`party_inventory` beside `status`, `services` and `item_holdings`, and a read-only `exam_schedule` reply SHALL leave
+mode and canonical state unchanged.
+
+#### Scenario: Turn-in updates wallet and merit panels together
+- **WHEN** a completed quest is turned in successfully
+- **THEN** narrative carries the reward message and status/services reflect wallet, merit, claim, and quest-log state at one newer revision before unlock
+
+#### Scenario: Item use updates HP and inventory atomically
+- **WHEN** `inventory.use` succeeds for a consumable healing potion
+- **THEN** narrative reports the safe result and one newer canonical commit shows HP, item count, mode, clock, and combat state from the same settlement
+
+#### Scenario: Exam start hands off while retaining personal inventory
+- **WHEN** `guild.exam_request` returns exam_started for the exact next rank
+- **THEN** mode becomes combat, context actions become combat, guild and shop services disappear, and canonical personal inventory remains reachable from the combat affordance
+
+#### Scenario: Mode change tears down exploration service state
+- **WHEN** the browser adopts combat mode
+- **THEN** exploration service menus discard local quantity, selection, confirmation, and speech state while the combat dock owns focus and can open a fresh combat inventory surface
+
+#### Scenario: Rejected inventory action emits no fabricated prose
+- **WHEN** deterministic item or equipment preflight rejects
+- **THEN** only the stable safe rejection is emitted, canonical state remains unchanged, and refreshed inventory permits another legal choice
+
+#### Scenario: Rejected purchase emits no fabricated prose
+- **WHEN** deterministic economy rejects for insufficient funds
+- **THEN** only the stable safe rejection is emitted, wallet and stock remain unchanged, and refreshed services permits another legal choice
+
+#### Scenario: Schedule information does not enter combat
+- **WHEN** guild.exam_request returns exam_schedule
+- **THEN** exploration mode/services remain available, planned attendance renders and no combat panel/session is created
+
+#### Scenario: Inventory actions publish a full snapshot
+- **WHEN** `inventory.use` or `inventory.toggle_equip` settles
+- **THEN** a full snapshot is published because the action may change inventory, contained mirrors, status,
+  character equipment, clock-derived state, combat/context state, terminal mode, and art
+
+#### Scenario: Combat retains services v3 personal data and its own affordance
+- **WHEN** the actor enters combat
+- **THEN** exploration service menus and their local forms are unloaded, services v5 retains personal
+  player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
+  absent in combat
+
+#### Scenario: A trade republishes the viewed member's bag and purse
+- **WHEN** `shop.buy` or `shop.sell` settles successfully while the recipient or seller is the viewed member
+- **THEN** the same newer revision carries the refreshed `services` rows and wallet, the `item_holdings` answer and the viewed member's `party_inventory` with its new held count and party purse, so the party window's 背包 tab and header purse are never stale after a trade
+
+#### Scenario: Prose never drives panel state
+- **WHEN** any success or domain-rejection message is produced
+- **THEN** it is emitted as text and never parsed by the browser to update panel state
+
+
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
 The managed localhost browser suite SHALL exercise, using keyboard controls at 1451x790 and 2560x1440, all
 existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus
