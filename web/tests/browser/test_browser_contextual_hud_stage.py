@@ -475,9 +475,6 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the recess mark clears only when no drawer and no overlay remain open",
         )
 
-    @covers_requirement(
-        "webclient-contextual-hud::the-help-overlay-carries-the-party-management-rules"
-    )
     def test_help_party_rules_are_static_and_absent_from_the_bag(self):
         """The real help opener explains rules without publishing any intent."""
         page = self.logged_in_page()
