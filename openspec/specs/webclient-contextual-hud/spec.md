@@ -1329,11 +1329,11 @@ No reference drawer SHALL present a keyboard router frame. Opening any reference
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
 
 ### Requirement: The party purse renders exactly once per window
-The party purse (the commander's wallet, read from the committed `party_inventory` panel) SHALL be rendered exactly once in the party window, in its `WindowFrame` header extras, and nowhere else in the drawer layer apart from the shop window's own header.
+The party purse (the commander's wallet) SHALL be rendered exactly once per window: in the party window's `WindowFrame` header extras (read from `party_inventory`) and in the shop window's header (read from `services.player.wallet`). The shop action bar MAY show the after-trade remainder, labelled as the remaining purse, and nothing else in the drawer layer SHALL render a balance.
 
 #### Scenario: No other drawer or body element carries a balance
-- **WHEN** the lore reference, the character-status drawer, or any tab body of the party window renders
-- **THEN** none of them renders a balance of its own
+- **WHEN** the lore reference, the quest drawer, or any tab body of the party window renders
+- **THEN** none of them renders a balance of its own, and the shop window's body renders only its action bar's labelled remainder
 
 #### Scenario: An unreadable wallet renders nothing rather than zero
 - **WHEN** the `party_inventory` panel is unavailable or carries no committed non-negative integer purse
@@ -1358,6 +1358,10 @@ The party purse (the commander's wallet, read from the committed `party_inventor
 #### Scenario: Possession shows the same purse
 - **WHEN** the player possesses a companion
 - **THEN** the header purse still shows the commander's wallet
+
+#### Scenario: The shop shows the purse once and a labelled remainder
+- **WHEN** the shop window is open on 購買 with three potions at 40 copper selected and a purse of 1,240
+- **THEN** the header shows 1,240 once and the action bar shows the remaining purse 1,120 labelled as remaining
 
 ### Requirement: Mutations issued from a drawer keep the dispatch and confirmation contract
 Every affordance inside a drawer SHALL emit exactly the server-authored action identifier and payload its descriptor carries, through the client's single dispatch entry, and SHALL be governed by the same in-flight, epoch and revision gates as the same action issued from the dock.

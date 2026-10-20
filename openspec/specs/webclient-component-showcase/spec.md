@@ -279,9 +279,9 @@ OOB-backed payload and inventing no field.
   and only an element that reference itself colour-codes may carry the dot
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
-The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`,
-`QuestBoard`, and `LoreDrawer`) and the party window's `PartyBagTab` (backed by `party_inventory` and
-`item_holdings`) SHALL render only committed OOB data.
+The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, the services-backed panels (`QuestBoard` and
+`LoreDrawer`), the `ShopWindow` (backed by `services` and `item_holdings`), and the party window's
+`PartyBagTab` (backed by `party_inventory` and `item_holdings`) SHALL render only committed OOB data.
 
 #### Scenario: Art degrades to a truthful placeholder
 - **WHEN** the art asset is missing, pending without a prior image, failed, invalid, or unavailable
@@ -337,8 +337,8 @@ The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels 
   standalone catalog strip
 
 #### Scenario: Shop, quest, and lore render only their services payload
-- **WHEN** the shop, quest board, or lore drawer renders
-- **THEN** it renders only its services payload
+- **WHEN** the shop window, quest board, or lore drawer renders
+- **THEN** it renders only its services payload, and the shop window's member chips render only `item_holdings` facts
 
 #### Scenario: The inventory renders its committed fields together
 - **WHEN** the `PartyBagTab` renders

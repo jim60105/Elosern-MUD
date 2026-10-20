@@ -49,11 +49,8 @@ def _sent_payload(page, action_id):
 class ShopJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_open"
 
-    # Canonical webclient-shop-window IDs for the archive to re-point once the
-    # capability exists in the main specs: `the-buy-view-shows-one-price-and-the-recipient-s-facts`.
     @covers_requirement(
-        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
+        "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
     )
     def test_buy_quantity_validation_exact_copper(self):
         page = self.logged_in_page()
@@ -121,11 +118,8 @@ class ShopJourneys(ServicesBrowserTest):
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         self.assertEqual(page.evaluate(FRAME_JS), frame_before)
 
-    # Canonical webclient-shop-window IDs for the archive to re-point once the
-    # capability exists in the main specs: `the-sell-view-lists-the-seller-s-unequipped-items-with-one-price`.
     @covers_requirement(
-        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
+        "webclient-shop-window::the-sell-view-lists-the-seller-s-unequipped-items-with-one-price",
     )
     def test_sell_and_repeated_inventory_without_use_control(self):
         page = self.logged_in_page()
@@ -234,11 +228,9 @@ class ShopJourneys(ServicesBrowserTest):
 class ShopCompanionJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_open_companion"
 
-    # Canonical webclient-shop-window IDs for the archive to re-point once the
-    # capability exists in the main specs: `the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail`, `the-buy-view-shows-one-price-and-the-recipient-s-facts`.
     @covers_requirement(
-        "webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative",
-        "webclient-contextual-hud::the-party-purse-renders-exactly-once-per-window",
+        "webclient-shop-window::the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail",
+        "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
     )
     def test_buy_potions_for_a_companion(self):
         page = self.logged_in_page()
@@ -319,11 +311,8 @@ class ShopCompanionJourneys(ServicesBrowserTest):
 class ShopClosedJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_closed"
 
-    # Canonical webclient-shop-window IDs for the archive to re-point once the
-    # capability exists in the main specs: `the-shop-window-explains-no-rules`.
     @covers_requirement(
-        "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
-        "webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region",
+        "webclient-shop-window::the-shop-window-explains-no-rules",
     )
     def test_closed_shop_disables_all_trades(self):
         page = self.logged_in_page()
