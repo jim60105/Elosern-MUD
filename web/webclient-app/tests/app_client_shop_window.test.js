@@ -71,7 +71,11 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     // The admitted request shows its row while in flight.
     await wrapper.vm.$nextTick();
     expect(get("shop-window__title").text()).toBe("鋼製短劍");
-    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: sent("party.view_member")[0].request_id, presentation_revision: 1 })]);
+    // The server answers the item before settling the request.
+    store.receive(1, "ui_update", [
+      fx.update({ revision: 2, panels: { item_holdings: { ...SHOP_HOLDINGS_POTION, item_key: "steel_shortsword" } } }),
+    ]);
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: sent("party.view_member")[0].request_id, presentation_revision: 2 })]);
     await wrapper.vm.$nextTick();
     await get(`member-rail__entry--${SHOP_KAHN_ID}`).trigger("click");
     expect(sent("party.view_member").at(-1).payload).toEqual({

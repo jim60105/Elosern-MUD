@@ -141,6 +141,25 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(get("shop-window__title").text()).toBe("治療藥水");
   });
 
+  it("a row request that ends without its answer hands the selection back to the committed item", async () => {
+    mountWindow({ itemHoldings: SHOP_HOLDINGS_POTION });
+    await row("steel_shortsword").trigger("click");
+    await wrapper.setProps({ pendingItemKey: "steel_shortsword" });
+    expect(get("shop-window__title").text()).toBe("鋼製短劍");
+    // Rejected: the request ends and item_holdings still answers the potion.
+    await wrapper.setProps({ pendingItemKey: null });
+    expect(get("shop-window__title").text()).toBe("治療藥水");
+  });
+
+  it("an entry holding no valid count disables the trade and hides the preview", async () => {
+    mountWindow({ itemHoldings: SHOP_HOLDINGS_POTION });
+    const input = get("shop-window__quantity");
+    input.element.value = "";
+    await input.trigger("input");
+    expect(get("action-bar__btn--trade").attributes("aria-disabled")).toBe("true");
+    expect(find("shop-window__sum").exists()).toBe(false);
+  });
+
   it("the equipment detail compares the recipient's committed values with the server change lines and chips the other members", () => {
     mountWindow();
     expect(get("shop-window__current").text()).toContain("艾拉");

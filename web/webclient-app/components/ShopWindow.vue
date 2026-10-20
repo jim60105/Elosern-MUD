@@ -108,7 +108,7 @@ const memberPending = computed(() => props.pendingMemberId !== null);
 
 function onRailSelect(id) {
   if (typeof id !== "number" || id === railSelected.value) return;
-  emit("view-member", { memberId: id, itemKey: selectedKey.value });
+  emit("view-member", { memberId: id, itemKey: activeKey.value });
 }
 
 // --------------------------------------------------------------- selection
@@ -131,6 +131,17 @@ watch(
 watch(committedKey, (key) => {
   if (key !== null && props.pendingItemKey === null) selectedKey.value = key;
 });
+// A request that ended without its answer (rejected or failed) hands the
+// selection back to the committed item, so the detail never shows a row
+// whose holdings belong to another item.
+watch(
+  () => props.pendingItemKey,
+  (key, previous) => {
+    if (key === null && previous !== null && committedKey.value !== selectedKey.value) {
+      selectedKey.value = committedKey.value;
+    }
+  },
+);
 const activeRow = computed(() => rowByKey(shop.value, view.value, selectedKey.value));
 const activeKey = computed(() => activeRow.value?.item_key ?? null);
 
@@ -207,8 +218,9 @@ const sendQuantity = computed(() => {
   const typed = raw === "" ? NaN : Number(raw);
   return Number.isInteger(typed) && typed >= bounds.value.min && typed <= bounds.value.max ? typed : null;
 });
+// The preview follows the entry and is hidden while it holds no valid count.
 const preview = computed(() =>
-  tradePreview(purse.value, unitPriceOf(activeRow.value, view.value), sendQuantity.value ?? quantity.value, view.value),
+  sendQuantity.value === null ? null : tradePreview(purse.value, unitPriceOf(activeRow.value, view.value), sendQuantity.value, view.value),
 );
 
 // --------------------------------------------------------------- trade
@@ -218,6 +230,7 @@ const canTrade = computed(
     !!activeRow.value &&
     action.value?.enabled === true &&
     !!bounds.value &&
+    sendQuantity.value !== null &&
     memberId.value !== null &&
     consistent.value &&
     !memberPending.value &&
