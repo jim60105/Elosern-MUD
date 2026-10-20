@@ -369,3 +369,7 @@ The client SHALL bind P (隊伍, last tab), B (背包), C (狀態), K (技能), 
 #### Scenario: Map is inert in combat
 - **WHEN** the player presses M in combat
 - **THEN** nothing opens, because the map entry is absent in combat
+
+#### Scenario: An open surface keeps its own keys
+- **WHEN** a drawer, an overlay or the full log is open, or the party window is open and the player presses J or M
+- **THEN** no hotkey opens another surface behind it; only while the party window itself is open do P, B, C, K and L switch it to their tab
