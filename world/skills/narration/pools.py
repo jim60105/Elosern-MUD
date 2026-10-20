@@ -360,6 +360,76 @@ MISS_LINES = (
     "{target} 早已不在原處。",
 )
 
+DAMAGE_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "graze": (
+            "{target} 只被擦出一道淺痕。",
+            "{target} 幾乎沒受影響。",
+            "{target} 偏了偏身，傷得不重。",
+        ),
+        "light": (
+            "{target} 的傷口淺而清晰。",
+            "{target} 皺了下眉。",
+            "{target} 退了半步，傷勢不深。",
+        ),
+        "solid": (
+            "{target} 悶哼一聲，摀住傷處。",
+            "{target} 的動作明顯慢了下來。",
+            "{target} 的身影晃了一下。",
+        ),
+        "heavy": (
+            "{target} 幾乎站不穩。",
+            "血順著 {target} 的指縫滴落。",
+            "{target} 的呼吸變得破碎。",
+        ),
+        "dire": (
+            "{target} 的身子幾乎被折斷。",
+            "{target} 眼前發黑，幾乎倒下。",
+            "{target} 只憑一口氣撐著。",
+        ),
+    }
+)
+
+HEAL_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "minor": (
+            "{target} 的傷口淺淺收攏。",
+            "{target} 感到一絲暖意。",
+            "{target} 的疼痛輕了些。",
+        ),
+        "restoring": (
+            "{target} 的傷勢明顯好轉。",
+            "{target} 的力氣回來了一些。",
+            "{target} 的呼吸平穩下來。",
+        ),
+        "bountiful": (
+            "{target} 的傷口迅速癒合。",
+            "{target} 幾乎恢復了全盛。",
+            "{target} 感到生命力重新湧上。",
+        ),
+    }
+)
+
+SELF_HEAL_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "minor": (
+            "{actor} 的傷口不再滲血。",
+            "{actor} 感到一點暖意。",
+            "{actor} 的疼痛減輕了。",
+        ),
+        "restoring": (
+            "{actor} 的傷勢明顯好轉。",
+            "{actor} 的力氣正在回來。",
+            "{actor} 的呼吸穩了下來。",
+        ),
+        "bountiful": (
+            "{actor} 的傷口迅速閉合。",
+            "{actor} 幾乎恢復了全盛。",
+            "{actor} 感到生命力重新湧上。",
+        ),
+    }
+)
+
 VERDICT_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "resist": (
@@ -523,6 +593,46 @@ GENERIC_ACTION_LINES = (
     "{actor} 踏前一步，動作展開。",
 )
 
+#: Every special pool the selector can draw from. Validation walks this map so
+#: the authoring guarantee covers the actual runtime selection surface, not
+#: only ``KIND_POOLS`` and per-row overrides.
+SPECIAL_POOLS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "hit": HIT_LINES,
+        "miss": MISS_LINES,
+        **{f"damage:{band}": lines for band, lines in DAMAGE_BAND_LINES.items()},
+        **{f"heal:{band}": lines for band, lines in HEAL_BAND_LINES.items()},
+        **{
+            f"self_heal:{band}": lines
+            for band, lines in SELF_HEAL_BAND_LINES.items()
+        },
+        **{f"verdict:{key}": lines for key, lines in VERDICT_LINES.items()},
+        **{
+            f"pleasure_actor:{key}": lines
+            for key, lines in PLEASURE_ACTOR_LINES.items()
+        },
+        **{
+            f"pleasure_target:{key}": lines
+            for key, lines in PLEASURE_TARGET_LINES.items()
+        },
+        "sexual_counter_actor": SEXUAL_COUNTER_ACTOR_LINES,
+        "sexual_counter_shared": SEXUAL_COUNTER_SHARED_LINES,
+        **{
+            f"trait_delta:{key}": lines
+            for key, lines in TRAIT_DELTA_LINES.items()
+        },
+        **{
+            f"transition:{key}": lines
+            for key, lines in TRANSITION_LINES.items()
+        },
+        **{
+            f"commanded:{key}": lines
+            for key, lines in COMMANDED_ACTION_LINES.items()
+        },
+        "generic_action": GENERIC_ACTION_LINES,
+    }
+)
+
 #: Structural combat prose. Single stable lines on purpose (design D10).
 CONTINUE_MESSAGE = "刀光未歇，下一輪交手已然開始。"
 
@@ -557,10 +667,12 @@ __all__ = [
     "COMPACT_POOLS",
     "COMPOSABLE_KINDS",
     "CONTINUE_MESSAGE",
+    "DAMAGE_BAND_LINES",
     "ENGAGEMENT_OPENING_TEMPLATE",
     "FALLBACK_TEMPLATES",
     "GENERIC_ACTION_LINES",
     "HIT_LINES",
+    "HEAL_BAND_LINES",
     "INTERNAL_KINDS",
     "KIND_POOLS",
     "MISS_LINES",
@@ -571,6 +683,8 @@ __all__ = [
     "PLEASURE_TARGET_LINES",
     "SEXUAL_COUNTER_ACTOR_LINES",
     "SEXUAL_COUNTER_SHARED_LINES",
+    "SELF_HEAL_BAND_LINES",
+    "SPECIAL_POOLS",
     "TERMINAL_OUTCOME_MESSAGES",
     "TRAIT_DELTA_LINES",
     "TRANSITION_LINES",

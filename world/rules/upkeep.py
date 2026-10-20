@@ -75,9 +75,13 @@ def _stored_maxima(battlefield: Any) -> dict[str, float]:
 def _narrate_upkeep_entries(
     entries: list[EventEntry],
     scope: str,
-    maximums: dict[str, float],
+    battlefield: Any,
 ) -> list[EventEntry]:
     """Select authored numbers-free prose for one upkeep log's entries."""
+    try:
+        maximums = _stored_maxima(battlefield)
+    except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal round (design D11)
+        maximums = {}
     narrated: list[EventEntry] = []
     for ordinal, entry in enumerate(entries):
         if entry.kind in INTERNAL_KINDS:
@@ -281,7 +285,7 @@ def settle_upkeep(
         if not entries:
             continue
         entries = _narrate_upkeep_entries(
-            entries, narration_scope, _stored_maxima(battlefield)
+            entries, narration_scope, battlefield
         )
         log = EventLog(
             actor=per_source_key[source_pk],

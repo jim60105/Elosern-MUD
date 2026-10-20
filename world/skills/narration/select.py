@@ -19,13 +19,16 @@ from .families import base_family_key
 from .pools import (
     COMMANDED_ACTION_LINES,
     COMPACT_POOLS,
+    DAMAGE_BAND_LINES,
     GENERIC_ACTION_LINES,
+    HEAL_BAND_LINES,
     HIT_LINES,
     INTERNAL_KINDS,
     KIND_POOLS,
     MISS_LINES,
     PLEASURE_ACTOR_LINES,
     PLEASURE_TARGET_LINES,
+    SELF_HEAL_BAND_LINES,
     SEXUAL_COUNTER_ACTOR_LINES,
     SEXUAL_COUNTER_SHARED_LINES,
     TRAIT_DELTA_LINES,
@@ -103,25 +106,26 @@ def choose_line(
     return None
 
 
-def _row_override(
+def _override_tiers(
     skill_key: str,
     family: str | None,
     kind: str,
     catalog: Grid,
     families: Grid,
-) -> tuple[str, ...]:
+) -> list[tuple[str, ...]]:
+    tiers: list[tuple[str, ...]] = []
     row = catalog.get(skill_key)
     if row is not None:
         lines = row.kind_lines.get(kind)
         if lines:
-            return lines
+            tiers.append(lines)
     for key in _family_chain(family):
         family_row = families.get(key)
         if family_row is not None:
             lines = family_row.kind_lines.get(kind)
             if lines:
-                return lines
-    return ()
+                tiers.append(lines)
+    return tiers
 
 
 def _family_chain(family: str | None) -> tuple[str, ...]:
@@ -131,21 +135,33 @@ def _family_chain(family: str | None) -> tuple[str, ...]:
     return (family,) if base == family else (family, base)
 
 
+def _action_tiers(
+    skill_key: str,
+    family: str | None,
+    catalog: Grid = NARRATION_CATALOG,
+    families: Grid = FAMILY_ROWS,
+) -> list[tuple[str, ...]]:
+    """Return the action-clause tiers in lookup order."""
+    tiers: list[tuple[str, ...]] = []
+    row = catalog.get(skill_key)
+    if row is not None and row.action:
+        tiers.append(row.action)
+    for key in _family_chain(family):
+        family_row = families.get(key)
+        if family_row is not None and family_row.action:
+            tiers.append(family_row.action)
+    tiers.append(GENERIC_ACTION_LINES)
+    return tiers
+
+
 def action_lines(
     skill_key: str,
     family: str | None,
     catalog: Grid = NARRATION_CATALOG,
     families: Grid = FAMILY_ROWS,
 ) -> tuple[str, ...]:
-    """Return the action clause candidates for one skill."""
-    row = catalog.get(skill_key)
-    if row is not None and row.action:
-        return row.action
-    for key in _family_chain(family):
-        family_row = families.get(key)
-        if family_row is not None and family_row.action:
-            return family_row.action
-    return GENERIC_ACTION_LINES
+    """Return the first action-clause tier for one skill."""
+    return _action_tiers(skill_key, family, catalog, families)[0]
 
 
 def action_line(
@@ -159,10 +175,12 @@ def action_line(
     families: Grid = FAMILY_ROWS,
 ) -> str:
     """Return the selected action-clause template for one resolved action."""
-    lines = action_lines(skill_key, family, catalog, families)
     seed = narration_seed(scope, skill_key, "action", 0, target_key, "")
-    chosen = choose_line(lines, seed, actor=actor, target="")
-    return chosen if chosen is not None else lines[0]
+    for lines in _action_tiers(skill_key, family, catalog, families):
+        chosen = choose_line(lines, seed, actor=actor, target="")
+        if chosen is not None:
+            return chosen
+    return COMPACT_POOLS["action_narration"]
 
 
 def _amount(data: Mapping[str, Any], key: str = "amount") -> float | None:
@@ -203,6 +221,15 @@ def _special_lines(
 ) -> tuple[str, ...]:
     if kind == "roll":
         return HIT_LINES if bool(data.get("hit")) else MISS_LINES
+    if kind == "damage":
+        table = DAMAGE_BAND_LINES
+        return table.get(band, table["solid"])
+    if kind == "heal":
+        table = HEAL_BAND_LINES
+        return table.get(band, table["restoring"])
+    if kind == "self_heal":
+        table = SELF_HEAL_BAND_LINES
+        return table.get(band, table["restoring"])
     if kind == "pleasure_gain":
         table = (
             PLEASURE_ACTOR_LINES
@@ -255,20 +282,25 @@ def entry_line(
     if kind in INTERNAL_KINDS:
         return ""
     band = band_for_entry(kind, data, max_hp)
-    lines = _row_override(skill_key, family, kind, catalog, families)
-    if not lines:
-        lines = _special_lines(
-            kind,
-            data,
-            actor_key=actor_key,
-            target_key=target_key,
-            act=act,
-            band=band,
-        )
-    if not lines:
-        lines = KIND_POOLS.get(kind, ())
     seed = narration_seed(scope, skill_key, kind, ordinal, target_key, band)
-    chosen = choose_line(lines, seed, actor=actor, target=target)
+    for lines in _override_tiers(skill_key, family, kind, catalog, families):
+        chosen = choose_line(lines, seed, actor=actor, target=target)
+        if chosen is not None:
+            return chosen
+    special = _special_lines(
+        kind,
+        data,
+        actor_key=actor_key,
+        target_key=target_key,
+        act=act,
+        band=band,
+    )
+    chosen = choose_line(special, seed, actor=actor, target=target)
+    if chosen is not None:
+        return chosen
+    chosen = choose_line(
+        KIND_POOLS.get(kind, ()), seed, actor=actor, target=target
+    )
     if chosen is not None:
         return chosen
     compact = COMPACT_POOLS.get(kind)
@@ -318,7 +350,7 @@ def commanded_action_line(action_kind: str, *, actor: str) -> str:
         narration_seed("", "", "commanded_action", 0, action_kind, ""),
         actor=actor,
         target="",
-    ) or lines[0]
+    ) or COMPACT_POOLS["commanded_action"]
 
 
 def act_for_skill(skill_key: str) -> SexualActDef | None:

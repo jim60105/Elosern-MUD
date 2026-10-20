@@ -42,7 +42,7 @@ from world.rules.sexual_transitions import apply_event
 from world.rules.unlock_notices import UnlockNotice
 from world.rules.upkeep import settle_upkeep
 from world.skills.registry import SKILL_REGISTRY, SkillKind
-from world.skills.narration import entry_line
+from world.skills.narration import COMPACT_POOLS, entry_line
 
 
 def default_attack_policy(
@@ -124,18 +124,22 @@ def _action_skipped_event_log(
     narration_scope: str = "",
 ) -> EventLog:
     key = str(entity.key)
-    entry = EventEntry(
-        kind="action_skipped",
-        actor=key,
-        target=None,
-        data=dict(data) if data is not None else {},
-        text_template=entry_line(
+    try:
+        template = entry_line(
             "action_skipped",
             {},
             scope=narration_scope,
             actor_key=key,
             actor=key,
-        ),
+        )
+    except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal round (design D11)
+        template = COMPACT_POOLS["action_skipped"]
+    entry = EventEntry(
+        kind="action_skipped",
+        actor=key,
+        target=None,
+        data=dict(data) if data is not None else {},
+        text_template=template,
     )
     return EventLog(key, "", (), (entry,), 0)
 

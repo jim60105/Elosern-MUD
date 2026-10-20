@@ -6,6 +6,7 @@ and every active skill resolves through a family tier in this change.
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import world.skills.sexual_acts  # noqa: F401  (registers the act rows)
 from world.skills.narration import (
@@ -15,7 +16,12 @@ from world.skills.narration import (
     family_key,
 )
 from world.skills.narration.validation import validate_catalog
-from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
+from world.skills.registry import (
+    SHIPPED_SKILL_REGISTRY,
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillKind,
+)
 
 
 class NarrationCoverageContractTests(unittest.TestCase):
@@ -54,6 +60,16 @@ class NarrationCoverageContractTests(unittest.TestCase):
         for skill in acts:
             with self.subTest(key=skill.key):
                 self.assertTrue(FAMILY_ROWS[family_key(skill)].action)
+
+    def test_a_synthetic_registry_scope_never_trips_validation(self):
+        # The catalog validates against the shipped snapshot, never the live
+        # binding a synthetic kit scope substitutes for the duration of a test.
+        with patch.dict(
+            SKILL_REGISTRY,
+            {"t_scope_only": SKILL_REGISTRY["basic_attack"]},
+            clear=True,
+        ):
+            validate_catalog(NARRATION_CATALOG, shipped=SHIPPED_SKILL_REGISTRY)
 
 
 if __name__ == "__main__":

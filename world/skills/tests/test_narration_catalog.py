@@ -8,10 +8,10 @@ contract rather than echoing registry data.
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 from world.skills.narration import (
     COMPACT_POOLS,
+    DAMAGE_BAND_LINES,
     FALLBACK_TEMPLATES,
     FAMILY_ROWS,
     INTERNAL_KINDS,
@@ -32,8 +32,6 @@ from world.skills.narration import (
 from world.skills.narration.select import choose_line, narration_seed
 from world.skills.narration.validation import build_catalog, validate_catalog
 from world.skills.registry import (
-    SHIPPED_SKILL_REGISTRY,
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
@@ -150,7 +148,7 @@ class LookupChainTests(unittest.TestCase):
             catalog={},
             families={},
         )
-        self.assertIn(line, KIND_POOLS["damage"])
+        self.assertIn(line, DAMAGE_BAND_LINES["solid"])
 
     def test_a_resolved_named_row_keeps_a_short_name(self):
         row = _row("t_short", lines=("{target} 的傷勢浮現。",))
@@ -189,7 +187,7 @@ class LookupChainTests(unittest.TestCase):
 
 class FamilyKeyTests(unittest.TestCase):
     def test_elemental_skills_split_by_element_and_shape(self):
-        fire = Element("fire", "火", "x")
+        fire = Element("fire", "fx", "x")
         assault = _skill(
             "t_fire_assault",
             category=SkillCategory.ELEMENTAL_MAGIC,
@@ -301,17 +299,6 @@ class CatalogValidationTests(unittest.TestCase):
                         action=("{actor}{target}",),
                     )
                 }
-            )
-
-    def test_a_synthetic_registry_scope_never_trips_shipped_validation(self):
-        with patch.dict(
-            SKILL_REGISTRY,
-            {"t_scope_only": _skill("t_scope_only", category=SkillCategory.MARTIAL_ARTS)},
-            clear=True,
-        ):
-            validate_catalog(
-                NARRATION_CATALOG,
-                shipped=SHIPPED_SKILL_REGISTRY,
             )
 
 

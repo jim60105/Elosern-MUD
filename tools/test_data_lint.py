@@ -67,6 +67,11 @@ CORPUS_EXCLUDES = ("/dist/", "/node_modules/")
 JS_SUFFIXES = (".js", ".mjs", ".cjs", ".ts", ".tsx")
 CATALOG_PACKAGES = ("world.lore", "world.skills", "world.quests", "world.maps")
 EXTRA_CATALOG_MODULES = ("world.rules.dialogue",)
+# Presentation-only packages: their authored prose and lookup keys are not
+# shipped-content identifiers (no registry/rulebook token is defined there),
+# so harvesting their module mappings would only retroactively flag behavior
+# tests that mention an entry kind or a terminal outcome name.
+PRESENTATION_MODULES = ("world.skills.narration",)
 SYMBOL_RE = re.compile(r"(_REGISTRY|_TABLE|_TIERS|_PACK_REGISTRY)$|^XYMAP_DATA$")
 DISPLAY_FIELDS = frozenset(
     {
@@ -211,6 +216,11 @@ def _catalog_module_names() -> list[str]:
                 dotted = ".".join(relative.parent.parts)
             else:
                 dotted = ".".join(relative.with_suffix("").parts)
+            if any(
+                dotted == excluded or dotted.startswith(excluded + ".")
+                for excluded in PRESENTATION_MODULES
+            ):
+                continue
             if dotted == package_name or dotted.startswith(package_name + "."):
                 names.append(dotted)
     names.extend(EXTRA_CATALOG_MODULES)

@@ -866,7 +866,10 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
         return _rejected("engage_failed", "無法開始戰鬥。")
     from world.skills.narration import engagement_opening_line
 
-    message = engagement_opening_line(str(monster.key))
+    try:
+        message = engagement_opening_line(str(monster.key))
+    except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal engage (design D11)
+        message = "你向目標發起了攻擊！"
     actor.msg(message)
     return _success("engaged", message, AFFECTED_ENGAGE)
 

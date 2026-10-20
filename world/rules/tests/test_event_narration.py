@@ -7,7 +7,9 @@ import unittest
 from world.skills.narration import (
     COMPACT_POOLS,
     CONTINUE_MESSAGE,
+    DAMAGE_BAND_LINES,
     FAMILY_ROWS,
+    HEAL_BAND_LINES,
     KIND_POOLS,
     MAX_RENDERED_CODE_POINTS,
     NARRATION_KINDS,
@@ -244,6 +246,87 @@ class CompositionTests(unittest.TestCase):
             action_line("t_special", None, catalog={"t_special": row}, families={}),
             "{actor} 精確出手——",
         )
+
+    def test_an_over_long_actor_degrades_the_action_and_marker(self):
+        long_actor = "名" * 300
+        self.assertEqual(
+            action_line(
+                "t_special",
+                None,
+                actor=long_actor,
+                catalog={"t_special": NarrationRow("t_special", action=("{actor} 出手——",))},
+                families={},
+            ),
+            COMPACT_POOLS["action_narration"],
+        )
+        self.assertEqual(
+            commanded_action_line("skill", actor=long_actor),
+            COMPACT_POOLS["commanded_action"],
+        )
+
+    def test_the_exact_tier_yields_to_a_fitting_family_tier(self):
+        oversized = NarrationRow(
+            "t_exact",
+            kind_lines={"damage": ("{target}" + "字" * 300, )},
+        )
+        family = NarrationRow(
+            "martial_arts",
+            kind_lines={"damage": ("{target} 家族的一擊。", )},
+        )
+        self.assertEqual(
+            entry_line(
+                "damage",
+                {},
+                skill_key="t_exact",
+                family="martial_arts",
+                target_key="goblin",
+                actor="hero",
+                target="goblin",
+                catalog={"t_exact": oversized},
+                families={"martial_arts": family},
+            ),
+            "{target} 家族的一擊。",
+        )
+
+    def test_damage_and_heal_pools_follow_the_band(self):
+        self.assertIn(
+            entry_line(
+                "damage", {"amount": 3}, actor="a", target="t", max_hp=100
+            ),
+            DAMAGE_BAND_LINES["graze"],
+        )
+        self.assertIn(
+            entry_line(
+                "damage", {"amount": 90}, actor="a", target="t", max_hp=100
+            ),
+            DAMAGE_BAND_LINES["dire"],
+        )
+        self.assertIn(
+            entry_line(
+                "heal", {"amount": 80}, actor="a", target="t", max_hp=100
+            ),
+            HEAL_BAND_LINES["bountiful"],
+        )
+
+    def test_a_resisted_act_composes_an_attempt_without_contact(self):
+        row = NarrationRow(
+            "t_act",
+            action=("{actor} 朝對方伸手——",),
+        )
+        template = compose_first_line(
+            "t_act",
+            "sexual_act:關係",
+            "{target} 輕輕別過臉，拒絕了這場靠近。",
+            scope="s",
+            target_key="target",
+            actor="hero",
+            target="target",
+            catalog={"t_act": row},
+            families=FAMILY_ROWS,
+        )
+        rendered = template.format(actor="hero", target="target")
+        for contact in ("拉住", "貼了上去", "落在對方肩上"):
+            self.assertNotIn(contact, rendered)
 
 
 class StructuralProseTests(unittest.TestCase):

@@ -30,6 +30,7 @@ from .pools import (
     NARRATION_KINDS,
     OVERWHELM_SUMMARY_LINE,
     PARTY_RETREAT_LINES,
+    SPECIAL_POOLS,
     TERMINAL_OUTCOME_MESSAGES,
 )
 from .vocab import (
@@ -111,6 +112,13 @@ def _validate_pools() -> None:
             raise NarrationCatalogError(
                 f"compact fallback for {kind!r} is too long"
             )
+    for pool_name, lines in SPECIAL_POOLS.items():
+        if not lines:
+            raise NarrationCatalogError(
+                f"special pool {pool_name!r} must declare at least one line"
+            )
+        for index, line in enumerate(lines):
+            validate_line(line, owner=f"special pool {pool_name!r}[{index}]")
 
 
 def _validate_composed_pairs(rows: Iterable[NarrationRow]) -> None:
@@ -121,6 +129,9 @@ def _validate_composed_pairs(rows: Iterable[NarrationRow]) -> None:
         compact = COMPACT_POOLS.get(kind)
         if compact is not None:
             outcomes.append((kind, compact))
+    for pool_name, lines in SPECIAL_POOLS.items():
+        for line in lines:
+            outcomes.append((pool_name, line))
     for row in rows:
         for kind, lines in row.kind_lines.items():
             for line in lines:
@@ -212,15 +223,20 @@ def validate_catalog(
     for key, skill in active.items():
         if key in catalog:
             continue
-        if skill.category is SkillCategory.SEXUAL_ACT:
-            # Sexual acts are always pending in this change; their sidecars
-            # carry the line, so coverage is deferred to the act change.
-            continue
         if skill.category.value in pending:
             continue
         raise NarrationCatalogError(
             f"active skill {key!r} has no narration row and its family "
             f"{_active_family(skill)!r} is not declared pending"
+        )
+    for key in acts:
+        if key in catalog:
+            continue
+        if "sexual_act" in pending:
+            continue
+        raise NarrationCatalogError(
+            f"sexual act {key!r} has no narration row and its family "
+            "'sexual_act' is not declared pending"
         )
 
     _validate_composed_pairs((*catalog.values(), *family_rows.values()))

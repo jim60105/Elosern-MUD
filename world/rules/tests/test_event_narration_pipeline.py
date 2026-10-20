@@ -221,6 +221,34 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             any(character.isdigit() for character in render_entry_text(damage))
         )
 
+    def test_an_upkeep_narration_fault_degrades_instead_of_aborting(self):
+        from world.rules.upkeep import settle_upkeep
+
+        monster = self._monster(hp=500)
+        _, field = self._request(self.damage_skill, monster)
+        record = type(
+            "Tick",
+            (),
+            {"source_pk": self.player.pk, "delta": -12.0, "hp_before": 500.0},
+        )()
+        with patch(
+            "world.rules.upkeep.entry_line",
+            side_effect=RuntimeError("narration fault"),
+        ):
+            logs = settle_upkeep(
+                field,
+                {monster.key: (record,)},
+                narration_scope="field|3|upkeep",
+            )
+        self.assertEqual(len(logs), 1)
+        damage = next(
+            entry for entry in logs[0].entries if entry.kind == "damage"
+        )
+        self.assertEqual(damage.data["amount"], 12)
+        self.assertFalse(
+            any(character.isdigit() for character in render_entry_text(damage))
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
