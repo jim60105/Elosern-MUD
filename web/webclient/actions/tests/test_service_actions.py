@@ -935,6 +935,52 @@ class ServiceDispatchTests(ServiceActionBase):
             )
         self.assertEqual(register_mock.call_count, 1)
 
+    @covers_requirement(
+        "webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative"
+    )
+    def test_trade_republishes_the_viewed_members_bag_and_purse(self):
+        # webclient-shop-window: a settled trade republishes the viewed
+        # member's party_inventory beside services, so the party window's bag
+        # tab and header purse match the trade without a full snapshot.
+        from world.rules.party import join_party
+        from web.webclient.presentation.party_view_selection import select_party_view
+
+        self.player.location = self.store
+        self.player.db.wallet = 1000
+        companion = create_object(NPC, key="艾拉", location=self.store)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        select_party_view(self.session, self.player.pk, companion.pk, "shop", None, _T_MEAL)
+        for action_id in ("shop.buy", "shop.sell"):
+            self.assertIn(
+                "party_inventory", self.action_registry.spec(action_id).affected_panels
+            )
+        coordinator = self._coordinator()
+        handle_ui_action(
+            self.session,
+            self.player,
+            self._envelope(
+                coordinator,
+                "shop.buy",
+                {"item_key": _T_MEAL, "quantity": 2, "recipient_id": companion.pk},
+            ),
+            self.action_registry,
+            self.registry,
+        )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        updates = [call for call in self.session.sent if "ui_update" in call]
+        self.assertTrue(updates)
+        panels = updates[-1]["ui_update"][0][0]["panels"]
+        self.assertIn("services", panels)
+        bag = panels["party_inventory"]
+        self.assertEqual(bag["member_id"], companion.pk)
+        self.assertEqual(bag["purse"], self.player.db.wallet)
+        self.assertEqual(panels["services"]["player"]["wallet"], self.player.db.wallet)
+        held = {row["item_key"]: row["held"] for row in bag["rows"]}
+        self.assertEqual(held[_T_MEAL], 2)
+
     @covers_requirement("webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
     def test_host_disappearance_between_render_and_submit(self):
         self._register()
