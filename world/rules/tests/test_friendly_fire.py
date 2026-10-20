@@ -179,7 +179,12 @@ class FriendlyFireBase(BattlefieldIsolation, EvenniaTest):
         grant_lineage(self.player, list(skill_keys))
 
     def _run_hit(self, skill_key, targets):
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             return complete_party_draft(
                 self.player, self.monster, submit_player_action(self.player, skill_key, targets)
             )
@@ -586,6 +591,7 @@ class OpeningFriendlyFireTests(FriendlyFireBase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             seeded = submit_opening_action(
                 self.player, _T_AREA, [companion, self.monster]

@@ -206,7 +206,7 @@ class RestrictionBehaviorTests(EvenniaTest):
         before = self.snapshot()
         for trade in (buy, sell):
             with self.assertRaises(TradeError) as raised:
-                trade(self.host, self.char2, _RING.key)
+                trade(self.player, self.host, _RING.key, 1, self.player.pk)
             self.assertEqual(raised.exception.args[0], TradeReason.UNSELLABLE)
         for delta in ({"additions": (_RING.key,)}, {"removals": (_RING.key,)}):
             with self.assertRaises(InventoryError):

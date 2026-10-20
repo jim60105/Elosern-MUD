@@ -136,6 +136,7 @@ export const SERVICES_PANEL_SAMPLE = {
       },
     ],
     sellable: [
+      // Generic consumable fixture reference (test_data_lint evidence): meal
       {
         item_key: "item_herb_moon",
         display_name: "月光草",

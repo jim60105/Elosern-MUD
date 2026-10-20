@@ -576,6 +576,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             return complete_party_draft(
                 self.player,
@@ -715,6 +716,7 @@ class SnapshotWideningTests(SexualCoercionBase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             return complete_party_draft(
                 self.player,
