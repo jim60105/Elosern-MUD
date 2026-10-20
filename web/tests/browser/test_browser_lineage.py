@@ -1,6 +1,6 @@
 """Party window 系譜 tab browser acceptance (webclient-party-lineage-tab).
 
-Two deterministic journeys on the shared managed server: the 技能系譜 tool
+Two deterministic journeys on the shared managed server: the L hotkey
 opens the party window on its 系譜 tab, where the committed ``lineage`` panel
 renders its graph list (root name, node diamonds, owned/total) and the
 selected graph drawn by depth (per-node levels, 見頂, XP meters, labelled
@@ -181,9 +181,12 @@ class PartyLineageTabBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # The 技能系譜 tool opens the party window on its 系譜 tab.
-        opener = page.locator('[data-testid="nav-tool-lineage"]')
-        opener.click()
+        # The L window hotkey opens the party window on its 系譜 tab
+        # (webclient-main-navigation-hotkeys), with the focused 隊伍 entry as
+        # its opener.
+        opener = page.locator('[data-nav-slot="party"]')
+        opener.focus()
+        page.keyboard.press("l")
         page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="party-window"]').get_attribute("data-tab"), "lineage"
@@ -232,15 +235,15 @@ class PartyLineageTabBrowserTest(BrowserAcceptanceTest):
         self.assertLess(tops[1], tops[2])
         self.assertEqual(page.evaluate("() => document.querySelectorAll('.lineage-chain__meter').length"), 0)
 
-        # Closing the window returns focus to the tool.
+        # Closing the window returns focus to the 隊伍 entry it was opened from.
         page.keyboard.press("Escape")
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"party-window\"]') === null",
             timeout=15000,
         )
         self.assertEqual(
-            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
-            "nav-tool-lineage",
+            page.evaluate("document.activeElement && document.activeElement.dataset.navSlot"),
+            "party",
         )
 
     @covers_requirement("skill-lineage-panel::the-party-window-lineage-tab-renders-the-graphs-from-the-view-alone")
@@ -254,7 +257,8 @@ class PartyLineageTabBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        page.locator('[data-testid="nav-tool-lineage"]').click()
+        page.locator('[data-nav-slot="party"]').focus()
+        page.keyboard.press("l")
         page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="party-window__tab-unavailable"]').inner_text(),

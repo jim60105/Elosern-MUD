@@ -1,6 +1,6 @@
-"""Top navigation placement, the shared tool tooltip, and the place card's hierarchy.
+"""Top navigation placement, the shared tool tooltip, the window hotkeys, and the place card's hierarchy.
 
-webclient-chrome-navigation-polish. Offline: the real Vue surfaces render from
+webclient-chrome-navigation-polish; webclient-main-navigation-hotkeys. Offline: the real Vue surfaces render from
 the static Storybook build, so no game server or generation service runs.
 """
 from __future__ import annotations
@@ -32,9 +32,11 @@ MEASURE_NAV = """() => {
     // scrollWidth/clientWidth are integers, so a fractional chrome factor can
     // leave a label that fits (its rect is inside its box) rounding to a 1px
     // difference. The suite's geometry tolerance is 1px.
-    clipped: [...document.querySelectorAll('[data-testid="nav-primary"] > button > span')]
+    clipped: [...document.querySelectorAll('[data-testid="nav-primary"] .desktop-navigation__label')]
       .filter((e) => e.scrollWidth > e.clientWidth + 1.5).map((e) => e.textContent),
-    overlap: cluster ? buttons.filter((b) => b.getBoundingClientRect().right > cluster.left).map((b) => b.textContent.trim() || b.getAttribute('aria-label')) : [],
+    overlap: cluster ? buttons.filter((b) => b.getBoundingClientRect().right > cluster.left).map((b) => b.dataset.navSlot || b.getAttribute('aria-label')) : [],
+    // Every control stands inside the 48px bar.
+    outside: buttons.filter((b) => { const r = b.getBoundingClientRect(); return r.top < -0.5 || r.bottom > 48.5 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1); }).length,
   };
 }"""
 
@@ -84,21 +86,24 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
                 dialogue = self.page.evaluate(MEASURE_NAV)
                 self.story("core-appshell--combat-hud", '[data-testid="nav-tools"]')
                 combat = self.page.evaluate(MEASURE_NAV)
-                self.assertEqual(explore["slots"], ["character", "quests", "inventory", "map", "settings"])
-                # Combat drops 角色狀態, 任務 and 地圖 outright; 背包 stands before 設定.
-                self.assertEqual(combat["slots"], ["inventory", "settings"])
+                self.assertEqual(explore["slots"], ["party", "quests", "map"])
+                # Combat drops 任務 and 地圖 outright; 隊伍 stays.
+                self.assertEqual(combat["slots"], ["party"])
                 for data in (explore, dialogue, combat):
                     self.assertEqual(data["placeholders"], 0)
                     self.assertEqual(data["overlap"], [])
+                    self.assertEqual(data["outside"], 0)
                     # Every label fits its control whole in the compact
                     # (up to 1350px) and the full padding.
                     self.assertEqual(data["clipped"], [])
                     self.assertAlmostEqual(explore["settings"], data["settings"], delta=1)
                     self.assertAlmostEqual(explore["tools"], data["tools"], delta=1)
+                # 設定 ends the bar, after the tool group.
+                self.assertGreater(combat["settings"], combat["tools"])
                 # The absent entries are out of the tab order as well.
-                self.page.locator('[data-testid="nav-settings"]').focus()
+                self.page.locator('[data-testid="nav-tool-letters"]').focus()
                 self.page.keyboard.press("Shift+Tab")
-                self.assertEqual(self.page.evaluate("document.activeElement.textContent.trim()"), "背包")
+                self.assertEqual(self.page.evaluate("document.activeElement.dataset.navSlot"), "party")
 
     @covers_requirement("webclient-desktop-shell::top-navigation-retains-stable-tool-placement-while-respecting-mode-availability")
     def test_unavailable_quest_entry_leaves_no_placeholder(self):
@@ -106,7 +111,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
         full = self.page.evaluate(MEASURE_NAV)
         self.story("core-desktopnavigation--quests-unavailable", '[data-testid="nav-tools"]')
         partial_nav = self.page.evaluate(MEASURE_NAV)
-        self.assertEqual(partial_nav["slots"], ["character", "inventory", "map", "settings"])
+        self.assertEqual(partial_nav["slots"], ["party", "map"])
         self.assertEqual(partial_nav["placeholders"], 0)
         self.assertAlmostEqual(full["settings"], partial_nav["settings"], delta=1)
         self.assertAlmostEqual(full["tools"], partial_nav["tools"], delta=1)
@@ -122,12 +127,12 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
           window.__escapes = 0;
           document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__escapes += 1; });
         }""")
-        self.page.locator('[data-testid="nav-settings"]').focus()
+        self.page.locator('[data-nav-slot="map"]').focus()
         self.page.keyboard.press("Tab")
-        self.assertEqual(self.active_testid(), "nav-tool-lineage")
+        self.assertEqual(self.active_testid(), "nav-tool-letters")
         tip = self.page.locator('[data-testid="nav-tooltip"]')
         tip.wait_for(state="visible")
-        self.assertEqual(tip.inner_text(), "技能系譜")
+        self.assertEqual(tip.inner_text(), "信件")
         self.assertEqual(tip.get_attribute("aria-hidden"), "true")
         # The tooltip hangs under the 48px bar, inside the viewport.
         box = tip.bounding_box()
@@ -136,7 +141,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
 
         self.page.keyboard.press("Escape")
         self.assertEqual(tip.count(), 0)
-        self.assertEqual(self.active_testid(), "nav-tool-lineage")
+        self.assertEqual(self.active_testid(), "nav-tool-letters")
         self.assertEqual(self.page.evaluate("window.__escapes"), 0)
         self.page.keyboard.press("Escape")
         self.assertEqual(self.page.evaluate("window.__escapes"), 1)
@@ -155,6 +160,47 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
         self.assertEqual(tip.inner_text(), "稱號冊")
         self.page.click('[data-testid="nav-tool-codex"]')
         self.assertEqual(tip.count(), 0)
+
+    @covers_requirement(
+        "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe",
+        "webclient-desktop-shell::top-navigation-retains-stable-tool-placement-while-respecting-mode-availability",
+    )
+    def test_p_and_b_open_the_party_window_and_typing_never_does(self):
+        # The added "Window hotkeys act only outside text inputs" requirement's
+        # ID joins this annotation once the archive syncs it into the main spec.
+        self.page.set_viewport_size({"width": 1451, "height": 790})
+        self.story("core-appshell--populated-hud", '[data-nav-slot="party"]')
+        window = self.page.locator('[data-testid="party-window"]')
+        self.page.evaluate("document.activeElement && document.activeElement.blur()")
+        # P opens the party window on its last tab (成員 on a fresh session),
+        # and the bar marks 隊伍 current.
+        self.page.keyboard.press("p")
+        window.wait_for(state="visible")
+        self.assertEqual(window.get_attribute("data-tab"), "member")
+        self.assertEqual(
+            self.page.evaluate("""[...document.querySelectorAll('.desktop-navigation [aria-current="page"]')].map((b) => b.dataset.navSlot)"""),
+            ["party"],
+        )
+        self.page.keyboard.press("Escape")
+        window.wait_for(state="detached")
+        # B opens it on 背包; P then reopens on the remembered 背包.
+        self.page.keyboard.press("b")
+        window.wait_for(state="visible")
+        self.assertEqual(window.get_attribute("data-tab"), "bag")
+        self.page.keyboard.press("Escape")
+        window.wait_for(state="detached")
+        self.page.keyboard.press("p")
+        window.wait_for(state="visible")
+        self.assertEqual(window.get_attribute("data-tab"), "bag")
+        self.page.keyboard.press("Escape")
+        window.wait_for(state="detached")
+        # Typed into the command line, p and b are text.
+        self.page.keyboard.press("/")
+        field = self.page.locator("#inputfield")
+        field.wait_for(state="visible")
+        self.page.keyboard.type("pb")
+        self.assertEqual(field.input_value(), "pb")
+        self.assertEqual(window.count(), 0)
 
     @covers_requirement("webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time")
     def test_place_card_sets_heading_rule_and_tabular_time(self):

@@ -563,9 +563,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # capability-driven [move, look, interact, wait, suggestions];
         # 角色狀態 opens from the DesktopNavigation entry — the nav click
         # routes the same store confirm the dock row carried).
-        # Since webclient-party-status-tab the entry opens the frameless
-        # party window on its 狀態 tab and switches no sub-dock.
-        page.locator('.desktop-navigation button', has_text="角色狀態").click()
+        # Since webclient-party-status-tab the opener opens the frameless
+        # party window on its 狀態 tab and switches no sub-dock; since
+        # webclient-main-navigation-hotkeys it is the C window hotkey.
+        page.keyboard.press("c")
         page.wait_for_selector('[data-testid="party-status-tab"]', timeout=15000)
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),

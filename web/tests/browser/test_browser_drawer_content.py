@@ -232,7 +232,8 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
             mode="exploration",
         )
         _wait_mode(page, "exploration")
-        page.locator('[data-testid="nav-tool-lineage"]').click()
+        page.locator('[data-nav-slot="party"]').focus()
+        page.keyboard.press("l")
         page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="party-lineage-tab__group-label"]').all_inner_texts(), ["燼"]
