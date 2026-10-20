@@ -147,7 +147,10 @@ describe("PartyLineageTab", () => {
     // The single-node graph: one filled diamond and 1 / 1.
     const single = row(w, LINEAGE_HOLY_WATER_GRAPH.graph_id);
     expect(single.findAll('[data-testid="party-lineage-tab__pip"]').map((p) => p.attributes("data-state"))).toEqual(["capped"]);
-    expect(single.get('[data-testid="party-lineage-tab__pips"]').attributes("aria-label")).toBe("見頂 1");
+    // The option's own text carries the state summary (its children are
+    // presentational, so the diamonds themselves are hidden).
+    expect(single.get('[data-testid="party-lineage-tab__state-summary"]').text()).toBe("（見頂 1）");
+    expect(single.get('[data-testid="party-lineage-tab__pips"]').attributes("aria-hidden")).toBe("true");
   });
 
   it("marks 可解鎖 only on graphs with a ready node and 已全數見頂 only on consumed graphs", () => {
@@ -227,6 +230,33 @@ describe("PartyLineageTab", () => {
     expect(row(w, ICE.graph_id).attributes("aria-selected")).toBe("true");
   });
 
+  it("finds the linked graph in a payload committed after the tab opened", async () => {
+    const w = mountTab({ lineage: LINEAGE_UNAVAILABLE_SAMPLE, focusSkill: LINEAGE_STAFF_GRAPH.nodes[0].skill_key });
+    await w.setProps({ lineage: PANEL });
+    expect(row(w, LINEAGE_STAFF_GRAPH.graph_id).attributes("aria-selected")).toBe("true");
+    expect(node(w, LINEAGE_STAFF_GRAPH.nodes[0].skill_key).attributes("aria-current")).toBe("true");
+  });
+
+  it("chooses again for a new member, also when that member's payload lands later", async () => {
+    const other = PARTY_WINDOW_PANEL_SAMPLE.slots.find((r) => r.identity !== MEMBER.identity);
+    const next = { ...PANEL, graphs: [LINEAGE_STAFF_GRAPH, ICE] };
+    // The rail flips first; the old payload is still committed.
+    const w = mountTab({ initialGraph: LINEAGE_PRAYER_GRAPH.graph_id });
+    await w.setProps({ member: other });
+    await w.setProps({ lineage: next });
+    expect(row(w, LINEAGE_STAFF_GRAPH.graph_id).attributes("aria-selected")).toBe("true");
+    // The player's own choice then survives a republish for the same member.
+    await row(w, ICE.graph_id).trigger("click");
+    await w.setProps({ lineage: { ...next, graphs: [...next.graphs] } });
+    expect(row(w, ICE.graph_id).attributes("aria-selected")).toBe("true");
+    // Rail and payload in one update: the new payload's first graph, kept afterwards.
+    await w.setProps({ member: MEMBER, lineage: PANEL });
+    expect(row(w, ICE.graph_id).attributes("aria-selected")).toBe("true");
+    await row(w, LINEAGE_HOLY_WATER_GRAPH.graph_id).trigger("click");
+    await w.setProps({ lineage: { ...PANEL, graphs: [...PANEL.graphs] } });
+    expect(row(w, LINEAGE_HOLY_WATER_GRAPH.graph_id).attributes("aria-selected")).toBe("true");
+  });
+
   it("states an unavailable panel's reason and invents no graph", () => {
     const w = mountTab({ lineage: LINEAGE_UNAVAILABLE_SAMPLE });
     expect(w.get('[data-testid="party-window__tab-unavailable"]').text()).toBe(LINEAGE_UNAVAILABLE_SAMPLE.reason.message);
@@ -283,6 +313,23 @@ describe("PartySkillTab focusSkill (the 系譜 link target)", () => {
 
   it("waits for a payload committed after the tab opened", async () => {
     wrapper = mount(PartySkillTab, { attachTo: document.body, props: { member: MEMBER, character: null, requestSkill: () => 1, focusSkill: OWNED_ROOT.skill_key } });
+    await wrapper.setProps({ character: CHARACTER });
+    await nextTick();
+    expect(selectedRow(wrapper).attributes("data-key")).toBe(OWNED_ROOT.skill_key);
+  });
+
+  it("drops the wish once the player switches segment", async () => {
+    wrapper = mount(PartySkillTab, { attachTo: document.body, props: { member: MEMBER, character: null, requestSkill: () => 1, focusSkill: OWNED_ROOT.skill_key } });
+    await wrapper.setProps({ character: { ...CHARACTER, actives: [] } });
+    await wrapper.get('[data-testid="party-skill-tab__segment--passive"]').trigger("click");
+    await wrapper.setProps({ character: CHARACTER });
+    await nextTick();
+    expect(wrapper.get('[data-testid="party-skill-tab__segment--passive"]').attributes("aria-pressed")).toBe("true");
+  });
+
+  it("keeps the wish through a transiently unavailable payload", async () => {
+    wrapper = mount(PartySkillTab, { attachTo: document.body, props: { member: MEMBER, character: { ...CHARACTER, actives: [] }, requestSkill: () => 1, focusSkill: OWNED_ROOT.skill_key } });
+    await wrapper.setProps({ character: { schema_version: CHARACTER.schema_version, available: false, reason: { code: "x", message: "x" } } });
     await wrapper.setProps({ character: CHARACTER });
     await nextTick();
     expect(selectedRow(wrapper).attributes("data-key")).toBe(OWNED_ROOT.skill_key);

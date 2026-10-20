@@ -63,25 +63,33 @@ const groups = computed(() => groupGraphs(props.lineage));
 const selectedId = ref(null);
 const graphById = (id) => graphs.value.find((graph) => graph.graph_id === id) ?? null;
 
-function initialSelection() {
+// The linked skill's graph, else (on open only) the story seam's graph,
+// else the first.
+function preferredSelection(opening = false) {
   const linked = graphOfSkill(props.lineage, props.focusSkill);
   if (linked) return linked.graph_id;
-  if (props.initialGraph && graphById(props.initialGraph)) return props.initialGraph;
+  if (opening && props.initialGraph && graphById(props.initialGraph)) return props.initialGraph;
   return graphs.value[0]?.graph_id ?? null;
 }
-selectedId.value = initialSelection();
+selectedId.value = preferredSelection(true);
 
-// A republished payload keeps the selection while its graph remains; a new
-// viewed member starts again from the first graph.
-watch(graphs, () => {
-  if (!graphById(selectedId.value)) selectedId.value = graphs.value[0]?.graph_id ?? null;
+// A republished payload keeps the selection while its graph remains (a
+// payload committed after the tab opened still finds the linked graph). A
+// new viewed member chooses again; when the rail flipped before that
+// member's payload landed, the next payload chooses once more, so the
+// previous member's graphs never keep the selection.
+let awaitingMemberPayload = false;
+watch([graphs, () => props.member?.identity], ([list, id], [previousList, previousId]) => {
+  if (id !== previousId) {
+    awaitingMemberPayload = list === previousList;
+    selectedId.value = preferredSelection();
+  } else if (awaitingMemberPayload) {
+    awaitingMemberPayload = false;
+    selectedId.value = preferredSelection();
+  } else if (!graphById(selectedId.value)) {
+    selectedId.value = preferredSelection();
+  }
 });
-watch(
-  () => props.member?.identity,
-  () => {
-    selectedId.value = graphs.value[0]?.graph_id ?? null;
-  },
-);
 
 const graph = computed(() => graphById(selectedId.value));
 const layout = computed(() => (graph.value ? graphLayout(graph.value) : null));
@@ -195,7 +203,8 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                     <span v-if="graphReady(item)" class="party-lineage-tab__tag party-lineage-tab__tag--ready" data-testid="party-lineage-tab__ready">可解鎖</span>
                     <span v-if="item.consumed === true" class="party-lineage-tab__tag party-lineage-tab__tag--consumed" data-testid="party-lineage-tab__consumed">已全數見頂</span>
                   </span>
-                  <span class="party-lineage-tab__pips" role="img" :aria-label="stateSummary(item)" data-testid="party-lineage-tab__pips">
+                  <span class="party-lineage-tab__sr" data-testid="party-lineage-tab__state-summary">（{{ stateSummary(item) }}）</span>
+                  <span class="party-lineage-tab__pips" aria-hidden="true" data-testid="party-lineage-tab__pips">
                     <i
                       v-for="pip in item.nodes"
                       :key="pip.skill_key"

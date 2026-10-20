@@ -184,14 +184,15 @@ function revealSelected() {
 onMounted(revealSelected);
 watch(memberId, (id, previous) => {
   // A member change drops the wish; the first payload's arrival keeps it.
-  if (previous !== null && id !== previous) focusWish = null;
+  // A transient null (an unavailable payload) keeps it.
+  if (previous !== null && id !== null && id !== previous) focusWish = null;
   query.value = "";
   reselect(false);
 });
 // The wish waits for the payload that carries it (a character committed
 // after the tab opened), switching to its segment when it is passive.
 watch(
-  () => [detail.value?.actives, detail.value?.passives],
+  [() => detail.value?.actives, () => detail.value?.passives],
   () => {
     const side = sideOf(focusWish);
     if (!side) return;
@@ -491,14 +492,14 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
               :aria-pressed="isActive ? 'true' : 'false'"
               :class="{ 'is-active': isActive }"
               data-testid="party-skill-tab__segment--active"
-              @click="segment = 'active'"
+              @click="focusWish = null; segment = 'active'"
             >主動 <b>{{ activeCount }}</b></button>
             <button
               type="button"
               :aria-pressed="!isActive ? 'true' : 'false'"
               :class="{ 'is-active': !isActive }"
               data-testid="party-skill-tab__segment--passive"
-              @click="segment = 'passive'"
+              @click="focusWish = null; segment = 'passive'"
             >被動 <b>{{ passiveCount }}</b></button>
           </div>
 
@@ -552,7 +553,7 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                 :tabindex="focusedId === `cat:${category.category}` ? 0 : -1"
                 :data-node-id="`cat:${category.category}`"
                 data-testid="party-skill-tab__category-head"
-                @click="toggleCategory(category.category); focusedId = `cat:${category.category}`"
+                @click="focusWish = null; toggleCategory(category.category); focusedId = `cat:${category.category}`"
               >
                 <span class="party-skill-tab__chevron" aria-hidden="true">▸</span>
                 <span class="party-skill-tab__sech-label">{{ category.label }}</span>
