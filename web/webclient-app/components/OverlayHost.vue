@@ -19,7 +19,7 @@ import DrawerHeader from "./DrawerHeader.vue";
 import { toolLabel } from "./nav-tools.js";
 
 const props = defineProps({
-  // The single open-overlay name (design D8): map | settings | help | lineage | codex.
+  // The single open-overlay name (design D8): map | settings | help | codex | gallery.
   overlay: { type: String, required: true },
   // The trigger control that opened this overlay, captured at open time
   // (design D7). Focus is restored to it on every close path.
@@ -55,7 +55,6 @@ function titleFor(name) {
 const OVERLAY_ICONS = {
   map: "map",
   settings: "settings",
-  lineage: "lineage",
   codex: "codex",
   gallery: "gallery",
   help: "help",
@@ -67,7 +66,6 @@ function iconFor(name) {
 function subtitleFor(name) {
   if (name === "map") return "所在位置與相鄰路徑";
   if (name === "settings") return "閱讀偏好與輔助顯示";
-  if (name === "lineage") return "熟練度 ‧ 見頂 ‧ 前置";
   if (name === "codex") return "稱號 ‧ 異名 ‧ 提名中";
   if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
   if (name === "help") return "按鍵、指令列與閱讀操作";

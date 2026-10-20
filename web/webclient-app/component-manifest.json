@@ -52,7 +52,7 @@
     "Overlays/ReadingSample",
     "Overlays/HelpOverlay",
     "Overlays/TitleCodexPanel",
-    "Overlays/LineagePanel",
+    "Overlays/PartyLineageTab",
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
     "Core/CompanionLineup",

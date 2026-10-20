@@ -80,7 +80,6 @@ describe("reference surface headers in the client", () => {
   it("draws each tool's own navigation glyph in the header of the surface it opens", async () => {
     await snapshot();
     const tools = [
-      ["nav-tool-lineage", "技能系譜"],
       ["nav-tool-codex", "稱號冊"],
       ["gallery-opener", "角色肖像圖庫"],
       ["nav-tool-help", "說明"],
@@ -100,6 +99,30 @@ describe("reference surface headers in the client", () => {
       expect(document.activeElement, testid).toBe(opener.element);
     }
   }, 20000);
+
+  it("opens the party window on 系譜 from the 技能系譜 tool and returns focus on close", async () => {
+    // webclient-party-lineage-tab: the lineage overlay is gone; the tool
+    // opens the one party window (its own 隊伍 header) on its 系譜 tab.
+    await snapshot();
+    const opener = wrapper.get('[data-testid="nav-tool-lineage"]');
+    opener.element.focus();
+    await opener.trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("party");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("lineage");
+    expect(wrapper.findAll(".drawer-header")).toHaveLength(1);
+    await wrapper.get(".drawer-header__close").trigger("click");
+    expect(document.activeElement).toBe(opener.element);
+    // With the window open on another tab, the tool switches it live.
+    store.openHudDrawer("status");
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="nav-tool-lineage"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll('[data-testid="party-window"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("lineage");
+    expect(store.openOverlay("lineage")).toBe(false);
+  });
 
   it("names the help overlay's dialog after its title", async () => {
     await snapshot();

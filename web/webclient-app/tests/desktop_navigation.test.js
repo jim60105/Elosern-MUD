@@ -166,7 +166,7 @@ describe("DesktopNavigation", () => {
     expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("角色肖像圖庫");
   });
 
-  it("emits overlay for settings/lineage/codex/gallery/help and drawer for lore", async () => {
+  it("emits overlay for settings/codex/gallery/help and drawer for lineage, lore and letters", async () => {
     mountNav({ galleryAvailable: true });
     await wrapper.get('[data-testid="nav-settings"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lineage"]').trigger("click");
@@ -175,8 +175,9 @@ describe("DesktopNavigation", () => {
     await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
-    expect(wrapper.emitted("overlay")).toEqual([["settings"], ["lineage"], ["codex"], ["gallery"], ["help"]]);
-    expect(wrapper.emitted("drawer")).toEqual([["lore"], ["letters"]]);
+    expect(wrapper.emitted("overlay")).toEqual([["settings"], ["codex"], ["gallery"], ["help"]]);
+    // 技能系譜 opens the party window on 系譜 (webclient-party-lineage-tab).
+    expect(wrapper.emitted("drawer")).toEqual([["lineage"], ["lore"], ["letters"]]);
   });
 });
 

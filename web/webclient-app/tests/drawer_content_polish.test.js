@@ -3,7 +3,7 @@
 // (the character's status moved into the party window, whose 狀態 hero names
 // the viewed member from supplied fields only); an available-empty list
 // shows the shared EmptyState while an unavailable panel keeps its registry
-// reason; lineage rows carry their supplied root-node names; an unknown item
+// reason; 系譜 rows carry their supplied root-node names; an unknown item
 // stays neutral.
 
 import { mount } from "@vue/test-utils";
@@ -13,8 +13,8 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import EmptyState from "../components/EmptyState.vue";
 import PartyBagTab from "../components/PartyBagTab.vue";
+import PartyLineageTab from "../components/PartyLineageTab.vue";
 import PartyStatusTab from "../components/PartyStatusTab.vue";
-import LineagePanel from "../components/LineagePanel.vue";
 import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
 import PartyWindow from "../components/PartyWindow.vue";
 import QuestDrawer from "../components/QuestDrawer.vue";
@@ -152,9 +152,10 @@ describe("lineage identity", () => {
 
   it("shows each same-label graph's supplied root name beside its own count", () => {
     // File-local synthetic lineage rows (test-data-independence): invented
-    // element prose outside the shipped lore universe, mirroring
-    // overlays/lineage_panel.test.js.
-    const w = mount(LineagePanel, {
+    // element prose outside the shipped lore universe. The 系譜 tab
+    // (webclient-party-lineage-tab) groups graphs under their label and names
+    // every row by its supplied roots.
+    const w = mount(PartyLineageTab, {
       props: {
         lineage: {
           schema_version: 2, available: true, kind: "lineage", completed_count: 0, total_count: 4,
@@ -167,17 +168,18 @@ describe("lineage identity", () => {
         },
       },
     });
-    for (const [key, name, count] of [["a_root", "焰羽箭", "1/2"], ["b_root", "焰潮波", "2/3"]]) {
-      const head = w.get(`[data-testid="lineage-graph-toggle-${key}"]`);
-      expect(head.get(`[data-testid="lineage-graph-root-${key}"]`).text()).toBe(name);
+    const row = (key) => w.get(`[data-testid="party-lineage-tab__row"][data-graph="${key}"]`);
+    for (const [key, name, count] of [["a_root", "焰羽箭", "1 / 2"], ["b_root", "焰潮波", "2 / 3"]]) {
+      expect(row(key).get('[data-testid="party-lineage-tab__row-name"]').text()).toBe(name);
       // Order inside the row: identity, then the owned/total count; no meter.
-      const parts = [...head.element.children].map((el) => el.className.baseVal ?? el.className);
-      expect(parts.slice(1)).toEqual(["lineage-graph__identity", "lineage-graph__count"]);
-      expect(head.get(".lineage-graph__count").text()).toBe(count);
+      const parts = [...row(key).element.children].map((el) => el.className);
+      expect(parts).toEqual(["party-lineage-tab__row-main", "party-lineage-tab__row-end"]);
+      expect(row(key).get('[data-testid="party-lineage-tab__count"]').text()).toBe(count);
     }
-    // A root name equal to the label, or no node at all, adds no subtitle.
-    expect(w.find('[data-testid="lineage-graph-root-c_root"]').exists()).toBe(false);
-    expect(w.find('[data-testid="lineage-graph-root-d_root"]').exists()).toBe(false);
+    // Both same-label graphs sit under one heading.
+    expect(w.findAll('[data-testid="party-lineage-tab__group-label"]').map((el) => el.text())).toEqual(["焰流", "馜流", "潮流"]);
+    // The name comes from the supplied nodes only: no node, no name.
+    expect(row("d_root").get('[data-testid="party-lineage-tab__row-name"]').text()).toBe("");
     expect(w.find(".lineage-chain__meter").exists()).toBe(false);
   });
 });

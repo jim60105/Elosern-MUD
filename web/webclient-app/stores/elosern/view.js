@@ -291,7 +291,7 @@ export function applyView(ctx) {
       // The NPC author editor's latest open request (`{ npcId, seq }`).
       npcPersonaRequest: ctx.npcPersonaRequest,
       // H5 (task 5.2): the single open-overlay name (null | map | settings
-      // | help | lineage), plus the opener element captured at open time —
+      // | help | codex | gallery), plus the opener element captured at open time —
       // the anchor
       // for the host's focus restoration (design D7).
       hudOverlay: ctx.hudOverlay.value,

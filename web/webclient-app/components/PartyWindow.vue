@@ -28,13 +28,14 @@
 // growth, the selected skill's lineage position and ladder (its selection
 // rides `requestSkill`, one `party.view_member` with tab `skills`), and 施放 /
 // 排入修煉 leaving as `use-skill` / `practice`; its lineage link switches to
-// 系譜. The 系譜 tab lands in the next change; until then it shows only its
-// backing panel's committed unavailable reason, or whatever the host passes
-// through the tab's scoped slot, and invents nothing.
+// 系譜 on the linked skill's graph. The 系譜 tab is PartyLineageTab
+// (webclient-party-lineage-tab): the viewed member's committed `lineage`
+// graphs, and an owned node switches to 技能 with that skill selected (a
+// local switch; the 技能 tab's own selection dispatch tells the server).
 import { computed, ref, watch } from "vue";
-import ListDetail from "./ListDetail.vue";
 import MemberRail, { EMPTY_SLOT } from "./MemberRail.vue";
 import PartyBagTab from "./PartyBagTab.vue";
+import PartyLineageTab from "./PartyLineageTab.vue";
 import PartyMemberTab from "./PartyMemberTab.vue";
 import PartySkillTab from "./PartySkillTab.vue";
 import PartyStatusTab from "./PartyStatusTab.vue";
@@ -44,7 +45,6 @@ import { usePartyWindowMemory, PARTY_WINDOW_DEFAULT_TAB } from "./party-window-m
 import {
   PARTY_WINDOW_TABS,
   PARTY_WINDOW_TAB_KEYS,
-  TAB_BACKING_PANEL,
   formatPurse,
   hasFreeSlot,
   panelReason,
@@ -93,9 +93,11 @@ const props = defineProps({
   useNotice: { type: Object, default: null },
   returnTarget: { type: Object, default: null },
   requestSkill: { type: Function, default: null },
-  // Story seams: the 技能 tab's segment and skill selected on open.
+  // Story seams: the 技能 tab's segment and skill selected on open, and the
+  // 系譜 tab's graph selected on open.
   skillSegment: { type: String, default: "active" },
   initialSkill: { type: String, default: null },
+  initialGraph: { type: String, default: null },
 });
 
 const emit = defineEmits(["close", "view-member", "view-item", "action", "bag-action", "combat-item", "open-npc-persona", "persona-edit", "practice", "use-skill"]);
@@ -192,15 +194,28 @@ const quota = computed(() => (partyAvailable.value ? props.party.general_quota :
 
 // --------------------------------------------------------------- tabs
 
-const backingPanels = computed(() => ({
-  party_inventory: props.partyInventory,
-  character: props.character,
-  lineage: props.lineage,
-}));
-const tabReason = computed(() => {
-  const name = TAB_BACKING_PANEL[tab.value];
-  return name ? panelReason(backingPanels.value[name]) : null;
+// The cross-tab links: a 系譜 node opens its skill on 技能, and the 技能
+// tab's 在系譜中檢視 opens the skill's graph on 系譜. Each is consumed by the
+// tab it targets and dropped when that tab is left or the viewed member
+// changes, so a later plain tab switch applies no stale link.
+const skillFocus = ref(null);
+const lineageFocus = ref(null);
+watch(tab, (key) => {
+  if (key !== "skills") skillFocus.value = null;
+  if (key !== "lineage") lineageFocus.value = null;
 });
+watch(viewedId, () => {
+  skillFocus.value = null;
+  lineageFocus.value = null;
+});
+function openSkillFromLineage(key) {
+  skillFocus.value = key;
+  tab.value = "skills";
+}
+function openLineageFromSkill(key) {
+  lineageFocus.value = typeof key === "string" ? key : null;
+  tab.value = "lineage";
+}
 
 // The 成員 tab's armed leave and unsaved persona draft, and the 背包 tab's
 // open use confirmation: a close attempt (Escape, ✕, the scrim) first
@@ -312,35 +327,27 @@ function closeGuard() {
         :initial-skill="initialSkill"
         @practice="(intent) => emit('practice', intent)"
         @use="(key) => emit('use-skill', key)"
-        @lineage="tab = 'lineage'"
+        :focus-skill="skillFocus"
+        @lineage="openLineageFromSkill"
       >
         <template #rail>
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
         </template>
       </PartySkillTab>
 
-      <ListDetail v-else :list-label="PARTY_WINDOW_TABS.find((t) => t.key === tab)?.label">
+      <PartyLineageTab
+        v-else-if="tab === 'lineage'"
+        :member="selectedRow"
+        :lineage="lineage"
+        :focus-skill="lineageFocus"
+        :initial-graph="initialGraph"
+        :pending="pendingMemberId !== null"
+        @open-skill="openSkillFromLineage"
+      >
         <template #rail>
           <MemberRail :members="members" :selected="railSelected" :pending="pendingMemberId" :empty-slot="freeSlot" @select="onSelect" />
         </template>
-        <template #list>
-          <p
-            v-if="tabReason"
-            class="party-window__reason"
-            data-testid="party-window__tab-unavailable"
-            :data-reason-code="tabReason.code || undefined"
-          >{{ tabReason.message }}</p>
-          <slot
-            v-else
-            :name="tab"
-            :member-id="viewedId"
-            :selected-item-key="selectedItemKey"
-            :quantity="quantity"
-            :set-item="setItem"
-            :set-quantity="setQuantity"
-          />
-        </template>
-      </ListDetail>
+      </PartyLineageTab>
     </div>
   </WindowFrame>
 </template>

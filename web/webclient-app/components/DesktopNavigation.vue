@@ -2,8 +2,9 @@
 // DesktopNavigation: the top bar's navigation row (webclient-desktop-shell;
 // webclient-avg-place-card-top-bar design D1/D2). One labelled control per
 // navigation-presented entry plus the map and settings controls, followed by
-// the icon-only tool group (`工具`: 技能系譜, 圖鑑, 稱號冊, 角色肖像圖庫 when
-// available, and 說明; webclient-collapsible-command-line design D6), inside
+// the icon-only tool group (`工具`: 技能系譜 (the party window on 系譜), 圖鑑,
+// 信件, 稱號冊, 角色肖像圖庫 when available, and 說明;
+// webclient-collapsible-command-line design D6), inside
 // the 48px band. There is no home entry:
 // the stage itself is the screen the player is on, and Escape and the
 // dock's back controls return the dock to its root.
