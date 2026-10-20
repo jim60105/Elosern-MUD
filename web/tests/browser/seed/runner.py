@@ -51,6 +51,15 @@ def main() -> None:
 
     _install_synthetic_catalogs_if_flagged()
 
+    # The dedicated party-management acceptance fixture is accepted only in
+    # this isolated synthetic runtime and must reject an invalid composition
+    # or a non-fresh database BEFORE any account/character/DB mutation.
+    from web.tests.browser.seed.party_management_acceptance_fixture import (
+        enforce_preconditions as _enforce_party_management_preconditions,
+    )
+
+    _enforce_party_management_preconditions()
+
     from evennia.utils.create import create_account, create_object
 
     from typeclasses.accounts import Account
@@ -447,6 +456,13 @@ def main() -> None:
         monster.traits.hp.current = hp
         monster.location = room
         monster.save()
+
+    from web.tests.browser.seed.party_management_acceptance_fixture import (
+        _acceptance_fixture as _party_management_acceptance_fixture,
+    )
+
+    _party_management_acceptance_fixture(character)
+
     print(
         f"seeded account={account.key} character={result.display_name} "
         f"race={result.race} magic_power={result.magic_power}"

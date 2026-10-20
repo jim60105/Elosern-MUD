@@ -1186,6 +1186,52 @@ runtime state），它維持原本的 late-import 語義，scope 結束時由 la
 完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。
 預設 off，shipped 行為不變。
 
+### 專用派對管理驗收 fixture
+
+`party-acceptance-deterministic-fixture` 為 `party-management-acceptance` 的實際 UI
+旅程提供**登入前**的決定性種子。開關為
+`ELOSERN_BROWSER_PARTY_MANAGEMENT_ACCEPTANCE=1`，且僅接受於隔離的合成受管執行環境
+（必須同時 `ELOSERN_BROWSER_SYNTH_CATALOGS=1`）；一般 shipped 模式與未設定此旗標的
+既有 fixture 行為完全不變。
+
+seed 行程在建立帳號、角色或任何 DB 狀態**之前**先驗證組合：缺少合成 catalog、或與
+下列重疊的派對／服務組合旗標同時出現時，以 setup 診斷結束（非零離開碼），不會靠旗標
+順序覆寫。seed 只在全新 runtime 執行；私有 DB 已存在任何 fixture 標籤時直接拒絕並要求
+重建 runtime（harness 的連線埠衝突重試本來就會重建 runtime 與 DB）。
+
+**不可併用**：`ELOSERN_BROWSER_PARTY_ACCEPTANCE`、`ELOSERN_BROWSER_COMPANION_LINEUP`、
+`ELOSERN_BROWSER_COMPANION_FIELD_CAST`、`ELOSERN_BROWSER_EXPLORATION`、
+`ELOSERN_BROWSER_SERVICES`、`ELOSERN_BROWSER_CREATION`、
+`ELOSERN_BROWSER_COMBAT_SEAL`。其餘合成基底設定（art、seeded identity、自訂儲存根）
+可照常搭配。
+
+**起始狀態表**（`艾拉`／`卡恩` 以穩定 fixture 標籤 `t_party_acceptance_*` 辨識，不依
+位置挑選既有夥伴）：
+
+| 項目 | 決定性內容 |
+| --- | --- |
+| 隊員 | `艾拉`、`卡恩` 皆為有效的一般隊員，與指揮官本體同處於營業中的合成商鋪 |
+| 艾拉技能 | 自有 `t_hush_mend`（治療）與 `t_ember_burst`（野外開戰），前置與 MP 滿足 |
+| 艾拉背包 | `t_ember_spray` ×4、`t_thorn_knife` ×1（初始主手裝備）、`t_cinder_dirk` ×1（替換用備品） |
+| 卡恩背包 | `t_ember_spray` ×1 |
+| 指揮官背包 | 沿用 kit 起始卡內容（`t_ember_spray` ×2、`t_iron_fang` ×1），不另行覆寫 |
+| 傷勢 | 指揮官 −60 HP、艾拉 −25 HP、卡恩 −30 HP（皆存活且可再受治療） |
+| 錢包 | 1000 copper；商鋪 `t_mossgate_stall` 藥水庫存 18／上限 20，至少可買 3 瓶，且賣回 1 瓶仍有庫存餘裕 |
+| 遭遇 | 商鋪內一頭存活、低 HP 的 `驗收燼蟲`，行為樹取自當前 rulebook；可經真實回合結束 |
+| 移動 | 商鋪 `後門` 通往連通的 `商鋪後院`，並有返回出口 |
+
+**執行期政策**：fixture 只授權登入前的決定性初始化。登入後任何手動狀態介入仍必須走
+既有受保護的 GM domain verbs（自動快照）；raw repair 與 shell 狀態修補一律禁止。
+`party-management-acceptance` 的 design 已由該 change 的 apply owner 在同一分支調整為
+此政策，其具名旅程、截圖政策與未勾選證據準則維持不變。
+
+測試歸屬：Evennia 消費者回歸
+`web/webclient/actions/tests/test_party_management_acceptance_fixture.py` 由
+`evennia-shards.json` 的 `web.webclient.actions` 套件 label 擁有（不得再加重疊的
+module label）；受管面板／文字煙霧測試位於
+`web/tests/browser/test_browser_party_acceptance.py` 的專用 class，並登記於
+`.github/browser-shards.json`。fixture 煙霧永遠不能取代原驗收 change 的 UI 證據。
+
 **Lineage index lifecycle**：`world.skills.registry` 在 import 時以
 `validate_prerequisite_graph` 建 reverse-edge cache；lineage 讀模型的 Kahn 排序同時讀
 live row 的 prerequisites 與這份 cache，兩者必須描述同一份 catalog。合成 kit 對 mutable

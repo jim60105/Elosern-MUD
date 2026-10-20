@@ -91,6 +91,24 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
         modifier_key=_first_equipment_modifier_key(),
     ),
+    # A second main-hand row: the party-management acceptance fixture holds
+    # one of these beside the equipped knife so the real equipment toggle has
+    # a distinct replacement to show. Both rows bind the same closed shipped
+    # modifier key and share the one synthetic weapon price band.
+    "t_cinder_dirk": ItemDefinition(
+        key="t_cinder_dirk",
+        display_name_zh="燼微短刃",
+        price_table_key="t_ironbite_steel",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.WEAPON,
+            icon_key=ItemIconKey.WEAPON,
+            rarity=ItemRarity.COMMON,
+            summary_zh="刃身覆著細碎冷燼的合成備用短刃。",
+        ),
+        equipment_slot=EquipmentSlot.WEAPON_MAIN,
+        modifier_key=_first_equipment_modifier_key(),
+    ),
     "t_wayfarer_pass": ItemDefinition(
         key="t_wayfarer_pass",
         display_name_zh="行旅通行證",
