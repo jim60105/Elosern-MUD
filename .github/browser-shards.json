@@ -97,7 +97,8 @@
         "web.tests.browser.test_browser_creation_reconnect.ReconnectPresetCreationJourney.test_reconnect_restores_preset_stage_and_never_auto_activates",
         "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_backpack_row_actions_echo_their_typed_commands",
         "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_dialogs_and_dispatch_state_fail_closed_across_interruptions",
-        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_keyboard_and_pointer_item_actions_are_confirmation_protected"
+        "web.tests.browser.test_browser_inventory_actions.InventoryActionJourneys.test_keyboard_and_pointer_item_actions_are_confirmation_protected",
+        "web.tests.browser.test_browser_console_saves.ConsoleSnapshotFailureBrowserTest.test_snapshot_failure_refuses_before_mutation_and_keeps_the_baseline"
       ]
     },
     {
@@ -165,7 +166,8 @@
         "web.tests.browser.test_browser_actions.ActionLockingTest",
         "web.tests.browser.test_harness.ManagedServerFastTests",
         "web.tests.browser.test_harness.StartupLockTests",
-        "web.tests.browser.test_harness.StartupSerializationTests"
+        "web.tests.browser.test_harness.StartupSerializationTests",
+        "web.tests.browser.test_browser_console_saves.ConsoleSaveConfigurationTests"
       ]
     },
     {
@@ -180,7 +182,8 @@
       "files_b": [
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
         "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
-        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach"
+        "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_tab_lists_the_committed_rows_with_keyboard_reach",
+        "web.tests.browser.test_browser_console_saves.ConsoleSaveIsolationBrowserTest.test_first_protected_teleport_saves_the_before_state_privately"
       ]
     },
     {
