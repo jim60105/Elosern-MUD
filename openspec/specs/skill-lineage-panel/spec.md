@@ -55,6 +55,14 @@ Define the pure skill-lineage read model and its user surfaces: the bounded vers
 - **WHEN** a node is not owned and every prerequisite edge's minimum level is met
 - **THEN** the node carries `ready == True`, and no owned node is ever ready
 
+#### Scenario: Valid synthetic installed and grafted lineage reaches both consumers
+- **WHEN** a valid synthetic companion's lineage is read repeatedly through authenticated text and the viewed-member panel after synthetic installation and browser graft completion
+- **THEN** both surfaces are available with matching bounded roots, node identities and prerequisite edges, every node is topologically ordered once, and stored member and world state remain unchanged
+
+#### Scenario: Valid merge graphs are distinguished from malformed cycles
+- **WHEN** lineage consumers read a valid branching graph with a two-parent merge, and separately encounter malformed or cyclic source data
+- **THEN** the valid graph remains readable with consistent prerequisite edges and counts, while invalid sources retain safe refusal or unavailable responses without fabricated nodes or query-time repair
+
 ### Requirement: The lineage panel ships as one bounded versioned OOB contract
 The presentation registry SHALL register panel name `lineage` at schema version 2
 with the availability discriminator and `kind` `lineage` in the available form,
