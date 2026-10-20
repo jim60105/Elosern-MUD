@@ -48,7 +48,8 @@
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
-        "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity"
+        "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity",
+        "web.tests.browser.test_browser_party_acceptance.PartyManagementFixtureSmokeBrowserTest.test_dedicated_fixture_publishes_members_merchant_and_lineage"
       ],
       "files_b": [
         "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest.test_failed_concept_surfaces_one_crit_toast_above_the_overlay",
