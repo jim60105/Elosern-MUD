@@ -155,3 +155,4 @@ Observed results after that commit and the feature rebase:
 - `uv run --locked python -m tools.contract_gate` passed: traceability, observability (0 violations), test-data (0 violations), manifests and 18 contract tests.
 - `uv run --locked python -m tools.spec_traceability check`: 2349 requirements, 10156 associations, 2349 covered, 0 uncovered, 0 errors.
 - No archived evidence and no `party-management-acceptance` artifact changed.
+- `scripts/openspec-gates.sh post-archive party-cutover-spec-maintenance` exited 0 after the CLI archive: traceability 2349 requirements / 10156 associations / 2349 covered / 0 uncovered / 0 errors, and `openspec validate --all --strict` 357 passed / 0 failed.
