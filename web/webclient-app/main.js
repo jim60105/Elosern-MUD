@@ -62,6 +62,9 @@ layoutStore.load();
 // shared lifecycle event names (the evennia emitter keeps one listener per
 // name). The hook is a no-op if the bundle is blocked (degradation path).
 window.__elosernTransportBind = (consoleHandle) => wireTransport(store, consoleHandle);
+if (window.__elosernConsole) {
+  window.__elosernTransportBind(window.__elosernConsole);
+}
 
 // Stable test hook (the repository's `__`-prefixed harness-hook convention,
 // cf. __elosernWs / __elosernSent): the managed-browser check drives the

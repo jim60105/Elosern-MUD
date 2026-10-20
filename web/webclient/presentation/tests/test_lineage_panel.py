@@ -495,3 +495,10 @@ class PresenterTests(InjectedRegistryMixin):
     def test_real_registry_payload_is_small(self):
         payload = lineage_presenter(_context(_entity()))
         self.assertLess(json_byte_size(payload), 48 * 1024)
+
+    def test_creation_pending_raises_panel_unavailable(self):
+        from web.webclient.presentation.registry import PanelUnavailableError
+        actor = _entity()
+        actor.creation_pending = True
+        with self.assertRaises(PanelUnavailableError):
+            lineage_presenter(_context(actor))

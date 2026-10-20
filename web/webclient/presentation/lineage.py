@@ -357,6 +357,9 @@ def lineage_presenter(context: PresentationContext) -> dict[str, Any]:
     envelope. Header counts and each graph's owned/total/consumed always come
     from the FULL view.
     """
+    actor = getattr(context, "actor", None)
+    if bool(getattr(actor, "creation_pending", False)):
+        raise PanelUnavailableError
     member = resolve_viewed_member(context)
     if member is None:
         raise PanelUnavailableError
