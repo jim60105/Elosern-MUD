@@ -52,11 +52,11 @@ the command region collapses (in combat the dock stands as the centred combat co
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 2560x1440
-- **THEN** every required surface remains reachable and the player can read narrative, open the complete log, open the character-status drawer to inspect status, and type a command after exactly one opening action (`/` or the ⌨ toggle)
+- **THEN** every required surface remains reachable and the player can read narrative, open the complete log, open the party window to inspect status, and type a command after exactly one opening action (`/` or the ⌨ toggle)
 
 #### Scenario: The reference surfaces are demand-opened, not permanently visible
 - **WHEN** the shell renders at 1451x790 or 2560x1440 with no drawer open
-- **THEN** no skill book, bag, shop, quest board, lore reference, or character-status surface is present in the layout or the tab order, and no permanently visible column of reference panels is rendered
+- **THEN** no party window, shop window, quest board, or lore reference surface is present in the layout or the tab order, and no permanently visible column of reference panels is rendered
 
 #### Scenario: An open drawer is always one action from closed
 - **WHEN** a reference drawer is open at the 1451x790 reference viewport
@@ -123,12 +123,12 @@ the command region collapses (in combat the dock stands as the centred combat co
 - **THEN** the command line is collapsed by default and its input field is reachable in exactly one action - `/` outside an editable control, or the ⌨ toggle - while every other surface MAY be opened on demand and closed
 
 #### Scenario: A reference surface opens in the shared drawer within two actions
-- **WHEN** the player reaches for the skill book, the bag and equipment, the shop, the quest board, the lore reference, or the character status
-- **THEN** the surface renders in a drawer laid over the stage in the shared reference workspace, reached in at most two actions from the top navigation bar or from a person's verb card
+- **WHEN** the player reaches for a party window tab (成員, 背包, 狀態, 技能, 系譜), the shop window, the quest board, or the lore reference
+- **THEN** the surface renders laid over the stage in the shared reference workspace, reached in at most two actions from the top navigation bar or from a person's verb card
 
 #### Scenario: The top navigation bar carries the mode's entry points
 - **WHEN** the shell renders the top navigation bar
-- **THEN** it carries a labelled control for each navigation-presented entry of the current mode's home surface - the character status, quest, and inventory entries - a labelled control for the map and settings surfaces, and the tool group that the top-navigation tool-group requirement defines, which carries the help control, and activating a bar control opens its surface in one action without pushing a keyboard menu frame
+- **THEN** it carries a labelled control for each navigation-presented entry of the current mode's home surface - the 隊伍 and 任務 entries - a labelled control for the map and settings surfaces, and the tool group that the top-navigation tool-group requirement defines, which carries the help control, and activating a bar control opens its surface in one action without pushing a keyboard menu frame
 
 #### Scenario: The bar names no screen the player is already on
 - **WHEN** the bar renders in exploration or combat
@@ -290,10 +290,9 @@ document.
 - **THEN** the router's exploration root carries no item; an interact target is the rail's `target-<identity>` entry, outside the router, whose Enter opens its client-local verb card without submitting and without pushing a router frame; exits, rail entries, the place card's room actions, and the 建議 pill are not router items
 
 #### Scenario: The dock root omits the navigation-carried entries
-- **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces
-  available and the dock renders its root
-- **THEN** the action dock carries no 角色狀態, 任務, or 背包 entry - those surfaces are opened
-  from the top navigation bar
+- **WHEN** the party and quest surfaces are available and the dock renders its exploration root
+- **THEN** the action dock carries no 隊伍 or 任務 entry - those surfaces are opened from the top
+  navigation bar or their hotkeys
 
 #### Scenario: The router is inert while the dock is collapsed
 - **WHEN** the committed mode is dialogue, focus is on the document body, and the player presses ArrowDown, Enter, Space, and Escape
@@ -334,7 +333,7 @@ document.
 
 #### Scenario: The exploration root omits the navigation-carried entries
 - **WHEN** the exploration keyboard root renders
-- **THEN** it carries no `character`, `quests`, or `inventory` entry - the top navigation bar carries them as the sole keyboard-visible stop
+- **THEN** it carries no `party`, `character`, `quests`, or `inventory` entry - the top navigation bar's 隊伍 and 任務 entries are the sole keyboard-visible stops for the party window and the quest board
 
 #### Scenario: The combat root declares a single column
 - **WHEN** the shell is in combat mode
@@ -346,13 +345,13 @@ document.
 
 ### Requirement: The top navigation bar carries the tool group
 
-The top navigation bar SHALL carry, after its 設定 control, one labelled group (`工具`) of icon
-controls that open the client's secondary overlays and reference drawers, and SHALL NOT push a
-keyboard menu frame.
+The top navigation bar SHALL carry, after its labelled primary entries and before its 設定 control,
+one labelled group (`工具`) of icon controls that open the client's secondary overlays and reference
+drawers, and SHALL NOT push a keyboard menu frame.
 
 #### Scenario: Each tool opens its surface in one action
-- **WHEN** the shell renders in exploration mode with the command line collapsed and the `gallery` panel available, and the player activates 技能系譜, then 稱號冊, then 角色肖像圖庫, then 說明, closing each surface in between
-- **THEN** each activation opens its surface (技能系譜 the party window on its 系譜 tab, the others their overlays), and each close returns focus to the control that opened it
+- **WHEN** the shell renders in exploration mode with the command line collapsed and the `gallery` panel available, and the player activates 信件, then 稱號冊, then 角色肖像圖庫, then 說明, closing each surface in between
+- **THEN** each activation opens its overlay, and each close returns focus to the control that opened it
 
 #### Scenario: The codex tool opens the reference drawer
 - **WHEN** the player activates the 圖鑑 control in the tool group
@@ -372,15 +371,15 @@ keyboard menu frame.
 
 #### Scenario: The command line carries no tool opener
 - **WHEN** the command line is expanded
-- **THEN** it carries no 技能系譜, 圖鑑, 稱號冊, 設定, 說明, or 角色肖像圖庫 control
+- **THEN** it carries no 信件, 圖鑑, 稱號冊, 設定, 說明, or 角色肖像圖庫 control
 
 #### Scenario: The tool group carries the five tools in order
 - **WHEN** the tool group renders
-- **THEN** it carries, in order, 技能系譜 for the party window's 系譜 tab, 圖鑑 for the world-codex reference drawer, 稱號冊 for the title-codex overlay, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay
+- **THEN** it carries, in order, 信件 for the letters drawer, 圖鑑 for the world-codex reference drawer, 稱號冊 for the title-codex overlay, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay; skill lineage is reached through the party window's 系譜 tab
 
 #### Scenario: Each tool control names itself from the shared tool model
 - **WHEN** a tool control renders
-- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the overlay or drawer it opens (技能系譜 instead opens the party window, whose 系譜 tab it selects), discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
+- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens, discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
 
 #### Scenario: A tool opens through the opener-captured path
 - **WHEN** the player activates a tool control with one pointer action or one Enter press
@@ -396,7 +395,7 @@ keyboard menu frame.
 
 #### Scenario: The five surfaces have exactly one opener each
 - **WHEN** the rendered surfaces are inspected for openers of the five tool surfaces
-- **THEN** no surface other than the tool group carries a second opener for the 圖鑑, 稱號冊, 角色肖像圖庫 and 說明 surfaces (the party window keeps its own openers, and its 技能 tab links into 系譜), and the command line carries none of the tool openers
+- **THEN** no surface other than the tool group carries a second opener for them, and the command line carries none
 
 #### Scenario: The tool group fits the 48px bar
 - **WHEN** the shell renders at the 1451x790 reference viewport with every navigation entry, the gallery control, and a maximum-length character name present
@@ -752,11 +751,11 @@ controls packed against the region's trailing edge.
 
 #### Scenario: Combat removes unavailable entries
 - **WHEN** the committed mode changes from exploration to combat at a fixed viewport of 1451x790, 1741x948, or 2560x1440
-- **THEN** the 角色狀態, 任務, and 地圖 controls are absent from rendering and the tab order, the combat 背包 control stands immediately before 設定, and the left edges of the 設定 control and of the `工具` group differ from their exploration positions by at most 1px
+- **THEN** the 任務 and 地圖 controls are absent from rendering and the tab order, the 隊伍 control stays, and the left edges of the `工具` group and of the 設定 control differ from their exploration positions by at most 1px
 
 #### Scenario: An unavailable panel leaves no placeholder
 - **WHEN** the committed exploration panel reports the quest surface unavailable
-- **THEN** no quest control and no placeholder renders, and the 設定 control and the `工具` group keep their positions
+- **THEN** no quest control and no placeholder renders, and the `工具` group and the 設定 control keep their positions
 
 #### Scenario: Keyboard user identifies a tool
 - **WHEN** a `工具` control receives keyboard focus by Tab
@@ -776,14 +775,14 @@ controls packed against the region's trailing edge.
 
 #### Scenario: The primary region's order is fixed
 - **WHEN** the bar renders in any mode
-- **THEN** the primary region's order is the character status entry (角色狀態), the quest entry (任務), the inventory entry (背包 - the exploration `inventory` entry and the combat root's `bag` entry are the same concept), the map control (地圖), and the settings control (設定), followed by the `工具` group
+- **THEN** the primary region's order is the party entry (隊伍), the quest entry (任務), and the map control (地圖), followed by the `工具` group and finally the settings control (設定)
 
 #### Scenario: Trailing packing keeps the settings and tool positions stable
 - **WHEN** the bar renders in exploration, dialogue, and combat at a fixed viewport size
-- **THEN** the region is exactly as wide as all five controls together, so the 設定 control and the `工具` group keep the same horizontal position (within 1px) in all three modes, and the space a missing entry leaves collects on the brand side
+- **THEN** the region is exactly as wide as all three labelled controls together, so the `工具` group and the 設定 control keep the same horizontal position (within 1px) in all three modes, and the space a missing entry leaves collects on the brand side
 
 #### Scenario: An unsupplied entry leaves no placeholder
-- **WHEN** the current mode or the committed panels do not supply an entry (the map control in combat, the character and quest entries in combat, an entry whose panel is unavailable)
+- **WHEN** the current mode or the committed panels do not supply an entry (the map control in combat, the quest entry in combat, an entry whose panel is unavailable)
 - **THEN** it is absent from rendering, the accessibility tree, and the tab order, and is not replaced by a disabled, `aria-disabled`, `visibility: hidden`, or otherwise present placeholder
 
 #### Scenario: Order, disabled reasons, and compact padding hold
@@ -803,6 +802,10 @@ controls packed against the region's trailing edge.
 - **WHEN** the player presses Escape while a tooltip is visible
 - **THEN** the tooltip hides without moving focus; when the tooltip belongs to the focused control that Escape is consumed by the dismissal and does not also reach the dock's keyboard router, while once no tooltip shows Escape on the control reaches the router as before
 - **AND** a tooltip shown by the pointer hides on any Escape without consuming it, and the next hover or Tab focus shows the tooltip again
+
+#### Scenario: 隊伍 opens the party window on its last tab
+- **WHEN** the player last left the party window on 技能 and activates 隊伍
+- **THEN** the party window opens on 技能 with the session's viewed member
 
 ### Requirement: Reading settings preview preferences without touching play
 The settings surface SHALL offer a local reading sample: one fixed line of prose set in the message
@@ -855,3 +858,26 @@ preference persistence path.
 #### Scenario: Settings cards share equal column tracks
 - **WHEN** the settings surface renders its cards
 - **THEN** the cards share equal column tracks while each takes its own content height
+
+### Requirement: Window hotkeys act only outside text inputs
+The client SHALL bind P 隊伍 (last tab), B 背包, C 狀態, K 技能, L 系譜, J 任務 and M 地圖 to their surfaces. A key SHALL act only outside text inputs and contenteditable elements, without modifiers or IME composition, with no modal question open, and for an available surface only; it SHALL NOT open a surface behind an open drawer, overlay or full log, except that P, B, C, K and L switch an open party window's tab.
+
+#### Scenario: A hotkey opens the bag tab
+- **WHEN** focus is on the stage and the player presses B
+- **THEN** the party window opens on 背包 with the session's viewed member
+
+#### Scenario: Typing never triggers a hotkey
+- **WHEN** focus is in the command line and the player types "p"
+- **THEN** the character is typed and no window opens
+
+#### Scenario: Map is inert in combat
+- **WHEN** the player presses M in combat
+- **THEN** nothing opens, because the map entry is absent in combat
+
+#### Scenario: An open surface keeps its own keys
+- **WHEN** a drawer other than the party window, an overlay or the full log is open and the player presses any of the hotkeys
+- **THEN** no hotkey opens another surface behind it
+
+#### Scenario: The party window switches its own tab
+- **WHEN** the party window is open on 成員 and the player presses B, then J or M
+- **THEN** B switches the window to 背包, and J and M open nothing behind it

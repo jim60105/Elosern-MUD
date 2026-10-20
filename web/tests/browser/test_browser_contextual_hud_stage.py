@@ -1617,9 +1617,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             [t["testid"] for t in fit["tools"]],
             [
-                "nav-tool-lineage",
-                "nav-tool-lore",
                 "nav-tool-letters",
+                "nav-tool-lore",
                 "nav-tool-codex",
                 "gallery-opener",
                 "nav-tool-help",
@@ -1634,16 +1633,17 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         for btn in fit["navButtons"]:
             self.assertLessEqual(btn["right"], fit["rightLeft"], f"nav button {btn['testid']} intersects .topbar-right")
 
-        # Sequential Tab from nav-settings reaches each tool in order; Enter
-        # opens its surface and Escape returns focus to that tool.
-        page.locator('[data-testid="nav-settings"]').focus()
+        # Sequential Tab from the 地圖 entry reaches each tool in order and
+        # then 設定, the bar's last control (webclient-main-navigation-
+        # hotkeys); Enter opens its surface and Escape returns focus to it.
+        page.locator('[data-nav-slot="map"]').focus()
         expected_tools = (
-            ("nav-tool-lineage", '[data-testid="party-window"][data-tab="lineage"]'),
-            ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
             ("nav-tool-letters", '[data-testid="letters-panel"]'),
+            ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
             ("nav-tool-codex", '[data-testid="overlay-host"][data-elosern-overlay="codex"]'),
             ("gallery-opener", '[data-testid="gallery-panel"]'),
             ("nav-tool-help", '[data-testid="help-overlay"]'),
+            ("nav-settings", '[data-testid="overlay-host"][data-elosern-overlay="settings"]'),
         )
         for testid, surface_sel in expected_tools:
             page.keyboard.press("Tab")

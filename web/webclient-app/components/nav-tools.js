@@ -3,21 +3,23 @@
 // its `key` is both the `dock-icons.js` glyph key and the key of the surface
 // it opens, and its `label` is at once the control's accessible name, its
 // visible tooltip, and the title of the surface's DrawerHeader, so the
-// opener, its tooltip and the opened header never disagree. 圖鑑 and 信件
-// open their drawers; 技能系譜 opens the party window on its 系譜 tab
-// (webclient-party-lineage-tab: the `lineage` drawer name is the party
-// window's tab alias, so the window keeps its own 隊伍 header); the rest
-// open overlays.
+// opener, its tooltip and the opened header never disagree. 信件 and 圖鑑
+// open their drawers; the rest open overlays. Skill lineage is the party
+// window's 系譜 tab (隊伍 or the L hotkey), not a tool
+// (webclient-main-navigation-hotkeys).
 export const NAV_TOOLS = Object.freeze([
-  { key: "lineage", label: "技能系譜", testid: "nav-tool-lineage", drawer: "lineage" },
-  { key: "lore", label: "圖鑑", testid: "nav-tool-lore", drawer: "lore" },
   { key: "letters", label: "信件", testid: "nav-tool-letters", drawer: "letters" },
+  { key: "lore", label: "圖鑑", testid: "nav-tool-lore", drawer: "lore" },
   { key: "codex", label: "稱號冊", testid: "nav-tool-codex" },
   { key: "gallery", label: "角色肖像圖庫", testid: "gallery-opener" },
   { key: "help", label: "說明", testid: "nav-tool-help" },
 ]);
 
+// 設定 stands after the tool group, at the very end of the bar, and shares
+// the tools' icon form and tooltip.
+export const NAV_SETTINGS = Object.freeze({ key: "settings", label: "設定", testid: "nav-settings" });
+
 // The label of a tool key, or null when the key names no tool.
 export function toolLabel(key) {
-  return NAV_TOOLS.find((tool) => tool.key === key)?.label ?? null;
+  return NAV_TOOLS.find((tool) => tool.key === key)?.label ?? (key === NAV_SETTINGS.key ? NAV_SETTINGS.label : null);
 }

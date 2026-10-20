@@ -99,6 +99,38 @@ When restyling a component, grep app-shell.css for its class names and remove or
 update the `.elosern-root` duplicates, and verify geometry with a live-client
 browser test, not only Storybook.
 
+## Main navigation and window hotkeys
+
+The top bar (`DesktopNavigation.vue`; webclient-main-navigation-hotkeys,
+design §8 of the party member management design, after the prototype's
+`MainNavPrototype.vue`) is 隊伍 / 任務 / 地圖, the `工具` icon group (信件,
+圖鑑, 稱號冊, 角色肖像圖庫 while the `gallery` panel is available, 說明) and
+設定 last, divided by thin gold hairlines.
+
+- `components/nav-primary.js` is the one entry model (label, glyph, hotkey)
+  and `primaryEntries()` decides presence: 隊伍 follows `store.partyAvailable`
+  in every playing mode, 任務 is the server's `quests` navigation row (none in
+  combat), 地圖 is absent in combat. Each entry draws its hotkey as a
+  decorative key chip (`aria-hidden`, the control carries `aria-keyshortcuts`).
+  The primary region is sized for all three entries (glyph counts plus a
+  fixed chrome including the chip) and packed trailing, so the tools and 設定
+  hold their place within 1px across modes.
+- 隊伍 is `store.openHudDrawer("party")` — the remembered tab, no router pop
+  and no submission-lock wait; 任務 keeps `tabToRootAndConfirm("quests")`.
+  The bar marks 隊伍 current while the party window is open, whatever its tab.
+- `composables/use-window-hotkeys.js`: one document `keydown` listener
+  (bubble phase, beside the keyboard bridge, which never claims letters).
+  P B C K L open the party window (bare, `inventory`, `status`, `skill`,
+  `lineage` aliases), J and M run the 任務 and 地圖 openers. It reads
+  the typed Latin letter (so the chip's letter works on any Latin layout),
+  falling back to `event.code` on non-Latin layouts, and ignores consumed, repeated,
+  modified (Shift included) and composing keys, text entries, the held
+  cross-side / party-exit questions and any rendered alertdialog or
+  aria-modal surface other than a drawer frame, creation, and every open
+  drawer, overlay or full log — except that P B C K L switch an open party
+  window live. An AppClient left mounted in a test keeps its listener, so
+  AppClient suites unmount between tests.
+
 ## Shared window primitives
 
 The party window and the shop compose the quest drawer frame through five
@@ -218,9 +250,9 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   descriptors. The server republishes `party_inventory` on engagement and on
   every settled round so the tab never shows stale combat descriptors or
   counts.
-- Bag routing: `InventoryPanel` and `EquipmentDoll` are gone. Every old bag
-  opener — the top navigation's 背包 entry, the exploration 背包 row and the
-  combat root's client-local 背包 row — still asks for the `inventory`
+- Bag routing: `InventoryPanel` and `EquipmentDoll` are gone. Every bag
+  opener — the B hotkey, the exploration 背包 row and the combat root's
+  client-local 背包 row — asks for the `inventory`
   drawer, and `stores/elosern/hud.js` `openHudDrawer("inventory")` remembers
   the 背包 tab and opens `party` instead; `inventory` is never the stored
   drawer name. The party purse in the window header is the only balance in
@@ -240,9 +272,7 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   while its `member_id` is the viewed member. `CharacterStatusDrawer` and its
   composables are gone: `openHudDrawer("status")` remembers 狀態 and opens
   `party` (an open window switches tab live), the 角色狀態 row no longer sets
-  the `character` sub-dock, no `HudDrawer` drawer stands an art column, and
-  the top navigation marks the entry of the window's live tab
-  (`party:<tab>`).
+  the `character` sub-dock, and no `HudDrawer` drawer stands an art column.
 - `PartySkillTab` (webclient-party-skill-tab; design §6.4) is the 技能 tab
   for the viewed member, after the prototype's `tabs/SkillTab.vue`; its pure
   projections live in `components/party-skill-model.js`. It keeps the old
@@ -294,9 +324,9 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   selection is in flight, are `aria-disabled`. 在系譜中檢視 on 技能 opens the
   selected skill's graph with its node marked current; both links are
   dropped when their tab is left or the member changes. `LineagePanel` and
-  the `lineage` overlay are gone: the tool group's 技能系譜 is a drawer tool
-  (`drawer: "lineage"`) and `openHudDrawer("lineage")` remembers 系譜 and
-  opens `party`, switching an open window live.
+  the `lineage` overlay are gone, and so is the tool group's 技能系譜: the L
+  hotkey's `openHudDrawer("lineage")` remembers 系譜 and opens `party`,
+  switching an open window live.
 
 ## Shop window
 

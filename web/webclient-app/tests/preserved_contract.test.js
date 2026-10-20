@@ -226,7 +226,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
     expect(wrapper.find('#action-dock [data-testid="exit-compass"] [data-exit-ref="east"]').exists()).toBe(true);
     expect(wrapper.find('#action-dock [data-item-key="exit-east"]').exists()).toBe(false);
     expect(wrapper.find('#action-dock [data-item-key="character"]').exists()).toBe(false);
-    expect(wrapper.get(".desktop-navigation").text()).toContain("角色狀態");
+    expect(wrapper.get(".desktop-navigation").text()).toContain("任務");
     wrapper.unmount();
   });
 

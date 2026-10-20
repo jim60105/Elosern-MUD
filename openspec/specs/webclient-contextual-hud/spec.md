@@ -1463,7 +1463,7 @@ The client's text control SHALL render as a single bar filling the stage's `comm
 
 #### Scenario: No opener or chip is rendered in the bar
 - **WHEN** the bar renders expanded in exploration, combat, or dialogue mode
-- **THEN** no quick-word chip, letter badge, chip cluster, or overlay or drawer opener (技能系譜, 圖鑑, 稱號冊, 設定, 說明, 角色肖像圖庫) is present in the bar
+- **THEN** no quick-word chip, letter badge, chip cluster, or overlay or drawer opener (信件, 圖鑑, 稱號冊, 設定, 說明, 角色肖像圖庫) is present in the bar
 
 #### Scenario: The expanded state is never restored from storage
 - **WHEN** the player expands the command line and reloads the page
@@ -1771,7 +1771,7 @@ The HUD SHALL carry the objective tracker as one line in the stage's `map` ancho
 - **THEN** the text is truncated with an overflow indicator, the line keeps its single-row height, and the full `objective_line` is the line's accessible text
 
 ### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
-The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
+The party window (whose tabs hold members, the bag and equipment, status, skills and lineage), the shop window, the quest board and the lore reference SHALL each render in exactly one place — its window or drawer — and SHALL NOT be present in the DOM while closed. The stage SHALL carry no permanently visible column of reference panels.
 
 #### Scenario: Every reference surface is reachable in two actions
 - **WHEN** a player seeks a reference surface from the top navigation bar or the dock's root frame
@@ -1783,11 +1783,11 @@ The skill book, the bag and equipment, the shop, the quest board, the lore refer
 
 #### Scenario: No reference surface is mounted while the drawers are closed
 - **WHEN** the stage renders in exploration mode with every drawer closed
-- **THEN** no skill book, bag, shop, quest board, lore reference or character-status element exists in the DOM or in the tab order, and no reference column is rendered
+- **THEN** no party window, shop window, quest board or lore reference element exists in the DOM or in the tab order, and no reference column is rendered
 
 #### Scenario: Every reference surface is reachable from the dock
 - **WHEN** the player starts at the dock's root frame or the top navigation bar
-- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption stays in the bottom band's message region
+- **THEN** each reference surface and party window tab is reached in at most two actions, and the narrative caption stays in the bottom band's message region
 
 #### Scenario: An emptied right-hand stack costs nothing
 - **WHEN** the stage renders at 1451x790 and 2560x1440 with every drawer closed

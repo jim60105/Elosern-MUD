@@ -137,12 +137,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         focus_action_dock(page)
         if surface_key == "inventory":
-            # The top navigation's 背包 entry (webclient-desktop-shell) opens
+            # The B window hotkey (webclient-main-navigation-hotkeys) opens
             # the party window on its 背包 tab (webclient-party-bag-retire):
             # the store aliases the retired bag drawer's name, so no keyboard
             # frame is pushed and the router's stack is unchanged. Returns the
             # committed `party_inventory` panel the tab renders.
-            page.locator('.desktop-navigation button', has_text="背包").click()
+            page.keyboard.press("b")
             wait_for_store_state(
                 page,
                 lambda s: s.get("hudDrawer") == "party"

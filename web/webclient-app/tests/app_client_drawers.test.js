@@ -6,7 +6,7 @@
 // exactly once — the party window's header, from the committed
 // `party_inventory` panel — and nowhere else (webclient-party-bag-retire).
 import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
@@ -36,6 +36,12 @@ import { CHARACTER_SKILL_COMPANION_SAMPLE } from "../stories/fixtures/skill_tab_
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
   let wrapper;
+  // One mounted client at a time: a leftover one would keep its document
+  // listeners (the window hotkeys) alive across tests.
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
 
   function mountAppClient() {
     const host = document.createElement("div");
@@ -468,8 +474,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(received.accepted).toBe(true);
     await wrapper.vm.$nextTick();
     // The player route uses the top navigation, with no clerk in this session.
-    await wrapper.get(".desktop-navigation").findAll("button")
-      .find((button) => button.text() === "任務").trigger("click");
+    await wrapper.get('.desktop-navigation [data-nav-slot="quests"]').trigger("click");
     expect(store.view.hudDrawer).toBe("quest");
     await wrapper.vm.$nextTick();
     // The quest drawer owns its scrolling regions: the drawer body is flush.
@@ -1016,7 +1021,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.findAll('[data-testid="companion-figure"]')).toHaveLength(1);
   });
 
-  it("with an empty party, the 角色狀態 opener opens the party window on the commander's 狀態 tab", async () => {
+  it("with an empty party, the 狀態 opener (the C hotkey) opens the party window on the commander's 狀態 tab", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -1043,8 +1048,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     await wrapper.vm.$nextTick();
 
-    // The 角色狀態 opener (webclient-party-status-tab).
-    store.tabToRootAndConfirm("character", "pointer");
+    // The 狀態 opener (webclient-party-status-tab), which the C hotkey runs
+    // (webclient-main-navigation-hotkeys).
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC", bubbles: true, cancelable: true }));
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
     expect(wrapper.find('[data-testid="hud-drawer"][data-drawer-key="status"]').exists()).toBe(false);
@@ -1052,11 +1058,11 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(tab.attributes("data-member")).toBe(String(CHARACTER_PANEL_SAMPLE.member_id));
     expect(tab.get('[data-testid="party-status-tab__name"]').text()).toBe("影行者");
     expect(tab.find('[data-testid="party-status-tab__trait--defense"]').exists()).toBe(true);
-    // Only the 角色狀態 entry is current while the window shows 狀態.
-    const current = wrapper.findAll('.desktop-navigation [aria-current="page"]').map((node) => node.text());
-    expect(current).toEqual(["角色狀態"]);
+    // 隊伍 is current while the window is open, whichever tab it shows.
+    const current = () => wrapper.findAll('.desktop-navigation [aria-current="page"]').map((node) => node.attributes("data-nav-slot"));
+    expect(current()).toEqual(["party"]);
     await wrapper.get('[data-testid="icon-tabs__tab--bag"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.findAll('.desktop-navigation [aria-current="page"]').map((node) => node.text())).toEqual(["背包"]);
+    expect(current()).toEqual(["party"]);
   });
 });
