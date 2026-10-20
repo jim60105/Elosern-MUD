@@ -314,6 +314,9 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
   --lineage-line-soft: rgba(185, 154, 96, 0.14);
   --lineage-node-width: calc(200px * var(--ui-scale));
   --lineage-row-pitch: calc(116px * var(--ui-scale));
+  --lineage-rows: 1;
+  --lineage-widest: 1;
+  --lineage-span: 1;
   display: flex;
   flex: 1;
   min-width: 0;
@@ -576,12 +579,12 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
 .party-lineage-tab__canvas {
   position: relative;
   /* A wide depth row keeps every node legible and scrolls sideways. */
-  min-width: calc(var(--lineage-widest) * calc(112px * var(--ui-scale)));
+  min-width: calc(var(--lineage-widest, 1) * calc(112px * var(--ui-scale)));
   flex: 1 0 auto;
   /* At least one pitch per depth; a taller detail column spreads the rows. */
-  min-height: calc(var(--lineage-rows) * var(--lineage-row-pitch));
+  min-height: calc(var(--lineage-rows, 1) * var(--lineage-row-pitch));
   /* ...but never so far apart that a short graph floats in empty space. */
-  max-height: calc(var(--lineage-rows) * var(--lineage-row-pitch) * 1.45);
+  max-height: calc(var(--lineage-rows, 1) * var(--lineage-row-pitch) * 1.45);
   /* A soft pool of light behind the drawing, no grid or legend. */
   background: radial-gradient(ellipse at 50% 40%, rgba(228, 200, 142, 0.05), transparent 70%);
 }
