@@ -135,6 +135,7 @@
         "world.rules.tests.test_item_combat_turn",
         "world.rules.tests.test_item_effects_rulebook",
         "world.rules.tests.test_item_use",
+        "world.rules.tests.test_lineage_catalog_lifecycle",
         "world.rules.tests.test_lineage_query",
         "world.rules.tests.test_lore_deterministic_reveals",
         "world.rules.tests.test_lore_knowledge",

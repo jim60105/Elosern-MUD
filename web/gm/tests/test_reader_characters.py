@@ -42,6 +42,7 @@ from world.tests.synthetic_data import (
     SYNTH_RACES,
     make_item,
     make_skill,
+    synthetic_registries,
 )
 
 from tools.spec_traceability import covers_requirement
@@ -165,6 +166,71 @@ class CharacterReaderTests(EvenniaTest):
         equipment = section_of(detail, "equipment")
         self.assertEqual(column_values(equipment, "slot"), ["weapon_main", "accessory"])
         self.assertEqual(column_values(equipment, "key"), ["t_iron_fang", "t_wayfarer_pass"])
+
+    @covers_requirement(
+        "skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free"
+    )
+    def test_synthetic_commander_lineage_section_is_available_and_unchanged(self):
+        """A commander under the installed synthetic catalog reads its lineage.
+
+        The read model caches the reverse-edge index at validation time, so a
+        scoped synthetic skill catalog must rebuild it before the GM detail
+        reader (a separate consumer from the text command and the party panel)
+        renders the section. The section stays the bounded view's own graphs,
+        and repeated reads write nothing.
+        """
+        from world.rules.lineage_query import build_lineage_view
+        from web.webclient.presentation.lineage import bounded_lineage_view
+
+        self.player.db.skills = {"active": ["t_ember_burst"], "passive": []}
+        self.player.db.skill_proficiency = {"t_ember_burst": 30.0}
+        before = (
+            deepcopy(dict(self.player.db.skills)),
+            deepcopy(dict(self.player.db.skill_proficiency)),
+            stored_attribute_keys(self.player),
+        )
+
+        with synthetic_registries("skills"):
+            first = characters.character_detail(self.player)
+            self.assertNotIn("lineage", failed_sections(first))
+            lineage = section_of(first, "lineage")
+            self.assertEqual(lineage["note"], "完成 0 / 1")
+
+            graph = next(
+                group for group in lineage["groups"] if group["key"] == "t_ember_burst"
+            )
+            view = bounded_lineage_view(build_lineage_view(self.player))
+            nodes = next(
+                item for item in view.graphs if item.graph_id == "t_ember_burst"
+            ).nodes
+            self.assertEqual(
+                [row["key"] for row in graph["rows"]],
+                [node.skill_key for node in nodes],
+            )
+            self.assertEqual(
+                [row["label"] for row in graph["rows"]],
+                [node.display_name_zh for node in nodes],
+            )
+            self.assertEqual(
+                [row["value"] for row in graph["rows"]],
+                [
+                    f"Lv.{node.level}" + ("（已滿）" if node.capped else "")
+                    for node in nodes
+                ],
+            )
+
+            # The same read again is byte-identical.
+            self.assertEqual(
+                section_of(characters.character_detail(self.player), "lineage"),
+                lineage,
+            )
+
+        after = (
+            deepcopy(dict(self.player.db.skills)),
+            deepcopy(dict(self.player.db.skill_proficiency)),
+            stored_attribute_keys(self.player),
+        )
+        self.assertEqual(after, before)
 
     def test_every_relationship_identifier_is_a_link(self):
         detail = characters.character_detail(self.player)
