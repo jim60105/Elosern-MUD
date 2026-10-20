@@ -162,12 +162,11 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
         self.assertEqual(tip.count(), 0)
 
     @covers_requirement(
+        "webclient-desktop-shell::window-hotkeys-act-only-outside-text-inputs",
         "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe",
         "webclient-desktop-shell::top-navigation-retains-stable-tool-placement-while-respecting-mode-availability",
     )
     def test_p_and_b_open_the_party_window_and_typing_never_does(self):
-        # The added "Window hotkeys act only outside text inputs" requirement's
-        # ID joins this annotation once the archive syncs it into the main spec.
         self.page.set_viewport_size({"width": 1451, "height": 790})
         self.story("core-appshell--populated-hud", '[data-nav-slot="party"]')
         window = self.page.locator('[data-testid="party-window"]')
