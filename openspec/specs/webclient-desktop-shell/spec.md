@@ -352,7 +352,7 @@ keyboard menu frame.
 
 #### Scenario: Each tool opens its surface in one action
 - **WHEN** the shell renders in exploration mode with the command line collapsed and the `gallery` panel available, and the player activates 技能系譜, then 稱號冊, then 角色肖像圖庫, then 說明, closing each surface in between
-- **THEN** each activation opens its overlay, and each close returns focus to the control that opened it
+- **THEN** each activation opens its surface (技能系譜 the party window on its 系譜 tab, the others their overlays), and each close returns focus to the control that opened it
 
 #### Scenario: The codex tool opens the reference drawer
 - **WHEN** the player activates the 圖鑑 control in the tool group
@@ -376,11 +376,11 @@ keyboard menu frame.
 
 #### Scenario: The tool group carries the five tools in order
 - **WHEN** the tool group renders
-- **THEN** it carries, in order, 技能系譜 for the skill lineage overlay, 圖鑑 for the world-codex reference drawer, 稱號冊 for the title-codex overlay, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay
+- **THEN** it carries, in order, 技能系譜 for the party window's 系譜 tab, 圖鑑 for the world-codex reference drawer, 稱號冊 for the title-codex overlay, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay
 
 #### Scenario: Each tool control names itself from the shared tool model
 - **WHEN** a tool control renders
-- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens, discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
+- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the overlay or drawer it opens (技能系譜 instead opens the party window, whose 系譜 tab it selects), discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
 
 #### Scenario: A tool opens through the opener-captured path
 - **WHEN** the player activates a tool control with one pointer action or one Enter press
@@ -396,7 +396,7 @@ keyboard menu frame.
 
 #### Scenario: The five surfaces have exactly one opener each
 - **WHEN** the rendered surfaces are inspected for openers of the five tool surfaces
-- **THEN** no surface other than the tool group carries a second opener for them, and the command line carries none
+- **THEN** no surface other than the tool group carries a second opener for the 圖鑑, 稱號冊, 角色肖像圖庫 and 說明 surfaces (the party window keeps its own openers, and its 技能 tab links into 系譜), and the command line carries none of the tool openers
 
 #### Scenario: The tool group fits the 48px bar
 - **WHEN** the shell renders at the 1451x790 reference viewport with every navigation entry, the gallery control, and a maximum-length character name present

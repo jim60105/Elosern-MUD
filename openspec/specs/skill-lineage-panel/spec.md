@@ -84,22 +84,20 @@ compatibility.
 - **WHEN** the session's viewed member is 艾拉, including while the player possesses 卡恩
 - **THEN** the lineage payload describes 艾拉's graphs and is republished by `party.view_member`
 
-### Requirement: The WebClient renders the lineage window from the view alone
-The stage SHALL carry an icon opening a big-window lineage view. Each graph SHALL
-render its nodes with per-node level and an XP meter of `xp_into_level / 50`,
-saturated nodes marked 見頂, locked nodes SHALL carry
-`prereq_text_zh`, ready nodes SHALL be marked 可解鎖, each graph SHALL show its
-`owned_count / total_count`, and the header SHALL show `已完成 completed_count /
-total_count 樹`. Every value SHALL come from the payload; the client SHALL compute
-no growth rules and render no chain meter.
+### Requirement: The party window lineage tab renders the graphs from the view alone
+The party window's 系譜 tab SHALL render the viewed member's `lineage` v2 graphs, with each graph's `owned_count / total_count` and the tab's `已完成 completed_count / total_count 樹`. Every rendered value SHALL come from the panel payload; the client SHALL compute no growth rules and render no chain meter.
 
 #### Scenario: Expanded fire tree shows per-node meters
 - **WHEN** a player opens the fire graph with `fire_arrow` at 23/50 into level 1
-- **THEN** the node row renders the meter 「23/50 → 下一階」 and the header counts only fully-`consumed` graphs
+- **THEN** the node renders the meter 「23/50 → 下一階」 and the tab header counts only fully-`consumed` graphs
+
+#### Scenario: Node states render from the payload
+- **WHEN** a graph holds a saturated node, a locked node and a ready node
+- **THEN** the saturated node is marked 見頂, the locked node carries `prereq_text_zh`, and the ready node is marked 可解鎖
 
 #### Scenario: The client invents nothing
 - **WHEN** the payload omits a graph (truncated or unavailable)
-- **THEN** the window renders no placeholder graph and no invented progress
+- **THEN** the tab renders no placeholder graph and no invented progress
 
 ### Requirement: The lineage Telnet command mirrors the panel surface
 A `lineage [<成員>]` command (alias `系譜`) on the `CharacterCmdSet` SHALL print the

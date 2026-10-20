@@ -2735,8 +2735,8 @@ An available but empty list — the quest book with no rows, the world codex wit
 Lineage graph rows with the same element/style name SHALL be distinguished using their supplied root-node display names joined with ‧ and keep their owned/total count beside that identity. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label.
 
 #### Scenario: The collapsed chain row lays out its identity and meter
-- **WHEN** a graph row renders
-- **THEN** it places its owned/total count (or 已全數見頂 when consumed) immediately after an identity column shared by every row, with no chain meter; the root subtitle joins the graph's supplied root display names, omitted when equal to the label, and no name is derived from a skill key
+- **WHEN** a graph row renders in the party window's 系譜 tab
+- **THEN** it names the graph by the graph's supplied root display names joined with ‧ under its element/style group heading and places its owned/total count in an end column shared by every row (a consumed graph additionally marked 已全數見頂), with no chain meter, and no name is derived from a skill key
 
 #### Scenario: Rarity borders stay visible without colour
 - **WHEN** an item's rarity frame renders
