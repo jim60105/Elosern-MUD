@@ -310,7 +310,7 @@ def sell(
     ``seller`` is a member dbid re-derived through the party boundary and
     never trusted as identity. Only that member's unequipped copies are
     sellable: the planner refuses an equipped removal, which maps to
-    ``item_equipped``. The unchanged sell price (half the buy price) is
+    ``item_equipped``. The unchanged, independently configured sell price is
     credited to the commander's wallet, and the trade affinity stays between
     the host and the commander, because the commander receives the proceeds.
     """

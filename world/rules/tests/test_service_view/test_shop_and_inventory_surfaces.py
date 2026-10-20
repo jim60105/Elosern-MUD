@@ -104,6 +104,10 @@ class ShopTests(ServiceRegistryIsolation):
         rows = {row.item_key: row for row in shop.stock}
         self.assertEqual(rows[T_APPLE].buy_copper, _buy_copper(T_APPLE))
         self.assertFalse(hasattr(rows[T_APPLE], "sell_copper"))
+        # One price per view: the potion's committed buy row carries its own
+        # configured 8 and never the 6 the sellable row publishes.
+        self.assertEqual(rows[T_SPRAY].buy_copper, 8)
+        self.assertFalse(hasattr(rows[T_SPRAY], "sell_copper"))
         self.assertEqual(view.shop.member_id, player.pk)
         self.assertEqual(rows[T_APPLE].stock, 20)
         self.assertEqual(rows[T_APPLE].max_stock, 20)
@@ -161,7 +165,11 @@ class ShopTests(ServiceRegistryIsolation):
                 location=None,
             )
         )
-        player = actor(location=room, wallet=1000, inventory=[T_APPLE, T_APPLE, T_FANG])
+        player = actor(
+            location=room,
+            wallet=1000,
+            inventory=[T_APPLE, T_APPLE, T_FANG, T_SPRAY],
+        )
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
@@ -176,6 +184,10 @@ class ShopTests(ServiceRegistryIsolation):
         self.assertEqual(sellable[T_APPLE].sell_copper, _sell_copper(T_APPLE))
         self.assertTrue(sellable[T_APPLE].sell.enabled)
         self.assertEqual(sellable[T_FANG].sell.enabled, True)
+        # The potion's sellable row publishes its independently configured 6
+        # and never the 8 its stock row carries.
+        self.assertEqual(sellable[T_SPRAY].sell_copper, 6)
+        self.assertFalse(hasattr(sellable[T_SPRAY], "buy_copper"))
 
 
     def test_stock_rows_report_held_and_no_delta_for_non_equipment(self):

@@ -4,6 +4,12 @@
 
 The parent party-management UI design §4.3 says prices are unchanged and then claims every sell price is half the buy price. Handoff evidence records buy 8 and sell 6 for a synthetic potion. `shop-economy` already sources exact integer buy/sell prices independently from commerce declarations, rejecting sell-above-buy without requiring a half ratio. `services_catalog.py` builds its synthetic potion offer through `synth_offer_rule`; synthetic item bands admit the observed values. The shop view reads `buy_copper` and `sell_copper` from their respective rows.
 
+## Evidence
+
+The authoritative rule is `openspec/specs/shop-economy/spec.md` ("Item and shop identities are immutable while numeric trade rules are YAML and lore-constrained"): exact integer `buy_copper` and `sell_copper` come from the `world/rules/rulebook/commerce/` declarations, and loading rejects sell above buy without imposing any ratio. `world/rules/economy.py` multiplies those two configured fields by quantity (`offer.buy_copper * quantity`, `offer.sell_copper * quantity`); no rule code derives either price from the other.
+
+The synthetic builder is `synth_offer_rule` in `world/rules/tests/_guild_service_probes.py`: buy is the live band floor + 2 and sell is the band floor. `t_ember_spray` is a potion priced by the live `t_mossmeals` band (6..12), so that rule yields 8 buy / 6 sell, and `web/browser_support/browser_fixtures_data/services_catalog.py` installs exactly that rule for the harness stall's first offered item. Six is not half of eight, so the observed pair itself contradicts the half-price sentence.
+
 ## Goals / Non-Goals
 
 Resolve the design discrepancy by retaining authoritative economy semantics. No pricing-engine correction, catalog rebalance, forced half-price rule or alteration of the already-corrected help convention is authorized.
@@ -19,6 +25,8 @@ Before recording completion, cite the authoritative offer rule and synthetic dec
 ## Risks / Trade-offs
 
 Storybook examples or tests using half-price pairs can hide a ratio assumption. Use an asymmetric pair in the focused consumer tests without migrating unrelated fixtures. New requirement IDs are unnecessary because the parent requirement names remain unchanged.
+
+The live `shop-economy` requirement text still carries the stale "(half the buy price)" parenthetical. This change's declared capability set is `webclient-shop-window` only, so that sentence must be corrected by the owning capability's next delta; editing a main spec here without a delta would leave this change and the current contract out of step.
 
 ## Verification and documentation
 
