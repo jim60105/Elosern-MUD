@@ -1,6 +1,6 @@
 // webclient-party-skill-tab: the party window's 技能 tab (design §6.4). The
-// SkillBook browsing carries over (segment, search, the keyboard category
-// tree in payload order); each active row adds the member's proficiency
+// Skill browsing covers the segment, search and keyboard category
+// tree in payload order; each active row adds the member's proficiency
 // meter and level and a 新 tag; the detail shows target, cost and field
 // capability, the ladder and the lineage position only while the committed
 // `selected_skill` names the row on screen; the action bar's 施放 and
@@ -457,7 +457,7 @@ describe("PartyWindow 技能 tab wiring", () => {
     expect(wrapper.emitted("view-member")).toEqual([[{ memberId: other.identity, tab: "skills" }]]);
   });
 
-  it("the SkillBook-era fixture still validates as a tab payload", () => {
+  it("the shared skill fixture validates as a tab payload", () => {
     // The shared skill slice keeps working for the commander's tab.
     wrapper = mount(PartySkillTab, {
       attachTo: document.body,

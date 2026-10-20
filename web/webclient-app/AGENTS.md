@@ -171,7 +171,7 @@ The prototype's new glyphs live in `components/dock-icons.js`.
 ## Party window
 
 `PartyWindow` (webclient-party-window-member-tab; design §6/§6.1 of the party
-member management design) replaced `PartyDrawer`. It mounts under the
+member management design) mounts under the
 existing `party` drawer key outside the generic `HudDrawer` (it is its own
 `WindowFrame`), with the tabs 成員/背包/狀態/技能/系譜 (keys `member`, `bag`,
 `status`, `skills`, `lineage` — the exact `party.view_member` tab values), the
@@ -250,7 +250,7 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   descriptors. The server republishes `party_inventory` on engagement and on
   every settled round so the tab never shows stale combat descriptors or
   counts.
-- Bag routing: `InventoryPanel` and `EquipmentDoll` are gone. Every bag
+- Bag routing: every bag
   opener — the B hotkey, the exploration 背包 row and the combat root's
   client-local 背包 row — asks for the `inventory`
   drawer, and `stores/elosern/hud.js` `openHudDrawer("inventory")` remembers
@@ -269,8 +269,7 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   true value. Raised/lowered totals carry ▲/▼ and a sign besides colour, and
   each severity its own glyph. The selection is local (first layered trait on
   open, reset with the viewed member); the `character` payload renders only
-  while its `member_id` is the viewed member. `CharacterStatusDrawer` and its
-  composables are gone: `openHudDrawer("status")` remembers 狀態 and opens
+  while its `member_id` is the viewed member. `openHudDrawer("status")` remembers 狀態 and opens
   `party` (an open window switches tab live), the 角色狀態 row no longer sets
   the `character` sub-dock, and no `HudDrawer` drawer stands an art column.
 - `PartySkillTab` (webclient-party-skill-tab; design §6.4) is the 技能 tab
@@ -295,7 +294,7 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   `explore.skill_preview`); in combat both are disabled with
   戰鬥中無法排入修煉。 / 戰鬥中請使用指令卡 and `beginSkillUse` refuses
   without a hand-off. No local knocked-out gate: the preview's refusal is
-  shown as 無法施放：… for that caster only. `SkillBook` is gone:
+  shown as 無法施放：… for that caster only.
   `openHudDrawer("skill")` remembers 技能 and opens `party`; the store hands
   a preview over only while the window is open on 技能 (it closes the window
   first) and its Escape return carries `{actorId, skillKey}`.
@@ -323,15 +322,14 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   dispatch tells the server. Locked nodes, and every node while a rail
   selection is in flight, are `aria-disabled`. 在系譜中檢視 on 技能 opens the
   selected skill's graph with its node marked current; both links are
-  dropped when their tab is left or the member changes. `LineagePanel` and
-  the `lineage` overlay are gone, and so is the tool group's 技能系譜: the L
+  dropped when their tab is left or the member changes. The L
   hotkey's `openHudDrawer("lineage")` remembers 系譜 and opens `party`,
   switching an open window live.
 
 ## Shop window
 
 `ShopWindow` (webclient-shop-window; design §4.3/§7 of the party member
-management design) replaced `ShopPanel`. It mounts under the `shop` drawer
+management design) mounts under the `shop` drawer
 key on its own `WindowFrame` (like `PartyWindow`, outside the generic
 `HudDrawer`): the shop seal, the host's `display_name`, 營業中 / 已打烊 as the
 header subtitle, the tabs 購買 / 出售 (`buy` / `sell`, local, default 購買) and

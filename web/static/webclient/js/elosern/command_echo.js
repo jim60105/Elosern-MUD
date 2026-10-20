@@ -121,7 +121,7 @@
     // success line is the player-facing outcome, delivered as narrative by the
     // commit itself (webclient-align-11).
     "explore.dialogue_leave",
-    // Opening the SkillBook use preview reads a server preview and casts
+    // Opening the skill-tab use preview reads a server preview and casts
     // nothing; only the confirmed `explore.cast` echoes a command line.
     "explore.skill_preview",
     // Gallery management is webclient-only (D14); no fabricated text commands.
@@ -161,7 +161,7 @@
   // AREA shorthand or the server-authored target labels of the chosen
   // candidates, and the chosen freeform magnitude rides as a display-only
   // suffix (e.g. 「施展 風刃術（威力×2）」) composed from the canonical scale
-  // label the menu descriptor carries. Shared by the SkillBook field cast.
+  // label the menu descriptor carries. Shared by the skill-tab field cast.
   function castLine(payload, display) {
     var skill = label(display && display.skillLabel);
     if (skill === null) {
@@ -300,7 +300,7 @@
     "explore.move": function (payload, display) {
       return label(display && display.exitLabel);
     },
-    // The SkillBook field cast echoes the canonical typed `cast
+    // The skill-tab field cast echoes the canonical typed `cast
     // <skill>[=<target>]` line; a monster opening names the anchor through
     // its server-authored label instead.
     "explore.cast": function (payload, display) {

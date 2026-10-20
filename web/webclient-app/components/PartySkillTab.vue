@@ -1,8 +1,8 @@
 <script setup>
 // PartySkillTab (webclient-party-skill-tab, design §6.4): the party window's
 // 技能 tab for the viewed member, after the approved prototype
-// docs/design/party-member-management/tabs/SkillTab.vue. It replaces the
-// retired SkillBook drawer and keeps its browsing: the 主動/被動 segment
+// docs/design/party-member-management/tabs/SkillTab.vue. It provides the
+// skill browsing: the 主動/被動 segment
 // (each with its count), the bounded search, and the keyboard category tree
 // in the payload's own category → group → skill order. Each active row adds
 // the member's proficiency meter and level (見頂 when capped), a 新 tag for a

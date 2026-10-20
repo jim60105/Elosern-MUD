@@ -1,5 +1,5 @@
 /*
- * Elosern DOM-independent SkillBook use menu model
+ * Elosern DOM-independent skill use menu model
  * (skillbook-authoritative-casting D6).
  *
  * Transforms a validated `skill_use` panel (one owned active skill previewed
