@@ -4,7 +4,9 @@ Total estimate: **7.5 hours**, including implementation, focused verification, d
 
 ## 1. Help content (1.5h)
 
-- [ ] 1.1 Add the 隊伍 help section (follow rules, transfer rules, combat restrictions, 系譜 legend with shape and text, one-price shop convention, P B C K L J M hotkeys) and its story; verify a Vitest content test and that no party or shop window renders rule prose.
+- [x] 1.1 Add the 隊伍 help section (follow rules, transfer rules, combat restrictions, 系譜 legend with shape and text, one-price shop convention, P B C K L J M hotkeys) and its story; verify a Vitest content test and that no party or shop window renders rule prose.
+
+Verified with `pnpm test web/webclient-app/tests/overlays/help_overlay.test.js web/webclient-app/tests/data/party_member_tab.test.js web/webclient-app/tests/data/party_window.test.js web/webclient-app/tests/world/shop_window.test.js`: 4 files, 71 tests passed. Help renders without store state or interactive controls; existing member/shop tests retain their rule-prose absence assertions. `Overlays/HelpOverlay/PartyRules` uses the real renderer.
 
 ## 2. Residue sweep (1h)
 

@@ -2,8 +2,8 @@
 // task 6.6; localized by webclient-zh-tw-copy-and-labels): the client's own
 // key and command reference, rendered as the help overlay's body. This is
 // the single client-owned source of truth for what the client binds; the
-// help overlay renders only what the client implements — no authored
-// game-help content, no placeholders. The game's own `help` command output
+// help overlay also carries the static party-management rules. The deferred
+// game-help browser is absent. The game's own `help` command output
 // is reached by typing `help` into the command field (the client knows this
 // path, and states it).
 //
@@ -14,6 +14,55 @@
 // DialogueChoices). `keys` are literal key names shown as key
 // caps; `id` is the stable hook for the row.
 export const CONTROLS_REFERENCE = [
+  {
+    id: "party",
+    title: "隊伍",
+    entries: [
+      {
+        id: "party-follow",
+        keys: [],
+        label: "同行與附身",
+        detail: "通過出口時，整支隊伍會跟隨目前操控的身體；附身同伴時，自己的身體與其他同伴也會跟隨。無法通行的成員會留在原地。",
+      },
+      {
+        id: "party-transfer",
+        keys: [],
+        label: "交換物品",
+        detail: "僅限戰鬥外，在同一房間的隊伍成員之間交換。交換免費，不推進時間，也不改變好感度；已裝備或鎖定的物品無法轉移，請先卸下裝備。",
+      },
+      {
+        id: "party-combat",
+        keys: [],
+        label: "戰鬥中的隊伍視窗",
+        detail: "可查看每位成員並免費更換裝備，不消耗回合或時間。無法交換物品或排入修煉；施法請使用戰鬥指令卡，背包的道具可設為該成員本回合的行動。",
+      },
+      {
+        id: "party-lineage",
+        keys: [],
+        label: "系譜圖例",
+        detail: "實心菱形表示見頂；半填菱形表示已習得；虛線菱形表示未習得。可解鎖表示圖中至少有一個未習得節點已符合前置條件。",
+      },
+      {
+        id: "party-shop",
+        keys: [],
+        label: "商店價格",
+        detail: "購買頁只顯示買價，出售頁只顯示賣價；賣價為買價的一半。購物由隊伍錢袋支付，出售所得也歸入隊伍錢袋；附身時無法交易。",
+      },
+      { id: "party-key-p", keys: ["P"], label: "隊伍", detail: "開啟隊伍視窗，回到上次的分頁。" },
+      { id: "party-key-b", keys: ["B"], label: "背包", detail: "開啟隊伍視窗的背包分頁。" },
+      { id: "party-key-c", keys: ["C"], label: "狀態", detail: "開啟隊伍視窗的狀態分頁。" },
+      { id: "party-key-k", keys: ["K"], label: "技能", detail: "開啟隊伍視窗的技能分頁。" },
+      { id: "party-key-l", keys: ["L"], label: "系譜", detail: "開啟隊伍視窗的系譜分頁。" },
+      { id: "party-key-j", keys: ["J"], label: "任務", detail: "開啟任務；戰鬥中不提供。" },
+      { id: "party-key-m", keys: ["M"], label: "地圖", detail: "開啟地圖；戰鬥中不提供。" },
+      {
+        id: "party-hotkey-scope",
+        keys: [],
+        label: "快捷鍵使用範圍",
+        detail: "焦點在文字輸入欄、輸入法組字中、按住修飾鍵或其他視窗與確認提示開啟時不作用。隊伍視窗開啟時仍可用 P B C K L 切換分頁。",
+      },
+    ],
+  },
   {
     id: "command-line",
     title: "指令列",

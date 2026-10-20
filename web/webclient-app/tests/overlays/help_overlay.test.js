@@ -72,10 +72,25 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(latinWords.filter((word) => !keyNames.has(word))).toEqual([]);
   });
 
-  it("renders no authored game-help sections", () => {
-    // The guide payload is gone with the onboarding subsystem: the overlay
-    // carries only the client-owned control reference.
+  it("explains party rules as static text with shape-and-text lineage states", () => {
     wrapper = mount(HelpOverlay);
+    const party = wrapper.get('[aria-labelledby="help-section-party"]');
+    expect(party.get("h3").text()).toBe("隊伍");
+    expect(rowText("party-follow")).toContain("自己的身體與其他同伴也會跟隨");
+    expect(rowText("party-transfer")).toContain("僅限戰鬥外");
+    expect(rowText("party-transfer")).toContain("交換免費，不推進時間");
+    expect(rowText("party-transfer")).toContain("已裝備或鎖定");
+    expect(rowText("party-combat")).toContain("免費更換裝備");
+    expect(rowText("party-combat")).toContain("無法交換物品或排入修煉");
+    expect(rowText("party-combat")).toContain("戰鬥指令卡");
+    for (const state of ["實心菱形表示見頂", "半填菱形表示已習得", "虛線菱形表示未習得", "可解鎖"]) {
+      expect(rowText("party-lineage")).toContain(state);
+    }
+    expect(rowText("party-shop")).toContain("購買頁只顯示買價，出售頁只顯示賣價");
+    expect(rowText("party-shop")).toContain("賣價為買價的一半");
+    expect(party.findAll("kbd").map((key) => key.text())).toEqual(["P", "B", "C", "K", "L", "J", "M"]);
+    expect(rowText("party-hotkey-scope")).toContain("文字輸入欄");
+    expect(wrapper.findAll("input, button, select").length).toBe(0);
     expect(wrapper.emitted().update).toBeUndefined();
     expect(wrapper.html()).not.toContain("guide");
   });

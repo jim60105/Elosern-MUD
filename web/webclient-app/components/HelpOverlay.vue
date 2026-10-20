@@ -5,8 +5,8 @@
 // renders the client's own control reference — the keys this client binds,
 // the dock's navigation model and the close paths — grouped by where the
 // keys act, from the single client-owned source `lib/controls-reference.js`,
-// with one line stating how the game's own `help` output is reached. No
-// authored game-help content is invented here.
+// alongside static party-management rules and the game's `help` command path.
+// There is no stateful game-help browser or fabricated live state here.
 import { controlsReferenceSection } from "../lib/controls-reference.js";
 
 const controlSection = controlsReferenceSection();
@@ -14,8 +14,7 @@ const controlSection = controlsReferenceSection();
 
 <template>
   <div class="help-overlay-body" data-testid="help-overlay">
-    <!-- The client's own control reference (task 6.6): the single
-         client-owned source, not authored game-help content. -->
+    <!-- Static controls and party rules share one authored reference. -->
     <div class="help-controls" data-testid="help-controls">
       <section
         v-for="section in controlSection.sections"
@@ -32,7 +31,7 @@ const controlSection = controlsReferenceSection();
             :data-testid="`help-controls-row-${entry.id}`"
           >
             <dt class="help-controls__term">
-              <span class="help-controls__keys">
+              <span v-if="entry.keys.length" class="help-controls__keys">
                 <template v-for="(key, index) in entry.keys" :key="index">
                   <span v-if="key === '…'" class="help-controls__range" aria-label="至">…</span>
                   <kbd v-else class="help-controls__key" :class="{ 'help-controls__key--glyph': /[^\x20-\x7e]/.test(key) }">{{ key }}</kbd>
