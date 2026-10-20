@@ -19,7 +19,7 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 - **WHEN** a second drawer is opened while one is open, or the open drawer is closed by Escape, its labelled close control, or the scrim
 - **THEN** at most one drawer is open at any time and opening a second closes the first; while open the drawer traps keyboard focus, so no surface behind it is reachable by sequential navigation; every close path restores focus to the control that opened it; and an open drawer registers itself as an open surface so the stage recession this capability already requires applies without a second mechanism
 
-#### Scenario: The skill-book drawer states its counts honestly
+#### Scenario: The party skill tab states its counts honestly
 - **WHEN** the party window's 技能 tab renders while the `character` panel is available, and when it is unavailable
 - **THEN** the tab carries the viewed member's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that same payload the tab renders); when the panel is unavailable the counts are empty, matching the degrade-without-inventing-data contract
 
@@ -59,7 +59,7 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 - **WHEN** a reference drawer's close control renders
 - **THEN** it carries no visible text node, renders a decorative close glyph, and exposes the same accessible name (e.g. `aria-label="關閉"`) an assistive technology would have read from the previous visible text
 
-#### Scenario: The skill-book drawer states its skill counts and cast syntax
+#### Scenario: The party skill tab states its skill counts and graphical actions
 - **WHEN** the party window opens on 技能 with the `character` panel available
 - **THEN** the 技能 tab carries its skill glyph and a `主動 {n} ‧ 被動 {m}` count matching the panel's active/passive row counts, the window title renders exactly once, and graphical 施放/排入修煉 are discoverable without the old cast-syntax footer
 

@@ -1,6 +1,6 @@
 ## Purpose
 
-Provide authoritative graphical skill use from SkillBook through the existing field settlement and combat-initiation rules, with accessible target selection, truthful availability and a verified redesigned browsing surface.
+Provide authoritative graphical skill use from the party window's skill tab through the existing field settlement and combat-initiation rules, with accessible target selection, truthful availability and a verified redesigned browsing surface.
 
 ## Requirements
 
