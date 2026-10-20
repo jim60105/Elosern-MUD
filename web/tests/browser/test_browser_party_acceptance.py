@@ -810,10 +810,6 @@ class PartyManagementFixtureSmokeBrowserTest(
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
 
-    @covers_requirement(
-        "webclient-browser-verification::"
-        "party-management-acceptance-has-an-explicit-deterministic-named-fixture"
-    )
     def test_dedicated_fixture_publishes_members_merchant_and_lineage(self):
         page = self.logged_in_page()
         wait_for_store_state(
