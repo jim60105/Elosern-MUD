@@ -476,6 +476,46 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
+        "webclient-contextual-hud::the-help-overlay-carries-the-party-management-rules"
+    )
+    def test_help_party_rules_are_static_and_absent_from_the_bag(self):
+        """The real help opener explains rules without publishing any intent."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        before = sent_action_count(page)
+        page.locator('[data-testid="nav-tool-help"]').click()
+        party = page.get_by_role("region", name="隊伍", exact=True)
+        party.wait_for(state="visible")
+        self.assertEqual(party.locator("h3").inner_text(), "隊伍")
+        for text in (
+            "自己的身體與其他同伴也會跟隨",
+            "僅限戰鬥外",
+            "交換免費，不推進時間",
+            "已裝備或鎖定",
+            "免費更換裝備",
+            "無法交換物品或排入修煉",
+            "戰鬥指令卡",
+            "實心菱形表示見頂",
+            "半填菱形表示已習得",
+            "虛線菱形表示未習得",
+            "可解鎖",
+            "購買頁只顯示買價，出售頁只顯示賣價",
+            "附身時無法交易",
+        ):
+            self.assertIn(text, party.inner_text())
+        self.assertEqual(party.locator("kbd").all_text_contents(), list("PBCKLJM"))
+        self.assertEqual(party.locator("input,button,select").count(), 0)
+        self.assertEqual(sent_action_count(page), before)
+        page.keyboard.press("Escape")
+        page.keyboard.press("b")
+        bag = page.locator('[data-testid="party-window"]')
+        bag.wait_for(state="visible")
+        self.assertEqual(bag.get_attribute("data-tab"), "bag")
+        for text in ("交換免費", "實心菱形表示", "自己的身體與其他同伴也會跟隨", "購買頁只顯示買價"):
+            self.assertNotIn(text, bag.inner_text())
+        page.close()
+
+    @covers_requirement(
         "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time"
     )
     @covers_requirement(

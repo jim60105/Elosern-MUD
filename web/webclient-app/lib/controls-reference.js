@@ -46,7 +46,7 @@ export const CONTROLS_REFERENCE = [
         id: "party-shop",
         keys: [],
         label: "商店價格",
-        detail: "購買頁只顯示買價，出售頁只顯示賣價；賣價為買價的一半。購物由隊伍錢袋支付，出售所得也歸入隊伍錢袋；附身時無法交易。",
+        detail: "購買頁只顯示買價，出售頁只顯示賣價。購物由隊伍錢袋支付，出售所得也歸入隊伍錢袋；附身時無法交易。",
       },
       { id: "party-key-p", keys: ["P"], label: "隊伍", detail: "開啟隊伍視窗，回到上次的分頁。" },
       { id: "party-key-b", keys: ["B"], label: "背包", detail: "開啟隊伍視窗的背包分頁。" },

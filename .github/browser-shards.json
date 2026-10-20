@@ -330,6 +330,7 @@
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_vertical_list_truthful_skills_count",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_verb_card_leaves_the_command_region_unchanged",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
+        "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_help_party_rules_are_static_and_absent_from_the_bag",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
         "web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",

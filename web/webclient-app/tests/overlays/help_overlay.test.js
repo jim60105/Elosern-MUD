@@ -87,7 +87,7 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
       expect(rowText("party-lineage")).toContain(state);
     }
     expect(rowText("party-shop")).toContain("購買頁只顯示買價，出售頁只顯示賣價");
-    expect(rowText("party-shop")).toContain("賣價為買價的一半");
+    expect(rowText("party-shop")).toContain("附身時無法交易");
     expect(party.findAll("kbd").map((key) => key.text())).toEqual(["P", "B", "C", "K", "L", "J", "M"]);
     expect(rowText("party-hotkey-scope")).toContain("文字輸入欄");
     expect(wrapper.findAll("input, button, select").length).toBe(0);
