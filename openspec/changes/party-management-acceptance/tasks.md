@@ -2,6 +2,8 @@
 
 Total estimate: **7.5 hours**, including implementation, focused verification, documentation and integration.
 
+Current status after the `possession-shop-access` follow-up is **5/5 verified tasks**. The final section records the former shop gap's successful re-check and supersedes the earlier blocked handoffs. The ordinary pre-sync contract gate still reports the new active-delta requirement as unknown; proposed-contract checking passes, and the archive owner must run the ordinary gate after synchronization.
+
 ## 1. Help content (1.5h)
 
 - [x] 1.1 Add the 隊伍 help section (follow rules, transfer rules, combat restrictions, 系譜 legend with shape and text, one-price shop convention, P B C K L J M hotkeys) and its story; verify a Vitest content test and that no party or shop window renders rule prose.
@@ -20,7 +22,7 @@ Intentional matches remain in negative-presence tests (`deferred_surfaces_absent
 
 ## 3. Assembled acceptance (4h)
 
-- [ ] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, have 艾拉 open combat on a monster through the 開戰並施放 confirmation (cancel once, then confirm) and finish the encounter, possess 艾拉 and walk her through an exit confirming the player's body and 卡恩 follow, and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
+- [x] 3.1 Run the agent-browser journey: buy potions for 艾拉, transfer some to 卡恩, re-equip 艾拉, cast a field heal as 艾拉, have 艾拉 open combat on a monster through the 開戰並施放 confirmation (cancel once, then confirm) and finish the encounter, possess 艾拉 and walk her through an exit confirming the player's body and 卡恩 follow, and confirm the party window, shop and navigation are unchanged, then in combat re-equip a companion and observe transfer disabled with 戰鬥中無法交換物品; record each step's committed state.
 - [x] 3.2 Exercise each text command once in a live session (`給`, `取回`, `裝備 = 成員`, `買`/`賣 = 成員`, `使用 = 成員`, `cast 由 成員`, `修煉 = 成員`, `狀態`, `技能`, `系譜`) and record the transcript lines.
 
 ### Initial runtime evidence and unmet prerequisites (historical, before blocker fixes)
@@ -147,3 +149,35 @@ The required ordinary `uv run --locked python -m tools.contract_gate` was execut
 ### Resumed final blocking review
 
 A fresh blocking `rubber-duck` review read the complete 838-line raw feature diff from `72f22a85` to `e807b211`, all 145 lines of this evidence as then committed, design/deltas and shortcut integration. It found **no blocking or non-blocking issues and no additional suggestions**. Its verdict explicitly retains task 3.1 as incomplete for the possessed-shop presentation gap and requires the ordinary contract gate to pass after owning spec synchronization before completion/archive. Those conditions are accepted, not waived. This was a read-only review of implementation and recorded observations, not an independent runtime rerun. Earlier pre-implementation findings and their dispositions remain recorded above; the resumed review adds no unresolved review finding.
+
+## Final closure after possession-shop-access
+
+The feature branch was rebased without conflict onto `cd58e69fbf9c7aed44de08f7f2c527476663f823`, which includes the archived owning fix `possession-shop-access`. This acceptance adds no replacement shop test or gameplay change. The earlier source diagnosis and refusal observations describe the pre-fix runtime only.
+
+### Closing task 3.1's exact remaining gap
+
+A fresh isolated synthetic runtime initialized only `ELOSERN_BROWSER_PARTY_MANAGEMENT_ACCEPTANCE=1` before login. Headless `agent-browser` opened it at the large acceptance viewport, 2560 × 1440. The session compared the actual merchant and party windows before possession, selected `艾拉`, used the real 附身 control, then reopened those windows through their live controls after the possession transition settled. No GM intervention or persistent-state patch was needed for this re-check.
+
+| Observation | Committed state and rendered result |
+| --- | --- |
+| Before possession | Selected member 艾拉 (`12`), party purse 1,000, four stock rows, potion stock 18 and 艾拉 holding four potions. |
+| Possessed party window | Same member order and selected `艾拉`; same five tabs, `成員 / 背包 / 狀態 / 技能 / 系譜`. The action becomes 解除附身 and leaving is disabled, as required by the possession context. |
+| Navigation | Exact same nine labels in the same order, `隊伍 / 任務 / 地圖 / 信件 / 圖鑑 / 稱號冊 / 角色肖像圖庫 / 說明 / 設定`. |
+| Possessed merchant entry | The real merchant's 商店 entry is enabled with no disabled reason. The committed service-entry list contains only `shop`, with no guild entry. |
+| Possessed shop | Merchant host remains available, `guild:null`, real non-null `shop`, `member_id:12`, owner purse 1,000 and all four committed stock rows byte-for-byte equal to the pre-possession rows. The rendered shop has 購買 / 出售 tabs, the full four-member rail, 為艾拉挑選 and actual stock/detail regions. |
+| Buy one while possessed | The real 買給艾拉 control settles potion stock 18 → 17, 艾拉 holdings 4 → 5 and the commander purse 1,000 → 992. The bag agrees on member 12 and purse 992. |
+| Sell one while possessed | The real 出售 control settles potion stock 17 → 18, 艾拉 holdings 5 → 4 and the commander purse 992 → 998. The bag agrees on member 12 and purse 998; possession remains active and mode remains exploration. |
+
+The comparison waited for committed state. The transition closes the drawer; reopening it is the normal interaction, and a transient pre-settlement snapshot is not counted as the final window. Full read-only view/snapshot evidence and screenshots remain in ignored scratch files, `tmp/party-management-possessed-shop-proof.json`, `tmp/party-management-possessed-shop-final.png` and `tmp/party-management-possessed-sale-final.png`.
+
+This re-check closes the only gap in the preceding assembled journey. Its already-recorded purchase/transfer, equipment, field-heal, cancel/confirm and victory, possessed exit with the commander's body and 卡恩 following, combat equipment, and disabled-transfer steps remain the exercised evidence for those steps. The complete journey is established by those recorded runs together; this final run does not claim to repeat them all.
+
+### Final integration evidence
+
+The owning automated journeys were reused without duplication. Both `ShopCompanionJourneys.test_buy_potions_for_a_companion` and `test_possessed_shop_opens_at_the_large_acceptance_viewport` passed through the managed browser driver, **2 tests**, covering actual possessed buy/sell settlement and the large-viewport opening. The acceptance's own managed static-help method also passed again, **1 test**.
+
+The final focused Vitest run passed **102 tests in five files**. The rebuilt client passed. Repository ownership, command-documentation and frozen contracts passed **49 tests** together. `openspec validate party-management-acceptance --strict` passed.
+
+The ordinary `uv run --locked python -m tools.contract_gate` again returned nonzero only for the new help requirement's pre-sync unknown ID. It reported **2,352 current main requirements covered, zero uncovered, one error**. Both lints, manifests and all **18 repository contracts** passed. A fresh scratch equivalent of the rebased main specs plus the two complete deltas and current tests passed canonical listing and static checking with **2,353 requirements covered, zero uncovered, zero errors**. An initial scratch-only heading parser produced duplicate headings; correcting that temporary parser resolved the scratch error without changing repository specs or gate policy.
+
+The headless browser was closed and the owned managed runtime exited cleanly with status 0 through `ManagedServer.stop()`, which removed its private roots. The temporary launcher was removed. No main spec, primary checkout or unrelated worktree was edited; synchronization and archive remain the owner's next phase.
