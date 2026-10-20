@@ -1209,6 +1209,41 @@ assert a dialogue outcome check the server side — the committed player/NPC tur
 pair reloaded from the private SQLite database and the NPC speech rendered in
 the narrative window — rather than only the dispatched envelope.
 
+**Managed save roots (browser-console-save-isolation).** The GM console
+snapshots the world before its first intervention after process start, so the
+real snapshot path (`server/saves/snapshot.py::default_layout`) reads the same
+settings production does. `web/tests/browser/browser_settings.py` declares
+every one of them against the invocation's temporary root — it never imports
+the developer settings, and production paths stay the reference for meaning,
+not for values:
+
+| Setting | Managed runtime source | Resolves to |
+| --- | --- | --- |
+| `DATABASES["default"]["NAME"]` | `ELOSERN_BROWSER_DB` | `<root>/evennia.db3` |
+| `GM_SAVES_ROOT` | `ELOSERN_BROWSER_SAVES_ROOT` | `<root>/saves` (fallback: `<CACHE_DIR>/saves`) |
+| `ART_STORE_ROOT` | `ELOSERN_BROWSER_ART_ROOT` | `<root>/cache/art` |
+| `ART_OFFICIAL_ROOT` | `ART_OFFICIAL_ROOT` (unset by default) | `<root>/cache/art-official` |
+| `GM_AUTOSAVE_KEEP` | `ELOSERN_BROWSER_AUTOSAVE_KEEP` | `10` (positive integer) |
+
+A save is two halves: the database copy under `GM_SAVES_ROOT/<id>/`
+and the art mirror under `ART_STORE_ROOT/.saves/<id>/`. Both therefore live
+under the same invocation root, and two managed runtimes never share a save.
+`GM_AUTOSAVE_KEEP` keeps the production meaning and default (each automatic
+kind retains at most that many saves; manual saves are never pruned); a test
+that exercises retention may set a smaller positive count, and an invalid
+value fails at import exactly as the production settings reject it.
+`fixtures.create_runtime` creates `<root>/saves`, exports
+`ELOSERN_BROWSER_SAVES_ROOT`, and `BrowserRuntime.cleanup` removes it with the
+rest of the root, so an invocation's teardown owns its saves.
+
+`web/tests/browser/test_browser_console_saves.py` is the executable evidence:
+it probes the resolved layout and configured retention without booting a
+server, then boots isolated runtimes for a real CSRF-authenticated
+`/gm/api/console/teleport` (response save id, complete save on disk, saved
+database still holding the pre-teleport location, committed target room) and
+for an injected snapshot failure (a file where the private save root belongs)
+that must refuse with `snapshot_failed` before any mutation.
+
 **JS mirror 規則**：Web 端測試載體（vitest 與 Node gate）共用
 `web/webclient-app/tests/support/synthetic-data.mjs` 與
 `web/static/webclient/js/tests/support/synthetic-data.js` 兩份**位元組相同**的

@@ -57,6 +57,7 @@ class BrowserRuntime:
     media_dir: Path
     static_dir: Path
     cache_dir: Path
+    saves_dir: Path
     ports: list[int] | None = None
     env: dict[str, str] = field(default_factory=dict)
 
@@ -126,6 +127,7 @@ RUNTIME_ENV_KEYS = frozenset(
         "ELOSERN_BROWSER_STATIC_ROOT",
         "ELOSERN_BROWSER_CACHE_DIR",
         "ELOSERN_BROWSER_ART_ROOT",
+        "ELOSERN_BROWSER_SAVES_ROOT",
         "ELOSERN_BROWSER_TELNET_PORT",
         "ELOSERN_BROWSER_HTTP_PORT",
         "ELOSERN_BROWSER_INTERNAL_PORT",
@@ -148,8 +150,9 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
     media_dir = root_dir / "media"
     static_dir = root_dir / "static"
     cache_dir = root_dir / "cache"
+    saves_dir = root_dir / "saves"
     database_path = root_dir / "evennia.db3"
-    for directory in (log_dir, media_dir, static_dir, cache_dir):
+    for directory in (log_dir, media_dir, static_dir, cache_dir, saves_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
     env = {
@@ -159,6 +162,10 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         "ELOSERN_BROWSER_STATIC_ROOT": str(static_dir),
         "ELOSERN_BROWSER_CACHE_DIR": str(cache_dir),
         "ELOSERN_BROWSER_ART_ROOT": str(cache_dir / "art"),
+        # World saves: the GM console snapshots the private database and art
+        # store into this invocation's own root before an intervention, so no
+        # save can reach the developer's ``server/db/saves``.
+        "ELOSERN_BROWSER_SAVES_ROOT": str(saves_dir),
         # Managed browser runtimes boot against the synthetic catalogs (kit
         # ``world.tests.synthetic_data``): the seed process installs them
         # before mirroring, and the server process installs them at
@@ -174,6 +181,7 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         media_dir=media_dir,
         static_dir=static_dir,
         cache_dir=cache_dir,
+        saves_dir=saves_dir,
         env=env,
     )
 
