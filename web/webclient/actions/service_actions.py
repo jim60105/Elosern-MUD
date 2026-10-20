@@ -512,24 +512,13 @@ def _exam_request_adapter(actor: Any, payload: dict[str, Any], session: Any = No
 def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck the host, then buy for the named recipient from the party purse.
 
-    The possessed refusal stays first. The recipient is reauthorized by the
-    economy rule's party boundary (a forged, absent, or non-member id rejects
-    with the shared party code and the commander never receives the goods in
-    its place); the adapter itself never writes state.
+    The recipient is reauthorized by the economy rule's party boundary (a
+    forged, absent, or non-member id rejects with the shared party code and
+    the commander never receives the goods in its place); the adapter itself
+    never writes state. A possessed actor settles through the same rule, with
+    the commander's purse and the named member's bag.
     """
     del session
-    from world.rules.possession import (
-        POSSESSED_REFUSAL_MESSAGES,
-        REASON_POSSESSED_SHOP,
-        is_possessed_actor,
-    )
-
-    if is_possessed_actor(actor):
-        return {
-            "outcome": "rejected",
-            "code": REASON_POSSESSED_SHOP,
-            "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP],
-        }
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(
@@ -563,23 +552,12 @@ def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> di
 def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck the host, then sell the named seller's unequipped items.
 
-    The possessed refusal stays first. The seller is reauthorized by the
-    economy rule's party boundary; the unchanged sell price is credited to
-    the party purse, and the adapter itself never writes state.
+    The seller is reauthorized by the economy rule's party boundary; the
+    unchanged sell price is credited to the party purse, and the adapter
+    itself never writes state. A possessed actor settles through the same
+    rule, with the named member's bag and the commander's purse.
     """
     del session
-    from world.rules.possession import (
-        POSSESSED_REFUSAL_MESSAGES,
-        REASON_POSSESSED_SHOP,
-        is_possessed_actor,
-    )
-
-    if is_possessed_actor(actor):
-        return {
-            "outcome": "rejected",
-            "code": REASON_POSSESSED_SHOP,
-            "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP],
-        }
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(

@@ -26,8 +26,12 @@ from web.webclient.actions.dispatcher import (
 )
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.actions.exploration_actions import (
+    _engage_adapter,
     _possess_adapter,
     _possess_release_adapter,
+    _talk_freeform_adapter,
+    _talk_open_adapter,
+    _talk_scripted_adapter,
     validate_possess_payload,
     validate_possess_release_payload,
 )
@@ -64,7 +68,6 @@ from world.rules.possession import (
     REASON_IN_COMBAT,
     REASON_NOT_CO_LOCATED,
     REASON_POSSESSED_ENGAGE,
-    REASON_POSSESSED_SHOP,
     REASON_POSSESSED_TALK,
     enter_possession,
     release_possession,
@@ -233,6 +236,86 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(engage_entries[0].disabled_reason[0], REASON_POSSESSED_ENGAGE)
 
     @covers_requirement(
+        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+    )
+    def test_possessed_actor_keeps_shop_navigation_and_omits_guild(self):
+        """Shop navigation stays enabled; guild navigation is absent everywhere."""
+        from typeclasses.components import GuildStaff, Merchant, ScriptedDialogue
+        from typeclasses.npcs import NPC
+        from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
+
+        staff = create_object(NPC, key="公會職員", location=self.room1)
+        staff.components.add(
+            GuildStaff.create(
+                staff, service_id="guild_staff", branch_key="t_possession_branch"
+            )
+        )
+        staff.components.add(
+            ScriptedDialogue.create(staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        )
+        shop = create_object(NPC, key="行商", location=self.room1)
+        shop.components.add(
+            Merchant.create(
+                shop, service_id="shop", shop_key="t_possession_shop"
+            )
+        )
+        monster = create_object(Monster, key="哥布林", location=self.room1)
+        enter_possession(self.player, self.npc)
+
+        vocabulary = exploration_affordances(self.npc)
+        navigation = [entry for entry in vocabulary if entry.navigation]
+        self.assertEqual([entry.surface for entry in navigation], ["shop"])
+        self.assertTrue(navigation[0].enabled)
+        self.assertIsNone(navigation[0].disabled_reason)
+
+        talk = [
+            entry
+            for entry in vocabulary
+            if entry.action_id == "explore.talk_scripted"
+        ]
+        self.assertTrue(talk)
+        for entry in talk:
+            self.assertFalse(entry.enabled)
+            self.assertEqual(entry.disabled_reason[0], REASON_POSSESSED_TALK)
+        engage = [entry for entry in vocabulary if entry.action_id == "explore.engage"]
+        self.assertEqual(len(engage), 1)
+        self.assertEqual(engage[0].disabled_reason[0], REASON_POSSESSED_ENGAGE)
+        self.assertIsNotNone(monster.pk)
+
+        context = PresentationContext(actor=self.npc, protocol_version=1)
+        exploration = self.registry.render("exploration", context)
+        exploration_navigation = [
+            affordance
+            for target in exploration["interact"]
+            for affordance in target["affordances"]
+            if affordance.get("kind") == "navigate"
+            and affordance.get("surface") in {"guild", "shop"}
+        ]
+        self.assertEqual(
+            [affordance["surface"] for affordance in exploration_navigation],
+            ["shop"],
+        )
+        self.assertTrue(exploration_navigation[0]["enabled"])
+
+        form = self.registry.render("context_actions", context)
+        self.assertEqual(form["kind"], "exploration")
+        form_navigation = [
+            affordance
+            for affordance in form["affordances"]
+            if affordance.get("navigation") is True
+        ]
+        self.assertEqual(
+            [affordance["surface"] for affordance in form_navigation], ["shop"]
+        )
+        self.assertTrue(form_navigation[0]["enabled"])
+        self.assertFalse(
+            any(
+                affordance.get("surface") == "guild"
+                for affordance in form["affordances"]
+            )
+        )
+
+    @covers_requirement(
         "exploration-affordances::affordance-params-are-validator-normalized"
     )
     def test_possess_affordance_params_normalized(self):
@@ -366,41 +449,123 @@ class PossessionPresentationTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results",
-        "shop-economy::possession-keeps-the-shop-refusal",
     )
-    def test_dispatcher_refuses_possession_incompatible_actions(self):
-        """Shop buy/sell and talk/engage return zero-write rejections while possessed."""
+    def test_possession_keeps_talk_and_engage_refusals_zero_write(self):
+        """Talk opening and combat engagement stay refused while possessed."""
         enter_possession(self.player, self.npc)
+        listener = create_object(LLMNPC, key="旁聽者", location=self.room1)
+        monster = create_object(Monster, key="哥布林", location=self.room1)
         wallet_before = self.player.db.wallet
-        inv_before = list(self.npc.db.inventory)
+        player_inventory = list(self.player.db.inventory)
+        npc_inventory = list(self.npc.db.inventory)
+        dialogue_before = self.npc.db.dialogue_session
+        combat_before = self.player.db.active_combat
+        results = (
+            _talk_open_adapter(self.npc, {"npc_id": listener.pk}),
+            _talk_scripted_adapter(
+                self.npc, {"npc_id": listener.pk, "keyword": "問候"}
+            ),
+            _talk_freeform_adapter(
+                self.npc, {"npc_id": listener.pk, "speech": "你好"}
+            ),
+            _engage_adapter(self.npc, {"monster_id": monster.pk}),
+        )
+        for result, code in zip(
+            results,
+            (
+                REASON_POSSESSED_TALK,
+                REASON_POSSESSED_TALK,
+                REASON_POSSESSED_TALK,
+                REASON_POSSESSED_ENGAGE,
+            ),
+        ):
+            self.assertEqual(result["outcome"], "rejected")
+            self.assertEqual(result["code"], code)
+            self.assertEqual(result["message"], POSSESSED_REFUSAL_MESSAGES[code])
+        self.assertEqual(self.player.db.wallet, wallet_before)
+        self.assertEqual(list(self.player.db.inventory), player_inventory)
+        self.assertEqual(list(self.npc.db.inventory), npc_inventory)
+        self.assertEqual(self.npc.db.dialogue_session, dialogue_before)
+        self.assertEqual(self.player.db.active_combat, combat_before)
+        self.assertIsNone(self.npc.db.active_combat)
+        self.assertIsNotNone(monster.pk)
 
-        # shop.buy refusal
-        buy_res = _buy_adapter(
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+    )
+    def test_possessed_shop_trades_settle_normally(self):
+        """Web buy/sell use the puppet's bag and the commander's purse."""
+        from typeclasses.components import Merchant
+        from typeclasses.npcs import NPC
+        from world.rules.tests._combat_session_helpers import open_synthetic_scope
+        from world.rules.tests._guild_service_probes import (
+            install_synthetic_catalog,
+            synth_catalog,
+            synth_offer_rule,
+            synth_shop_config,
+        )
+        from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
+
+        open_synthetic_scope(self, "items", "prices", "shops")
+        shop_key = next(iter(SYNTH_SHOPS))
+        potion = SYNTH_ITEMS["t_ember_spray"].key
+        offer = synth_offer_rule(potion, max_stock=10, initial_stock=5)
+        install_synthetic_catalog(
+            self,
+            synth_catalog(
+                shop_configs={
+                    shop_key: synth_shop_config(
+                        shop_key, (potion,), offer_rules=(offer,)
+                    )
+                }
+            ),
+        )
+        get_world_clock()._persist(12 * 3600)
+        merchant_host = create_object(NPC, key="合成商人", location=self.room1)
+        merchant = Merchant.create(
+            merchant_host, service_id="possession_store", shop_key=shop_key
+        )
+        merchant_host.components.add(merchant)
+        merchant.merchant_stock = {potion: 5}
+        enter_possession(self.player, self.npc)
+        npc_bag = list(self.npc.db.inventory)
+        commander_bag = list(self.player.db.inventory)
+
+        buy_result = _buy_adapter(
             self.npc,
             {
-                "item_key": "t_possession_ration",
-                "quantity": 1,
-                "recipient_id": self.player.pk,
+                "item_key": potion,
+                "quantity": 2,
+                "recipient_id": self.npc.pk,
             },
         )
-        self.assertEqual(buy_res["outcome"], "rejected")
-        self.assertEqual(buy_res["code"], REASON_POSSESSED_SHOP)
-        self.assertEqual(buy_res["message"], POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP])
-        self.assertEqual(self.player.db.wallet, wallet_before)
-        self.assertEqual(list(self.npc.db.inventory), inv_before)
+        self.assertEqual(buy_result["outcome"], "success")
+        self.assertEqual(buy_result["code"], "bought")
+        self.assertEqual(self.player.db.wallet, 5000 - 2 * offer.buy_copper)
+        self.assertEqual(list(self.npc.db.inventory), npc_bag + [potion, potion])
+        self.assertEqual(list(self.player.db.inventory), commander_bag)
+        self.assertEqual(merchant.merchant_stock[potion], 3)
+        self.assertEqual(merchant_host.relations.affinity_for(self.player), 1)
+        self.assertFalse(merchant_host.relations.has_record(self.npc))
 
-        # shop.sell refusal
-        sell_res = _sell_adapter(
+        sell_result = _sell_adapter(
             self.npc,
             {
-                "item_key": "t_possession_ration",
+                "item_key": potion,
                 "quantity": 1,
-                "seller_id": self.player.pk,
+                "seller_id": self.npc.pk,
             },
         )
-        self.assertEqual(sell_res["outcome"], "rejected")
-        self.assertEqual(sell_res["code"], REASON_POSSESSED_SHOP)
-        self.assertEqual(self.player.db.wallet, wallet_before)
+        self.assertEqual(sell_result["outcome"], "success")
+        self.assertEqual(sell_result["code"], "sold")
+        self.assertEqual(
+            self.player.db.wallet, 5000 - 2 * offer.buy_copper + offer.sell_copper
+        )
+        self.assertEqual(list(self.npc.db.inventory), npc_bag + [potion])
+        self.assertEqual(merchant.merchant_stock[potion], 4)
+        self.assertEqual(merchant_host.relations.affinity_for(self.player), 2)
 
     @covers_requirement(
         "webclient-possession-presentation::possession-re-points-the-session-actor-through-the-epoch-transition"

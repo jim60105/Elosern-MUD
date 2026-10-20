@@ -22,7 +22,11 @@ from world.rules.service_gate import (
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.npc_schedules import interaction_reason
-from world.rules.party_scope import PartyScopeError, resolve_member_token
+from world.rules.party_scope import (
+    PartyScopeError,
+    resolve_commander,
+    resolve_member_token,
+)
 from world.skills.equipment import list_items
 
 
@@ -52,25 +56,6 @@ SELL_ERROR_MESSAGES = {
 class _ShopCommandBase(Command):
     locks = "cmd:all()"
     help_category = "Economy"
-
-    def refuse_possessed_trade(self) -> bool:
-        """Refuse a trade requested while the player possesses a companion.
-
-        The web adapters already answer this request with the shared
-        ``possessed_shop`` line; the text client keeps the same refusal so
-        both transports behave identically, before any host resolution or
-        argument parsing and whatever member the line names.
-        """
-        from world.rules.possession import (
-            POSSESSED_REFUSAL_MESSAGES,
-            REASON_POSSESSED_SHOP,
-            is_possessed_actor,
-        )
-
-        if not is_possessed_actor(self.caller):
-            return False
-        self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP])
-        return True
 
     def resolve_merchant(self):
         try:
@@ -183,8 +168,6 @@ class CmdBuy(_ShopCommandBase):
     aliases = ("購買", "買", "shop buy")
 
     def func(self) -> None:
-        if self.refuse_possessed_trade():
-            return
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
             return
@@ -222,8 +205,6 @@ class CmdSell(_ShopCommandBase):
     aliases = ("販賣", "賣", "shop sell")
 
     def func(self) -> None:
-        if self.refuse_possessed_trade():
-            return
         merchant_host = self.resolve_merchant()
         if merchant_host is None:
             return
@@ -261,8 +242,13 @@ class CmdInventory(Command):
     aliases = ("背包", "inv")
 
     def func(self) -> None:
+        try:
+            purse_owner = resolve_commander(self.caller)
+        except PartyScopeError as error:
+            self.caller.msg(error.message)
+            return
         items = list_items(self.caller)
-        wallet = int(self.caller.db.wallet or 0)
+        wallet = int(purse_owner.db.wallet or 0)
         self.caller.msg(f"錢包：{wallet} 銅")
         # v5 parity (expose-stat-breakdown-read-model D5): the same
         # breakdown rows the character panel serializes, printed once as a

@@ -1,19 +1,22 @@
 """Services panel presenter tests: guild/shop/quest envelopes through the registry."""
 from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.party_view_selection import PartyViewSelection
 from web.webclient.presentation.registry import build_production_registry
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestStage
 from world.quests.tests._fixtures import defeat, quest, register
 from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY, GuildQuestOffer, QuestReward, accept_guild_offer, register_guild_offer
+from world.rules.party import join_party
+from world.rules.possession import enter_possession
 from world.rules.surfaces import write_counter_trait
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import install_synthetic_catalog, price_band, synth_catalog, synth_shop_config
@@ -25,7 +28,7 @@ from unittest.mock import patch
 from world.rules.tests._guild_service_probes import live_guild_branch_registry
 
 
-class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
+class ServicesPresenterTests(BattlefieldIsolation, EvenniaTest):
 
     def setUp(self):
         # Scope before construction: branch/shop/item identities resolve
@@ -84,8 +87,12 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         super().tearDown()
 
 
-    def _context(self):
-        return PresentationContext(actor=self.player, protocol_version=1)
+    def _context(self, actor=None, party_view=None):
+        return PresentationContext(
+            actor=actor or self.player,
+            protocol_version=1,
+            party_view=party_view,
+        )
 
 
     def _render(self):
@@ -109,6 +116,45 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row["reward"], {"copper": 50, "merit": 25, "items": []})
         self.assertIsNone(row["rationale"])
         self.assertIsNone(row["flavor"])
+
+    @covers_requirement(
+        "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
+    )
+    def test_possessed_actor_omits_guild_and_keeps_the_merchant_shop(self):
+        # Put the merchant beside the guild counter so the omission is
+        # observable: the possessed actor must see only the merchant surface.
+        self.merchant_npc.location = self.room1
+        companion = create_object(NPC, key="艾拉", location=self.room1)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        self.player.account = self.account
+        self.account.characters.add(self.player)
+        self.session.puppet = self.player
+        self.player.sessions.add(self.session)
+        enter_possession(self.player, companion)
+        selection = PartyViewSelection(
+            int(self.player.pk), int(companion.pk), "shop"
+        )
+        payload = build_production_registry().render(
+            "services", self._context(actor=companion, party_view=selection)
+        )
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["player"]["wallet"], 1000)
+        self.assertEqual(payload["player"]["guild_rank"], "F")
+        self.assertIsNone(payload["guild"])
+        self.assertEqual(payload["host"]["display_name"], "shop keeper")
+        self.assertEqual(payload["shop"]["member_id"], int(companion.pk))
+        self.assertEqual(len(payload["shop"]["stock"]), 2)
+        self.assertEqual(payload["pagination"]["board_total"], 0)
+        self.assertEqual(payload["pagination"]["quest_total"], 0)
+        self.assertEqual(
+            payload["pagination"]["stock_total"], len(payload["shop"]["stock"])
+        )
+        self.assertEqual(
+            payload["pagination"]["sellable_total"],
+            len(payload["shop"]["sellable"]),
+        )
 
     @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_cross_branch_acceptance_matches_board_reward_and_quest_issuer(self):

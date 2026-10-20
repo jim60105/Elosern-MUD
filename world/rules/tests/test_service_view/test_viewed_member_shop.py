@@ -14,10 +14,10 @@ this file.
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
-from typeclasses.components import Merchant
+from typeclasses.components import GuildStaff, Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.presentation.context import PresentationContext
@@ -29,6 +29,7 @@ from world.rules.economy import TradeError, TradeReason, buy, sell
 from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.guild_config import ItemOfferRule
 from world.rules.party import join_party, leave_party
+from world.rules.possession import enter_possession
 from world.rules.service_view import build_services_view
 from world.rules.tests._combat_session_helpers import (
     _player,
@@ -39,6 +40,7 @@ from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
     synth_catalog,
     synth_shop_config,
+    synthetic_branch_key,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.tests._fixtures import register_catalog_once
@@ -116,7 +118,7 @@ def _offer(item_key, buy_copper, sell_copper, max_stock):
     )
 
 
-class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTestCase):
+class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTest):
     """A commander, one present companion, and a co-located merchant."""
 
     def setUp(self):
@@ -170,6 +172,13 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTestCase):
 
     def _shop(self, viewed=None):
         return build_services_view(self.commander, viewed=viewed).shop
+
+    def _enter_possession(self):
+        self.commander.account = self.account
+        self.account.characters.add(self.commander)
+        self.session.puppet = self.commander
+        self.commander.sessions.add(self.session)
+        enter_possession(self.commander, self.aila)
 
     def _stock(self, shop, item_key):
         return next(row for row in shop.stock if row.item_key == item_key)
@@ -331,9 +340,9 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTestCase):
             sell(self.commander, self.keeper, _STAFF.key, 1, self.aila.pk)
         self.assertIs(refused.exception.args[0], TradeReason.STOCK_OVERFLOW)
 
-    def _render(self, selection=None):
+    def _render(self, selection=None, actor=None):
         context = PresentationContext(
-            actor=self.commander, protocol_version=1, party_view=selection
+            actor=actor or self.commander, protocol_version=1, party_view=selection
         )
         return build_production_registry().render("services", context)
 
@@ -368,6 +377,86 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(view.shop)
         self.assertEqual(view.shop_unavailable_reason, "equipment_delta_unavailable")
         self.assertEqual(view.player.wallet, 1000)
+
+    @covers_requirement(
+        "webclient-service-menus::service-presentation-resolves-hosts-per-service-class-and-a-stable-player-summary"
+    )
+    def test_possessed_actor_keeps_the_owner_summary_and_merchant_shop(self):
+        guild = create_object(NPC, key="公會職員", location=self.room)
+        guild.components.add(
+            GuildStaff.create(
+                guild, service_id="staff", branch_key=synthetic_branch_key()
+            )
+        )
+        self.aila.db.inventory = [_TONIC.key, _TONIC.key]
+        self._enter_possession()
+        self.assertEqual(self.session.puppet, self.aila)
+        view = build_services_view(self.aila, viewed=self.aila)
+        # The player summary belongs to the owner, not the puppet.
+        self.assertEqual(view.player.wallet, 1000)
+        self.assertEqual(view.player.guild_rank, None)
+        # Guild and rank are omitted without a failure reason.
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.guild_unavailable_reason)
+        self.assertEqual(view.host.display_name, "viewed shop keeper")
+        self.assertIsNotNone(view.shop)
+        self.assertEqual(view.shop.member_id, int(self.aila.pk))
+        tonic = self._stock(view.shop, _TONIC.key)
+        self.assertEqual(tonic.viewed.held, 2)
+        self.assertEqual(view.pagination.board_total, 0)
+        self.assertEqual(view.pagination.quest_total, 0)
+        self.assertEqual(view.pagination.stock_total, len(view.shop.stock))
+        self.assertEqual(view.pagination.sellable_total, len(view.shop.sellable))
+
+    @covers_requirement(
+        "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
+    )
+    def test_possessed_malformed_merchant_degrades_only_the_shop(self):
+        self.merchant.merchant_stock = {"nope": 1}
+        self._enter_possession()
+        view = build_services_view(self.aila, viewed=self.aila)
+        self.assertEqual(view.player.wallet, 1000)
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.guild_unavailable_reason)
+        self.assertIsNotNone(view.host)
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "malformed_stock")
+        self.assertEqual(view.pagination.stock_total, 0)
+        self.assertEqual(view.pagination.sellable_total, 0)
+
+    @covers_requirement(
+        "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
+    )
+    def test_combat_suppression_wins_over_a_possessed_merchant(self):
+        # Enter possession first (the entry gate refuses combat), then attach
+        # the active session to the possessed puppet.
+        self._enter_possession()
+        self.aila.db.active_combat = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 1,
+            "player_ids": [int(self.commander.pk)],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        view = build_services_view(self.aila, viewed=self.aila)
+        self.assertEqual(view.player.wallet, 1000)
+        self.assertIsNone(view.host)
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.shop)
+        self.assertIsNone(view.guild_unavailable_reason)
+        self.assertIsNone(view.shop_unavailable_reason)
+        self.assertEqual(view.pagination.board_total, 0)
+        self.assertEqual(view.pagination.quest_total, 0)
+        self.assertEqual(view.pagination.stock_total, 0)
+        self.assertEqual(view.pagination.sellable_total, 0)
 
     @covers_requirement(
         "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"

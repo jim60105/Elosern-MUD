@@ -113,6 +113,22 @@ class OffAnchorServiceEntryTests(VocabularyTestCase):
     @covers_requirement(
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
     )
+    def test_possessed_actor_keeps_the_ordinary_merchant_gate(self):
+        # Possession changes neither the merchant's enabled state nor its
+        # fixed off-anchor reason.
+        self.player.db.possessed_by = 1
+        self._merchant(room=self.square, binding="place", anchor=self.anchor.pk)
+        (entry,) = self._navigation()
+        self.assertEqual(entry.surface, "shop")
+        self.assertFalse(entry.enabled)
+        self.assertEqual(
+            entry.disabled_reason,
+            ("service_unavailable", "他的服務不在這裡營業。"),
+        )
+
+    @covers_requirement(
+        "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
+    )
     def test_at_anchor_and_default_bindings_stay_enabled(self):
         with self.subTest("place-bound host at its anchor"):
             self._merchant(

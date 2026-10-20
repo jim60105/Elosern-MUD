@@ -14,16 +14,24 @@ from tools.spec_traceability import covers_requirement
 from dataclasses import replace
 from unittest.mock import patch
 
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTest
 
 from commands.economy import CmdInventory
 from world.lore.items import EquipmentSlot
 from world.rules import equipment_effects
 from world.rules.equipment import toggle_equipment
+from world.rules.party import join_party
+from world.rules.party_scope import (
+    PARTY_SCOPE_MESSAGES,
+    REASON_NOT_PARTY_MEMBER,
+)
+from world.rules.possession import enter_possession
 from world.rules.status_query import build_character_read_model
 from world.rules.status_text import breakdown_text
 from world.rules.tests._equipment_rulebook_probes import unique_rule
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from typeclasses.npcs import NPC
 from world.tests.synthetic_data import make_item, synthetic_registries
 
 # One borrowed rulebook row (fail-fast unique probe) supplies the modifier
@@ -100,3 +108,57 @@ class InventoryBreakdownHeaderTests(BattlefieldIsolation, EvenniaCommandTest):
             expected_header,
         )
         self.assertIn(f"{_GEAR_DISPLAY} ＋{_DEFENSE_FLAT}）", expected_header)
+
+    def _possess_companion(self):
+        companion = create_object(
+            NPC, key="艾拉", location=self.char1.location, home=self.char1.location
+        )
+        companion.race = "t_duskmari"
+        companion.apply_race_baseline()
+        join_party(companion, self.char1)
+        enter_possession(self.char1, companion)
+        return companion
+
+    @covers_requirement(
+        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only"
+    )
+    def test_possessed_inventory_shows_the_party_purse_and_the_acting_bag(self):
+        companion = self._possess_companion()
+        companion.db.wallet = None
+        self.char1.db.wallet = 321
+        output = self.call(CmdInventory(), "", caller=companion)
+        self.assertIn("錢包：321 銅", output)
+        self.assertIn("背包是空的。", output)
+        # The caller's bag and its header stay the companion's, never the
+        # commander's worn gear.
+        self.assertNotIn(_GEAR_KEY, output)
+
+    @covers_requirement(
+        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only"
+    )
+    def test_ordinary_inventory_keeps_its_wallet_and_bag_presentation(self):
+        self.char1.db.wallet = 77
+        output = self.call(CmdInventory(), "", caller=self.char1)
+        self.assertIn("錢包：77 銅", output)
+        expected_header = breakdown_text(build_character_read_model(self.char1))
+        self.assertIn(expected_header, output)
+        self.assertIn(f"  {_GEAR_KEY} ×1", output)
+
+    @covers_requirement(
+        "character-breakdown-view::text-client-renders-layers-and-compact-surfaces-stay-totals-only"
+    )
+    def test_stale_possession_flag_cannot_manufacture_a_purse(self):
+        companion = create_object(
+            NPC, key="殘旗", location=self.char1.location, home=self.char1.location
+        )
+        companion.race = "t_duskmari"
+        companion.apply_race_baseline()
+        join_party(companion, self.char1)
+        # A bare flag without a live owner-account possession grants nothing.
+        companion.db.possessed_by = self.char1.pk
+        self.char1.db.wallet = 999
+        output = self.call(CmdInventory(), "", caller=companion)
+        self.assertEqual(
+            output.strip(), PARTY_SCOPE_MESSAGES[REASON_NOT_PARTY_MEMBER]
+        )
+        self.assertNotIn("錢包：", output)
