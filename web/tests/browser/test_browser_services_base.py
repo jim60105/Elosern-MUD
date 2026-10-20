@@ -191,11 +191,11 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 page,
                 lambda s: s.get("hudDrawer") == "shop",
                 dom_readiness={
-                    "selector": '[data-testid="shop-panel"]',
+                    "selector": '[data-testid="shop-window"]',
                     "predicate": (
-                        "() => !!document.querySelector('[data-testid=\"shop-panel\"]')"
+                        "() => !!document.querySelector('[data-testid=\"shop-window\"]')"
                     ),
-                    "description": "frameless shop drawer rendered",
+                    "description": "shop window rendered (webclient-shop-window)",
                 },
             )
         elif surface_key == "guild":
@@ -272,6 +272,58 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """Replace the currently focused number entry's value using the keyboard."""
         page.keyboard.press("Control+A")
         page.keyboard.type(str(value))
+
+    # -- shop window (webclient-shop-window) ------------------------------------
+
+    def _focus_roving(self, page, container, item_selector, target_selector, keys=("ArrowDown",)):
+        """Tab to a roving composite's tab stop, then walk it to the target."""
+        self._tab_until_focused(page, f"{container} {item_selector}[tabindex=\"0\"]", max_presses=40)
+        for _ in range(20):
+            if page.evaluate("(sel) => document.activeElement && document.activeElement.matches(sel)", target_selector):
+                return
+            for key in keys:
+                _press(page, key)
+        self.fail(f"{target_selector} is not reachable in {container}")
+
+    def _select_shop_tab(self, page, key):
+        """Select 購買 or 出售 by keyboard (one roving stop; Enter selects)."""
+        tabs = '[data-testid="window-frame__tabs"]'
+        self._focus_roving(page, tabs, '[role="tab"]', f'{tabs} [data-tab-key="{key}"]', keys=("ArrowRight",))
+        _press(page, "Enter")
+        page.wait_for_selector(f'{tabs} [data-tab-key="{key}"][aria-selected="true"]', timeout=5000)
+
+    def _select_shop_member(self, page, member_id):
+        """Select a rail member by keyboard; waits for the server's adoption."""
+        entry = f'[data-testid="member-rail__entry--{member_id}"]'
+        self._focus_roving(page, '[data-testid="shop-window"] .member-rail', ".member-rail__entry", entry)
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("party") or {}).get("viewed_member_id") == member_id
+            and (((s.get("panels") or {}).get("services") or {}).get("shop") or {}).get("member_id") == member_id,
+            dom_readiness={
+                "selector": entry,
+                "predicate": f"() => document.querySelector('{entry}')?.getAttribute('aria-current') === 'true'",
+                "description": "rail entry adopted as the viewed member",
+            },
+        )
+
+    def _select_shop_row(self, page, item_key):
+        """Select a shop row by keyboard; waits for its holdings answer."""
+        rows = '[data-testid="shop-rows"]'
+        row = f'[data-testid="shop-rows__row--{item_key}"]'
+        self._focus_roving(page, rows, '[role="option"]', row)
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("item_holdings") or {}).get("item_key") == item_key
+            and not ((s.get("dispatch") or {}).get("inFlight")),
+            dom_readiness={
+                "selector": row,
+                "predicate": f"() => document.querySelector('{row}')?.getAttribute('aria-selected') === 'true'",
+                "description": "shop row selected",
+            },
+        )
 
     def _open_guild_menu(self, page):
         return self._open_surface(page, "guild")

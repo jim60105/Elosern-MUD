@@ -234,7 +234,8 @@
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_forged_exit_confirmation_rejects",
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_buy_quantity_validation_exact_copper",
-        "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control"
+        "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control",
+        "web.tests.browser.test_browser_services_shop.ShopCompanionJourneys.test_buy_potions_for_a_companion"
       ]
     },
     {

@@ -97,17 +97,17 @@ class VueTypographyBrowserTest(unittest.TestCase):
     def test_changed_numerals_keep_columns_and_tabular_glyph_widths(self):
         for width, height in ((1451, 790), (2560, 1440)):
             self.page.set_viewport_size({"width": width, "height": height})
-            self.story("data-vitalstrack--changing-numerals", ".shop-row__price")
+            self.story("data-vitalstrack--changing-numerals", ".shop-rows__price")
             def metrics():
                 return self.page.evaluate("""() => {
                   const values = [...document.querySelectorAll('.reading .num')];
-                  const stocks = [...document.querySelectorAll('[data-testid="shop-panel__stock-section"] .shop-row')];
+                  const stocks = [...document.querySelectorAll('[data-testid="shop-rows"] .shop-rows__row')];
                   return {
                     text: values.map(e => e.textContent.trim()),
                     vitals: values.map(e => ({right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})),
-                    prices: stocks.map(e => [...e.querySelectorAll('.shop-row__price')].map(n => n.getBoundingClientRect().right)),
-                    fonts: [...values, ...document.querySelectorAll('.shop-row__price')].map(e => ({family:getComputedStyle(e).fontFamily,variant:getComputedStyle(e).fontVariantNumeric})),
-                    clipped: [...values, ...document.querySelectorAll('.shop-row__price')].some(e=>e.scrollWidth>e.clientWidth+1)
+                    prices: stocks.map(e => [...e.querySelectorAll('.shop-rows__price')].map(n => n.getBoundingClientRect().right)),
+                    fonts: [...values, ...document.querySelectorAll('.shop-rows__price')].map(e => ({family:getComputedStyle(e).fontFamily,variant:getComputedStyle(e).fontVariantNumeric})),
+                    clipped: [...values, ...document.querySelectorAll('.shop-rows__price')].some(e=>e.scrollWidth>e.clientWidth+1)
                   };
                 }""")
             before = metrics()

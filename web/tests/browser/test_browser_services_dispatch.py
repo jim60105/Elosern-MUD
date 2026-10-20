@@ -147,12 +147,13 @@ class ReconnectJourney(ServicesBrowserTest):
         shelf = panel["shop"]["stock"][0]
         first_key = shelf["item_key"]
 
-        # Type an unsubmitted quantity in the shop drawer; the value is local.
+        # Type an unsubmitted quantity in the shop window; the value is local.
         self._open_surface(page, "shop")
-        first_stock_input_sel = f'[data-testid="shop-panel__stock--{first_key}"] input.shop-row__qty'
-        self._tab_until_focused(page, first_stock_input_sel)
+        quantity_sel = '[data-testid="shop-window__quantity"]'
+        self._select_shop_row(page, first_key)
+        self._tab_until_focused(page, quantity_sel)
         self._replace_focused_number(page, "5")
-        self.assertTrue(page.evaluate("() => document.querySelector('[data-testid=\"services-quantity\"]') !== null"))
+        self.assertEqual(page.evaluate(f"() => document.querySelector('{quantity_sel}').value"), "5")
 
         # Abnormally close the raw WebSocket (preserves login) and wait for the
         # offline overlay.
@@ -199,14 +200,16 @@ class ReconnectJourney(ServicesBrowserTest):
         self.assertEqual(panel["player"]["wallet"], wallet)
         self.assertTrue(panel["available"])
 
-        # Reopen the shop drawer: unsubmitted quantity was discarded, value is back at lower bound
+        # Reopen the shop window: the unsubmitted quantity and the row
+        # selection were discarded; the entry is absent until a row is
+        # selected, then starts at the row action's own lower bound.
         self._open_surface(page, "shop")
-        val = page.evaluate(f"() => document.querySelector('{first_stock_input_sel}').value")
-        self.assertEqual(val, str(shelf["buy"]["quantity"]["min"]))
-        # services-quantity is absent until a row takes focus
         self.assertEqual(
-             page.evaluate("() => document.querySelector('[data-testid=\"services-quantity\"]') === null"),
+            page.evaluate(f"() => document.querySelector('{quantity_sel}') === null"),
             True,
             "unsubmitted quantity must be discarded on reconnect",
         )
+        self._select_shop_row(page, first_key)
+        val = page.evaluate(f"() => document.querySelector('{quantity_sel}').value")
+        self.assertEqual(val, str(shelf["buy"]["quantity"]["min"]))
         self.assertEqual(sent_action_count(page, "shop.buy"), 0)

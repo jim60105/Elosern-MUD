@@ -143,7 +143,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Action/RestForm",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
-                "World/LocalMap", "World/ShopPanel",
+                "World/LocalMap", "World/ShopWindow",
                 "World/QuestDrawer", "World/LoreCodexDrawer",
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",

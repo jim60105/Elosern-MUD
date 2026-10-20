@@ -297,3 +297,48 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   the `lineage` overlay are gone: the tool group's 技能系譜 is a drawer tool
   (`drawer: "lineage"`) and `openHudDrawer("lineage")` remembers 系譜 and
   opens `party`, switching an open window live.
+
+## Shop window
+
+`ShopWindow` (webclient-shop-window; design §4.3/§7 of the party member
+management design) replaced `ShopPanel`. It mounts under the `shop` drawer
+key on its own `WindowFrame` (like `PartyWindow`, outside the generic
+`HudDrawer`): the shop seal, the host's `display_name`, 營業中 / 已打烊 as the
+header subtitle, the tabs 購買 / 出售 (`buy` / `sell`, local, default 購買) and
+the party purse from `services.player.wallet` in the header extras. Every
+merchant navigate affordance (`surface: "shop"`) opens it through
+`openHudDrawer("shop")`; no category rail exists. Pure projections live in
+`components/shop-window-model.js`; the row listbox is `ShopRows.vue` (also the
+VitalsTrack changing-numerals story's price column).
+
+- The `MemberRail` shows `party.viewed_member_id` (shared with the party
+  window, so a member chosen there is the default recipient). A rail or chip
+  selection emits `view-member` and `use-party-window.js`
+  `onViewShopMember` sends one `party.view_member {tab: "shop", item_key}`
+  carrying the shown item; the entry stays pending (never switched
+  optimistically) and the rows' facts are dimmed and trading is off until
+  the server adopts it. A row selection emits `view-item` →
+  `onViewShopItem`; the row shows once admitted (`pendingItemKey`) or
+  committed (`item_holdings.item_key` for `shop.member_id`).
+- Rows: rarity-framed icon, name, 庫存 n / 售完 (購買) or 持有 n (出售), ONE
+  price per view (`buy_copper` or `sell_copper`), and on 購買 the
+  recipient's `viewed` fact: ▲/▼ delta lines, 無法裝備, ±0 or 持有 n. Delta
+  reason codes (`accessory_slots_full`, ...) are never printed: they ride on
+  `data-reason-code`, here and in `HoldingsStrip`.
+- Detail: hero, and on 購買 for equipment a 裝備比較 of the recipient's
+  committed current values (from `character`, only while its `member_id` is
+  the recipient) beside the server change lines — no slot is committed for a
+  stock row, so the replaced item is never named and nothing is added up —
+  then 其他成員 chips; otherwise 隊伍持有量 chips. Chips are
+  `HoldingsStrip variant="chips"` over the committed `item_holdings` answer
+  for exactly the shown item and recipient.
+- Action bar: the quantity entry and ± stepper bounded by the descriptor's
+  committed `quantity` (absent when it is disabled), committed on change/
+  blur; an out-of-bounds typed value sends nothing. 花費/得到 and 剩餘 N 銅
+  are the one display-only arithmetic. 買給 X / 出售 sends one `shop.buy
+  {item_key, quantity, recipient_id}` / `shop.sell {..., seller_id}` naming
+  `shop.member_id`, only while the rail agrees with it. `use-shop-trade.js`
+  states that trade's committed refusal (e.g. `possessed_shop`) in the bar;
+  a new member, tab or row drops it.
+- The server republishes `party_inventory` with every trade, so the party
+  window's 背包 tab and header purse never lag a purchase.

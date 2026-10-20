@@ -59,7 +59,7 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # design D5).
 WORLD_FAMILY_KEYS = (
     "World/LocalMap",
-    "World/ShopPanel",
+    "World/ShopWindow",
     "World/QuestDrawer",
     "World/LoreCodexDrawer",
     "World/MapLattice",
@@ -98,9 +98,13 @@ WORLD_FAMILY_STORY_IDS = {
     "world-questdrawer--disabled-accept",
     "world-questdrawer--unregistered",
     "world-questdrawer--top-rank",
-    "world-shoppanel--full-payload",
-    "world-shoppanel--section-absent",
-    "world-shoppanel--section-unavailable",
+    "world-shopwindow--buy-equipment-reference",
+    "world-shopwindow--buy-equipment-full-hd",
+    "world-shopwindow--sell-reference",
+    "world-shopwindow--sell-full-hd",
+    "world-shopwindow--closed-reference",
+    "world-shopwindow--no-shop-reference",
+    "world-shopwindow--unavailable-reference",
 }
 
 # The exact manifest baseline before this change (B1 core, B2 action-dock,
@@ -379,7 +383,7 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         self.assertEqual(
             family_titles,
             {f"World/{component}" for component in (
-                "LocalMap", "ShopPanel",
+                "LocalMap", "ShopWindow",
                 "QuestDrawer", "LoreCodexDrawer",
                 "MapLattice",
             )},

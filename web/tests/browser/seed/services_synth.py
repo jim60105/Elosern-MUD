@@ -243,6 +243,13 @@ def _services_fixture_synth(character, mode: str) -> None:
         accept_guild_offer(character, staff, SYNTH_GUILD_OFFER_QUEST_KEY)
         place(original_room)
         character.save()
+    elif mode == "store_open_companion":
+        place(store)
+        character.db.wallet = 1000
+        character.db.inventory = list(inventory)
+        get_world_clock()._persist(12 * 3600)
+        character.save()
+        seed_shop_companion(character, store, race="t_duskmari")
     elif mode in ("store_open", "store_closed"):
         place(store)
         character.db.wallet = 1000
@@ -263,3 +270,31 @@ def _services_fixture_synth(character, mode: str) -> None:
         character.save()
     print(f"seeded services fixture (synth): {mode}")
 
+
+def seed_shop_companion(character, store, *, race: str) -> None:
+    """Join one companion co-located in the store (webclient-shop-window).
+
+    The shop window's rail can then name a recipient other than the
+    commander. A party already at its cap reuses its first companion, moved
+    into the store; the companion starts with an empty bag.
+    """
+    from evennia.utils.create import create_object
+    from typeclasses.npcs import LLMNPC
+    from world.rules.party import (
+        PARTY_MAX_COMPANIONS,
+        join_party,
+        live_companions,
+        party_size,
+    )
+
+    if party_size(character) < PARTY_MAX_COMPANIONS:
+        companion = create_object(LLMNPC, key="艾拉", location=store)
+        companion.race = race
+        companion.apply_race_baseline()
+        companion.db.age = companion.db.apparent_age = 30
+        join_party(companion, character)
+    else:
+        companion = live_companions(character)[0]
+    companion.location = store
+    companion.db.inventory = []
+    companion.save()

@@ -160,6 +160,7 @@ SYNTH_INVENTORY_BY_MODE = MappingProxyType(
     {
         "guild_registered_board": ("t_ember_spray",),
         "store_open": ("t_huskapple", "t_huskapple", "t_ember_spray"),
+        "store_open_companion": ("t_huskapple", "t_ember_spray"),
         "store_closed": ("t_huskapple",),
         "inventory_only": ("t_huskapple", "t_huskapple", "t_thorn_knife", "t_ember_spray"),
         "inventory_actions": ("t_ember_spray", "t_ember_spray", "t_thorn_knife"),
