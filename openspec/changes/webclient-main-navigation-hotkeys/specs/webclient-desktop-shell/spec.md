@@ -343,7 +343,7 @@ document.
 
 #### Scenario: The exploration root omits the navigation-carried entries
 - **WHEN** the exploration keyboard root renders
-- **THEN** it carries no `character`, `quests`, or `inventory` entry - the top navigation bar carries them as the sole keyboard-visible stop
+- **THEN** it carries no `party`, `character`, `quests`, or `inventory` entry - the top navigation bar's 隊伍 and 任務 entries are the sole keyboard-visible stops for the party window and the quest board
 
 #### Scenario: The combat root declares a single column
 - **WHEN** the shell is in combat mode
