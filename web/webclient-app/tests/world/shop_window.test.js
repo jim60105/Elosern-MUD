@@ -31,6 +31,42 @@ import {
 // The potion row's committed display name, read from the fixture.
 const POTION_NAME = SHOP_SERVICES_SAMPLE.shop.stock.find((r) => r.item_key === "potion_heal").display_name;
 
+// One local asymmetric offer for the price-authority regression: the potion
+// buys at 8 and sells at 6. Six is not half of eight (half of eight is four),
+// so a view that read the other field would render or total a different
+// number. The shared story fixtures keep their own pairs untouched.
+const POTION_BUY_COPPER = 8;
+const POTION_SELL_COPPER = 6;
+
+function withAsymmetricPotion(panel) {
+  return {
+    ...panel,
+    shop: {
+      ...panel.shop,
+      stock: panel.shop.stock.map((row) =>
+        row.item_key === "potion_heal" ? { ...row, buy_copper: POTION_BUY_COPPER } : row
+      ),
+      sellable: panel.shop.sellable.map((row) =>
+        row.item_key === "potion_heal" ? { ...row, sell_copper: POTION_SELL_COPPER } : row
+      ),
+    },
+  };
+}
+
+const SHOP_SERVICES_ASYMMETRIC_BUY = withAsymmetricPotion(SHOP_SERVICES_SAMPLE);
+const SHOP_SERVICES_ASYMMETRIC_SELL = withAsymmetricPotion(SHOP_SERVICES_SELLER_SAMPLE);
+
+// 卡恩's committed answer for the potion he is selling: the potion's held
+// counts and non-equipment facts, with his own row refusing a receive.
+const SHOP_HOLDINGS_ASYMMETRIC_SELL = {
+  ...SHOP_HOLDINGS_POTION,
+  giver_id: SHOP_KAHN_ID,
+  rows: SHOP_HOLDINGS_POTION.rows.map((row) => ({
+    ...row,
+    receive: { enabled: row.member_id !== SHOP_KAHN_ID, reason: null },
+  })),
+};
+
 describe("ShopWindow (webclient-shop-window)", () => {
   let wrapper;
 
@@ -59,6 +95,9 @@ describe("ShopWindow (webclient-shop-window)", () => {
   const get = (id) => wrapper.get(`[data-testid="${id}"]`);
   const find = (id) => wrapper.find(`[data-testid="${id}"]`);
   const row = (key) => get(`shop-rows__row--${key}`);
+  const priceTexts = () => wrapper.findAll('[data-testid="shop-rows__price"]').map((n) => n.text());
+  const priceValues = () =>
+    wrapper.findAll('[data-testid="shop-rows__price"]').map((n) => Number(n.text().replace(/\D/g, "")));
 
   it("the fixtures are exact committed payloads", () => {
     for (const panel of [SHOP_SERVICES_SAMPLE, SHOP_SERVICES_SELLER_SAMPLE, SHOP_SERVICES_CLOSED_SAMPLE]) {
@@ -254,6 +293,53 @@ describe("ShopWindow (webclient-shop-window)", () => {
     await get("action-bar__btn--trade").trigger("click");
     expect(wrapper.emitted("trade")).toEqual([
       [{ action_id: "shop.sell", payload: { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID } }],
+    ]);
+  });
+
+  it("an asymmetric configured pair keeps the 購買 view on its own price and totals", async () => {
+    const services = SHOP_SERVICES_ASYMMETRIC_BUY;
+    mountWindow({ services, itemHoldings: SHOP_HOLDINGS_POTION });
+    expect(Protocol.validateServicesPanel(services)).toEqual(services);
+    // Every rendered price is the row's own buy field and its label; the
+    // potion's sell value is one complete price no row publishes here.
+    expect(priceTexts()).toEqual(services.shop.stock.map((r) => `售價${r.buy_copper}`));
+    expect(priceValues()).not.toContain(POTION_SELL_COPPER);
+    expect(row("potion_heal").get('[data-testid="shop-rows__price"]').text()).toBe(
+      `售價${POTION_BUY_COPPER}`,
+    );
+    await get("shop-window__quantity").setValue("3");
+    expect(get("shop-window__total").text()).toBe("24");
+    expect(get("shop-window__remaining").text()).toBe("剩餘 1,216 銅");
+    expect(get("action-bar__btn--trade").text()).toBe("買給艾拉");
+    await get("action-bar__btn--trade").trigger("click");
+    expect(wrapper.emitted("trade")).toEqual([
+      [{ action_id: "shop.buy", payload: { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID } }],
+    ]);
+  });
+
+  it("an asymmetric configured pair keeps the 出售 view on its own price and proceeds", async () => {
+    const services = SHOP_SERVICES_ASYMMETRIC_SELL;
+    mountWindow({
+      services,
+      party: SHOP_PARTY_SELLER_SAMPLE,
+      itemHoldings: SHOP_HOLDINGS_ASYMMETRIC_SELL,
+      initialTab: "sell",
+    });
+    expect(Protocol.validateServicesPanel(services)).toEqual(services);
+    expect(Protocol.validateItemHoldingsPanel(SHOP_HOLDINGS_ASYMMETRIC_SELL)).toEqual(
+      SHOP_HOLDINGS_ASYMMETRIC_SELL,
+    );
+    expect(priceTexts()).toEqual(services.shop.sellable.map((r) => `賣價${r.sell_copper}`));
+    expect(priceValues()).not.toContain(POTION_BUY_COPPER);
+    expect(row("potion_heal").get('[data-testid="shop-rows__price"]').text()).toBe(
+      `賣價${POTION_SELL_COPPER}`,
+    );
+    expect(get("shop-window__quantity").element.value).toBe("1");
+    expect(get("shop-window__total").text()).toBe("6");
+    expect(get("shop-window__remaining").text()).toBe("剩餘 1,246 銅");
+    await get("action-bar__btn--trade").trigger("click");
+    expect(wrapper.emitted("trade")).toEqual([
+      [{ action_id: "shop.sell", payload: { item_key: "potion_heal", quantity: 1, seller_id: SHOP_KAHN_ID } }],
     ]);
   });
 
