@@ -9,19 +9,22 @@ each tick was already applied by ``tick_buffs`` itself; this module never
 re-applies it.
 """
 
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
 
 from world.rules.action import (
     PendingEffect,
-    _ENTRY_TEMPLATES,
+    _FALLBACK_TEMPLATES,
     _EVENT_EFFECT_PLANNERS,
     _commit,
     _defeated_entry,
     _stored_trait_value,
 )
+from world.rules.action.event_log import _max_hp_value
 from world.rules.buffs import TickRecord
 from world.rules.event_log import EventEntry, EventLog
+from world.skills.narration import INTERNAL_KINDS, entry_line
 
 UPKEEP_SKILL_KEY = "combat_upkeep"
 
@@ -57,6 +60,47 @@ def _floor_hp(entity: Any) -> None:
             trait.current = 1
         else:
             trait.value = 1
+
+
+def _stored_maxima(battlefield: Any) -> dict[str, float]:
+    """Map the battlefield roster's keys to their stored maximum HP."""
+    maximums: dict[str, float] = {}
+    for key, entity in getattr(battlefield, "roster", {}).items():
+        maximum = _max_hp_value(entity)
+        if maximum is not None:
+            maximums[str(key)] = maximum
+    return maximums
+
+
+def _narrate_upkeep_entries(
+    entries: list[EventEntry],
+    scope: str,
+    maximums: dict[str, float],
+) -> list[EventEntry]:
+    """Select authored numbers-free prose for one upkeep log's entries."""
+    narrated: list[EventEntry] = []
+    for ordinal, entry in enumerate(entries):
+        if entry.kind in INTERNAL_KINDS:
+            narrated.append(entry)
+            continue
+        target = entry.target or ""
+        try:
+            template = entry_line(
+                entry.kind,
+                entry.data,
+                scope=scope,
+                ordinal=ordinal,
+                actor_key=entry.actor,
+                target_key=target,
+                actor=entry.actor,
+                target=target,
+                max_hp=maximums.get(target),
+            )
+        except Exception:  # observability: ignore R2: narration is presentation and degrades rather than reject a legal round (design D11)
+            narrated.append(entry)
+            continue
+        narrated.append(replace(entry, text_template=template))
+    return narrated
 
 
 def _stage_casualties(
@@ -103,7 +147,7 @@ def _stage_casualties(
                 actor=CASUALTY_ACTOR_KEY,
                 target=str(entity.key),
                 data=data,
-                text_template=_ENTRY_TEMPLATES["target_defeated"],
+                text_template=_FALLBACK_TEMPLATES["target_defeated"],
             )
         )
     if not entries:
@@ -136,6 +180,7 @@ def settle_upkeep(
     *,
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
+    narration_scope: str = "",
 ) -> list[EventLog]:
     """Settle the round's damaging tick records into events and staged effects.
 
@@ -188,7 +233,7 @@ def settle_upkeep(
                 actor=per_source_key[source_pk],
                 target=key,
                 data={"amount": int(applied)},
-                text_template=_ENTRY_TEMPLATES["damage"],
+                text_template=_FALLBACK_TEMPLATES["damage"],
             )
             per_source.setdefault(source_pk, []).append(damage_entry)
             if key not in per_source_targets.setdefault(source_pk, []):
@@ -235,6 +280,9 @@ def settle_upkeep(
     for source_pk, entries in per_source.items():
         if not entries:
             continue
+        entries = _narrate_upkeep_entries(
+            entries, narration_scope, _stored_maxima(battlefield)
+        )
         log = EventLog(
             actor=per_source_key[source_pk],
             skill_key=UPKEEP_SKILL_KEY,

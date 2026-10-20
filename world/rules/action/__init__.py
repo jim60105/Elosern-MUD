@@ -104,7 +104,7 @@ from world.rules.action.effects.sexual import (
     _stimulus_rng,
 )
 from world.rules.action.event_log import (
-    _ENTRY_TEMPLATES,
+    _FALLBACK_TEMPLATES,
     _defeated_entry,
     _entries_from_effect,
     _logged_targets,

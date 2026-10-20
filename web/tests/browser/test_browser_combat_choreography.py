@@ -21,6 +21,7 @@ from __future__ import annotations
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_result import CONTINUE_MESSAGE
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
@@ -46,7 +47,7 @@ REFERENCE = (1451, 790)
 PLAYER = "1"
 FOE_A = "11"
 FOE_B = "12"
-ROUND_CLOSING_LINE = "行動完成，繼續戰鬥。"
+ROUND_CLOSING_LINE = CONTINUE_MESSAGE
 VICTORY_LINE = "戰鬥勝利。"
 
 

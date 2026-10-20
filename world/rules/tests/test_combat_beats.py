@@ -22,6 +22,7 @@ from world.rules.combat_beats import (
     build_combat_beats,
 )
 from world.rules.event_log import EventEntry, EventLog, render_plain_text
+from world.skills.narration import COMPACT_POOLS, entry_line
 
 
 _HERO = "hero"
@@ -409,6 +410,39 @@ class CombatBeatsBuilderTests(unittest.TestCase):
             self.assertNotIn("hit", repr(fields))
         self.assertIn("damage", BEAT_KINDS)
         self.assertIn("other", BEAT_KINDS)
+
+    def test_an_over_long_participant_key_degrades_and_keeps_the_panel(self):
+        long_key = "名" * 300
+        template = entry_line(
+            "damage",
+            {"amount": 5},
+            target_key=long_key,
+            actor=_HERO,
+            target=long_key,
+        )
+        self.assertEqual(template, COMPACT_POOLS["damage"])
+        view = build_combat_beats(
+            _record(
+                [
+                    _log(
+                        [
+                            _entry(
+                                "damage",
+                                target=long_key,
+                                data={"amount": 5},
+                                template=template,
+                            )
+                        ]
+                    )
+                ],
+                identities={_HERO: _HERO_DBREF, long_key: _GOBLIN_DBREF},
+                hp_before={_GOBLIN_DBREF: 30},
+                hp_after={_GOBLIN_DBREF: 25},
+            )
+        )
+        self.assertEqual(len(view.beats), 1)
+        self.assertLessEqual(len(view.beats[0].text), MAX_BEAT_TEXT)
+        self.assertEqual(view.beats[0].hp_after, 25)
 
 
 if __name__ == "__main__":

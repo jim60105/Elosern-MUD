@@ -12,6 +12,7 @@ from world.rules.event_log import (
     render_entry_text,
     render_plain_text,
 )
+from world.skills.narration import entry_line
 
 
 class EventLogTests(unittest.TestCase):
@@ -88,3 +89,51 @@ class EventLogTests(unittest.TestCase):
         )
         log = EventLog("actor", "cast", ("actor",), (entry,), 6)
         self.assertEqual(render_plain_text(log), "actor 的 mp 改變了。")
+
+    def test_narration_hides_the_number_and_the_payload_keeps_it(self):
+        template = entry_line(
+            "damage",
+            {"amount": 450698},
+            target_key="goblin",
+            actor="hero",
+            target="goblin",
+            max_hp=500000,
+        )
+        entry = EventEntry(
+            "damage", "hero", "goblin", {"amount": 450698}, template
+        )
+        line = render_entry_text(entry)
+        self.assertFalse(any(character.isdigit() for character in line), line)
+        self.assertEqual(entry.data["amount"], 450698)
+
+    def test_rendering_is_a_pure_repeatable_format(self):
+        entry = EventEntry(
+            "damage",
+            "hero",
+            "goblin",
+            {"amount": 12},
+            entry_line(
+                "damage",
+                {"amount": 12},
+                target_key="goblin",
+                actor="hero",
+                target="goblin",
+                max_hp=100,
+            ),
+        )
+        first = render_entry_text(entry)
+        second = render_entry_text(entry)
+        self.assertEqual(first, second)
+        self.assertEqual(entry.data, {"amount": 12})
+
+    def test_an_internal_kind_contributes_no_line(self):
+        entries = (
+            EventEntry("damage", "a", "b", {"amount": 3}, "{target} 退了半步。"),
+            EventEntry("combat_kill_xp", "a", "b", {"xp": 4}, ""),
+            EventEntry("damage", "a", "b", {"amount": 1}, "{target} 又退了半步。"),
+        )
+        log = EventLog("a", "test", ("b",), entries, 0)
+        self.assertEqual(
+            render_plain_text(log),
+            "b 退了半步。\n\nb 又退了半步。",
+        )

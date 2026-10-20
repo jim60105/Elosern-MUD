@@ -33,6 +33,10 @@ from world.tests.synthetic_data import (
 from world.quests.runtime import QuestNotFound, QuestState
 from world.rules.clock import AdvanceSource, DaypartError
 from world.rules.combat_session import CombatSessionError, SessionReason
+from world.rules.player_messages import (
+    CONTINUE_COMBAT_MESSAGE,
+    terminal_outcome_message,
+)
 from world.rules.character_creation import CharacterCreationError
 from world.rules.economy import TradeError, TradeReason
 from world.rules.guild import GuildDataError, GuildError, RewardClaimError
@@ -297,9 +301,9 @@ class CombatCommandBranchTests(TestCase):
             session_id="hostile:1:0", round_revision=0, rounds_elapsed=0
         )
         for outcome, message in (
-            ("defeat", "你被擊敗了，倒地不起，許久之後才在原地醒轉。"),
-            ("exam_failed", "你未能通過公會考核。"),
-            ("other", "繼續戰鬥。"),
+            ("defeat", terminal_outcome_message("defeat")),
+            ("exam_failed", terminal_outcome_message("exam_failed")),
+            ("other", CONTINUE_COMBAT_MESSAGE),
         ):
             command = _command(CmdCombatForfeit, "confirm S-0-0123456789ABCDEF0123")
             with patch(
@@ -614,12 +618,12 @@ class ActionCommandBranchTests(TestCase):
             return_value={"outcome": "victory", "logs": ["log"]},
         ), patch(
             "world.rules.combat_result.settle_to_messages",
-            return_value=(("rendered",), "戰鬥結束，你取得了勝利。"),
+            return_value=(("rendered",), terminal_outcome_message("victory")),
         ):
             command._cast_in_session(command.caller, object(), "skill", "")
         self.assertEqual(
             [call.args[0] for call in command.caller.msg.call_args_list],
-            ["rendered", "戰鬥結束，你取得了勝利。"],
+            ["rendered", terminal_outcome_message("victory")],
         )
 
     def test_out_of_combat_success_renders_from_the_settlement_and_failure_reports_reason(self):

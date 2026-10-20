@@ -7,6 +7,11 @@ escaped text output.
 """
 
 from world.rules.action import RejectReason
+from world.skills.narration import (
+    CONTINUE_MESSAGE,
+    TERMINAL_OUTCOME_MESSAGES,
+    terminal_outcome_message,
+)
 
 
 _REJECTION_MESSAGES: dict[RejectReason, str] = {
@@ -116,17 +121,10 @@ def party_exit_prompt_lines(
     ]
     return tuple(lines)
 
-# Stable terminal outcome announcements shared by command and adapter paths.
-TERMINAL_OUTCOME_MESSAGES: dict[str, str] = {
-    "victory": "戰鬥結束，你取得了勝利。",
-    "defeat": "你被擊敗了，倒地不起，許久之後才在原地醒轉。",
-    "fled": "你脫離了戰鬥。",
-    "exam_passed": "你通過了公會考核。",
-    "exam_failed": "你未能通過公會考核。",
-    "cap": "戰鬥超出了回合上限，回合結束。",
-}
-
-CONTINUE_COMBAT_MESSAGE = "繼續戰鬥。"
+# Terminal outcome announcements and the round marker are authored prose
+# owned by the narration catalog (``action-narration``); this module keeps the
+# stable player-message surface that command and adapter paths import.
+CONTINUE_COMBAT_MESSAGE = CONTINUE_MESSAGE
 
 
 def rejection_message(reason: RejectReason, detail: str | None = None) -> str:
@@ -142,11 +140,6 @@ def rejection_message(reason: RejectReason, detail: str | None = None) -> str:
 def session_reason_message(reason: str) -> str:
     """Return the stable safe player-facing message for a session rejection."""
     return SESSION_REASON_MESSAGES.get(reason, _REJECTION_FALLBACK)
-
-
-def terminal_outcome_message(outcome: str) -> str:
-    """Return the stable announcement for one terminal session outcome."""
-    return TERMINAL_OUTCOME_MESSAGES.get(outcome, CONTINUE_COMBAT_MESSAGE)
 
 
 # The fixed server-authored line a conversation opens on when the host has no

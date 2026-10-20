@@ -401,6 +401,10 @@
       "reason": "skill registry content contract"
     },
     {
+      "path": "world/skills/tests/test_skill_registry/test_narration_coverage.py",
+      "reason": "shipped narration coverage contract over the skill and act registries"
+    },
+    {
       "path": "world/skills/tests/test_skill_registry/test_out_of_combat_policy.py",
       "reason": "skill registry content contract"
     },

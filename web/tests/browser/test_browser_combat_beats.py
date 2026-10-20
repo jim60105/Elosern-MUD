@@ -12,6 +12,7 @@ from __future__ import annotations
 import time
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_result import CONTINUE_MESSAGE
 from web.browser_support.browser_fixtures_data import combat_journey_values
 
 from ._journey_support import _press
@@ -33,7 +34,7 @@ from .harness import ManagedServerTearDownMixin
 
 # The closing line `world.rules.combat_result.CONTINUE_MESSAGE` sends after a
 # settled ordinary round; it is the first line after the beats.
-ROUND_CLOSING_LINE = "行動完成，繼續戰鬥。"
+ROUND_CLOSING_LINE = CONTINUE_MESSAGE
 
 
 class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):

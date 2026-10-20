@@ -29,7 +29,7 @@ from world.rules.combat_session import (
     submit_opening_action,
 )
 from world.rules.overwhelm import classify_overwhelm
-from world.rules.event_log import render_plain_text
+from world.rules.event_log import render_entry_text, render_plain_text
 from world.rules.party import join_party
 from world.rules.combat_session import BASIC_ATTACK_KEY
 from world.skills.registry import SkillKind, TargetSpec
@@ -116,19 +116,28 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
             and log.skill_key == _T_CAST
         ]
         self.assertEqual(len(opening_logs), 1)
-        opening_lines = opening_logs[0].splitlines()
-        # The marker prefixes the action's own roll line, which stays
-        # immediately before the damage it describes.
-        self.assertEqual(opening_lines[0], f"你施展了「{SYNTH_SKILLS[_T_CAST].label}」。")
-        self.assertEqual(
-            opening_lines[1],
-            f"{self.player.key} 對 {self.monster.key} 的攻擊擲出了 44。",
+        opening_log = next(
+            log
+            for log in logs
+            if log.actor == str(self.player.key) and log.skill_key == _T_CAST
         )
-        self.assertTrue(
-            opening_lines[2].startswith(
-                f"{self.player.key} 對 {self.monster.key} 造成了 "
+        opening_entries = list(opening_log.entries)
+        roll_entry = next(
+            entry for entry in opening_entries if entry.kind == "roll"
+        )
+        damage_entry = next(
+            entry for entry in opening_entries if entry.kind == "damage"
+        )
+        # The exact roll stays in the structured payload while the delivered
+        # prose hides it (design D12): selection adds no digit.
+        self.assertEqual(roll_entry.data["raw_roll"], 44)
+        self.assertGreater(damage_entry.data["amount"], 0)
+        for entry in opening_entries:
+            line = render_entry_text(entry)
+            self.assertFalse(
+                any(character.isdigit() for character in line),
+                line,
             )
-        )
 
 
 class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):

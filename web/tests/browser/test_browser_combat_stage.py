@@ -15,6 +15,7 @@ import re
 from playwright.sync_api import expect
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_result import CONTINUE_MESSAGE
 from world.rules.combat_view import BASIC_ATTACK_KEY
 
 from .browser_base import BrowserAcceptanceTest
@@ -1078,7 +1079,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         }
         page.evaluate(
             _PLAY_ROUND,
-            [snapshot_envelope("", 0, panels, mode="combat"), "ui_update", [*lines, "行動完成，繼續戰鬥。"]],
+            [snapshot_envelope("", 0, panels, mode="combat"), "ui_update", [*lines, CONTINUE_MESSAGE]],
         )
         self.assertIsNone(self._read(page)["rows"][0]["slots"][1]["fallen"], "it stands until its beat")
         # On its beat the collapse eases over the defeat token on the exit curve.

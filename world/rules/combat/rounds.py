@@ -42,6 +42,7 @@ from world.rules.sexual_transitions import apply_event
 from world.rules.unlock_notices import UnlockNotice
 from world.rules.upkeep import settle_upkeep
 from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.skills.narration import entry_line
 
 
 def default_attack_policy(
@@ -118,7 +119,9 @@ def default_attack_policy(
 
 
 def _action_skipped_event_log(
-    entity: Any, data: dict[str, Any] | None = None
+    entity: Any,
+    data: dict[str, Any] | None = None,
+    narration_scope: str = "",
 ) -> EventLog:
     key = str(entity.key)
     entry = EventEntry(
@@ -126,7 +129,13 @@ def _action_skipped_event_log(
         actor=key,
         target=None,
         data=dict(data) if data is not None else {},
-        text_template="{actor} 無法行動。",
+        text_template=entry_line(
+            "action_skipped",
+            {},
+            scope=narration_scope,
+            actor_key=key,
+            actor=key,
+        ),
     )
     return EventLog(key, "", (), (entry,), 0)
 
@@ -371,6 +380,7 @@ def _resolve_round(
     logs: list[EventLog] = []
     session_id = "" if decision_scope_base is None else decision_scope_base.session_id
     round_index = 0 if decision_scope_base is None else decision_scope_base.round_index
+    round_scope = f"{session_id}|{round_index}"
     observe = None
     if session_id:
         # Local import: the session-owned observation memory lives in
@@ -408,14 +418,21 @@ def _resolve_round(
             if zero_rules or modifiers.get("actions_per_turn") == 0:
                 certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
                 if certain:
-                    logs.append(_action_skipped_event_log(entity))
+                    logs.append(
+                        _action_skipped_event_log(
+                            entity,
+                            narration_scope=f"{round_scope}|skipped|{key}",
+                        )
+                    )
                     continue
                 max_chance = max(int(adj["chance"]) for adj in zero_rules)
                 roll = roll_d100()
                 if roll <= max_chance:
                     logs.append(
                         _action_skipped_event_log(
-                            entity, data={"chance": max_chance, "roll": roll}
+                            entity,
+                            data={"chance": max_chance, "roll": roll},
+                            narration_scope=f"{round_scope}|skipped|{key}",
                         )
                     )
                     continue
@@ -423,7 +440,12 @@ def _resolve_round(
             else:
                 raw_count = modifiers.get("actions_per_turn", 1)
                 if raw_count == 0:
-                    logs.append(_action_skipped_event_log(entity))
+                    logs.append(
+                        _action_skipped_event_log(
+                            entity,
+                            narration_scope=f"{round_scope}|skipped|{key}",
+                        )
+                    )
                     continue
                 count = max(1, int(raw_count))
         else:
@@ -473,7 +495,10 @@ def _resolve_round(
                         if observe is not None:
                             observe(item_result.event_log)
                 continue
-            result = ActionResolver.resolve(request)
+            result = ActionResolver.resolve(
+                request,
+                narration_scope=f"{round_scope}|{slot_index}",
+            )
             if result.outcome == "rejected":
                 # Distinguish technical failure (CommitFailed) from gameplay invalidation
                 from world.rules.action import RejectReason
@@ -506,6 +531,7 @@ def _resolve_round(
         records_by_key,
         simulated=simulated,
         nonlethal_keys=nonlethal_keys,
+        narration_scope=f"{round_scope}|upkeep",
     )
     if observe is not None:
         for log in upkeep_logs:

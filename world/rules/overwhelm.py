@@ -16,6 +16,7 @@ from world.rules.unlock_notices import UnlockNotice
 from world.skills.effects import DamageEffect
 from world.skills.registry import SKILL_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.skills.narration import commanded_action_line, overwhelm_summary_line
 
 
 OVERWHELM_YAML = yaml.safe_load(
@@ -367,7 +368,9 @@ def compress_event_logs(
                     actor=commanded_actor,
                     target=None,
                     data={"item": label},
-                    text_template="你使用了「{data[item]}」。",
+                    text_template=commanded_action_line(
+                        "item", actor=str(commanded_actor)
+                    ),
                 )
             else:
                 skill = SKILL_REGISTRY.get(commanded_action_key)
@@ -377,7 +380,9 @@ def compress_event_logs(
                     actor=commanded_actor,
                     target=None,
                     data={"skill": label},
-                    text_template="你施展了「{data[skill]}」。",
+                    text_template=commanded_action_line(
+                        "skill", actor=str(commanded_actor)
+                    ),
                 )
             entries = (marker,) + entries
         preserved.append(replace(log, entries=entries))
@@ -397,11 +402,7 @@ def compress_event_logs(
             "hits": hits,
             "total_damage": total_damage,
         },
-        text_template=(
-            "{actor} 與 {target} 在壓倒性態勢判定下交戰 "
-            "{data[rounds]} 回合；雙方共命中 {data[hits]} 次，"
-            "造成 {data[total_damage]} 點傷害。"
-        ),
+        text_template=overwhelm_summary_line(),
     )
     summary = EventLog(
         actor=overwhelming_team,

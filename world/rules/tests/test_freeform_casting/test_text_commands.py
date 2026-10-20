@@ -82,6 +82,32 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         target.race = _race_key()
         target.apply_race_baseline()
         target.move_to(self.room1)
+        self.glow_target = target
+
+    def _cast_capturing(self, args: str):
+        """Run the text cast and return its messages plus the field outcome."""
+        from commands.action import CmdCast
+        from world.rules.field_cast import cast_in_field as real_cast
+
+        captured = []
+
+        def _capture(*call_args, **call_kwargs):
+            outcome = real_cast(*call_args, **call_kwargs)
+            captured.append(outcome)
+            return outcome
+
+        with patch("commands.action.cast_in_field", side_effect=_capture):
+            output = self.call(CmdCast(), args)
+        return output, captured[-1]
+
+    def _assert_heal_entry(self, output, outcome) -> None:
+        entries = outcome.settlement.result.event_log.entries
+        heal = next(entry for entry in entries if entry.kind == "heal")
+        self.assertIsInstance(heal.data["amount"], int)
+        self.assertFalse(
+            any(character.isdigit() for line in output for character in line),
+            output,
+        )
 
     def _clock(self):
         clock = WorldClock()
@@ -103,12 +129,20 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self._setup_caster(mastery=True)
         self._setup_target()
         read_patch, get_patch, clock = self._clock()
+        before = int(self.glow_target.traits.hp.value)
         with read_patch, get_patch:
-            self.call(
-                CmdCast(),
-                f"{_T_OOC_HEAL.key}@1/2=glow target",
-                f"{self.char1.key} 對 glow target 恢復了",
+            output, outcome = self._cast_capturing(
+                f"{_T_OOC_HEAL.key}@1/2=glow target"
             )
+        self._assert_heal_entry(output, outcome)
+        heal = next(
+            entry
+            for entry in outcome.settlement.result.event_log.entries
+            if entry.kind == "heal"
+        )
+        self.assertEqual(
+            heal.data["amount"], int(self.glow_target.traits.hp.value) - before
+        )
         half_end = self.char1.traits.mp.value
         # The ordinary command-time charge applies per cast.
         self.assertEqual(clock.tick, 6)
@@ -117,12 +151,20 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # differential between the two command casts.
         self.char1.traits.mp.current = 500
         self.char1.traits.mp.regen_remainder = 0.0
+        before = int(self.glow_target.traits.hp.value)
         with read_patch, get_patch:
-            self.call(
-                CmdCast(),
-                f"{_T_OOC_HEAL.key}@1=glow target",
-                f"{self.char1.key} 對 glow target 恢復了",
+            output, outcome = self._cast_capturing(
+                f"{_T_OOC_HEAL.key}@1=glow target"
             )
+        self._assert_heal_entry(output, outcome)
+        heal = next(
+            entry
+            for entry in outcome.settlement.result.event_log.entries
+            if entry.kind == "heal"
+        )
+        self.assertEqual(
+            heal.data["amount"], int(self.glow_target.traits.hp.value) - before
+        )
         one_end = self.char1.traits.mp.value
         self.assertEqual(clock.tick, 12)
         base_mp = int(_T_OOC_HEAL.cost["mp"])
@@ -190,23 +232,39 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self._setup_caster(mastery=True)
         self._setup_target()
         read_patch, get_patch, clock = self._clock()
+        before = int(self.glow_target.traits.hp.value)
         with read_patch, get_patch:
-            self.call(
-                CmdCast(),
-                f"{_T_OOC_HEAL.key}@1=glow target",
-                f"{self.char1.key} 對 glow target 恢復了",
+            output, outcome = self._cast_capturing(
+                f"{_T_OOC_HEAL.key}@1=glow target"
             )
+        self._assert_heal_entry(output, outcome)
+        heal = next(
+            entry
+            for entry in outcome.settlement.result.event_log.entries
+            if entry.kind == "heal"
+        )
+        self.assertEqual(
+            heal.data["amount"], int(self.glow_target.traits.hp.value) - before
+        )
         one_end = self.char1.traits.mp.value
         # Reset the gauge (and its regen remainder) so the second cast
         # accrues the same regen; the exact deduction is the differential.
         self.char1.traits.mp.current = 500
         self.char1.traits.mp.regen_remainder = 0.0
+        before = int(self.glow_target.traits.hp.value)
         with read_patch, get_patch:
-            self.call(
-                CmdCast(),
-                f"{_T_OOC_HEAL.key}@2=glow target",
-                f"{self.char1.key} 對 glow target 恢復了",
+            output, outcome = self._cast_capturing(
+                f"{_T_OOC_HEAL.key}@2=glow target"
             )
+        self._assert_heal_entry(output, outcome)
+        heal = next(
+            entry
+            for entry in outcome.settlement.result.event_log.entries
+            if entry.kind == "heal"
+        )
+        self.assertEqual(
+            heal.data["amount"], int(self.glow_target.traits.hp.value) - before
+        )
         two_end = self.char1.traits.mp.value
         self.assertEqual(clock.tick, 12)
         base_mp = int(_T_OOC_HEAL.cost["mp"])

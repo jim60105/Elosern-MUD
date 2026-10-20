@@ -1,0 +1,103 @@
+"""Deterministic, authored Traditional-Chinese narration.
+
+The catalog and selector in this package turn one resolved entry into one
+skill-specific, numberless story line. It is presentation only: no game rule,
+no gameplay RNG draw, no clock read, and no model or network call.
+"""
+
+from .catalog import FAMILY_ROWS, NARRATION_CATALOG
+from .families import (
+    PENDING_FAMILIES,
+    base_family_key,
+    family_key,
+)
+from .pools import (
+    COMPACT_POOLS,
+    CONTINUE_MESSAGE,
+    ENGAGEMENT_OPENING_TEMPLATE,
+    FALLBACK_TEMPLATES,
+    INTERNAL_KINDS,
+    KIND_POOLS,
+    NARRATION_KINDS,
+    OVERWHELM_SUMMARY_LINE,
+    PARTY_RETREAT_LINES,
+    TERMINAL_OUTCOME_MESSAGES,
+)
+from .select import (
+    act_for_skill,
+    action_line,
+    action_lines,
+    band_for_entry,
+    choose_line,
+    commanded_action_line,
+    compose_first_line,
+    entry_line,
+    narration_seed,
+    variant_index,
+)
+from .structural import (
+    engagement_opening_line,
+    overwhelm_summary_line,
+    party_retreat_line,
+    terminal_outcome_message,
+)
+from .vocab import (
+    MAX_COMPACT_CODE_POINTS,
+    MAX_LINE_CODE_POINTS,
+    MAX_NAME_CODE_POINTS,
+    MAX_RENDERED_CODE_POINTS,
+    MAX_SLOTS,
+    BandTable,
+    NarrationBands,
+    NarrationCatalogError,
+    NarrationRow,
+    band_for,
+    composed_fits,
+    slot_count,
+    validate_line,
+)
+
+__all__ = [
+    "COMPACT_POOLS",
+    "CONTINUE_MESSAGE",
+    "ENGAGEMENT_OPENING_TEMPLATE",
+    "FALLBACK_TEMPLATES",
+    "FAMILY_ROWS",
+    "INTERNAL_KINDS",
+    "KIND_POOLS",
+    "MAX_COMPACT_CODE_POINTS",
+    "MAX_LINE_CODE_POINTS",
+    "MAX_NAME_CODE_POINTS",
+    "MAX_RENDERED_CODE_POINTS",
+    "MAX_SLOTS",
+    "NARRATION_CATALOG",
+    "NARRATION_KINDS",
+    "OVERWHELM_SUMMARY_LINE",
+    "PARTY_RETREAT_LINES",
+    "PENDING_FAMILIES",
+    "TERMINAL_OUTCOME_MESSAGES",
+    "BandTable",
+    "NarrationBands",
+    "NarrationCatalogError",
+    "NarrationRow",
+    "act_for_skill",
+    "action_line",
+    "action_lines",
+    "band_for",
+    "band_for_entry",
+    "base_family_key",
+    "choose_line",
+    "commanded_action_line",
+    "compose_first_line",
+    "composed_fits",
+    "engagement_opening_line",
+    "entry_line",
+    "family_key",
+    "narration_seed",
+    "overwhelm_summary_line",
+    "party_retreat_line",
+    "slot_count",
+    "terminal_outcome_message",
+    "validate_line",
+    "variant_index",
+]
