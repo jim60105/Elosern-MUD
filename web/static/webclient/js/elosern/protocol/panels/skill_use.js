@@ -2,7 +2,7 @@
 
 // skill_use panel (mirror of web.webclient.presentation.skill_use,
 // skillbook-authoritative-casting D2; v2 adds the explicit caster): the
-// on-demand SkillBook use preview of one named party member's owned active
+// on-demand skill use preview of one named party member's owned active
 // skill at one selected scale. The browser re-checks the exact version-2
 // form, the positive safe-integer caster, unique bounded identities, the
 // opening line-up cross references, and the enabled/disabled_reason pairing

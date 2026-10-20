@@ -489,7 +489,7 @@ manifest-listed overlay that nothing imports is not complete.
 #### Scenario: The help overlay renders the client's own control reference
 - **WHEN** the help overlay renders and the deferred-surface assertion is enumerated
 - **THEN** the help overlay renders the client's own control reference, which the client
-  authoritatively knows, and no authored game-help content
+  authoritatively knows, together with the static Traditional Chinese party-management rule reference; it renders no fabricated live state or category-to-entry game-help browser
 - **AND** the event-log Toasts surface and the design draft's category-to-entry game-help browser
   are named in the deferred-surface assertion together with the read model each waits on, and
   MUST NOT be built or mocked to look real

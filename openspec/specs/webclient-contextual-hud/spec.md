@@ -1609,7 +1609,7 @@ The map, settings and help surfaces SHALL each be reachable from the running cli
 
 #### Scenario: The help surface is the client's own truth
 - **WHEN** the help surface renders
-- **THEN** it renders the client's own control reference — the keys this client binds, the dock's navigation model and the close paths — from a single client-owned source, and states how the game's own help output is reached; it names no key binding or control the client does not implement, describes `/` and the ⌨ toggle as expanding the command line and Escape and a successful send as collapsing it, renders no authored game-help content for which no committed panel exists, and stands no placeholder in for it
+- **THEN** it renders the client's own control reference — the keys this client binds, the dock's navigation model and the close paths — from a single client-owned source, and states how the game's own help output is reached; it names no key binding or control the client does not implement, describes `/` and the ⌨ toggle as expanding the command line and Escape and a successful send as collapsing it, also renders the static party-management rule reference, and renders no category-to-entry game-help browser, fabricated live state or placeholder for an absent guide panel
 
 #### Scenario: Each surface has a live trigger
 - **WHEN** the client renders in exploration mode with the `local_map` panel committed and the command line collapsed
@@ -1632,7 +1632,7 @@ The map, settings and help surfaces SHALL each be reachable from the running cli
 
 #### Scenario: The help surface tells the truth about what it knows
 - **WHEN** the help surface renders with no committed panel carrying authored guide content
-- **THEN** it renders the client's own control reference, including `/` and the ⌨ toggle expanding the command line and Escape collapsing it, and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
+- **THEN** it renders the client's own control reference, including `/` and the ⌨ toggle expanding the command line and Escape collapsing it, and a statement of how the game's help output is reached, alongside the static party-management rule reference; it renders no category-to-entry game-help browser, fabricated live state or placeholder for an absent guide panel
 
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
 The client SHALL expose a narrative prose scale with three steps — `A−` 16px, `A` 18px, and `A+` 20px at the 1451x790 reference scale, multiplied once by the desktop chrome factor — selectable from the settings surface, whose current step is marked by an indicator that does not rely on colour alone. The scale SHALL apply to narrative and dialogue prose only and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text.
@@ -3243,3 +3243,18 @@ During the stage target step that "Combat targets are picked on the stage figure
 #### Scenario: A reload or reconnect renders the step at rest
 - **WHEN** the client mounts, reloads or reconnects, or a panel replacement commits, while the current frame is a stage target step
 - **THEN** the collapsed prompt, the dim, the lit set and the markers render in their final state in the commit's frame with no entrance or fade, and at `full` only the steady focus loop runs
+
+### Requirement: The help overlay carries the party management rules
+The help overlay SHALL carry the rule explanations the party and shop windows omit: companion follow rules, item transfer rules (out of combat only, free, equipped and locked items excluded), combat restrictions in the party window, the 系譜 node legend (filled, half-filled, dashed, 可解鎖), the shop's single-price convention, and the P B C K L J M hotkeys, in Traditional Chinese, as static authored text with no state.
+
+#### Scenario: Transfer rules live in help, not in the bag
+- **WHEN** the player opens 說明 and the party window's 背包 tab in turn
+- **THEN** the help overlay explains the transfer rules while the bag shows only counts, controls and committed disabled reasons
+
+#### Scenario: Help explains following under possession
+- **WHEN** the help overlay's party section renders
+- **THEN** its follow rules state that the whole party, the player's own body included, follows a possessed companion through exits
+
+#### Scenario: The lineage legend is in help
+- **WHEN** the help overlay's party section renders
+- **THEN** it explains the three node diamond states and 可解鎖 with shape and text, never colour alone

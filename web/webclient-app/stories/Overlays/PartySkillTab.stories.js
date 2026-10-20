@@ -12,7 +12,7 @@ import { atFullHd, atReference, windowViewportParameters } from "../window-viewp
 
 // PartySkillTab (webclient-party-skill-tab): the party window's 技能 tab,
 // rendered inside the real PartyWindow for side by side review with
-// Design/PartyMemberManagement (SkillBook, SkillFreeformScales,
+// Design/PartyMemberManagement (the skill browsing and freeform-scale stories,
 // SkillInCombat) at both viewport sizes. The viewed member is the companion
 // 蕾娜:
 //   * Book — her field heal 治癒之光 selected: target, cost and the field

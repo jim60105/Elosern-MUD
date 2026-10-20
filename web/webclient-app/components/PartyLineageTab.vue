@@ -1,8 +1,8 @@
 <script setup>
 // PartyLineageTab (webclient-party-lineage-tab, design §6.5): the party
 // window's 系譜 tab for the viewed member, after the approved prototype
-// docs/design/party-member-management/tabs/LineageTab.vue. It replaces the
-// retired LineagePanel overlay and renders the committed `lineage` v2 panel
+// docs/design/party-member-management/tabs/LineageTab.vue. It renders the
+// committed `lineage` v2 panel
 // alone (the server builds it for the viewed member).
 //
 // The list column groups the graphs by their element/style label; each row

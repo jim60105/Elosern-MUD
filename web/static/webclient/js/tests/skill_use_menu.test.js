@@ -1,5 +1,5 @@
 /*
- * SkillBook use menu model (skillbook-authoritative-casting D6): exact
+ * Skill use menu model (skillbook-authoritative-casting D6): exact
  * explore.cast payloads per TargetSpec, AREA presenter-order selection,
  * monster-opening confirmation, scale frames, disabled reasons, and
  * selection reconciliation against a newer panel. Synthetic fixtures only.
