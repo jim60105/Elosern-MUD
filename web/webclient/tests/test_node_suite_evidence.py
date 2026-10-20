@@ -940,6 +940,45 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-party-window::the-lineage-list-groups-graphs-with-node-diamonds",
+        "webclient-party-window::the-lineage-detail-draws-the-real-graph",
+        "skill-lineage-panel::the-party-window-lineage-tab-renders-the-graphs-from-the-view-alone",
+        "webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields",
+        "webclient-desktop-shell::the-top-navigation-bar-carries-the-tool-group",
+    )
+    def test_party_lineage_tab_vitest_evidence_passes(self):
+        # webclient-party-lineage-tab: the party window's 系譜 tab (graphs
+        # grouped by label, rows named by their roots with node diamonds,
+        # owned/total, 可解鎖 and 已全數見頂; the detail drawn by depth with each
+        # merge node once and labelled edges; per-node level, meter, 見頂,
+        # prerequisite and 可解鎖 text from the payload alone; an owned node
+        # opening its skill on 技能 and the 技能 link opening its graph), the
+        # 系譜 rows' root identity, and the 技能系譜 tool opening the party
+        # window on 系譜 with focus returned to it.
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_lineage_tab.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/drawer_content_polish.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/desktop_navigation.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/reference_surface_frame.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "party lineage tab Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
 
 class GalleryArtConsumptionEvidenceTest(unittest.TestCase):
     """align-gallery-art-consumption-specs: the shared face-rect crop mapping

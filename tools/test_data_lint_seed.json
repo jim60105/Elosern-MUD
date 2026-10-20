@@ -507,7 +507,6 @@
     "web/webclient-app/tests/data/breakdown_rendering.test.js",
     "web/webclient-app/tests/frame-resolvers.test.js",
     "web/webclient-app/tests/overlays/creation_overlay.test.js",
-    "web/webclient-app/tests/overlays/lineage_panel.test.js",
     "web/webclient-app/tests/overlays/title_codex_panel.test.js",
     "web/webclient-app/tests/preserved_contract.test.js",
     "web/webclient-app/tests/store/command_echo_surfaces.test.js",

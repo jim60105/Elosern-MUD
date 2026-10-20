@@ -222,32 +222,37 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
     @covers_requirement("webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields")
     def test_same_label_lineage_rows_carry_their_root_names_beside_counts(self):
         """Two graphs sharing an element label read apart by their supplied
-        root names, each compact row placing its owned/total count right
-        after the shared identity column and rendering no chain meter."""
+        root names under one heading of the party window's 系譜 tab, each
+        compact row keeping its owned/total count in the shared end column
+        and rendering no chain meter (webclient-party-lineage-tab)."""
         page = self.logged_in_page((1451, 790))
-        _inject_snapshot(page, {"lineage": _same_label_lineage_panel()}, mode="exploration")
+        _inject_snapshot(
+            page,
+            {"party": _commander_party_panel(), "lineage": _same_label_lineage_panel()},
+            mode="exploration",
+        )
         _wait_mode(page, "exploration")
         page.locator('[data-testid="nav-tool-lineage"]').click()
-        page.wait_for_selector('[data-testid="lineage-panel"]', timeout=15000)
+        page.wait_for_selector('[data-testid="party-lineage-tab"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="party-lineage-tab__group-label"]').all_inner_texts(), ["燼"]
+        )
         rows = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.lineage-graph__head')).map((head) => {
-                const id = head.querySelector('.lineage-graph__identity').getBoundingClientRect();
-                const count = head.querySelector('.lineage-graph__count').getBoundingClientRect();
-                const root = head.querySelector('.lineage-graph__root');
+            """() => Array.from(document.querySelectorAll('[data-testid="party-lineage-tab__row"]')).map((row) => {
+                const count = row.querySelector('[data-testid="party-lineage-tab__count"]').getBoundingClientRect();
                 return {
-                    root: root ? root.textContent.trim() : null,
-                    count: head.querySelector('.lineage-graph__count').textContent.trim(),
-                    height: head.getBoundingClientRect().height,
-                    gap: count.left - id.right,
-                    meters: head.querySelectorAll('.lineage-chain__meter').length,
+                    root: row.querySelector('[data-testid="party-lineage-tab__row-name"]').textContent.trim(),
+                    count: row.querySelector('[data-testid="party-lineage-tab__count"]').textContent.trim(),
+                    height: row.getBoundingClientRect().height,
+                    countRight: Math.round(count.right),
+                    meters: row.querySelectorAll('.lineage-chain__meter').length,
                 };
             })"""
         )
         self.assertEqual([r["root"] for r in rows], ["燼影箭", "燼心爆"])
-        self.assertEqual([r["count"] for r in rows], ["1/3", "2/4"])
+        self.assertEqual([r["count"] for r in rows], ["1 / 3", "2 / 4"])
+        self.assertEqual(len({r["countRight"] for r in rows}), 1, rows)
         for row in rows:
-            self.assertLessEqual(row["height"], 60, row)
-            self.assertGreaterEqual(row["gap"], 0, row)
-            self.assertLessEqual(row["gap"], 16.5, row)
+            self.assertLessEqual(row["height"], 72, row)
             self.assertEqual(row["meters"], 0, row)
         page.close()

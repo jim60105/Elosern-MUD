@@ -269,5 +269,31 @@ party purse (`party_inventory.purse`) in the header and, on 成員, the
   `openHudDrawer("skill")` remembers 技能 and opens `party`; the store hands
   a preview over only while the window is open on 技能 (it closes the window
   first) and its Escape return carries `{actorId, skillKey}`.
-- The 系譜 tab lands in the next change; until then it shows its backing
-  panel's committed unavailable reason or its (empty) scoped slot.
+- `PartyLineageTab` (webclient-party-lineage-tab; design §6.5) is the 系譜
+  tab, after the prototype's `tabs/LineageTab.vue`; its pure projections
+  live in `components/party-lineage-model.js`. It renders the committed
+  `lineage` v2 panel alone (the server builds it for the viewed member; it
+  carries no member id). The list groups graphs by `group_label_zh` in
+  payload order under `已完成 completed / total 樹`; a row is named by its
+  supplied roots' display names joined with ` ‧ ` (never a skill key) and
+  shows one diamond per node, the committed owned/total, 可解鎖 when a node
+  is `ready` and 已全數見頂 when `consumed`. Node state follows ownership
+  (capped: filled diamond, solid gold border, 見頂; owned: half-filled, solid
+  border, `Lv n` and 「into/band → 下一階」 with band = into + to-next;
+  otherwise locked: dashed), so the diamonds agree with `owned_count`; a
+  non-empty `prereq_text_zh` shows on any node. The detail draws the
+  selected graph: one row per `depth`, each row's nodes spread evenly in
+  payload order (a lone merge node centres), one SVG curve per edge (an edge
+  to an absent node is skipped) with an HTML `Lv n` pill at its midpoint; a
+  wide row scrolls sideways. The graph selection is local (kept across a
+  republish, first graph for a new member). An owned node emits
+  `open-skill` and the window switches to 技能 with `focusSkill` set: the
+  技能 tab selects it on its own segment ahead of the committed selection
+  (waiting for the payload that carries it) and its normal selection
+  dispatch tells the server. Locked nodes, and every node while a rail
+  selection is in flight, are `aria-disabled`. 在系譜中檢視 on 技能 opens the
+  selected skill's graph with its node marked current; both links are
+  dropped when their tab is left or the member changes. `LineagePanel` and
+  the `lineage` overlay are gone: the tool group's 技能系譜 is a drawer tool
+  (`drawer: "lineage"`) and `openHudDrawer("lineage")` remembers 系譜 and
+  opens `party`, switching an open window live.

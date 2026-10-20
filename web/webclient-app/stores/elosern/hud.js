@@ -11,7 +11,7 @@
 //
 // H5 (webclient-hud-05-overlays-and-command-line, design D7/D8): the
 // full-screen overlay controller. `view.hudOverlay` is the single
-// open-overlay name (null | map | settings | help | lineage); at most one
+// open-overlay name (null | map | settings | help | codex | gallery); at most one
 // overlay is open at a time (structural: a single value). Unknown names are
 // rejected, not coerced. Opening an overlay closes any open reference
 // drawer (design D8: an overlay and a drawer are never open together,
@@ -57,8 +57,10 @@ export function applyHud(ctx) {
     // window on its 狀態 tab, switching an already open window's live tab.
     // The retired skill-book drawer's name is aliased the same way
     // (webclient-party-skill-tab): the skill-use flow's Escape return opens
-    // the party window on its 技能 tab.
-    const PARTY_TAB_ALIASES = { inventory: "bag", status: "status", skill: "skills" };
+    // the party window on its 技能 tab. The tool group's 技能系譜 opens the
+    // party window on its 系譜 tab the same way (webclient-party-lineage-
+    // tab); the lineage overlay is gone.
+    const PARTY_TAB_ALIASES = { inventory: "bag", status: "status", skill: "skills", lineage: "lineage" };
     if (Object.prototype.hasOwnProperty.call(PARTY_TAB_ALIASES, name)) {
       const view = ctx.view.value || {};
       rememberPartyWindowTab(`${view.generation}|${view.epoch}`, PARTY_TAB_ALIASES[name]);
@@ -125,7 +127,7 @@ export function applyHud(ctx) {
     return true;
   };
 
-  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "lineage", "codex", "gallery"]);
+  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "codex", "gallery"]);
   const hudOverlay = ref(null);
   const hudOverlayOpener = ref(null);
   ctx.hudOverlay = hudOverlay;

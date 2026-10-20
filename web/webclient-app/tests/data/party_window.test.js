@@ -239,12 +239,13 @@ describe("PartyWindow (webclient-party-window-member-tab)", () => {
     expect(wrapper.get('[data-testid="party-window"]').attributes("data-tab")).toBe("member");
   });
 
-  it("shows an unbuilt tab's backing reason and invents no rows", async () => {
+  it("shows the 系譜 tab's backing reason and invents no rows", async () => {
     rememberPartyWindowTab(SCOPE, "lineage");
     mountWindow({ lineage: { schema_version: 2, available: false, reason: { code: "lineage_unavailable", message: "系譜目前無法顯示。" } } });
     expect(wrapper.get('[data-testid="party-window__tab-unavailable"]').text()).toBe("系譜目前無法顯示。");
     wrapper.unmount();
     mountWindow();
+    expect(wrapper.find('[data-testid="party-lineage-tab"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="list-detail__list"]').text()).toBe("");
   });
 

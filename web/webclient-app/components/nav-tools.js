@@ -3,10 +3,13 @@
 // its `key` is both the `dock-icons.js` glyph key and the key of the surface
 // it opens, and its `label` is at once the control's accessible name, its
 // visible tooltip, and the title of the surface's DrawerHeader, so the
-// opener, its tooltip and the opened header never disagree. 圖鑑 opens the
-// lore drawer; the rest open overlays.
+// opener, its tooltip and the opened header never disagree. 圖鑑 and 信件
+// open their drawers; 技能系譜 opens the party window on its 系譜 tab
+// (webclient-party-lineage-tab: the `lineage` drawer name is the party
+// window's tab alias, so the window keeps its own 隊伍 header); the rest
+// open overlays.
 export const NAV_TOOLS = Object.freeze([
-  { key: "lineage", label: "技能系譜", testid: "nav-tool-lineage" },
+  { key: "lineage", label: "技能系譜", testid: "nav-tool-lineage", drawer: "lineage" },
   { key: "lore", label: "圖鑑", testid: "nav-tool-lore", drawer: "lore" },
   { key: "letters", label: "信件", testid: "nav-tool-letters", drawer: "letters" },
   { key: "codex", label: "稱號冊", testid: "nav-tool-codex" },

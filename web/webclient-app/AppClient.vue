@@ -30,7 +30,6 @@ import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
-import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
@@ -1307,11 +1306,6 @@ const rootStyle = computed(() => {
           @text-speed-change="store.setTextSpeed"
           @auto-advance-change="store.setAutoAdvance"
         />
-        <!-- skill-lineage-panel (task 2.3): the big-window ledger renders the
-             committed `lineage` panel verbatim — expanded chains carry per-node
-             meters, collapsed chains their aggregate meter; the client
-             computes no growth rules. -->
-        <LineagePanel v-else-if="openName === 'lineage'" :lineage="panel('lineage')" />
         <!-- title-codex-removal: the big-window codex renders the committed
              `title_codex` panel verbatim — the server's `can_remove` flag
              alone decides whether a 移除 control exists; the client owns no

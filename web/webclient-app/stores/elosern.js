@@ -311,7 +311,7 @@ export const useElosernStore = defineStore("elosern", () => {
     closeHudDrawer: ctx.closeHudDrawer,
     openNpcPersonaEditor: ctx.openNpcPersonaEditor,
     // H5 (task 5.3): the full-screen overlay controller — the single open
-    // entry (`openOverlay` over `map` / `settings` / `help` / `lineage`,
+    // entry (`openOverlay` over `map` / `settings` / `help` / `codex` / `gallery`,
     // unknown names
     // rejected, closes any open drawer for mutual exclusion, design D8)
     // and the single close entry (`closeOverlay`). The opener element is

@@ -159,6 +159,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/PartyStatusTab",
     # The party window's 技能 tab (webclient-party-skill-tab).
     "Overlays/PartySkillTab",
+    # The party window's 系譜 tab (webclient-party-lineage-tab).
+    "Overlays/PartyLineageTab",
     # The shared window primitives (webclient-window-primitives) joined the
     # frozen set; this change pins them with the party window.
     "Core/WindowFrame",
@@ -170,7 +172,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
     # desktop redesign, World/TitleBallotMenu from the dock-workspace
-    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel
+    # alignment, and the Overlays/LineagePanel (since retired) + Overlays/TitleCodexPanel
     # big windows from the obsidian-gold wave.
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
@@ -186,7 +188,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ArtworkAlpha",
     "Core/ArtworkFailure",
     "World/TitleBallotMenu",
-    "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
     # The gallery management surface refroze the manifest at 56:
     # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery

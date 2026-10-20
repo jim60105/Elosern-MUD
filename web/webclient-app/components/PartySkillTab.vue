@@ -73,6 +73,11 @@ const props = defineProps({
   // Story seams: the segment and the skill selected on open.
   initialSegment: { type: String, default: "active" },
   initialSkill: { type: String, default: null },
+  // A skill the 系譜 tab opened (webclient-party-lineage-tab): selected on
+  // its own segment ahead of the committed selection, as soon as the
+  // viewed member's payload carries it; the tab's own selection dispatch
+  // then tells the server.
+  focusSkill: { type: String, default: null },
 });
 
 const emit = defineEmits(["practice", "use", "lineage"]);
@@ -95,7 +100,18 @@ const memberId = computed(() => {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 });
 
-const segment = ref(props.initialSegment === "passive" ? "passive" : "active");
+// The pending 系譜 wish: kept until the payload carries the key, then
+// applied once; the player's own selection or another member drops it.
+let focusWish = props.focusSkill || null;
+const sideRows = (side) => flattenSkills(filterCategories(side === "active" ? detail.value?.actives : detail.value?.passives, ""));
+function sideOf(key) {
+  if (!key) return null;
+  if (sideRows("active").some((entry) => entry.row.key === key)) return "active";
+  if (sideRows("passive").some((entry) => entry.row.key === key)) return "passive";
+  return null;
+}
+
+const segment = ref(sideOf(focusWish) ?? (props.initialSegment === "passive" ? "passive" : "active"));
 const isActive = computed(() => segment.value === "active");
 const query = ref("");
 const activeCount = computed(() => skillCount(detail.value?.actives));
@@ -147,7 +163,8 @@ function entryFor(key) {
 // else the first visible row.
 function reselect(preferInitial) {
   const committed = isActive.value ? detail.value?.selected_skill?.key : null;
-  const wanted = [committed, preferInitial ? props.initialSkill : null].find((key) => key && entryFor(key));
+  const wanted = [focusWish, committed, preferInitial ? props.initialSkill : null].find((key) => key && entryFor(key));
+  if (focusWish && wanted === focusWish) focusWish = null;
   const entry = wanted ? entryFor(wanted) : (visibleSkills.value[0] ?? null);
   // Every category opens (the approved prototype lists every group); the
   // player's own collapses hold until the segment or the member changes.
@@ -165,10 +182,33 @@ function revealSelected() {
   });
 }
 onMounted(revealSelected);
-watch(memberId, () => {
+watch(memberId, (id, previous) => {
+  // A member change drops the wish; the first payload's arrival keeps it.
+  // A transient null (an unavailable payload) keeps it.
+  if (previous !== null && id !== null && id !== previous) focusWish = null;
   query.value = "";
   reselect(false);
 });
+// The wish waits for the payload that carries it (a character committed
+// after the tab opened), switching to its segment when it is passive.
+watch(
+  [() => detail.value?.actives, () => detail.value?.passives],
+  () => {
+    const side = sideOf(focusWish);
+    if (!side) return;
+    if (side !== segment.value) {
+      segment.value = side; // the segment watch reselects with the wish
+      return;
+    }
+    const entry = entryFor(focusWish);
+    if (!entry) return;
+    focusWish = null;
+    toggleCategory(entry.category.category, true);
+    selectedKey.value = entry.row.key;
+    focusedId.value = `skill:${entry.row.key}`;
+    revealSelected();
+  },
+);
 watch(segment, () => reselect(false));
 watch(query, () => {
   if (!entryFor(selectedKey.value)) {
@@ -300,6 +340,7 @@ function nodeElement(id) {
   return Array.from(all).find((el) => el.getAttribute("data-node-id") === id) ?? null;
 }
 function focusNode(id) {
+  focusWish = null;
   focusedId.value = id;
   const node = nodes.value.find((entry) => entry.id === id);
   if (node?.type === "skill") selectedKey.value = node.row.key;
@@ -451,14 +492,14 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
               :aria-pressed="isActive ? 'true' : 'false'"
               :class="{ 'is-active': isActive }"
               data-testid="party-skill-tab__segment--active"
-              @click="segment = 'active'"
+              @click="focusWish = null; segment = 'active'"
             >主動 <b>{{ activeCount }}</b></button>
             <button
               type="button"
               :aria-pressed="!isActive ? 'true' : 'false'"
               :class="{ 'is-active': !isActive }"
               data-testid="party-skill-tab__segment--passive"
-              @click="segment = 'passive'"
+              @click="focusWish = null; segment = 'passive'"
             >被動 <b>{{ passiveCount }}</b></button>
           </div>
 
@@ -512,7 +553,7 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                 :tabindex="focusedId === `cat:${category.category}` ? 0 : -1"
                 :data-node-id="`cat:${category.category}`"
                 data-testid="party-skill-tab__category-head"
-                @click="toggleCategory(category.category); focusedId = `cat:${category.category}`"
+                @click="focusWish = null; toggleCategory(category.category); focusedId = `cat:${category.category}`"
               >
                 <span class="party-skill-tab__chevron" aria-hidden="true">▸</span>
                 <span class="party-skill-tab__sech-label">{{ category.label }}</span>
@@ -643,7 +684,7 @@ const glyph = (name) => ({ d: glyphPath(name), attrs: glyphAttrs(name) });
                   <span v-for="edge in lineage.next" :key="edge.key" class="party-skill-tab__node is-locked" data-testid="party-skill-tab__next">{{ edge.label }}<small>{{ edge.levelText }}</small></span>
                 </span>
               </div>
-              <button type="button" class="party-skill-tab__link" data-testid="party-skill-tab__lineage-link" @click="emit('lineage')">
+              <button type="button" class="party-skill-tab__link" data-testid="party-skill-tab__lineage-link" @click="emit('lineage', selected.row.key)">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path :d="glyph('lineage').d" stroke="currentColor" stroke-width="1.6" v-bind="glyph('lineage').attrs" /></svg>在系譜中檢視
               </button>
             </template>
