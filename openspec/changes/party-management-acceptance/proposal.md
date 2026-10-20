@@ -20,6 +20,7 @@ None.
 ### Modified Capabilities
 
 - `webclient-contextual-hud`: adds the help-overlay party rules requirement.
+- `webclient-component-showcase`: permits that static rule reference while keeping the category-to-entry game-help browser deferred. The existing HUD reachability requirement receives the same clarification.
 
 ## Impact
 
