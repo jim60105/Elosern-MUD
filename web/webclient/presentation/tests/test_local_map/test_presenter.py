@@ -1,5 +1,6 @@
 from tools.spec_traceability import covers_requirement
 import unittest
+from evennia.contrib.grid.xyzgrid.xymap import XYMap
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from unittest.mock import patch
@@ -8,7 +9,8 @@ from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS
 from web.webclient.presentation.registry import PanelUnavailableError, build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
-from world.rules.map_knowledge import record_arrival
+from world.rules.clock import get_world_clock
+from world.rules.map_knowledge import encode_grid, parse_knowledge, record_arrival
 
 from ._support import (
     EAST_APPROACH,
@@ -315,6 +317,92 @@ class LocalMapPresenterTests(EvenniaTestCase):
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         for node in remembered:
             self.assertIsNone(node["action"])
+
+
+class GridLocalMapDisplayIndependenceTests(EvenniaTest):
+    """The graphical payload ignores the automatic ASCII-map display default."""
+
+    def setUp(self):
+        super().setUp()
+        from world.tests.synthetic_grid_map import load_synthetic_grid, synthetic_rooms
+
+        load_synthetic_grid()
+        self.start, self.anchor, _end = synthetic_rooms()
+
+    def _render(self):
+        return build_production_registry().render("local_map", _context(self.char1))
+
+    @staticmethod
+    def _parts(call):
+        value = call.kwargs.get("text", call.args[0] if call.args else None)
+        metadata = {}
+        if isinstance(value, tuple):
+            value, metadata = value
+        return str(value), dict(metadata or {})
+
+    def test_disabled_text_map_default_leaves_the_payload_identical(self):
+        for room in (self.start, self.anchor):
+            with self.subTest(room=room.key):
+                self.char1.location = room
+                record_arrival(self.char1)
+
+                # Enabled baseline: only the presenter renders, so no look runs
+                # and no ASCII text map is generated (`get_visual_range` gate).
+                with patch.object(GridRoom, "map_display", True):
+                    self.assertIs(GridRoom.map_display, True)
+                    with patch.object(XYMap, "get_visual_range") as visual_range:
+                        enabled = self._render()
+                    visual_range.assert_not_called()
+
+                self.assertIs(GridRoom.map_display, False)
+                disabled = self._render()
+
+                self.assertTrue(enabled["available"])
+                self.assertEqual(enabled["schema_version"], 1)
+                self.assertEqual(enabled, disabled)
+                x, y, z = room.xyz
+                self.assertEqual(disabled["current_node"], encode_grid(str(z), x, y))
+
+                moves = [node["action"] for node in disabled["nodes"] if node["action"]]
+                self.assertTrue(moves, "a genuine adjacent move descriptor is required")
+                for move in moves:
+                    self.assertEqual(move["kind"], "move")
+                    self.assertTrue(move["exit_ref"])
+                    self.assertTrue(move["destination"].startswith("grid:"))
+
+    def test_explore_look_leaves_the_map_widget_input_intact(self):
+        from web.webclient.actions.exploration_actions import AFFECTED_FULL, _look_adapter
+
+        for room in (self.start, self.anchor):
+            with self.subTest(room=room.key):
+                self.char1.location = room
+                record_arrival(self.char1)
+                before_payload = self._render()
+                before_location = self.char1.location
+                before_clock = get_world_clock().tick
+                before_knowledge = parse_knowledge(self.char1)
+
+                with (
+                    patch.object(XYMap, "get_visual_range") as visual_range,
+                    patch.object(self.char1, "msg") as recorder,
+                ):
+                    result = _look_adapter(self.char1, {"room": True})
+                visual_range.assert_not_called()
+                self.assertEqual(result["outcome"], "success")
+                self.assertEqual(result["code"], "looked")
+                self.assertEqual(result["affected_panels"], AFFECTED_FULL)
+                messages = [self._parts(call) for call in recorder.call_args_list]
+                self.assertTrue(messages)
+                for text, metadata in messages:
+                    self.assertNotEqual(metadata.get("type"), "xymap")
+                    self.assertNotIn("~", text)
+
+                refreshed = self._render()
+                self.assertTrue(refreshed["available"])
+                self.assertEqual(refreshed, before_payload)
+                self.assertIs(self.char1.location, before_location)
+                self.assertEqual(get_world_clock().tick, before_clock)
+                self.assertEqual(parse_knowledge(self.char1), before_knowledge)
 
 
 if __name__ == "__main__":
