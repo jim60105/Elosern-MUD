@@ -602,7 +602,8 @@ def _dialogue_open(npc: Any, player: Any) -> bool:
 
 def is_possessed_actor(actor: Any) -> bool:
     """Return True if ``actor`` is an NPC currently possessed by a player."""
-    return getattr(getattr(actor, "db", None), "possessed_by", None) is not None
+    val = getattr(getattr(actor, "db", None), "possessed_by", None)
+    return isinstance(val, int) and not isinstance(val, bool)
 
 
 def possession_verdict(player: Any, npc: Any) -> str | None:

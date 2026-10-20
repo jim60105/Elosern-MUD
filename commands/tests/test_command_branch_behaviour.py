@@ -51,6 +51,8 @@ from tools.spec_traceability import covers_requirement
 def _command(command_type, args=""):
     command = command_type()
     command.caller = Mock()
+    command.caller.pk = 1
+    command.caller.db.possessed_by = None
     command.args = args
     return command
 

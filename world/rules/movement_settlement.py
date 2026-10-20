@@ -314,8 +314,9 @@ def _snapshot_movement_state(
         wilderness = getattr(source_location, "wilderness", None) or getattr(
             destination, "wilderness", None
         )
+    itemcoordinates_prop = getattr(wilderness, "itemcoordinates", None)
     if wilderness is not None and traverser_registration is None:
-        traverser_registration = wilderness.itemcoordinates.get(traversing_object)
+        traverser_registration = itemcoordinates_prop.get(traversing_object) if itemcoordinates_prop else None
 
     commander, followers = follow_scope(
         traversing_object,
@@ -327,7 +328,7 @@ def _snapshot_movement_state(
     for follower in followers:
         try:
             registration = (
-                wilderness.itemcoordinates.get(follower) if wilderness is not None else None
+                itemcoordinates_prop.get(follower) if itemcoordinates_prop else None
             )
             companions.append(CompanionState(follower, follower.location, registration))
         except Exception as error:
@@ -341,7 +342,7 @@ def _snapshot_movement_state(
             )
 
     itemcoordinates = rooms = unused_rooms = None
-    if wilderness is not None:
+    if wilderness is not None and hasattr(wilderness, "db"):
         itemcoordinates = dict(wilderness.db.itemcoordinates or {})
         rooms = dict(wilderness.db.rooms or {})
         unused_rooms = list(wilderness.db.unused_rooms or [])
@@ -568,7 +569,7 @@ def _restore_wilderness_bookkeeping(snapshot: MovementSnapshot) -> None:
     helper would ``deepcopy`` live Evennia objects.
     """
     wilderness = snapshot.wilderness
-    if wilderness is None:
+    if wilderness is None or not hasattr(wilderness, "db"):
         return
     for key, value in (
         ("itemcoordinates", snapshot.wilderness_itemcoordinates),

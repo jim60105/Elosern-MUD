@@ -67,7 +67,7 @@ def follow_lines(msg):
     ]
 
 
-class SelectiveRejectingRoom(Room):
+class PossessionSelectiveRejectingRoom(Room):
     """Refuse arrival to members whose key is listed in ``rejected_keys``."""
 
     rejected_keys: tuple[str, ...] = ()
@@ -172,7 +172,7 @@ class PossessedGridFollowTests(PossessedFollowTestCase):
     )
     def test_failed_companion_follow_notifies_the_puppet_session_once(self):
         rejecting = create_object(
-            SelectiveRejectingRoom, key="Rejecting", location=None
+            PossessionSelectiveRejectingRoom, key="Rejecting", location=None
         )
         rejecting.rejected_keys = ("卡恩",)
         trap = create_object(
@@ -195,7 +195,7 @@ class PossessedGridFollowTests(PossessedFollowTestCase):
     )
     def test_refused_owner_body_is_left_behind_with_the_notice(self):
         rejecting = create_object(
-            SelectiveRejectingRoom, key="Rejecting", location=None
+            PossessionSelectiveRejectingRoom, key="Rejecting", location=None
         )
         rejecting.rejected_keys = (self.char1.key,)
         trap = create_object(
