@@ -240,7 +240,7 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
             page,
             {
                 "services": {
-                    "schema_version": 6,
+                    "schema_version": 7,
                     "available": False,
                     "reason": {
                         "code": "services_unavailable",

@@ -513,22 +513,34 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # During combat the exploration and character panels render
-        # unavailable; only a full post-settlement snapshot restores them.
+        # During combat the exploration panel renders unavailable; only a full
+        # post-settlement snapshot restores it. The character panel (v9)
+        # follows the viewed member in combat too, so it stays available.
         # services v3 keeps its panel available through combat with the read
         # model forcing host/guild/shop null, so personal item actions stay
         # usable while no remote service is exposed.
         state = store_state(page)
-        for name in ("exploration", "character"):
-            self.assertIn(name, state["panels"])
-            self.assertFalse(state["panels"][name]["available"], f"{name} must be combat-unavailable")
+        self.assertIn("exploration", state["panels"])
+        self.assertFalse(
+            state["panels"]["exploration"]["available"],
+            "exploration must be combat-unavailable",
+        )
+        self.assertTrue(
+            state["panels"]["character"]["available"],
+            "character follows the viewed member in combat",
+        )
         services = state["panels"]["services"]
         self.assertTrue(services["available"], "services v3 keeps the personal surfaces available")
         self.assertIsNone(services["host"])
         self.assertIsNone(services["guild"])
         self.assertIsNone(services["shop"])
         self.assertIsNotNone(services["player"])
-        self.assertIsNotNone(services["inventory"])
+        # v7 moved the personal bag off `services`: `party_inventory` publishes
+        # it, and it stays reachable in combat.
+        self.assertTrue(
+            state["panels"]["party_inventory"]["available"],
+            "party_inventory publishes the personal bag in combat",
+        )
         self.assertEqual(state["mode"], "combat")
 
         # Settle before submitting: a confirmation naming the pre-burst
