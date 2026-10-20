@@ -215,6 +215,19 @@ def disguise_section(entity: Any) -> dict[str, Any]:
     return ledger(rows, note="僅顯示用：偽裝數值永不取代真實屬性。")
 
 
+def _amount_text(value: int | float) -> str:
+    """Render an authoritative layer amount; an integral float prints bare."""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _signed_amount_text(value: int | float) -> str:
+    """Render a signed amount with its explicit sign, keeping any fraction."""
+    text = _amount_text(value)
+    return text if text.startswith("-") else f"+{text}"
+
+
 def breakdown_section(entity: Any) -> dict[str, Any]:
     from world.rules.status_query import TRAIT_LABELS, build_character_read_model
 
@@ -225,11 +238,11 @@ def breakdown_section(entity: Any) -> dict[str, Any]:
         for layer in entry.layers:
             amount = layer.amount
             if layer.kind == "mult":
-                amount = f"×{amount}"
+                amount = f"×{_amount_text(amount)}"
             elif layer.kind == "pct":
-                amount = f"{amount:+d}%"
+                amount = f"{_signed_amount_text(amount)}%"
             else:
-                amount = f"{amount:+}"
+                amount = _signed_amount_text(amount)
             rows.append(
                 row(
                     f"{layer.name}（{layer.source}）",
