@@ -69,6 +69,18 @@ Add one requirement to each of the three existing capabilities below. ADDED bloc
 | `localized-appearance` / `Grid room look emits the ordinary appearance without an automatic ASCII map` | Text command and web action retain the same appearance without any extra map message. | `typeclasses/tests/test_appearance.py` tests real `CmdLook`, direct `at_look` and `_look_adapter` for both typeclasses, with all `msg` calls captured. |
 | `webclient-local-map` / `The graphical grid map is independent of automatic ASCII map display` | Full payload equality when only the display default changes; successful look retains an available actionable map. | `web/webclient/presentation/tests/test_local_map/test_presenter.py` through the production registry, with fixed knowledge and world state for comparison. |
 
+Canonical IDs of the three added requirements, read from
+`uv run --locked python -m tools.spec_traceability --repo-root <merged-tree> list`
+against a temporary tree holding the main specs plus these deltas (they are
+absent from the indexed main tree until the later spec sync, so the tests below
+carry only the pre-existing valid annotations):
+
+| Requirement ID | Passing test methods |
+|---|---|
+| `grid-room-typeclasses::grid-rooms-disable-automatic-text-maps-by-default-without-disabling-navigation` | `typeclasses.tests.test_rooms.GridRoomTypeclassTests::test_grid_room_disables_the_automatic_text_map_by_default`, `::test_anchor_room_inherits_the_disabled_text_map_default`, `::test_unrelated_room_types_keep_their_own_text_map_behavior`; `typeclasses.tests.test_appearance.GridLookTextMapTests` (loaded-map suppression for both typeclasses); `commands.tests.test_localized.test_xyz_grid_and_help.LocalizedSyntheticRouteTests::test_path_reports_the_known_two_step_route_without_moving`, `::test_goto_walks_the_known_two_step_route_without_a_text_map` |
+| `localized-appearance::grid-room-look-emits-the-ordinary-appearance-without-an-automatic-ascii-map` | `typeclasses.tests.test_appearance.GridLookTextMapTests::test_grid_room_text_look_emits_only_the_ordinary_appearance`, `::test_anchor_room_text_look_emits_no_map_message`, `::test_english_look_alias_emits_no_map_message`, `::test_direct_at_look_emits_no_map_side_message`, `::test_browser_look_adapter_emits_no_map_message`, `::test_scene_flavor_and_ordinary_content_survive_without_a_map` (retains the shared zh-tw frame annotation) |
+| `webclient-local-map::the-graphical-grid-map-is-independent-of-automatic-ascii-map-display` | `web.webclient.presentation.tests.test_local_map.test_presenter.GridLocalMapDisplayIndependenceTests::test_disabled_text_map_default_leaves_the_payload_identical`, `::test_explore_look_leaves_the_map_widget_input_intact` |
+
 No delta for `sample-city-altoria` or `village-ciaran-map`; authored options, topology, coordinates and prototypes stay unchanged. Keep their existing map-data regression modules as verification inputs. No delta for general web transport or room-action dispatch; their APIs and refresh behavior stay unchanged. The stale `InstanceRoom is not forward-declared by this change` requirement in the grid spec is pre-existing and outside this change.
 
 ### D4. Test messages as well as the returned string
