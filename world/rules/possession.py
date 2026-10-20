@@ -116,13 +116,11 @@ REASON_WRITE_FAILED = "write_failed"
 REASON_MISMATCHED_POSSESSION = "mismatched_possession"
 REASON_TRANSFER_REFUSED = "transfer_refused"
 REASON_RELEASE_REFUSED = "release_refused"
-REASON_POSSESSED_SHOP = "possessed_shop"
 REASON_POSSESSED_TALK = "possessed_talk"
 REASON_POSSESSED_ENGAGE = "possessed_engage"
 
 # D10 stable refusal messages for possessed actor
 POSSESSED_REFUSAL_MESSAGES: dict[str, str] = {
-    REASON_POSSESSED_SHOP: "附身狀態下無法進行交易。",
     REASON_POSSESSED_TALK: "附身狀態下無法與他人開啟對話。",
     REASON_POSSESSED_ENGAGE: "附身狀態下無法主動發起戰鬥。",
 }

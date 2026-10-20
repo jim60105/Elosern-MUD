@@ -82,7 +82,7 @@ class AffordanceVocabularyTests(VocabularyTestCase):
     def test_suggestible_never_empty_in_an_exploration_room(self):
         self.assertGreaterEqual(len(suggestible_candidates(self._vocabulary())), 1)
 
-    @covers_requirement("exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only")
+    @covers_requirement("exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access")
     def test_the_conversation_opening_code_is_allowlisted_but_never_emitted(self):
         host = create_object(NPC, key="公會職員", location=self.room)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))

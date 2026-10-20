@@ -622,7 +622,10 @@ def _interact_targets(
     if location is None:
         return []
     resolve = portrait_ref_for or (lambda _entity: None)
-    guild_host = _resolve_single_host(actor, GuildStaff)
+    possessed = is_possessed_actor(actor)
+    # Possession omits guild navigation entirely: no opener, no disabled
+    # substitute, and no guild host resolution.
+    guild_host = None if possessed else _resolve_single_host(actor, GuildStaff)
     shop_host = _resolve_single_host(actor, Merchant)
     candidates = [
         obj
@@ -635,7 +638,6 @@ def _interact_targets(
         for obj in visible
     ]
     present.sort(key=lambda obj: (int(obj.pk),))
-    possessed = is_possessed_actor(actor)
     targets: list[dict[str, Any]] = []
     for obj in present[:MAX_INTERACT_TARGETS]:
         entries = _target_affordance_entries(

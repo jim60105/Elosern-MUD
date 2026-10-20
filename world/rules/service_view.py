@@ -874,7 +874,9 @@ def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
     stable reason while the rest of the panel stays healthy. During an active
     combat session the remote service surfaces (host, guild, shop) are forced
     null with zero pagination totals while the canonical player summary
-    stays available.
+    stays available. Outside combat, a possessed actor omits only the guild
+    and rank surfaces: the merchant still resolves normally and the shop keeps
+    its ordinary viewed-member rows.
     """
     from world.rules.combat_session import is_in_active_session
 
@@ -894,18 +896,22 @@ def build_services_view(actor: Any, viewed: Any = None) -> ServicesView:
 
     player = _build_player(player_source, wallet, catalog)
     in_combat = is_in_active_session(actor)
-    if in_combat or owner is not None:
+    if in_combat:
         guild, guild_reason = None, None
         shop, shop_reason = None, None
         host = None
     else:
-        staff, staff_reason = _resolve_host(actor, GuildStaff)
-        examiner, _ = _resolve_host(actor, GuildExaminer)
         merchant_host, merchant_reason = _resolve_host(actor, Merchant)
-        host = _build_host(staff, merchant_host)
-        guild, guild_reason = _build_guild(
-            actor, staff, staff_reason, examiner, catalog, tick
-        )
+        if owner is not None:
+            guild, guild_reason = None, None
+            host = _build_host(None, merchant_host)
+        else:
+            staff, staff_reason = _resolve_host(actor, GuildStaff)
+            examiner, _ = _resolve_host(actor, GuildExaminer)
+            host = _build_host(staff, merchant_host)
+            guild, guild_reason = _build_guild(
+                actor, staff, staff_reason, examiner, catalog, tick
+            )
         shop, shop_reason = _build_shop(
             actor,
             viewed if viewed is not None else actor,

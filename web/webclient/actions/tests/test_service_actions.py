@@ -17,7 +17,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
@@ -155,7 +155,7 @@ def _registration(rank="F"):
     }
 
 
-class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
+class ServiceActionBase(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         # Scope before construction: branch/shop/item/offer identities and
         # the exam ladder resolve through the kit registries.
@@ -177,6 +177,7 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
                 "items": exam_scope_extra()["items"],
             },
         )
+        super().setUp()
         seam = patch("world.lore.titles.STARTER_EPITHET", _T_STARTER_EPITHET)
         seam.start()
         self.addCleanup(seam.stop)
@@ -269,6 +270,23 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
 
     def _register(self):
         return register_adventurer(self.player, staff=self.staff)
+
+    def _possessed_companion(self, key, *, location=None):
+        """Create one bound, co-located companion and enter real possession."""
+        from world.rules.party import join_party
+        from world.rules.possession import enter_possession
+
+        room = self.player.location if location is None else location
+        companion = create_object(NPC, key=key, location=room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        self.player.account = self.account
+        self.account.characters.add(self.player)
+        self.session.puppet = self.player
+        self.player.sessions.add(self.session)
+        enter_possession(self.player, companion)
+        return companion
 
 
 class ServiceAdapterTests(ServiceActionBase):
@@ -636,6 +654,197 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(self.player.db.wallet, floor)
         self.assertEqual(list_items(companion), [_T_MEAL])
         self.assertEqual(list_items(self.player), [])
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_buy_adapter_fills_the_acting_puppet_from_the_party_purse(self):
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 1000
+        companion = self._possessed_companion("艾拉")
+        result = _buy_adapter(
+            companion,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 2,
+                "recipient_id": companion.pk,
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, 1000 - 2 * (floor + 2))
+        self.assertEqual(list_items(companion), [_T_MEAL, _T_MEAL])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
+        self.assertFalse(self.merchant_npc.relations.has_record(companion))
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_buy_adapter_can_name_the_commander(self):
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 1000
+        companion = self._possessed_companion("艾拉")
+        result = _buy_adapter(
+            companion,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 1,
+                "recipient_id": self.player.pk,
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, 1000 - (floor + 2))
+        self.assertEqual(list_items(self.player), [_T_MEAL])
+        self.assertEqual(list_items(companion), [])
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_sell_adapter_sells_the_acting_puppet_and_credits_the_purse(self):
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 0
+        self.merchant.merchant_stock = {_T_MEAL: 10, _T_POTION: 3, _T_SWORD: 1}
+        companion = self._possessed_companion("卡恩")
+        companion.db.inventory = [_T_MEAL, _T_MEAL]
+        result = _sell_adapter(
+            companion,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 1,
+                "seller_id": companion.pk,
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "sold")
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, floor)
+        self.assertEqual(list_items(companion), [_T_MEAL])
+        self.assertEqual(list_items(self.player), [])
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_trade_refusals_leave_every_surface_unchanged(self):
+        from world.skills.equipment import list_items
+
+        self.player.location = self.store
+        self.player.db.wallet = 5
+        companion = self._possessed_companion("艾拉")
+        outsider = create_object(NPC, key="路人", location=self.store)
+        wallet_before = int(self.player.db.wallet)
+        stock_before = dict(self.merchant.merchant_stock)
+        before = (list_items(self.player), list_items(companion), list_items(outsider))
+
+        forged = _buy_adapter(
+            companion,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 1,
+                "recipient_id": outsider.pk,
+            },
+        )
+        self.assertEqual(forged["outcome"], "rejected")
+        self.assertEqual(forged["code"], "not_party_member")
+        broke = _buy_adapter(
+            companion,
+            {
+                "item_key": _T_MEAL,
+                "quantity": 1,
+                "recipient_id": companion.pk,
+            },
+        )
+        self.assertEqual(broke["outcome"], "rejected")
+        self.assertEqual(broke["code"], "insufficient_funds")
+        self.assertEqual(int(self.player.db.wallet), wallet_before)
+        self.assertEqual(dict(self.merchant.merchant_stock), stock_before)
+        self.assertEqual(
+            (list_items(self.player), list_items(companion), list_items(outsider)),
+            before,
+        )
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
+
+    @covers_requirement(
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+        "webclient-possession-presentation::shop-access-does-not-delegate-other-npc-services-during-possession",
+    )
+    def test_possessed_actor_cannot_delegate_guild_exam_or_quest_services(self):
+        from world.quests.runtime import definition_for, fulfill_record, to_storage
+
+        self.player.location = self.hall
+        companion = self._possessed_companion("艾拉")
+        # The commander is fully eligible: registered with a real active board
+        # quest and the exam threshold met. Any accidental delegation would
+        # therefore succeed and change state, so the rejections below are
+        # genuine admission refusals, not incidental failures.
+        self._register()
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        active = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
+        active_id = active.quest_id
+
+        def _state(actor):
+            merit = getattr(getattr(actor, "traits", None), "guild_merit", None)
+            return {
+                "wallet": int(actor.db.wallet or 0),
+                "registration": actor.db.guild_registration,
+                "quest_log": list(actor.db.quest_log or []),
+                "claims": list(actor.db.guild_reward_claims or []),
+                "rank": getattr(actor, "guild_rank", None),
+                "merit": None if merit is None else int(merit.value),
+            }
+
+        commander_before = _state(self.player)
+        companion_before = _state(companion)
+        results = (
+            _guild_register_adapter(companion, {}),
+            _exam_request_adapter(companion, {"target_rank": _T_EXAM_RANK}),
+            _quest_accept_adapter(
+                companion, {"definition_key": _T_BOARD_QUEST}
+            ),
+            _quest_abandon_adapter(companion, {"quest_id": active_id}),
+            _quest_track_adapter(companion, {"quest_id": active_id, "tracked": True}),
+        )
+        self.assertEqual(
+            [result["code"] for result in results],
+            [
+                "not_a_player",
+                "not_a_player",
+                "board_access",
+                "quest_not_found",
+                "quest_not_found",
+            ],
+        )
+        for result in results:
+            self.assertEqual(result["outcome"], "rejected")
+        records = read_records(self.player)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].quest_id, active_id)
+        self.assertIs(records[0].state, QuestState.IN_PROGRESS)
+        self.assertEqual(_state(self.player), commander_before)
+        self.assertEqual(_state(companion), companion_before)
+
+        # A real completed quest on the commander: a delegated turn-in would
+        # claim it, so the possessed actor's rejection is load-bearing.
+        completed = fulfill_record(records[0], definition_for(records[0]))
+        self.player.db.quest_log = [to_storage(completed)]
+        fulfilled_before = _state(self.player)
+        turnin = _quest_turnin_adapter(companion, {"quest_id": active_id})
+        self.assertEqual(turnin["outcome"], "rejected")
+        self.assertEqual(turnin["code"], "not_a_player")
+        self.assertEqual(_state(self.player), fulfilled_before)
+        self.assertEqual(read_records(self.player)[0].quest_id, active_id)
+        self.assertEqual(_state(companion), companion_before)
 
 
     def test_validate_quest_track_payload(self):

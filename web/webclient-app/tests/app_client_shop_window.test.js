@@ -2,7 +2,7 @@
 // under the `shop` drawer key on its own WindowFrame, shares the party
 // window's viewed member, selects through `party.view_member {tab: "shop"}`,
 // trades through one `shop.buy` / `shop.sell` naming the recipient or seller,
-// and states the committed refusal of its own trade (possessed_shop).
+// refreshes the committed purse and bag, and states an ordinary refusal.
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -13,10 +13,14 @@ import * as fx from "./store/protocol_fixtures.js";
 import {
   SHOP_ELLA_ID,
   SHOP_HOLDINGS_POTION,
+  SHOP_HOLDINGS_SELL,
   SHOP_KAHN_ID,
   SHOP_PARTY_SAMPLE,
+  SHOP_PARTY_SELLER_SAMPLE,
   SHOP_SERVICES_SAMPLE,
+  SHOP_SERVICES_SELLER_SAMPLE,
 } from "../stories/fixtures/shop_window_panels.js";
+import { PARTY_BAG_INVENTORY_SAMPLE } from "../stories/fixtures/party_panels.js";
 
 describe("the shop window in AppClient (webclient-shop-window)", () => {
   let store;
@@ -54,6 +58,24 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
   const sent = (id) => sender.sent.actions.filter((envelope) => envelope.action_id === id);
   const get = (id) => wrapper.get(`[data-testid="${id}"]`);
 
+  function bagFor(memberId, potionHeld, purse) {
+    return {
+      ...PARTY_BAG_INVENTORY_SAMPLE,
+      member_id: memberId,
+      purse,
+      rows: PARTY_BAG_INVENTORY_SAMPLE.rows.map((row) =>
+        row.item_key === "potion_heal" ? { ...row, held: potionHeld } : row,
+      ),
+    };
+  }
+
+  function commitTrade(requestId, panels, revision = 2) {
+    store.receive(1, "ui_update", [fx.update({ revision, panels })]);
+    store.receive(1, "ui_action_result", [
+      fx.actionResult({ request_id: requestId, presentation_revision: revision }),
+    ]);
+  }
+
   it("mounts its own WindowFrame under the shop key, with no generic drawer body", async () => {
     await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE });
     const drawer = wrapper.get('[data-testid="hud-drawer"]');
@@ -87,7 +109,7 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
     expect(get(`member-rail__entry--${SHOP_KAHN_ID}`).attributes("aria-busy")).toBe("true");
   });
 
-  it("buys for the viewed companion and states the committed possessed_shop refusal", async () => {
+  it("buys for the viewed acting puppet and refreshes the committed purse and bag", async () => {
     await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE, item_holdings: SHOP_HOLDINGS_POTION });
     const input = get("shop-window__quantity");
     input.element.value = "3";
@@ -98,19 +120,74 @@ describe("the shop window in AppClient (webclient-shop-window)", () => {
       { item_key: "potion_heal", quantity: 3, recipient_id: SHOP_ELLA_ID },
     ]);
     expect(get("action-bar__btn--trade").attributes("aria-busy")).toBe("true");
+    const requestId = sent("shop.buy")[0].request_id;
+    commitTrade(requestId, {
+      services: {
+        ...SHOP_SERVICES_SAMPLE,
+        player: { ...SHOP_SERVICES_SAMPLE.player, wallet: 1120 },
+      },
+      party_inventory: bagFor(SHOP_ELLA_ID, 5, 1120),
+    });
+    await wrapper.vm.$nextTick();
+    expect(get("shop-window__purse").text()).toBe("1,120 銅");
+    expect(store.view.panels.party_inventory.purse).toBe(1120);
+    const potion = store.view.panels.party_inventory.rows.find((row) => row.item_key === "potion_heal");
+    expect(potion.held).toBe(5);
+    expect(wrapper.find('[data-testid="action-bar__reason"]').exists()).toBe(false);
+  });
+
+  it("sells from the viewed acting puppet and refreshes the committed purse", async () => {
+    await mountWith({
+      services: SHOP_SERVICES_SELLER_SAMPLE,
+      party: SHOP_PARTY_SELLER_SAMPLE,
+      item_holdings: SHOP_HOLDINGS_SELL,
+    });
+    store.openHudDrawer("shop");
+    await wrapper.vm.$nextTick();
+    await get("window-frame__tabs").find('[data-tab-key="sell"]').trigger("click");
+    const input = get("shop-window__quantity");
+    input.element.value = "2";
+    await input.trigger("input");
+    await input.trigger("change");
+    await get("action-bar__btn--trade").trigger("click");
+    expect(sent("shop.sell").map((envelope) => envelope.payload)).toEqual([
+      { item_key: "rusty_sword", quantity: 2, seller_id: SHOP_KAHN_ID },
+    ]);
+    const requestId = sent("shop.sell")[0].request_id;
+    commitTrade(requestId, {
+      services: {
+        ...SHOP_SERVICES_SELLER_SAMPLE,
+        player: { ...SHOP_SERVICES_SELLER_SAMPLE.player, wallet: 1330 },
+      },
+      party_inventory: {
+        ...PARTY_BAG_INVENTORY_SAMPLE,
+        member_id: SHOP_KAHN_ID,
+        purse: 1330,
+        rows: [],
+      },
+    });
+    await wrapper.vm.$nextTick();
+    expect(get("shop-window__purse").text()).toBe("1,330 銅");
+    expect(store.view.panels.party_inventory.purse).toBe(1330);
+    expect(store.view.panels.party_inventory.member_id).toBe(SHOP_KAHN_ID);
+  });
+
+  it("states the committed ordinary refusal of its own trade", async () => {
+    await mountWith({ services: SHOP_SERVICES_SAMPLE, party: SHOP_PARTY_SAMPLE, item_holdings: SHOP_HOLDINGS_POTION });
+    await get("action-bar__btn--trade").trigger("click");
     store.receive(1, "ui_action_result", [
       fx.actionResult({
         request_id: sent("shop.buy")[0].request_id,
         outcome: "rejected",
-        code: "possessed_shop",
-        message: "附身狀態下無法進行交易。",
+        code: "insufficient_funds",
+        message: "你的銅幣不足。",
         presentation_revision: 1,
       }),
     ]);
     await wrapper.vm.$nextTick();
     const reason = get("action-bar__reason");
-    expect(reason.text()).toBe("附身狀態下無法進行交易。");
-    expect(reason.attributes("data-reason-code")).toBe("possessed_shop");
+    expect(reason.text()).toBe("你的銅幣不足。");
+    expect(reason.attributes("data-reason-code")).toBe("insufficient_funds");
   });
 
   it("closes through the drawer close route and leaves no shop surface in the DOM", async () => {

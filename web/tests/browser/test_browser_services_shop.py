@@ -10,6 +10,7 @@ from tools.spec_traceability import covers_requirement
 
 from web.browser_support.browser_fixtures_data import store_fixture_values
 
+from .browser_base import ACCEPTANCE_VIEWPORTS
 from .browser_helpers import (
     install_outbound_recorder,
     outbound_messages,
@@ -228,8 +229,43 @@ class ShopJourneys(ServicesBrowserTest):
 class ShopCompanionJourneys(ServicesBrowserTest):
     SERVICES_MODE = "store_open_companion"
 
+    def _enter_companion_possession(self, page, companion_id):
+        """Select the companion and enter real possession."""
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
+        page.locator('[data-testid="icon-tabs__tab--member"]').click()
+        entry = page.locator(f'[data-testid="member-rail__entry--{companion_id}"]')
+        entry.wait_for(timeout=30000)
+        if entry.get_attribute("aria-current") != "true":
+            entry.click()
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("party") or {}).get(
+                "viewed_member_id"
+            )
+            == companion_id,
+        )
+        page.locator('[data-testid="action-bar__btn--possess"]').click()
+        self.assertEqual(sent_action_count(page, "explore.possess"), 1)
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("possession_banner") or {}).get(
+                    "available"
+                )
+                and ((s.get("panels") or {}).get("services") or {}).get("available")
+            ),
+        )
+        exploration = store_state(page)["panels"]["exploration"]
+        service_entries = [
+            affordance
+            for target in exploration.get("interact") or []
+            for affordance in target.get("affordances") or []
+            if affordance.get("surface") in {"guild", "shop"}
+        ]
+        return self._services_panel(page), service_entries
+
     @covers_requirement(
-        "webclient-shop-window::the-shop-window-uses-the-frame-with-buy-and-sell-tabs-and-the-member-rail",
+        "webclient-shop-window::the-shop-window-shares-member-selection-and-normal-trades-during-possession",
         "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
     )
     def test_buy_potions_for_a_companion(self):
@@ -248,8 +284,32 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         # The shop opens on the commander (the session's viewed member).
         self.assertEqual(panel["shop"]["member_id"], commander_id)
 
+        # Enter real possession with the companion selected, so the viewed
+        # member survives the transition and the shop opens on her.
+        possessed_services, service_entries = self._enter_companion_possession(
+            page, companion_id
+        )
+        self.assertIsNone(possessed_services["guild"])
+        self.assertEqual(
+            [entry["surface"] for entry in service_entries], ["shop"]
+        )
+        self.assertTrue(service_entries[0]["enabled"])
+        self.assertIsNone(service_entries[0]["disabled_reason"])
+
         self._open_surface(page, "shop")
-        self._select_shop_member(page, companion_id)
+        # The viewed-member selection survives possession; the journey never
+        # re-selects the companion to make this pass.
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("party") or {}).get(
+                "viewed_member_id"
+            )
+            == companion_id
+            and (((s.get("panels") or {}).get("services") or {}).get("shop") or {}).get(
+                "member_id"
+            )
+            == companion_id,
+        )
         title = page.evaluate(
             "() => document.querySelector('[data-testid=\"shop-window__list-title\"]').textContent"
         )
@@ -305,6 +365,85 @@ class ShopCompanionJourneys(ServicesBrowserTest):
         )
         self.assertEqual(
             page.evaluate("() => document.querySelectorAll('[data-testid=\"shop-window__purse\"]').length"), 1
+        )
+
+        # Sell one of the bought potions back from the same acting puppet.
+        sell_row = next(
+            row
+            for row in self._services_panel(page)["shop"]["sellable"]
+            if row["item_key"] == potion
+        )
+        sale_copper = sell_row["sell_copper"]
+        expected_after_sale = expected_wallet + sale_copper
+        self._select_shop_tab(page, "sell")
+        self._select_shop_row(page, potion)
+        self._tab_until_focused(page, QUANTITY)
+        self._replace_focused_number(page, "1")
+        _press(page, "Tab")
+        self._tab_until_focused(page, TRADE)
+        _press(page, "Enter")
+
+        self._wait_panel(page, lambda p: p["player"]["wallet"] == expected_after_sale)
+        self.assertEqual(sent_action_count(page, "shop.sell"), 1)
+        self.assertEqual(
+            _sent_payload(page, "shop.sell"),
+            {"item_key": potion, "quantity": 1, "seller_id": companion_id},
+        )
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("party_inventory") or {}).get(
+                "purse"
+            )
+            == expected_after_sale,
+        )
+        state = store_state(page)
+        self.assertEqual(
+            state["panels"]["party_inventory"]["purse"], expected_after_sale
+        )
+        self.assertEqual(
+            next(
+                row
+                for row in state["panels"]["party_inventory"]["rows"]
+                if row["item_key"] == potion
+            )["held"],
+            held_before + 1,
+        )
+
+    @covers_requirement(
+        "webclient-shop-window::the-shop-window-shares-member-selection-and-normal-trades-during-possession",
+        "webclient-shop-window::the-buy-view-shows-one-price-and-the-recipient-s-facts",
+    )
+    def test_possessed_shop_opens_at_the_large_acceptance_viewport(self):
+        page = self.logged_in_page(ACCEPTANCE_VIEWPORTS[1])
+        install_outbound_recorder(page)
+        self._wait_services_available(page)
+        party = store_state(page)["panels"]["party"]
+        companions = [row for row in party["slots"] if row["role"] == "companion"]
+        companion = next(
+            (row for row in companions if row["display_name"] == "艾拉"),
+            companions[0],
+        )
+        companion_id = companion["identity"]
+        panel, service_entries = self._enter_companion_possession(page, companion_id)
+        self.assertIsNone(panel["guild"])
+        self.assertEqual(
+            [entry["surface"] for entry in service_entries], ["shop"]
+        )
+        self.assertTrue(service_entries[0]["enabled"])
+        self._open_surface(page, "shop")
+        wait_for_store_state(
+            page,
+            lambda s: (((s.get("panels") or {}).get("services") or {}).get("shop") or {}).get(
+                "member_id"
+            )
+            == companion_id,
+        )
+        self.assertTrue(page.locator('[data-testid="shop-window"]').is_visible())
+        self.assertEqual(
+            page.evaluate(
+                "() => document.querySelectorAll('[data-testid=\"shop-window__purse\"]').length"
+            ),
+            1,
         )
 
 

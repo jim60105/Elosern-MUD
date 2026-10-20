@@ -224,3 +224,27 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
         except ServicesViewError:
             pass
         self.assertEqual(list(search_script("world_clock")), list(original))
+
+    def test_possessed_actor_in_a_guild_only_room_omits_every_service(self):
+        # A guild-only room: while possessed, the guild surface is omitted
+        # without a failure reason and no merchant is invented.
+        possessed = create_object(NPC, key="附身同伴", location=self.hall)
+        possessed.race = "human"
+        possessed.apply_race_baseline()
+        possessed.db.possessed_by = self.player.pk
+        before = list(possessed.db.inventory or [])
+        view = build_services_view(possessed)
+        self.assertEqual(view.player.wallet, 1000)
+        self.assertEqual(view.player.guild_rank, "F")
+        self.assertIsNone(view.guild)
+        self.assertIsNone(view.guild_unavailable_reason)
+        self.assertIsNone(view.host)
+        self.assertIsNone(view.shop)
+        self.assertEqual(view.shop_unavailable_reason, "no_local_service_host")
+        self.assertEqual(
+            view.pagination.board_total, 0
+        )
+        self.assertEqual(view.pagination.quest_total, 0)
+        self.assertEqual(view.pagination.stock_total, 0)
+        self.assertEqual(view.pagination.sellable_total, 0)
+        self.assertEqual(list(possessed.db.inventory or []), before)

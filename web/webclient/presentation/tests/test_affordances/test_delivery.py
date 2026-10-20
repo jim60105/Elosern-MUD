@@ -72,7 +72,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         ]
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_held_item_offers_one_enabled_normalized_entry(self):
         self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
@@ -90,7 +90,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         self.assertIsNone(entry.surface)
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_unheld_item_keeps_a_disabled_entry_with_the_rule_reason(self):
         self.player.db.inventory = []
@@ -102,7 +102,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         )
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_no_entry_without_an_active_bound_stage(self):
         self.player.db.inventory = [_T_SPRAY, _T_SPRAY]
@@ -135,7 +135,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
         )
 
     @covers_requirement(
-        "exploration-affordances::the-canonical-affordance-vocabulary-is-shared-and-read-only"
+        "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
     def test_delivery_entry_serializes_into_the_panel_target_with_params(self):
         from web.webclient.presentation.exploration import (

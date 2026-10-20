@@ -14,7 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.localized import CmdDrop, CmdGet, CmdGive
-from commands.economy import CmdBuy, CmdSell
+from commands.economy import CmdBuy, CmdInventory, CmdSell
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
@@ -52,6 +52,7 @@ from world.rules.party_scope import (
     REASON_NOT_PARTY_MEMBER,
     PartyScopeError,
 )
+from world.rules.possession import enter_possession
 from world.rules.surfaces import attribute_snapshot
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
@@ -716,6 +717,16 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
             dict(parse_merchant_stock(self.merchant)),
         )
 
+    def _possess(self, companion=None):
+        """Enter live, authenticated possession of ``companion``."""
+        companion = self.companion if companion is None else companion
+        self.player.account = self.account
+        self.account.characters.add(self.player)
+        self.session.puppet = self.player
+        self.player.sessions.add(self.session)
+        enter_possession(self.player, companion)
+        return companion
+
     @covers_requirement(
         "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically",
         "shop-economy::shop-economy-stays-consistent-with-the-canonical-inventory",
@@ -1150,27 +1161,140 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertEqual(list_items(self.companion), [])
 
     @covers_requirement(
-        "shop-economy::possession-keeps-the-shop-refusal"
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
     )
-    def test_text_trades_refuse_possession(self):
-        from world.rules.possession import (
-            POSSESSED_REFUSAL_MESSAGES,
-            REASON_POSSESSED_SHOP,
+    def test_possessed_text_purchase_defaults_to_the_acting_puppet(self):
+        # A live possession authenticates the commander; the typed line names
+        # no member, so the acting puppet's own bag receives the goods while
+        # the commander pays and keeps the merchant affinity.
+        self._possess()
+        stock_before = parse_merchant_stock(self.merchant)[_T_APPLE]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            output = self.call(CmdBuy(), f"{_T_APPLE} 2", caller=self.companion)
+        self.assertIn("你買了 2 個", output)
+        self.assertEqual(
+            int(self.player.db.wallet), 1240 - 2 * _buy_copper(_T_APPLE)
+        )
+        self.assertEqual(list_items(self.companion), [_T_APPLE] * 2)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_APPLE], stock_before - 2
+        )
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
+
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_text_sale_defaults_to_the_acting_puppet(self):
+        self._possess()
+        self.companion.db.inventory = [_T_FANG]
+        stock_before = parse_merchant_stock(self.merchant)[_T_FANG]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            output = self.call(CmdSell(), f"{_T_FANG} 1", caller=self.companion)
+        self.assertIn("你賣了 1 個", output)
+        self.assertEqual(list_items(self.companion), [])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            int(self.player.db.wallet), 1240 + _sell_copper(_T_FANG)
+        )
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_FANG], stock_before + 1
+        )
+        self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
+
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_text_trade_can_name_another_party_member(self):
+        kahn = self._companion("卡恩")
+        self._possess()
+        stock_before = parse_merchant_stock(self.merchant)[_T_APPLE]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            output = self.call(
+                CmdBuy(), f"{_T_APPLE} 1 = 卡恩", caller=self.companion
+            )
+        self.assertIn("你買了 1 個", output)
+        self.assertEqual(list_items(kahn), [_T_APPLE])
+        self.assertEqual(list_items(self.companion), [])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            int(self.player.db.wallet), 1240 - _buy_copper(_T_APPLE)
+        )
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_APPLE], stock_before - 1
         )
 
-        # The text client answers a possessed trade exactly like the web
-        # adapters: the shared fixed line, before any host or argument work,
-        # whatever member the line names.
-        self.companion.db.possessed_by = self.player.pk
-        refusal = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
+    @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
+        "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse",
+    )
+    def test_possessed_trade_refusals_change_nothing(self):
+        self._possess()
+        self.player.db.wallet = _buy_copper(_T_APPLE) - 1
         before = self._surface(self.player, self.companion)
-        buy_output = self.call(CmdBuy(), f"{_T_APPLE} 1", caller=self.companion)
-        sell_output = self.call(
-            CmdSell(), f"{_T_APPLE} 1 = 艾拉", caller=self.companion
-        )
-        self.assertEqual(buy_output.strip(), refusal)
-        self.assertEqual(sell_output.strip(), refusal)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            output = self.call(CmdBuy(), f"{_T_APPLE} 1", caller=self.companion)
+        self.assertEqual(output.strip(), "你的銅幣不足。")
         self.assertEqual(self._surface(self.player, self.companion), before)
+
+    @covers_requirement(
+        "shop-economy::buying-and-selling-commit-wallet-inventory-acquisition-progress-and-stock-atomically"
+    )
+    def test_possessed_trade_fault_injection_restores_every_surface(self):
+        self._possess()
+        self.player.db.wallet = 1240
+        self.companion.db.inventory = [_T_APPLE]
+        before = self._surface(self.player, self.companion)
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            with patch(
+                "world.rules.economy.materialize_registry_object",
+                side_effect=RuntimeError("mirror failure"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    buy(
+                        self.companion,
+                        self.merchant_npc,
+                        _T_APPLE,
+                        2,
+                        self.companion.pk,
+                    )
+        self.assertEqual(self._surface(self.player, self.companion), before)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
+
+    @covers_requirement(
+        "shop-economy::text-shop-commands-name-the-recipient-or-seller",
+        "shop-economy::text-inventory-reports-the-party-purse-independently-of-the-caller-s-bag",
+    )
+    def test_possessed_inventory_reports_the_party_purse_and_acting_bag(self):
+        from world.rules.party_inventory import inventory_view
+
+        self._possess()
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            self.call(CmdBuy(), f"{_T_APPLE} 2", caller=self.companion)
+        purse_after_buy = int(self.player.db.wallet)
+        output = self.call(CmdInventory(), "", caller=self.companion)
+        self.assertIn(f"錢包：{purse_after_buy} 銅", output)
+        self.assertIn(f"  {_T_APPLE} ×2", output)
+        self.assertEqual(
+            inventory_view(self.companion, in_combat=False).purse, purse_after_buy
+        )
+
+        self.merchant.merchant_stock = {**_stock(), _T_FANG: 1}
+        self.companion.db.inventory = [_T_FANG]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            self.call(CmdSell(), f"{_T_FANG} 1", caller=self.companion)
+        purse_after_sale = int(self.player.db.wallet)
+        output = self.call(CmdInventory(), "", caller=self.companion)
+        self.assertIn(f"錢包：{purse_after_sale} 銅", output)
+        self.assertEqual(purse_after_sale, purse_after_buy + _sell_copper(_T_FANG))
+        self.assertEqual(
+            inventory_view(self.companion, in_combat=False).purse, purse_after_sale
+        )
 
     @covers_requirement(
         "shop-economy::text-shop-commands-name-the-recipient-or-seller"

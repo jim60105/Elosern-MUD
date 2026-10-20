@@ -493,20 +493,6 @@ def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
     enabled entry — presentation never fail-closes a whole panel on data
     the resolver was never asked about.
     """
-    from world.rules.possession import (
-        POSSESSED_REFUSAL_MESSAGES,
-        REASON_POSSESSED_SHOP,
-        is_possessed_actor,
-    )
-    if is_possessed_actor(actor):
-        disabled_msg = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
-        return AffordanceView(
-            surface=surface,
-            label="公會服務" if surface == "guild" else "商店",
-            navigation=True,
-            enabled=False,
-            disabled_reason=(REASON_POSSESSED_SHOP, disabled_msg),
-        )
     from typeclasses.components import GuildStaff, Merchant
 
     component_class = GuildStaff if surface == "guild" else Merchant
@@ -721,11 +707,14 @@ def _target_entries(actor: Any) -> list[AffordanceView]:
     from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
+    from world.rules.possession import is_possessed_actor
 
     location = getattr(actor, "location", None)
     if location is None:
         return []
-    guild_host = _resolve_single_host(actor, GuildStaff)
+    # Possession omits guild navigation entirely: neither the guild opener nor
+    # a disabled substitute is emitted, and no guild host is resolved.
+    guild_host = None if is_possessed_actor(actor) else _resolve_single_host(actor, GuildStaff)
     shop_host = _resolve_single_host(actor, Merchant)
     candidates = [
         obj

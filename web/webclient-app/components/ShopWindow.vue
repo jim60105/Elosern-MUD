@@ -26,7 +26,7 @@
 // sending one `shop.buy {item_key, quantity, recipient_id}` or `shop.sell
 // {item_key, quantity, seller_id}` naming `shop.member_id`. One price per
 // view; no rule text; committed disabled reasons and a trade's committed
-// refusal (`tradeNotice`, e.g. possessed_shop) are the only state lines.
+// refusal (`tradeNotice`, e.g. insufficient_funds) are the only state lines.
 import { computed, ref, watch } from "vue";
 import ActionBar from "./ActionBar.vue";
 import EmptyState from "./EmptyState.vue";

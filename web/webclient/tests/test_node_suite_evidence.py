@@ -596,7 +596,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         and the other members' chips from item_holdings, the stepper bounded
         by the committed maximum, the labelled remaining purse beside the one
         header purse, the shop.buy/shop.sell payloads naming the member, the
-        closed reasons, the possessed_shop refusal and no rule prose."""
+        closed reasons, an ordinary trade refusal and no rule prose."""
         result = subprocess.run(
             [
                 "npx",
