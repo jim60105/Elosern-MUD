@@ -95,13 +95,31 @@ def _sell_copper(item_key: str) -> int:
     return price_band(item_key)[0]
 
 
+# The price-authority regression pins one asymmetric configured pair instead
+# of reading it back from the band helper. ``t_ember_spray`` is a potion in
+# the live ``t_mossmeals`` band (6..12), the browser harness catalog prices it
+# through ``synth_offer_rule`` at 8 buy / 6 sell, and 6 is not half of 8 (half
+# of 8 is 4), so a view or trade that infers either price from the other
+# cannot produce these numbers. These are synthetic arithmetic inputs, never
+# a production balance table.
+_POTION_BUY_COPPER = 8
+_POTION_SELL_COPPER = 6
+
+
 def _shop_config():
     """Built inside the scope: the offer rules read live price bands."""
     return synth_shop_config(
         T_SHOP,
         (_T_SPRAY, _T_FANG, _T_APPLE, _T_KNIFE),
         offer_rules=(
-            synth_offer_rule(_T_SPRAY, max_stock=20),
+            ItemOfferRule(
+                item_key=_T_SPRAY,
+                buy_copper=_POTION_BUY_COPPER,
+                sell_copper=_POTION_SELL_COPPER,
+                max_stock=20,
+                initial_stock=20,
+                restock_quantity=2,
+            ),
             synth_offer_rule(_T_FANG, max_stock=3),
             synth_offer_rule(_T_APPLE, max_stock=20),
             # Low starting stock so guard sells never overflow the cap.
@@ -732,6 +750,28 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
 
     @covers_requirement(
+        "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag"
+    )
+    def test_asymmetric_buy_price_is_not_inferred_from_the_sale_value(self):
+        # The configured pair is 8 buy / 6 sell. Three units must leave the
+        # purse exactly 24 lighter (3 * 8); reading the sell value instead
+        # would debit 18, and deriving buy as twice the sell value would
+        # debit 36. The bag and stock facts are known independently.
+        stock_before = parse_merchant_stock(self.merchant)[_T_SPRAY]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = buy(
+                self.player, self.merchant_npc, _T_SPRAY, 3, self.companion.pk
+            )
+        self.assertEqual(result["total_copper"], 24)
+        self.assertEqual(result["wallet"], 1216)
+        self.assertEqual(int(self.player.db.wallet), 1216)
+        self.assertEqual(list_items(self.companion), [_T_SPRAY] * 3)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_SPRAY], stock_before - 3
+        )
+
+    @covers_requirement(
         "shop-economy::purchases-debit-the-party-purse-and-fill-the-recipient-s-bag",
         "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse",
     )
@@ -948,6 +988,29 @@ class PartyShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, Evenni
         )
         self.assertEqual(self.merchant_npc.relations.affinity_for(self.player), 1)
         self.assertFalse(self.merchant_npc.relations.has_record(self.companion))
+
+    @covers_requirement(
+        "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
+    )
+    def test_asymmetric_sell_price_is_not_half_the_buy_price(self):
+        # The same 8-buy/6-sell offer sold once credits exactly 6; a half-buy
+        # derivation would credit 4. The purse starts empty, the seller holds
+        # one unit and the merchant has headroom under its cap.
+        self.player.db.wallet = 0
+        self.companion.db.inventory = [_T_SPRAY]
+        stock_before = parse_merchant_stock(self.merchant)[_T_SPRAY]
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = sell(
+                self.player, self.merchant_npc, _T_SPRAY, 1, self.companion.pk
+            )
+        self.assertEqual(result["total_copper"], 6)
+        self.assertEqual(result["wallet"], 6)
+        self.assertEqual(int(self.player.db.wallet), 6)
+        self.assertEqual(list_items(self.companion), [])
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(
+            parse_merchant_stock(self.merchant)[_T_SPRAY], stock_before + 1
+        )
 
     @covers_requirement(
         "shop-economy::sales-draw-from-the-seller-s-unequipped-items-and-credit-the-party-purse"
