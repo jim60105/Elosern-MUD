@@ -89,7 +89,9 @@ MAX_REASON_CODE = 64
 MAX_PARTICIPANT_REF = 32
 MAX_CONDITION_LABEL = MAX_PARTICIPANT_CONDITION_LABEL
 
-PARTICIPANT_STATES = frozenset({"active", "fled", "knocked_out", "defeated"})
+PARTICIPANT_STATES = frozenset(
+    {"active", "asleep", "fled", "knocked_out", "defeated"}
+)
 TEAMS = frozenset({"party", "foes"})
 MODES = frozenset({"hostile", "guild_exam"})
 SESSION_STATES = frozenset({"ready", "recovery"})

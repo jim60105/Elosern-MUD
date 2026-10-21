@@ -270,10 +270,13 @@ class DecisionReads:
         """Return the entity's action-capability projection."""
         key = _memo_key(entity)
         if key not in self._capability:
+            from world.rules.fatigue import sleep_blocks_actions
+
             modifiers = self.modifiers(entity)
             self._capability[key] = CapabilityState(
                 blocked_by_buff=self.blocked_by_buff(entity),
                 actions_per_turn=int(modifiers.get("actions_per_turn", 1)),
+                asleep=sleep_blocks_actions(entity),
             )
         return self._capability[key]
 

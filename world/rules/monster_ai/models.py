@@ -66,10 +66,17 @@ class DecisionScope:
 
 @dataclass(frozen=True, slots=True)
 class CapabilityState:
-    """Whether the participant can act at all this decision."""
+    """Whether the participant can act at all this decision.
+
+    ``asleep`` is the persisted sleep posture projected without materializing
+    physiology. It is a truthful inability-to-act fact about the participant,
+    never a targeting exclusion: a sleeping opponent stays present, alive and
+    in range, and only its own next action opportunity disappears.
+    """
 
     blocked_by_buff: bool
     actions_per_turn: int
+    asleep: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,6 +273,7 @@ def _participant_payload(participant: ParticipantSnapshot) -> dict[str, Any]:
         "capability": [
             participant.capability.blocked_by_buff,
             participant.capability.actions_per_turn,
+            participant.capability.asleep,
         ],
         "buffs": [
             [buff.key, buff.stacks, buff.remaining_seconds, buff.marker]
