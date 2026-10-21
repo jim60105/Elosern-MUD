@@ -66,6 +66,8 @@
 | [`combat command`](/game/command-reference?id=combat-command) | `combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]`、`combat command <actor-token> item <item_key>[=<target-token>]`、`combat command <actor-token> defend/dodge/taunt[=<enemy-token>]`：以同伴代號（`a2` 等）確認該成員的指令，不需要附身該成員；再次輸入同一成員即改選並取代前一筆，最後一位成員確認後自動結算本回合。 |
 | [`combat actions`](/game/command-reference?id=combat-actions) | `combat actions [<actor-token>]` 列出指定成員（省略代號時是你）的技能、道具與戰術，以及本回合的指令進度；列出同伴的指令同樣不需要附身。 |
 
+戰鬥中的生理疲勞只在終局結算時一次計入（完成回合數 × 6 秒），不會每回合消耗精神儲備、推進世界時間或自然醒來；沉睡會持續到終局結算，除非日後有明確的狀態效果改變它。沉睡的成員仍在場上、仍可被選為目標，但不會被要求下達指令，也不會自動出手，畫面以「沉睡中，無法行動」標示，與倒地或擊破不同；沉睡時仍可指揮清醒的同伴。
+
 ## 技能施放
 
 | 指令 | 說明 |
