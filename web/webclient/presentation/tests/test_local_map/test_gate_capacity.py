@@ -6,7 +6,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from unittest.mock import patch
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
-from web.webclient.presentation.local_map import MAX_NODES
+from web.webclient.presentation.local_map import COORD_MAX, MAX_NODES
 from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
@@ -165,8 +165,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # Run-2 remediation (rubber-duck run 2): a preferred slot outside the
         # payload coordinate bounds must probe to the nearest legal free slot,
         # never emit an out-of-bounds node that kills the whole panel.
+        # project-metric-local-maps: the envelope's upper bound is now the
+        # shared metric bound, so the case is anchored on COORD_MAX itself.
+        edge = COORD_MAX
         self._make_gate(self.plaza)
-        current = types.SimpleNamespace(X=1024, Y=1024, node_index=1, links={}, symbol="#")
+        current = types.SimpleNamespace(X=edge, Y=edge, node_index=1, links={}, symbol="#")
 
         class FakeMap:
             Z = _T_MAP_KEY
@@ -183,13 +186,13 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.location = self.plaza
         record_arrival(self.char1)
         with (
-            patch.object(type(self.plaza), "xyz", (1024, 1024, _T_MAP_KEY)),
+            patch.object(type(self.plaza), "xyz", (edge, edge, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
             # A map whose registered bounds reach the payload edge is the
-            # only way a room coordinate of 1024 can be legal at all.
+            # only way a room coordinate at the envelope edge can be legal.
             patch(
                 "world.rules.map_knowledge._registered_grid_bounds",
-                return_value=(1100, 1100),
+                return_value=(edge, edge),
             ),
             patch(
                 "typeclasses.rooms.GridRoom.objects.filter_xyz",
@@ -200,11 +203,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertTrue(payload["available"])
         by_id = {node["id"]: node for node in payload["nodes"]}
         gate_node = by_id[self.ENTRY_ID]
-        # Preferred (1025,1024) is out of bounds; diamond ring 1 (dy,dx)-
-        # sorted: (1024,1024) occupied by the current node, (1025,1023)/
-        # (1026,1024)/(1025,1025) out of bounds; ring 2 opens at
-        # (dy=-1,dx=-1) -> (1024,1023), the first legal free slot.
-        self.assertEqual((gate_node["x"], gate_node["y"]), (1024, 1023))
+        # The preferred east slot is out of bounds; diamond ring 1 (dy,dx)-
+        # sorted starts at (dy=-1,dx=0), which is the first legal free slot.
+        self.assertEqual((gate_node["x"], gate_node["y"]), (edge, edge - 1))
         self.assertIsNotNone(gate_node["action"])
 
     @covers_requirement(

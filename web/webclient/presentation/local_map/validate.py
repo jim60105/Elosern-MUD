@@ -38,8 +38,13 @@ MAX_STRING_CODE_POINTS = 256
 MAX_TITLE_CODE_POINTS = 128
 MAX_NODE_ID_CHARS = 128
 MAX_EXIT_REF_CHARS = 64
-COORD_MIN = -1024
-COORD_MAX = 1024
+# The shared coordinate envelope (project-metric-local-maps): settlement
+# nodes carry integer-meter local-frame coordinates (a few kilometres), and
+# the wilderness frame is 0..2699 one-kilometre cells. The envelope must stay
+# equal in the JavaScript validator (protocol/constants.js); it is a transport
+# bound, not a rendering bound.
+COORD_MIN = -10_000_000
+COORD_MAX = 10_000_000
 
 VISIBILITIES = ("current", "visible_unvisited", "visible_visited", "remembered")
 LAYERS = ("grid", "wilderness", "instance", "interior")

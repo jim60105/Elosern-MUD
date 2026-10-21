@@ -19,7 +19,14 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 
-from ._support import _T_MAP_KEY, _valid_edge, _valid_node, _valid_panel
+from ._support import (
+    _T_MAP_KEY,
+    _t_grid_id,
+    _t_wild_id,
+    _valid_edge,
+    _valid_node,
+    _valid_panel,
+)
 
 
 
@@ -120,7 +127,7 @@ class LocalMapSchemaTests(unittest.TestCase):
         long_id = f"grid:{_T_MAP_KEY}:" + "9" * 130
         with self.assertRaises(ProtocolValidationError):
             validate_local_map(_valid_panel(current_node=long_id))
-        # Coordinates within -1024..1024.
+        # Coordinates within the shared metric envelope.
         with self.assertRaises(ProtocolValidationError):
             validate_local_map(_valid_panel(nodes=[_valid_node(x=COORD_MAX + 1)]))
         with self.assertRaises(ProtocolValidationError):
@@ -144,6 +151,114 @@ class LocalMapSchemaTests(unittest.TestCase):
         ]
         with self.assertRaises(ProtocolValidationError):
             validate_local_map(_valid_panel(nodes=nodes))
+
+    @covers_requirement(
+        "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection"
+    )
+    def test_metric_settlement_and_wilderness_frames_share_one_envelope(self):
+        """The wire envelope carries integer metres and the wilderness frame.
+
+        It is a transport bound only: a settlement node at (6500, 6350) and a
+        wilderness node at (2699, 2699) are both legal, while a fraction, a
+        non-finite value, a numeric string or a value just past either bound
+        stays rejected rather than reaching the renderer as guessed geometry.
+        """
+        self.assertEqual((COORD_MIN, COORD_MAX), (-10_000_000, 10_000_000))
+
+        settlement = _valid_panel(
+            layer="grid",
+            current_node=_t_grid_id(6500, 6350),
+            nodes=[
+                _valid_node(id=_t_grid_id(6500, 6350), x=6500, y=6350),
+                _valid_node(
+                    id=_t_grid_id(6500, 6351),
+                    label="北門",
+                    x=6500,
+                    y=6351,
+                    visibility="visible_visited",
+                    current=False,
+                    action={
+                        "kind": "move",
+                        "exit_ref": "n",
+                        "destination": _t_grid_id(6500, 6351),
+                    },
+                ),
+            ],
+            edges=[
+                _valid_edge(
+                    source=_t_grid_id(6500, 6350),
+                    destination=_t_grid_id(6500, 6351),
+                )
+            ],
+        )
+        # The payload envelope admits integer metres; the grid identity itself
+        # still resolves against the map's own registered extent. The metric
+        # settlement declaration that widens that extent ships with
+        # `activate-metric-settlements`, so this transport test registers a
+        # synthetic extent instead of inventing a shipped coordinate.
+        with patch(
+            "world.rules.map_knowledge._registered_grid_bounds",
+            return_value=(10_000_000, 10_000_000),
+        ):
+            normalized = validate_local_map(settlement)
+        self.assertEqual(
+            {node["id"]: (node["x"], node["y"]) for node in normalized["nodes"]},
+            {
+                _t_grid_id(6500, 6350): (6500, 6350),
+                _t_grid_id(6500, 6351): (6500, 6351),
+            },
+        )
+
+        wilderness = _valid_panel(
+            layer="wilderness",
+            current_node=_t_wild_id(2699, 2699),
+            nodes=[
+                _valid_node(id=_t_wild_id(2699, 2699), x=2699, y=2699),
+                _valid_node(
+                    id=_t_wild_id(2698, 2699),
+                    label="林地",
+                    x=2698,
+                    y=2699,
+                    visibility="visible_unvisited",
+                    current=False,
+                    action={
+                        "kind": "move",
+                        "exit_ref": "w",
+                        "destination": _t_wild_id(2698, 2699),
+                    },
+                ),
+            ],
+            edges=[
+                _valid_edge(
+                    source=_t_wild_id(2699, 2699),
+                    destination=_t_wild_id(2698, 2699),
+                )
+            ],
+        )
+        # Same split for the wilderness frame: the payload envelope already
+        # admits 0..2699; the shipped provider still bounds identity at its
+        # pre-rescale 10 km cell count, and `rescale-wilderness-geography`
+        # owns that provider change.
+        with (
+            patch("world.rules.map_knowledge.WILDERNESS_MAX_X", 2699),
+            patch("world.rules.map_knowledge.WILDERNESS_MAX_Y", 2699),
+        ):
+            self.assertTrue(validate_local_map(wilderness)["available"])
+
+        for malformed in (
+            {"x": 100.5},
+            {"x": True},
+            {"x": float("nan")},
+            {"y": float("inf")},
+            {"x": "100"},
+            {"x": COORD_MIN - 1},
+            {"y": COORD_MAX + 1},
+        ):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_local_map(
+                        _valid_panel(nodes=[_valid_node(**malformed)])
+                    )
 
     def test_legend_bounded_at_16(self):
         legend = ["x" * 10] * (MAX_LEGEND + 1)
