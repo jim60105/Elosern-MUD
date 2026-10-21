@@ -1278,6 +1278,54 @@ class MetricCutoverTests(EvenniaTest):
     @covers_requirement(
         "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
     )
+    def test_failed_cutover_restores_a_two_settlement_observation(self):
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        observer = create_object(
+            PlayerCharacter,
+            key="測試雙居者",
+            location=self._object(ids["capital_altoria"]["south_gate"]),
+        )
+        original = {
+            "schema_version": 1,
+            "visited": {
+                "grid:capital_altoria:3:3": {
+                    "first_seen_tick": 3,
+                    "last_seen_tick": 5,
+                },
+                "grid:village_ciaran:1:1": {
+                    "first_seen_tick": 7,
+                    "last_seen_tick": 9,
+                },
+            },
+        }
+        observer.attributes.add(KNOWLEDGE_ATTR, original)
+
+        import world.rules.map_knowledge as knowledge
+
+        real = knowledge._write_knowledge
+        calls = {"n": 0}
+
+        def fail_second_settlement(character, record):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("injected second-settlement fault")
+            return real(character, record)
+
+        with patch.object(
+            knowledge, "_write_knowledge", side_effect=fail_second_settlement
+        ):
+            with self.assertRaises(RuntimeError):
+                sync_grid()
+
+        self.assertEqual(observer.attributes.get(KNOWLEDGE_ATTR), original)
+
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
     def test_upgrade_removes_retired_ascii_registration_without_deleting_rooms(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
 

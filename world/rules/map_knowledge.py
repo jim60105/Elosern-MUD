@@ -421,9 +421,14 @@ def remap_grid_identities(
                 )
         if not changed:
             continue
-        if journal is not None:
+        if journal is not None and not any(
+            entry_character is character for entry_character, _ in journal
+        ):
             # The snapshot restores the durable value even if the failed
             # transaction's rollback is not observable through the handler.
+            # Each character is journalled once, before its FIRST mutation: a
+            # character observed in both settlements must roll back to its
+            # pre-startup record, never to a partially remapped one.
             journal.append((character, deepcopy(current)))
         _write_knowledge(
             character, {"schema_version": SCHEMA_VERSION, "visited": remapped}
