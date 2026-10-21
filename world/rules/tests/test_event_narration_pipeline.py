@@ -156,7 +156,8 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         self.assertIn("{target}", first.text_template)
 
     @covers_requirement(
-        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_an_area_spell_opens_once_on_the_field_not_on_one_body(self):
         foes = [self._monster(key=f"narr foe {index}") for index in range(3)]

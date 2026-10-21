@@ -97,6 +97,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_the_covered_families_have_exact_row_coverage(self):
         expected: set[str] = set()
@@ -109,6 +110,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
     @covers_requirement(
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_each_element_carries_exactly_its_own_active_spells(self):
         by_element = _elemental_keys_by_element()
@@ -124,7 +126,8 @@ class NarrationCoverageContractTests(unittest.TestCase):
                 )
 
     @covers_requirement(
-        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_no_two_element_registers_share_an_authored_line(self):
         registers = {
@@ -141,7 +144,8 @@ class NarrationCoverageContractTests(unittest.TestCase):
                 self.assertFalse(registers[first] & registers[second])
 
     @covers_requirement(
-        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_an_area_spell_opens_on_the_field_and_not_one_body(self):
         area = [
@@ -162,6 +166,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
     @covers_requirement(
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_every_authored_row_opens_its_own_skill(self):
         for key, row in NARRATION_CATALOG.items():
@@ -181,6 +186,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
     @covers_requirement(
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
+        "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_a_missing_row_in_a_covered_family_stops_the_catalog_loading(self):
         for category in COVERED_FAMILIES:
