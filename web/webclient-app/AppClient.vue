@@ -926,11 +926,11 @@ const rootStyle = computed(() => {
               v-if="restOpen"
               class="choice-card rest-card"
               role="dialog"
-              aria-label="休息 N 小時"
+              aria-label="等待 N 小時"
               data-testid="rest-card"
             >
               <span class="choice-card__corners" aria-hidden="true"></span>
-              <div class="choice-card__caption" aria-hidden="true">休息 N 小時</div>
+              <div class="choice-card__caption" aria-hidden="true">等待 N 小時</div>
               <RestForm :disabled="skipDisabled" @submit="onRestSubmit" @close="onRestClose" />
             </section>
           </template>

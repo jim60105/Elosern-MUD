@@ -235,7 +235,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
       expect(waitCard().exists()).toBe(false);
     });
 
-    it("休息 N 小時 opens the bounded form and submits nothing until confirmed; Escape returns to the row", async () => {
+    it("等待 N 小時 opens the bounded form and submits nothing until confirmed; Escape returns to the row", async () => {
       await mountWith();
       await openWaitCard();
       await rowsOf(waitCard())[2].trigger("click");

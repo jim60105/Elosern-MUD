@@ -528,6 +528,34 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertNotIn(_PROBE_BUFF, entity_active_buffs(self.ella))
 
     @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    def test_present_forced_sleeper_blocks_gate_entry_with_zero_writes(self):
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        self.assertFalse(self.gate.at_traverse(self.player, self.east_gate))
+        self.assertIs(self.player.location, self.east_gate)
+        self.assertIs(self.ella.location, self.east_gate)
+        self.assertIs(self.kahn.location, self.east_gate)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    def test_present_forced_sleeper_blocks_a_wilderness_step(self):
+        self.gate.at_traverse(self.player, self.east_gate)
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        coordinates = self.player.location.coordinates
+        result = self._exit("east").at_traverse(
+            self.player, self.player.location
+        )
+        self.assertFalse(result)
+        self.assertEqual(self.player.location.coordinates, coordinates)
+        self.assertEqual(self.ella.location.coordinates, coordinates)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
     )

@@ -76,7 +76,7 @@ export const Verbs = {
   args: { ...verbCardArgs(GUILD_HALL, 11), autofocus: true, trapFocus: true },
 };
 
-// The wait menu on the card: 等待直到黎明, 睡眠至完全恢復, 休息 N 小時.
+// The wait menu on the card: 等待直到黎明, 睡眠至完全恢復, 等待 N 小時.
 export const Wait = {
   render,
   args: { ...waitCardArgs(), autofocus: true, trapFocus: true },

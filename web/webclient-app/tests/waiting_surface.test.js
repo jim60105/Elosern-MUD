@@ -72,12 +72,16 @@ describe("waiting surface (the wait card: three operations, hours form)", () => 
     expect(rows().map((row) => row.text().replace(/^\d/, ""))).toEqual([
       "等待直到黎明",
       "睡眠至完全恢復",
-      "休息 N 小時",
+      "等待 N 小時",
       "返回",
     ]);
     expect(waitCard().text()).not.toMatch("午夜");
     expect(waitCard().text()).not.toMatch("正午");
     expect(waitCard().text()).not.toMatch("夢境");
+    // No fourth quiet-rest choice or stance: the custom hours form is a
+    // bounded wait, never an independent rest action.
+    expect(waitCard().text()).not.toMatch("靜養");
+    expect(waitCard().text()).not.toMatch("調息");
     // Exactly one row carries the active-row treatment, and it is the row
     // `aria-activedescendant` names.
     const active = rows().filter((row) => row.attributes("data-active") === "true");

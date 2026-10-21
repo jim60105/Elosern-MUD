@@ -202,6 +202,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(result.elapsed_seconds, 60)
         self.assertFalse(result.voluntary)
 
+    @covers_requirement(
+        "time-skip-commands::rest-duration-parses-an-explicit-duration-and-"
+        "advances-the-clock-by-that-much-capped-at-the-configured-maximum"
+    )
     def test_mixed_wait_differs_per_member_activity(self):
         sleeper = self._companion(0, SleepPosture.FORCED)
         result = advance_wait(self.player, 600)
@@ -254,6 +258,48 @@ class SkipHelperAdvanceTests(EvenniaTest):
             "synthetic_interactive", [event.kind for event in result.events]
         )
 
+    def test_tied_member_boundaries_commit_one_shared_interval(self):
+        first = self._companion(0, SleepPosture.FORCED)
+        second = self._companion(0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        result = advance_wait(self.player, 10000)
+        self.assertEqual(result.elapsed_seconds, 6000)
+        self.assertEqual(get_world_clock().tick - before, 6000)
+        for sleeper in (first, second):
+            self.assertEqual(read_fatigue_state(sleeper).reserve_units, 72000)
+            self.assertIs(
+                read_fatigue_state(sleeper).posture, SleepPosture.AWAKE
+            )
+
+    @covers_requirement(
+        "time-skip-commands::rest-duration-parses-an-explicit-duration-and-"
+        "advances-the-clock-by-that-much-capped-at-the-configured-maximum"
+    )
+    def test_tied_registered_event_and_wake_publish_both_facts(self):
+        previous = _EVENT_SOURCES.get("shop_hours")
+        sleeper = self._companion(0, SleepPosture.FORCED)
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent("synthetic_interactive", end, {})
+            ],
+            next_boundary=lambda start, end: start + 6000,
+        )
+        try:
+            result = advance_wait(self.player, 10000)
+        finally:
+            if previous is None:
+                _EVENT_SOURCES.pop("shop_hours", None)
+            else:
+                _EVENT_SOURCES["shop_hours"] = previous
+        self.assertEqual(result.elapsed_seconds, 6000)
+        self.assertIn(
+            "synthetic_interactive", [event.kind for event in result.events]
+        )
+        self.assertIs(
+            read_fatigue_state(sleeper).posture, SleepPosture.AWAKE
+        )
+
     def test_duplicate_operation_identity_never_replays_time(self):
         before = get_world_clock().tick
         first = advance_wait(self.player, 60, operation_id="synthetic-op-once")
@@ -278,6 +324,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY)
         self.assertEqual(entry.requested_seconds, 0)
 
+    @covers_requirement(
+        "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-"
+        "capped-at-a-configured-maximum"
+    )
     def test_full_gauges_with_half_reserve_continue_for_15000_seconds(self):
         for key in ("hp", "mp", "sp"):
             gauge = getattr(self.player.traits, key)

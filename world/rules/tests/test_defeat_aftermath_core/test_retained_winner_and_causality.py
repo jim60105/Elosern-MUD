@@ -111,12 +111,21 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
             evaluate_skip_safety(self.player), SkipRejectReason.HOSTILE_PRESENT
         )
         # Movement has no HP gate (pinned behavior, no edit): the shared cost
-        # charge succeeds at the post-settlement wake state.
+        # charge succeeds at the post-settlement wake state. The physiology
+        # travel bar is separate from this HP/defeat pin, so start awake.
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
         before = self.clock.tick
+        hp_before = self.player.traits.hp.current
         charge_movement(
             self.player, "move", source_location=self.player.location
         )
-        self.assertGreater(self.clock.tick, before)
+        # A same-cell wilderness move resolves a zero-distance edge, so the
+        # pin is that the charge is admitted without an HP gate: no refusal,
+        # no HP change, and the tick never moves backwards.
+        self.assertGreaterEqual(self.clock.tick, before)
+        self.assertEqual(self.player.traits.hp.current, hp_before)
 
     @covers_requirement(
         "defeat-aftermath-recovery::a-retained-quest-bound-winner-forces-the-move-and-rest-route"

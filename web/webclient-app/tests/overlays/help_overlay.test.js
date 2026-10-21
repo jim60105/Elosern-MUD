@@ -118,7 +118,7 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(rowText("tab-order")).toContain("出口羅盤、在場列、地點卡的「查看房間」、「等待」");
     expect(rowText("tab-order")).toContain("「建議」");
     expect(rowText("place-look")).toContain("重新查看目前所在的房間");
-    expect(rowText("place-wait")).toContain("等待直到黎明、睡眠至完全恢復、休息 N 小時");
+    expect(rowText("place-wait")).toContain("等待直到黎明、睡眠至完全恢復、等待 N 小時");
     expect(rowText("place-wait")).toContain("夢境協作");
     expect(rowText("pill")).toContain("清除建議");
     expect(keys("room-card-keys")).toEqual(["↑", "↓", "1", "9", "Enter"]);
