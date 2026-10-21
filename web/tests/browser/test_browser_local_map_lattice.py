@@ -731,7 +731,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
               const el = document.querySelector(
                 '[data-testid="local-map"] [data-testid="local-map__node--wild:elosern:2699:2699"]'
               );
-              const m = el.getAttribute("transform").match(/-?[\d.]+/g);
+              const m = el.getAttribute("transform").match(/-?[\\d.]+/g);
               return { x: Number(m[0]), y: Number(m[1]) };
             }"""
         )
