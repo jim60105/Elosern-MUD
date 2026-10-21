@@ -142,7 +142,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(release.inner_text().strip(), "解除附身")
         release.click()
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
-        wait_for_store_state(page, lambda s: s["panels"]["status"]["actor"]["identity"] == str(player_id))
+        # The release unpuppets the companion: the client enters its
+        # `detached` phase (panels cleared by the no_puppet protocol error)
+        # until the fresh-epoch snapshot restores the commander. Wait for that
+        # active state and the player's identity instead of reading through a
+        # panel the detached window legitimately omits.
+        wait_for_store_state(
+            page,
+            lambda s: s.get("phase") == "active"
+            and (
+                ((s.get("panels") or {}).get("status") or {}).get("actor", {})
+                .get("identity")
+                == str(player_id)
+            ),
+        )
         self.assertEqual(identities(), expected)
 
     def _select_party_member(self, page, member_id):
