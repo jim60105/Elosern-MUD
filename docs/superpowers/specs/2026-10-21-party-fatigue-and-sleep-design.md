@@ -1,7 +1,7 @@
 # Party Fatigue, Sleep, and Control Design
 
 Date: 2026-10-21
-Status: Approved conversation decisions, recorded for written-spec review; not implemented.
+Status: Approved; OpenSpec proposals created (§16); not implemented.
 Companion design: [World Map Scale](2026-10-21-world-map-scale-design.md).
 
 ## 1. Outcome and architectural authority
@@ -303,3 +303,37 @@ The user selected SP plus a separate long-term reserve over SP-only fatigue or a
 The user selected stationary recovery over carrying sleepers or splitting the party. The user then replaced natural in-battle recovery with terminal-only settlement because the 100-minute minimum sleep would require approximately 1,000 six-second rounds from empty reserve. The final battle model preserves existing timing and avoids that complexity.
 
 Record the two designs as shared context, then obtain written-spec approval before invoking `writing-plans`. Implementation must subsequently follow the repository's OpenSpec workflow and amend affected capabilities together, including party authority, possession, sleep/wait, debuff/cleanse, movement, and combat contracts. No gameplay implementation, migration, new item, or skill is authorized merely by committing these design documents.
+
+## 16. Proposed changes
+
+This design is decomposed into six dependency-ordered OpenSpec changes. Each is sized to about one workday, was validated with `openspec validate <change> --strict`, and records the exact branch and worktree its implementation worker must use. All are committed on the primary branch; none is implemented.
+
+| Change | Commit | Scope | Tasks |
+| --- | --- | --- | ---: |
+| `establish-mental-reserve-core` | `a52ec2a5` | Mental reserve core, exact units and the pure prediction API | 10 |
+| `project-physiological-fatigue` | `8566ac40` | Staged debuff projection, cleanse protection and sleep action prohibition | 11 |
+| `settle-party-sleep-and-wait` | `5ea32830` | Per-member sleep settlement, bounded waits, indivisible actions and stationary party | 15 |
+| `handoff-sleeping-party-control` | `b2b72fd4` | Sleep-driven possession handoff with browser and text parity | 11 |
+| `integrate-sleeping-combat-rosters` | `8829a80a` | Sleeping members present, targetable and observed as unable to act | 11 |
+| `settle-terminal-combat-fatigue` | `85b5f725` | Terminal one-shot fatigue settlement and zero-round all-forced-sleep defeat | 11 |
+
+The implementation worker is **luna** for every change, using `feat/<change-slug>` on branch and `.worktrees/<change-slug>` as worktree.
+
+### 16.1 Cross-batch contract with the map design
+
+`integrate-fatigue-aware-traversal` in the companion batch carries `depends-on: external:party-fatigue-and-sleep`. The integration step replaces that token with **`settle-terminal-combat-fatigue`**, which transitively requires every change in this batch. Replacing the token with any single earlier component would let traversal integrate against a partial physiology contract; the whole batch must be treated as one scheduling barrier. Re-run `openspec validate --all --strict` after the replacement.
+
+## 17. Parallel implementation order
+
+Dependency-correct waves below. This batch supplies the physiology contract that the map batch's traversal change waits on, so the two batches interleave; the combined order is in the companion design. Changes sharing declared code conflicts serialize even inside a wave.
+
+| Wave | Changes | Workers | Basis |
+| --- | --- | ---: | --- |
+| 1 | `establish-mental-reserve-core` | 1 | No prerequisites; new reserve module and entity state are isolated from map work |
+| 2 | `project-physiological-fatigue` | 1 | Needs wave 1 reserve; buff, status-query and party-scope surfaces serialize with later consumers |
+| 3 | `settle-party-sleep-and-wait` | 1 | Needs wave 2 projection plus the map batch's `charge-distance-based-travel`; owns clock, skip, exit and movement edits |
+| 4 | `integrate-sleeping-combat-rosters` | 1 | Needs wave 2 projection only, so it may run beside wave 3 |
+| 5 | `handoff-sleeping-party-control` | 1 | Declares conflicts with the sleep adapters and combat authority landed in waves 3 and 4 |
+| 6 | `settle-terminal-combat-fatigue` | 1 | Needs wave 4 rosters and wave 5 post-commit handoff routing |
+
+Waves 3 and 4 are the batch's only parallelism. Everything after them serializes: handoff depends on both, and terminal settlement closes the physiology contract that `integrate-fatigue-aware-traversal` then consumes.

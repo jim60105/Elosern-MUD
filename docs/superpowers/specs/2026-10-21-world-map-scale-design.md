@@ -1,7 +1,7 @@
 # World Map Scale and Metric Settlement Design
 
 Date: 2026-10-21
-Status: Approved conversation decisions, recorded for written-spec review; not implemented.
+Status: Approved; OpenSpec proposals created (§16); not implemented.
 Companion design: [Party Fatigue and Sleep](2026-10-21-party-fatigue-and-sleep-design.md).
 
 ## 1. Goal and authority
@@ -290,3 +290,49 @@ Historical military daily rates informed the initial investigation, but the user
 ## 15. Delivery boundary
 
 This is a design specification. Implementation requires scoped OpenSpec changes that update the affected current capabilities and their behavior evidence together. Coordinate/rendering cutover and fatigue integration have separate ownership boundaries and must share the units, speed and forced-sleep contract above. Do not ship the meter-coordinate cutover while a consumer still assumes old unit hops. Do not add transport to shorten accepted geographic distances.
+
+## 16. Proposed changes
+
+This design is decomposed into seven dependency-ordered OpenSpec changes. Each is sized to about one workday, was validated with `openspec validate <change> --strict`, and records the exact branch and worktree its implementation worker must use. All are committed on the primary branch; none is implemented.
+
+| Change | Commit | Scope | Tasks |
+| --- | --- | --- | ---: |
+| `establish-continental-geography` | `787f921e` | Frozen mainland polygon, demographics, nine anchor cells, six harbor sites and coordinate-unit contracts | 13 |
+| `implement-sparse-settlement-graphs` | `343239be` | Sparse graph synchronization, route handling and deterministic in-place room identity binding | 13 |
+| `project-metric-local-maps` | `833b40bb` | Expanded coordinate transport and uniform physical viewport projection with pan/zoom | 16 |
+| `charge-distance-based-travel` | `94ee6ae5` | Physical-edge terrain charging, slowest-member speed, diagonal legality and charge-once approaches | 16 |
+| `integrate-fatigue-aware-traversal` | `cf7b3a83` | External fatigue integration, piecewise prediction, pre-destination depletion refusal and atomic rollback | 15 |
+| `rescale-wilderness-geography` | `4e02ed96` | Virtual 2700 by 2700 one-kilometer wilderness, mainland validity, terrain relationships and physical gateways | 15 |
+| `activate-metric-settlements` | `bef9bced` | Exact 31-node coordinate cutover and identity, reference and knowledge consumer convergence | 21 |
+
+The implementation worker is **luna** for every change, using `feat/<change-slug>` on branch and `.worktrees/<change-slug>` as worktree.
+
+### 16.1 Cross-batch dependency on the fatigue design
+
+`integrate-fatigue-aware-traversal` consumes the fatigue API that the companion design owns, so it carries an unresolved token instead of a guessable name:
+
+```text
+depends-on: charge-distance-based-travel
+depends-on: external:party-fatigue-and-sleep
+```
+
+The integration step replaces `external:party-fatigue-and-sleep` with **`settle-terminal-combat-fatigue`**. That change transitively requires every component of the companion batch, so one replacement preserves a full-design scheduling barrier and introduces no dependency cycle. Replace the token in `openspec/changes/integrate-fatigue-aware-traversal/proposal.md` and in every matrix row that quotes it, then re-run `openspec validate --all --strict`. Do not replace it before the companion batch exists, and do not substitute a narrower fatigue change, which would let traversal integrate against a partially landed physiology contract.
+
+## 17. Parallel implementation order
+
+Dependency-correct waves below. A wave may run concurrently only where the changes touch disjoint code surfaces; where two changes declare overlapping files they serialize even inside one wave. With one worker, execute the waves in order.
+
+| Wave | Changes | Workers | Basis |
+| --- | --- | ---: | --- |
+| 1 | `establish-continental-geography`, `implement-sparse-settlement-graphs`, `establish-mental-reserve-core` | 3 | No prerequisites; lore declarations, map/grid storage and the new reserve module are disjoint |
+| 2 | `project-metric-local-maps`, `charge-distance-based-travel`, `project-physiological-fatigue` | 3 | Wave 1 prerequisites satisfied; protocol/client, movement rules and buff projection are disjoint |
+| 3 | `settle-party-sleep-and-wait`, `integrate-sleeping-combat-rosters` | 2 | Clock/skip orchestration and combat roster/AI surfaces are disjoint |
+| 4 | `handoff-sleeping-party-control` | 1 | Declares conflicts with the sleep adapters and combat authority landed in wave 3 |
+| 5 | `settle-terminal-combat-fatigue` | 1 | Needs wave 3 combat rosters and wave 4 handoff post-commit routing |
+| 6 | `integrate-fatigue-aware-traversal` | 1 | Needs the fatigue API (wave 5) plus wave 2 charging; shares clock and movement surfaces with wave 3 |
+| 7 | `rescale-wilderness-geography` | 1 | Needs geography, projection, charging, fatigue traversal and sparse graphs |
+| 8 | `activate-metric-settlements` | 1 | Needs all six preceding map changes |
+
+The critical path runs through `charge-distance-based-travel` to `integrate-fatigue-aware-traversal`, then `rescale-wilderness-geography` and `activate-metric-settlements`. Wave 1 and wave 2 hold the only real parallelism, at three workers; the map batch then serializes because every remaining change declares shared bootstrap, exit, geometry, map-identity or client surfaces.
+
+`activate-metric-settlements` is the last change in both batches' order: it relocates the authored settlement coordinates, so it must not land while any consumer still assumes unit hops or a pre-fatigue traversal contract.
