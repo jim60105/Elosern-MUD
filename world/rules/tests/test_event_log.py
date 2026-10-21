@@ -90,6 +90,9 @@ class EventLogTests(unittest.TestCase):
         log = EventLog("actor", "cast", ("actor",), (entry,), 6)
         self.assertEqual(render_plain_text(log), "actor 的 mp 改變了。")
 
+    @covers_requirement(
+        "event-log::entry-text-is-authored-narration-while-the-payload-keeps-exact-numbers"
+    )
     def test_narration_hides_the_number_and_the_payload_keeps_it(self):
         template = entry_line(
             "damage",
@@ -106,6 +109,9 @@ class EventLogTests(unittest.TestCase):
         self.assertFalse(any(character.isdigit() for character in line), line)
         self.assertEqual(entry.data["amount"], 450698)
 
+    @covers_requirement(
+        "event-log::entry-text-is-authored-narration-while-the-payload-keeps-exact-numbers"
+    )
     def test_rendering_is_a_pure_repeatable_format(self):
         entry = EventEntry(
             "damage",
@@ -126,6 +132,9 @@ class EventLogTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(entry.data, {"amount": 12})
 
+    @covers_requirement(
+        "event-log::internal-only-entry-kinds-keep-rendering-nothing"
+    )
     def test_an_internal_kind_contributes_no_line(self):
         entries = (
             EventEntry("damage", "a", "b", {"amount": 3}, "{target} 退了半步。"),

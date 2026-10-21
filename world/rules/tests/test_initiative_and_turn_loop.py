@@ -80,6 +80,51 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         for call in decay.call_args_list:
             self.assertEqual(call.args[1], 6)
 
+    @covers_requirement(
+        "action-resolution-pipeline::narration-scope-is-supplied-through-the-action-context"
+    )
+    def test_a_round_supplies_a_distinct_scope_for_each_action_slot(self):
+        from types import SimpleNamespace
+        from world.rules.action import ActionRequest
+
+        battlefield = self.battlefield()
+        slow = battlefield.roster["slow"]
+        success = SimpleNamespace(outcome="success", event_log=None, journal=None)
+        scopes: list[str] = []
+
+        def provider(entity, field):
+            if entity.key != "fast":
+                return None
+            return ActionRequest(entity, BASIC_ATTACK_KEY, [slow], None)
+
+        def _capture(request, *, narration_scope=""):
+            scopes.append(narration_scope)
+            return success
+
+        with (
+            patch(
+                "world.rules.combat.rounds.roll_initiative",
+                return_value=["fast", "slow"],
+            ),
+            patch(
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
+                side_effect=lambda entity: (
+                    {"actions_per_turn": 2} if entity.key == "fast" else {}
+                ),
+            ),
+            patch(
+                "world.rules.combat.rounds.ActionResolver.resolve",
+                side_effect=_capture,
+            ),
+            patch("world.rules.combat.rounds.tick_buffs"),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch(
+                "world.rules.combat.rounds.settle_upkeep", return_value=[]
+            ),
+        ):
+            run_round(battlefield, provider)
+        self.assertEqual(scopes, ["|0|0", "|0|1"])
+
     def test_count_of_two_provisions_two_slots_in_order(self):
         battlefield = self.battlefield()
         calls = []

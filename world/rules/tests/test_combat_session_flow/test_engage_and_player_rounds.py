@@ -131,6 +131,37 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
+    @covers_requirement(
+        "action-resolution-pipeline::narration-scope-is-supplied-through-the-action-context"
+    )
+    def test_a_round_supplies_a_stable_narration_scope(self):
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        scopes = []
+        real = ActionResolver.resolve
+
+        def _capture(request, *, narration_scope=""):
+            scopes.append(narration_scope)
+            return real(request, narration_scope=narration_scope)
+
+        with patch(
+            "world.rules.combat.rounds.ActionResolver.resolve",
+            side_effect=_capture,
+        ), patch(
+            "world.rules.combat.battlefield.roll_d100", return_value=100
+        ), patch(
+            "world.rules.combat.damage.roll_d100", return_value=100
+        ), patch(
+            "world.rules.combat.rounds.roll_d100", return_value=100
+        ):
+            submit_player_action(self.player, _T_CAST, [self.monster])
+        self.assertGreaterEqual(len(scopes), 2)
+        # One action slot per combatant in this round: every scope derives from
+        # the same session identity and round index, so it is stable.
+        self.assertEqual(len(set(scopes)), 1, scopes)
+        for scope in scopes:
+            self.assertTrue(scope.startswith(f"{session_id}|"), scope)
+
     def test_mid_round_invalidation_consumes_round(self):
         engage(self.player, self.monster)
         record = read_session(self.player)

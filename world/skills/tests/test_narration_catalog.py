@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.skills.narration import (
     COMPACT_POOLS,
     DAMAGE_BAND_LINES,
@@ -78,6 +80,9 @@ class BandTableTests(unittest.TestCase):
 
 
 class PoolInventoryTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
     def test_every_non_internal_kind_has_a_pool_and_a_compact_fallback(self):
         for kind in NARRATION_KINDS:
             if kind in INTERNAL_KINDS:
@@ -136,6 +141,9 @@ class LookupChainTests(unittest.TestCase):
         )
         self.assertEqual(line, "家族 {target}。")
 
+    @covers_requirement(
+        "action-narration::narration-resolution-degrades-instead-of-rejecting-an-action"
+    )
     def test_a_missing_family_and_row_degrades_to_the_kind_pool(self):
         line = entry_line(
             "damage",
@@ -164,6 +172,9 @@ class LookupChainTests(unittest.TestCase):
         )
         self.assertEqual(line, "{target} 的傷勢浮現。")
 
+    @covers_requirement(
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit"
+    )
     def test_an_over_long_name_degrades_to_the_compact_fallback(self):
         long_name = "名" * 300
         row = _row("t_long", lines=("{target} 的傷勢浮現得很清楚。",))
@@ -179,6 +190,9 @@ class LookupChainTests(unittest.TestCase):
         )
         self.assertEqual(line, COMPACT_POOLS["damage"])
 
+    @covers_requirement(
+        "action-narration::narration-resolution-degrades-instead-of-rejecting-an-action"
+    )
     def test_an_unknown_skill_still_renders_the_generic_action(self):
         lines = action_lines("t_only_synthetic", None, catalog={}, families={})
         self.assertTrue(lines)
@@ -238,15 +252,24 @@ class CatalogValidationTests(unittest.TestCase):
         defaults.update(kwargs)
         validate_catalog(**defaults)
 
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_duplicate_key_is_rejected(self):
         row = _row("t_dup")
         with self.assertRaises(NarrationCatalogError):
             build_catalog([row, row])
 
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_unknown_key_is_rejected(self):
         with self.assertRaises(NarrationCatalogError):
             self._validate(catalog={"t_unknown": _row("t_unknown")})
 
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_missing_row_outside_pending_families_is_rejected(self):
         skill = _skill("t_needed", category=SkillCategory.MARTIAL_ARTS)
         with self.assertRaises(NarrationCatalogError):
@@ -260,6 +283,9 @@ class CatalogValidationTests(unittest.TestCase):
         skill = _skill("t_needed", category=SkillCategory.MARTIAL_ARTS)
         self._validate(catalog={}, shipped={"t_needed": skill})
 
+    @covers_requirement(
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+    )
     def test_an_over_bound_row_is_rejected(self):
         with self.assertRaises(NarrationCatalogError):
             self._validate(
@@ -271,6 +297,9 @@ class CatalogValidationTests(unittest.TestCase):
                 }
             )
 
+    @covers_requirement(
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+    )
     def test_a_slot_over_budget_row_is_rejected(self):
         with self.assertRaises(NarrationCatalogError):
             self._validate(
@@ -290,6 +319,9 @@ class CatalogValidationTests(unittest.TestCase):
                 }
             )
 
+    @covers_requirement(
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+    )
     def test_an_impossible_composed_pair_is_rejected(self):
         with self.assertRaises(NarrationCatalogError):
             self._validate(
@@ -303,6 +335,9 @@ class CatalogValidationTests(unittest.TestCase):
 
 
 class CompositionBudgetTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+    )
     def test_named_lines_are_inside_the_authoring_bound(self):
         for row in FAMILY_ROWS.values():
             for line in row.action:

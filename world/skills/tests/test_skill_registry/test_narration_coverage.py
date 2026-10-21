@@ -8,6 +8,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 import world.skills.sexual_acts  # noqa: F401  (registers the act rows)
 from world.skills.narration import (
     FAMILY_ROWS,
@@ -25,6 +27,9 @@ from world.skills.registry import (
 
 
 class NarrationCoverageContractTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_the_shipped_catalog_validates_at_import(self):
         validate_catalog(NARRATION_CATALOG)
         self.assertEqual(
@@ -61,6 +66,9 @@ class NarrationCoverageContractTests(unittest.TestCase):
             with self.subTest(key=skill.key):
                 self.assertTrue(FAMILY_ROWS[family_key(skill)].action)
 
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_a_synthetic_registry_scope_never_trips_validation(self):
         # The catalog validates against the shipped snapshot, never the live
         # binding a synthetic kit scope substitutes for the duration of a test.

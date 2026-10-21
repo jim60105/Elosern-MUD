@@ -6,6 +6,7 @@ import unittest
 
 from world.rules.event_log import EventEntry, EventLog, render_plain_text
 from world.rules.overwhelm import compress_event_logs
+from world.skills.narration import OVERWHELM_SUMMARY_LINE
 
 from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 
@@ -122,6 +123,9 @@ class CompressionTests(unittest.TestCase):
         )
 
     @covers_requirement("event-log-compression::a-compressed-eventlog-renders-through-render-plain-text-with-no-llm-involvement")
+    @covers_requirement(
+        "action-narration::structural-combat-prose-is-authored-once-and-stays-stable"
+    )
     def test_damage_attribution_and_rendering_are_preserved(self):
         damage_one = entry("damage", amount=10)
         damage_two = entry("damage", amount=15)
@@ -149,8 +153,7 @@ class CompressionTests(unittest.TestCase):
         )
         self.assertNotIn("壓制了", rendered)
         self.assertEqual(
-            render_plain_text(result[0]),
-            render_plain_text(result[0]),
+            result[0].entries[0].text_template, OVERWHELM_SUMMARY_LINE
         )
 
 

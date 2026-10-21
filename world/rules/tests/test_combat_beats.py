@@ -411,6 +411,10 @@ class CombatBeatsBuilderTests(unittest.TestCase):
         self.assertIn("damage", BEAT_KINDS)
         self.assertIn("other", BEAT_KINDS)
 
+    @covers_requirement(
+        "webclient-combat-beats::authored-narration-cannot-make-a-round-s-beats-unavailable",
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit",
+    )
     def test_an_over_long_participant_key_degrades_and_keeps_the_panel(self):
         long_key = "名" * 300
         template = entry_line(

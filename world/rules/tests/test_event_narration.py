@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+
+from tools.spec_traceability import covers_requirement
 
 from world.skills.narration import (
     COMPACT_POOLS,
@@ -39,6 +42,9 @@ class SeedSelectionTests(unittest.TestCase):
             "||roll|0||",
         )
 
+    @covers_requirement(
+        "action-narration::variant-selection-is-deterministic-and-consumes-no-gameplay-randomness"
+    )
     def test_variant_index_is_stable_across_process_state(self):
         first = variant_index("scope|skill|damage|1|target|solid", 3)
         second = variant_index("scope|skill|damage|1|target|solid", 3)
@@ -47,6 +53,9 @@ class SeedSelectionTests(unittest.TestCase):
         self.assertLess(first, 3)
         self.assertEqual(variant_index("anything", 0), 0)
 
+    @covers_requirement(
+        "action-narration::variant-selection-is-deterministic-and-consumes-no-gameplay-randomness"
+    )
     def test_the_same_inputs_select_the_same_line(self):
         first = entry_line(
             "damage",
@@ -72,6 +81,9 @@ class SeedSelectionTests(unittest.TestCase):
         )
         self.assertEqual(first, second)
 
+    @covers_requirement(
+        "action-narration::variant-selection-is-deterministic-and-consumes-no-gameplay-randomness"
+    )
     def test_a_different_scope_can_select_a_different_variant(self):
         lines = {
             entry_line(
@@ -124,6 +136,9 @@ class NumberlessProseTests(unittest.TestCase):
             "gauge_transfer": {"gauge": "mp", "direction": "drain", "amount": 9},
         }.get(kind, {})
 
+    @covers_requirement(
+        "action-narration::narration-prose-contains-no-numeric-magnitude"
+    )
     def test_every_kind_renders_without_a_digit(self):
         for kind in NARRATION_KINDS:
             with self.subTest(kind=kind):
@@ -144,6 +159,9 @@ class NumberlessProseTests(unittest.TestCase):
                 )
                 self.assertNotIn("{data", template)
 
+    @covers_requirement(
+        "action-narration::narration-prose-contains-no-numeric-magnitude"
+    )
     def test_a_miss_still_reads_as_a_miss(self):
         hit = entry_line(
             "roll",
@@ -163,6 +181,9 @@ class NumberlessProseTests(unittest.TestCase):
         for template in (hit, miss):
             self.assertNotIn("92", template)
 
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
     def test_a_resisted_act_reads_as_a_refusal(self):
         template = entry_line(
             "sexual_resist",
@@ -174,6 +195,9 @@ class NumberlessProseTests(unittest.TestCase):
         )
         self.assertIn("拒絕", template.format(actor="hero", target="target"))
 
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
     def test_a_complied_act_does_not_read_as_a_refusal(self):
         template = entry_line(
             "sexual_resist",
@@ -185,8 +209,103 @@ class NumberlessProseTests(unittest.TestCase):
         )
         self.assertNotIn("別過臉", template)
 
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_the_casters_pleasure_line_differs_from_the_targets(self):
+        caster = entry_line(
+            "pleasure_gain",
+            {"amount": 40},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+        )
+        target = entry_line(
+            "pleasure_gain",
+            {"amount": 40},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+        )
+        self.assertIn("{actor}", caster)
+        self.assertNotIn("{actor}", target)
+        self.assertIn("{target}", target)
+        self.assertNotEqual(caster, target)
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_the_counter_clause_reflects_who_records_it(self):
+        shared_act = SimpleNamespace(
+            participant_counters=frozenset({"duo_act_count"})
+        )
+        actor_act = SimpleNamespace(participant_counters=frozenset())
+        shared = entry_line(
+            "sexual_counter",
+            {"counter": "duo_act_count"},
+            act=shared_act,
+            actor="hero",
+            target="hero",
+        )
+        actor_only = entry_line(
+            "sexual_counter",
+            {"counter": "duo_act_count"},
+            act=actor_act,
+            actor="hero",
+            target="hero",
+        )
+        self.assertIn("{target}", shared)
+        self.assertIn("{actor}", actor_only)
+        self.assertNotEqual(shared, actor_only)
+
+
+class MechanicalNarrationTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
+    def test_two_mechanical_kinds_never_read_alike(self):
+        resource = entry_line(
+            "resource_spend",
+            {"amount": 30, "resource_key": "mp"},
+            skill_key="t",
+            actor="hero",
+        )
+        practice = entry_line(
+            "skill_practice",
+            {"amount": 1},
+            skill_key="t",
+            actor="hero",
+        )
+        self.assertNotEqual(resource, practice)
+        for legacy in ("消耗了資源", "提升了", "{data"):
+            self.assertNotIn(legacy, resource)
+            self.assertNotIn(legacy, practice)
+
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
+    def test_repeated_casts_can_vary_a_mechanical_line(self):
+        lines = {
+            entry_line(
+                "resource_spend",
+                {"amount": 30, "resource_key": "mp"},
+                skill_key="t",
+                scope=f"scope-{index}",
+                actor="hero",
+            )
+            for index in range(30)
+        }
+        self.assertGreater(len(lines), 1)
+
 
 class CompositionTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+    )
     def test_the_action_clause_opens_the_first_line(self):
         template = compose_first_line(
             "t_missing",
@@ -203,6 +322,9 @@ class CompositionTests(unittest.TestCase):
         self.assertTrue(rendered.endswith("{target} 的傷勢浮現。".format(target="goblin")))
         self.assertGreater(len(rendered), len("goblin 的傷勢浮現。"))
 
+    @covers_requirement(
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit"
+    )
     def test_an_over_long_name_degrades_to_the_compact_line(self):
         long_name = "名" * 300
         template = compose_first_line(
@@ -247,6 +369,9 @@ class CompositionTests(unittest.TestCase):
             "{actor} 精確出手——",
         )
 
+    @covers_requirement(
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit"
+    )
     def test_an_over_long_actor_degrades_the_action_and_marker(self):
         long_actor = "名" * 300
         self.assertEqual(
@@ -264,6 +389,9 @@ class CompositionTests(unittest.TestCase):
             COMPACT_POOLS["commanded_action"],
         )
 
+    @covers_requirement(
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit"
+    )
     def test_the_exact_tier_yields_to_a_fitting_family_tier(self):
         oversized = NarrationRow(
             "t_exact",
@@ -330,6 +458,9 @@ class CompositionTests(unittest.TestCase):
 
 
 class StructuralProseTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::structural-combat-prose-is-authored-once-and-stays-stable"
+    )
     def test_structural_lines_are_single_numberless_lines(self):
         self.assertFalse(any(ch.isdigit() for ch in CONTINUE_MESSAGE))
         for outcome in ("victory", "defeat", "fled", "exam_passed", "exam_failed", "cap"):
@@ -340,6 +471,9 @@ class StructuralProseTests(unittest.TestCase):
         for escaped in (True, False):
             self.assertFalse(any(ch.isdigit() for ch in party_retreat_line(escaped)))
 
+    @covers_requirement(
+        "action-narration::structural-combat-prose-is-authored-once-and-stays-stable"
+    )
     def test_the_engagement_opening_names_the_foe(self):
         self.assertEqual(
             engagement_opening_line("哥布林"),
@@ -352,6 +486,9 @@ class StructuralProseTests(unittest.TestCase):
             self.assertNotIn("{data", template)
             self.assertFalse(any(ch.isdigit() for ch in template))
 
+    @covers_requirement(
+        "action-narration::the-built-line-degrades-to-its-compact-fallback-when-names-do-not-fit"
+    )
     def test_compact_fallbacks_are_participant_free(self):
         for kind, line in COMPACT_POOLS.items():
             with self.subTest(kind=kind):
