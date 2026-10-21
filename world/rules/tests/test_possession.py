@@ -26,6 +26,7 @@ from world.rules.party import (
     party_ids,
 )
 from world.rules.clock import get_world_clock
+from world.rules.buffs import apply_buff
 from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
 from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
@@ -657,6 +658,27 @@ class SleepHandoffTests(EvenniaTest):
         write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
         second = sleep_handoff_candidates(self.account, self.player, sleeper)
         self.assertNotEqual(first.transition_id, second.transition_id)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    def test_action_locked_candidate_is_not_lawful(self):
+        sleeper, _entry = self._sleeping_possession()
+        candidate = self._companion("麻痺者")
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertIn(int(candidate.pk), [item.dbid for item in options.candidates])
+        apply_buff(candidate, "paralysis")
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertNotIn(int(candidate.pk), [item.dbid for item in options.candidates])
+        with self.assertRaises(PossessionGateError) as ctx:
+            confirm_sleep_handoff(
+                self.account,
+                self.player,
+                sleeper,
+                int(candidate.pk),
+                transition_id=options.transition_id,
+            )
+        self.assertEqual(ctx.exception.reason, REASON_STALE_HANDOFF)
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
