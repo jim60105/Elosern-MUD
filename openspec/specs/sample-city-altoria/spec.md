@@ -7,31 +7,29 @@ plaza and one authored bridging exit to non-grid space.
 ## Requirements
 
 ### Requirement: The sample city has exactly thirteen rooms in a fixed, connected topology
-`world/maps/altoria_capital.py` SHALL declare `XYMAP_DATA` for `zcoord="capital_altoria"` describing
-exactly twenty-one rooms at the coordinates: `(3,0)`, `(1,1)`, `(2,1)`, `(3,1)`, `(4,1)`, `(5,1)`,
-`(2,2)`, `(3,2)`, `(1,3)`, `(2,3)`, `(3,3)`, `(4,3)`, `(5,3)`, `(6,3)`, `(2,4)`, `(3,4)`, `(4,4)`,
-`(3,5)`, `(4,5)`, `(5,5)`, `(4,6)`, connected by exactly twenty-six links such that every room is
+`world/maps/altoria_capital.py` SHALL declare the sparse map declaration for `zcoord="capital_altoria"` describing
+exactly twenty-one rooms on the approved metric coordinates and exactly twenty-six links such that every room is
 reachable from every other room.
 
 #### Scenario: The map parses to exactly thirteen nodes
 <!-- Scenario name retained verbatim; the count it asserts is the one in the text above. -->
-- **WHEN** `world/maps/altoria_capital.py`'s `XYMAP_DATA["map"]` string is parsed with
-  `evennia.contrib.grid.xyzgrid.xymap.XYMap.parse()`
-- **THEN** exactly twenty-one nodes exist, at exactly the coordinates listed above
+- **WHEN** `world/maps/altoria_capital.py`'s sparse node/road declaration is parsed with
+  the sparse graph validator
+- **THEN** exactly twenty-one nodes exist, at exactly the coordinates `(3050, 150)`, `(1250, 760)`, `(2150, 920)`, `(3140, 1050)`, `(3970, 1120)`, `(4830, 970)`, `(2350, 1900)`, `(3350, 1980)`, `(1300, 2600)`, `(2420, 2700)`, `(3500, 2850)`, `(4380, 3000)`, `(5380, 2850)`, `(6500, 3010)`, `(2300, 3820)`, `(3480, 3700)`, `(4560, 3920)`, `(3500, 4850)`, `(4690, 5010)`, `(5650, 5200)`, `(4500, 6350)`
 
 #### Scenario: Every room is reachable from every other room
-- **WHEN** `XYMap.calculate_path_matrix()` is run against the parsed map
+- **WHEN** sparse shortest-path calculation is run against the validated sparse graph
 - **THEN** a shortest path exists between every pair of the twenty-one coordinates
 
 #### Scenario: The topology has no cycle
 <!-- Scenario name retained verbatim: the contract inverted, and a MODIFIED block may not rename
      a scenario. The body states the current rule. -->
-- **WHEN** the twenty-six links in the parsed map are inspected
+- **WHEN** the twenty-six links in the validated sparse graph are inspected
 - **THEN** they connect the twenty-one nodes with exactly twenty-six edges, six more than a tree
   would need, and at least one pair of rooms has two distinct routes between them
 
 #### Scenario: The map declares bounded visual-range options
-- **WHEN** `world/maps/altoria_capital.py`'s `XYMAP_DATA` is inspected
+- **WHEN** `world/maps/altoria_capital.py`'s the sparse map declaration is inspected
 - **THEN** its `options` contains a `map_visual_range` positive integer of at most 8 and a `map_mode`
   equal to `nodes` or `scan`, and parsing the map still yields exactly twenty-one nodes and
   twenty-six links
@@ -82,12 +80,12 @@ reachable from every other room.
   capability
 
 ### Requirement: Exactly one room is the AnchorRoom, at the central plaza
-Of the twenty-one rooms, exactly one, at coordinate `(3,3)`, SHALL spawn as an `AnchorRoom` with
+Of the twenty-one rooms, exactly one, at coordinate `(3500, 2850)`, SHALL spawn as an `AnchorRoom` with
 `anchor_key="capital_altoria"`. The remaining twenty SHALL spawn as plain `GridRoom`.
 
 #### Scenario: Only the plaza is an AnchorRoom
 - **WHEN** all twenty-one spawned rooms are inspected by typeclass
-- **THEN** exactly one, at `(3,3)`, is an `AnchorRoom` instance, and the others are `GridRoom`
+- **THEN** exactly one, at `(3500, 2850)`, is an `AnchorRoom` instance, and the others are `GridRoom`
   instances that are not `AnchorRoom` instances
 
 ### Requirement: The sample city's xyzgrid remains thirteen exterior nodes while permanent service interiors are attached
@@ -98,7 +96,7 @@ that place's declared exterior. The number and identity of those interiors SHALL
 rather than being fixed by this requirement.
 
 #### Scenario: Grid topology is unchanged
-- **WHEN** `XYMAP_DATA` is parsed after guild economy lands
+- **WHEN** the sparse map declaration is parsed after guild economy lands
 - **THEN** it still contains exactly the twenty-one grid nodes and twenty-six links
 
 #### Scenario: Both interiors are reachable and permanent
@@ -113,7 +111,7 @@ rather than being fixed by this requirement.
 
 #### Scenario: Adding a trading place needs no map edit
 - **WHEN** a place is declared against an exterior that already exists in the grid
-- **THEN** its interior and doorways appear after synchronization with no change to `XYMAP_DATA`
+- **THEN** its interior and doorways appear after synchronization with no change to the sparse map declaration
 
 #### Scenario: Specialist shops do not narrow what the capital sells
 - **WHEN** offers across capital places are resolved
@@ -163,16 +161,16 @@ rather than being fixed by this requirement.
   by interior attachment
 
 ### Requirement: The sample city connects to the rest of the world through exactly one bridging exit
-The South Gate room, at `(3,0)`, SHALL be the sample city's sole connection point to non-grid space,
+The South Gate room, at `(3050, 150)`, SHALL be the sample city's sole connection point to non-grid space,
 reached via the single forward bridging `Exit` from Limbo described by the `grid-room-sync`
 capability — exactly one forward bridging exit per `CITY_GATE_REGISTRY` row, of which
-`capital_altoria` is one. The East Gate room, at `(6,3)`, SHALL carry the capital's
+`capital_altoria` is one. The East Gate room, at `(6500, 3010)`, SHALL carry the capital's
 second wilderness gate and SHALL NOT be a dead end.
 
 #### Scenario: The South Gate is the only room reachable from Limbo
 - **WHEN** Limbo's exits are inspected after `sync_grid()` runs
 - **THEN** they are exactly the registry's forward gate exits — one per `CITY_GATE_REGISTRY` row —
-  and the `capital_altoria` row's exit leads into that map, at `(3,0)`
+  and the `capital_altoria` row's exit leads into that map, at `(3050, 150)`
 
 #### Scenario: No city room leads back to Limbo
 - **WHEN** every exit of every spawned `capital_altoria` room is inspected after `sync_grid()` runs
@@ -216,7 +214,7 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 
 #### Scenario: A successful traversal of an intra-city exit advances the clock
 - **WHEN** a `PlayerCharacter` successfully traverses any of the sample city's intra-city exits
-- **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`
+- **THEN** `get_world_clock().tick` increases by exactly the resolved physical edge duration
 
 #### Scenario: The requirement name's "twelve" is stale and the text is current
 <!-- Name-note moved out of the description unchanged in substance. -->
@@ -275,3 +273,40 @@ preserving any existing attribute value.
 - **WHEN** `sync_guild_economy` creates the guild-master host or the merchant host for their
   service components
 - **THEN** both NPCs have integer `age` and `apparent_age` reflecting their authored profile canonical ages
+
+### Requirement: Altoria uses approved metric outdoor positions
+Altoria SHALL use the following integer-meter node positions in its local logical layer, retaining 21 nodes, 26 undirected roads, six independent cycles and both diagonal shortcuts. Initial roads SHALL be straight; every existing compass octant and interior attachment SHALL persist.
+
+#### Scenario: Exact metric positions
+- **WHEN** the authored city is synchronized
+- **THEN** its old-to-new coordinate bindings equal this table with no collisions.
+
+| Location | Old local coordinate | New local coordinate, meters |
+| --- | --- | --- |
+| 南門 | (3, 0) | (3050, 150) |
+| 碼頭埠 | (1, 1) | (1250, 760) |
+| 河岸道 | (2, 1) | (2150, 920) |
+| 南大道 | (3, 1) | (3140, 1050) |
+| 客棧巷 | (4, 1) | (3970, 1120) |
+| 浴場前 | (5, 1) | (4830, 970) |
+| 舊城牆遺跡 | (2, 2) | (2350, 1900) |
+| 大道北段 | (3, 2) | (3350, 1980) |
+| 工匠巷 | (1, 3) | (1300, 2600) |
+| 市場街 | (2, 3) | (2420, 2700) |
+| 中央廣場 | (3, 3) | (3500, 2850) |
+| 公會前 | (4, 3) | (4380, 3000) |
+| 東市 | (5, 3) | (5380, 2850) |
+| 東門 | (6, 3) | (6500, 3010) |
+| 校場外 | (2, 4) | (2300, 3820) |
+| 聖階 | (3, 4) | (3480, 3700) |
+| 大神殿前 | (4, 4) | (4560, 3920) |
+| 貴族區前 | (3, 5) | (3500, 4850) |
+| 上城門 | (4, 5) | (4690, 5010) |
+| 學院前 | (5, 5) | (5650, 5200) |
+| 王宮前庭 | (4, 6) | (4500, 6350) |
+
+
+
+#### Scenario: Physical city interpretation
+- **WHEN** settlement and routes are inspected
+- **THEN** built-up area targets approximately 40km² for 600000 residents across roughly 7km; riverfront lower city, market belt and three northern terraces persist; healthy south-gate-to-plaza and palace routes are approximately 37 and 94 minutes, with no claim all housing is authored.

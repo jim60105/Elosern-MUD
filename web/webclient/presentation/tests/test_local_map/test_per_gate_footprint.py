@@ -55,7 +55,7 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
             if not node["id"].startswith("wild:elosern:"):
                 continue
             _, _, x, y = node["id"].split(":")
-            if int(x) in self.FOOTPRINT_X and int(y) in self.FOOTPRINT_Y:
+            if (int(x), int(y)) in self._CELLS:
                 ids.add(node["id"])
         return ids
 
@@ -80,12 +80,13 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         # north of it.
         ex, ey = EAST_APPROACH
         sx, sy = SOUTH_APPROACH
-        fy = max(self.FOOTPRINT_Y)
+        minx, maxx = min(self.FOOTPRINT_X), max(self.FOOTPRINT_X)
+        miny, maxy = min(self.FOOTPRINT_Y), max(self.FOOTPRINT_Y)
         vantages = [
-            ((ex - 6, sy + 3), "e"),  # west vantage -> footprint edge
-            ((ex, ey + 1), "w"),      # north of the east approach -> footprint
-            ((sx - 1, sy), "n"),      # south vantage -> footprint edge
-            ((sx - 1, fy + 1), "s"),  # north vantage -> footprint edge
+            ((minx - 1, sy + 3), "e"),  # west of the mask -> footprint face
+            ((maxx + 1, sy), "w"),      # east of the mask -> footprint face
+            ((minx, miny - 1), "n"),    # south of the mask -> footprint face
+            ((minx + 2, maxy + 1), "s"),  # north of the mask -> footprint face
         ]
         for coordinates, blocked in vantages:
             with self.subTest(vantage=coordinates, direction=blocked):

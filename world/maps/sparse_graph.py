@@ -457,9 +457,76 @@ class SparseSettlementGraph:
             return ()
         return self.plan(start.node_id, end.node_id)
 
+    def display_projection(self) -> "SparseDisplayMap":
+        """Return the read-only map projection the display adapters consume.
+
+        The xyzgrid contrib's ``XYMap`` is an ASCII surface and cannot carry
+        meter coordinates (a meter lattice would allocate millions of cells).
+        This projection exposes the same duck-typed surface the local-map
+        adapter reads -- ``Z``, ``options``, ``node_index_map``,
+        ``get_node_from_coord`` and ``max_X``/``max_Y`` -- from the declared
+        graph. It is a derived read view, never a second authority: it is
+        rebuilt from the graph and cannot be written.
+        """
+
+        return SparseDisplayMap(self)
+
     @property
     def max_route_length(self) -> float:  # pragma: no cover - diagnostic helper
         return sum(edge.length for edge in self.edges)
+
+
+class SparseDisplayNode:
+    """One node of the read-only display projection.
+
+    Field names mirror the xyzgrid contrib's ``MapNode`` surface the local-map
+    adapter already consumes (``X``, ``Y``, ``node_index``, ``links``); the
+    ``anchor`` fact is the sparse graph's own authored anchor declaration.
+    """
+
+    __slots__ = ("node_id", "X", "Y", "node_index", "links", "anchor")
+
+    def __init__(self, node: SparseNode, node_index: int, anchor: bool) -> None:
+        self.node_id = node.node_id
+        self.X = node.x
+        self.Y = node.y
+        self.node_index = node_index
+        self.links: dict[str, "SparseDisplayNode"] = {}
+        self.anchor = anchor
+
+
+class SparseDisplayMap:
+    """The read-only display surface of one sparse settlement graph."""
+
+    __slots__ = ("Z", "options", "node_index_map", "max_X", "max_Y", "_by_coord")
+
+    def __init__(self, graph: SparseSettlementGraph) -> None:
+        ordered = sorted(graph.nodes.values(), key=lambda node: (node.y, node.x))
+        nodes = {
+            node.node_id: SparseDisplayNode(node, index, node.is_anchor)
+            for index, node in enumerate(ordered)
+        }
+        for edge in graph.edges:
+            source = nodes[edge.source.node_id]
+            source.links[edge.direction] = nodes[edge.destination.node_id]
+        self.Z = graph.map_id
+        self.options = graph.options
+        ordered_nodes = [nodes[node.node_id] for node in ordered]
+        self.node_index_map = MappingProxyType(dict(enumerate(ordered_nodes)))
+        self.max_X = graph.max_x
+        self.max_Y = graph.max_y
+        self._by_coord = MappingProxyType(
+            {(node.X, node.Y): node for node in self.node_index_map.values()}
+        )
+
+    def get_node_from_coord(self, coord: tuple[int, int]) -> SparseDisplayNode | None:
+        """Return the projection node at ``coord``, or ``None``."""
+
+        try:
+            key = (int(coord[0]), int(coord[1]))
+        except (TypeError, ValueError, IndexError):
+            return None
+        return self._by_coord.get(key)
 
 
 def build_sparse_graph(
@@ -537,12 +604,21 @@ def build_sparse_graph(
         if isinstance(entry, SparseRoad):
             road_objects.append(entry)
         else:
-            source_id, destination_id = entry
+            # A road may author its compass octant explicitly. Metre
+            # coordinates of an irregular layout are almost never axis-aligned,
+            # so geometry sign alone would turn every cardinal street into a
+            # diagonal; the declared octant is the authored exit direction.
+            if len(entry) == 3:
+                source_id, destination_id, direction = entry
+            else:
+                source_id, destination_id = entry
+                direction = None
             road_objects.append(
                 SparseRoad(
                     road_id=f"{source_id}>{destination_id}",
                     source_id=source_id,
                     destination_id=destination_id,
+                    direction_hint=direction,
                 )
             )
     return SparseSettlementGraph(

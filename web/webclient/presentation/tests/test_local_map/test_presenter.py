@@ -288,16 +288,11 @@ class LocalMapPresenterTests(EvenniaTestCase):
         # topology). The set is derived from the SAME source the presenter
         # reads, but membership is what the test guards -- a node id with no
         # registered origin must never be fabricated into the payload.
-        from evennia.contrib.grid.xyzgrid.xymap import XYMap
-        from world.maps.map_data import XYMAP_DATA_LIST
+        from world.maps.map_data import settlement_graph
 
-        capital_map = next(
-            data for data in XYMAP_DATA_LIST if data["zcoord"] == _T_MAP_KEY
-        )
-        parsed = XYMap(dict(capital_map), Z=_T_MAP_KEY, xyzgrid=None)
-        parsed.parse()
+        capital_map = settlement_graph(_T_MAP_KEY)
         valid = {
-            _t_grid_id(node.X, node.Y) for node in parsed.node_index_map.values()
+            _t_grid_id(node.x, node.y) for node in capital_map.nodes.values()
         }
         valid |= {_t_wild_id(*EAST_APPROACH), _t_wild_id(*SOUTH_APPROACH)}
         for node in payload["nodes"]:
@@ -310,8 +305,10 @@ class LocalMapPresenterTests(EvenniaTestCase):
         record_arrival(actor)
         # Move away and deep into the city so a remembered grid node forms.
         from typeclasses.rooms import GridRoom as _Grid
+        from world.maps.map_data import SETTLEMENT_GRAPHS
 
-        north = _Grid.objects.filter_xyz(xyz=(2, 3, _T_MAP_KEY)).first()
+        market = SETTLEMENT_GRAPHS[_T_MAP_KEY].node("market_street").coordinate
+        north = _Grid.objects.filter_xyz(xyz=(*market, _T_MAP_KEY)).first()
         actor.location = north
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))

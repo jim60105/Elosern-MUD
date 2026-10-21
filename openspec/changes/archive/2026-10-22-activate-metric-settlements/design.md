@@ -14,6 +14,8 @@ Outdoor node positions are exact; approximate city/village areas describe built-
 
 Prefer stable sparse authored identity and explicit physical segments to dense meter ASCII or uniform coordinate multiplication. Distances use local-to-world anchor transforms; z remains logical. Snapshot intended source-present travellers once and reuse that scope before relocation, cost, followers and compensation. Refusals occur before writes. Runtime activations depend on projection, cost and external physiology integration; declarations/support can land earlier without exposing a mixed-unit runtime.
 
+**Road octants are authored, not derived (implementation decision).** The approved metre layout intentionally offsets every node on both axes, so the raw sign of the metre delta would label every cardinal street as a diagonal and destroy the two authored shortcuts. `ROADS` therefore carries `(source identity, destination identity, compass octant)`; `build_sparse_graph()` feeds the third field into `SparseRoad.direction_hint`, and geometry supplies only the length. The octants were verified against the pre-cutover logical layout for all 35 undirected roads, so every existing compass exit — including 工匠巷↔校場外 `ne/sw` and 大神殿前↔東市 `se/nw` — survives unchanged.
+
 ## Risks / Trade-offs
 
 - Shared bootstrap/exit consumers can retain old assumptions. Mitigation: enumerate consumers in tasks and execute end-to-end owning tests before handoff.

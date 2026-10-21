@@ -14,16 +14,19 @@ from server.conf.at_server_startstop import at_server_start
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.maps.altoria_capital import XYMAP_DATA
 from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
+from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
-SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
-EAST_GATE_XYZ = (6, 3, "capital_altoria")
+_CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+SOUTH_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("n").grid_xy, "capital_altoria")
+EAST_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("w").grid_xy, "capital_altoria")
 
 
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -116,14 +119,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         # equals its authored prototype), not the sentence — the prototype's
         # prose is Traditional Chinese like every other shipped room text.
         from world.maps.altoria_capital import PROTOTYPES
+        from world.maps.map_data import SETTLEMENT_GRAPHS
 
+        south_gate_coordinate = SETTLEMENT_GRAPHS["capital_altoria"].node(
+            "south_gate"
+        ).coordinate
         self.assertEqual(
-            south_gate.db.desc, PROTOTYPES[(3, 0)]["desc"]
+            south_gate.db.desc, PROTOTYPES[south_gate_coordinate]["desc"]
         )
 
         from dataclasses import replace
 
-        from world.maps.map_data import SETTLEMENT_GRAPHS
         from world.maps.sparse_graph import SparseSettlementGraph
 
         capital = SETTLEMENT_GRAPHS["capital_altoria"]
@@ -221,7 +227,15 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         exits = list(east_gate.exits)
         self.assertEqual(len(exits), 1)
-        self.assertEqual(exits[0].destination.xyz, (5, 3, "capital_altoria"))
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        self.assertEqual(
+            exits[0].destination.xyz,
+            (
+                *SETTLEMENT_GRAPHS["capital_altoria"].node("east_market").coordinate,
+                "capital_altoria",
+            ),
+        )
 
     def test_absent_limbo_degrades_without_raising(self):
         sync_grid()
@@ -255,11 +269,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
         row = CITY_GATE_REGISTRY["capital_altoria"]
-        self.assertEqual(row.gate_xyz, (3, 0, "capital_altoria"))
+        self.assertEqual(row.gate_xyz, SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
         self.assertEqual(row.exit_aliases, ("王都", "城門"))
         village = CITY_GATE_REGISTRY["village_ciaran"]
-        self.assertEqual(village.gate_xyz, (0, 1, "village_ciaran"))
+        self.assertEqual(
+            village.gate_xyz,
+            (
+                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+                "village_ciaran",
+            ),
+        )
         self.assertEqual(village.exit_key, "隱密小徑")
         with self.assertRaises(TypeError):
             CITY_GATE_REGISTRY["ghost"] = row
@@ -391,19 +411,25 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             )
 
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_same_coordinate_resolves_to_different_rooms_in_each_settlement(self):
+    def test_each_settlement_keeps_its_own_coordinate_space(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
-        # (2,1) exists on both maps: 河岸道 in the capital, 練刀場 in the
-        # village — the shared (X, Y) still names two different rooms.
-        capital_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "capital_altoria")).first()
-        village_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "village_ciaran")).first()
-        self.assertIsNotNone(capital_room)
-        self.assertIsNotNone(village_room)
-        self.assertIsNot(capital_room, village_room)
-        self.assertNotEqual(capital_room.id, village_room.id)
-        self.assertEqual(capital_room.key, "河岸道")
-        self.assertEqual(village_room.key, "練刀場")
+        # The metre frames are disjoint: each settlement's coordinates resolve
+        # only inside its own map key, never into the other's rooms.
+        for map_key, node_id, key in (
+            ("capital_altoria", "riverbank_road", "河岸道"),
+            ("village_ciaran", "training_clearing", "練刀場"),
+        ):
+            coordinate = SETTLEMENT_GRAPHS[map_key].node(node_id).coordinate
+            room = GridRoom.objects.filter_xyz(xyz=(*coordinate, map_key)).first()
+            self.assertIsNotNone(room)
+            self.assertEqual(room.key, key)
+            other_map = (
+                "village_ciaran" if map_key == "capital_altoria" else "capital_altoria"
+            )
+            self.assertIsNone(
+                GridRoom.objects.filter_xyz(xyz=(*coordinate, other_map)).first()
+            )
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
     def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
@@ -553,8 +579,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # The village's single gate provisions exactly one exit on the
         # entrance node 隱密小徑, facing the wilderness with the authored
         # return direction "n".
+        village_entrance = (
+            *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+            "village_ciaran",
+        )
         village_gate_exits = [
-            e for e in GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first().exits
+            e for e in GridRoom.objects.filter_xyz(xyz=village_entrance).first().exits
             if isinstance(e, WildernessGateExit)
         ]
         self.assertEqual(len(village_gate_exits), 1)
@@ -667,7 +697,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         source = inspect.getsource(sync_grid)
         # The sparse synchronizer is the spawn path; the xyzgrid contrib's
         # dense ``reload()``/``spawn()`` pipeline must not come back.
-        self.assertIn("_apply_graph_plan(plan)", source)
+        self.assertIn("_apply_graph_plan(plan, knowledge_journal)", source)
         self.assertNotIn("grid.spawn()", source)
         self.assertNotIn("get_xyzgrid()", source)
         self.assertNotIn("sync_wilderness", source)
@@ -701,7 +731,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_grid()
         sync_wilderness()
 
-        entrance_room = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
+        entrance_room = GridRoom.objects.filter_xyz(
+            xyz=(
+                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+                "village_ciaran",
+            )
+        ).first()
         gate_exit = [
             e for e in entrance_room.exits if isinstance(e, WildernessGateExit)
         ][0]
@@ -1022,3 +1057,376 @@ class SparseSettlementSyncTests(EvenniaTest):
             XYZExit.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
             52,
         )
+
+
+#: The pre-cutover compact bindings, used only to seed a real cutover database.
+OLD_COORDINATES = {
+    "capital_altoria": {
+        "south_gate": (3, 0),
+        "quay": (1, 1),
+        "riverbank_road": (2, 1),
+        "south_avenue": (3, 1),
+        "inn_lane": (4, 1),
+        "bath_forecourt": (5, 1),
+        "old_wall_ruins": (2, 2),
+        "north_avenue": (3, 2),
+        "craft_alley": (1, 3),
+        "market_street": (2, 3),
+        "central_plaza": (3, 3),
+        "guild_forecourt": (4, 3),
+        "east_market": (5, 3),
+        "east_gate": (6, 3),
+        "training_ground": (2, 4),
+        "holy_steps": (3, 4),
+        "great_temple": (4, 4),
+        "noble_quarter": (3, 5),
+        "upper_gate": (4, 5),
+        "academy": (5, 5),
+        "palace_forecourt": (4, 6),
+    },
+    "village_ciaran": {
+        "hidden_path": (0, 1),
+        "village_plaza": (1, 1),
+        "stream_path": (1, 0),
+        "stream_bend": (2, 0),
+        "training_clearing": (2, 1),
+        "herb_garden": (3, 1),
+        "old_tree_north": (1, 2),
+        "elder_tree": (1, 3),
+        "weaving_slope": (2, 2),
+        "silver_leaf_slope": (2, 3),
+    },
+}
+
+
+class MetricCutoverTests(EvenniaTest):
+    """The real pre-cutover database converges in place onto metres."""
+
+    def _count_grid_rooms(self):
+        return GridRoom.objects.all_family().count()
+
+    def _count_city_exits(self):
+        from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
+
+        return XYZExit.objects.all_family().count()
+
+    def _seed_precutover_rooms(self):
+        from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY
+
+        ids = {}
+        for map_id, graph in SETTLEMENT_GRAPHS.items():
+            ids[map_id] = {}
+            for node_id in graph.nodes:
+                coordinate = OLD_COORDINATES[map_id][node_id]
+                room, errors = GridRoom.create(
+                    key=f"舊{map_id}:{node_id}",
+                    xyz=(*coordinate, map_id),
+                )
+                self.assertFalse(errors, errors)
+                room.sparse_node_id = node_id
+                room.tags.add(
+                    f"{map_id}:{node_id}", category=NODE_IDENTITY_TAG_CATEGORY
+                )
+                room.save()
+                ids[map_id][node_id] = room.id
+        return ids
+
+    def _object(self, pk):
+        from evennia.objects.models import ObjectDB
+
+        return ObjectDB.objects.get(pk=pk)
+
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
+    def test_cutover_preserves_identity_references_and_knowledge(self):
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.npcs import NPC
+        from world.maps.bootstrap import SyncReport
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        plaza_id = ids["capital_altoria"]["central_plaza"]
+        plaza = self._object(plaza_id)
+
+        occupant = create_object(NPC, key="測試居民", location=plaza)
+        native = create_object(PlayerCharacter, key="測試歸鄉者", location=plaza)
+        native.home = plaza
+        native.save()
+        external = create_object(Room, key="測試外部", location=None)
+        inbound = create_object(Exit, key="測試入境", location=external, destination=plaza)
+        native.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {
+                    "grid:capital_altoria:3:3": {
+                        "first_seen_tick": 5,
+                        "last_seen_tick": 9,
+                    },
+                    "grid:capital_altoria:3500:2850": {
+                        "first_seen_tick": 7,
+                        "last_seen_tick": 11,
+                    },
+                },
+            },
+        )
+
+        report = sync_grid()
+
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
+        self.assertGreater(report.updated + report.created, 0)
+        moved = self._object(plaza_id)
+        self.assertEqual(
+            moved.xyz,
+            (
+                *SETTLEMENT_GRAPHS["capital_altoria"].node("central_plaza").coordinate,
+                "capital_altoria",
+            ),
+        )
+        self.assertEqual(occupant.db_location_id, plaza_id)
+        self.assertEqual(native.db_location_id, plaza_id)
+        self.assertEqual(native.db_home_id, plaza_id)
+        self.assertEqual(inbound.db_destination_id, plaza_id)
+        self.assertIsNone(
+            GridRoom.objects.filter_xyz(xyz=(3, 3, "capital_altoria")).first()
+        )
+
+        visits = native.attributes.get("map_knowledge")["visited"]
+        self.assertEqual(
+            visits,
+            {
+                "grid:capital_altoria:3500:2850": {
+                    "first_seen_tick": 5,
+                    "last_seen_tick": 11,
+                }
+            },
+        )
+
+        before = {
+            (map_id, node_id): self._object(pk).xyz
+            for map_id, nodes in ids.items()
+            for node_id, pk in nodes.items()
+        }
+        second = sync_grid()
+        self.assertEqual(second, SyncReport())
+        self.assertEqual(
+            before,
+            {
+                (map_id, node_id): self._object(pk).xyz
+                for map_id, nodes in ids.items()
+                for node_id, pk in nodes.items()
+            },
+        )
+
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    def test_failed_cutover_restores_durable_and_cached_state(self):
+        from typeclasses.characters import PlayerCharacter
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        south_id = ids["capital_altoria"]["south_gate"]
+        south = self._object(south_id)
+        old_xyz = south.xyz
+
+        snapshot = {
+            "schema_version": 1,
+            "visited": {
+                "grid:capital_altoria:3:0": {
+                    "first_seen_tick": 1,
+                    "last_seen_tick": 2,
+                }
+            },
+        }
+        first = create_object(PlayerCharacter, key="測試甲", location=south)
+        second = create_object(PlayerCharacter, key="測試乙", location=south)
+        first.attributes.add(KNOWLEDGE_ATTR, snapshot)
+        second.attributes.add(KNOWLEDGE_ATTR, snapshot)
+
+        import world.rules.map_knowledge as knowledge
+
+        real = knowledge._write_knowledge
+        calls = {"n": 0}
+
+        def fail_second(character, record):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("injected knowledge write fault")
+            return real(character, record)
+
+        with patch.object(knowledge, "_write_knowledge", side_effect=fail_second):
+            with self.assertRaises(RuntimeError):
+                sync_grid()
+
+        self.assertEqual(self._object(south_id).xyz, old_xyz)
+        self.assertEqual(
+            GridRoom.objects.filter_xyz(xyz=(3, 0, "capital_altoria")).first().id,
+            south_id,
+        )
+        for character in (first, second):
+            self.assertEqual(character.attributes.get(KNOWLEDGE_ATTR), snapshot)
+
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
+    def test_failed_cutover_restores_a_two_settlement_observation(self):
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        observer = create_object(
+            PlayerCharacter,
+            key="測試雙居者",
+            location=self._object(ids["capital_altoria"]["south_gate"]),
+        )
+        original = {
+            "schema_version": 1,
+            "visited": {
+                "grid:capital_altoria:3:3": {
+                    "first_seen_tick": 3,
+                    "last_seen_tick": 5,
+                },
+                "grid:village_ciaran:1:1": {
+                    "first_seen_tick": 7,
+                    "last_seen_tick": 9,
+                },
+            },
+        }
+        observer.attributes.add(KNOWLEDGE_ATTR, original)
+
+        import world.rules.map_knowledge as knowledge
+
+        real = knowledge._write_knowledge
+        calls = {"n": 0}
+
+        def fail_second_settlement(character, record):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("injected second-settlement fault")
+            return real(character, record)
+
+        with patch.object(
+            knowledge, "_write_knowledge", side_effect=fail_second_settlement
+        ):
+            with self.assertRaises(RuntimeError):
+                sync_grid()
+
+        self.assertEqual(observer.attributes.get(KNOWLEDGE_ATTR), original)
+
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
+    def test_upgrade_removes_retired_ascii_registration_without_deleting_rooms(self):
+        from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        grid, errors = XYZGrid.create("XYZGrid")
+        self.assertFalse(errors, errors)
+        grid.db.map_data = {
+            "capital_altoria": {
+                "zcoord": "capital_altoria",
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+            "synthetic_keep": {
+                "zcoord": "synthetic_keep",
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+        }
+        grid.save()
+
+        sync_grid()
+
+        self.assertNotIn("capital_altoria", grid.db.map_data)
+        self.assertIn("synthetic_keep", grid.db.map_data)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
+
+    @covers_requirement(
+        "grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all"
+    )
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    def test_real_startup_converges_places_scene_art_and_quest_targets(self):
+        from evennia.utils.search import search_object_by_tag
+        from typeclasses.characters import PlayerCharacter
+        from world.lore.settlements.places import PLACE_REGISTRY
+        from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+        from world.maps.room_art import grid_scene_identity
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        plaza_id = ids["capital_altoria"]["central_plaza"]
+        observer = create_object(
+            PlayerCharacter, key="測試旅人", location=self._object(plaza_id)
+        )
+        observer.attributes.add(
+            KNOWLEDGE_ATTR,
+            {
+                "schema_version": 1,
+                "visited": {
+                    "grid:capital_altoria:3:3": {
+                        "first_seen_tick": 4,
+                        "last_seen_tick": 8,
+                    }
+                },
+            },
+        )
+
+        at_server_start()
+
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._object(plaza_id).sparse_node_id, "central_plaza")
+        self.assertEqual(
+            observer.attributes.get(KNOWLEDGE_ATTR)["visited"],
+            {
+                "grid:capital_altoria:3500:2850": {
+                    "first_seen_tick": 4,
+                    "last_seen_tick": 8,
+                }
+            },
+        )
+        # Scene-art indices follow the moved room, not a stale coordinate.
+        plaza = self._object(plaza_id)
+        self.assertEqual(
+            plaza.scene_identity,
+            grid_scene_identity("capital_altoria", *plaza.xyz[:2]),
+        )
+        # A quest GRID locator resolves through the new metre coordinate.
+        self.assertEqual(
+            GridRoom.objects.filter_xyz(
+                xyz=(*SETTLEMENT_GRAPHS["capital_altoria"].node("great_temple").coordinate,
+                     "capital_altoria")
+            ).first().sparse_node_id,
+            "great_temple",
+        )
+        # Every service place's exterior resolves to its converged room and
+        # every interior keeps its bidirectional doorway.
+        for place in PLACE_REGISTRY.values():
+            zcoord = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
+            exterior = GridRoom.objects.filter_xyz(
+                xyz=(*place.exterior_xy, zcoord)
+            ).first()
+            with self.subTest(place=place.key):
+                self.assertIsNotNone(exterior)
+                interior = search_object_by_tag(place.key)
+                self.assertEqual(len(interior), 1)
+                self.assertTrue(
+                    any(
+                        exit_obj.destination == exterior
+                        for exit_obj in interior[0].exits
+                    )
+                )

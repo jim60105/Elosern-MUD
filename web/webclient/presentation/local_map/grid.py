@@ -1,9 +1,10 @@
-"""The grid/anchor layer adapter and its XYMap geometry helpers (design D6).
+"""The grid/anchor layer adapter and its geometry helpers (design D6).
 
-Reads the live XYMap node/link model -- never the rendered ANSI -- and lays
-down the bounded grid payload: current node, in-range nodes with real exit
-edges, registered gate nodes claiming capacity first, and bounded remembered
-gateways.
+Reads the settlement's declared sparse graph (a read-only display projection),
+or the live contrib XYMap for synthetic/builder maps -- never rendered ANSI --
+and lays down the bounded grid payload: current node, in-range nodes with real
+exit edges, registered gate nodes claiming capacity first, and bounded
+remembered gateways.
 """
 
 from typing import Any
@@ -39,8 +40,9 @@ from world.rules.map_knowledge import (
 
 
 def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> str:
-    """Build the grid/anchor layer from the live XYMap node/link model (D6)."""
+    """Build the grid/anchor layer from the declared graph or live XYMap (D6)."""
     from typeclasses.rooms import AnchorRoom, GridRoom
+    from world.maps.map_data import settlement_graph
     from world.maps.wilderness_destination import DIRECTION_DELTAS
 
     location = actor.location
@@ -50,7 +52,8 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         x, y, z = location.xyz
     except Exception:
         raise PanelUnavailableError
-    xymap = location.xymap
+    graph = settlement_graph(str(z))
+    xymap = graph.display_projection() if graph is not None else location.xymap
     if xymap is None:
         raise PanelUnavailableError
     options = getattr(xymap, "options", None) or {}
@@ -357,9 +360,16 @@ def _grid_coord_is_anchor(xymap, coord: tuple[int, int]) -> bool:
         node = xymap.get_node_from_coord(coord)
     except Exception:
         return False
-    return node is not None and getattr(node, "interrupt_path", False) or (
-        node is not None and node.symbol == "@"
-    )
+    if node is None:
+        return False
+    # The sparse display projection carries the authored anchor fact; the
+    # contrib XYMap carries it as an interrupt-path node drawn with '@'.
+    anchor = getattr(node, "anchor", None)
+    if anchor is not None:
+        return bool(anchor)
+    return bool(getattr(node, "interrupt_path", False)) or getattr(
+        node, "symbol", None
+    ) == "@"
 
 
 def _grid_room_label(coord: tuple[int, int], z: str) -> str:

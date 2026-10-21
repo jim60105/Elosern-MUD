@@ -50,7 +50,7 @@ city to exist after a fresh container boot.
 - **WHEN** the Evennia server starts against a fresh, migrated, empty database (as
   `docker-entrypoint.sh`'s `evennia migrate --noinput` followed by `evennia start --log` would
   produce)
-- **THEN** the `capital_altoria` sample city's thirteen rooms and twenty-four intra-city exits exist
+- **THEN** the `capital_altoria` sample city's twenty-one rooms and fifty-two intra-city exits exist
   before the server accepts player connections, with no separate command having been issued
 
 #### Scenario: at_server_start calls sync_grid after sync_all, not before
@@ -72,7 +72,6 @@ city to exist after a fresh container boot.
 - **THEN** it contains no `evennia xyzgrid` invocation of any kind — grid provisioning happens
   entirely inside the `evennia start` process via `at_server_start()`
 
-
 ### Requirement: A single authored, idempotent Exit bridges Limbo and the sample city
 `sync_grid()` SHALL locate the starting room through the shared `LIMBO_KEY` constant
 (`world/maps/bootstrap.py`) — never by dbref, never by a `"Limbo"` literal. When the room
@@ -83,7 +82,7 @@ never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: The bridging exit exists after sync_grid runs
 - **WHEN** `sync_grid()` runs against a database containing a room keyed `LIMBO_KEY`
-- **THEN** that room has exactly one exit leading to `(2, 0, "capital_altoria")`, and the South Gate
+- **THEN** that room has exactly one exit leading to `(3050, 150, "capital_altoria")`, and the South Gate
   room has no exit leading back to it
 
 #### Scenario: Repeated calls do not duplicate the bridging exit
@@ -99,7 +98,7 @@ never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: A missing Limbo degrades gracefully, without preventing the rest of sync_grid from running
 - **WHEN** `sync_grid()` runs against a database with no object keyed `LIMBO_KEY`
-- **THEN** the sample city's thirteen rooms and twenty-four intra-city exits are still spawned, no
+- **THEN** the sample city's twenty-one rooms and fifty-two intra-city exits are still spawned, no
   bridging exit is created, and `sync_grid()` does not raise
 
 #### Scenario: The bridge exit carries zh-tw key and aliases from the registry

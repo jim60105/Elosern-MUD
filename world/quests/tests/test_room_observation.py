@@ -230,16 +230,21 @@ class RoomArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, Evennia
 
     @covers_requirement("quest-progress-tracking::room-arrival-drives-reach-and-escort-through-supported-persistent-room-hooks")
     def test_grid_arrival_uses_exact_xyz_identity(self):
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        coordinate = SETTLEMENT_GRAPHS[
+            live_anchor_placement_row().zcoord
+        ].node("market_street").coordinate
         definition = register(
             quest(
                 "reach_grid_xyz",
                 quest_type=QuestType.EXPLORE,
-                stages=(reach_stage(grid_locator(1, 1)),),
+                stages=(reach_stage(grid_locator(*coordinate)),),
             )
         )
         record = accept(self.player, definition.key)
-        self._companion("同伴", self._grid_room(1, 1))
-        self._enter(self._grid_room(1, 1))
+        self._companion("同伴", self._grid_room(*coordinate))
+        self._enter(self._grid_room(*coordinate))
         stored = self._records()[0]
         self.assertEqual(stored["state"], "completed")
         self.assertEqual(stored["quest_id"], record.quest_id)

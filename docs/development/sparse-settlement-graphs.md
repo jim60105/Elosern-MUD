@@ -2,8 +2,9 @@
 
 This page records the unit and ownership contract introduced by
 `implement-sparse-settlement-graphs` (world-map-scale design §11). It is the
-reference for changing settlement maps, route finding, or the grid bootstrap
-before the metric-coordinate cutover (`activate-metric-settlements`) lands.
+reference for changing settlement maps, route finding, or the grid bootstrap.
+The metric cutover (`activate-metric-settlements`) landed on top of it: the
+authored coordinates are now integer metres and there is no ASCII map.
 
 ## Ownership
 
@@ -22,22 +23,23 @@ Lore and quest modules read the declarations; they never write a graph. Only
 
 ## Units and identity
 
-- A `SparseNode` has a stable authored `node_id`, an integer `(x, y)` binding,
-  and a room prototype. The identity, never the coordinate, is the matching
-  authority.
-- A `SparseRoad` has a stable ordered endpoint pair, optional bend points, and
-  a physical length: the sum of Euclidean segment lengths. Untouched segments
-  are straight, exactly as the current two settlements are authored.
+- A `SparseNode` has a stable authored `node_id`, an integer-metre `(x, y)`
+  local-frame binding, and a room prototype. The identity, never the
+  coordinate, is the matching authority.
+- A `SparseRoad` has a stable ordered endpoint pair, an authored compass
+  octant, optional bend points, and a length: the sum of Euclidean segment
+  lengths. The octant is authored because an irregular metre layout is almost
+  never axis-aligned; deriving it from the raw delta would turn every cardinal
+  street into a diagonal. The two settlements author straight segments.
 - `SparseSettlementGraph` validates at construction: duplicate identity,
   duplicate coordinate (two identities binding one destination), unknown
   endpoint, self-loop, duplicate ordered road, duplicate outgoing compass
   direction, and identity/prototype table drift all raise
   `SparseGraphError` before a caller can persist anything.
 
-The current coordinates keep their existing integer settlement scale. The
-metric-coordinate change rewrites the same identity tables; nothing in this
-contract assumes a meter lattice, so a coordinate move is a declaration edit,
-not an identity change.
+Coordinates are the settlement's integer-metre local frame (`x` east, `y`
+north); `z` stays the logical map/layer key. A coordinate move is a declaration
+edit, not an identity change.
 
 ## Synchronization contract
 
@@ -59,6 +61,17 @@ changed. It then applies all plans in one transaction:
 5. Authored prototypes are applied only when their fingerprint changes, so a
    second run over unchanged data performs no managed write. Plain
    `room_art` assignments are likewise compared before writing.
+6. Every moved node contributes an old→new coordinate binding. The knowledge
+   owner (`world/rules/map_knowledge.remap_grid_identities`) rewrites the
+   affected players' stored `grid:` ids inside the same transaction, keeping
+   first/last-seen ticks and merging collapsed ids by earliest/latest tick. It
+   never records a new arrival.
+7. A failed transaction reloads every touched room/exit and resets the
+   attribute caches of every knowledge record it journalled, so durable and
+   process-local state both return to the pre-cutover values.
+8. An unbound legacy room that would be pruned while occupants, a `HOME`
+   reference or an inbound destination still point at it is refused before any
+   write. Occupied rooms are never deleted and recreated.
 
 `sync_settlement_graph(graph)` exposes the same convergence for one synthetic
 or test graph and returns a `SyncReport(created, updated, deleted)`.
@@ -73,22 +86,23 @@ span. `plan()` names each step's compass direction and spawned exit key;
 `commands/localized/xyzgrid.CmdGoto` uses the declared graph. Maps without a
 sparse declaration (synthetic test grids, builder maps) are adapted for the
 lifetime of the loaded `XYMap` by `graph_from_xymap()`, so the ASCII contrib
-remains a display/compatibility surface but never the routing authority for a
-declared settlement.
+remains a compatibility surface for synthetic maps but never the routing
+authority for a declared settlement. `SparseSettlementGraph.display_projection()`
+gives the local-map adapter the same read-only node/link view without an ASCII
+lattice.
 
-## Transitional dense surface
+## Display surface
 
-`XYMAP_DATA_LIST` and the ASCII `MAPSTR` remain registered with the `XYZGrid`
-script **only for display**: the localized `地圖`/`map` command, the
-`evennia xyzgrid` CLI, the contrib's room appearance hook, and synthetic test
-maps. `sync_grid()` stores that data without calling `reload()` or `spawn()`;
-it never parses ASCII. The metric-coordinate cutover removes the ASCII source
-and this display path together.
+There is no ASCII authoring source and no dense lattice. The settlement
+declaration is the sparse table set (`PROTOTYPES`, `NODE_IDS`, `ROADS`); the
+localized `地圖`/`map` command lists a declared settlement's nodes, metre
+coordinates and outgoing compass exits, and still renders an ASCII map for a
+synthetic/builder map loaded in the contrib. `sync_grid()` removes any
+settlement id an older database still carries in `XYZGrid.db.map_data`; it
+never deletes a room or exit for that cleanup.
 
 Local-map payload bounds (`web/webclient/presentation/local_map/validate.py`)
-were intentionally left unchanged here: this change ships the sparse graph, not
-the projection. `project-metric-local-maps` now owns that cutover — it widens
-the shared transport envelope to integer metres and projects the payload at one
-uniform physical scale; see `docs/development/metric-local-maps.md`. The
-registered per-map extent still gates `grid:` identities, so the authored
-coordinate cutover itself remains `activate-metric-settlements`.
+carry integer metres and the client projects the payload at one uniform
+physical scale; see `docs/development/metric-local-maps.md` and
+`docs/development/metric-settlements.md`. The registered per-map extent gates
+`grid:` identities.

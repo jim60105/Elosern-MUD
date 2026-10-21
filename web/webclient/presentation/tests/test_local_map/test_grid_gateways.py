@@ -116,7 +116,10 @@ class LocalMapGridGatewayTests(EvenniaTest):
                 "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
                 {**shipped_entries, "other_capital_entry": other_entry},
             ),
-            patch("world.rules.map_knowledge._registered_grid_bounds", return_value=(8, 8)),
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(10_000_000, 10_000_000),
+            ),
         ):
             payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
@@ -163,6 +166,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         with (
             patch.object(type(self.plaza), "xyz", (*current_coord, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch("world.maps.map_data.settlement_graph", return_value=None),
             patch(
                 "web.webclient.presentation.local_map.grid._grid_nodes_in_range",
                 return_value=[current_node, neighbour_node],

@@ -1,49 +1,33 @@
-"""Sample city sample grid data for 聖潔王都 (capital_altoria), map-anchor-grid.
+"""Sample city data for 聖潔王都 (capital_altoria), map-anchor-grid.
 
-The ``XYMAP_DATA_LIST`` assembly for all settlements lives in
-``world/maps/map_data.py`` (settlement-shops design §6.2 / §10); this module
-declares only its own ``XYMAP_DATA``.
+This module is the settlement's sparse declaration: stable node identities,
+their authored integer-metre local coordinates (world-map-scale design §8),
+explicit roads and the room prototypes the synchronizer applies. There is no
+ASCII map: the meter coordinates are the single authored geometry. The
+``SETTLEMENT_GRAPHS`` assembly for all settlements lives in
+``world/maps/map_data.py``.
 
 The layout is a river town that climbed a rock (altoria-capital-replan): the
-lower city (Y=0-2) hugs the north bank where the southern road meets the
-crossing, the middle belt (Y=3) runs along the line of the wall the city
-outgrew, and the upper city (Y=4-6) sits on the terrace above, reached by the
-聖階 steps. The pilgrim road runs 南門 → 南大道 → 大道北段 → 中央廣場 → 聖階 →
-大神殿前. Twenty-one nodes, twenty-six links, six cycles — deliberately not a
-tree: a capital where every route is the only route is a corridor. The two
-diagonals are worn shortcuts: apprentices' path from 工匠巷 up to 校場外, and
-the pilgrims' slope from 東市 up to 大神殿前.
+riverbank lower city hugs the north bank where the southern road meets the
+crossing, the market belt runs along the line of the wall the city outgrew,
+and the upper city sits on the terrace above, reached by the 聖階 steps. The
+pilgrim road runs 南門 → 南大道 → 大道北段 → 中央廣場 → 聖階 → 大神殿前.
+Twenty-one nodes, twenty-six links, six cycles — deliberately not a tree: a
+capital where every route is the only route is a corridor. The two diagonals
+are worn shortcuts: apprentices' path from 工匠巷 up to 校場外, and the
+pilgrims' slope from 東市 up to 大神殿前.
 """
 
-MAPSTR = r"""
-+ 0 1 2 3 4 5 6
-
-6         #
-          |
-5       #-#-#
-        | |
-4     #-#-#
-     /  | |\
-3   #-#-#-#-#-#
-      | |
-2     #-#
-      | |
-1   #-#-#-#-#
-        |
-0       #
-
-+ 0 1 2 3 4 5 6
-"""
-
-# Prototypes keyed by (X, Y) coordinate; sync_grid() spawns these through the
-# xyzgrid contrib's prototype machinery. Every coordinate except the central
-# plaza (3,3) is a plain GridRoom; the plaza is the AnchorRoom that
+# Prototypes keyed by the node's (X, Y) integer-metre local coordinate;
+# sync_grid() applies these through the prototype machinery. Every coordinate
+# except the central plaza (3500, 2850) is a plain GridRoom; the plaza is the
+# AnchorRoom that
 # ANCHOR_PLACEMENT_REGISTRY["capital_altoria"] points at. Seven nodes are
 # walkable scenery with no interior to enter — quayside, ruin, plaza, steps,
 # gates, and the road — which the design doc treats as the parts of a capital
 # that exist to be moved through and looked at.
 PROTOTYPES = {
-    (3, 0): {
+    (3050, 150): {
         "prototype_parent": "grid_room",
         "key": "南門",
         "desc": (
@@ -51,7 +35,7 @@ PROTOTYPES = {
             "著身後岩壁向上攀爬的王城。"
         ),
     },
-    (1, 1): {
+    (1250, 760): {
         "prototype_parent": "grid_room",
         "key": "碼頭埠",
         "desc": (
@@ -59,21 +43,21 @@ PROTOTYPES = {
             "、水鳥與貨件吵成一片。"
         ),
     },
-    (2, 1): {
+    (2150, 920): {
         "prototype_parent": "grid_room",
         "key": "河岸道",
         "desc": (
             "聖潔王都的河岸道，從碼頭沿著北岸向東而去。屋舍在這裡肩並著肩擠成一排，離水最近的土地最先被認領，而且從不肯讓出一寸。"
         ),
     },
-    (3, 1): {
+    (3140, 1050): {
         "prototype_parent": "grid_room",
         "key": "南大道",
         "desc": (
             "聖潔王都的南大道，朝聖之路的第一段。從南門沿著它直直向上，整座城市就在前方攤開來，市集、廣場、階梯、大教堂。"
         ),
     },
-    (4, 1): {
+    (3970, 1120): {
         "prototype_parent": "grid_room",
         "key": "客棧巷",
         "desc": (
@@ -81,7 +65,7 @@ PROTOTYPES = {
             "、馬廄與打烊遲的酒館，就在同一片擁擠的地面上招呼他們。"
         ),
     },
-    (5, 1): {
+    (4830, 970): {
         "prototype_parent": "grid_room",
         "key": "浴場前",
         "desc": (
@@ -89,7 +73,7 @@ PROTOTYPES = {
             "而這一間浴場，比這座城市興築又捨棄的每一道牆都活得久。"
         ),
     },
-    (2, 2): {
+    (2350, 1900): {
         "prototype_parent": "grid_room",
         "key": "舊城牆遺跡",
         "desc": (
@@ -97,7 +81,7 @@ PROTOTYPES = {
             "了這座城市最寬敞的空地，市集街正是因此在這裡。對著這處遺跡讀地圖吧，它上方那條市集帶，就是那道牆變成的墳。"
         ),
     },
-    (3, 2): {
+    (3350, 1980): {
         "prototype_parent": "grid_room",
         "key": "大道北段",
         "desc": (
@@ -105,7 +89,7 @@ PROTOTYPES = {
             "。"
         ),
     },
-    (1, 3): {
+    (1300, 2600): {
         "prototype_parent": "grid_room",
         "key": "工匠巷",
         "desc": (
@@ -113,7 +97,7 @@ PROTOTYPES = {
             "條斜斜切往校場的磨舊小徑，學徒們帶著貨物跑的就是這條。"
         ),
     },
-    (2, 3): {
+    (2420, 2700): {
         "prototype_parent": "grid_room",
         "key": "市場街",
         "desc": (
@@ -121,7 +105,7 @@ PROTOTYPES = {
             "的攤位，就是王都的貿易為什麼向東流的原因。"
         ),
     },
-    (3, 3): {
+    (3500, 2850): {
         "prototype_parent": "anchor_room",
         "anchor_key": "capital_altoria",
         "key": "中央廣場",
@@ -130,7 +114,7 @@ PROTOTYPES = {
             "都的地圖從這個廣場畫出去，多數日子，吵架也是。"
         ),
     },
-    (4, 3): {
+    (4380, 3000): {
         "prototype_parent": "grid_room",
         "key": "公會前",
         "desc": (
@@ -138,7 +122,7 @@ PROTOTYPES = {
             "還沒進門檻，條件早已拍定；公會的搬運工也在這裡裝貨，雇來的刀客與木箱一齊上車。"
         ),
     },
-    (5, 3): {
+    (5380, 2850): {
         "prototype_parent": "grid_room",
         "key": "東市",
         "desc": (
@@ -146,7 +130,7 @@ PROTOTYPES = {
             "旁一條磨舊的斜坡抄近直通向大教堂，專走給不肯繞廣場和聖階的朝聖者。"
         ),
     },
-    (6, 3): {
+    (6500, 3010): {
         "prototype_parent": "grid_room",
         "key": "東門",
         "desc": (
@@ -154,7 +138,7 @@ PROTOTYPES = {
             "都以東的買賣、以及多半的麻煩，都從這扇門進來。"
         ),
     },
-    (2, 4): {
+    (2300, 3820): {
         "prototype_parent": "grid_room",
         "key": "校場外",
         "desc": (
@@ -162,7 +146,7 @@ PROTOTYPES = {
             "路傳得進工匠巷，從工匠巷斜斜上來的學徒小徑在坡上磨出一道草綠的縫。"
         ),
     },
-    (3, 4): {
+    (3480, 3700): {
         "prototype_parent": "grid_room",
         "key": "聖階",
         "desc": (
@@ -170,7 +154,7 @@ PROTOTYPES = {
             "過這座王都的野心。階頂之上是那片想要高度的地，教會、學院、王宮。"
         ),
     },
-    (4, 4): {
+    (4560, 3920): {
         "prototype_parent": "grid_room",
         "key": "大神殿前",
         "desc": (
@@ -178,7 +162,7 @@ PROTOTYPES = {
             "的一句話，神在前，王冠在更高的地方俯視。"
         ),
     },
-    (3, 5): {
+    (3500, 4850): {
         "prototype_parent": "grid_room",
         "key": "貴族區前",
         "desc": (
@@ -186,7 +170,7 @@ PROTOTYPES = {
             "上岩壁的；他們的門、點燈人與拴著的狗，都寫著這一段攀爬走了多久。"
         ),
     },
-    (4, 5): {
+    (4690, 5010): {
         "prototype_parent": "grid_room",
         "key": "上城門",
         "desc": (
@@ -194,7 +178,7 @@ PROTOTYPES = {
             "不想被市集帶看見的那些日子。"
         ),
     },
-    (5, 5): {
+    (5650, 5200): {
         "prototype_parent": "grid_room",
         "key": "學院前",
         "desc": (
@@ -202,7 +186,7 @@ PROTOTYPES = {
             "他們打轉，而下到東市的那條斜坡，是理論到晚餐之間最短的距離。"
         ),
     },
-    (4, 6): {
+    (4500, 6350): {
         "prototype_parent": "grid_room",
         "key": "王宮前庭",
         "desc": (
@@ -212,9 +196,11 @@ PROTOTYPES = {
     },
 }
 
+# The sparse map declaration. ``map_data.py`` builds the authoritative graph
+# from these tables; the xyzgrid contrib's ASCII ``map`` key is intentionally
+# absent because a metre lattice is never allocated (world-map-scale §11).
 XYMAP_DATA = {
     "zcoord": "capital_altoria",
-    "map": MAPSTR,
     "options": {
         # map-knowledge-minimap: the closed visual-range options the xyzgrid
         # contrib's own get_visual_range accepts, consumed by the grid layer
@@ -235,119 +221,90 @@ XYMAP_DATA = {
 
 # Stable authored identity per coordinate (implement-sparse-settlement-graphs).
 # Identity, not the coordinate, is the synchronizer's matching authority: a
-# later metric-coordinate cutover rewrites the coordinates here while the same
-# rooms, occupants and references persist. ``NODE_IDS`` must describe exactly
-# the ``PROTOTYPES`` coordinates; ``build_sparse_graph()`` rejects drift.
+# coordinate move rewrites the coordinate here while the same rooms, occupants
+# and references persist. ``NODE_IDS`` must describe exactly the
+# ``PROTOTYPES`` coordinates; ``build_sparse_graph()`` rejects drift.
 NODE_IDS = {
-    (3, 0): "south_gate",
-    (1, 1): "quay",
-    (2, 1): "riverbank_road",
-    (3, 1): "south_avenue",
-    (4, 1): "inn_lane",
-    (5, 1): "bath_forecourt",
-    (2, 2): "old_wall_ruins",
-    (3, 2): "north_avenue",
-    (1, 3): "craft_alley",
-    (2, 3): "market_street",
-    (3, 3): "central_plaza",
-    (4, 3): "guild_forecourt",
-    (5, 3): "east_market",
-    (6, 3): "east_gate",
-    (2, 4): "training_ground",
-    (3, 4): "holy_steps",
-    (4, 4): "great_temple",
-    (3, 5): "noble_quarter",
-    (4, 5): "upper_gate",
-    (5, 5): "academy",
-    (4, 6): "palace_forecourt",
+    (3050, 150): "south_gate",
+    (1250, 760): "quay",
+    (2150, 920): "riverbank_road",
+    (3140, 1050): "south_avenue",
+    (3970, 1120): "inn_lane",
+    (4830, 970): "bath_forecourt",
+    (2350, 1900): "old_wall_ruins",
+    (3350, 1980): "north_avenue",
+    (1300, 2600): "craft_alley",
+    (2420, 2700): "market_street",
+    (3500, 2850): "central_plaza",
+    (4380, 3000): "guild_forecourt",
+    (5380, 2850): "east_market",
+    (6500, 3010): "east_gate",
+    (2300, 3820): "training_ground",
+    (3480, 3700): "holy_steps",
+    (4560, 3920): "great_temple",
+    (3500, 4850): "noble_quarter",
+    (4690, 5010): "upper_gate",
+    (5650, 5200): "academy",
+    (4500, 6350): "palace_forecourt",
 }
 
-# Authored absolute meter position per coordinate (world-map-scale design §8).
-# Pre-activation the xyzgrid rooms stay on their compact display coordinates;
-# travel geometry already measures these approved positions, and the
-# metric-coordinate cutover later relocates the rooms onto them. The table is
-# keyed by the same coordinate as ``NODE_IDS``/``PROTOTYPES`` and must describe
-# exactly those cells (``build_sparse_graph()`` rejects drift both ways); the
-# stable identity remains ``NODE_IDS``, never a second name table.
-PHYSICAL_POSITIONS = {
-    (1, 1): (1250, 760),
-    (1, 3): (1300, 2600),
-    (2, 1): (2150, 920),
-    (2, 2): (2350, 1900),
-    (2, 3): (2420, 2700),
-    (2, 4): (2300, 3820),
-    (3, 0): (3050, 150),
-    (3, 1): (3140, 1050),
-    (3, 2): (3350, 1980),
-    (3, 3): (3500, 2850),
-    (3, 4): (3480, 3700),
-    (3, 5): (3500, 4850),
-    (4, 1): (3970, 1120),
-    (4, 3): (4380, 3000),
-    (4, 4): (4560, 3920),
-    (4, 5): (4690, 5010),
-    (4, 6): (4500, 6350),
-    (5, 1): (4830, 970),
-    (5, 3): (5380, 2850),
-    (5, 5): (5650, 5200),
-    (6, 3): (6500, 3010),
-}
-
-# Explicit roads (stable endpoint identities, one directed road per travel
-# direction). The sparse route adapter uses these edges and their physical
-# lengths instead of a coordinate lattice; the ASCII map above remains the
-# display/authoring source until the metric-coordinate cutover.
+# Explicit roads: (source identity, destination identity, compass octant), one
+# directed road per travel direction. The octant is authored because the
+# irregular metre layout is almost never axis-aligned: it is the exit a
+# traveller takes, exactly the octant the compact layout used to spell. The
+# sparse route adapter measures each edge's physical length between the two
+# authored metre positions.
 ROADS = (
-    ("south_gate", "south_avenue"),
-    ("south_avenue", "south_gate"),
-    ("south_avenue", "north_avenue"),
-    ("north_avenue", "south_avenue"),
-    ("north_avenue", "central_plaza"),
-    ("central_plaza", "north_avenue"),
-    ("south_avenue", "riverbank_road"),
-    ("riverbank_road", "south_avenue"),
-    ("south_avenue", "inn_lane"),
-    ("inn_lane", "south_avenue"),
-    ("riverbank_road", "quay"),
-    ("quay", "riverbank_road"),
-    ("riverbank_road", "old_wall_ruins"),
-    ("old_wall_ruins", "riverbank_road"),
-    ("old_wall_ruins", "market_street"),
-    ("market_street", "old_wall_ruins"),
-    ("old_wall_ruins", "north_avenue"),
-    ("north_avenue", "old_wall_ruins"),
-    ("inn_lane", "bath_forecourt"),
-    ("bath_forecourt", "inn_lane"),
-    ("market_street", "craft_alley"),
-    ("craft_alley", "market_street"),
-    ("craft_alley", "training_ground"),
-    ("training_ground", "craft_alley"),
-    ("market_street", "central_plaza"),
-    ("central_plaza", "market_street"),
-    ("central_plaza", "holy_steps"),
-    ("holy_steps", "central_plaza"),
-    ("central_plaza", "guild_forecourt"),
-    ("guild_forecourt", "central_plaza"),
-    ("holy_steps", "training_ground"),
-    ("training_ground", "holy_steps"),
-    ("holy_steps", "noble_quarter"),
-    ("noble_quarter", "holy_steps"),
-    ("holy_steps", "great_temple"),
-    ("great_temple", "holy_steps"),
-    ("guild_forecourt", "great_temple"),
-    ("great_temple", "guild_forecourt"),
-    ("guild_forecourt", "east_market"),
-    ("east_market", "guild_forecourt"),
-    ("great_temple", "upper_gate"),
-    ("upper_gate", "great_temple"),
-    ("great_temple", "east_market"),
-    ("east_market", "great_temple"),
-    ("noble_quarter", "upper_gate"),
-    ("upper_gate", "noble_quarter"),
-    ("upper_gate", "palace_forecourt"),
-    ("palace_forecourt", "upper_gate"),
-    ("upper_gate", "academy"),
-    ("academy", "upper_gate"),
-    ("east_market", "east_gate"),
-    ("east_gate", "east_market"),
+    ("south_gate", "south_avenue", "n"),
+    ("south_avenue", "south_gate", "s"),
+    ("south_avenue", "north_avenue", "n"),
+    ("north_avenue", "south_avenue", "s"),
+    ("north_avenue", "central_plaza", "n"),
+    ("central_plaza", "north_avenue", "s"),
+    ("south_avenue", "riverbank_road", "w"),
+    ("riverbank_road", "south_avenue", "e"),
+    ("south_avenue", "inn_lane", "e"),
+    ("inn_lane", "south_avenue", "w"),
+    ("riverbank_road", "quay", "w"),
+    ("quay", "riverbank_road", "e"),
+    ("riverbank_road", "old_wall_ruins", "n"),
+    ("old_wall_ruins", "riverbank_road", "s"),
+    ("old_wall_ruins", "market_street", "n"),
+    ("market_street", "old_wall_ruins", "s"),
+    ("old_wall_ruins", "north_avenue", "e"),
+    ("north_avenue", "old_wall_ruins", "w"),
+    ("inn_lane", "bath_forecourt", "e"),
+    ("bath_forecourt", "inn_lane", "w"),
+    ("market_street", "craft_alley", "w"),
+    ("craft_alley", "market_street", "e"),
+    ("craft_alley", "training_ground", "ne"),
+    ("training_ground", "craft_alley", "sw"),
+    ("market_street", "central_plaza", "e"),
+    ("central_plaza", "market_street", "w"),
+    ("central_plaza", "holy_steps", "n"),
+    ("holy_steps", "central_plaza", "s"),
+    ("central_plaza", "guild_forecourt", "e"),
+    ("guild_forecourt", "central_plaza", "w"),
+    ("holy_steps", "training_ground", "w"),
+    ("training_ground", "holy_steps", "e"),
+    ("holy_steps", "noble_quarter", "n"),
+    ("noble_quarter", "holy_steps", "s"),
+    ("holy_steps", "great_temple", "e"),
+    ("great_temple", "holy_steps", "w"),
+    ("guild_forecourt", "great_temple", "n"),
+    ("great_temple", "guild_forecourt", "s"),
+    ("guild_forecourt", "east_market", "e"),
+    ("east_market", "guild_forecourt", "w"),
+    ("great_temple", "upper_gate", "n"),
+    ("upper_gate", "great_temple", "s"),
+    ("great_temple", "east_market", "se"),
+    ("east_market", "great_temple", "nw"),
+    ("noble_quarter", "upper_gate", "e"),
+    ("upper_gate", "noble_quarter", "w"),
+    ("upper_gate", "palace_forecourt", "n"),
+    ("palace_forecourt", "upper_gate", "s"),
+    ("upper_gate", "academy", "e"),
+    ("academy", "upper_gate", "w"),
+    ("east_market", "east_gate", "e"),
+    ("east_gate", "east_market", "w"),
 )

@@ -8,6 +8,44 @@ from web.webclient.presentation.registry import PanelUnavailableError
 from ._support import _T_MAP_KEY
 
 
+class SparseDisplayProjectionTests(unittest.TestCase):
+    """The read-only projection the grid adapter reads instead of ASCII."""
+
+    def setUp(self):
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        self.graph = SETTLEMENT_GRAPHS[_T_MAP_KEY]
+        self.projection = self.graph.display_projection()
+
+    def test_projection_carries_every_node_and_linked_neighbour(self):
+        self.assertEqual(self.projection.Z, _T_MAP_KEY)
+        self.assertEqual(len(self.projection.node_index_map), 21)
+        self.assertEqual(
+            self.projection.max_X,
+            max(node.x for node in self.graph.nodes.values()),
+        )
+        south = self.projection.get_node_from_coord(
+            self.graph.node("south_gate").coordinate
+        )
+        self.assertEqual(list(south.links), ["n"])
+        destination = south.links["n"]
+        self.assertEqual(
+            (destination.X, destination.Y),
+            self.graph.node("south_avenue").coordinate,
+        )
+        self.assertIsNone(self.projection.get_node_from_coord((1, 99_999)))
+
+    def test_projection_exposes_the_authored_anchor_fact(self):
+        from web.webclient.presentation.local_map.grid import _grid_coord_is_anchor
+
+        plaza = self.graph.node("central_plaza").coordinate
+        node = self.projection.get_node_from_coord(plaza)
+        self.assertTrue(node.anchor)
+        self.assertTrue(_grid_coord_is_anchor(self.projection, plaza))
+        south = self.graph.node("south_gate").coordinate
+        self.assertFalse(_grid_coord_is_anchor(self.projection, south))
+
+
 
 class LocalMapGridHelperTests(unittest.TestCase):
     """Pure unit tests for the grid adapter helper functions (task 3.2)."""

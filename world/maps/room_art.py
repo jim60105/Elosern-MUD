@@ -93,46 +93,47 @@ _REGION_SCENE_ARCHETYPES: dict[str, str] = {
 
 REGION_SCENE_ARCHETYPES: Mapping[str, str] = MappingProxyType(_REGION_SCENE_ARCHETYPES)
 
-# Authored grid node -> registered scene archetype, keyed (map key, x, y).
-# Every walkable node of every declared ``XYMAP_DATA`` map is listed so the
-# art panel resolves a real registered archetype on a fresh boot.
+# Authored grid node -> registered scene archetype, keyed (map key, x, y) in
+# the settlement's integer-metre local frame. Every walkable node of every
+# declared settlement graph is listed so the art panel resolves a real
+# registered archetype on a fresh boot.
 _GRID_NODE_SCENE_ARCHETYPES: dict[tuple[str, int, int], str] = {
     # 聖潔王都 (capital_altoria): the river town's streets, plazas, gates and
     # quays are all the town street.
-    ("capital_altoria", 3, 0): "city_street",
-    ("capital_altoria", 1, 1): "city_street",
-    ("capital_altoria", 2, 1): "city_street",
-    ("capital_altoria", 3, 1): "city_street",
-    ("capital_altoria", 4, 1): "city_street",
-    ("capital_altoria", 5, 1): "city_street",
-    ("capital_altoria", 2, 2): "city_street",
-    ("capital_altoria", 3, 2): "city_street",
-    ("capital_altoria", 1, 3): "city_street",
-    ("capital_altoria", 2, 3): "city_street",
-    ("capital_altoria", 3, 3): "city_street",
-    ("capital_altoria", 4, 3): "city_street",
-    ("capital_altoria", 5, 3): "city_street",
-    ("capital_altoria", 6, 3): "city_street",
-    ("capital_altoria", 2, 4): "city_street",
-    ("capital_altoria", 3, 4): "city_street",
-    ("capital_altoria", 4, 4): "city_street",
-    ("capital_altoria", 3, 5): "city_street",
-    ("capital_altoria", 4, 5): "city_street",
-    ("capital_altoria", 5, 5): "city_street",
-    ("capital_altoria", 4, 6): "city_street",
+    ("capital_altoria", 3050, 150): "city_street",
+    ("capital_altoria", 1250, 760): "city_street",
+    ("capital_altoria", 2150, 920): "city_street",
+    ("capital_altoria", 3140, 1050): "city_street",
+    ("capital_altoria", 3970, 1120): "city_street",
+    ("capital_altoria", 4830, 970): "city_street",
+    ("capital_altoria", 2350, 1900): "city_street",
+    ("capital_altoria", 3350, 1980): "city_street",
+    ("capital_altoria", 1300, 2600): "city_street",
+    ("capital_altoria", 2420, 2700): "city_street",
+    ("capital_altoria", 3500, 2850): "city_street",
+    ("capital_altoria", 4380, 3000): "city_street",
+    ("capital_altoria", 5380, 2850): "city_street",
+    ("capital_altoria", 6500, 3010): "city_street",
+    ("capital_altoria", 2300, 3820): "city_street",
+    ("capital_altoria", 3480, 3700): "city_street",
+    ("capital_altoria", 4560, 3920): "city_street",
+    ("capital_altoria", 3500, 4850): "city_street",
+    ("capital_altoria", 4690, 5010): "city_street",
+    ("capital_altoria", 5650, 5200): "city_street",
+    ("capital_altoria", 4500, 6350): "city_street",
     # 暗影谷村 (village_ciaran): the forest village's paths and groves are the
     # forest path, the cleared plaza and drill ground the town street, and the
     # stream approaches the wilderness path.
-    ("village_ciaran", 0, 1): "forest_path",
-    ("village_ciaran", 1, 1): "city_street",
-    ("village_ciaran", 2, 1): "city_street",
-    ("village_ciaran", 1, 0): "wilderness_path",
-    ("village_ciaran", 1, 2): "forest_path",
-    ("village_ciaran", 2, 2): "forest_path",
-    ("village_ciaran", 1, 3): "forest_path",
-    ("village_ciaran", 2, 3): "forest_path",
-    ("village_ciaran", 3, 1): "forest_path",
-    ("village_ciaran", 2, 0): "wilderness_path",
+    ("village_ciaran", 35, 270): "forest_path",
+    ("village_ciaran", 220, 305): "city_street",
+    ("village_ciaran", 405, 335): "city_street",
+    ("village_ciaran", 245, 135): "wilderness_path",
+    ("village_ciaran", 200, 465): "forest_path",
+    ("village_ciaran", 390, 495): "forest_path",
+    ("village_ciaran", 165, 650): "forest_path",
+    ("village_ciaran", 440, 665): "forest_path",
+    ("village_ciaran", 590, 300): "forest_path",
+    ("village_ciaran", 430, 85): "wilderness_path",
 }
 
 GRID_NODE_SCENE_ARCHETYPES: Mapping[tuple[str, int, int], str] = MappingProxyType(

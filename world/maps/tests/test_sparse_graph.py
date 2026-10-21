@@ -221,28 +221,23 @@ class PhysicalGeometryTests(unittest.TestCase):
         self.assertEqual(graph.node("end").physical_coordinate, (1000, 0))
 
     @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
-    def test_shipped_settlement_graphs_carry_distinct_physical_positions(self):
+    def test_shipped_settlement_graphs_carry_distinct_meter_positions(self):
         from world.maps.map_data import SETTLEMENT_GRAPHS
 
         self.assertTrue(SETTLEMENT_GRAPHS)
         for map_id, graph in SETTLEMENT_GRAPHS.items():
             with self.subTest(map_id=map_id):
-                positions = [node.physical_coordinate for node in graph.nodes.values()]
-                self.assertIsNone(
-                    next(
-                        (node.node_id for node in graph.nodes.values() if node.physical is None),
-                        None,
-                    )
-                )
+                # The authored coordinate IS the integer-metre local position;
+                # no second physical table survives the cutover.
+                positions = [node.coordinate for node in graph.nodes.values()]
                 self.assertEqual(len(set(positions)), len(positions))
-                # Compass exits remain the authored logical octants.
+                self.assertTrue(
+                    all(node.physical is None for node in graph.nodes.values())
+                )
+                # Compass exits remain the authored octants, declared on each
+                # directed road rather than guessed from oblique metre deltas.
                 for edge in graph.edges:
-                    self.assertEqual(
-                        edge.direction,
-                        compass_direction(
-                            edge.destination.x - edge.source.x,
-                            edge.destination.y - edge.source.y,
-                        ),
-                    )
-                # Physical spacing is unequal: a path charges unequal lengths.
+                    self.assertIsNotNone(edge.road.direction_hint)
+                    self.assertEqual(edge.direction, edge.road.direction_hint)
+                # Meter spacing is unequal: a path charges unequal lengths.
                 self.assertGreater(len({round(edge.length, 6) for edge in graph.edges}), 1)
