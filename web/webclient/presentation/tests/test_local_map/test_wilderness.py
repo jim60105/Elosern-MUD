@@ -155,7 +155,9 @@ class LocalMapWildernessTests(EvenniaTestCase):
         # The gateway west node advertises the grid arrival node, not a wild cell.
         west_node_id = directions["w"]
         west_node = next(node for node in payload["nodes"] if node["id"] == west_node_id)
-        self.assertEqual(west_node["action"]["destination"], _t_grid_id(6, 3))
+        self.assertEqual(
+            west_node["action"]["destination"], _t_grid_id(*EAST_GATE_XYZ[:2])
+        )
 
     @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
     def test_locked_wilderness_node_stays_inert(self):

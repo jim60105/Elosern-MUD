@@ -39,7 +39,7 @@ from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
-from world.maps.map_data import SETTLEMENT_GRAPHS, XYMAP_DATA_LIST
+from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.sparse_graph import SparseGraphError, SparseSettlementGraph, exit_spawn_names
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
@@ -391,6 +391,10 @@ class _GraphPlan:
     roads: list[_RoadBinding] = field(default_factory=list)
     stale_rooms: list = field(default_factory=list)
     stale_exits: list = field(default_factory=list)
+    # old coordinate -> new coordinate for every node this plan relocates.
+    remapped_coordinates: dict[tuple[int, int], tuple[int, int]] = field(
+        default_factory=dict
+    )
 
 
 def _node_tag(graph: SparseSettlementGraph, node) -> str:
@@ -513,11 +517,26 @@ def _plan_settlement_graph(graph: SparseSettlementGraph) -> _GraphPlan:
                     f"map {graph.map_id!r} binds room #{room.id} to more than one node"
                 )
             claimed.add(int(room.id))
+            try:
+                old_coordinate = (int(room.xyz[0]), int(room.xyz[1]))
+            except (TypeError, ValueError):
+                old_coordinate = None
+            if old_coordinate is not None and old_coordinate != node.coordinate:
+                plan.remapped_coordinates[old_coordinate] = node.coordinate
         plan.nodes.append(_NodeBinding(node=node, room=room))
 
     plan.stale_rooms = [
         room for room in rooms if int(room.id) not in claimed
     ]
+    # A coordinate move never deletes-or-recreates an occupied or referenced
+    # room. An unbound legacy room that would be pruned while something still
+    # points at it is an ambiguous binding, refused before any write.
+    for room in plan.stale_rooms:
+        if _room_is_referenced(room):
+            raise SparseGraphError(
+                f"map {graph.map_id!r} cannot prune referenced unbound room "
+                f"#{room.id} at {room.xyz}"
+            )
 
     source_rooms = {
         binding.node.node_id: binding.room
@@ -575,6 +594,18 @@ def _plan_settlement_graph(graph: SparseSettlementGraph) -> _GraphPlan:
         exit_obj for exit_obj in exits if int(exit_obj.id) not in used_exits
     ]
     return plan
+
+
+def _room_is_referenced(room) -> bool:
+    """Whether anything still depends on ``room`` (occupants, homes, exits)."""
+
+    if room.contents:
+        return True
+    if ObjectDB.objects.filter(db_destination=room.id).exists():
+        return True
+    if ObjectDB.objects.filter(db_home=room.id).exists():
+        return True
+    return False
 
 
 def _apply_node_binding(plan: _GraphPlan, binding: _NodeBinding) -> SyncReport:
@@ -692,12 +723,23 @@ def _apply_road_binding(plan: _GraphPlan, binding: _RoadBinding) -> SyncReport:
     return SyncReport(created=created, updated=updated)
 
 
-def _apply_graph_plan(plan: _GraphPlan) -> SyncReport:
+def _apply_graph_plan(plan: _GraphPlan, knowledge_journal=None) -> SyncReport:
     report = SyncReport()
     for binding in plan.nodes:
         report += _apply_node_binding(plan, binding)
     for binding in plan.roads:
         report += _apply_road_binding(plan, binding)
+    if plan.remapped_coordinates:
+        # The knowledge owner rewrites the stored node identity of every moved
+        # room inside this transaction, so observations keep their ticks and
+        # are never re-recorded as a fresh arrival (map-knowledge cutover).
+        from world.rules.map_knowledge import remap_grid_identities
+
+        remap_grid_identities(
+            plan.graph.map_id,
+            plan.remapped_coordinates,
+            journal=knowledge_journal,
+        )
     for room in plan.stale_rooms:
         log_info(
             "settlement_graph_node_pruned",
@@ -723,7 +765,7 @@ def _apply_graph_plan(plan: _GraphPlan) -> SyncReport:
     return report
 
 
-def _invalidate_plan_caches(plans) -> None:
+def _invalidate_plan_caches(plans, characters=()) -> None:
     """Restore touched objects and drop their process-local projections.
 
     A database rollback does not undo Evennia's tag/attribute/alias handler
@@ -734,6 +776,14 @@ def _invalidate_plan_caches(plans) -> None:
     again by the caller.
     """
 
+    for character in characters:
+        for handler_name in ("attributes",):
+            reset = getattr(getattr(character, handler_name, None), "reset_cache", None)
+            if reset is not None:
+                try:
+                    reset()
+                except Exception:  # observability: ignore R2: handler cache reset is best-effort after rollback
+                    continue
     for plan in plans:
         objects = [
             *(binding.room for binding in plan.nodes if binding.room is not None),
@@ -763,11 +813,12 @@ def sync_settlement_graph(graph: SparseSettlementGraph) -> SyncReport:
     """Converge one sparse settlement graph and return what changed."""
 
     plan = _plan_settlement_graph(graph)
+    knowledge_journal: list = []
     try:
         with transaction.atomic():
-            report = _apply_graph_plan(plan)
+            report = _apply_graph_plan(plan, knowledge_journal)
     except Exception:
-        _invalidate_plan_caches([plan])
+        _invalidate_plan_caches([plan], knowledge_journal)
         raise
     if report.created or report.updated or report.deleted:
         log_info(
@@ -782,25 +833,34 @@ def sync_settlement_graph(graph: SparseSettlementGraph) -> SyncReport:
     return report
 
 
-def _register_grid_display_maps() -> None:
-    """Store the ASCII map data for the contrib's display surfaces, unparsed.
+def _clear_grid_display_maps() -> None:
+    """Drop the retired ASCII registrations of every declared settlement.
 
-    The contrib parses lazily when a display command or its CLI asks for a map,
-    so the synchronization path never allocates the dense lattice.
+    The meter cutover removed the ASCII authoring/display source. A database
+    that booted an older version still carries those declarations in the
+    contrib script, so convergence removes exactly the declared settlement
+    ids and drops the process-local projection. Synthetic/builder maps are
+    untouched, and no room or exit is deleted here.
     """
 
     grid = XYZGrid.objects.all().first()
     if grid is None:
-        grid, errors = XYZGrid.create("XYZGrid")
-        if errors or grid is None:
-            raise RuntimeError(f"could not create the XYZGrid script: {errors}")
-    stored = grid.db.map_data
-    changed = []
-    for map_data in XYMAP_DATA_LIST:
-        if stored.get(map_data["zcoord"]) != map_data:
-            changed.append(map_data)
-    if changed:
-        grid.add_maps(*changed)
+        return
+    stored = grid.db.map_data or {}
+    stale = [zcoord for zcoord in stored if zcoord in SETTLEMENT_GRAPHS]
+    if not stale:
+        return
+    for zcoord in stale:
+        stored.pop(zcoord)
+    grid.db.map_data = stored
+    # The contrib caches the parsed maps in ndb; a later display reads the
+    # restored db declaration and reloads from it instead of the retired one.
+    grid.ndb.grid = None
+    grid.ndb.loaded = False
+    log_info(
+        "settlement_grid_display_retired",
+        context={"maps": len(stale), "action": "remove_ascii_registration"},
+    )
 
 
 def sync_grid() -> SyncReport:
@@ -822,11 +882,12 @@ def sync_grid() -> SyncReport:
     graphs = tuple(SETTLEMENT_GRAPHS.values())
     plans = tuple(_plan_settlement_graph(graph) for graph in graphs)
     report = SyncReport()
+    knowledge_journal: list = []
     try:
         with transaction.atomic():
-            _register_grid_display_maps()
+            _clear_grid_display_maps()
             for plan in plans:
-                report += _apply_graph_plan(plan)
+                report += _apply_graph_plan(plan, knowledge_journal)
 
             _sync_grid_room_art()
 
@@ -857,7 +918,7 @@ def sync_grid() -> SyncReport:
 
             _prune_exits_into(limbo)
     except Exception:
-        _invalidate_plan_caches(plans)
+        _invalidate_plan_caches(plans, knowledge_journal)
         raise
     if report.created or report.updated or report.deleted:
         log_info(

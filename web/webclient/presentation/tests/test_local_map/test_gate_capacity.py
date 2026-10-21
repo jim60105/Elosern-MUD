@@ -85,27 +85,32 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_capacity_trim_keeps_the_gate_and_farthers_first(self):
-        # At the real east gate (6,3): in-range within 2 hops is
-        # {(6,3),(5,3),(4,3),(4,4)} + gate. Cap 4 reserves one slot for the
-        # gate, so exactly one far node goes.
+        # At the real east gate: in-range within 2 hops is the gate plus
+        # 東市 / 公會前 / 大神殿前. A cap of 3 reserves one slot for the gate,
+        # so the farthest in-range node (公會前) is dropped first.
         self.char1.location = self.east_gate
         record_arrival(self.char1)
         with patch(
-            "web.webclient.presentation.local_map.grid.MAX_NODES", 4
+            "web.webclient.presentation.local_map.grid.MAX_NODES", 3
         ):
             payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         ids = {node["id"] for node in payload["nodes"]}
-        self.assertEqual(len(ids), 4)
-        # Cap 4 reserves one slot for the gate -> trim drops the single
-        # farthest node in Chebyshev/Y/X descending order: (4,4).
+        self.assertEqual(len(ids), 3)
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        graph = SETTLEMENT_GRAPHS[_T_MAP_KEY]
+        east_market = graph.node("east_market").coordinate
+        guild_forecourt = graph.node("guild_forecourt").coordinate
         self.assertIn(self.ENTRY_ID, ids)
-        self.assertNotIn(_t_grid_id(4, 4), ids)
-        self.assertIn(_t_grid_id(6, 3), ids)
-        self.assertIn(_t_grid_id(5, 3), ids)
-        self.assertIn(_t_grid_id(4, 3), ids)
+        self.assertNotIn(_t_grid_id(*guild_forecourt), ids)
+        self.assertIn(_t_grid_id(*EAST_GATE_XYZ[:2]), ids)
+        self.assertIn(_t_grid_id(*east_market), ids)
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
-        self.assertEqual((gate_node["x"], gate_node["y"]), (7, 3))
+        self.assertEqual(
+            (gate_node["x"], gate_node["y"]),
+            (EAST_GATE_XYZ[0] + 1, EAST_GATE_XYZ[1]),
+        )
         self.assertIsNotNone(gate_node["action"])
 
     @covers_requirement(
@@ -211,23 +216,22 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
-    def test_occupied_preferred_slot_probes_deterministically(self):
-        # Plaza (3,3): a registered gate's east slot (4,3) is a real,
-        # already-occupied in-range city node; the gate takes the nearest
-        # free slot, not a dropped identity.
+    def test_gate_takes_its_registry_face_slot_at_the_plaza(self):
+        # The plaza anchor: the registered gate's east face slot is a legal
+        # renderer-local position that no city node occupies, so the gate
+        # keeps its face direction instead of probing away from it.
         gate = self._make_gate(self.plaza)
         self.char1.location = self.plaza
         record_arrival(self.char1)
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         by_id = {node["id"]: node for node in payload["nodes"]}
-        self.assertIn(_t_grid_id(4, 3), by_id)
         self.assertIn(self.ENTRY_ID, by_id)
         gate_node = by_id[self.ENTRY_ID]
-        # (4,3) is occupied; ring 1's first candidate (dy=-1, dx=0) from
-        # (4,3) is (4,2), which no city node occupies. Renderer-local
-        # geometry is slot freedom, never identity.
-        self.assertEqual((gate_node["x"], gate_node["y"]), (4, 2))
+        self.assertEqual(
+            (gate_node["x"], gate_node["y"]),
+            (_T_PLAZA_XYZ[0] + 1, _T_PLAZA_XYZ[1]),
+        )
         slots = [(n["x"], n["y"]) for n in payload["nodes"] if n["id"] != self.ENTRY_ID]
         self.assertNotIn((gate_node["x"], gate_node["y"]), slots)
         self.assertEqual(gate_node["action"]["exit_ref"], str(int(gate.id)))

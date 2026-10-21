@@ -14,16 +14,19 @@ from server.conf.at_server_startstop import at_server_start
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.maps.altoria_capital import XYMAP_DATA
 from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
+from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
-SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
-EAST_GATE_XYZ = (6, 3, "capital_altoria")
+_CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+SOUTH_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("n").grid_xy, "capital_altoria")
+EAST_GATE_XYZ = (*_CAPITAL_ENTRY.gate_for("w").grid_xy, "capital_altoria")
 
 
 class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -116,14 +119,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         # equals its authored prototype), not the sentence — the prototype's
         # prose is Traditional Chinese like every other shipped room text.
         from world.maps.altoria_capital import PROTOTYPES
+        from world.maps.map_data import SETTLEMENT_GRAPHS
 
+        south_gate_coordinate = SETTLEMENT_GRAPHS["capital_altoria"].node(
+            "south_gate"
+        ).coordinate
         self.assertEqual(
-            south_gate.db.desc, PROTOTYPES[(3, 0)]["desc"]
+            south_gate.db.desc, PROTOTYPES[south_gate_coordinate]["desc"]
         )
 
         from dataclasses import replace
 
-        from world.maps.map_data import SETTLEMENT_GRAPHS
         from world.maps.sparse_graph import SparseSettlementGraph
 
         capital = SETTLEMENT_GRAPHS["capital_altoria"]
@@ -221,7 +227,15 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         exits = list(east_gate.exits)
         self.assertEqual(len(exits), 1)
-        self.assertEqual(exits[0].destination.xyz, (5, 3, "capital_altoria"))
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        self.assertEqual(
+            exits[0].destination.xyz,
+            (
+                *SETTLEMENT_GRAPHS["capital_altoria"].node("east_market").coordinate,
+                "capital_altoria",
+            ),
+        )
 
     def test_absent_limbo_degrades_without_raising(self):
         sync_grid()
@@ -255,11 +269,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria", "village_ciaran"])
         row = CITY_GATE_REGISTRY["capital_altoria"]
-        self.assertEqual(row.gate_xyz, (3, 0, "capital_altoria"))
+        self.assertEqual(row.gate_xyz, SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
         self.assertEqual(row.exit_aliases, ("王都", "城門"))
         village = CITY_GATE_REGISTRY["village_ciaran"]
-        self.assertEqual(village.gate_xyz, (0, 1, "village_ciaran"))
+        self.assertEqual(
+            village.gate_xyz,
+            (
+                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+                "village_ciaran",
+            ),
+        )
         self.assertEqual(village.exit_key, "隱密小徑")
         with self.assertRaises(TypeError):
             CITY_GATE_REGISTRY["ghost"] = row
@@ -391,19 +411,25 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             )
 
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_same_coordinate_resolves_to_different_rooms_in_each_settlement(self):
+    def test_each_settlement_keeps_its_own_coordinate_space(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
-        # (2,1) exists on both maps: 河岸道 in the capital, 練刀場 in the
-        # village — the shared (X, Y) still names two different rooms.
-        capital_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "capital_altoria")).first()
-        village_room = GridRoom.objects.filter_xyz(xyz=(2, 1, "village_ciaran")).first()
-        self.assertIsNotNone(capital_room)
-        self.assertIsNotNone(village_room)
-        self.assertIsNot(capital_room, village_room)
-        self.assertNotEqual(capital_room.id, village_room.id)
-        self.assertEqual(capital_room.key, "河岸道")
-        self.assertEqual(village_room.key, "練刀場")
+        # The metre frames are disjoint: each settlement's coordinates resolve
+        # only inside its own map key, never into the other's rooms.
+        for map_key, node_id, key in (
+            ("capital_altoria", "riverbank_road", "河岸道"),
+            ("village_ciaran", "training_clearing", "練刀場"),
+        ):
+            coordinate = SETTLEMENT_GRAPHS[map_key].node(node_id).coordinate
+            room = GridRoom.objects.filter_xyz(xyz=(*coordinate, map_key)).first()
+            self.assertIsNotNone(room)
+            self.assertEqual(room.key, key)
+            other_map = (
+                "village_ciaran" if map_key == "capital_altoria" else "capital_altoria"
+            )
+            self.assertIsNone(
+                GridRoom.objects.filter_xyz(xyz=(*coordinate, other_map)).first()
+            )
 
     @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
     def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
@@ -553,8 +579,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # The village's single gate provisions exactly one exit on the
         # entrance node 隱密小徑, facing the wilderness with the authored
         # return direction "n".
+        village_entrance = (
+            *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+            "village_ciaran",
+        )
         village_gate_exits = [
-            e for e in GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first().exits
+            e for e in GridRoom.objects.filter_xyz(xyz=village_entrance).first().exits
             if isinstance(e, WildernessGateExit)
         ]
         self.assertEqual(len(village_gate_exits), 1)
@@ -667,7 +697,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         source = inspect.getsource(sync_grid)
         # The sparse synchronizer is the spawn path; the xyzgrid contrib's
         # dense ``reload()``/``spawn()`` pipeline must not come back.
-        self.assertIn("_apply_graph_plan(plan)", source)
+        self.assertIn("_apply_graph_plan(plan, knowledge_journal)", source)
         self.assertNotIn("grid.spawn()", source)
         self.assertNotIn("get_xyzgrid()", source)
         self.assertNotIn("sync_wilderness", source)
@@ -701,7 +731,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_grid()
         sync_wilderness()
 
-        entrance_room = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
+        entrance_room = GridRoom.objects.filter_xyz(
+            xyz=(
+                *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+                "village_ciaran",
+            )
+        ).first()
         gate_exit = [
             e for e in entrance_room.exits if isinstance(e, WildernessGateExit)
         ][0]

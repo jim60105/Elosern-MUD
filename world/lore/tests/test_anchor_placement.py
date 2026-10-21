@@ -30,11 +30,11 @@ class AnchorPlacementRegistryTests(unittest.TestCase):
         capital = ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]
         self.assertEqual(capital.anchor_key, "capital_altoria")
         self.assertEqual(capital.zcoord, "capital_altoria")
-        self.assertEqual(capital.entrance_xy, (3, 3))
+        self.assertEqual(capital.entrance_xy, (3500, 2850))
         village = ANCHOR_PLACEMENT_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
         self.assertEqual(village.zcoord, "village_ciaran")
-        self.assertEqual(village.entrance_xy, (1, 1))
+        self.assertEqual(village.entrance_xy, (220, 305))
 
     @covers_requirement("anchor-placement::every-placement-s-anchor-key-resolves-against-anchor-registry")
     def test_every_entrys_anchor_key_exists_in_anchor_registry(self):

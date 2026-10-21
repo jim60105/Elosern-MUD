@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from typing import Any
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from world.maps.wilderness_provider import (
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
@@ -358,6 +358,85 @@ def _characters_with_knowledge() -> list[Any]:
             db_attributes__db_key=KNOWLEDGE_ATTR
         )
     )
+
+
+def remap_grid_identities(
+    map_id: str,
+    bindings: Mapping[tuple[int, int], tuple[int, int]],
+    *,
+    journal: list | None = None,
+) -> int:
+    """Rewrite moved grid nodes' stored identities, preserving observation.
+
+    ``bindings`` maps each old ``(x, y)`` binding to its new one for one
+    settlement map. The knowledge owner is the sole writer of these records,
+    so a coordinate cutover remaps the existing ``grid:`` ids here instead of
+    letting the next arrival record a fresh observation. First/last seen ticks
+    are preserved; an old and new id that collapse onto one node merge by the
+    earliest first-seen and the latest last-seen tick.
+
+    ``journal`` is the caller's mutation log: each character is registered
+    BEFORE its write is attempted, so a failed transaction can invalidate the
+    process-local attribute caches of every character whose durable record
+    will roll back. Returns the number of characters written.
+    """
+
+    if not bindings:
+        return 0
+    mapping = {
+        encode_grid(map_id, old[0], old[1]): encode_grid(map_id, new[0], new[1])
+        for old, new in bindings.items()
+        if tuple(old) != tuple(new)
+    }
+    if not mapping:
+        return 0
+
+    written = 0
+    for character in _characters_with_knowledge():
+        current = character.attributes.get(KNOWLEDGE_ATTR)
+        try:
+            visits = _validated_visits(current)
+        except KnowledgeError as error:
+            log_warn(
+                "map_knowledge_remap_skipped_corrupt_record",
+                exc=error,
+                context={"obj": str(character), "key": KNOWLEDGE_ATTR, "map_id": map_id},
+            )
+            continue
+        remapped: dict[str, dict[str, int]] = {}
+        changed = False
+        for node_id, entry in visits.items():
+            target = mapping.get(node_id, node_id)
+            if target != node_id:
+                changed = True
+            existing = remapped.get(target)
+            if existing is None:
+                remapped[target] = dict(entry)
+            else:
+                existing["first_seen_tick"] = min(
+                    existing["first_seen_tick"], entry["first_seen_tick"]
+                )
+                existing["last_seen_tick"] = max(
+                    existing["last_seen_tick"], entry["last_seen_tick"]
+                )
+        if not changed:
+            continue
+        if journal is not None:
+            journal.append(character)
+        _write_knowledge(
+            character, {"schema_version": SCHEMA_VERSION, "visited": remapped}
+        )
+        written += 1
+    if written:
+        log_info(
+            "map_knowledge_coordinates_remapped",
+            context={
+                "map_id": map_id,
+                "nodes": len(mapping),
+                "characters": written,
+            },
+        )
+    return written
 
 
 def prune_reclaimed_room(room_id: int) -> bool:

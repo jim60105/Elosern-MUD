@@ -20,7 +20,7 @@ CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
 def _point_entry(anchor_key="capital_altoria", anchor=(500, 500), gates=None):
     """A throwaway point-shape (cave) entry for helper/validation tests."""
     if gates is None:
-        gates = (WildernessGate("n", (3, 0), "capital_altoria"),)
+        gates = (WildernessGate("n", (3050, 150), "capital_altoria"),)
     return WildernessEntryPoint(anchor_key, ("#",), anchor, gates)
 
 
@@ -41,7 +41,10 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         self.assertEqual(CAPITAL.origin_xy, (857, 1076))
         self.assertEqual(
             [(gate.return_direction, gate.grid_xy, gate.z_map_key) for gate in CAPITAL.gates],
-            [("n", (3, 0), "capital_altoria"), ("w", (6, 3), "capital_altoria")],
+            [
+                ("n", (3050, 150), "capital_altoria"),
+                ("w", (6500, 3010), "capital_altoria"),
+            ],
         )
         village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
         self.assertEqual(village.anchor_key, "village_ciaran")
@@ -49,7 +52,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         self.assertTrue(village.is_point_shape)
         self.assertEqual(
             [(gate.return_direction, gate.grid_xy, gate.z_map_key) for gate in village.gates],
-            [("n", (0, 1), "village_ciaran")],
+            [("n", (35, 270), "village_ciaran")],
         )
         # A point entrance contributes no footprint at all, so it can never
         # collide with the capital's mask or another village-wide obstacle.
@@ -68,7 +71,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         self.assertEqual(village.approach_cell(village.gate_for("n")), (1340, 1220))
         gate = village.gate_for("n")
         # The gate returns to the village's entrance node on its own map.
-        self.assertEqual((gate.grid_xy, gate.z_map_key), ((0, 1), "village_ciaran"))
+        self.assertEqual((gate.grid_xy, gate.z_map_key), ((35, 270), "village_ciaran"))
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
@@ -133,8 +136,8 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
             self.assertIn(entry.anchor_key, ANCHOR_PLACEMENT_REGISTRY)
 
     def test_gate_lookup_by_return_direction(self):
-        self.assertEqual(CAPITAL.gate_for("n").grid_xy, (3, 0))
-        self.assertEqual(CAPITAL.gate_for("w").grid_xy, (6, 3))
+        self.assertEqual(CAPITAL.gate_for("n").grid_xy, (3050, 150))
+        self.assertEqual(CAPITAL.gate_for("w").grid_xy, (6500, 3010))
         # The capital's second gate is the 東門 since the replan; the old
         # 北門 directions are authored nowhere.
         self.assertIsNone(CAPITAL.gate_for("s"))
@@ -171,7 +174,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
 
         extents = _iter_map_extents()
         self.assertIn("village_ciaran", extents)
-        self.assertIn((0, 1), extents["village_ciaran"])
+        self.assertIn((35, 270), extents["village_ciaran"])
         validate_wilderness_entries()
 
     def _assert_rejected(self, key, entry, fragment):
@@ -196,7 +199,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
     )
     def test_malformed_entries_are_each_rejected(self):
-        gate = WildernessGate("n", (3, 0), "capital_altoria")
+        gate = WildernessGate("n", (3050, 150), "capital_altoria")
         cases = [
             ("empty mask", "x", WildernessEntryPoint("x", (), (0, 0), (gate,)), "empty mask"),
             (
@@ -221,7 +224,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "non-canonical return_direction",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#####",) * 5, (600, 600), (WildernessGate("q", (3, 0), "capital_altoria"),)
+                    "x", ("#####",) * 5, (600, 600), (WildernessGate("q", (3050, 150), "capital_altoria"),)
                 ),
                 "non-canonical return_direction",
             ),
@@ -232,7 +235,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "x",
                     ("#####",) * 5,
                     (600, 600),
-                    (gate, WildernessGate("n", (6, 3), "capital_altoria")),
+                    (gate, WildernessGate("n", (6500, 3010), "capital_altoria")),
                 ),
                 "duplicated return_direction",
             ),
@@ -243,7 +246,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "x",
                     ("#", "#", "#"),
                     (1390, 1200),
-                    (WildernessGate("e", (3, 0), "capital_altoria"),),
+                    (WildernessGate("e", (3050, 150), "capital_altoria"),),
                 ),
                 "is not walkable terrain",
             ),
@@ -258,8 +261,8 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "x",
                 _point_entry(
                     gates=(
-                        WildernessGate("n", (3, 0), "capital_altoria"),
-                        WildernessGate("w", (6, 3), "capital_altoria"),
+                        WildernessGate("n", (3050, 150), "capital_altoria"),
+                        WildernessGate("w", (6500, 3010), "capital_altoria"),
                     )
                 ),
                 "exactly one gate",
@@ -292,7 +295,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "ragged mask rows",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("###", "##"), (600, 640), (WildernessGate("n", (3, 0), "capital_altoria"),)
+                    "x", ("###", "##"), (600, 640), (WildernessGate("n", (3050, 150), "capital_altoria"),)
                 ),
                 "ragged mask",
             ),
@@ -300,7 +303,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "illegal mask character",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#X#", "#.#", "#.#"), (600, 660), (WildernessGate("n", (3, 0), "capital_altoria"),)
+                    "x", ("#X#", "#.#", "#.#"), (600, 660), (WildernessGate("n", (3050, 150), "capital_altoria"),)
                 ),
                 "illegal mask character",
             ),
@@ -311,7 +314,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     "capital_altoria",
                     ("###", "#.#", "###"),
                     (600, 680),
-                    (WildernessGate("n", (3, 0), "capital_altoria"),),
+                    (WildernessGate("n", (3050, 150), "capital_altoria"),),
                 ),
                 "is not a '#' footprint cell",
             ),
@@ -319,7 +322,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "overlapping footprints",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("#", "#"), (860, 1080), (WildernessGate("e", (3, 0), "capital_altoria"),)
+                    "x", ("#", "#"), (860, 1080), (WildernessGate("e", (3050, 150), "capital_altoria"),)
                 ),
                 "footprint overlaps",
             ),
@@ -327,7 +330,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 "footprint contains another entry's gate approach cell",
                 "x",
                 WildernessEntryPoint(
-                    "x", ("##",), (859, 1077), (WildernessGate("w", (3, 0), "capital_altoria"),)
+                    "x", ("##",), (859, 1077), (WildernessGate("w", (3050, 150), "capital_altoria"),)
                 ),
                 "lies inside footprint",
             ),
@@ -351,8 +354,8 @@ class WildernessEntryValidationTests(unittest.TestCase):
                     ("#####",) * 5,
                     (600, 700),
                     (
-                        WildernessGate("n", (3, 3), "capital_altoria"),
-                        WildernessGate("s", (3, 3), "capital_altoria"),
+                        WildernessGate("n", (3500, 2850), "capital_altoria"),
+                        WildernessGate("s", (3500, 2850), "capital_altoria"),
                     ),
                 ),
                 "shares destination room",

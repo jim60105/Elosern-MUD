@@ -543,17 +543,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: host sex, assortment keys, authored kwargs).
     HOSPITALITY_PLACE_ROWS = {
         "altoria_tavern": (
-            "tavern", (4, 1), "醉月酒館",
+            "tavern", (3970, 1120), "醉月酒館",
             "human", "female", (),
             {"dialogue_key": "altoria_tavern"},
         ),
         "altoria_lodging": (
-            "lodging", (4, 1), "爐火旅店",
+            "lodging", (3970, 1120), "爐火旅店",
             "human", "female", (),
             {"dialogue_key": "altoria_lodging"},
         ),
         "altoria_bathhouse": (
-            "bathhouse", (5, 1), "公共浴場",
+            "bathhouse", (4830, 970), "公共浴場",
             "human", "female", (),
             {"dialogue_key": "altoria_bathhouse"},
         ),
@@ -595,21 +595,21 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: host sex, assortment keys, authored kwargs).
     CROWN_WATCH_PLACE_ROWS = {
         "altoria_palace": (
-            "palace", (4, 6), "王宮",
+            "palace", (4500, 6350), "王宮",
             None, None, (), {},
         ),
         "altoria_noble_watch": (
-            "watch_post", (3, 5), "貴族區衛所",
+            "watch_post", (3500, 4850), "貴族區衛所",
             "human", "male", (),
             {"dialogue_key": "altoria_noble_watch"},
         ),
         "altoria_drill_yard": (
-            "training_ground", (2, 4), "校場",
+            "training_ground", (2300, 3820), "校場",
             "human", "male", (),
             {"dialogue_key": "altoria_drill_yard"},
         ),
         "altoria_guardhouse": (
-            "watch_post", (3, 0), "衛兵駐所",
+            "watch_post", (3050, 150), "衛兵駐所",
             "human", "male", (),
             {"dialogue_key": "altoria_guardhouse"},
         ),
@@ -678,17 +678,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: neither authored a branch, shop or quest kwarg.
     LEARNING_EXCHANGE_PLACE_ROWS = {
         "altoria_academy": (
-            "academy", (5, 5), "王立魔法學院",
+            "academy", (5650, 5200), "王立魔法學院",
             "human", "male", (),
             {"dialogue_key": "altoria_academy"},
         ),
         "altoria_merchant_hall": (
-            "merchant_hall", (5, 3), "商會公所",
+            "merchant_hall", (5380, 2850), "商會公所",
             "human", "male", (),
             {"dialogue_key": "altoria_merchant_hall"},
         ),
         "altoria_market_stalls": (
-            "market", (2, 3), "市集棚",
+            "market", (2420, 2700), "市集棚",
             None, None, (), {},
         ),
     }

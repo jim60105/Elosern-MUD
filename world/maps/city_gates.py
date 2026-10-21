@@ -38,13 +38,13 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType(
     {
         "capital_altoria": CityGateDef(
             map_id="capital_altoria",
-            gate_xyz=(3, 0, "capital_altoria"),
+            gate_xyz=(3050, 150, "capital_altoria"),
             exit_key="南門",
             exit_aliases=("王都", "城門"),
         ),
         "village_ciaran": CityGateDef(
             map_id="village_ciaran",
-            gate_xyz=(0, 1, "village_ciaran"),
+            gate_xyz=(35, 270, "village_ciaran"),
             exit_key="隱密小徑",
             exit_aliases=("祕徑", "幽徑"),
         ),

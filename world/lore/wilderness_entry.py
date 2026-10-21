@@ -438,9 +438,9 @@ WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
         origin_xy=(857, 1076),
         gates=(
             # 南門: a traveler at (860, 1077) heading north enters the city.
-            WildernessGate("n", (3, 0), "capital_altoria"),
+            WildernessGate("n", (3050, 150), "capital_altoria"),
             # 東門: a traveler at (864, 1080) heading west enters the city.
-            WildernessGate("w", (6, 3), "capital_altoria"),
+            WildernessGate("w", (6500, 3010), "capital_altoria"),
         ),
     ),
     "village_ciaran": WildernessEntryPoint(
@@ -455,7 +455,7 @@ WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
             # 隱密小徑: a traveler at the anchor cell heading north follows the
             # concealed path into the village. No other direction is a
             # gateway.
-            WildernessGate("n", (0, 1), "village_ciaran"),
+            WildernessGate("n", (35, 270), "village_ciaran"),
         ),
     ),
 }

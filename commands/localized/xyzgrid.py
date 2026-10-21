@@ -19,7 +19,7 @@ from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils import ansi, list_to_string
 from evennia.utils.utils import delay
 
-from world.maps.map_data import settlement_graph
+from world.maps.map_data import SETTLEMENT_GRAPHS, settlement_graph
 from world.maps.sparse_graph import graph_from_xymap
 
 PathData = namedtuple("PathData", ("target", "graph", "directions", "legs", "task"))
@@ -270,7 +270,16 @@ class CmdMap(_CmdMap):
             Z = xyz[2]
 
         elif self.args.strip().lower() == "list":
-            xymaps = "\n ".join(str(repr(xymap)) for xymap in xyzgrid.all_maps())
+            entries = [
+                f"{graph.map_id} ({len(graph.nodes)} 個地點)"
+                for graph in SETTLEMENT_GRAPHS.values()
+            ]
+            entries.extend(
+                repr(xymap)
+                for xymap in xyzgrid.all_maps()
+                if xymap.Z not in SETTLEMENT_GRAPHS
+            )
+            xymaps = "\n ".join(entries)
             self.caller.msg(f"網格上的地圖（Z 座標）：\n |w{xymaps}")
             return
 
@@ -279,12 +288,38 @@ class CmdMap(_CmdMap):
 
         xymap = xyzgrid.get_map(Z)
         if not xymap:
+            graph = settlement_graph(Z)
+            if graph is not None:
+                self.caller.msg(ansi.raw(_sparse_map_listing(graph)))
+                return
             self.caller.msg(
                 f"找不到 XYMap '{Z}'。輸入「地圖 list」查看可用的地圖與 Z 座標。"
             )
             return
 
         self.caller.msg(ansi.raw(xymap.mapstring))
+
+
+def _sparse_map_listing(graph) -> str:
+    """Render one declared settlement as a deterministic node/exit listing.
+
+    The meter scale has no ASCII lattice; the builder-facing map view lists
+    each authored location with its physical coordinate and outgoing compass
+    exits instead.
+    """
+
+    lines = [f"{graph.map_id}（{len(graph.nodes)} 個地點，單位：公尺）"]
+    for node in sorted(graph.nodes.values(), key=lambda item: (item.y, item.x)):
+        exits = [
+            f"{edge.direction}→{edge.destination.key}"
+            for edge in graph.edges
+            if edge.source.node_id == node.node_id
+        ]
+        lines.append(
+            f" {node.key} ({node.x}, {node.y})："
+            + ("、".join(sorted(exits)) if exits else "無")
+        )
+    return "\n".join(lines)
 
 
 class ProjectXYZGridCmdSet(XYZGridCmdSet):

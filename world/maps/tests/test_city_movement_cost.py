@@ -17,7 +17,12 @@ from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
-SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+SOUTH_GATE_XYZ = (
+    *WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").grid_xy,
+    "capital_altoria",
+)
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
@@ -122,7 +127,11 @@ class SampleCityCostedExitTests(EvenniaTest):
         # intra-village link, and each step charges the same physical-edge
         # calculation as a capital street step.
         sync_grid()
-        entrance = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
+        village_entrance = (
+            *WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").grid_xy,
+            "village_ciaran",
+        )
+        entrance = GridRoom.objects.filter_xyz(xyz=village_entrance).first()
         self.char1.location = entrance
         village_exit = [e for e in entrance.exits if e.destination.key == "村中廣場"][0]
         self.assertIsInstance(village_exit, CostedXYZExit)

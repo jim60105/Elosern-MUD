@@ -153,68 +153,68 @@ class PlaceRegistryTests(unittest.TestCase):
     PRE_SPLIT_PLACE_CAPTURE = {
         "altoria_guild_hall": (
             'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
-            '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。', (4, 3),
+            '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。', (4380, 3000),
             '冒險者公會大廳', ('guild hall', 'hall'),
             'human', None, 'other',
         ),
         "altoria_general_store": (
             'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
             '阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。',
-            (2, 3), '雜貨店', ('general store', 'store', 'shop'),
+            (2420, 2700), '雜貨店', ('general store', 'store', 'shop'),
             'human', None, 'other',
         ),
         "altoria_forge": (
             'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
             "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。",
-            (1, 3), '鍛造鋪', ('forge', 'smithy'),
+            (1300, 2600), '鍛造鋪', ('forge', 'smithy'),
             'human', 'human_plains', 'male',
         ),
         "altoria_eatery": (
             'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
             "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。",
-            (3, 1), '餐館', ('eatery', 'restaurant', 'diner'),
+            (3140, 1050), '餐館', ('eatery', 'restaurant', 'diner'),
             'human', 'human_plains', 'male',
         ),
         "altoria_tailor": (
             'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',
             "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。",
-            (1, 3), '裁縫坊', ('tailor', 'tailor shop'),
+            (1300, 2600), '裁縫坊', ('tailor', 'tailor shop'),
             'human', 'human_plains', 'female',
         ),
         "ciaran_hailiel_home": (
             'ciaran_hailiel_home', 'village_ciaran', PlaceKind.HOME, '海莉爾的家',
             "一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺著等誰來買。",
-            (2, 1), '海莉爾的家', ('hailiel', "hailiel's home"),
+            (405, 335), '海莉爾的家', ('hailiel', "hailiel's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_gwenaera_home": (
             'ciaran_gwenaera_home', 'village_ciaran', PlaceKind.HOME, '格威娜拉的家',
             "銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。",
-            (2, 3), '格威娜拉的家', ('gwenaera', "gwenaera's home"),
+            (440, 665), '格威娜拉的家', ('gwenaera', "gwenaera's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_lareneth_home": (
             'ciaran_lareneth_home', 'village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
             "溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。",
-            (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"),
+            (245, 135), '拉瑞內斯的家', ('lareneth', "lareneth's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_nireth_home": (
             'ciaran_nireth_home', 'village_ciaran', PlaceKind.HOME, '妮瑞斯的家',
             "成把的藥草與塞著木塞的小藥罐擠滿這間曬得到太陽的屋子，按摘下的時辰排，不按值多少錢排。窗邊一方臼，窗外望得見村子的藥草園，門口一帶的空氣苦裡帶甜。藥是留給需要的人的；被村子請託把藥換成錢賣，是同一座種藥的村子順便想到的事。",
-            (3, 1), '妮瑞斯的家', ('nireth', "nireth's home"),
+            (590, 300), '妮瑞斯的家', ('nireth', "nireth's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
             "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。",
-            (1, 2), '瓦爾溫的家', ('valwyn', "valwyn's home"),
+            (200, 465), '瓦爾溫的家', ('valwyn', "valwyn's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_vethiel_home": (
             'ciaran_vethiel_home', 'village_ciaran', PlaceKind.HOME, '維特希爾的家',
             "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。",
-            (2, 2), '維特希爾的家', ('vethiel', "vethiel's home"),
+            (390, 495), '維特希爾的家', ('vethiel', "vethiel's home"),
             'elf', 'ciaran', 'female',
         ),
     }
@@ -362,9 +362,9 @@ class PlaceRegistryTests(unittest.TestCase):
         # every other field these rows transcribe is untouched by the replan
         # (the neutrality gate: test_capital_places_keep_their_identities).
         self.assertEqual(self.guild.room_name_zh, "阿爾托利亞冒險者公會大廳")
-        self.assertEqual(self.guild.exterior_xy, (4, 3))  # 公會前
+        self.assertEqual(self.guild.exterior_xy, (4380, 3000))  # 公會前
         self.assertEqual(self.store.room_name_zh, "阿爾托利亞雜貨店")
-        self.assertEqual(self.store.exterior_xy, (2, 3))  # 市場街
+        self.assertEqual(self.store.exterior_xy, (2420, 2700))  # 市場街
 
     def test_shipped_hosts_author_human_race_and_default_sex(self):
         # host_race/host_subrace/host_sex are creation-time authored identity,
@@ -386,11 +386,11 @@ class PlaceRegistryTests(unittest.TestCase):
         # correspondence test) and the derived shop registry, so a valid later
         # personnel or merchandise edit does not fail this guard.
         expected = {
-            "altoria_guild_hall": ("阿爾托利亞冒險者公會大廳", (4, 3), "冒險者公會大廳"),
-            "altoria_general_store": ("阿爾托利亞雜貨店", (2, 3), "雜貨店"),
-            "altoria_forge": ("聖潔王都鍛造鋪", (1, 3), "鍛造鋪"),
-            "altoria_eatery": ("聖潔王都餐館", (3, 1), "餐館"),
-            "altoria_tailor": ("聖潔王都裁縫坊", (1, 3), "裁縫坊"),
+            "altoria_guild_hall": ("阿爾托利亞冒險者公會大廳", (4380, 3000), "冒險者公會大廳"),
+            "altoria_general_store": ("阿爾托利亞雜貨店", (2420, 2700), "雜貨店"),
+            "altoria_forge": ("聖潔王都鍛造鋪", (1300, 2600), "鍛造鋪"),
+            "altoria_eatery": ("聖潔王都餐館", (3140, 1050), "餐館"),
+            "altoria_tailor": ("聖潔王都裁縫坊", (1300, 2600), "裁縫坊"),
         }
         for key, (room_name, exterior, doorway) in expected.items():
             with self.subTest(place=key):
@@ -652,13 +652,13 @@ class PlaceRegistryTests(unittest.TestCase):
     # ---- shared exteriors (altoria-place-slices) ----------------------------
 
     def _alley(self, key, doorway):
-        """One synthetic place on the shared craft-alley exterior (1, 3)."""
+        """One synthetic place on the shared craft-alley exterior."""
         return replace(
             self.guild,
             key=key,
             service_id=f"{key}_service",
             room_name_zh=f"合成巷道室 {key}",
-            exterior_xy=(1, 3),
+            exterior_xy=(1300, 2600),
             doorway_key_zh=doorway,
         )
 

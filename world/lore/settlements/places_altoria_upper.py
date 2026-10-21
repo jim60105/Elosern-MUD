@@ -56,7 +56,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "上就看得見那裡的商品櫃。祝禱、事工與買賣是同一份信仰的三座櫃檯，並排站在同一片光裡；這座城市裡沒有人會覺得提起它們其中任何一樣時該壓"
             "低聲音。"
         ),
-        exterior_xy=(4, 4),  # 大神殿前
+        exterior_xy=(4560, 3920),  # 大神殿前
         doorway_key_zh="光明神殿",
         doorway_aliases=("temple", "cathedral", "church"),
         host_name="艾莉安娜‧寒水",
@@ -89,7 +89,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "事名字的聲調跟喊祝禱時完全一樣。敬拜、事工、買賣在同一棟屋簷下、毫不避人。光明教會就是這樣過日子，聖所公開營生這件事，整個大陸都"
             "知道，跟酒館賣酒沒有兩樣。"
         ),
-        exterior_xy=(4, 4),  # 大神殿前
+        exterior_xy=(4560, 3920),  # 大神殿前
         doorway_key_zh="聖所",
         doorway_aliases=("sanctum", "church sanctum"),
         host_name="羅海西亞‧芬威克",
@@ -125,7 +125,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "東西、一座王宮該有的每個故事，都還沒有被寫出來，大殿也懶得假裝不是這樣。沿著它走完一趟的人會聽見的唯一聲音是自己的腳步，那才是這座城"
             "市頭上這頂王冠最忠實的描述。"
         ),
-        exterior_xy=(4, 6),  # 王宮前庭
+        exterior_xy=(4500, 6350),  # 王宮前庭
         doorway_key_zh="王宮",
         doorway_aliases=("palace", "royal palace"),
     ),
@@ -143,7 +143,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "桌上。街區的巡邏按整點輪過這裡。牆上沒有任何一張是命令，屋裡也沒有任何一樣東西會阻擋人，當初蓋這駐所的人把地面從門到桌留空，像一戶"
             "沒有訪客的人家把客廳的門敞著。"
         ),
-        exterior_xy=(3, 5),  # 貴族區前
+        exterior_xy=(3500, 4850),  # 貴族區前
         doorway_key_zh="貴族區衛所",
         doorway_aliases=("noble watch", "watch post"),
         host_name="古利安‧鷹守",
@@ -172,7 +172,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "凳。王都的徵兵在白天於此操練，公會到傍晚才來用屬於它的時段，樁上的痕跡來自一百雙不同的手。場子裡沒有任何東西會自己磨快一刀或評定一階"
             "，它是這座城市來做「任何地面都肯承接的那種功課」的地方，只因為在這裡，每個人都看得見標準在哪裡。"
         ),
-        exterior_xy=(2, 4),  # 校場外
+        exterior_xy=(2300, 3820),  # 校場外
         doorway_key_zh="校場",
         doorway_aliases=("drill yard", "training ground"),
         host_name="伊沃‧高丘",
@@ -207,7 +207,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特‧阿爾托利亞從前坐過的教"
             "室。"
         ),
-        exterior_xy=(5, 5),  # 學院前
+        exterior_xy=(5650, 5200),  # 學院前
         doorway_key_zh="王立魔法學院",
         doorway_aliases=("academy", "royal academy", "magic academy"),
         host_name="奧德溫‧薩契",

@@ -14,7 +14,7 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 | Concern | Owner |
 | --- | --- |
 | 地形速度表、區域→地形對照、單次向上取整的耗時計算 | `world/rules/travel_cost.py`、`world/rules/rulebook/movement.yaml` |
-| 聚落道路的物理公尺座標與路段長度 | `world/maps/altoria_capital.py::PHYSICAL_POSITIONS`、`world/maps/village_ciaran.py::PHYSICAL_POSITIONS`、`world/maps/sparse_graph.py` |
+| 聚落道路的公尺座標、作者宣告的羅盤方位與路段長度 | `world/maps/altoria_capital.py`、`world/maps/village_ciaran.py`、`world/maps/sparse_graph.py` |
 | 荒野格距、區域判定 | `world/maps/wilderness_provider.py`（`WILDERNESS_KM_PER_CELL`、`region_for_coordinates`） |
 | 城門絕對公尺幾何與聚落錨點轉換 | `world/maps/wilderness_destination.py::settlement_world_position_m`、`gate_approach_distance_m` |
 | 移動前預檢與單一充能入口 | `world/rules/travel_cost.py::preflight_movement_cost`、`world/rules/movement.py::charge_movement` |
@@ -29,10 +29,12 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 - 速度以「整數公尺／小時」宣告，因此單一路段的秒數在取整前是精確分數：
   settlement／road 4500、open ground 3000、woodland 2000、mountain trail 1500。
   1.25 m/s = 4500 m/h；3 km/h = 3000 m/h。
-- 聚落節點同時有「目前 xyzgrid 座標」與「作者宣告的絕對公尺位置」。路段長度一律
-  取物理位置（含彎道折線全長）；羅盤方向仍由邏輯座標決定，所以座標搬遷不會悄悄
-  改寫出口方位。`PHYSICAL_POSITIONS` 以座標為鍵，必須與 `NODE_IDS` 的格位完全
-  一致，否則 `build_sparse_graph()` 在寫入前拒絕。
+- 聚落節點座標本身就是聚落區域座標系中的整數公尺位置（`x` 向東、`y` 向北）；
+  `z` 仍是邏輯地圖／圖層鍵，不是海拔。路段長度取兩端公尺座標的歐氏距離（含作者
+  宣告的彎道折線全長）。羅盤方位由每條有向道路作者宣告，因為不規則的公尺佈局幾
+  乎不會與軸對齊；由原始座標差推導會把所有主要街道誤判為斜向。`NODE_IDS`、
+  `PROTOTYPES` 與 `ROADS` 必須描述同一組節點，否則 `build_sparse_graph()` 在寫
+  入前拒絕。
 - 荒野距離 = 歐氏格距 × 宣告格距（`WILDERNESS_KM_PER_CELL × 1000` 公尺；自
   `rescale-wilderness-geography` 起為每格 1 公里）。斜向不是一格：`(1,1)` 格的
   斜向距離是 `√2 × 格距`。地形取兩端較慢者，因此同一條邊雙向同價。荒野格是否

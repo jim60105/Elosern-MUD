@@ -6,11 +6,15 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import AnchorRoom, GridRoom, Room
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.lore.sync import sync_all
 
-SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
+SOUTH_GATE_XYZ = (
+    *WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").grid_xy,
+    "capital_altoria",
+)
 
 
 class SampleCityWalkthroughTests(EvenniaTest):

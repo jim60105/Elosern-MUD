@@ -37,7 +37,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_desc_zh=(
             "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。"
         ),
-        exterior_xy=(3, 1),  # 南大道
+        exterior_xy=(3140, 1050),  # 南大道
         doorway_key_zh="餐館",
         doorway_aliases=("eatery", "restaurant", "diner"),
         host_name="西格瑪‧庫柏",
@@ -68,7 +68,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "一堆堆各自的談話，而這間屋子唯一的規矩出自酒館老闆，在這裡什麼都可以談，被聽見的人也不會因此吃虧。消息、謠言與同伴才是這間屋子經營的"
             "東西；杯子只是佈景，桌上的東西什麼都不做，只是擱在那裡。"
         ),
-        exterior_xy=(4, 1),  # 客棧巷
+        exterior_xy=(3970, 1120),  # 客棧巷
         doorway_key_zh="醉月酒館",
         doorway_aliases=("tavern", "drinking hall"),
         host_name="蘿溫‧古橡",
@@ -96,7 +96,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "一字排開，門後各自私密，一張床、一個臉盆、一道扣得住的門閂。這座城市在這裡把旅途睡回去，歇著、一覺到天亮，或是趁著安靜的幾個小時修煉"
             "。樓梯對每個使用它的人都不作任何要求。"
         ),
-        exterior_xy=(4, 1),  # 客棧巷
+        exterior_xy=(3970, 1120),  # 客棧巷
         doorway_key_zh="爐火旅店",
         doorway_aliases=("inn", "lodging"),
         host_name="溫弗蕾德‧古林",
@@ -126,7 +126,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "讓它當眾進行的地方，在陌生人之間、隔著一堵牆。一個精靈若和他們共浴，會覺得沒什麼值得隔牆；這場分歧是浴場另一處地標，而伊莎貝爾對它很"
             "有意見，問起便說給你聽。"
         ),
-        exterior_xy=(5, 1),  # 浴場前
+        exterior_xy=(4830, 970),  # 浴場前
         doorway_key_zh="公共浴場",
         doorway_aliases=("bathhouse", "baths"),
         host_name="伊莎貝爾‧葦沼",
@@ -155,7 +155,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             "的窗俯瞰門洞，值更的人坐在爐邊就能盯著接下來的幾個小時。靴子按整點進出這裡，牆上的輿圖標出每一條出城的路。這是一個當值的場所，而一個"
             "駐所該掛在輿圖旁邊的東西，告示、公文、人頭的金價，這裡一概沒有；這座城市的工作從公會那扇門走進來，這扇門不發活。"
         ),
-        exterior_xy=(3, 0),  # 南門
+        exterior_xy=(3050, 150),  # 南門
         doorway_key_zh="衛兵駐所",
         doorway_aliases=("guardhouse", "guard house"),
         host_name="托瓦德‧鄧堡",

@@ -1,48 +1,45 @@
-"""Data-contract test: village ciaran map data contract
-Parsing, topology and content checks for the village_ciaran map (map-anchor-grid,
-settlement-shops design §6.2)."""
+"""Data-contract test: village sparse map declaration.
+
+Pins the village's approved integer-metre node positions (world-map-scale
+design §9), its ten-node nine-edge tree, sole anchor, authored exit octants,
+physical route duration and concealed-path prose."""
+
+from math import hypot
 
 from tools.spec_traceability import covers_requirement
 
-import unittest
-
-from evennia.contrib.grid.xyzgrid.xymap import XYMap
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.maps.map_data import SETTLEMENT_GRAPHS
-from world.maps.village_ciaran import MAPSTR, PROTOTYPES, XYMAP_DATA
+from world.maps.village_ciaran import PROTOTYPES, XYMAP_DATA
 
-# The six coordinates the village shipped with (ciaran-village-map).
-# ciaran-village-crafts grew the map to ten nodes; these six pin the
-# scenario "the six original coordinates are undisturbed" — a home's
-# exterior moving because a new node reshaped the grid fails here first.
-ORIGINAL_SIX_COORDS = {
-    (0, 1),  # 隱密小徑 — the concealed entrance
-    (1, 1),  # 村中廣場 — the plaza/anchor
-    (2, 1),  # 練刀場
-    (1, 0),  # 溪畔小徑
-    (1, 2),  # 村北古樹下
-    (2, 2),  # 織房坡
+# The approved outdoor positions, keyed by their stable authored identity.
+METER_COORDS = {
+    "hidden_path": (35, 270),
+    "village_plaza": (220, 305),
+    "stream_path": (245, 135),
+    "stream_bend": (430, 85),
+    "training_clearing": (405, 335),
+    "herb_garden": (590, 300),
+    "old_tree_north": (200, 465),
+    "elder_tree": (165, 650),
+    "weaving_slope": (390, 495),
+    "silver_leaf_slope": (440, 665),
 }
 
-VILLAGE_COORDS = ORIGINAL_SIX_COORDS | {
-    (1, 3),  # 長老古樹下 — the elder's grove (commons change fills it)
-    (2, 3),  # 銀葉坡 — further up the weaving slope
-    (3, 1),  # 藥草園 — past the training ground, in the cleared sun
-    (2, 0),  # 溪畔下游 — further along the stream (scenery)
-}
+VILLAGE_COORDS = set(METER_COORDS.values())
 
 GRID_KEYS = {
-    (0, 1): "隱密小徑",
-    (1, 1): "村中廣場",
-    (2, 1): "練刀場",
-    (1, 0): "溪畔小徑",
-    (1, 2): "村北古樹下",
-    (2, 2): "織房坡",
-    (1, 3): "長老古樹下",
-    (2, 3): "銀葉坡",
-    (3, 1): "藥草園",
-    (2, 0): "溪畔下游",
+    METER_COORDS["hidden_path"]: "隱密小徑",
+    METER_COORDS["village_plaza"]: "村中廣場",
+    METER_COORDS["stream_path"]: "溪畔小徑",
+    METER_COORDS["stream_bend"]: "溪畔下游",
+    METER_COORDS["training_clearing"]: "練刀場",
+    METER_COORDS["herb_garden"]: "藥草園",
+    METER_COORDS["old_tree_north"]: "村北古樹下",
+    METER_COORDS["elder_tree"]: "長老古樹下",
+    METER_COORDS["weaving_slope"]: "織房坡",
+    METER_COORDS["silver_leaf_slope"]: "銀葉坡",
 }
 
 # The village reads as a concealed forest settlement, not a town: none of the
@@ -51,76 +48,65 @@ GRID_KEYS = {
 FORBIDDEN_TEXT = ("wall", "gate", "guard", "marketplace", "shop", "store", "城牆", "城門", "衛兵", "市集", "市場", "店")
 
 
-def _undirected_edges(node_map):
+def _undirected_edges(graph):
     """Every link seen once: frozensets of endpoint coordinates."""
-    edges = set()
-    for node in node_map.values():
-        for direction, end_node in node.links.items():
-            edges.add(frozenset([(node.X, node.Y), (end_node.X, end_node.Y)]))
-    return edges
+    return {
+        frozenset((edge.source.coordinate, edge.destination.coordinate))
+        for edge in graph.edges
+    }
 
 
 class VillageCiaranMapTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        self.map = XYMap(dict(XYMAP_DATA), Z="village_ciaran", xyzgrid=None)
-        self.map.parse()
+        self.graph = SETTLEMENT_GRAPHS["village_ciaran"]
 
-    def test_sparse_graph_declaration_matches_the_parsed_topology(self):
-        graph = SETTLEMENT_GRAPHS["village_ciaran"]
-        parsed_nodes = {
-            (node.X, node.Y): node for node in self.map.node_index_map.values()
-        }
+    @covers_requirement(
+        "village-ciaran-map::ciaran-uses-metric-skylit-underground-geography"
+    )
+    def test_declaration_yields_exactly_the_ten_meter_coordinates(self):
         self.assertEqual(
-            {node.coordinate for node in graph.nodes.values()},
-            set(parsed_nodes),
+            {node.coordinate for node in self.graph.nodes.values()}, VILLAGE_COORDS
         )
-        parsed_edges = {
-            frozenset(((node.X, node.Y), (neighbor.X, neighbor.Y)))
-            for node in parsed_nodes.values()
-            for neighbor in node.links.values()
-        }
-        graph_edges = {
-            frozenset((edge.source.coordinate, edge.destination.coordinate))
-            for edge in graph.edges
-        }
-        self.assertEqual(graph_edges, parsed_edges)
-        self.assertEqual(len(graph_edges), 9)
-
-    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_parse_yields_exactly_the_ten_coordinates(self):
-        parsed = {(node.X, node.Y) for node in self.map.node_index_map.values()}
-        self.assertEqual(parsed, VILLAGE_COORDS)
+        for identity, coordinate in METER_COORDS.items():
+            self.assertEqual(self.graph.node(identity).coordinate, coordinate)
 
     @covers_requirement(
         "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
     )
     def test_the_six_original_coordinates_are_undisturbed(self):
-        # The expansion added leaves; it moved nothing. Every original
-        # coordinate still parses, so none of the four landed homes'
-        # exteriors (nor the entrance or the anchor) shifted.
-        parsed = {(node.X, node.Y) for node in self.map.node_index_map.values()}
-        self.assertTrue(ORIGINAL_SIX_COORDS <= parsed)
-
-    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_path_matrix_exists_between_every_pair_of_coordinates(self):
-        self.map.calculate_path_matrix(force=True)
-        matrix = self.map.dist_matrix
-        self.assertEqual(matrix.shape, (10, 10))
-        self.assertFalse((matrix == float("inf")).any())
+        # The expansion added leaves; the original identities kept their
+        # approved meter bindings, so no landed home's exterior moved.
+        original = {
+            METER_COORDS[key]
+            for key in (
+                "hidden_path",
+                "village_plaza",
+                "training_clearing",
+                "stream_path",
+                "old_tree_north",
+                "weaving_slope",
+            )
+        }
+        self.assertTrue(original <= {node.coordinate for node in self.graph.nodes.values()})
 
     @covers_requirement(
         "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
     )
-    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
+    def test_path_exists_between_every_pair_of_coordinates(self):
+        for start in self.graph.nodes:
+            for end in self.graph.nodes:
+                with self.subTest(start=start, end=end):
+                    self.assertIsNotNone(self.graph.route(start, end))
+
+    @covers_requirement(
+        "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
+    )
     def test_nine_links_form_a_tree(self):
-        nodes = self.map.node_index_map
-        edges = _undirected_edges(nodes)
-        self.assertEqual(len(nodes), 10)
+        edges = _undirected_edges(self.graph)
+        self.assertEqual(len(self.graph.nodes), 10)
         # Ten nodes, nine links, no cycles: connected (proven separately by
-        # the finite path matrix) with exactly one fewer link than nodes is a
-        # tree. The village stays a tree as it grows — growth adds leaves and
-        # short branches, never a loop.
+        # the finite route matrix) with exactly one fewer link than nodes.
         self.assertEqual(len(edges), 9)
 
     @covers_requirement(
@@ -129,17 +115,17 @@ class VillageCiaranMapTests(EvenniaTestCase):
     def test_removing_any_link_disconnects_the_map(self):
         # The tree property's other half: no link is redundant, so no pair of
         # nodes has two routes — the no-crossroads rule at graph scale.
-        nodes = {(node.X, node.Y) for node in self.map.node_index_map.values()}
-        edges = _undirected_edges(self.map.node_index_map)
+        edges = _undirected_edges(self.graph)
         adjacency = {}
         for edge in edges:
             (first, second) = tuple(edge)
             adjacency.setdefault(first, set()).add(second)
             adjacency.setdefault(second, set()).add(first)
+        start = METER_COORDS["hidden_path"]
         for removed in edges:
             with self.subTest(link=tuple(sorted(removed))):
-                seen = {(0, 1)}
-                stack = [(0, 1)]
+                seen = {start}
+                stack = [start]
                 while stack:
                     node = stack.pop()
                     for neighbour in adjacency[node]:
@@ -148,43 +134,41 @@ class VillageCiaranMapTests(EvenniaTestCase):
                         if neighbour not in seen:
                             seen.add(neighbour)
                             stack.append(neighbour)
-                self.assertLess(len(seen), len(nodes))
+                self.assertLess(len(seen), len(VILLAGE_COORDS))
 
     @covers_requirement(
         "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
     )
-    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
     def test_only_plaza_is_an_anchor_room(self):
         for coordinate, prototype in PROTOTYPES.items():
             with self.subTest(coordinate=coordinate):
-                if coordinate == (1, 1):
+                if coordinate == METER_COORDS["village_plaza"]:
                     self.assertEqual(prototype["prototype_parent"], "anchor_room")
                     self.assertEqual(prototype["anchor_key"], "village_ciaran")
                 else:
                     self.assertEqual(prototype["prototype_parent"], "grid_room")
                 self.assertEqual(prototype["key"], GRID_KEYS[coordinate])
 
-    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
-    def test_same_coordinate_names_different_rooms_in_each_settlement(self):
-        # The two settlements deliberately share raw (X, Y) coordinates (e.g.
-        # (2,1) is 南大道 in the capital and 練刀場 here): each map is its own
-        # coordinate space, so "the same coordinate resolves to a different
-        # room in each" — established at the parse level here and at the room
-        # level by the bootstrap suite. Each settlement's shortest paths are
-        # closed over its own nodes (its matrix never indexes the other map's
-        # room set).
-        from world.maps.altoria_capital import XYMAP_DATA as CAPITAL_DATA
-
-        capital = XYMap(dict(CAPITAL_DATA), Z="capital_altoria", xyzgrid=None)
-        capital.parse()
-        capital_nodes = {(node.X, node.Y) for node in capital.node_index_map.values()}
-        village_nodes = {(node.X, node.Y) for node in self.map.node_index_map.values()}
-        self.assertTrue(capital_nodes & village_nodes)
+    @covers_requirement(
+        "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
+    )
+    def test_the_village_occupies_a_coordinate_space_of_its_own(self):
+        # The meter frames are disjoint, and a coordinate from one map never
+        # resolves in the other: shortest paths stay closed over their map.
+        capital = SETTLEMENT_GRAPHS["capital_altoria"]
+        capital_coords = {node.coordinate for node in capital.nodes.values()}
+        self.assertFalse(capital_coords & VILLAGE_COORDS)
+        for coordinate in VILLAGE_COORDS:
+            self.assertIsNone(capital.node_at(coordinate))
+        for coordinate in capital_coords:
+            self.assertIsNone(self.graph.node_at(coordinate))
 
     @covers_requirement(
         "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
     )
-    @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit")
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit"
+    )
     def test_village_movement_uses_the_costed_exit_override(self):
         wildcard = XYMAP_DATA["prototypes"].get(("*", "*", "*"))
         self.assertIsNotNone(wildcard)
@@ -192,7 +176,53 @@ class VillageCiaranMapTests(EvenniaTestCase):
         self.assertEqual(
             wildcard["typeclass"], "typeclasses.exits.CostedXYZExit"
         )
-        self.assertEqual(len(self.map.node_index_map), 10)
+        self.assertEqual(len(self.graph.nodes), 10)
+
+    @covers_requirement(
+        "village-ciaran-map::ciaran-uses-metric-skylit-underground-geography"
+    )
+    def test_entrance_to_elder_route_takes_about_seven_minutes(self):
+        from world.rules.travel_cost import distance_traversal_cost
+
+        route = self.graph.route("hidden_path", "elder_tree")
+        total = sum(edge.length for edge in route)
+        self.assertEqual(
+            distance_traversal_cost(total, "settlement", [_Probe()]).seconds, 431
+        )
+
+    @covers_requirement(
+        "village-ciaran-map::ciaran-uses-metric-skylit-underground-geography"
+    )
+    def test_every_segment_length_is_its_meter_endpoint_distance(self):
+        for edge in self.graph.edges:
+            with self.subTest(road=edge.road.road_id):
+                self.assertAlmostEqual(
+                    edge.length,
+                    hypot(
+                        edge.destination.x - edge.source.x,
+                        edge.destination.y - edge.source.y,
+                    ),
+                    places=6,
+                )
+        self.assertGreater(len({round(edge.length, 6) for edge in self.graph.edges}), 1)
+
+    @covers_requirement(
+        "village-ciaran-map::the-village-has-exactly-one-concealed-entrance"
+    )
+    def test_the_entrance_does_not_read_as_a_gate(self):
+        entrance = PROTOTYPES[METER_COORDS["hidden_path"]]
+        text = f"{entrance['key']} {entrance['desc']}".lower()
+        for forbidden in ("wall", "gate", "guard", "城牆", "城門", "衛兵"):
+            self.assertNotIn(forbidden, text)
+
+    @covers_requirement(
+        "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"
+    )
+    def test_the_declared_entrance_is_the_city_gate_registry_slot(self):
+        from world.maps.city_gates import CITY_GATE_REGISTRY
+
+        row = CITY_GATE_REGISTRY["village_ciaran"]
+        self.assertEqual(row.gate_xyz, (*METER_COORDS["hidden_path"], "village_ciaran"))
 
     def test_no_wall_gate_guard_or_marketplace_in_village_text(self):
         for coordinate, prototype in PROTOTYPES.items():
@@ -200,9 +230,6 @@ class VillageCiaranMapTests(EvenniaTestCase):
             for forbidden in FORBIDDEN_TEXT:
                 self.assertNotIn(forbidden, text, f"{coordinate}: {forbidden!r} in {text!r}")
 
-    @covers_requirement(
-        "village-ciaran-map::the-village-is-a-small-connected-grid-with-one-anchor"
-    )
     def test_room_keys_and_descriptions_are_traditional_chinese(self):
         # The spec requires the village's authored prose to be Traditional
         # Chinese prose — every node's key and description is prose a
@@ -212,16 +239,12 @@ class VillageCiaranMapTests(EvenniaTestCase):
                 text = prototype[field]
                 with self.subTest(coordinate=coordinate, field=field):
                     han = sum("\u4e00" <= char <= "\u9fff" for char in text)
-                    # Keys are two-or-three-character place names; only the
-                    # descriptions are prose. Either way the field must be
-                    # Chinese characters, never an English placeholder.
                     self.assertGreaterEqual(han, 2 if field == "key" else 4, text)
                     ascii_words = [
                         word for word in text.split() if word.isascii() and word.isalpha()
                     ]
                     self.assertEqual(ascii_words, [], text)
 
-if __name__ == "__main__":
-    import sys
 
-    unittest.main(argv=sys.argv[:1])
+class _Probe:
+    """An uninitialized body: the base speed, no fatigue attributes."""
