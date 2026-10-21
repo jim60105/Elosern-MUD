@@ -57,11 +57,11 @@ Gate crossings SHALL use authored absolute-meter approach geometry and the settl
 ### Requirement: charge_movement() is the single, shared movement-cost charging function
 `world/rules/movement.py` SHALL provide `charge_movement(traversing_object,
 cost_key: str, *, source_location, wilderness_source_coordinates=None) -> None`.
-It resolves distance-bearing outdoor cost from the preflight physical traversal; explicit non-distance connectors use their authored duration and calls
-`get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` when
-`is_player_driven(traversing_object)` is true, doing nothing otherwise.
-`entities` is the traverser followed by the followers the follow step moves
-from `source_location`.
+It prices distance-bearing traversal from the preflight record and
+non-distance connectors from their authored duration, and calls
+`get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` only when
+`is_player_driven(traversing_object)`; `entities` is the traverser plus
+the followers the follow step moves from `source_location`.
 
 #### Scenario: charge_movement advances the clock by the resolved cost for a PlayerCharacter
 - **WHEN** `charge_movement(player_character, "move")` is called
