@@ -362,7 +362,7 @@ def compose_first_line(
     catalog: Grid = NARRATION_CATALOG,
     families: Grid = FAMILY_ROWS,
 ) -> str:
-    """Compose the action clause behind the first entry's outcome clause."""
+    """Compose the action clause and the first entry's outcome clause."""
     if not outcome_template:
         return outcome_template
     action = action_line(
@@ -376,13 +376,20 @@ def compose_first_line(
     )
     if not action:
         return outcome_template
-    if _fits(action + outcome_template, actor, target):
-        return action + outcome_template
+    joined = _join_clauses(action, outcome_template)
+    if _fits(joined, actor, target):
+        return joined
     if _fits(outcome_template, actor, target):
         return outcome_template
     if _fits(action, actor, target):
         return action
     return outcome_template
+
+
+def _join_clauses(action: str, outcome: str) -> str:
+    """Join a complete action sentence and an outcome sentence with a semicolon."""
+    head = action[:-1] if action.endswith("。") else action
+    return f"{head}；{outcome}"
 
 
 def commanded_action_line(action_kind: str, *, actor: str) -> str:

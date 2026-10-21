@@ -346,7 +346,7 @@ class CompositionTests(unittest.TestCase):
     def test_an_authored_override_composes_with_the_action(self):
         row = NarrationRow(
             key="t_special",
-            action=("{actor} 的劍氣破空——",),
+            action=("{actor} 的劍氣破空。",),
             kind_lines={"damage": ("{target} 被釘在原地。",)},
         )
         template = compose_first_line(
@@ -360,7 +360,7 @@ class CompositionTests(unittest.TestCase):
             catalog={"t_special": row},
             families={},
         )
-        self.assertEqual(template, "{actor} 的劍氣破空——{target} 被釘在原地。")
+        self.assertEqual(template, "{actor} 的劍氣破空；{target} 被釘在原地。")
 
     def test_action_line_prefers_the_exact_row(self):
         row = NarrationRow(key="t_special", action=("{actor} 精確出手——",))
@@ -439,7 +439,7 @@ class CompositionTests(unittest.TestCase):
     def test_a_resisted_act_composes_an_attempt_without_contact(self):
         row = NarrationRow(
             "t_act",
-            action=("{actor} 朝對方伸手——",),
+            action=("{actor} 朝對方伸手。",),
         )
         template = compose_first_line(
             "t_act",

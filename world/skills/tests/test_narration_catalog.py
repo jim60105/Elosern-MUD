@@ -532,7 +532,7 @@ class SexualRowTests(unittest.TestCase):
     def test_every_verdict_keeps_the_act_clause_and_changes_only_the_verdict(
         self,
     ):
-        row = NarrationRow("t_act", action=("{actor} 朝對方伸手——",))
+        row = NarrationRow("t_act", action=("{actor} 朝對方伸手。",))
         composed = []
         for payload in (
             {"resisted": True, "auto_comply": False, "roll": 90},
@@ -563,7 +563,7 @@ class SexualRowTests(unittest.TestCase):
                 )
             )
         for line in composed:
-            self.assertTrue(line.startswith("{actor} 朝對方伸手——"), line)
+            self.assertTrue(line.startswith("{actor} 朝對方伸手；"), line)
         self.assertEqual(len(set(composed)), 3)
 
     @covers_requirement(
@@ -594,7 +594,7 @@ class SexualRowTests(unittest.TestCase):
     def test_a_cast_without_a_resist_entry_opens_on_its_own_outcome(self):
         row = NarrationRow(
             "t_solo",
-            action=("{actor} 朝自己伸手——",),
+            action=("{actor} 朝自己伸手。",),
             performer_lines={"pleasure_gain": ("{actor} 的一刻。",)},
         )
         outcome = entry_line(
@@ -619,7 +619,7 @@ class SexualRowTests(unittest.TestCase):
             catalog={"t_solo": row},
             families={},
         )
-        self.assertEqual(composed, "{actor} 朝自己伸手——" + outcome)
+        self.assertEqual(composed, "{actor} 朝自己伸手；" + outcome)
         for verdict_lines in VERDICT_LINES.values():
             for verdict_line in verdict_lines:
                 self.assertNotIn(verdict_line, composed)

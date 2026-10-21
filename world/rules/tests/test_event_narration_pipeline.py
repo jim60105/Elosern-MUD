@@ -209,7 +209,10 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         first = result.event_log.entries[0]
         family_actions = FAMILY_ROWS["martial_arts"].action
         self.assertTrue(
-            any(first.text_template.startswith(action) for action in family_actions),
+            any(
+                first.text_template.startswith(action.removesuffix("。") + "；")
+                for action in family_actions
+            ),
             first.text_template,
         )
         self.assertIn("{target}", first.text_template)
@@ -246,7 +249,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             entry
             for entry in entries
             if any(
-                entry.text_template.startswith(action)
+                entry.text_template.startswith(action.removesuffix("。") + "；")
                 for action in action_tier
             )
         ]
@@ -255,7 +258,9 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         selected_action = next(
             action
             for action in action_tier
-            if openings[0].text_template.startswith(action)
+            if openings[0].text_template.startswith(
+                action.removesuffix("。") + "；"
+            )
         )
         self.assertNotIn("{target}", selected_action)
         self.assertEqual(
@@ -505,7 +510,9 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertTrue(
             any(
-                refused_entries[0].text_template.startswith(action)
+                refused_entries[0].text_template.startswith(
+                    action.removesuffix("。") + "；"
+                )
                 for action in actions
             )
         )
