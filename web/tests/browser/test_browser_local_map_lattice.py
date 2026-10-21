@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import time
+
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import store_state, wait_for_store_state
@@ -672,8 +674,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
         # 5. The adjacent node keeps its exact move identity. (Only the
         #    overlay scale exposes keyboard activation by design.)
+        # The island stays mounted behind the overlay, so scope the node to
+        # the overlay body (both surfaces render the same node id).
         destination = page.locator(
-            '[data-testid="local-map__node--grid:metric:100:0"]'
+            f'{overlay_scope} [data-testid="local-map__node--grid:metric:100:0"]'
         )
         self.assertEqual(destination.get_attribute("role"), "button")
         destination.click()
