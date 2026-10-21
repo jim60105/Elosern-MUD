@@ -99,7 +99,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(dotField.exists()).toBe(true);
       const pattern = w.find("defs pattern");
       expect(Number(pattern.attributes("width"))).toBe(280);
-      expect(Number(pattern.attributes("height"))).toBe(212);
+      expect(Number(pattern.attributes("height"))).toBe(280);
       const circle = pattern.find("circle");
       expect(Number(circle.attributes("r"))).toBeCloseTo(1.15 * 4.83, 4);
     });
@@ -369,7 +369,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       });
       const patternOverlay = wOverlayDistinct.find("defs pattern");
       expect(Number(patternOverlay.attributes("width"))).toBe(280);
-      expect(Number(patternOverlay.attributes("height"))).toBe(212);
+      expect(Number(patternOverlay.attributes("height"))).toBe(280);
     });
 
     it("Task 2.3: verifies all 6 rows of Design D5 Table and scale <= 1 invariant", () => {
@@ -533,7 +533,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         4,
       );
       expect(Number(wOverlay.get("svg.local-map__lattice").attributes("height"))).toBeCloseTo(
-        1 * 212 + 14 + 2 * expectedGutter,
+        1 * 280 + 14 + 2 * expectedGutter,
         4,
       );
       expect(wOverlay.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);

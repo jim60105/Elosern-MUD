@@ -660,3 +660,86 @@ describe("LocalMap (B4 world family)", () => {
     expect(lattice.props("markerNameFont")).toBeLessThanOrEqual(chromeStep);
   });
 });
+
+describe("LocalMap metric projection (project-metric-local-maps)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+// project-metric-local-maps: a real metric frame — (0,0), (100,0), (1000,0)
+// and (1000,6500) plus a (100,100) diagonal control — with 100 m as the
+// smallest in-view coordinate delta.
+const METRIC_PAYLOAD = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:metric:0:0",
+  title: "度量城區",
+  nodes: [
+    { id: "grid:metric:0:0", label: "原點", x: 0, y: 0, visibility: "current", current: true, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:100:0", label: "東街", x: 100, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: { kind: "move", exit_ref: "e", destination: "grid:metric:100:0" } },
+    { id: "grid:metric:1000:0", label: "遠東", x: 1000, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:1000:6500", label: "北關", x: 1000, y: 6500, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:100:100", label: "東北", x: 100, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, action: null },
+  ],
+  edges: [
+    { source: "grid:metric:0:0", destination: "grid:metric:100:0", label: "e", known: true, traversable: true },
+    { source: "grid:metric:100:0", destination: "grid:metric:1000:0", label: "e", known: true, traversable: true },
+    { source: "grid:metric:1000:0", destination: "grid:metric:1000:6500", label: "n", known: true, traversable: true },
+    { source: "grid:metric:0:0", destination: "grid:metric:100:100", label: "ne", known: true, traversable: false },
+  ],
+  legend: ["你目前所在的位置", "尚未探索的相鄰位置", "曾經到過的位置", "記憶中的邊界"],
+};
+
+function nodeCenter(wrapper, id) {
+  const match = wrapper
+    .get(`[data-testid="local-map__node--${id}"]`)
+    .attributes("transform")
+    .match(/-?[\d.]+/g)
+    .map(Number);
+  return { x: match[0], y: match[1] };
+}
+
+  it("projects unequal metric gaps at one uniform scale and keeps the wire coordinates", () => {
+    const model = localMapModelFor(METRIC_PAYLOAD);
+    // One cell per 100 m on BOTH axes; the 100 m gap is 1 cell and the 900 m
+    // gap is 9, so the drawn ratio is exactly 1:9 rather than equalized ranks.
+    expect(model.cell).toBe(100);
+    expect(model.cols).toBe(11);
+    expect(model.rows).toBe(66);
+    wrapper = mount(LocalMap, { props: { localMap: model } });
+
+    const origin = nodeCenter(wrapper, "grid:metric:0:0");
+    const near = nodeCenter(wrapper, "grid:metric:100:0");
+    const far = nodeCenter(wrapper, "grid:metric:1000:0");
+    const north = nodeCenter(wrapper, "grid:metric:1000:6500");
+    const diagonal = nodeCenter(wrapper, "grid:metric:100:100");
+
+    expect(far.x - near.x).toBeCloseTo(9 * (near.x - origin.x), 6);
+    expect(near.x - origin.x).toBeGreaterThan(0);
+    // 6500 m north is 65 cells on the same uniform scale.
+    expect(far.y - north.y).toBeCloseTo(65 * (near.x - origin.x), 6);
+    // One cell east and one cell north draw equal lengths: the cell is square,
+    // so a diagonal neighbour keeps its 45-degree bearing.
+    expect(Math.abs(diagonal.y - origin.y)).toBeCloseTo(diagonal.x - origin.x, 6);
+    // The projection never rewrites the payload's metric coordinates.
+    const placed = model.nodes.find((node) => node.id === "grid:metric:1000:6500");
+    expect([placed.x, placed.y]).toEqual([1000, 6500]);
+  });
+
+  it("keeps adjacent-node action identity while projecting metric geometry", async () => {
+    wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(METRIC_PAYLOAD) } });
+    const adjacent = wrapper.get('[data-testid="local-map__node--grid:metric:100:0"]');
+    // The projection moves only geometry: the node keeps its canonical id and
+    // the exact move descriptor the server committed.
+    expect(adjacent.attributes("data-node")).toBe("grid:metric:100:0");
+    await adjacent.trigger("click");
+    expect(wrapper.emitted("move")).toEqual([
+      [{ exit_ref: "e", destination: "grid:metric:100:0" }],
+    ]);
+  });
+});

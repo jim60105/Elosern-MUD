@@ -19,6 +19,12 @@
 //   of the committed payload's current node (design D3/D6).
 // - The readout states only `座標 x,y` on coordinate-bearing layers
 //   (grid/wilderness); nothing on coordinate-free layers.
+//
+// The island draws the model's metric lattice (`project-metric-local-maps`):
+// payload `x`/`y` are integer metres (or wilderness cells), the model projects
+// them onto one uniform cell — the smallest in-view coordinate delta — and
+// this component draws that cell at its declared pitch. Server coordinates and
+// node identity stay authoritative; only the drawing is presentation.
 import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
 import MapLattice from "./MapLattice.vue";
@@ -65,6 +71,8 @@ const islandEdgeMarkers = computed(() => {
   if (!current || typeof current.x !== "number" || typeof current.y !== "number") {
     return { markers: [], gutter: 0, width: 0, height: 0 };
   }
+  // `cols`/`rows`/`col`/`row` are the model's metric cell units, so this
+  // preview geometry keeps the same coordinate space as the drawn lattice.
   const cols = props.localMap.cols ?? 0;
   const rows = props.localMap.rows ?? 0;
   return LocalMap.edgeMarkersFor(nodes.value, remembered.value, {

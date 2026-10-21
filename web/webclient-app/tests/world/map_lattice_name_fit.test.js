@@ -15,7 +15,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
 
   const OVERLAY_CONFIG = {
     colPitch: 280,
-    rowPitch: 212,
+    rowPitch: 280,
     labelMax: 10,
     markerScale: 4.83,
     overlayChrome: true,
@@ -36,7 +36,8 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     const svgHeight = Number(svg.attributes("height"));
     const viewBox = svg.attributes("viewBox");
 
-    // Core lattice: 3 cols × 280 = 840; 3 rows × 212 = 636 + 14 = 650.
+    // Core lattice: 3 cols × 280 = 840; 3 rows × 280 = 840 + 14 = 854
+    // (one uniform pitch on both axes, project-metric-local-maps).
     // Model gutterMin for overlay: 2 * reach + 1 + namePad, where namePad is
     // the outward name box, (labelMax + 1) × 2 = 22 monospace cells at 16,
     // plus 2.
@@ -44,7 +45,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     // Pinned literal, so a drift in the cell measure itself is caught here too.
     expect(22 * CELL_EM * 16).toBeCloseTo(206.25, 3);
     expect(svgWidth).toBeCloseTo(840 + 2 * expectedOverlayGutter, 5);
-    expect(svgHeight).toBeCloseTo(650 + 2 * expectedOverlayGutter, 5);
+    expect(svgHeight).toBeCloseTo(854 + 2 * expectedOverlayGutter, 5);
     expect(viewBox).toBe(`0 0 ${svgWidth} ${svgHeight}`);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
