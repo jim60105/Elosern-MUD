@@ -297,6 +297,9 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die"
     )
+    @covers_requirement(
+        "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership"
+    )
     def test_sleeping_companion_remains_targetable_and_takes_real_damage(self):
         from world.rules.action import ActionRequest
         from world.rules.combat import run_round

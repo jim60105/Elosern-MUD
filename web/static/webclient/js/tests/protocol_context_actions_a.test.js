@@ -12,7 +12,7 @@ const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
 const { deepMerge, snapshot } = require("./protocol_support.js");
-const { validCombatPanel, validContextActionsExplorationPanel, validRecoveryPanel } = require("./protocol_fixtures.js");
+const { validCombatPanel, validCombatParticipant, validContextActionsExplorationPanel, validRecoveryPanel } = require("./protocol_fixtures.js");
 
 
 
@@ -28,6 +28,24 @@ test("validates the available context_actions combat panel", () => {
     Protocol.validateContextActionsPanel(validContextActionsExplorationPanel()).schema_version,
     7
   );
+});
+
+test("accepts the asleep participant state with its restriction condition", () => {
+  const sleeper = deepMerge(validCombatParticipant(), {
+    state: "asleep",
+    conditions: [
+      { code: "asleep", label: "沉睡中，無法行動", severity: "informational" },
+    ],
+  });
+  const panel = validCombatPanel({ participants: [sleeper] });
+  const normalized = Protocol.validateContextActionsPanel(panel);
+  assert.equal(normalized.participants[0].state, "asleep");
+  assert.equal(normalized.participants[0].conditions[0].code, "asleep");
+  // The state stays a closed vocabulary: an unrecognized value still rejects.
+  const unknown = validCombatPanel({
+    participants: [deepMerge(validCombatParticipant(), { state: "dreaming" })],
+  });
+  assert.throws(() => Protocol.validateContextActionsPanel(unknown));
 });
 
 test("validates the available context_actions exploration form", () => {

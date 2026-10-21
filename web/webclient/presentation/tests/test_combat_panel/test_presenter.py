@@ -119,6 +119,57 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_sleeping_member_presents_a_distinct_state_and_restriction_text(self):
+        from typeclasses.npcs import NPC
+        from world.rules.fatigue import (
+            SleepPosture,
+            project_fatigue_status,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+        from world.rules.status_query import SLEEP_RESTRICTION_MESSAGE
+
+        companion = create_object(
+            NPC, key="sleeping panel companion", location=self.room
+        )
+        companion.race = self.player.race
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        write_fatigue_state(companion, 0, SleepPosture.VOLUNTARY)
+        project_fatigue_status(companion)
+        hp = companion.traits.hp.current
+        engage(self.player, self.monster)
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
+        )
+        row = next(
+            item
+            for item in payload["participants"]
+            if item["identity"] == companion.pk
+        )
+        # A sleeping member is neither defeated nor knocked out: it stands
+        # with its real HP and a distinct, textual restriction.
+        self.assertEqual(row["state"], "asleep")
+        self.assertEqual(row["hp_current"], hp)
+        self.assertIn(
+            {
+                "code": "asleep",
+                "label": SLEEP_RESTRICTION_MESSAGE,
+                "severity": "informational",
+            },
+            row["conditions"],
+        )
+        self.assertNotEqual(row["state"], "defeated")
+        validate_context_actions(payload)
+        # The sleeper is not a command actor but stays a roster participant.
+        actor = next(
+            item for item in payload["actors"] if item["identity"] == companion.pk
+        )
+        self.assertFalse(actor["commandable"])
+        self.assertIn(companion.pk, [p["identity"] for p in payload["participants"]])
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_ready_session_groups_skills_by_category(self):
         # Three kit rows across three categories: the elemental burst, the
         # martial-template twin, and the kit sexual act (invented line-name

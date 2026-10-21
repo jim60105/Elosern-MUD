@@ -854,6 +854,64 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.control.magnitude, 0.8 / 40)
         self.assertGreater(_recipient(estimate, self.enemy).damage, 0.0)
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
+    def test_a_sleeping_opponent_stays_a_target_without_an_opportunity(self):
+        """The opportunity denominator excludes sleepers but never their target slot.
+
+        Both runs carry the same two opponents; only the sleeper's persisted
+        posture differs. A denominator that kept the sleeping body's action
+        allowance would report two opportunities in both runs, so the exact
+        values detect that defect while ``enemies`` still names the sleeper.
+        """
+        from world.rules.monster_ai.estimation import _Decision
+        from world.rules.targeting import Relation
+
+        awake = _ProbeParticipant("t_est_awake")
+        sleeper = _ProbeParticipant("t_est_sleeper")
+
+        snapshot, reads, roster, context = _shaped(
+            self.actor, (awake, sleeper)
+        )
+        decision = _Decision(
+            snapshot=snapshot,
+            actor=self.actor,
+            context=context,
+            roster=roster,
+            reads=reads,
+        )
+        self.assertEqual(decision._baseline_opportunities(Relation.ENEMY), 2.0)
+        self.assertIn(stable_identity(sleeper), {
+            stable_identity(entity) for entity in decision.enemies
+        })
+        self.assertFalse(
+            snapshot.participant(stable_identity(sleeper)).capability.asleep
+        )
+
+        sleeper.attributes.values["sleep_posture"] = "forced"
+        snapshot, reads, roster, context = _shaped(
+            self.actor, (awake, sleeper)
+        )
+        decision = _Decision(
+            snapshot=snapshot,
+            actor=self.actor,
+            context=context,
+            roster=roster,
+            reads=reads,
+        )
+        self.assertEqual(decision._baseline_opportunities(Relation.ENEMY), 1.0)
+        # The sleeper keeps its target slot, presence and health facts.
+        self.assertIn(stable_identity(sleeper), {
+            stable_identity(entity) for entity in decision.enemies
+        })
+        facts = snapshot.participant(stable_identity(sleeper))
+        self.assertTrue(facts.capability.asleep)
+        self.assertTrue(facts.alive)
+        self.assertTrue(facts.present)
+        self.assertTrue(facts.in_range)
+        self.assertFalse(
+            snapshot.participant(stable_identity(awake)).capability.asleep
+        )
+
     @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_candidate_that_takes_from_a_friend_is_refused_while_others_survive(self):
         _owned(self.actor, FRIEND_LEECH.key)

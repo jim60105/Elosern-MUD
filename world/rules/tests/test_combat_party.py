@@ -1723,3 +1723,97 @@ class PartyRetreatContestTests(EvenniaTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class SleepingPartyFlowTests(BattlefieldIsolation, EvenniaTestCase):
+    """Delta: live rounds never simulate fatigue; time stays terminal-only."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room = create_object(Room, key="sleeping party arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.player.traits.hp.base = 500
+        self.player.traits.hp.current = 500
+        self.monster = _monster("sleeping flow goblin", hp=1000)
+        self.monster.location = self.room
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_a_near_threshold_sleeper_never_wakes_in_live_rounds(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session.settlement import _round_cap
+        from world.rules.fatigue import (
+            FatigueActivity,
+            PHYSIOLOGICAL_BUFF_KEYS,
+            SleepPosture,
+            next_fatigue_boundary,
+            project_fatigue_status,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.buffs import entity_active_buffs
+
+        companion = _companion(self.player, "臨界沉睡者", hp=500)
+        # One unit below the forced-sleep wake threshold, latched: ordinary
+        # rounds must never tick this awake on their own.
+        write_fatigue_state(companion, 5999, SleepPosture.FORCED)
+        project_fatigue_status(companion)
+        before = read_fatigue_state(companion)
+        before_buffs = entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS
+        tick_before = get_world_clock().tick
+        self.assertIsNone(
+            next_fatigue_boundary(before, FatigueActivity.SLEEP, in_combat=True)
+        )
+        self.assertEqual(_round_cap(), 100)
+
+        engage(self.player, self.monster)
+        for round_number in (1, 2, 3):
+            with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+                result = submit_player_action(
+                    self.player, BASIC_ATTACK_KEY, [self.monster]
+                )
+            self.assertEqual(result["outcome"], "round")
+            record = read_session(self.player)
+            self.assertEqual(record.rounds_elapsed, round_number)
+            self.assertEqual(record.sleep_transitions, ())
+            self.assertEqual(get_world_clock().tick, tick_before)
+            after = read_fatigue_state(companion)
+            self.assertEqual(
+                (after.reserve_units, after.posture),
+                (before.reserve_units, before.posture),
+            )
+            self.assertEqual(
+                entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS,
+                before_buffs,
+            )
+            self.assertIn(
+                int(companion.pk),
+                read_session(self.player).player_ids,
+            )
+
+        # The accumulated rounds settle once, at terminal time: exactly one
+        # 3 x 6 s advance and none during the live rounds above.
+        from world.rules.clock import WorldClock
+
+        advances = []
+        real_advance = WorldClock.advance
+
+        def capture(clock, seconds, *args, **kwargs):
+            advances.append(seconds)
+            return real_advance(clock, seconds, *args, **kwargs)
+
+        with patch.object(WorldClock, "advance", capture):
+            forfeit(self.player)
+        combat_seconds = [int(seconds) for seconds in advances]
+        # The first advance is the combat settlement itself; the later advance
+        # belongs to the existing defeat-aftermath recovery and carries no
+        # second combat charge.
+        self.assertEqual(combat_seconds[0], 3 * 6)
+        self.assertEqual(combat_seconds.count(3 * 6), 1)
