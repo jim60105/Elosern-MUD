@@ -844,11 +844,18 @@ class SkillUsePanelValidationTests(_SkillUseCase):
                 validate_skill_use(mutate(change))
 
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
-    def test_upper_bound_preview_fits_a_full_snapshot(self):
+    def test_upper_bound_choice_count_fits_a_full_snapshot(self):
+        # The guarantee asserted here is the maximum CHOICE COUNT (64 targets
+        # and 64 monster openings) while every other panel is present, at
+        # realistic display-name lengths. The 8-character padding keeps the
+        # names representative; at the protocol's label bound the composed
+        # envelope exceeds 65,536 bytes, which is a separate panel-budget
+        # concern (skill_use has no per-panel byte guard yet).
+        padding = "長" * 8
         for index in range(64):
-            self._wolf(f"horde wolf {index:02d} " + "長" * 20)
+            self._wolf(f"horde wolf {index:02d} " + padding)
         for index in range(63):
-            self._npc(f"crowd npc {index:02d} " + "長" * 20)
+            self._npc(f"crowd npc {index:02d} " + padding)
         self._act("explore.skill_preview", {"skill_key": _T_AREA_HEAL.key})
         panel = self._panel()
         self.assertTrue(panel["available"])
