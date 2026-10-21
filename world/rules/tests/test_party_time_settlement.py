@@ -318,6 +318,36 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         for member in (self.player, self.ella, self.kahn):
             self.assertEqual(self._gauges(member), (28, 46, 64))
 
+    @covers_requirement(
+        "party-time-settlement::no-accepted-time-means-no-mental-settlement"
+    )
+    def test_free_inspection_operations_advance_no_time_or_reserve(self):
+        from commands.economy import CmdInventory
+        from world.rules.status_query import build_status_read_model
+
+        write_fatigue_state(self.player, 300000, SleepPosture.AWAKE)
+        before_tick = get_world_clock().tick
+        before_state = read_fatigue_state(self.player)
+
+        # Status inspection and the inventory/menu surface are reads: neither
+        # game time nor reserve moves.
+        build_status_read_model(self.player)
+        inventory = CmdInventory()
+        inventory.caller = self.player
+        inventory.args = ""
+        inventory.func()
+
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(read_fatigue_state(self.player), before_state)
+
+        # Waiting uses ordinary awake cost with no special recovery, guard or
+        # ambush benefit: 600 s drains 2,400 units and selects no posture.
+        advance_wait(self.player, 600)
+        self.assertEqual(get_world_clock().tick - before_tick, 600)
+        state = read_fatigue_state(self.player)
+        self.assertEqual(state.reserve_units, 297600)
+        self.assertIs(state.posture, SleepPosture.AWAKE)
+
 
 class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     """A successful traversal settles the traverser's travelling party."""
@@ -403,6 +433,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
     def test_present_forced_sleeper_blocks_a_plain_exit_with_zero_writes(self):
         write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
         before = get_world_clock().tick
@@ -417,6 +450,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
     def test_remote_forced_sleeper_does_not_block_the_present_party(self):
         write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)
         before = get_world_clock().tick
@@ -429,6 +465,9 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
     )
     def test_possessing_an_awake_member_cannot_carry_a_sleeper(self):
         self.kahn.location = self.room1
@@ -530,6 +569,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
     def test_present_forced_sleeper_blocks_gate_entry_with_zero_writes(self):
         write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
         before = get_world_clock().tick
@@ -541,6 +583,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
     )
     def test_present_forced_sleeper_blocks_a_wilderness_step(self):
         self.gate.at_traverse(self.player, self.east_gate)

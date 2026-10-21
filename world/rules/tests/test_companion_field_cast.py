@@ -233,6 +233,10 @@ class CompanionCastRuleTests(_CompanionCastCase):
         "companion-field-actions::companion-field-casts-cost-the-commander-s-"
         "time-and-settle-the-party"
     )
+    @covers_requirement(
+        "companion-field-actions::indivisible-field-actions-complete-before-"
+        "collapse"
+    )
     def test_a_depleted_caster_completes_the_full_action_then_collapses(self):
         write_fatigue_state(self.aila, 12, SleepPosture.AWAKE)
         outcome = self._cast(self.aila, _HEAL.key, targets=[self.commander])
@@ -250,6 +254,10 @@ class CompanionCastRuleTests(_CompanionCastCase):
     @covers_requirement(
         "companion-field-actions::companion-field-casts-cost-the-commander-s-"
         "time-and-settle-the-party"
+    )
+    @covers_requirement(
+        "companion-field-actions::indivisible-field-actions-complete-before-"
+        "collapse"
     )
     def test_only_the_unselected_depleted_companion_collapses(self):
         write_fatigue_state(self.kahn, 12, SleepPosture.AWAKE)
@@ -291,6 +299,10 @@ class CompanionCastRuleTests(_CompanionCastCase):
 
     @covers_requirement(
         "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
+    @covers_requirement(
+        "companion-field-actions::indivisible-field-actions-complete-before-"
+        "collapse"
     )
     def test_a_sleeping_caster_is_refused_with_zero_effects_and_time(self):
         write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)

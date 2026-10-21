@@ -3,12 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: rest <duration> parses an explicit duration and advances the clock by that much, capped at the configured maximum
-`commands/skip.py::CmdRest` SHALL parse an explicit duration argument into seconds, cap it at
-`MAX_SKIP_SECONDS` (`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when
-`evaluate_skip_safety()` returns `None`, call
-`WorldClock.advance(seconds, AdvanceSource.SKIP, entities)` for only the actual interval up to the earliest relevant interruption boundary within that capped value,
-where `entities` is the caller's present party scope. Every positive-duration SKIP advance SHALL settle each
-eligible awake in-scope member's own standing practice booking; no skip path clears a booking it did not settle.
+`commands/skip.py::CmdRest` SHALL parse a duration into seconds, capped at `MAX_SKIP_SECONDS` (`max_sleep_seconds`). When `evaluate_skip_safety()` returns `None`, it SHALL call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities)` for only the actual interval before the earliest interruption boundary, `entities` being the present party scope. Every positive-duration SKIP advance SHALL settle each eligible awake in-scope member's own booking; no skip path clears an unsettled booking.
 
 #### Scenario: rest settles the present party
 - **WHEN** no earlier forced-sleep, wake or interactive-event boundary intervenes and a safe awake commander with no earlier relevant boundary standing with companion 艾拉 issues `rest 1h`
@@ -134,11 +129,7 @@ Voluntary sleep SHALL select only the named body (default acting body), take no 
 - **THEN** neither voluntary posture entry nor elapsed recovery commits
 
 ### Requirement: wait until <daypart> computes seconds to the next occurrence of a named daypart
-`commands/skip.py::CmdWaitUntil` SHALL parse a named daypart (`midnight`, `dawn`, `noon`, `dusk`, from
-`rulebook/clock.yaml`'s `dayparts` mapping) and compute the number of seconds from the current
-`WorldClock.calendar` state to the next future occurrence of that daypart's hour, always resolving to
-a strictly positive value (a request matching the current hour resolves to the following day's
-occurrence, not zero). That interval SHALL be the request limit; only time to the earliest relevant boundary SHALL commit.
+`commands/skip.py::CmdWaitUntil` SHALL parse a named daypart (`midnight`, `dawn`, `noon`, `dusk`, from `rulebook/clock.yaml`'s `dayparts` mapping) and compute the seconds from the current `WorldClock.calendar` state to the next future occurrence of that daypart's hour, always strictly positive: a request matching the current hour resolves to the following day's occurrence. That interval SHALL be the request limit; only time to the earliest relevant boundary commits.
 
 #### Scenario: Waiting for a future daypart today computes the same-day interval
 - **WHEN** no earlier relevant boundary intervenes and the current calendar hour is `2` and a safe actor issues `wait until dawn` (`dawn == 6`)

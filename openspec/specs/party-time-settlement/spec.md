@@ -28,11 +28,11 @@ A movement advance SHALL settle the travelling party: the traverser and every pa
 - **THEN** the one movement advance settles 艾拉, the player's body and 卡恩
 
 ### Requirement: Other advances keep their scope
-Church rites, GM console advances, defeat aftermath and combat settlement SHALL keep their existing entity scopes and SHALL NOT be widened by this capability.
+Church rites, GM console advances, defeat aftermath and combat settlement SHALL keep their existing non-mental entity scopes. Every accepted player-driven noncombat advance SHALL additionally settle mental time over the present co-located party, without widening unrelated HP/MP/SP, rite, quest or practice effects. Combat SHALL retain terminal participant scope; GM-only advances SHALL retain their declared scope.
 
 #### Scenario: A church rite settles only its participant
 - **WHEN** the commander performs a church rite with companions present
-- **THEN** the rite's advance settles only the commander
+- **THEN** the rite's existing resource effects settle only the commander, while its actual elapsed mental time settles the present party
 
 ### Requirement: A failed party advance restores every settled member
 When a party-scoped advance fails after any settlement write, the system SHALL restore every settled member's gauges, buffs and practice booking together with the tick.
@@ -53,10 +53,10 @@ Every successful out-of-combat field cast or item use SHALL settle its command-t
 - **THEN** no member's gauges, buffs or booking change and the tick is unchanged
 
 ### Requirement: Each member owns one standing practice booking
-Every party member SHALL own at most one standing practice booking that the commander can set for any present member outside combat; the booking SHALL persist until the next SKIP advance that settles that member, which SHALL settle it through the existing study-practice writer.
+Every party member SHALL own at most one standing practice booking that the commander can set for any present member outside combat; the booking SHALL persist until the next positive-duration eligible awake SKIP interval that settles that member, which SHALL settle it through the existing study-practice writer.
 
 #### Scenario: Two members practise during one rest
-- **WHEN** the commander books her own `slash` and 艾拉's `healing_light`, then rests three hours with 艾拉 present
+- **WHEN** the commander books her own `slash` and 艾拉's `healing_light`, then waits three awake hours with 艾拉 present
 - **THEN** both skills grow by three study hours each, each on its own member, and both bookings are consumed
 
 #### Scenario: A member elsewhere keeps the booking
@@ -73,3 +73,21 @@ Every party member SHALL own at most one standing practice booking that the comm
 #### Scenario: Text booking matches the action
 - **WHEN** the player types `修煉 healing_light = 艾拉`
 - **THEN** 艾拉's booking equals the one `explore.practice` would record, and no time passes
+
+### Requirement: Per-member mental time uses actual posture and activity
+Every actual noncombat player-driven advance SHALL settle present co-located party mental time once using transient per-member activities. SKIP alone SHALL select nobody for sleep. Dead/deleted actors SHALL receive no physiological revival, and remote populations SHALL not be scanned.
+
+#### Scenario: Mixed wait
+- **WHEN** one member forced asleep at zero and an awake companion at 216000 units share a 600-second wait
+- **THEN** the sleeper reaches 7200 (2%) and stays asleep; the companion reaches 213600 (59.3333%); neither posture is selected by the shared advance
+
+#### Scenario: Sleeping practice booking
+- **WHEN** a sleeping booked member and an awake booked member share an eligible two-hour skip
+- **THEN** only the awake member earns practice and consumes its booking; the sleeping booking remains for a later eligible awake interval
+
+### Requirement: No accepted time means no mental settlement
+Status inspection, inventory inspection, menus, handoff selection/cancel, inactivity, disconnect and wall-clock time SHALL advance neither game time nor reserve. Waiting SHALL use ordinary awake cost with no special recovery or guard/ambush benefit.
+
+#### Scenario: Free operations
+- **WHEN** the player reads status, opens inventory, cancels handoff and disconnects
+- **THEN** tick and all mental reserves remain identical

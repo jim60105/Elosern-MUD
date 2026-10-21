@@ -105,6 +105,7 @@ class DreamSurfaceTests(EvenniaTest):
     @covers_requirement(
         "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum",
         "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result",
+        "dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result",
     )
     def test_zero_elapsed_sleep_opens_no_dream(self):
         for gauge in ("hp", "mp", "sp"):
@@ -176,6 +177,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIsNone(service.dream_state(self.actor))
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
+    @covers_requirement("dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result")
     def test_interrupted_committed_result_uses_actual_ticks_on_both_clients(self):
         for browser in (False, True):
             from typeclasses.npcs import NPC

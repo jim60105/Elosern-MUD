@@ -436,6 +436,10 @@ class DeclaredPracticeSettlementTests(unittest.TestCase):
     @covers_requirement(
         "party-time-settlement::each-member-owns-one-standing-practice-booking"
     )
+    @covers_requirement(
+        "party-time-settlement::per-member-mental-time-uses-actual-posture-and-"
+        "activity"
+    )
     def test_sleeping_booking_is_preserved_while_awake_booking_settles(self):
         sleeper = _FatigueBookingEntity(0, SleepPosture.FORCED)
         awake = _FatigueBookingEntity(360000, SleepPosture.AWAKE)
@@ -759,6 +763,9 @@ class WorldClockAtomicityTests(EvenniaTest):
     @covers_requirement(
         "party-time-settlement::skip-advances-settle-the-present-party"
     )
+    @covers_requirement(
+        "world-clock::mental-intervals-compose-with-the-single-clock-writer"
+    )
     def test_wide_mental_scope_settles_beyond_the_narrow_resource_scope(self):
         other = create_object(
             PlayerCharacter, key="mental-only companion", location=self.room1
@@ -782,6 +789,9 @@ class WorldClockAtomicityTests(EvenniaTest):
 
     @covers_requirement(
         "world-clock::advance-persists-the-tick-and-entity-state-atomically"
+    )
+    @covers_requirement(
+        "world-clock::mental-intervals-compose-with-the-single-clock-writer"
     )
     def test_late_boundary_failure_restores_a_mental_only_member(self):
         write_fatigue_state(self.player, 300000, SleepPosture.AWAKE)

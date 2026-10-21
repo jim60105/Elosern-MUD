@@ -207,6 +207,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         "time-skip-commands::rest-duration-parses-an-explicit-duration-and-"
         "advances-the-clock-by-that-much-capped-at-the-configured-maximum"
     )
+    @covers_requirement(
+        "party-time-settlement::per-member-mental-time-uses-actual-posture-and-"
+        "activity"
+    )
     def test_mixed_wait_differs_per_member_activity(self):
         sleeper = self._companion(0, SleepPosture.FORCED)
         result = advance_wait(self.player, 600)
@@ -227,6 +231,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(result.elapsed_seconds, 72000)
         self.assertEqual(get_world_clock().tick - before, 72000)
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-"
+        "boundary"
+    )
     def test_first_wake_truncates_and_discards_the_remainder(self):
         sleeper = self._companion(0, SleepPosture.FORCED)
         before = get_world_clock().tick
@@ -237,6 +245,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(read_fatigue_state(sleeper).reserve_units, 72000)
         self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.AWAKE)
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-"
+        "boundary"
+    )
     def test_first_collapse_truncates_and_latches_forced_sleep(self):
         companion = self._companion(2400)
         result = advance_wait(self.player, 1200)
@@ -245,6 +257,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(state.reserve_units, 0)
         self.assertIs(state.posture, SleepPosture.FORCED)
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-"
+        "boundary"
+    )
     def test_registered_interactive_boundary_stops_the_skip(self):
         previous = _EVENT_SOURCES.get("shop_hours")
 
@@ -310,6 +326,10 @@ class SkipHelperAdvanceTests(EvenniaTest):
             read_fatigue_state(sleeper).posture, SleepPosture.AWAKE
         )
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-"
+        "boundary"
+    )
     def test_duplicate_operation_identity_never_replays_time(self):
         before = get_world_clock().tick
         first = advance_wait(self.player, 60, operation_id="synthetic-op-once")
@@ -319,12 +339,21 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(after_first - before, 60)
         self.assertEqual(first, second)
 
+    @covers_requirement(
+        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+    )
     def test_unsafe_wait_refuses_before_any_time(self):
         monster = self._monster()
+        # Forced-sleep entry itself grants no skip or safety: a collapsed body
+        # in a hostile room is still refused outright.
+        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         before = get_world_clock().tick
         with self.assertRaises(SkipRefused):
             advance_wait(self.player, 60)
         self.assertEqual(get_world_clock().tick, before)
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.FORCED
+        )
         self.assertIsNotNone(monster.pk)
 
     def test_entry_commits_posture_at_zero_elapsed(self):
@@ -365,6 +394,9 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
         self.assertTrue(outcome.result.woke)
 
+    @covers_requirement(
+        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+    )
     def test_forced_sleeper_cannot_volunteer_but_recovers_by_waiting(self):
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         with self.assertRaises(SleepRefused):

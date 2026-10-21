@@ -224,9 +224,9 @@ game seconds separately, so the handler cannot schedule real-time cleanup.
   regardless of `SETTLEMENT_QUANTUM_SECONDS` — it is never chunked into quanta the way
   `tick_buffs()`/`decay_tick()` are — and accrues `completed_whole_hours ×
 PRACTICE_XP_PER_STUDY_HOUR` scaled by learning, affinity, and `growth_rate_multiplier`, once per
-  entity per advance, SKIP-source only, saturating at the skill's derived tip cap and writing
-  nothing when the actor's booking has been consumed or never existed. A successful SKIP advance
-  of fewer than 3600 seconds consumes any booking while growing nothing (whole-hour closed form),
+  eligible awake entity per positive-duration advance, SKIP-source only, saturating at the skill's derived tip cap and writing
+  nothing when the actor's booking has been consumed or never existed. A successful positive-duration awake SKIP interval
+  of fewer than 3600 seconds consumes its eligible booking while growing nothing; sleeping and zero-duration members retain their bookings without progression (whole-hour closed form),
   and a COMMAND-source advance leaves the booking unconsumed for the actor's next SKIP advance.
   Settlement is per-entity against each entity's OWN booking — the design §11 batch note's
   contract that every member's growth comes only from that member's own declared command; the
