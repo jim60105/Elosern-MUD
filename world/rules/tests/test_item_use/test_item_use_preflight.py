@@ -56,6 +56,9 @@ from ._support import (
 
 
 class ItemUsePreflightTests(_ItemUseTestCase):
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
     def test_sleeping_actor_rejects_before_planning_effects(self):
         from world.rules.fatigue import SleepPosture, write_fatigue_state
 

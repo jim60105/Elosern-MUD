@@ -29,11 +29,11 @@ with `polarity == "buff"` and protected physiological projections SHALL NOT be r
   external removal rather than a natural expiry
 
 ### Requirement: Status removal is expressed as one selector-driven operation returning a count
-`world/rules/buffs.py` SHALL expose a public removal function taking an entity and one selector, and
-returning the number of eligible buff instances actually removed. Protected physiological projections SHALL be excluded for every selector. The selector vocabulary SHALL be exactly: a
-concrete `buffs.yaml` definition key, `negative` (every active debuff-polarity instance), `positive`
-(every active buff-polarity instance), and `all` (both). A selector matching nothing SHALL write
-nothing and return `0`.
+`world/rules/buffs.py` SHALL expose one public removal function taking an entity and a selector
+and returning the count of eligible instances actually removed; protected physiological projections
+SHALL be excluded from every selector. Selectors SHALL be exactly a `buffs.yaml` definition key,
+`negative` (every active debuff-polarity instance), `positive` (every active buff-polarity
+instance), or `all` (both). A selector matching nothing SHALL write nothing and return `0`.
 
 #### Scenario: The negative selector removes every debuff and nothing else
 - **WHEN** the removal function is called with `negative` against a target carrying two active

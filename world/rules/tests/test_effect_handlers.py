@@ -433,7 +433,10 @@ class CleanseHandlerTests(EvenniaTest):
         self.assertNotIn("poisoned", self.entity.buffs.all)
         self.assertIn("focus", self.entity.buffs.all)
 
-    @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
+    @covers_requirement(
+        "cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target",
+        "cleanse-effect-handler::physiological-protection-applies-to-every-external-selector",
+    )
     def test_cleanse_never_removes_protected_physiology(self):
         apply_buff(self.entity, "poisoned")
         write_fatigue_state(self.entity, 71999, SleepPosture.AWAKE)

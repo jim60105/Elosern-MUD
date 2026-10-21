@@ -76,6 +76,9 @@ class StatusPanelPresenterTests(EvenniaTest):
         self.assertFalse(rendered["available"])
         self.assertEqual(rendered["reason"]["code"], "presentation_unavailable")
 
+    @covers_requirement(
+        "webclient-status-presentation::fatigue-presentation-identifies-its-physiological-subject"
+    )
     def test_possession_identifies_both_physiological_subjects_without_writes(self):
         owner = self.player
         controlled = create_object(

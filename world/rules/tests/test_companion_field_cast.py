@@ -239,6 +239,9 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertEqual(self.clock.tick, 0)
         self.assertIsNone(read_session(self.commander))
 
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
     def test_a_sleeping_caster_is_refused_with_zero_effects_and_time(self):
         write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)
         with self.assertRaises(PartyScopeError) as caught:

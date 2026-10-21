@@ -742,7 +742,7 @@ class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
         project_fatigue_status(entity)
 
     @covers_requirement(
-        "cleanse-effect-handler::status-removal-is-expressed-as-one-selector-driven-operation-returning-a-count"
+        "buff-handler-integration::physiological-fatigue-projects-one-authoritative-protected-status"
     )
     def test_exact_thresholds_project_one_stage_with_the_declared_modifiers(self):
         entity = self._entity()
@@ -767,6 +767,9 @@ class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
                 # base-stat rewrite.
                 self.assertEqual(entity.traits.agility.base, agility_base)
 
+    @covers_requirement(
+        "buff-handler-integration::physiological-fatigue-projects-one-authoritative-protected-status"
+    )
     def test_replacement_never_overlaps_and_survives_time_and_reload(self):
         entity = self._entity()
         self._write(entity, 71999)
@@ -783,6 +786,9 @@ class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
         entity.flush_cached_instance(entity)
         self.assertEqual(self._projected(entity), {"fatigue_moderate"})
 
+    @covers_requirement(
+        "buff-handler-integration::physiological-fatigue-projects-one-authoritative-protected-status"
+    )
     def test_settlement_projects_the_committed_stage_atomically(self):
         entity = self._entity()
         write_fatigue_state(entity, 1, SleepPosture.AWAKE)
@@ -803,6 +809,9 @@ class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
         self.assertEqual(read_fatigue_state(entity).posture, SleepPosture.AWAKE)
         self.assertEqual(self._projected(entity), {"fatigue_moderate"})
 
+    @covers_requirement(
+        "buff-handler-integration::physiological-fatigue-projects-one-authoritative-protected-status"
+    )
     def test_projection_failure_rolls_back_physiology_and_buff_cache(self):
         entity = self._entity()
         write_fatigue_state(entity, 144001, SleepPosture.AWAKE)
@@ -930,6 +939,9 @@ class RemoveBySelectorTests(_BuffFixtureMixin, EvenniaTestCase):
         self.assertEqual(cleanse_debuffs(entity), 1)
         self.assertEqual(self._polarities(entity), {"focus"})
 
+    @covers_requirement(
+        "cleanse-effect-handler::physiological-protection-applies-to-every-external-selector"
+    )
     def test_protected_physiology_is_excluded_from_every_selector(self):
         entity = self._entity()
         apply_buff(entity, "poisoned")

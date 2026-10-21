@@ -90,6 +90,9 @@ class StandingPracticeBookingTests(EvenniaTest):
         self.kahn = self._make_companion("卡恩", location=self.room2)
 
     @synthetic_registries("skills")
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
     def test_sleep_rejects_member_booking_and_the_shared_clause_preflight(self):
         _own(self.ella, _HEAL)
         write_fatigue_state(self.ella, 0, SleepPosture.FORCED)

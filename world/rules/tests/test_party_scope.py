@@ -396,6 +396,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             companion,
         )
 
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
     def test_sleep_alone_forbids_acting_but_not_organizing(self):
         for posture in (SleepPosture.VOLUNTARY, SleepPosture.FORCED):
             with self.subTest(posture=posture):
