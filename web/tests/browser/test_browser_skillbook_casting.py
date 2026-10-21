@@ -59,6 +59,22 @@ class _SkillBookJourney:
         self._press(page, "ArrowDown")
         self._press(page, "Enter")
 
+    def _wait_focus(self, page, testids, timeout=15000):
+        """Wait for keyboard focus to land on one of ``testids``.
+
+        The tab selects through a server round trip and hands focus to the
+        action bar only after the committed selection republishes, so a
+        fixed press delay races the handover on a loaded worker.
+        """
+        page.wait_for_function(
+            """(ids) => {
+              const el = document.activeElement;
+              return !!el && ids.includes(el.getAttribute('data-testid'));
+            }""",
+            arg=list(testids),
+            timeout=timeout,
+        )
+
     def _skill_label(self, page, key):
         character = store_state(page)["panels"]["character"]
         for category in character["actives"]:
@@ -152,6 +168,9 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
                 # Keyboard: the tree holds a single tab stop and Enter goes to 施放.
                 page.locator('[data-testid="party-skill-tab__tree"] [tabindex="0"]').focus()
                 self._press(page, "Enter")
+                self._wait_focus(
+                    page, ("action-bar__btn--cast", "action-bar__btn--practice")
+                )
                 active = page.evaluate("() => document.activeElement.getAttribute('data-testid')")
                 self.assertIn(active, ("action-bar__btn--cast", "action-bar__btn--practice"))
                 ring = page.evaluate("() => getComputedStyle(document.activeElement).boxShadow")
@@ -163,6 +182,9 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._open_book(page)
         self._select_by_search(page, self._skill_label(page, UTILITY_SINGLE))
+        self._wait_focus(
+            page, ("action-bar__btn--cast", "action-bar__btn--practice")
+        )
         self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-testid')"), "action-bar__btn--cast")
         self._press(page, "Enter")
         self._wait_flow(page, UTILITY_SINGLE)
@@ -178,6 +200,9 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
         self._press(page, "Escape")
         page.wait_for_selector('[data-testid="party-skill-tab"]', timeout=15000)
         page.wait_for_timeout(200)
+        self._wait_focus(
+            page, ("action-bar__btn--cast", "action-bar__btn--practice")
+        )
         self.assertEqual(
             page.evaluate("() => document.activeElement.getAttribute('data-testid')"),
             "action-bar__btn--cast",
