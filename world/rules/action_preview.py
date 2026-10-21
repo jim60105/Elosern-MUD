@@ -154,7 +154,10 @@ def _skill_tail_failure(
         if readings is None
         else readings.blocked_by_buff(actor)
     )
-    failure = capability_failure(actor, blocked, modifiers=modifiers)
+    asleep = None if readings is None else readings.capability(actor).asleep
+    failure = capability_failure(
+        actor, blocked, modifiers=modifiers, asleep=asleep
+    )
     if failure is not None:
         return failure
     for effect_id in skill.effects:

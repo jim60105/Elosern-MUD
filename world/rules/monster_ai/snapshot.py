@@ -280,6 +280,10 @@ class DecisionReads:
             )
         return self._capability[key]
 
+    def asleep(self, entity: Any) -> bool:
+        """Return the entity's memoized sleep-posture fact for this decision."""
+        return self.capability(entity).asleep
+
     def divert_limits(self, entity: Any) -> tuple[DivertLimit, ...]:
         """Return the entity's active damage-diversion budgets, read once.
 

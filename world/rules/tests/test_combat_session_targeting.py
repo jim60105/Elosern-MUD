@@ -348,3 +348,27 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         self.assertLess(self.companion.traits.hp.current, hp_before)
         self.assertNotIn(int(self.companion.pk), record.knocked_out_ids)
         self.assertGreater(self.companion.traits.hp.current, 0)
+
+        # A sleeper also genuinely knocked out keeps the knockout state and
+        # exclusion: sleep creates no immunity or priority of its own.
+        from world.rules.combat_session import (
+            _persist,
+            from_storage,
+            to_storage,
+        )
+        from world.rules.combat_view import build_combat_view
+
+        knocked = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "knocked_out_ids": [int(self.companion.pk)],
+            }
+        )
+        _persist(self.player, knocked)
+        states = {
+            row.identity: row.state
+            for row in build_combat_view(self.player).participants
+        }
+        self.assertEqual(states[int(self.companion.pk)], "knocked_out")
+        knocked_field = reconstruct_battlefield(self.player, knocked)
+        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))

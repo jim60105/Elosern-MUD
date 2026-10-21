@@ -912,6 +912,30 @@ class SpreadProjectionTests(unittest.TestCase):
             snapshot.participant(stable_identity(awake)).capability.asleep
         )
 
+        # The opportunity numerator follows the same fact: a lock mount still
+        # denies an awake opponent an action, but grants nothing against a
+        # sleeper that has no action to lose.
+        from world.rules.buffs import BUFF_DEFINITIONS
+        from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+
+        lock_key = next(
+            key
+            for key in sorted(BUFF_DEFINITIONS)
+            if evaluate_combat_modifiers_no_create(
+                awake, active_buffs={key}
+            ).get("actions_per_turn")
+            == 0
+        )
+        definition = BUFF_DEFINITIONS[lock_key]
+        sleeping_projection = decision._control_projection(
+            decision.participant(sleeper), definition, 1.0
+        )
+        awake_projection = decision._control_projection(
+            decision.participant(awake), definition, 1.0
+        )
+        self.assertEqual(sleeping_projection.opportunity, 0.0)
+        self.assertGreater(awake_projection.opportunity, 0.0)
+
     @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_candidate_that_takes_from_a_friend_is_refused_while_others_survive(self):
         _owned(self.actor, FRIEND_LEECH.key)

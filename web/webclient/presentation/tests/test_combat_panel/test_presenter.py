@@ -119,7 +119,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
-    def test_sleeping_member_presents_a_distinct_state_and_restriction_text(self):
+    def test_sleeping_commander_presents_a_distinct_state_and_restriction_text(self):
         from typeclasses.npcs import NPC
         from world.rules.fatigue import (
             SleepPosture,
@@ -130,14 +130,14 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.status_query import SLEEP_RESTRICTION_MESSAGE
 
         companion = create_object(
-            NPC, key="sleeping panel companion", location=self.room
+            NPC, key="awake panel companion", location=self.room
         )
         companion.race = self.player.race
         companion.apply_race_baseline()
         join_party(companion, self.player)
-        write_fatigue_state(companion, 0, SleepPosture.VOLUNTARY)
-        project_fatigue_status(companion)
-        hp = companion.traits.hp.current
+        write_fatigue_state(self.player, 0, SleepPosture.VOLUNTARY)
+        project_fatigue_status(self.player)
+        hp = self.player.traits.hp.current
         engage(self.player, self.monster)
         payload = self.registry.render(
             "context_actions",
@@ -146,10 +146,10 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         row = next(
             item
             for item in payload["participants"]
-            if item["identity"] == companion.pk
+            if item["identity"] == self.player.pk
         )
-        # A sleeping member is neither defeated nor knocked out: it stands
-        # with its real HP and a distinct, textual restriction.
+        # The sleeping commander is neither defeated nor knocked out: it
+        # stands with its real HP and a distinct, textual restriction.
         self.assertEqual(row["state"], "asleep")
         self.assertEqual(row["hp_current"], hp)
         self.assertIn(
@@ -162,11 +162,9 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertNotEqual(row["state"], "defeated")
         validate_context_actions(payload)
-        # The sleeper is not a command actor but stays a roster participant.
-        actor = next(
-            item for item in payload["actors"] if item["identity"] == companion.pk
-        )
-        self.assertFalse(actor["commandable"])
+        actors = {item["identity"]: item for item in payload["actors"]}
+        self.assertFalse(actors[self.player.pk]["commandable"])
+        self.assertTrue(actors[companion.pk]["commandable"])
         self.assertIn(companion.pk, [p["identity"] for p in payload["participants"]])
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
