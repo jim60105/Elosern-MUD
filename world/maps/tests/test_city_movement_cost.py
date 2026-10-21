@@ -12,7 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
-from world.maps.map_data import XYMAP_DATA_LIST
+from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.bootstrap import sync_grid
 from world.maps.limbo import LIMBO_KEY
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -47,10 +47,18 @@ class SampleCityCostedExitTests(EvenniaTest):
 
     def test_retype_path_updates_db_row_but_not_loaded_objects(self):
         # First sync WITHOUT the wildcard override: bare XYZExit instances.
-        old_data = dict(XYMAP_DATA_LIST[0])
-        old_data["prototypes"] = dict(XYMAP_DATA_LIST[0]["prototypes"])
-        old_data["prototypes"].pop(("*", "*", "*"))
-        with patch("world.maps.bootstrap.XYMAP_DATA_LIST", [old_data]):
+        from world.maps.sparse_graph import SparseSettlementGraph
+
+        capital = SETTLEMENT_GRAPHS["capital_altoria"]
+        bare_graph = SparseSettlementGraph(
+            capital.map_id,
+            capital.nodes.values(),
+            capital.roads,
+            options=capital.options,
+            exit_prototype={},
+        )
+        without_override = {"capital_altoria": bare_graph}
+        with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", without_override):
             sync_grid()
 
         loaded = self._intra_city_exits()

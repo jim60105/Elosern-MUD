@@ -176,21 +176,17 @@ def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
     Deferred import: lore must not import ``world.maps`` at module scope, and
     this is only consulted by the sync-time validation call (no import cycle —
     the shared ``world.maps.map_data`` assembly imports nothing from lore).
-    The assembly is the single home of ``XYMAP_DATA_LIST`` (settlement-shops
-    design §6.2 / §10): validation must see every map a gate names or a
-    second settlement's gate fails startup with ``unknown z_map_key``.
+    The assembly is the single home of the sparse settlement graphs
+    (settlement-shops design §6.2 / §10; implement-sparse-settlement-graphs):
+    validation must see every map a gate names or a second settlement's gate
+    fails startup with ``unknown z_map_key``.
     """
-    from world.maps.map_data import XYMAP_DATA_LIST
+    from world.maps.map_data import SETTLEMENT_GRAPHS
 
-    extents: dict[str, set[tuple[int, int]]] = {}
-    for data in XYMAP_DATA_LIST:
-        cells = {
-            key
-            for key in data["prototypes"]
-            if isinstance(key, tuple) and len(key) == 2 and all(isinstance(v, int) for v in key)
-        }
-        extents[str(data["zcoord"])] = cells
-    return extents
+    return {
+        map_id: {node.coordinate for node in graph.nodes.values()}
+        for map_id, graph in SETTLEMENT_GRAPHS.items()
+    }
 
 
 def _in_provider_rect(cell: tuple[int, int]) -> bool:

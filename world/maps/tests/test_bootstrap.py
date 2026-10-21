@@ -121,17 +121,32 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
             south_gate.db.desc, PROTOTYPES[(3, 0)]["desc"]
         )
 
-        changed = dict(XYMAP_DATA)
-        changed["prototypes"] = dict(XYMAP_DATA["prototypes"])
-        changed["prototypes"][(3, 0)] = dict(changed["prototypes"][(3, 0)])
-        changed["prototypes"][(3, 0)]["desc"] = "A rebuilt southern gate."
+        from dataclasses import replace
 
-        from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.maps.sparse_graph import SparseSettlementGraph
 
-        grid = get_xyzgrid()
-        grid.add_maps(changed)
-        grid.reload()
-        grid.spawn()
+        capital = SETTLEMENT_GRAPHS["capital_altoria"]
+        nodes = [
+            replace(
+                node,
+                prototype={**node.prototype, "desc": "A rebuilt southern gate."},
+            )
+            if node.node_id == "south_gate"
+            else node
+            for node in capital.nodes.values()
+        ]
+        changed_graph = SparseSettlementGraph(
+            capital.map_id,
+            nodes,
+            capital.roads,
+            options=capital.options,
+            exit_prototype=capital.exit_prototype,
+        )
+        changed = dict(SETTLEMENT_GRAPHS)
+        changed["capital_altoria"] = changed_graph
+        with patch("world.maps.bootstrap.SETTLEMENT_GRAPHS", changed):
+            sync_grid()
 
         self.assertEqual(self._count_grid_rooms(), 31)
         south_gate = GridRoom.objects.get(db_key="南門")
@@ -591,7 +606,11 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     def test_sync_grid_body_is_unmodified(self):
         source = inspect.getsource(sync_grid)
-        self.assertIn("grid.spawn()", source)
+        # The sparse synchronizer is the spawn path; the xyzgrid contrib's
+        # dense ``reload()``/``spawn()`` pipeline must not come back.
+        self.assertIn("_apply_graph_plan(plan)", source)
+        self.assertNotIn("grid.spawn()", source)
+        self.assertNotIn("get_xyzgrid()", source)
         self.assertNotIn("sync_wilderness", source)
 
     @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
@@ -761,3 +780,186 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         foreign = [e for e in east_gate.exits if isinstance(e, Exit) and not isinstance(e, WildernessGateExit)]
         self.assertEqual(len(foreign), 1)
         self.assertEqual(foreign[0].key, "荒野")
+
+
+SYNTHETIC_MAP_KEY = "t_sparse_settlement"
+
+
+def _synthetic_node(node_id, coordinate, key):
+    from world.maps.sparse_graph import SparseNode
+
+    return SparseNode(
+        node_id=node_id,
+        x=coordinate[0],
+        y=coordinate[1],
+        prototype={"prototype_parent": "grid_room", "key": key},
+    )
+
+
+def _synthetic_graph(start_coordinate, north_coordinate):
+    from world.maps.sparse_graph import SparseRoad, SparseSettlementGraph
+
+    return SparseSettlementGraph(
+        SYNTHETIC_MAP_KEY,
+        [
+            _synthetic_node("start", start_coordinate, "測試起點"),
+            _synthetic_node("north", north_coordinate, "測試北端"),
+        ],
+        [
+            SparseRoad("start>north", "start", "north"),
+            SparseRoad("north>start", "north", "start"),
+        ],
+        exit_prototype={
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    )
+
+
+class SparseSettlementSyncTests(EvenniaTest):
+    """Stable-identity convergence over synthetic sparse graphs."""
+
+    def _room(self, xyz):
+        return GridRoom.objects.filter_xyz(xyz=xyz).first()
+
+    def _xyz(self, value):
+        return tuple(
+            int(item) if str(item).lstrip("-").isdigit() else item for item in value
+        )
+
+    @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    def test_coordinate_replacement_preserves_room_occupant_home_and_references(self):
+        from world.maps.bootstrap import SyncReport, sync_settlement_graph
+
+        sync_settlement_graph(_synthetic_graph((1, 1), (1, 2)))
+        room = self._room((1, 1, SYNTHETIC_MAP_KEY))
+        self.assertIsNotNone(room)
+        self.assertEqual(room.sparse_node_id, "start")
+        room_id = room.id
+
+        self.char1.location = room
+        self.char1.home = room
+        self.char1.save()
+
+        external = create_object(Room, key="測試外部", location=None)
+        inbound = create_object(Exit, key="測試入口", location=external, destination=room)
+        inbound_id = inbound.id
+        outbound_roads = {
+            exit_obj.destination.key: exit_obj for exit_obj in room.exits
+        }
+        self.assertEqual(
+            set(outbound_roads), {"測試北端"},
+        )
+        road_exit = outbound_roads["測試北端"]
+        road_exit_id = road_exit.id
+
+        sync_settlement_graph(_synthetic_graph((5000, 200), (5000, 201)))
+        report = sync_settlement_graph(_synthetic_graph((5000, 200), (5000, 201)))
+
+        moved = self._room((5000, 200, SYNTHETIC_MAP_KEY))
+        self.assertEqual(moved.id, room_id)
+        self.assertEqual(moved.sparse_node_id, "start")
+        self.assertEqual(self.char1.db_location_id, room_id)
+        self.assertEqual(self.char1.db_home_id, room_id)
+        self.assertEqual(inbound.id, inbound_id)
+        self.assertEqual(inbound.db_destination_id, room_id)
+        self.assertEqual(report, SyncReport())
+
+        roads = list(moved.exits)
+        self.assertEqual(len(roads), 1)
+        self.assertEqual(roads[0].id, road_exit_id)
+        self.assertEqual(self._xyz(roads[0].xyz), (5000, 200, SYNTHETIC_MAP_KEY))
+        self.assertEqual(
+            self._xyz(roads[0].xyz_destination), (5000, 201, SYNTHETIC_MAP_KEY)
+        )
+
+        north = self._room((5000, 201, SYNTHETIC_MAP_KEY))
+        inbound_road = [exit_obj for exit_obj in north.exits if exit_obj.destination == moved]
+        self.assertEqual(len(inbound_road), 1)
+        self.assertEqual(
+            self._xyz(inbound_road[0].xyz_destination), (5000, 200, SYNTHETIC_MAP_KEY)
+        )
+
+    @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    def test_ambiguous_legacy_room_refuses_before_any_mutation(self):
+        from evennia.contrib.grid.xyzgrid.xyzroom import (
+            MAP_X_TAG_CATEGORY,
+            MAP_Y_TAG_CATEGORY,
+            MAP_Z_TAG_CATEGORY,
+        )
+        from world.maps.sparse_graph import SparseGraphError
+        from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY, sync_settlement_graph
+
+        for index in (1, 2):
+            create_object(
+                GridRoom,
+                key=f"測試重複{index}",
+                location=None,
+                tags=[
+                    ("7", MAP_X_TAG_CATEGORY),
+                    ("7", MAP_Y_TAG_CATEGORY),
+                    (SYNTHETIC_MAP_KEY, MAP_Z_TAG_CATEGORY),
+                ],
+            )
+        before = GridRoom.objects.filter_xyz(
+            xyz=("*", "*", SYNTHETIC_MAP_KEY)
+        ).count()
+        self.assertEqual(before, 2)
+
+        with self.assertRaises(SparseGraphError):
+            sync_settlement_graph(_synthetic_graph((7, 7), (7, 8)))
+
+        rooms = list(
+            GridRoom.objects.filter_xyz(xyz=("*", "*", SYNTHETIC_MAP_KEY))
+        )
+        self.assertEqual(len(rooms), 2)
+        for room in rooms:
+            self.assertIsNone(
+                room.tags.get(category=NODE_IDENTITY_TAG_CATEGORY, return_list=False)
+            )
+
+    @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    def test_moved_identity_cannot_land_on_an_unbound_legacy_room(self):
+        from evennia.contrib.grid.xyzgrid.xyzroom import (
+            MAP_X_TAG_CATEGORY,
+            MAP_Y_TAG_CATEGORY,
+            MAP_Z_TAG_CATEGORY,
+        )
+        from world.maps.bootstrap import sync_settlement_graph
+        from world.maps.sparse_graph import SparseGraphError
+
+        sync_settlement_graph(_synthetic_graph((1, 1), (1, 2)))
+        moved_identity = self._room((1, 1, SYNTHETIC_MAP_KEY))
+        create_object(
+            GridRoom,
+            key="測試佔位",
+            location=None,
+            tags=[
+                ("9", MAP_X_TAG_CATEGORY),
+                ("9", MAP_Y_TAG_CATEGORY),
+                (SYNTHETIC_MAP_KEY, MAP_Z_TAG_CATEGORY),
+            ],
+        )
+        occupant = self._room((9, 9, SYNTHETIC_MAP_KEY))
+
+        with self.assertRaises(SparseGraphError):
+            sync_settlement_graph(_synthetic_graph((9, 9), (9, 10)))
+
+        self.assertEqual(moved_identity.xyz, (1, 1, SYNTHETIC_MAP_KEY))
+        self.assertTrue(
+            GridRoom.objects.filter(id=occupant.id).exists(),
+        )
+
+    @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
+    def test_capital_sparse_graph_spawns_twenty_one_rooms_and_fifty_two_exits(self):
+        from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
+
+        sync_grid()
+        self.assertEqual(
+            GridRoom.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
+            21,
+        )
+        self.assertEqual(
+            XYZExit.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
+            52,
+        )

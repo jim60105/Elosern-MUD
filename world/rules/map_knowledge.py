@@ -8,7 +8,7 @@ prunes that attribute; presenters and adapters read exclusively through
 Node IDs use strict per-layer grammar (design D2):
 
 - ``grid:<z-map-key>:<x>:<y>`` for the Grid/Anchor layer, bounded by the
-  registered xyzgrid map's own ``max_X``/``max_Y``.
+  declared sparse settlement graph's own coordinate extent.
 - ``wild:<wilderness-name>:<x>:<y>`` for the Wilderness layer, bounded by
   ``WILDERNESS_MAX_X``/``WILDERNESS_MAX_Y``.
 - ``room:<dbref>`` for Instance and ordinary interior rooms, where ``dbref``
@@ -109,12 +109,19 @@ def _validated_visits(record: Any) -> dict[str, dict[str, int]]:
 def _registered_grid_bounds(z_map_key: str) -> tuple[int, int] | None:
     """Return ``(max_X, max_Y)`` for a registered grid map, or ``None``.
 
-    Resolves through the live xyzgrid so the bounds are exactly the map's own
-    ``max_X``/``max_Y`` rather than a duplicated constant (design D2). The
-    lookup is read-only: a grid that has never been provisioned resolves to
-    ``None`` without creating the global grid script, so a pure validation
-    path can never write the database.
+    Resolves through the declared sparse settlement graph, so the bounds are
+    the authored node extent rather than a duplicated constant or a dense
+    lattice's ``max_X``/``max_Y`` (design D2). The lookup is pure Python: a
+    validation path can never write the database or depend on provisioning.
     """
+    from world.maps.map_data import settlement_graph
+
+    graph = settlement_graph(z_map_key)
+    if graph is not None:
+        return int(graph.max_x), int(graph.max_y)
+
+    # Synthetic/builder grids are not authored settlements; they still resolve
+    # their extent from the live xyzgrid without creating it on a pure read.
     try:
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid, get_xyzgrid
 

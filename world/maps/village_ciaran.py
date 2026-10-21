@@ -119,3 +119,40 @@ XYMAP_DATA = {
         },
     },
 }
+
+# Stable authored identity per coordinate (implement-sparse-settlement-graphs).
+# Same contract as the capital's ``NODE_IDS``: the identity, not the
+# coordinate, is the synchronizer's matching authority.
+NODE_IDS = {
+    (1, 0): "stream_path",
+    (2, 0): "stream_bend",
+    (0, 1): "hidden_path",
+    (1, 1): "village_plaza",
+    (2, 1): "training_clearing",
+    (3, 1): "herb_garden",
+    (1, 2): "old_tree_north",
+    (2, 2): "weaving_slope",
+    (1, 3): "elder_tree",
+    (2, 3): "silver_leaf_slope",
+}
+
+ROADS = (
+    ("hidden_path", "village_plaza"),
+    ("village_plaza", "hidden_path"),
+    ("stream_path", "village_plaza"),
+    ("village_plaza", "stream_path"),
+    ("stream_path", "stream_bend"),
+    ("stream_bend", "stream_path"),
+    ("village_plaza", "old_tree_north"),
+    ("old_tree_north", "village_plaza"),
+    ("village_plaza", "training_clearing"),
+    ("training_clearing", "village_plaza"),
+    ("old_tree_north", "elder_tree"),
+    ("elder_tree", "old_tree_north"),
+    ("old_tree_north", "weaving_slope"),
+    ("weaving_slope", "old_tree_north"),
+    ("elder_tree", "silver_leaf_slope"),
+    ("silver_leaf_slope", "elder_tree"),
+    ("training_clearing", "herb_garden"),
+    ("herb_garden", "training_clearing"),
+)

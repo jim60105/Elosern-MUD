@@ -1,9 +1,29 @@
-"""Idempotent grid and wilderness bootstrap: spawn the sample city, bridge it to
-Limbo with one-way registry gates, and provision the wilderness layer and one
-grid-side gate exit per registered gate (map-wilderness,
-wilderness-anchor-footprint, limbo-one-way-gates)."""
+"""Idempotent grid and wilderness bootstrap: converge the sparse settlements,
+bridge them to Limbo with one-way registry gates, and provision the wilderness
+layer and one grid-side gate exit per registered gate (map-wilderness,
+wilderness-anchor-footprint, limbo-one-way-gates).
 
-from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
+``sync_grid()`` synchronizes the authored sparse graphs. Stable node identities
+are the matching authority: a coordinate change moves the existing room, its
+occupants and every reference in place instead of deleting and recreating it.
+The ASCII map data is only registered for the contrib's display/builder
+surfaces; it is never the spawn input."""
+
+import hashlib
+from dataclasses import dataclass, field
+
+from django.db import transaction
+from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
+from evennia.contrib.grid.xyzgrid.xyzroom import (
+    MAP_X_TAG_CATEGORY,
+    MAP_XDEST_TAG_CATEGORY,
+    MAP_Y_TAG_CATEGORY,
+    MAP_YDEST_TAG_CATEGORY,
+    MAP_Z_TAG_CATEGORY,
+    MAP_ZDEST_TAG_CATEGORY,
+    XYZExit,
+)
+from evennia.prototypes import spawner as prototype_spawner
 from evennia.contrib.grid.wilderness.wilderness import (
     WildernessScript,
     create_wilderness,
@@ -11,6 +31,7 @@ from evennia.contrib.grid.wilderness.wilderness import (
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object
+from evennia.utils.utils import class_from_module
 
 from world.observability import log_info, log_warn
 from typeclasses.exits import Exit, WildernessGateExit
@@ -18,7 +39,8 @@ from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
-from world.maps.map_data import XYMAP_DATA_LIST
+from world.maps.map_data import SETTLEMENT_GRAPHS, XYMAP_DATA_LIST
+from world.maps.sparse_graph import SparseGraphError, SparseSettlementGraph, exit_spawn_names
 from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
@@ -83,9 +105,13 @@ def _apply_room_art(room, *, scene_archetype, room_art_key, scene_identity):
     declaration. The values come only from the authored tables in
     ``world.maps.room_art``; nothing here infers a key from a name or id.
     """
-    room.scene_archetype = scene_archetype
-    room.room_art_key = room_art_key
-    room.scene_identity = scene_identity
+    for field_name, value in (
+        ("scene_archetype", scene_archetype),
+        ("room_art_key", room_art_key),
+        ("scene_identity", scene_identity),
+    ):
+        if getattr(room, field_name) != value:
+            setattr(room, field_name, value)
 
 
 def _ensure_interior_doorways(interior, exterior, interior_key, interior_aliases):
@@ -319,55 +345,531 @@ def _ensure_exit(location, destination, key, aliases):
         keep.save()
 
 
-def sync_grid() -> None:
-    """Spawn every declared grid map and bridge Limbo to the registry gates.
+#: Tag categories owned by the sparse synchronizer. They identify the authored
+#: object independently of its coordinate, so a moved node keeps its room.
+NODE_IDENTITY_TAG_CATEGORY = "sparse_node_identity"
+ROAD_IDENTITY_TAG_CATEGORY = "sparse_road_identity"
+
+#: Attribute carrying the hash of the applied authored prototype. A repeat
+#: synchronization whose authored data is unchanged performs no prototype write
+#: (the second-run no-op contract), while an authored edit still converges.
+PROTOTYPE_FINGERPRINT_ATTR = "sparse_prototype_fingerprint"
+
+
+@dataclass(frozen=True, slots=True)
+class SyncReport:
+    """How many managed rooms/exits one synchronization changed."""
+
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+
+    def __add__(self, other: "SyncReport") -> "SyncReport":
+        return SyncReport(
+            created=self.created + other.created,
+            updated=self.updated + other.updated,
+            deleted=self.deleted + other.deleted,
+        )
+
+
+@dataclass
+class _NodeBinding:
+    node: object
+    room: object | None
+
+
+@dataclass
+class _RoadBinding:
+    edge: object
+    exit_obj: object | None = None
+
+
+@dataclass
+class _GraphPlan:
+    graph: SparseSettlementGraph
+    nodes: list[_NodeBinding] = field(default_factory=list)
+    roads: list[_RoadBinding] = field(default_factory=list)
+    stale_rooms: list = field(default_factory=list)
+    stale_exits: list = field(default_factory=list)
+
+
+def _node_tag(graph: SparseSettlementGraph, node) -> str:
+    return f"{graph.map_id}:{node.node_id}"
+
+
+def _road_tag(graph: SparseSettlementGraph, edge) -> str:
+    return f"{graph.map_id}:{edge.road.road_id}"
+
+
+def _fingerprint(prototype: dict) -> str:
+    payload = repr(sorted((str(key), repr(value)) for key, value in prototype.items()))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _flatten(prototype, prototype_key: str, default_typeclass: str) -> dict:
+    prepared = dict(prototype)
+    prepared["prototype_key"] = prototype_key
+    flattened = prototype_spawner.flatten_prototype(prepared, no_db=True)
+    if not prototype.get("typeclass") and not prototype.get("prototype_parent"):
+        # ``flatten_prototype`` supplies the global base object typeclass when
+        # the authored prototype names none. A sparse node/road still creates
+        # a coordinate-aware object, so pin the owning default instead.
+        flattened["typeclass"] = default_typeclass
+    return flattened
+
+
+def _object_identity_tag(obj, category: str) -> str | None:
+    return obj.tags.get(category=category, return_list=False)
+
+
+def _set_coordinate_tags(obj, source_xyz, destination_xyz=None) -> bool:
+    """Converge XYZ tags in place and drop cached coordinate projections."""
+
+    updates = [
+        (MAP_X_TAG_CATEGORY, source_xyz[0]),
+        (MAP_Y_TAG_CATEGORY, source_xyz[1]),
+        (MAP_Z_TAG_CATEGORY, source_xyz[2]),
+    ]
+    if destination_xyz is not None:
+        updates.extend(
+            [
+                (MAP_XDEST_TAG_CATEGORY, destination_xyz[0]),
+                (MAP_YDEST_TAG_CATEGORY, destination_xyz[1]),
+                (MAP_ZDEST_TAG_CATEGORY, destination_xyz[2]),
+            ]
+        )
+    changed = False
+    for category, value in updates:
+        current = obj.tags.get(category=category, return_list=False)
+        if current == str(value):
+            continue
+        if current is not None:
+            obj.tags.remove(current, category=category)
+        obj.tags.add(str(value), category=category)
+        changed = True
+    for cache in ("_xyz", "_xyz_destination", "_xymap"):
+        if hasattr(obj, cache):
+            delattr(obj, cache)
+    return changed
+
+
+def _apply_prototype(obj, prototype: dict) -> bool:
+    """Apply an authored prototype only when it actually changed."""
+
+    fingerprint = _fingerprint(prototype)
+    if obj.attributes.get(PROTOTYPE_FINGERPRINT_ATTR) == fingerprint:
+        return False
+    prototype_spawner.batch_update_objects_with_prototype(
+        prototype, objects=[obj], exact=False
+    )
+    obj.attributes.add(PROTOTYPE_FINGERPRINT_ATTR, fingerprint)
+    return True
+
+
+def _plan_settlement_graph(graph: SparseSettlementGraph) -> _GraphPlan:
+    """Resolve room/exit bindings read-only, refusing conflicts before mutation."""
+
+    plan = _GraphPlan(graph=graph)
+    rooms = list(GridRoom.objects.filter_xyz(xyz=("*", "*", graph.map_id)))
+    by_identity: dict[str, list] = {}
+    unbound: list = []
+    for room in rooms:
+        identity = _object_identity_tag(room, NODE_IDENTITY_TAG_CATEGORY)
+        if identity:
+            by_identity.setdefault(identity, []).append(room)
+        else:
+            unbound.append(room)
+    for identity, bound in by_identity.items():
+        if len(bound) > 1:
+            raise SparseGraphError(
+                f"map {graph.map_id!r} has {len(bound)} rooms bound to identity {identity!r}"
+            )
+
+    claimed: set[int] = set()
+    for node in graph.nodes.values():
+        tag = _node_tag(graph, node)
+        bound = by_identity.get(tag)
+        room = bound[0] if bound else None
+        if room is None:
+            candidates = [candidate for candidate in unbound if candidate.xyz[:2] == node.coordinate]
+            if len(candidates) > 1:
+                raise SparseGraphError(
+                    f"map {graph.map_id!r} cannot bind node {node.node_id!r}: "
+                    f"{len(candidates)} unbound rooms occupy {node.coordinate}"
+                )
+            if candidates:
+                room = candidates[0]
+                unbound.remove(room)
+        elif any(candidate.xyz[:2] == node.coordinate for candidate in unbound):
+            # A moved identity may not silently land on and delete an
+            # unbound legacy room; that is an ambiguous binding. Refuse.
+            raise SparseGraphError(
+                f"map {graph.map_id!r} cannot move node {node.node_id!r} to "
+                f"{node.coordinate}: an unbound room already occupies it"
+            )
+        if room is not None:
+            if int(room.id) in claimed:
+                raise SparseGraphError(
+                    f"map {graph.map_id!r} binds room #{room.id} to more than one node"
+                )
+            claimed.add(int(room.id))
+        plan.nodes.append(_NodeBinding(node=node, room=room))
+
+    plan.stale_rooms = [
+        room for room in rooms if int(room.id) not in claimed
+    ]
+
+    source_rooms = {
+        binding.node.node_id: binding.room
+        for binding in plan.nodes
+        if binding.room is not None
+    }
+    exits = list(XYZExit.objects.filter_xyz(xyz=("*", "*", graph.map_id)))
+    by_road: dict[str, list] = {}
+    unbound_exits: list = []
+    for exit_obj in exits:
+        identity = _object_identity_tag(exit_obj, ROAD_IDENTITY_TAG_CATEGORY)
+        if identity:
+            by_road.setdefault(identity, []).append(exit_obj)
+        else:
+            unbound_exits.append(exit_obj)
+    for identity, bound in by_road.items():
+        if len(bound) > 1:
+            raise SparseGraphError(
+                f"map {graph.map_id!r} has {len(bound)} exits bound to road {identity!r}"
+            )
+
+    used_exits: set[int] = set()
+    for edge in graph.edges:
+        tag = _road_tag(graph, edge)
+        bound = by_road.get(tag)
+        exit_obj = bound[0] if bound else None
+        if exit_obj is None:
+            source_room = source_rooms.get(edge.source.node_id)
+            exit_key = exit_spawn_names(edge.direction)[0]
+            candidates = [
+                candidate
+                for candidate in unbound_exits
+                if source_room is not None
+                and candidate.db_location_id == source_room.id
+                and candidate.key.lower() == exit_key
+            ]
+            if len(candidates) > 1:
+                raise SparseGraphError(
+                    f"map {graph.map_id!r} cannot bind road {edge.road.road_id!r}: "
+                    f"{len(candidates)} legacy exits match {exit_key!r} from "
+                    f"{edge.source.node_id!r}"
+                )
+            if candidates:
+                exit_obj = candidates[0]
+                unbound_exits.remove(exit_obj)
+        if exit_obj is not None:
+            if int(exit_obj.id) in used_exits:
+                raise SparseGraphError(
+                    f"map {graph.map_id!r} binds exit #{exit_obj.id} to more than one road"
+                )
+            used_exits.add(int(exit_obj.id))
+        plan.roads.append(_RoadBinding(edge=edge, exit_obj=exit_obj))
+
+    plan.stale_exits = [
+        exit_obj for exit_obj in exits if int(exit_obj.id) not in used_exits
+    ]
+    return plan
+
+
+def _apply_node_binding(plan: _GraphPlan, binding: _NodeBinding) -> SyncReport:
+    graph = plan.graph
+    node = binding.node
+    prototype = _flatten(
+        dict(node.prototype),
+        f"sparse_room_{graph.map_id}_{node.node_id}",
+        "typeclasses.rooms.GridRoom",
+    )
+    room = binding.room
+    created = updated = 0
+    if room is None:
+        typeclass_path = prototype.get("typeclass") or "typeclasses.rooms.GridRoom"
+        room, errors = class_from_module(typeclass_path).create(
+            prototype.get("key") or node.key,
+            xyz=(node.x, node.y, graph.map_id),
+        )
+        if errors or room is None:
+            raise SparseGraphError(
+                f"map {graph.map_id!r} could not create room {node.node_id!r}: {errors}"
+            )
+        binding.room = room
+        created = 1
+    else:
+        if _set_coordinate_tags(room, (node.x, node.y, graph.map_id)):
+            updated = 1
+    if room.sparse_node_id != node.node_id:
+        room.sparse_node_id = node.node_id
+        if not created:
+            updated = 1
+    identity_tag = _node_tag(graph, node)
+    current_tags = room.tags.get(
+        category=NODE_IDENTITY_TAG_CATEGORY, return_list=True
+    )
+    if identity_tag not in current_tags:
+        room.tags.add(identity_tag, category=NODE_IDENTITY_TAG_CATEGORY)
+    stale_tags = [tag for tag in current_tags if tag != identity_tag]
+    for tag in stale_tags:
+        room.tags.remove(tag, category=NODE_IDENTITY_TAG_CATEGORY)
+    if _apply_prototype(room, prototype) and not created:
+        updated = 1
+    return SyncReport(created=created, updated=updated)
+
+
+def _apply_road_binding(plan: _GraphPlan, binding: _RoadBinding) -> SyncReport:
+    graph = plan.graph
+    edge = binding.edge
+    source_room = next(
+        item.room for item in plan.nodes if item.node.node_id == edge.source.node_id
+    )
+    destination_room = next(
+        item.room for item in plan.nodes if item.node.node_id == edge.destination.node_id
+    )
+    key, *aliases = exit_spawn_names(edge.direction)
+    prototype = _flatten(
+        dict(graph.exit_prototype),
+        f"sparse_exit_{graph.map_id}_{edge.road.road_id}",
+        "evennia.contrib.grid.xyzgrid.xyzroom.XYZExit",
+    )
+    exit_obj = binding.exit_obj
+    created = updated = 0
+    if exit_obj is None:
+        typeclass_path = prototype.get("typeclass") or (
+            "evennia.contrib.grid.xyzgrid.xyzroom.XYZExit"
+        )
+        exit_obj, errors = class_from_module(typeclass_path).create(
+            key,
+            xyz=(edge.source.x, edge.source.y, graph.map_id),
+            xyz_destination=(edge.destination.x, edge.destination.y, graph.map_id),
+            aliases=aliases,
+        )
+        if errors or exit_obj is None:
+            raise SparseGraphError(
+                f"map {graph.map_id!r} could not create road "
+                f"{edge.road.road_id!r}: {errors}"
+            )
+        binding.exit_obj = exit_obj
+        created = 1
+    else:
+        changed = False
+        if exit_obj.db_location_id != source_room.id:
+            exit_obj.location = source_room
+            changed = True
+        if exit_obj.db_destination_id != destination_room.id:
+            exit_obj.destination = destination_room
+            changed = True
+        if changed:
+            exit_obj.save()
+        if exit_obj.key != key or set(exit_obj.aliases.all()) != set(aliases):
+            exit_obj.key = key
+            exit_obj.aliases.clear()
+            exit_obj.aliases.add(list(aliases))
+            exit_obj.save()
+            changed = True
+        if _set_coordinate_tags(
+            exit_obj,
+            (edge.source.x, edge.source.y, graph.map_id),
+            (edge.destination.x, edge.destination.y, graph.map_id),
+        ):
+            changed = True
+        if changed:
+            updated = 1
+    identity_tag = _road_tag(graph, edge)
+    current_tags = exit_obj.tags.get(
+        category=ROAD_IDENTITY_TAG_CATEGORY, return_list=True
+    )
+    if identity_tag not in current_tags:
+        exit_obj.tags.add(identity_tag, category=ROAD_IDENTITY_TAG_CATEGORY)
+    stale_tags = [tag for tag in current_tags if tag != identity_tag]
+    for tag in stale_tags:
+        exit_obj.tags.remove(tag, category=ROAD_IDENTITY_TAG_CATEGORY)
+    if _apply_prototype(exit_obj, prototype) and not created:
+        updated = 1
+    return SyncReport(created=created, updated=updated)
+
+
+def _apply_graph_plan(plan: _GraphPlan) -> SyncReport:
+    report = SyncReport()
+    for binding in plan.nodes:
+        report += _apply_node_binding(plan, binding)
+    for binding in plan.roads:
+        report += _apply_road_binding(plan, binding)
+    for room in plan.stale_rooms:
+        log_info(
+            "settlement_graph_node_pruned",
+            context={
+                "map_id": plan.graph.map_id,
+                "room_key": room.key,
+                "room_dbref": room.dbref,
+            },
+        )
+        room.delete()
+        report += SyncReport(deleted=1)
+    for exit_obj in plan.stale_exits:
+        log_info(
+            "settlement_graph_road_pruned",
+            context={
+                "map_id": plan.graph.map_id,
+                "exit_key": exit_obj.key,
+                "exit_dbref": exit_obj.dbref,
+            },
+        )
+        exit_obj.delete()
+        report += SyncReport(deleted=1)
+    return report
+
+
+def _invalidate_plan_caches(plans) -> None:
+    """Restore touched objects and drop their process-local projections.
+
+    A database rollback does not undo Evennia's tag/attribute/alias handler
+    caches or the loaded object's field values, so a failed convergence reloads
+    each surviving object and resets those caches before the coordinate
+    projections are dropped. Objects created inside the rolled-back transaction
+    no longer exist; their reload is ignored and they are never referenced
+    again by the caller.
+    """
+
+    for plan in plans:
+        objects = [
+            *(binding.room for binding in plan.nodes if binding.room is not None),
+            *(binding.exit_obj for binding in plan.roads if binding.exit_obj is not None),
+        ]
+        for obj in objects:
+            try:
+                obj.refresh_from_db()
+            except Exception:  # observability: ignore R2: rolled-back creations no longer exist
+                pass
+            for handler_name in ("tags", "aliases", "attributes", "locks"):
+                reset = getattr(getattr(obj, handler_name, None), "reset_cache", None)
+                if reset is not None:
+                    try:
+                        reset()
+                    except Exception:  # observability: ignore R2: handler cache reset is best-effort after rollback
+                        continue
+            for cache in ("_xyz", "_xyz_destination", "_xymap"):
+                try:
+                    if hasattr(obj, cache):
+                        delattr(obj, cache)
+                except Exception:  # observability: ignore R2: cache invalidation is best-effort after rollback
+                    continue
+
+
+def sync_settlement_graph(graph: SparseSettlementGraph) -> SyncReport:
+    """Converge one sparse settlement graph and return what changed."""
+
+    plan = _plan_settlement_graph(graph)
+    try:
+        with transaction.atomic():
+            report = _apply_graph_plan(plan)
+    except Exception:
+        _invalidate_plan_caches([plan])
+        raise
+    if report.created or report.updated or report.deleted:
+        log_info(
+            "settlement_graph_synchronized",
+            context={
+                "map_id": graph.map_id,
+                "created": report.created,
+                "updated": report.updated,
+                "deleted": report.deleted,
+            },
+        )
+    return report
+
+
+def _register_grid_display_maps() -> None:
+    """Store the ASCII map data for the contrib's display surfaces, unparsed.
+
+    The contrib parses lazily when a display command or its CLI asks for a map,
+    so the synchronization path never allocates the dense lattice.
+    """
+
+    grid = XYZGrid.objects.all().first()
+    if grid is None:
+        grid, errors = XYZGrid.create("XYZGrid")
+        if errors or grid is None:
+            raise RuntimeError(f"could not create the XYZGrid script: {errors}")
+    stored = grid.db.map_data
+    changed = []
+    for map_data in XYMAP_DATA_LIST:
+        if stored.get(map_data["zcoord"]) != map_data:
+            changed.append(map_data)
+    if changed:
+        grid.add_maps(*changed)
+
+
+def sync_grid() -> SyncReport:
+    """Converge every declared sparse settlement and bridge Limbo to its gates.
+
+    Every graph is planned read-only before the first write, so a conflicting
+    binding refuses with no room, tag, reference or cached coordinate changed.
+    The whole convergence then applies in one transaction: stable node
+    identities keep rooms, occupants, homes and inbound references across a
+    coordinate change, and a second run over unchanged authored data performs
+    no managed writes.
 
     The bridge is one-way (limbo-one-way-gates): one forward exit per
     ``CITY_GATE_REGISTRY`` row, then a prune pass deleting every persisted
     exit that points back into the starting room. A registry row whose gate
     room is missing warns and is skipped; other rows still converge.
-
-    Mirrors ``world.lore.sync.sync_all()`` in being idempotent and called on
-    every server start, but instantiates real walkable rooms/exits (via the
-    xyzgrid contrib's coordinate-existence check) instead of ``LoreRecord``
-    Scripts. ``add_maps()`` must be followed by ``reload()`` and then
-    ``spawn()`` in the same process -- without ``reload()`` the first boot
-    would spawn nothing (design.md D-5).
     """
 
-    grid = get_xyzgrid()
-    grid.add_maps(*XYMAP_DATA_LIST)
-    grid.reload()
-    grid.spawn()
+    graphs = tuple(SETTLEMENT_GRAPHS.values())
+    plans = tuple(_plan_settlement_graph(graph) for graph in graphs)
+    report = SyncReport()
+    try:
+        with transaction.atomic():
+            _register_grid_display_maps()
+            for plan in plans:
+                report += _apply_graph_plan(plan)
 
-    _sync_grid_room_art()
+            _sync_grid_room_art()
 
-    register_instance_reclamation()
+            register_instance_reclamation()
 
-    limbo = find_starting_rooms(LIMBO_KEY)
-    if not limbo:
-        log_warn(
-            "bootstrap_grid_limbo_room_missing",
-            context={"room_key": LIMBO_KEY, "action": "skip_bridging_exits"},
+            limbo = find_starting_rooms(LIMBO_KEY)
+            if not limbo:
+                log_warn(
+                    "bootstrap_grid_limbo_room_missing",
+                    context={"room_key": LIMBO_KEY, "action": "skip_bridging_exits"},
+                )
+                return report
+            limbo = limbo[0]
+
+            for row in CITY_GATE_REGISTRY.values():
+                gate = GridRoom.objects.filter_xyz(xyz=row.gate_xyz).first()
+                if gate is None:
+                    log_warn(
+                        "bootstrap_grid_gate_missing",
+                        context={
+                            "map_id": row.map_id,
+                            "xyz": row.gate_xyz,
+                            "action": "skip_gate_row",
+                        },
+                    )
+                    continue
+                _ensure_exit(limbo, gate, key=row.exit_key, aliases=list(row.exit_aliases))
+
+            _prune_exits_into(limbo)
+    except Exception:
+        _invalidate_plan_caches(plans)
+        raise
+    if report.created or report.updated or report.deleted:
+        log_info(
+            "settlement_graphs_synchronized",
+            context={
+                "maps": len(graphs),
+                "created": report.created,
+                "updated": report.updated,
+                "deleted": report.deleted,
+            },
         )
-        return
-    limbo = limbo[0]
-
-    for row in CITY_GATE_REGISTRY.values():
-        gate = grid.get_room(row.gate_xyz).first()
-        if gate is None:
-            log_warn(
-                "bootstrap_grid_gate_missing",
-                context={
-                    "map_id": row.map_id,
-                    "xyz": row.gate_xyz,
-                    "action": "skip_gate_row",
-                },
-            )
-            continue
-        _ensure_exit(limbo, gate, key=row.exit_key, aliases=list(row.exit_aliases))
-
-    _prune_exits_into(limbo)
+    return report
 
 
 def _sync_grid_room_art() -> None:

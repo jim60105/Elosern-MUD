@@ -8,6 +8,7 @@ import unittest
 
 from evennia.contrib.grid.xyzgrid.xymap import XYMap
 
+from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.village_ciaran import MAPSTR, PROTOTYPES, XYMAP_DATA
 
 # The six coordinates the village shipped with (ciaran-village-map).
@@ -62,6 +63,27 @@ class VillageCiaranMapTests(unittest.TestCase):
     def setUp(self):
         self.map = XYMap(dict(XYMAP_DATA), Z="village_ciaran", xyzgrid=None)
         self.map.parse()
+
+    def test_sparse_graph_declaration_matches_the_parsed_topology(self):
+        graph = SETTLEMENT_GRAPHS["village_ciaran"]
+        parsed_nodes = {
+            (node.X, node.Y): node for node in self.map.node_index_map.values()
+        }
+        self.assertEqual(
+            {node.coordinate for node in graph.nodes.values()},
+            set(parsed_nodes),
+        )
+        parsed_edges = {
+            frozenset(((node.X, node.Y), (neighbor.X, neighbor.Y)))
+            for node in parsed_nodes.values()
+            for neighbor in node.links.values()
+        }
+        graph_edges = {
+            frozenset((edge.source.coordinate, edge.destination.coordinate))
+            for edge in graph.edges
+        }
+        self.assertEqual(graph_edges, parsed_edges)
+        self.assertEqual(len(graph_edges), 9)
 
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits")
     def test_parse_yields_exactly_the_ten_coordinates(self):

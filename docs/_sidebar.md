@@ -64,6 +64,7 @@
   - [官方美術部署](/development/official-artwork-deployment)
   - [開發資料庫重置手冊](/development/database-reset)
   - [OpenSpec 測試可追溯性](/development/spec-test-traceability)
+  - [稀疏聚落圖與座標身分契約](/development/sparse-settlement-graphs)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
   - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)
