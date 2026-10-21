@@ -22,6 +22,7 @@ from unittest import TestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from tools.spec_traceability import covers_requirement
 from world.rules import human_guild_hosts as hosts
 from world.rules import fatigue
 from world.rules.clock import (
@@ -119,6 +120,9 @@ def _deviant(replacements):
 class PolicyContractTests(TestCase):
     """The authored policy is closed, exact and fail-closed."""
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_shipped_policy_carries_the_exact_units_rates_and_bands(self):
         policy = fatigue.get_policy()
         self.assertEqual(policy.units_per_percent, 3600)
@@ -179,6 +183,9 @@ class PolicyContractTests(TestCase):
 class StageAndScaleTests(TestCase):
     """Exclusive threshold truth and the exact travel scale."""
 
+    @covers_requirement(
+        "mental-reserve::fatigue-stages-have-exact-exclusive-thresholds"
+    )
     def test_stage_boundary_truth(self):
         expected = (
             (252000, "normal"),
@@ -193,11 +200,20 @@ class StageAndScaleTests(TestCase):
             with self.subTest(reserve=reserve):
                 self.assertEqual(fatigue_stage(_state(reserve)).value, stage)
 
+    @covers_requirement(
+        "mental-reserve::fatigue-stages-have-exact-exclusive-thresholds"
+    )
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
     def test_zero_reserve_awake_is_worst_stage_and_forced_replaces_it(self):
         self.assertEqual(fatigue_stage(_state(0)).value, "severe")
         self.assertEqual(fatigue_stage(_state(0, FORCED)).value, "forced_sleep")
         self.assertEqual(fatigue_stage(_state(300000, VOLUNTARY)).value, "sleeping")
 
+    @covers_requirement(
+        "mental-reserve::fatigue-stages-have-exact-exclusive-thresholds"
+    )
     def test_foot_speed_scale_projects_the_instantaneous_stage(self):
         self.assertEqual(foot_speed_scale(_state(FULL)), Fraction(1))
         self.assertEqual(foot_speed_scale(_state(252001)), Fraction(1))
@@ -208,6 +224,9 @@ class StageAndScaleTests(TestCase):
         self.assertEqual(foot_speed_scale(_state(72000)), Fraction(3, 4))
         self.assertEqual(foot_speed_scale(_state(71999)), Fraction(1, 2))
 
+    @covers_requirement(
+        "mental-reserve::fatigue-stages-have-exact-exclusive-thresholds"
+    )
     def test_outgoing_segment_scale_uses_the_next_consumed_band_at_a_floor(self):
         self.assertEqual(outgoing_foot_speed_scale(_state(FULL)), Fraction(1))
         self.assertEqual(outgoing_foot_speed_scale(_state(252001)), Fraction(1))
@@ -216,6 +235,12 @@ class StageAndScaleTests(TestCase):
         self.assertEqual(outgoing_foot_speed_scale(_state(72000)), Fraction(1, 2))
         self.assertEqual(outgoing_foot_speed_scale(_state(71999)), Fraction(1, 2))
 
+    @covers_requirement(
+        "mental-reserve::fatigue-stages-have-exact-exclusive-thresholds"
+    )
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
     def test_sleeping_postures_forbid_travel_and_actions_but_not_targeting(self):
         for posture in (VOLUNTARY, FORCED):
             state = _state(WAKE, posture)
@@ -236,6 +261,9 @@ class ExactRateTests(TestCase):
     def _end(self, state, activity, seconds, **kwargs):
         return predict_interval(state, activity, seconds, **kwargs).end
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_full_day_calibration(self):
         after_walk = self._end(_state(FULL), FatigueActivity.FOOT_TRAVEL, 6 * 3600)
         self.assertEqual(after_walk.reserve_units, 187200)  # 52 percent
@@ -247,6 +275,9 @@ class ExactRateTests(TestCase):
         self.assertEqual(after_sleep.reserve_units, FULL)
         self.assertEqual(after_sleep.reserve_units * 100 // FULL, 100)
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_split_and_unsplit_intervals_are_identical(self):
         unsplit = self._end(_state(FULL), FatigueActivity.AWAKE, 3)
         one = self._end(_state(FULL), FatigueActivity.AWAKE, 1)
@@ -258,6 +289,9 @@ class ExactRateTests(TestCase):
         sleep_split = self._end(sleep_one, FatigueActivity.SLEEP, 2)
         self.assertEqual(sleep_split, sleep_unsplit)
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_sleep_saturates_identically_in_parts(self):
         unsplit = self._end(_state(FULL - 12, VOLUNTARY), FatigueActivity.SLEEP, 2)
         one = self._end(_state(FULL - 12, VOLUNTARY), FatigueActivity.SLEEP, 1)
@@ -265,6 +299,9 @@ class ExactRateTests(TestCase):
         self.assertEqual(unsplit.reserve_units, FULL)
         self.assertEqual(split.reserve_units, FULL)
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_continuous_walking_has_no_daily_quota_or_midnight_reset(self):
         # 45,000 s at 8 units/s is exactly twelve and a half hours of reserve.
         prediction = predict_interval(
@@ -277,12 +314,18 @@ class ExactRateTests(TestCase):
         self.assertIs(prediction.end.posture, FORCED)
         self.assertIs(prediction.transition, TransitionReason.DEPLETION)
 
+    @covers_requirement(
+        "mental-reserve::activity-rates-are-exact-net-per-second-effects"
+    )
     def test_terrain_never_adds_a_multiplier_because_only_time_matters(self):
         # Equal seconds of the same activity are equal reserve cost.
         first = self._end(_state(FULL), FatigueActivity.FOOT_TRAVEL, 900)
         second = self._end(_state(FULL), FatigueActivity.FOOT_TRAVEL, 900)
         self.assertEqual(first, second)
 
+    @covers_requirement(
+        "mental-reserve::each-body-owns-exact-persistent-mental-reserve"
+    )
     def test_true_and_out_of_range_values_are_rejected_before_mutation(self):
         entity = _FakeEntity("t_probe", FULL)
         for reserve in (True, 1.5, "1", -1, FULL + 1):
@@ -299,6 +342,9 @@ class ExactRateTests(TestCase):
 class BoundaryAndPredictionTests(TestCase):
     """Pure, exact and write-free prediction for rules consumers."""
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_full_walk_boundary_is_exactly_13500_seconds(self):
         boundary = next_fatigue_boundary(
             _state(FULL), FatigueActivity.FOOT_TRAVEL
@@ -307,6 +353,9 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertIs(boundary.kind, BoundaryKind.THRESHOLD)
         self.assertEqual(boundary.reserve_units, 252000)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_fractional_boundary_offsets_stay_exact(self):
         # One unit above the normal floor at 8 units/s is one eighth of a second.
         boundary = next_fatigue_boundary(
@@ -318,6 +367,9 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertEqual(depletion.offset_seconds, Fraction(1, 8))
         self.assertIs(depletion.kind, BoundaryKind.DEPLETION)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_interactive_advance_takes_the_first_whole_second_at_the_boundary(self):
         prediction = predict_interval(
             _state(252001), FatigueActivity.FOOT_TRAVEL, 100
@@ -325,6 +377,9 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertEqual(prediction.applicable_seconds, 1)
         self.assertEqual(prediction.seconds, 100)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_piecewise_prediction_covers_25987_5_metres_in_six_hours(self):
         speed = Fraction(4500, 3600)  # 4.5 km/h in metres per second
         state = _state(FULL)
@@ -345,6 +400,9 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertEqual(state.reserve_units, 187200)
         self.assertEqual(fatigue_stage(state).value, "light")
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_forced_sleeper_wakes_after_6000_seconds_outside_combat(self):
         boundary = next_fatigue_boundary(
             _state(0, FORCED), FatigueActivity.SLEEP
@@ -359,11 +417,17 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertIs(prediction.transition, TransitionReason.WAKE)
         self.assertEqual(fatigue_stage(prediction.end).value, "moderate")
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_voluntary_sleep_has_no_natural_wake_boundary(self):
         self.assertIsNone(
             next_fatigue_boundary(_state(1000, VOLUNTARY), FatigueActivity.SLEEP)
         )
 
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
     def test_forced_sleep_latches_until_the_exact_wake_threshold(self):
         for reserve in (1, 71999):
             state = _state(reserve, FORCED)
@@ -375,6 +439,12 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertIs(at_threshold.end.posture, AWAKE)
         self.assertIs(at_threshold.transition, TransitionReason.WAKE)
 
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_live_combat_and_terminal_settlement_suppress_natural_wake(self):
         for kwargs in (
             {"in_combat": True},
@@ -386,6 +456,9 @@ class BoundaryAndPredictionTests(TestCase):
             self.assertIs(prediction.end.posture, FORCED)
             self.assertIsNot(prediction.transition, TransitionReason.WAKE)
 
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
     def test_forced_sleeper_above_the_threshold_releases_immediately(self):
         for reserve in (WAKE, WAKE + 4, FULL):
             prediction = predict_interval(
@@ -393,6 +466,9 @@ class BoundaryAndPredictionTests(TestCase):
             )
             self.assertIs(prediction.end.posture, AWAKE)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_prediction_reports_depletion_before_arrival_without_writing(self):
         entity = _FakeEntity("t_route", FULL)
         start = read_fatigue_state(entity)
@@ -411,6 +487,9 @@ class BoundaryAndPredictionTests(TestCase):
         self.assertIs(depletion.kind, BoundaryKind.DEPLETION)
         self.assertEqual(entity.attributes.values, before)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_prediction_and_reads_emit_no_log_event(self):
         entity = _FakeEntity("t_quiet", FULL)
         with patch("world.rules.fatigue.log_info") as logged:
@@ -421,6 +500,9 @@ class BoundaryAndPredictionTests(TestCase):
             foot_speed_scale(state)
         logged.assert_not_called()
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_activity_and_posture_must_agree(self):
         with self.assertRaises(fatigue.FatigueStateError) as caught:
             predict_interval(_state(FULL), FatigueActivity.SLEEP, 1)
@@ -430,6 +512,9 @@ class BoundaryAndPredictionTests(TestCase):
         with self.assertRaises(fatigue.FatigueStateError):
             predict_interval(_state(0, FORCED), FatigueActivity.AWAKE, 1)
 
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_invalid_seconds_and_completion_are_rejected(self):
         for seconds in (True, -1, 1.5):
             with self.subTest(seconds=seconds):
@@ -444,6 +529,9 @@ class BoundaryAndPredictionTests(TestCase):
 class ConstructionTests(EvenniaTest):
     """Construction baseline, repeat synchronization, corruption and reload."""
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_new_construction_is_full_and_awake_and_reloads(self):
         character = create_object(PlayerCharacter, key="t_fresh_body")
         self.assertEqual(
@@ -458,6 +546,9 @@ class ConstructionTests(EvenniaTest):
             FatigueState(reserve_units=FULL, posture=AWAKE),
         )
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_repeat_synchronization_preserves_valid_fatigue(self):
         character = create_object(PlayerCharacter, key="t_tired_body")
         character.attributes.add(fatigue.RESERVE_ATTRIBUTE, 120000)
@@ -466,6 +557,9 @@ class ConstructionTests(EvenniaTest):
         self.assertEqual(read_fatigue_state(character).reserve_units, 120000)
         self.assertIs(read_fatigue_state(character).posture, AWAKE)
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_malformed_state_is_never_repaired_and_reads_fail(self):
         character = create_object(PlayerCharacter, key="t_corrupt_body")
         character.attributes.add(fatigue.RESERVE_ATTRIBUTE, "oops")
@@ -477,6 +571,9 @@ class ConstructionTests(EvenniaTest):
             read_fatigue_state(character)
         self.assertIs(caught.exception.reason, FatigueRejectReason.INVALID_TYPE)
 
+    @covers_requirement(
+        "mental-reserve::each-body-owns-exact-persistent-mental-reserve"
+    )
     def test_restoring_sp_never_refills_or_shares_reserve(self):
         first = create_object(PlayerCharacter, key="t_first_body")
         second = create_object(PlayerCharacter, key="t_second_body")
@@ -493,6 +590,9 @@ class ConstructionTests(EvenniaTest):
         self.assertEqual(first.traits.sp.current, 20)
         self.assertEqual(second.traits.sp.current, 20)
 
+    @covers_requirement(
+        "mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped"
+    )
     def test_forced_sleeper_reload_keeps_posture_and_wake_eligibility(self):
         character = create_object(PlayerCharacter, key="t_reloaded_sleeper")
         character.attributes.add(fatigue.RESERVE_ATTRIBUTE, 71999)
@@ -508,6 +608,9 @@ class ConstructionTests(EvenniaTest):
         in_battle = predict_interval(state, FatigueActivity.SLEEP, 1, in_combat=True)
         self.assertIs(in_battle.end.posture, FORCED)
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_missing_state_is_reported_and_never_materialized(self):
         character = create_object(PlayerCharacter, key="t_legacy_body")
         character.attributes.remove(fatigue.RESERVE_ATTRIBUTE)
@@ -518,6 +621,9 @@ class ConstructionTests(EvenniaTest):
         self.assertFalse(character.attributes.has(fatigue.RESERVE_ATTRIBUTE))
         self.assertFalse(character.attributes.has(fatigue.POSTURE_ATTRIBUTE))
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_authored_synchronization_establishes_absent_state_only(self):
         host = create_object(NPC, key="t_sync_host")
         host.attributes.remove(fatigue.RESERVE_ATTRIBUTE)
@@ -547,6 +653,9 @@ class ConstructionTests(EvenniaTest):
                 corrupt.attributes.get(fatigue.RESERVE_ATTRIBUTE), "oops"
             )
 
+    @covers_requirement(
+        "mental-reserve::construction-establishes-full-awake-physiology"
+    )
     def test_synchronization_failure_restores_initialized_hosts(self):
         first = create_object(NPC, key="t_sync_first")
         second = create_object(NPC, key="t_sync_second")
@@ -591,6 +700,9 @@ class ConstructionTests(EvenniaTest):
 class SettlementTests(EvenniaTest):
     """The sole fatigue writer: validation, atomicity, rollback and events."""
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_two_members_settle_their_own_declared_activity(self):
         walker = create_object(PlayerCharacter, key="t_walker", location=self.room1)
         thinker = create_object(PlayerCharacter, key="t_thinker", location=self.room1)
@@ -636,6 +748,9 @@ class SettlementTests(EvenniaTest):
         self.assertEqual(event.kwargs["context"]["session"], "t_s")
         self.assertEqual(event.kwargs["context"]["reason"], "reserve_change")
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_stale_start_is_rejected_before_any_write(self):
         first = _FakeEntity("t_first", FULL)
         second = _FakeEntity("t_second", FULL)
@@ -653,6 +768,12 @@ class SettlementTests(EvenniaTest):
         self.assertEqual(first.stored(fatigue.RESERVE_ATTRIBUTE), FULL)
         self.assertEqual(second.stored(fatigue.RESERVE_ATTRIBUTE), FULL)
 
+    @covers_requirement(
+        "mental-reserve::each-body-owns-exact-persistent-mental-reserve"
+    )
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_every_member_is_validated_before_the_first_write(self):
         first = _FakeEntity("t_first", FULL)
         second = _FakeEntity("t_second", FULL)
@@ -671,6 +792,9 @@ class SettlementTests(EvenniaTest):
         self.assertIs(caught.exception.reason, FatigueRejectReason.INVALID_TYPE)
         self.assertEqual(first.stored(fatigue.RESERVE_ATTRIBUTE), FULL)
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_duplicate_member_is_rejected(self):
         first = _FakeEntity("t_first", FULL)
         with self.assertRaises(fatigue.FatigueStateError) as caught:
@@ -686,6 +810,9 @@ class SettlementTests(EvenniaTest):
             )
         self.assertIs(caught.exception.reason, FatigueRejectReason.DUPLICATE_MEMBER)
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_interruptible_interval_may_not_cross_a_boundary(self):
         body = _FakeEntity("t_body", FULL)
         with self.assertRaises(fatigue.FatigueStateError) as caught:
@@ -704,6 +831,12 @@ class SettlementTests(EvenniaTest):
         )
         self.assertEqual(body.stored(fatigue.RESERVE_ATTRIBUTE), FULL)
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
+    @covers_requirement(
+        "mental-reserve::pure-prediction-exposes-interval-and-travel-boundaries"
+    )
     def test_indivisible_completion_commits_the_whole_interval(self):
         body = _FakeEntity("t_body", FULL)
         prediction = predict_interval(
@@ -727,6 +860,9 @@ class SettlementTests(EvenniaTest):
         self.assertEqual(settlement.commits[0].end.reserve_units, 0)
         self.assertIs(settlement.commits[0].end.posture, FORCED)
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_unchanged_settlement_emits_no_event(self):
         body = _FakeEntity("t_body", FULL)
         with patch("world.rules.fatigue.log_info") as logged:
@@ -741,6 +877,9 @@ class SettlementTests(EvenniaTest):
         self.assertEqual(settlement.commits[0].end.reserve_units, FULL)
         logged.assert_not_called()
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_fault_after_the_second_member_write_restores_every_member(self):
         first = create_object(PlayerCharacter, key="t_first", location=self.room1)
         second = create_object(PlayerCharacter, key="t_second", location=self.room1)
@@ -792,6 +931,9 @@ class SettlementTests(EvenniaTest):
             before,
         )
 
+    @covers_requirement(
+        "mental-reserve::physiology-settlement-is-atomic-and-observable-after-commit"
+    )
     def test_enclosing_advance_snapshot_owns_fatigue_state(self):
         first = create_object(PlayerCharacter, key="t_first", location=self.room1)
         second = create_object(PlayerCharacter, key="t_second", location=self.room1)
