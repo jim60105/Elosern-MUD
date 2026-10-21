@@ -5,7 +5,7 @@
 // exists ONLY where the server row says `can_remove`, and no 卸裝 control
 // exists anywhere. Equip/remove/ballot intents ride the single dispatch
 // entry through AppClient.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -18,6 +18,12 @@ import * as fx from "../store/protocol_fixtures.js";
 // one invented t_-keyed row; the panel renders whatever the codex payload
 // authors, and every assertion follows the row constants.
 import { SYNTH_TITLE } from "../support/synthetic-data.mjs";
+
+// AppClient mount suite: the default 5 s budget is below the observed
+// mount/teardown cost under a loaded CI worker, so use the same explicit
+// headroom the project's other mount-heavy suites declare.
+vi.setConfig({ testTimeout: 20000 });
+
 const T_ROW = SYNTH_TITLE.id;
 const T_ROW_DISPLAY = SYNTH_TITLE.display;
 const T_ROW2 = "t_ember_gate";
