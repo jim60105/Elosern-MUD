@@ -270,7 +270,10 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertIn(
             "fatigue_forced_sleep", entity_active_buffs(self.kahn)
         )
-        self.assertIs(resolve_commander(self.aila), self.commander)
+        # Control never moved: no combat session opened and the companion
+        # stayed in place.
+        self.assertIsNone(read_session(self.commander))
+        self.assertIs(self.kahn.location, self.room)
 
     @covers_requirement(
         "party-member-authority::acting-purposes-exclude-knocked-out-members",

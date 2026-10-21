@@ -27,7 +27,8 @@ from world.lore.titles import (
 from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 from world.lore.wilderness_regions import WildernessRegion
 from world.maps.city_gates import CityGateDef
-from world.rules.buffs import BuffDefinition
+from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
+from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 
 from world.tests.synthetic_data.vocab import _SYNTH_GATE_XY, _SYNTH_MAP_KEY
@@ -348,3 +349,21 @@ SYNTH_BUFFS: dict[str, BuffDefinition] = {
         polarity="debuff",
     ),
 }
+
+# The physiological projection is deterministic mechanics, not authored lore:
+# a scoped buff catalog must still carry its protected, indefinite rows so
+# mental settlement can project a stage during a synthetic-scope test.
+SYNTH_BUFFS.update(
+    {
+        key: BuffDefinition(
+            key=key,
+            duration=None,
+            tick_interval=None,
+            stacking="refresh",
+            modifiers={},
+            polarity="debuff",
+            protection=PHYSIOLOGICAL_PROTECTION,
+        )
+        for key in PROJECTION_BUFF_KEYS.values()
+    }
+)
