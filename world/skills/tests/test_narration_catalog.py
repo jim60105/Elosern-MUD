@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import itertools
 import unittest
+from types import SimpleNamespace
 
 from tools.spec_traceability import covers_requirement
 
@@ -23,16 +24,28 @@ from world.skills.narration import (
     NARRATION_CATALOG,
     NARRATION_KINDS,
     PENDING_FAMILIES,
+    SEXUAL_COUNTER_LINES,
+    TRANSITION_LINES,
     BandTable,
     NarrationCatalogError,
     NarrationRow,
+    RoleClause,
     action_lines,
     base_family_key,
     composed_fits,
+    compose_first_line,
     entry_line,
     family_key,
     slot_count,
 )
+from world.skills.narration.data_sexual_combat import ROWS as SEXUAL_COMBAT_ROWS
+from world.skills.narration.data_sexual_divine import ROWS as SEXUAL_DIVINE_ROWS
+from world.skills.narration.data_sexual_interspecies import (
+    ROWS as SEXUAL_INTERSPECIES_ROWS,
+)
+from world.skills.narration.data_sexual_partner import ROWS as SEXUAL_PARTNER_ROWS
+from world.skills.narration.data_sexual_shame import ROWS as SEXUAL_SHAME_ROWS
+from world.skills.narration.data_sexual_solo import ROWS as SEXUAL_SOLO_ROWS
 from world.skills.narration.data_divine_mystery import ROWS as DIVINE_MYSTERY_ROWS
 from world.skills.narration.data_dark import ROWS as DARK_ROWS
 from world.skills.narration.data_earth import ROWS as EARTH_ROWS
@@ -46,7 +59,15 @@ from world.skills.narration.data_martial import ROWS as MARTIAL_ROWS
 from world.skills.narration.data_water import ROWS as WATER_ROWS
 from world.skills.narration.data_wind import ROWS as WIND_ROWS
 from world.skills.narration.select import action_line, choose_line, narration_seed
-from world.skills.narration.validation import build_catalog, validate_catalog
+from world.skills.narration.pools import (
+    SEXUAL_COUNTER_SHARED_LINES,
+    VERDICT_LINES,
+)
+from world.skills.narration.validation import (
+    build_catalog,
+    validate_catalog,
+    validate_sexual_pools,
+)
 from world.skills.narration.vocab import contains_ascii_digit
 from world.skills.registry import (
     SkillCategory,
@@ -77,7 +98,17 @@ AUTHORED_FAMILIES = (
 )
 
 #: Every authored module, used by the whole-catalog distinctness checks.
-AUTHORED_MODULES = (*ELEMENTAL_MODULES, *AUTHORED_FAMILIES)
+SEXUAL_MODULES = (
+    (SEXUAL_SOLO_ROWS, "sexual_act:獨處"),
+    (SEXUAL_SHAME_ROWS, "sexual_act:羞恥"),
+    (SEXUAL_PARTNER_ROWS, "sexual_act:關係"),
+    (SEXUAL_COMBAT_ROWS, "sexual_act:戰鬥"),
+    (SEXUAL_INTERSPECIES_ROWS, "sexual_act:異種"),
+    (SEXUAL_DIVINE_ROWS, "sexual_act:神之秘法"),
+)
+
+#: Every authored module, used by the whole-catalog distinctness checks.
+AUTHORED_MODULES = (*ELEMENTAL_MODULES, *AUTHORED_FAMILIES, *SEXUAL_MODULES)
 
 
 def _skill(key: str, *, category: SkillCategory, element: Element | None = None,
@@ -137,10 +168,7 @@ class PendingFamilyDeclarationTests(unittest.TestCase):
         "action-narration::every-elemental-spell-has-its-own-action-narration",
     )
     def test_pending_families_is_the_frozen_declared_set(self):
-        self.assertEqual(
-            PENDING_FAMILIES,
-            frozenset({"sexual_act"}),
-        )
+        self.assertEqual(PENDING_FAMILIES, frozenset())
 
 
 class LookupChainTests(unittest.TestCase):
@@ -479,6 +507,366 @@ class CompositionBudgetTests(unittest.TestCase):
         first = choose_line(KIND_POOLS["damage"], seed, actor="a", target="t")
         second = choose_line(KIND_POOLS["damage"], seed, actor="a", target="t")
         self.assertEqual(first, second)
+
+
+def _act_stub(
+    *,
+    events: tuple[str, ...] = (),
+    pair_events: tuple[tuple[tuple[str, str], str], ...] = (),
+    actor_counters: tuple[str, ...] = (),
+    participant_counters: tuple[str, ...] = (),
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        sexual_events=events,
+        pair_events=pair_events,
+        actor_counters=actor_counters,
+        participant_counters=participant_counters,
+    )
+
+
+class SexualRowTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_every_verdict_keeps_the_act_clause_and_changes_only_the_verdict(
+        self,
+    ):
+        row = NarrationRow("t_act", action=("{actor} 朝對方伸手——",))
+        composed = []
+        for payload in (
+            {"resisted": True, "auto_comply": False, "roll": 90},
+            {"resisted": False, "auto_comply": False, "roll": 20},
+            {"resisted": False, "auto_comply": True, "roll": None},
+        ):
+            outcome = entry_line(
+                "sexual_resist",
+                payload,
+                skill_key="t_act",
+                target_key="t_target",
+                actor="hero",
+                target="t_target",
+                catalog={"t_act": row},
+                families={},
+            )
+            composed.append(
+                compose_first_line(
+                    "t_act",
+                    None,
+                    outcome,
+                    scope="verdict",
+                    target_key="t_target",
+                    actor="hero",
+                    target="t_target",
+                    catalog={"t_act": row},
+                    families={},
+                )
+            )
+        for line in composed:
+            self.assertTrue(line.startswith("{actor} 朝對方伸手——"), line)
+        self.assertEqual(len(set(composed)), 3)
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_the_auto_complied_clause_is_not_the_ordinary_complied_clause(self):
+        complied = entry_line(
+            "sexual_resist",
+            {"resisted": False, "auto_comply": False, "roll": 40},
+            actor="hero",
+            target="t_target",
+        )
+        auto = entry_line(
+            "sexual_resist",
+            {"resisted": False, "auto_comply": True, "roll": None},
+            actor="hero",
+            target="t_target",
+        )
+        self.assertNotEqual(complied, auto)
+        self.assertIn("{target}", complied)
+        self.assertIn("{target}", auto)
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_a_cast_without_a_resist_entry_opens_on_its_own_outcome(self):
+        row = NarrationRow(
+            "t_solo",
+            action=("{actor} 朝自己伸手——",),
+            performer_lines={"pleasure_gain": ("{actor} 的一刻。",)},
+        )
+        outcome = entry_line(
+            "pleasure_gain",
+            {"amount": 10},
+            skill_key="t_solo",
+            actor_key="hero",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+            catalog={"t_solo": row},
+            families={},
+        )
+        composed = compose_first_line(
+            "t_solo",
+            None,
+            outcome,
+            scope="solo",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+            catalog={"t_solo": row},
+            families={},
+        )
+        self.assertEqual(composed, "{actor} 朝自己伸手——" + outcome)
+        for verdict_lines in VERDICT_LINES.values():
+            for verdict_line in verdict_lines:
+                self.assertNotIn(verdict_line, composed)
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_a_row_voices_the_performer_and_the_participant_separately(self):
+        row = NarrationRow(
+            "t_act",
+            action=("{actor} 伸手——",),
+            performer_lines={"pleasure_gain": ("{actor} 記下自己的一刻。",)},
+            participant_lines={"pleasure_gain": ("{target} 記下被碰的一刻。",)},
+        )
+        caster = entry_line(
+            "pleasure_gain",
+            {"amount": 10},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+            catalog={"t_act": row},
+            families={},
+        )
+        other = entry_line(
+            "pleasure_gain",
+            {"amount": 10},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+            catalog={"t_act": row},
+            families={},
+        )
+        self.assertEqual(caster, "{actor} 記下自己的一刻。")
+        self.assertEqual(other, "{target} 記下被碰的一刻。")
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_a_role_clause_precedes_a_plain_kind_override(self):
+        row = NarrationRow(
+            "t_act",
+            action=("{actor} 伸手——",),
+            kind_lines={"pleasure_gain": ("通用的一刻。",)},
+            performer_lines={"pleasure_gain": ("{actor} 自己的一刻。",)},
+        )
+        caster = entry_line(
+            "pleasure_gain",
+            {"amount": 10},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+            catalog={"t_act": row},
+            families={},
+        )
+        other = entry_line(
+            "pleasure_gain",
+            {"amount": 10},
+            skill_key="t_act",
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+            catalog={"t_act": row},
+            families={},
+        )
+        self.assertEqual(caster, "{actor} 自己的一刻。")
+        self.assertEqual(other, "通用的一刻。")
+
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
+    def test_a_role_clause_over_the_shared_bound_is_rejected(self):
+        with self.assertRaises(NarrationCatalogError):
+            validate_catalog(
+                catalog={},
+                family_rows={
+                    "t_bad": NarrationRow(
+                        "t_bad",
+                        performer_lines={
+                            "pleasure_gain": ("{actor}" + "字" * 200,)
+                        },
+                    )
+                },
+                shipped={},
+                acts={},
+            )
+
+
+class SexualPoolSelectionTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_a_pooled_counter_voices_the_entries_own_participant(self):
+        pool = {
+            "t_counter": RoleClause(
+                performer=("{actor} 記下自己做的事。",),
+                participant=("{target} 記下被做的事。",),
+            )
+        }
+        shared_act = _act_stub(participant_counters=("t_counter",))
+        caster = entry_line(
+            "sexual_counter",
+            {"counter": "t_counter"},
+            act=shared_act,
+            actor_key="hero",
+            target_key="hero",
+            actor="hero",
+            target="hero",
+            counters=pool,
+        )
+        other = entry_line(
+            "sexual_counter",
+            {"counter": "t_counter"},
+            act=shared_act,
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+            counters=pool,
+        )
+        self.assertEqual(caster, "{actor} 記下自己做的事。")
+        self.assertEqual(other, "{target} 記下被做的事。")
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+    )
+    def test_a_performer_only_counter_never_renders_the_participant_clause(self):
+        pool = {
+            "t_counter": RoleClause(
+                performer=("{actor} 記下自己做的事。",),
+                participant=("{target} 記下被做的事。",),
+            )
+        }
+        solo_act = _act_stub(
+            actor_counters=("t_counter",), participant_counters=()
+        )
+        line = entry_line(
+            "sexual_counter",
+            {"counter": "t_counter"},
+            act=solo_act,
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+            counters=pool,
+        )
+        self.assertEqual(line, "{actor} 記下自己做的事。")
+
+    @covers_requirement(
+        "action-narration::narration-resolution-degrades-instead-of-rejecting-an-action"
+    )
+    def test_an_unpooled_counter_degrades_to_the_role_fallback(self):
+        line = entry_line(
+            "sexual_counter",
+            {"counter": "t_unpooled"},
+            actor_key="hero",
+            target_key="partner",
+            actor="hero",
+            target="partner",
+            counters={},
+        )
+        self.assertIn(line, SEXUAL_COUNTER_SHARED_LINES)
+
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
+    def test_a_transition_selects_by_event_name_and_degrades_when_unknown(self):
+        pool = {"t_event": ("{target} 越過了一道界線。",)}
+        known = entry_line(
+            "sexual_transition",
+            {"event": "t_event"},
+            actor="hero",
+            target="t_target",
+            transitions=pool,
+        )
+        unknown = entry_line(
+            "sexual_transition",
+            {"event": "t_unknown"},
+            actor="hero",
+            target="t_target",
+            transitions=pool,
+        )
+        self.assertEqual(known, "{target} 越過了一道界線。")
+        self.assertIn(unknown, KIND_POOLS["sexual_transition"])
+
+class SexualPoolCoverageTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
+    def test_the_pools_accept_exactly_the_declared_names(self):
+        act = _act_stub(
+            events=("t_event",),
+            pair_events=((("female", "male"), "t_pair_event"),),
+            actor_counters=("t_counter",),
+            participant_counters=("t_counter",),
+        )
+        validate_sexual_pools(
+            {"t_act": act},
+            transitions={"t_event": ("一。",), "t_pair_event": ("二。",)},
+            counters={
+                "t_counter": RoleClause(
+                    performer=("{actor} 一。",), participant=("{target} 二。",)
+                )
+            },
+        )
+
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
+    def test_an_event_without_a_clause_fails_validation_naming_it(self):
+        act = _act_stub(events=("t_missing_event",))
+        with self.assertRaises(NarrationCatalogError) as caught:
+            validate_sexual_pools({"t_act": act}, transitions={}, counters={})
+        self.assertIn("t_missing_event", str(caught.exception))
+
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
+    def test_a_counter_without_clauses_fails_validation_naming_it(self):
+        act = _act_stub(actor_counters=("t_missing_counter",))
+        with self.assertRaises(NarrationCatalogError) as caught:
+            validate_sexual_pools({"t_act": act}, transitions={}, counters={})
+        self.assertIn("t_missing_counter", str(caught.exception))
+
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
+    def test_an_unemitted_pool_entry_fails_validation_naming_it(self):
+        with self.assertRaises(NarrationCatalogError) as caught:
+            validate_sexual_pools(
+                {},
+                transitions={"t_orphan_event": ("一。",)},
+                counters={},
+            )
+        self.assertIn("t_orphan_event", str(caught.exception))
+
+    def test_a_role_clause_requires_both_roles(self):
+        for keyword in (
+            {"performer": (), "participant": ("{target} 二。",)},
+            {"performer": ("{actor} 一。",), "participant": ()},
+        ):
+            with self.subTest(**keyword):
+                with self.assertRaises(NarrationCatalogError):
+                    RoleClause(**keyword)
 
 
 if __name__ == "__main__":

@@ -23,7 +23,9 @@ from .pools import (
     NARRATION_KINDS,
     OVERWHELM_SUMMARY_LINE,
     PARTY_RETREAT_LINES,
+    SEXUAL_COUNTER_LINES,
     TERMINAL_OUTCOME_MESSAGES,
+    TRANSITION_LINES,
 )
 from .select import (
     act_for_skill,
@@ -53,6 +55,7 @@ from .vocab import (
     NarrationBands,
     NarrationCatalogError,
     NarrationRow,
+    RoleClause,
     band_for,
     composed_fits,
     slot_count,
@@ -79,7 +82,10 @@ __all__ = [
     "OVERWHELM_SUMMARY_LINE",
     "PARTY_RETREAT_LINES",
     "PENDING_FAMILIES",
+    "RoleClause",
+    "SEXUAL_COUNTER_LINES",
     "TERMINAL_OUTCOME_MESSAGES",
+    "TRANSITION_LINES",
     "BandTable",
     "NarrationBands",
     "NarrationCatalogError",

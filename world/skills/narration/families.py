@@ -1,10 +1,9 @@
 """Family-tier narration rows: the fallback every active skill resolves to.
 
-The elemental-magic and four non-elemental families narrate from their own
-per-skill rows; the family tier stays as the documented fallback under them,
-including the element-and-shape line for an element key that has no authored
-row yet. For the still-pending sexual-act family a skill's own line-of-act
-clause is its action clause. The family tier never replaces an authored
+Every ACTIVE family narrates from its own per-skill rows; the family tier
+stays as the documented fallback under them, including the element-and-shape
+line for an element key that has no authored row yet and the line-of-act
+clause for a hand-built act. The family tier never replaces an authored
 per-skill row; it only keeps a skill narrating from day one.
 """
 
@@ -22,13 +21,10 @@ from world.skills.registry import SkillCategory, SkillDef
 
 from .vocab import NarrationRow
 
-#: Families whose per-skill rows have not landed yet. The set only shrinks:
-#: a test pins it, so re-opening an exemption fails.
-PENDING_FAMILIES = frozenset(
-    {
-        "sexual_act",
-    }
-)
+#: Families whose per-skill rows have not landed yet. Every ACTIVE family is
+#: authored, so the set is empty; a test pins it empty, so no family can
+#: silently re-open an exemption.
+PENDING_FAMILIES = frozenset()
 
 #: The two elemental shapes: a damaging spell and a supportive one.
 ELEMENTAL_SHAPES = ("assault", "succor")
