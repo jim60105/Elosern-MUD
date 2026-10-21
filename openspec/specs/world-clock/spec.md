@@ -201,7 +201,7 @@ rejected. During an active persistent combat session, CmdCast SHALL NOT advance 
 
 ### Requirement: move and converse command-default time costs are declared as rulebook data only
 `world/rules/rulebook/clock.yaml`'s `command_defaults` mapping SHALL declare valid authored `move` and
-`converse` durations (design doc §6.5's flat defaults). `move` SHALL be consumed by every successful
+`converse` durations (design doc §6.5's flat defaults). `move` SHALL supply only non-distance connector defaults; resolved physical durations SHALL be consumed by distance-bearing outdoor
 traversal of a `typeclasses.exits.Exit` or `typeclasses.exits.CostedXYZExit` instance by a
 `PlayerCharacter`, via `world.rules.movement.charge_movement()` (the `movement-cost-charging`
 capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia command.
@@ -225,7 +225,7 @@ capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia co
 #### Scenario: A successful exit traversal advances the clock by the move cost
 - **WHEN** a `PlayerCharacter` successfully traverses a `typeclasses.exits.Exit` or
   `typeclasses.exits.CostedXYZExit` instance
-- **THEN** `WorldClock.tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`
+- **THEN** `WorldClock.tick` increases by exactly the resolved physical duration for an outdoor edge or the authored connector duration otherwise
 
 #### Scenario: converse remains unconsumed
 - **WHEN** `world/rules/rulebook/clock.yaml`'s `converse` value is inspected for any consumer added by

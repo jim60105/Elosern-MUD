@@ -97,12 +97,20 @@ class SparseNode:
     ``prototype`` is the room prototype mapping applied by the synchronizer
     (``prototype_parent``, ``key``, ``desc`` and any Attribute keys). A node
     prototype must be a mapping; the synchronizer resolves its typeclass.
+
+    ``physical`` is the node's authored absolute meter position. It is the
+    travel-geometry authority: physical polyline lengths feed route weights and
+    distance-bearing movement costs, while ``x``/``y`` stay the room's current
+    xyzgrid coordinate until the metric-coordinate cutover relocates it. It is
+    ``None`` for synthetic/builder maps, where the coordinate itself is the
+    meter position.
     """
 
     node_id: str
     x: int
     y: int
     prototype: Mapping[str, Any]
+    physical: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.node_id, str) or not self.node_id:
@@ -111,10 +119,25 @@ class SparseNode:
             raise SparseGraphError(f"node {self.node_id!r} coordinate must be an integer pair")
         if not isinstance(self.prototype, Mapping) or not self.prototype:
             raise SparseGraphError(f"node {self.node_id!r} needs a room prototype mapping")
+        if self.physical is not None and (
+            not isinstance(self.physical, tuple)
+            or len(self.physical) != 2
+            or not _is_int(self.physical[0])
+            or not _is_int(self.physical[1])
+        ):
+            raise SparseGraphError(
+                f"node {self.node_id!r} physical position must be an integer pair"
+            )
 
     @property
     def coordinate(self) -> tuple[int, int]:
         return (self.x, self.y)
+
+    @property
+    def physical_coordinate(self) -> tuple[int, int]:
+        """The node's authored meter position (its coordinate when undeclared)."""
+
+        return self.physical if self.physical is not None else self.coordinate
 
     @property
     def key(self) -> str:
@@ -205,12 +228,21 @@ class RouteStep:
 
 
 def _polyline(
-    source: SparseNode, road: SparseRoad, destination: SparseNode
+    source: SparseNode,
+    road: SparseRoad,
+    destination: SparseNode,
+    *,
+    physical: bool = False,
 ) -> tuple[tuple[int, int], ...]:
+    point = (
+        (lambda node: node.physical_coordinate)
+        if physical
+        else (lambda node: node.coordinate)
+    )
     return (
-        source.coordinate,
+        point(source),
         *road.bend_points,
-        destination.coordinate,
+        point(destination),
     )
 
 
@@ -275,6 +307,7 @@ class SparseSettlementGraph:
         pairs: set[tuple[str, str]] = set()
         directions: set[tuple[str, str]] = set()
         edges: list[SparseEdge] = []
+        by_pair: dict[tuple[str, str], SparseEdge] = {}
         adjacency: dict[str, list[tuple[SparseEdge, str]]] = {node_id: [] for node_id in by_id}
         for road in road_list:
             if not isinstance(road, SparseRoad):
@@ -294,6 +327,11 @@ class SparseSettlementGraph:
                     f"map {map_id!r} binds road {road.identity} twice"
                 )
             pairs.add(road.identity)
+            # Direction stays the authored logical-companion octant (the ASCII
+            # display source); only the physical length changes once meter
+            # positions are declared. Keeping direction on the logical
+            # coordinates means physical position authoring can never silently
+            # rewrite which exit leaves a node.
             points = _polyline(source, road, destination)
             direction = road.direction_hint or compass_direction(
                 points[1][0] - points[0][0], points[1][1] - points[0][1]
@@ -309,9 +347,12 @@ class SparseSettlementGraph:
                 source=source,
                 destination=destination,
                 direction=direction,
-                length=_polyline_length(points),
+                length=_polyline_length(
+                    _polyline(source, road, destination, physical=True)
+                ),
             )
             edges.append(edge)
+            by_pair[(source.node_id, destination.node_id)] = edge
             adjacency[source.node_id].append((edge, destination.node_id))
 
         for node_edges in adjacency.values():
@@ -321,6 +362,7 @@ class SparseSettlementGraph:
             {node_id: tuple(node_edges) for node_id, node_edges in adjacency.items()}
         )
         self._by_coord = MappingProxyType(by_coord)
+        self._by_pair = MappingProxyType(by_pair)
 
     # -- lookups ---------------------------------------------------------
     def node(self, node_id: str) -> SparseNode | None:
@@ -328,6 +370,11 @@ class SparseSettlementGraph:
 
     def node_at(self, coordinate: tuple[int, int]) -> SparseNode | None:
         return self._by_coord.get(tuple(coordinate))  # type: ignore[arg-type]
+
+    def edge(self, source_id: str, destination_id: str) -> SparseEdge | None:
+        """Return the directed road between two authored identities, or ``None``."""
+
+        return self._by_pair.get((source_id, destination_id))
 
     @property
     def max_x(self) -> int:
@@ -423,12 +470,16 @@ def build_sparse_graph(
     roads: Iterable[tuple[str, str] | SparseRoad],
     options: Mapping[str, Any] | None = None,
     exit_prototype: Mapping[str, Any] | None = None,
+    physical_positions: Mapping[str, tuple[int, int]] | None = None,
 ) -> SparseSettlementGraph:
     """Assemble a validated graph from coordinate-keyed authored declarations.
 
     ``node_ids`` is the authored identity table (coordinate → stable slug) and
     must describe exactly the prototype coordinates: a missing or extra entry is
     a graph error, so identity and room data cannot drift apart silently.
+    ``physical_positions`` is the authored meter position table keyed by stable
+    identity; it must describe exactly the same identities, and it is the only
+    source of edge lengths when present.
     """
 
     prototype_coords = {
@@ -444,12 +495,39 @@ def build_sparse_graph(
             f"map {map_id!r} identity table and prototypes disagree "
             f"(identities without prototypes: {missing}; prototypes without identities: {extra})"
         )
+    if physical_positions is not None:
+        declared = set(physical_positions)
+        identities = set(node_ids.values())
+        if declared != identities:
+            missing = sorted(identities - declared)
+            extra = sorted(declared - identities)
+            raise SparseGraphError(
+                f"map {map_id!r} physical position table disagrees with node identities "
+                f"(identities without physical positions: {missing}; "
+                f"unknown physical identities: {extra})"
+            )
+        for node_id, position in physical_positions.items():
+            if (
+                not isinstance(position, tuple)
+                or len(position) != 2
+                or not _is_int(position[0])
+                or not _is_int(position[1])
+            ):
+                raise SparseGraphError(
+                    f"map {map_id!r} physical position for {node_id!r} "
+                    "must be an integer pair"
+                )
     nodes = [
         SparseNode(
             node_id=node_ids[coordinate],
             x=coordinate[0],
             y=coordinate[1],
             prototype=dict(prototypes[coordinate]),
+            physical=(
+                physical_positions[node_ids[coordinate]]
+                if physical_positions is not None
+                else None
+            ),
         )
         for coordinate in sorted(node_ids, key=lambda cell: (cell[1], cell[0]))
     ]

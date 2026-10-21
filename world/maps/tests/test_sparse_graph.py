@@ -179,3 +179,70 @@ class SparseRouteTests(unittest.TestCase):
         self.assertIsNone(graph.route("a", "unknown"))
         self.assertEqual(graph.plan("a", "b"), ())
         self.assertEqual(graph.route("a", "a"), ())
+
+
+class PhysicalGeometryTests(unittest.TestCase):
+    """Authored meter positions drive lengths without rewriting compass exits."""
+
+    def test_physical_positions_must_cover_exactly_the_authored_identities(self):
+        prototypes = {(0, 0): {"key": "起點"}, (1, 0): {"key": "終點"}}
+        node_ids = {(0, 0): "start", (1, 0): "end"}
+        with self.assertRaises(SparseGraphError):
+            build_sparse_graph(
+                map_id="t_map",
+                prototypes=prototypes,
+                node_ids=node_ids,
+                roads=[("start", "end")],
+                physical_positions={"start": (0, 0)},
+            )
+        with self.assertRaises(SparseGraphError):
+            build_sparse_graph(
+                map_id="t_map",
+                prototypes=prototypes,
+                node_ids=node_ids,
+                roads=[("start", "end")],
+                physical_positions={"start": (0, 0), "end": (10, 0), "extra": (1, 1)},
+            )
+
+    def test_lengths_use_physical_positions_while_direction_uses_logical_ones(self):
+        graph = build_sparse_graph(
+            map_id="t_map",
+            prototypes={
+                (0, 0): {"key": "起點"},
+                (1, 0): {"key": "終點"},
+            },
+            node_ids={(0, 0): "start", (1, 0): "end"},
+            roads=[("start", "end")],
+            physical_positions={"start": (0, 0), "end": (1000, 0)},
+        )
+        edge = graph.edge("start", "end")
+        self.assertEqual(edge.length, 1000)
+        self.assertEqual(edge.direction, "e")
+        self.assertEqual(graph.node("end").physical_coordinate, (1000, 0))
+
+    @covers_requirement("grid-room-sync::sparse-authored-graphs-synchronize-without-identity-loss")
+    def test_shipped_settlement_graphs_carry_distinct_physical_positions(self):
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        self.assertTrue(SETTLEMENT_GRAPHS)
+        for map_id, graph in SETTLEMENT_GRAPHS.items():
+            with self.subTest(map_id=map_id):
+                positions = [node.physical_coordinate for node in graph.nodes.values()]
+                self.assertIsNone(
+                    next(
+                        (node.node_id for node in graph.nodes.values() if node.physical is None),
+                        None,
+                    )
+                )
+                self.assertEqual(len(set(positions)), len(positions))
+                # Compass exits remain the authored logical octants.
+                for edge in graph.edges:
+                    self.assertEqual(
+                        edge.direction,
+                        compass_direction(
+                            edge.destination.x - edge.source.x,
+                            edge.destination.y - edge.source.y,
+                        ),
+                    )
+                # Physical spacing is unequal: a path charges unequal lengths.
+                self.assertGreater(len({round(edge.length, 6) for edge in graph.edges}), 1)

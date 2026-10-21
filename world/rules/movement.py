@@ -1,12 +1,25 @@
 """Shared movement-cost charging for every exit lineage (map-movement-clock).
 
 One function, ``charge_movement``, is the single place an exit traversal advances
-``WorldClock`` for a successful, player-driven step. Each exit typeclass carries
-a ``movement_cost_key`` resolved against ``CLOCK_YAML["command_defaults"]``, so
-grid steps, the Limbo bridge, instance-room doorways, and wilderness steps all
-share one cost table and one charging mechanism instead of bespoke inline
-``get_world_clock().advance(...)`` calls (design.md D-1/D-5).
+``WorldClock`` for a successful, player-driven step. Distance-bearing outdoor
+traversal charges the physical duration the exit resolved at preflight
+(``world.rules.travel_cost``: authored edge geometry divided by the slowest
+eligible source-present traveller's terrain speed, rounded upward once);
+explicit non-distance connectors — the Limbo bridge, instance-room doorways, a
+plain room pair — charge their authored ``CLOCK_YAML["command_defaults"]``
+duration. Grid steps, wilderness steps and gate approaches still share one cost
+mechanism instead of bespoke inline ``get_world_clock().advance(...)`` calls
+(design.md D-1/D-5).
+
+``wilderness_move`` is retained only as the distinct wilderness travel context
+that carries the existing flight waiver. It is never a seconds authority: a
+wilderness step with no resolvable physical edge is refused instead of being
+priced from a fixed constant.
 """
+
+
+class MovementCostError(ValueError):
+    """A movement event has no priceable traversal (refused, not guessed)."""
 
 
 def charge_movement(
@@ -18,22 +31,29 @@ def charge_movement(
 ) -> None:
     """Charge ``WorldClock`` for one successful traversal, if the traverser is a player.
 
-    Resolves the cost from ``CLOCK_YAML["command_defaults"][cost_key]`` and calls
-    ``WorldClock.advance(cost, AdvanceSource.COMMAND, entities)`` only when
-    ``traversing_object`` is player-driven — matching design doc D4 ("the world
-    advances only on player action"). Anything else is a no-op, so a future NPC
-    or monster crossing an exit never drives the global clock on its own
-    schedule (design.md D-8). A ``PlayerCharacter`` owning the ``flight`` skill
-    is waived the ``wilderness_move`` cost entirely (movement-skill-waiver
-    design); every other cost key charges normally.
+    The cost is the preflight record the exit resolved before relocation
+    (``preflight_movement_cost``), consumed here without changing this public
+    signature: its seconds, its source-present traveller tuple and its terrain
+    are immutable, so post-relocation room pooling can never alter the charge.
+    A direct call outside an exit lineage falls back to resolving from
+    ``source_location`` and the traverser's current location — exactly the
+    values the exit would have preflighted.
+
+    ``WorldClock.advance(cost, AdvanceSource.COMMAND, entities)`` runs only when
+    ``is_player_driven(traversing_object)`` is true — matching design doc D4
+    ("the world advances only on player action"). Anything else is a no-op, so a
+    future NPC or monster crossing an exit never drives the global clock on its
+    own schedule (design.md D-8). A ``PlayerCharacter`` owning the ``flight``
+    skill is waived the ``wilderness_move`` cost entirely
+    (movement-skill-waiver design); every other cost key charges normally.
 
     ``entities`` is the traverser followed by every party member the follow
     step moves with it (party-rest-move-settlement): the effective companions
     co-located in ``source_location`` before the step and, for a possessed
-    traverser, the commander's body. The follower set comes from the same
+    traverser, the commander's body. The set comes from the same
     ``follow_scope`` predicate ``follow_companions`` uses, evaluated against
-    the pre-move ``source_location`` (and ``wilderness_source_coordinates``
-    for a wilderness step), so charging and following can never disagree.
+    the pre-move ``source_location`` (and ``wilderness_source_coordinates`` for
+    a wilderness step), so charging and following can never disagree.
     ``source_location`` is required so a caller cannot silently fall back to
     the post-relocation room.
     """
@@ -43,8 +63,13 @@ def charge_movement(
     if not is_player_driven(traversing_object):
         return
     from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
-    from world.rules.party import follow_scope
-
+    from world.rules.travel_cost import (
+        MovementPreflightRefused,
+        TraversalStatus,
+        consume_preflight_resolution,
+        resolve_traversal_cost,
+        source_present_members,
+    )
     from world.skills.restrictions import skill_effect_allowed
 
     if (
@@ -57,15 +82,38 @@ def charge_movement(
         # (movement-skill-waiver design). ``flash_step`` explicitly does NOT
         # waive this cost; only the flight-required-exit gate honors it.
         return
-    _, followers = follow_scope(
-        traversing_object,
-        source_location,
-        wilderness_source_coordinates,
-        log_unresolved=False,
+    resolution = consume_preflight_resolution(
+        traversing_object, cost_key, source_location
     )
-    cost = CLOCK_YAML["command_defaults"][cost_key]
+    if resolution is None:
+        members = source_present_members(
+            traversing_object, source_location, wilderness_source_coordinates
+        )
+        resolution = resolve_traversal_cost(
+            traversing_object,
+            cost_key,
+            source_location=source_location,
+            destination=getattr(traversing_object, "location", None),
+            wilderness_source_coordinates=wilderness_source_coordinates,
+            members=members,
+        )
+    if resolution.status is TraversalStatus.UNRESOLVED:
+        raise MovementPreflightRefused(
+            "unresolved_outdoor_edge",
+            f"{cost_key!r} movement has no authored physical traversal",
+        )
+    if resolution.cost is not None:
+        cost = resolution.cost.seconds
+    else:
+        if cost_key == "wilderness_move":
+            # No fixed wilderness seconds authority remains: a wilderness
+            # context with no physical edge is a caller error, never a price.
+            raise MovementCostError(
+                "wilderness_move requires a resolved physical traversal"
+            )
+        cost = CLOCK_YAML["command_defaults"][cost_key]
     get_world_clock().advance(
         cost,
         AdvanceSource.COMMAND,
-        [traversing_object, *followers],
+        list(resolution.members),
     )

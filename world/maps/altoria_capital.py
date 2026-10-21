@@ -262,6 +262,36 @@ NODE_IDS = {
     (4, 6): "palace_forecourt",
 }
 
+# Authored absolute meter position per stable identity (world-map-scale design
+# §8). Pre-activation the xyzgrid rooms stay on their compact display
+# coordinates; travel geometry already measures these approved positions, and
+# the metric-coordinate cutover later relocates the rooms onto them. Every
+# ``NODE_IDS`` identity must appear exactly once here (build_sparse_graph()
+# rejects drift both ways).
+PHYSICAL_NODE_POSITIONS = {
+    "south_gate": (3050, 150),
+    "quay": (1250, 760),
+    "riverbank_road": (2150, 920),
+    "south_avenue": (3140, 1050),
+    "inn_lane": (3970, 1120),
+    "bath_forecourt": (4830, 970),
+    "old_wall_ruins": (2350, 1900),
+    "north_avenue": (3350, 1980),
+    "craft_alley": (1300, 2600),
+    "market_street": (2420, 2700),
+    "central_plaza": (3500, 2850),
+    "guild_forecourt": (4380, 3000),
+    "east_market": (5380, 2850),
+    "east_gate": (6500, 3010),
+    "training_ground": (2300, 3820),
+    "holy_steps": (3480, 3700),
+    "great_temple": (4560, 3920),
+    "noble_quarter": (3500, 4850),
+    "upper_gate": (4690, 5010),
+    "academy": (5650, 5200),
+    "palace_forecourt": (4500, 6350),
+}
+
 # Explicit roads (stable endpoint identities, one directed road per travel
 # direction). The sparse route adapter uses these edges and their physical
 # lengths instead of a coordinate lattice; the ASCII map above remains the

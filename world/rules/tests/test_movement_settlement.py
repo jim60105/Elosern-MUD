@@ -253,6 +253,24 @@ class MovementSettlementWildernessTests(EvenniaTest):
         self.assertEqual(self._bookkeeping(), before_bookkeeping)
         self._assert_rooms_coherent()
 
+    @covers_requirement("movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed")
+    def test_a_blocked_corner_is_refused_before_any_write(self):
+        # The traversal preflight reads the same neighbour rule the canonical
+        # resolver and the local map read; a refused step never relocates,
+        # charges, or records anything.
+        self.gate.at_traverse(self.char1, self.east_gate)
+        before_tick = get_world_clock().tick
+        before_location = self.char1.location
+        before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
+        with patch("typeclasses.exits.wilderness_neighbor", return_value=None):
+            result = self._exit("east").at_traverse(self.char1, before_location)
+        self.assertFalse(result)
+        self.assertIs(self.char1.location, before_location)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(
+            {visit.node_id for visit in parse_knowledge(self.char1)}, before_knowledge
+        )
+
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_with_fresh_room_keeps_no_zombie_rooms(self):
         self.char1.location = self.east_gate

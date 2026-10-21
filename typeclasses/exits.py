@@ -21,6 +21,7 @@ from world.maps.wilderness_destination import (
     find_gateway,
     grid_room_for_gate,
     normalize_wilderness_direction,
+    wilderness_neighbor,
 )
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.movement_settlement import settle_movement
@@ -233,8 +234,25 @@ class MovementCostMixin:
         following in one outer database transaction and compensates every
         Evennia cache surface when any step fails
         (movement-settlement-atomicity design D5).
+
+        The movement cost is resolved once, before relocation, by
+        ``preflight_movement_cost``: an authored settlement edge becomes its
+        physical duration and every source-present traveller is captured, so
+        the charge cannot drift from the party the follow step moves. An
+        outdoor lineage whose authored geometry cannot be resolved is refused
+        before any write; a preflight eligibility refusal (a corrupt or
+        travel-forbidden member) is likewise a clean refusal.
         """
+        from world.rules.travel_cost import (
+            MovementPreflightRefused,
+            TraversalStatus,
+            log_traversal_refusal,
+            preflight_movement_cost,
+            source_present_members,
+        )
+
         stock_traversal = super().at_traverse
+        source_location = traversing_object.location
 
         def traverse_stock():
             return stock_traversal(traversing_object, target_location, **kwargs)
@@ -244,12 +262,28 @@ class MovementCostMixin:
         # swallow this traversal's own failure line.
         traversing_object.ndb.limbo_refused = None
 
-        return settle_movement(
-            traversing_object,
-            traversing_object.location,
-            destination=target_location,
-            traverse=traverse_stock,
-        )
+        try:
+            with preflight_movement_cost(
+                traversing_object,
+                self.movement_cost_key,
+                source_location=source_location,
+                destination=target_location,
+                members=source_present_members(traversing_object, source_location),
+            ) as resolution:
+                if resolution.status is TraversalStatus.UNRESOLVED:
+                    log_traversal_refusal(
+                        "movement_cost_mixin", traversing_object, "unresolved_outdoor_edge"
+                    )
+                    return None
+                return settle_movement(
+                    traversing_object,
+                    source_location,
+                    destination=target_location,
+                    traverse=traverse_stock,
+                )
+        except MovementPreflightRefused as error:
+            log_traversal_refusal("movement_cost_mixin", traversing_object, error.reason)
+            return None
 
 
 class Exit(MovementCostMixin, ObjectParent, DefaultExit):
@@ -294,6 +328,14 @@ class WildernessGateExit(Exit):
     """
 
     def at_traverse(self, traversing_object, target_location, **kwargs):
+        from world.rules.travel_cost import (
+            MovementPreflightRefused,
+            TraversalStatus,
+            log_traversal_refusal,
+            preflight_movement_cost,
+            source_present_members,
+        )
+
         entry = WILDERNESS_ENTRY_REGISTRY.get(self.db.anchor_key)
         gate = entry.gate_for(self.db.gate_direction) if entry is not None else None
         landing_cell = entry.approach_cell(gate) if gate is not None else None
@@ -345,12 +387,34 @@ class WildernessGateExit(Exit):
             )
             return True
 
-        return settle_movement(
-            traversing_object,
-            source_location,
-            wilderness_coordinates=landing_cell,
-            traverse=gate_traversal,
-        )
+        try:
+            with preflight_movement_cost(
+                traversing_object,
+                "wilderness_move",
+                source_location=source_location,
+                # The exit's own room is the grid side of this crossing (a
+                # direct at_traverse call may not have relocated the traverser
+                # into it yet).
+                grid_location=self.location,
+                wilderness_destination_coordinates=landing_cell,
+                members=source_present_members(traversing_object, source_location),
+            ) as resolution:
+                if resolution.status is not TraversalStatus.RESOLVED:
+                    # A gate crossing is distance-bearing by definition: its
+                    # authored approach must resolve before relocation.
+                    log_traversal_refusal(
+                        "wilderness_gate_exit", traversing_object, "unresolved_gate_approach"
+                    )
+                    return False
+                return settle_movement(
+                    traversing_object,
+                    source_location,
+                    wilderness_coordinates=landing_cell,
+                    traverse=gate_traversal,
+                )
+        except MovementPreflightRefused as error:
+            log_traversal_refusal("wilderness_gate_exit", traversing_object, error.reason)
+            return False
 
 
 class WildernessReturnExit(WildernessExit):
@@ -398,13 +462,23 @@ class WildernessReturnExit(WildernessExit):
                 )
                 return True
 
-            return settle_movement(
+            return self._settle_with_preflight(
                 traversing_object,
-                self.location,
                 destination=grid_room,
                 wilderness_source_coordinates=current,
                 traverse=return_traversal,
+                require_resolved=True,
             )
+        if direction is None:
+            # Only the contrib's eight canonical direction exits are wired
+            # here; anything else cannot name an arrival cell.
+            return False
+        # Reject a blocked step (out of bounds, a footprint cell, or a corner
+        # cut past an impassable orthogonal neighbour) BEFORE any write, using
+        # the same rule the canonical resolver and the local map read.
+        destination_coordinates = wilderness_neighbor(current[0], current[1], direction)
+        if destination_coordinates is None:
+            return False
         # ORDINARY wilderness movement -- every coordinate/direction that is not
         # a registered gateway (or whose gateway landing is refused). Not free:
         # a successful step still pays
@@ -423,10 +497,70 @@ class WildernessReturnExit(WildernessExit):
                 )
             return result
 
-        return settle_movement(
+        return self._settle_with_preflight(
             traversing_object,
-            self.location,
-            wilderness_coordinates=traversing_object.location.coordinates,
+            destination_coordinates=destination_coordinates,
+            # Same snapshot surface the settled step always provided: the
+            # pre-move coordinates of the (pooled) wilderness room.
+            wilderness_coordinates=self.location.coordinates,
             wilderness_source_coordinates=current,
             traverse=step_traversal,
         )
+
+    def _settle_with_preflight(
+        self,
+        traversing_object,
+        *,
+        traverse,
+        wilderness_source_coordinates: tuple[int, int],
+        destination=None,
+        wilderness_coordinates: tuple[int, int] | None = None,
+        destination_coordinates: tuple[int, int] | None = None,
+        require_resolved: bool = False,
+    ):
+        """Resolve the physical step before relocation, then run the boundary."""
+        from world.rules.travel_cost import (
+            MovementPreflightRefused,
+            TraversalStatus,
+            log_traversal_refusal,
+            preflight_movement_cost,
+            source_present_members,
+        )
+
+        source_location = self.location
+        try:
+            with preflight_movement_cost(
+                traversing_object,
+                "wilderness_move",
+                source_location=source_location,
+                destination=destination,
+                wilderness_source_coordinates=wilderness_source_coordinates,
+                wilderness_destination_coordinates=destination_coordinates,
+                members=source_present_members(
+                    traversing_object,
+                    source_location,
+                    wilderness_source_coordinates,
+                ),
+            ) as resolution:
+                if resolution.status is not TraversalStatus.RESOLVED or (
+                    require_resolved and resolution.cost is None
+                ):
+                    log_traversal_refusal(
+                        "wilderness_return_exit",
+                        traversing_object,
+                        "unresolved_wilderness_edge",
+                    )
+                    return False
+                return settle_movement(
+                    traversing_object,
+                    source_location,
+                    destination=destination,
+                    wilderness_coordinates=wilderness_coordinates,
+                    wilderness_source_coordinates=wilderness_source_coordinates,
+                    traverse=traverse,
+                )
+        except MovementPreflightRefused as error:
+            log_traversal_refusal(
+                "wilderness_return_exit", traversing_object, error.reason
+            )
+            return False

@@ -56,6 +56,14 @@ SOUTH_GATE_XYZ = (
     _ENTRY.gate_for("n").z_map_key,
 )
 
+#: Physical durations at the current 10 km wilderness cell span, from the
+#: authored meter positions (world-map-scale §8):
+#:   east gate local (6500,3010) -> absolute (608000,1005160); approach cell
+#:   (63,100) center (635000,1005000): 27,000.47 m at 1.25 m/s = 21,601 s.
+#:   one 10 km cardinal wilderness step over open ground (3 km/h) = 12,000 s.
+GATE_APPROACH_SECONDS = 21601
+WILDERNESS_STEP_SECONDS = 12000
+
 
 class CityWildernessRoundTripTests(EvenniaTest):
     def setUp(self):
@@ -80,8 +88,10 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         before = get_world_clock().tick
+        advances = []
 
         self.gate.at_traverse(self.char1, self.east_gate)
+        advances.append(get_world_clock().tick - before)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
         entry_room = self.char1.location
@@ -89,7 +99,9 @@ class CityWildernessRoundTripTests(EvenniaTest):
         # One east step off the east-gate approach leaves the gate cell
         # (the footprint lies west);
         # the description follows the deterministic terrain model.
+        previous = get_world_clock().tick
         self._exit("east").at_traverse(self.char1, self.char1.location)
+        advances.append(get_world_clock().tick - previous)
         ax, ay = EAST_APPROACH
         self.assertEqual(self.char1.location.coordinates, (ax + 1, ay))
         self.assertEqual(
@@ -99,12 +111,29 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
         # Return west to the approach cell, then west again through the
         # gateway to the East Gate.
+        previous = get_world_clock().tick
         self._exit("west").at_traverse(self.char1, self.char1.location)
+        advances.append(get_world_clock().tick - previous)
+        previous = get_world_clock().tick
         self._exit("west").at_traverse(self.char1, self.char1.location)
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, self.east_gate)
 
-        # 1 entry + 1 east + 1 west + 1 return = 4 legs.
-        self.assertEqual(get_world_clock().tick, before + 4 * 9000)
+        # 1 entry + 1 east + 1 west + 1 return = 4 legs, each its own physical
+        # segment; the crossing is charged once in either direction.
+        self.assertEqual(
+            advances,
+            [
+                GATE_APPROACH_SECONDS,
+                WILDERNESS_STEP_SECONDS,
+                WILDERNESS_STEP_SECONDS,
+                GATE_APPROACH_SECONDS,
+            ],
+        )
+        self.assertEqual(
+            get_world_clock().tick,
+            before + 2 * GATE_APPROACH_SECONDS + 2 * WILDERNESS_STEP_SECONDS,
+        )
         # The player's own bookkeeping is cleaned up on the return exit, but a
         # persistent population monster stays registered at the entry
         # coordinate -- the wilderness is no longer empty (wilderness-
@@ -139,12 +168,9 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
     @covers_requirement("movement-cost-charging::typeclasses-exits-exit-and-costedxyzexit-both-carry-movementcostmixin-with", "wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     def test_intra_city_grid_traversal_advances_clock_by_move(self):
-        # map-movement-clock: intra-city exits are CostedXYZExit and each
-        # successful step charges the ordinary move cost -- the wilderness-
-        # gateway "grid traversal stays unwired" posture was deliberately
-        # retired by that change.
+        # Intra-city exits are CostedXYZExit and each successful step charges
+        # its authored physical edge duration.
         from typeclasses.exits import CostedXYZExit
-        from world.rules.clock import CLOCK_YAML
 
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = south_gate
@@ -155,5 +181,6 @@ class CityWildernessRoundTripTests(EvenniaTest):
         self.assertEqual(self.char1.location.key, "南大道")
         self.assertEqual(
             get_world_clock().tick,
-            before + CLOCK_YAML["command_defaults"]["move"],
+            # 南門 (3050,150) -> 南大道 (3140,1050) = 904.49 m -> 724 s.
+            before + 724,
         )

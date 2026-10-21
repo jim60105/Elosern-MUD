@@ -22,13 +22,16 @@ gateway hit only. The pinning test moves a character through the real exit and
 compares predicted and actual arrival nodes.
 """
 
+from math import hypot
 from typing import Any
 
+from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import (
     WILDERNESS_ENTRY_REGISTRY,
     WildernessEntryPoint,
     WildernessGate,
 )
+from world.maps.map_data import settlement_graph
 from world.maps.wilderness_provider import (
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
@@ -103,12 +106,114 @@ def wilderness_neighbor(x: int, y: int, direction: str) -> tuple[int, int] | Non
     :func:`normalize_wilderness_direction`); returns ``None`` when the step
     leaves the provider bounds or lands on an anchor footprint cell -- the
     provider refuses both, so the resolver must not offer either.
+
+    A diagonal step additionally forbids corner cutting: either orthogonal
+    neighbour being impassable (out of bounds or an anchor footprint cell)
+    refuses the diagonal. Traversal, the canonical resolver and the local map
+    all read this one rule, so an offered edge is always a traversable one.
     """
     dx, dy = DIRECTION_DELTAS[direction]
     nx, ny = x + dx, y + dy
     if not is_provider_valid_coordinates((nx, ny)):
         return None
+    if dx and dy:
+        if not is_provider_valid_coordinates((x + dx, y)):
+            return None
+        if not is_provider_valid_coordinates((x, y + dy)):
+            return None
     return (nx, ny)
+
+
+def cell_center_m(coordinates: tuple[int, int], cell_size_m: int) -> tuple[int, int]:
+    """The absolute continent-meter center of one wilderness cell."""
+
+    return (
+        coordinates[0] * cell_size_m + cell_size_m // 2,
+        coordinates[1] * cell_size_m + cell_size_m // 2,
+    )
+
+
+def _anchor_node(graph):
+    """The sparse graph's authored anchor node, or ``None``."""
+
+    for node in graph.nodes.values():
+        if node.is_anchor:
+            return node
+    return None
+
+
+def settlement_world_position_m(
+    entry: WildernessEntryPoint,
+    local_position_m: tuple[int, int],
+    *,
+    cell_size_m: int,
+) -> tuple[int, int] | None:
+    """Transform one settlement-local meter position into absolute meters.
+
+    ``world_position_m = wilderness_anchor_center_m + local_position_m -
+    local_anchor_position_m`` (world-map-scale design §5.3). The local anchor
+    is the settlement graph's own anchor node's authored physical position, and
+    the wilderness anchor is the center of the entry's anchor cell at the
+    declared cell span. ``None`` means the graph or the anchor node is absent.
+    """
+
+    placement = ANCHOR_PLACEMENT_REGISTRY.get(entry.anchor_key)
+    if placement is None:
+        return None
+    graph = settlement_graph(placement.zcoord)
+    if graph is None:
+        return None
+    anchor = _anchor_node(graph)
+    anchor_cell = entry.anchor_cell
+    if anchor is None or anchor_cell is None:
+        return None
+    world_anchor = cell_center_m(anchor_cell, cell_size_m)
+    local_anchor = anchor.physical_coordinate
+    return (
+        world_anchor[0] + local_position_m[0] - local_anchor[0],
+        world_anchor[1] + local_position_m[1] - local_anchor[1],
+    )
+
+
+def gate_approach_distance_m(
+    entry: WildernessEntryPoint,
+    gate: WildernessGate,
+    *,
+    cell_size_m: int | None = None,
+) -> float | None:
+    """The authored physical gate-approach segment length in meters.
+
+    One segment runs from the gate's grid node (its authored meter position,
+    anchored through :func:`settlement_world_position_m`) to the exterior
+    approach cell's center. Both directions of a crossing measure the same
+    segment, so the approach is charged exactly once. ``None`` means the gate
+    room has no authored settlement identity or metric position.
+    """
+
+    from world.maps.wilderness_provider import WILDERNESS_KM_PER_CELL
+
+    span = (
+        int(WILDERNESS_KM_PER_CELL) * 1000 if cell_size_m is None else int(cell_size_m)
+    )
+    placement = ANCHOR_PLACEMENT_REGISTRY.get(entry.anchor_key)
+    if placement is None:
+        return None
+    graph = settlement_graph(placement.zcoord)
+    if graph is None:
+        return None
+    node = graph.node_at(gate.grid_xy)
+    approach = entry.approach_cell(gate)
+    if node is None or approach is None:
+        return None
+    gate_world = settlement_world_position_m(
+        entry, node.physical_coordinate, cell_size_m=span
+    )
+    if gate_world is None:
+        return None
+    approach_world = cell_center_m(approach, span)
+    return hypot(
+        approach_world[0] - gate_world[0], approach_world[1] - gate_world[1]
+    )
 
 
 def _gateway_from_entry(

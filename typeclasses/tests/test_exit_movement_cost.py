@@ -122,6 +122,36 @@ class MovementCostExitTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before)
 
 
+class PhysicalEdgeExitTests(EvenniaTest):
+    """A settlement exit charges the authored physical edge, not the flat default."""
+
+    def setUp(self):
+        super().setUp()
+        from world.maps.bootstrap import sync_grid
+
+        sync_grid()
+        self.south_gate = GridRoom.objects.filter_xyz((3, 0, "capital_altoria")).first()
+        self.south_avenue = GridRoom.objects.filter_xyz(
+            (3, 1, "capital_altoria")
+        ).first()
+
+    @covers_requirement(
+        "movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry",
+        "movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value",
+    )
+    def test_a_plain_exit_between_authored_nodes_charges_the_physical_edge(self):
+        # 南門 (3050,150) -> 南大道 (3140,1050) = 904.49 m at 1.25 m/s = 724 s.
+        exit_obj = create_object(
+            Exit, key="上山", location=self.south_gate, destination=self.south_avenue
+        )
+        self.char1.location = self.south_gate
+        before = get_world_clock().tick
+        exit_obj.at_traverse(self.char1, self.south_avenue)
+        self.assertIs(self.char1.location, self.south_avenue)
+        self.assertEqual(get_world_clock().tick, before + 724)
+        self.assertNotEqual(MOVE, 724)
+
+
 class MovementCostMixinSourceTests(EvenniaTestCase):
     """Source-inspection: at_post_traverse delegates to the shared
     after_successful_movement completion helper, never an inline

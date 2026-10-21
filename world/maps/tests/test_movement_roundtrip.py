@@ -14,7 +14,17 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-WILD = CLOCK_YAML["command_defaults"]["wilderness_move"]
+
+#: Physical per-edge durations from the authored meter positions
+#: (world-map-scale §8/§9) at 1.25 m/s settlement speed, rounded once each:
+#:   南門->南大道 904.49m=724s, 南大道->大道北段 953.43m=763s,
+#:   大道北段->中央廣場 882.84m=707s, 中央廣場->公會前 892.70m=715s,
+#:   公會前->東市 1011.19m=809s, 東市->東門 1131.37m=906s.
+#: Gate approach (east gate -> approach cell center) = 21,601 s; one 10 km
+#: open-ground wilderness step = 12,000 s.
+CITY_EDGE_SECONDS = (724, 763, 707, 715, 809, 906)
+GATE_APPROACH_SECONDS = 21601
+WILDERNESS_STEP_SECONDS = 12000
 
 
 def live_gateway_entry():
@@ -61,6 +71,7 @@ class MovementLineageRoundTripTests(EvenniaTest):
 
     def test_every_lineage_charges_and_one_failure_charges_nothing(self):
         before = get_world_clock().tick
+        advances = []
 
         # 1. Limbo -> South Gate via the bridging Exit (move).
         limbo_to_city = [
@@ -68,7 +79,9 @@ class MovementLineageRoundTripTests(EvenniaTest):
         ][0]
         self.assertIsInstance(limbo_to_city, Exit)
         self.char1.location = self.limbo
+        previous = get_world_clock().tick
         limbo_to_city.at_traverse(self.char1, self.south_gate)
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, self.south_gate)
 
         # 2. Across the city via CostedXYZExit links: South Gate -> 南大道 ->
@@ -80,22 +93,30 @@ class MovementLineageRoundTripTests(EvenniaTest):
                 for e in self.char1.location.exits
                 if e.destination.key == expected_key
             ][0]
+            previous = get_world_clock().tick
             exit_obj.at_traverse(self.char1, exit_obj.destination)
+            advances.append(get_world_clock().tick - previous)
             self.assertEqual(self.char1.location.key, expected_key)
         self.assertIs(self.char1.location, self.east_gate)
 
         # 3. Into the wilderness through WildernessGateExit (wilderness_move),
         #    two intermediate steps, and back via WildernessReturnExit's
         #    special-cased return (3 more wilderness_move legs).
+        previous = get_world_clock().tick
         self.gate.at_traverse(self.char1, self.east_gate)
+        advances.append(get_world_clock().tick - previous)
         self.assertIsInstance(self.char1.location, TerrainRoom)
         entry_xy = self.char1.location.coordinates
         for direction in ("east", "west"):
             exit_obj = [e for e in self.char1.location.exits if e.key == direction][0]
+            previous = get_world_clock().tick
             exit_obj.at_traverse(self.char1, self.char1.location)
+            advances.append(get_world_clock().tick - previous)
         self.assertEqual(self.char1.location.coordinates, entry_xy)
         exit_obj = [e for e in self.char1.location.exits if e.key == "west"][0]
+        previous = get_world_clock().tick
         exit_obj.at_traverse(self.char1, self.char1.location)
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, self.east_gate)
 
         # 4. A synthetic origin/return Exit pair, mirroring change 14's
@@ -107,9 +128,13 @@ class MovementLineageRoundTripTests(EvenniaTest):
             key="return", location=target, destination=origin
         )
         self.char1.location = origin
+        previous = get_world_clock().tick
         instance_enter.at_traverse(self.char1, target)
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, target)
+        previous = get_world_clock().tick
         instance_return.at_traverse(self.char1, origin)
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, origin)
 
         # 5. A deliberately failed traversal (locked exit) contributes 0.
@@ -120,12 +145,30 @@ class MovementLineageRoundTripTests(EvenniaTest):
         command = ExitCommand()
         command.obj = locked
         command.caller = self.char1
+        previous = get_world_clock().tick
         command.func()
+        advances.append(get_world_clock().tick - previous)
         self.assertIs(self.char1.location, origin)
 
-        grid_legs = 1 + 6 + 2  # Limbo bridge + 6 city links + instance pair
-        wild_legs = 1 + 2 + 1  # entry + east + west + return
+        self.assertEqual(
+            advances,
+            [
+                MOVE,
+                *CITY_EDGE_SECONDS,
+                GATE_APPROACH_SECONDS,
+                WILDERNESS_STEP_SECONDS,
+                WILDERNESS_STEP_SECONDS,
+                GATE_APPROACH_SECONDS,
+                MOVE,
+                MOVE,
+                0,
+            ],
+        )
         self.assertEqual(
             get_world_clock().tick,
-            before + grid_legs * MOVE + wild_legs * WILD,
+            before
+            + 3 * MOVE
+            + sum(CITY_EDGE_SECONDS)
+            + 2 * GATE_APPROACH_SECONDS
+            + 2 * WILDERNESS_STEP_SECONDS,
         )

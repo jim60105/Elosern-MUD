@@ -21,6 +21,13 @@ SOUTH_GATE_XYZ = (3, 0, "capital_altoria")
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
+# Pinned physical durations from the authored meter positions (world-map-scale
+# §8/§9) at the settlement 1.25 m/s calibration, rounded upward once:
+#   南門 (3050,150) -> 南大道 (3140,1050): hypot(90,900)=904.49 m -> 724 s
+#   隱密小徑 (35,270) -> 村中廣場 (220,305): hypot(185,35)=188.28 m -> 151 s
+SOUTH_GATE_TO_AVENUE_SECONDS = 724
+HIDDEN_PATH_TO_PLAZA_SECONDS = 151
+
 
 class SampleCityCostedExitTests(EvenniaTest):
     def setUp(self):
@@ -86,6 +93,10 @@ class SampleCityCostedExitTests(EvenniaTest):
         exit_obj.at_traverse(self.char1, destination)
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement(
+        "movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry",
+        "movement-cost-charging::typeclasses-exits-exit-and-costedxyzexit-both-carry-movementcostmixin-with",
+    )
     def test_fresh_intra_city_traversal_advances_clock_by_move(self):
         sync_grid()
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
@@ -95,13 +106,21 @@ class SampleCityCostedExitTests(EvenniaTest):
         before = get_world_clock().tick
         city_exit.at_traverse(self.char1, city_exit.destination)
         self.assertEqual(self.char1.location.key, "南大道")
-        self.assertEqual(get_world_clock().tick, before + MOVE)
+        # A settlement edge charges its authored physical duration, not the
+        # flat non-distance connector default.
+        self.assertEqual(
+            get_world_clock().tick, before + SOUTH_GATE_TO_AVENUE_SECONDS
+        )
+        self.assertNotEqual(SOUTH_GATE_TO_AVENUE_SECONDS, MOVE)
 
+    @covers_requirement(
+        "movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry",
+        "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only",
+    )
     def test_village_traversal_advances_clock_by_move_like_city_movement(self):
-        # map-movement-clock: the village's wildcard link override spawns
-        # CostedXYZExit for every intra-village link, so a step inside the
-        # village charges exactly the ordinary move cost a capital street
-        # step charges (ciaran-village-map scenario).
+        # The village's wildcard link override spawns CostedXYZExit for every
+        # intra-village link, and each step charges the same physical-edge
+        # calculation as a capital street step.
         sync_grid()
         entrance = GridRoom.objects.filter_xyz(xyz=(0, 1, "village_ciaran")).first()
         self.char1.location = entrance
@@ -110,7 +129,9 @@ class SampleCityCostedExitTests(EvenniaTest):
         before = get_world_clock().tick
         village_exit.at_traverse(self.char1, village_exit.destination)
         self.assertEqual(self.char1.location.key, "村中廣場")
-        self.assertEqual(get_world_clock().tick, before + MOVE)
+        self.assertEqual(
+            get_world_clock().tick, before + HIDDEN_PATH_TO_PLAZA_SECONDS
+        )
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-twelve-intra-city-exits-spawn-as-costedxyzexit-not-the-bare-contrib-xyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
     def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):

@@ -136,6 +136,21 @@ NODE_IDS = {
     (2, 3): "silver_leaf_slope",
 }
 
+# Authored absolute meter position per stable identity (world-map-scale design
+# §9), the same pre-activation contract as the capital's table.
+PHYSICAL_NODE_POSITIONS = {
+    "hidden_path": (35, 270),
+    "village_plaza": (220, 305),
+    "stream_path": (245, 135),
+    "stream_bend": (430, 85),
+    "training_clearing": (405, 335),
+    "herb_garden": (590, 300),
+    "old_tree_north": (200, 465),
+    "elder_tree": (165, 650),
+    "weaving_slope": (390, 495),
+    "silver_leaf_slope": (440, 665),
+}
+
 ROADS = (
     ("hidden_path", "village_plaza"),
     ("village_plaza", "hidden_path"),
