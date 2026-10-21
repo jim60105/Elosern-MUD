@@ -839,6 +839,19 @@ class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
         with self.assertRaises(fatigue.FatigueRulebookError):
             fatigue._validate_projection_definitions()
 
+    def test_projection_never_dispatches_authored_negative_buff_reactions(self):
+        """A threshold crossing is persisted state, not an action outcome."""
+        entity = self._entity()
+        with patch(
+            "world.rules.state_reactions.dispatch_outcome_reaction"
+        ) as dispatch:
+            self._write(entity, 71999)
+            dispatch.assert_not_called()
+            # The ordinary grant path still fires the authored reaction.
+            apply_buff(entity, "poisoned")
+            dispatch.assert_called_once()
+        self.assertEqual(self._projected(entity), {"fatigue_severe"})
+
 
 class RemoveBySelectorTests(_BuffFixtureMixin, EvenniaTestCase):
     """The selector-driven removal (item-effect-model design §5.6, D3)."""

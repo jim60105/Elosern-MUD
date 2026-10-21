@@ -126,6 +126,7 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "guild_property": "公會保管的封印環不能自行穿脫。",
     "exam_kit_locked": "考核期間不能更換考官的裝備。",
     "not_alive": "你目前無法使用這個物品。",
+    "asleep": "你正在沉睡，無法使用物品。",
     "combat_not_allowed": "戰鬥中無法使用這個物品。",
     "unknown_effect": "這個物品的效果尚未設定。",
     "no_target": "這個物品需要指定一個目標。",

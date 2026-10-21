@@ -196,24 +196,6 @@ class ConditionValue:
 
 
 @dataclass(frozen=True)
-class StatusReadModel:
-    """The complete read-only inputs a presenter may serialize."""
-
-    actor_name: str
-    actor_identity: str
-    full_title: str
-    location_label: str | None
-    location_identity: str | None
-    resources: dict[str, GaugeValue]
-    conditions: tuple[ConditionValue, ...]
-    fatigue: tuple["FatigueSubjectView", ...]
-    disguise_active: bool
-    combat_mode: str | None
-    combat_round: int | None
-    creation_pending: bool
-
-
-@dataclass(frozen=True)
 class FatigueSubjectView:
     """One physiological subject row: identity, rounded reserve and restriction.
 
@@ -231,6 +213,24 @@ class FatigueSubjectView:
     label: str
     severity: str
     restriction: str | None
+
+
+@dataclass(frozen=True)
+class StatusReadModel:
+    """The complete read-only inputs a presenter may serialize."""
+
+    actor_name: str
+    actor_identity: str
+    full_title: str
+    location_label: str | None
+    location_identity: str | None
+    resources: dict[str, GaugeValue]
+    conditions: tuple[ConditionValue, ...]
+    fatigue: tuple[FatigueSubjectView, ...]
+    disguise_active: bool
+    combat_mode: str | None
+    combat_round: int | None
+    creation_pending: bool
 
 
 @dataclass(frozen=True)

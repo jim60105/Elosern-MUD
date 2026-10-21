@@ -23,8 +23,21 @@ from .rates import _active_buff_instances
 
 
 def apply_buff(
-    entity, definition_key: str, *, instance_key: str | None = None, **data
+    entity,
+    definition_key: str,
+    *,
+    instance_key: str | None = None,
+    dispatch_reaction: bool = True,
+    **data,
 ) -> None:
+    """Mount one rulebook buff through the grant-time guards.
+
+    ``dispatch_reaction=False`` is reserved for canonical physiology
+    projections: a projected fatigue status is a display of persisted state,
+    not an action outcome, so it must not fire the authored
+    ``negative_buff_added`` reactions. Both grant guards (equipment immunity
+    and the unique-source key requirement) still run.
+    """
     from world.rules.equipment_effects import equipment_immune_buff_keys
 
     definition = BUFF_DEFINITIONS[definition_key]
@@ -144,7 +157,7 @@ def apply_buff(
         duration=-1,
         to_cache=cache,
     )
-    if definition.polarity == "debuff" and not is_refresh:
+    if definition.polarity == "debuff" and not is_refresh and dispatch_reaction:
         from world.rules.state_reactions import dispatch_outcome_reaction
 
         dispatch_outcome_reaction(
@@ -412,10 +425,12 @@ def remove_by_selector(entity, selector: str) -> int:
         raise ValueError(f"unknown buff removal selector {selector!r}")
 
     def _matches(definition_key: str) -> bool:
-        if (
-            BUFF_DEFINITIONS[definition_key].protection
-            == PHYSIOLOGICAL_PROTECTION
-        ):
+        # A live instance may name a definition absent from the current
+        # synthetic scope (the same seam ``clear_lamb_seals`` documents):
+        # an unknown definition has no protection metadata and stays
+        # removable exactly as it was before the projection existed.
+        definition = BUFF_DEFINITIONS.get(definition_key)
+        if definition is not None and definition.protection == PHYSIOLOGICAL_PROTECTION:
             return False
         if selector == "all":
             return True

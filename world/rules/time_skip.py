@@ -70,6 +70,7 @@ class PracticeRejectReason(StrEnum):
     SKILL_UNKNOWN = "PRACTICE_SKILL_UNKNOWN"
     SKILL_CAPPED = "PRACTICE_SKILL_CAPPED"
     IN_COMBAT = "booking_in_combat"
+    ASLEEP = "PRACTICE_ASLEEP"
 
 
 @dataclass(frozen=True)
@@ -101,8 +102,15 @@ def preflight_practice_booking(
     Checked BEFORE any clock advance (the skip never half-applies): the skill
     must be registered, ACTIVE (nothing practises a passive), owned, and not
     saturated at its derived tip cap (D6). Reasons are the stable codes
-    ``PRACTICE_SKILL_UNKNOWN`` / ``PRACTICE_SKILL_CAPPED``.
+    ``PRACTICE_SKILL_UNKNOWN`` / ``PRACTICE_SKILL_CAPPED`` / ``PRACTICE_ASLEEP``.
     """
+    from world.rules.fatigue import sleep_blocks_actions
+
+    if sleep_blocks_actions(actor):
+        return PracticeReject(
+            PracticeRejectReason.ASLEEP,
+            "你正在沉睡，無法排入修煉。",
+        )
     skill = SKILL_REGISTRY.get(skill_key)
     if (
         skill is None

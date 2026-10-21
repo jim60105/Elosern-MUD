@@ -830,7 +830,11 @@ def project_fatigue_status(
         if key != desired and key in active:
             buffs.remove(key, dispel=True)
     if desired is not None and desired not in active:
-        apply_buff(entity, desired)
+        # Reserve/posture are canonical: a threshold crossing is not an
+        # action outcome, so the projection must not fire the authored
+        # ``negative_buff_added`` reactions (which could write unrelated
+        # pleasure state outside this settlement's rollback surfaces).
+        apply_buff(entity, desired, dispatch_reaction=False)
     return desired
 
 
