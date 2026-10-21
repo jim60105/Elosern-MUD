@@ -798,6 +798,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("player-combat-session::reconnect-and-restart-restore-confirmed-selection-progress-without-execution")
     @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    @covers_requirement("player-combat-session::sleeping-roster-members-remain-present-without-commands")
     def test_reconnect_restores_a_sleeping_member_without_time_or_synthetic_knockout(self):
         """Delta: sleeping roster members remain present without commands."""
         from world.rules.buffs import entity_active_buffs
@@ -877,6 +878,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    @covers_requirement("player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening")
     def test_completed_rounds_record_an_explicit_wake_without_physiology_or_clock(self):
         """Delta: live rounds neither simulate fatigue nor block a real state effect."""
         from world.rules.buffs import entity_active_buffs

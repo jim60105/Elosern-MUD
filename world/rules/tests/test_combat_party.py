@@ -1746,6 +1746,9 @@ class SleepingPartyFlowTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
     )
+    @covers_requirement(
+        "player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening"
+    )
     def test_a_near_threshold_sleeper_never_wakes_in_live_rounds(self):
         from world.rules.clock import get_world_clock
         from world.rules.combat_session.settlement import _round_cap

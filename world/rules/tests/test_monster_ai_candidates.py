@@ -1035,6 +1035,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
         self.monster.db.skills = {"active": list(keys), "passive": []}
 
     @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
+    @covers_requirement("monster-ai-legal-candidates::monster-decisions-observe-sleep-inability-without-losing-targets")
     def test_a_sleeping_opponent_remains_a_legal_present_target(self):
         from world.rules.fatigue import SleepPosture, write_fatigue_state
 

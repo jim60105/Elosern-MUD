@@ -211,6 +211,9 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership"
     )
+    @covers_requirement(
+        "player-combat-session::sleeping-roster-members-remain-present-without-commands"
+    )
     def test_sleeping_commander_keeps_ownership_but_no_command_of_any_kind(self):
         from world.rules.combat_session import (
             _persist,
@@ -299,6 +302,9 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
     )
     @covers_requirement(
         "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership"
+    )
+    @covers_requirement(
+        "battlefield-action-context::sleep-prohibits-actions-while-retaining-ordinary-target-legality"
     )
     def test_sleeping_companion_remains_targetable_and_takes_real_damage(self):
         from world.rules.action import ActionRequest

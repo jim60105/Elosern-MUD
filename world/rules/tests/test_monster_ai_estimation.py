@@ -855,6 +855,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertGreater(_recipient(estimate, self.enemy).damage, 0.0)
 
     @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
+    @covers_requirement("monster-ai-legal-candidates::monster-decisions-observe-sleep-inability-without-losing-targets")
     def test_a_sleeping_opponent_stays_a_target_without_an_opportunity(self):
         """The opportunity denominator excludes sleepers but never their target slot.
 
