@@ -8,13 +8,17 @@
  * travel action). Unknown nodes never appear because the server already
  * validated the panel; this module only adds a small bounded layout pass.
  *
- * Layout is a bounded integer lattice computed over the current field of
- * view only: `current`, `visible_unvisited`, and `visible_visited` nodes
- * occupy `col = x - minX`, `row = y - minY` cells, and the model exports
- * the lattice's column and row counts. `remembered` remote nodes are kept
- * out of the coordinate canvas entirely (their payload coordinates describe
- * places outside the current view and must not distort the local spacing);
- * they surface as a bounded, order-preserved list.
+ * Layout is a metric lattice computed over the current field of view only:
+ * `current`, `visible_unvisited`, and `visible_visited` nodes occupy
+ * `col = (x - minX) / cell`, `row = (y - minY) / cell`, and the model exports
+ * the lattice's column and row counts plus `cell`, the lattice cell's size in
+ * payload coordinate units. `cell` is the smallest positive coordinate delta
+ * in the in-view set, applied to BOTH axes, so the placement preserves every
+ * gap's exact ratio and every compass bearing; no axis is ever compressed
+ * independently. `remembered` remote nodes are kept out of the coordinate
+ * canvas entirely (their payload coordinates describe places outside the
+ * current view and must not distort the local spacing); they surface as a
+ * bounded, order-preserved list.
  *
  * Alongside the lattice, the model exports a radial (graph) placement
  * (`radial`) and the data-derived `layoutVariant` resolver
@@ -24,11 +28,11 @@
  * drawn extent, from RAW payload coordinates against an explicitly passed
  * surface geometry (design D3b).
  *
- * When the in-view span would exceed `MAX_LATTICE` columns or rows -- only
- * possible for a schema-valid but geometrically sparse payload -- the model
- * falls back to rank compression over the distinct sorted coordinate
- * values, which cannot exceed the payload's 64-node bound. Direction
- * markers deliberately never read those compressed ranks.
+ * A schema-valid but geometrically sparse payload therefore yields a large
+ * cell count rather than compressed ranks: the renderer keeps one uniform
+ * physical scale and reaches the far part of the drawing through its viewport
+ * (the island's current-centred window, the full map's fitted pan and zoom).
+ * Direction markers read RAW payload coordinates, never lattice cells.
  *
  * No `document` or `window` access at load time; Node tests exercise the
  * model directly. All server strings are passed through unchanged as display
@@ -45,7 +49,6 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var MAX_LATTICE = 64;
   var MAX_FOCUS_TARGETS = 16;
   var MAX_NODES = 64;
 
@@ -106,25 +109,36 @@
     return targets;
   }
 
-  // Rank compression: distinct sorted coordinate values become consecutive
-  // indices. Deterministic and bounded by the number of distinct values.
-  function compressAxis(values) {
-    var sorted = values.slice().sort(function (a, b) {
-      return a - b;
-    });
-    var rank = {};
-    var index = 0;
-    for (var i = 0; i < sorted.length; i += 1) {
-      if (rank[sorted[i]] === undefined) {
-        rank[sorted[i]] = index;
-        index += 1;
+  // The lattice cell's size in payload coordinate units: the smallest positive
+  // pairwise delta of the in-view coordinates, on either axis. One divisor
+  // serves both axes, so col/row are an exact uniform projection of the
+  // payload's metric coordinates. A single node (or one with zero span) has no
+  // delta to observe, so the cell is one coordinate unit.
+  function cellSize(nodes) {
+    var smallest = 0;
+    ["x", "y"].forEach(function (axis) {
+      var values = [];
+      nodes.forEach(function (node) {
+        var value = node[axis];
+        if (typeof value === "number" && isFinite(value)) {
+          values.push(value);
+        }
+      });
+      values.sort(function (a, b) {
+        return a - b;
+      });
+      for (var i = 1; i < values.length; i += 1) {
+        var delta = values[i] - values[i - 1];
+        if (delta > 0 && (smallest === 0 || delta < smallest)) {
+          smallest = delta;
+        }
       }
-    }
-    return rank;
+    });
+    return smallest === 0 ? 1 : smallest;
   }
 
-  // Deterministic bounded layout pass: place only in-view nodes on the
-  // lattice. Returns { nodes, cols, rows }.
+  // Deterministic metric layout pass: place only in-view nodes on the lattice.
+  // Returns { nodes, cols, rows, cell } in cell units.
   function layoutNodes(nodes) {
     var minX = Infinity;
     var maxX = -Infinity;
@@ -145,39 +159,19 @@
       }
     });
     if (nodes.length === 0) {
-      return { nodes: [], cols: 0, rows: 0 };
+      return { nodes: [], cols: 0, rows: 0, cell: 1 };
     }
-    var cols = maxX - minX + 1;
-    var rows = maxY - minY + 1;
-    if (cols <= MAX_LATTICE && rows <= MAX_LATTICE) {
-      return {
-        nodes: nodes.map(function (node) {
-          return Object.assign({}, node, {
-            col: node.x - minX,
-            row: node.y - minY,
-          });
-        }),
-        cols: cols,
-        rows: rows,
-      };
-    }
-    // Sparse fallback: rank-compress both axes; cannot exceed the payload's
-    // node bound (at most 64 distinct values each).
-    var colRank = compressAxis(nodes.map(function (node) {
-      return node.x;
-    }));
-    var rowRank = compressAxis(nodes.map(function (node) {
-      return node.y;
-    }));
+    var cell = cellSize(nodes);
     return {
       nodes: nodes.map(function (node) {
         return Object.assign({}, node, {
-          col: colRank[node.x],
-          row: rowRank[node.y],
+          col: (node.x - minX) / cell,
+          row: (node.y - minY) / cell,
         });
       }),
-      cols: Math.max(1, Object.keys(colRank).length),
-      rows: Math.max(1, Object.keys(rowRank).length),
+      cols: (maxX - minX) / cell + 1,
+      rows: (maxY - minY) / cell + 1,
+      cell: cell,
     };
   }
 
@@ -626,6 +620,7 @@
       nodes: layout.nodes,
       cols: layout.cols,
       rows: layout.rows,
+      cell: layout.cell,
       edges: edges,
       legend: legend,
       remembered: remembered,
@@ -675,7 +670,6 @@
   }
 
   return {
-    MAX_LATTICE: MAX_LATTICE,
     MAX_FOCUS_TARGETS: MAX_FOCUS_TARGETS,
     MAX_NODES: MAX_NODES,
     STATE_INDICATORS: Object.assign({}, STATE_INDICATORS),

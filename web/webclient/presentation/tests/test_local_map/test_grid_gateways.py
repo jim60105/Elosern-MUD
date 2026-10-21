@@ -123,6 +123,78 @@ class LocalMapGridGatewayTests(EvenniaTest):
         ids = {node["id"] for node in payload["nodes"]}
         self.assertNotIn("grid:other_capital:2:4", ids)
 
+    @covers_requirement(
+        "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection"
+    )
+    def test_metric_coordinates_reach_the_payload_unchanged(self):
+        """The presenter projects nothing: server coordinates stay authoritative.
+
+        A metric settlement frame (metres, not cell indices) is carried through
+        the grid layer exactly as the room model holds it, and the move
+        descriptor keeps the real destination identity. The projection into
+        presentation geometry happens only in the client render model.
+        """
+        import types
+
+        current_coord = (6500, 6350)
+        neighbour_coord = (6500, 6450)
+
+        current_node = types.SimpleNamespace(
+            X=current_coord[0], Y=current_coord[1], node_index=0, symbol="#"
+        )
+        neighbour_node = types.SimpleNamespace(
+            X=neighbour_coord[0], Y=neighbour_coord[1], node_index=1, symbol="#"
+        )
+        current_node.links = {"n": neighbour_node}
+
+        class FakeMap:
+            Z = _T_MAP_KEY
+            options = {"map_mode": "nodes", "map_visual_range": 2}
+            node_index_map = {0: current_node, 1: neighbour_node}
+
+            def get_node_from_coord(self, coord):
+                return {current_coord: current_node, neighbour_coord: neighbour_node}.get(coord)
+
+        class EmptyQuery:
+            def first(self):
+                return None
+
+        self.char1.location = self.plaza
+        with (
+            patch.object(type(self.plaza), "xyz", (*current_coord, _T_MAP_KEY)),
+            patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch(
+                "web.webclient.presentation.local_map.grid._grid_nodes_in_range",
+                return_value=[current_node, neighbour_node],
+            ),
+            # The metric extent itself is declared by the settlement map; this
+            # change owns the transport envelope, so the synthetic frame is
+            # registered explicitly instead of inventing a shipped coordinate.
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(10_000_000, 10_000_000),
+            ),
+            patch(
+                "typeclasses.rooms.GridRoom.objects.filter_xyz",
+                return_value=EmptyQuery(),
+            ),
+        ):
+            record_arrival(self.char1)
+            payload = self._registry().render("local_map", _context(self.char1))
+
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["layer"], "grid")
+        by_id = {node["id"]: node for node in payload["nodes"]}
+        current = by_id[_t_grid_id(*current_coord)]
+        self.assertEqual((current["x"], current["y"]), current_coord)
+        self.assertEqual(current["visibility"], "current")
+        neighbour = by_id[_t_grid_id(*neighbour_coord)]
+        self.assertEqual((neighbour["x"], neighbour["y"]), neighbour_coord)
+        self.assertEqual(neighbour["visibility"], "visible_unvisited")
+        # No exit exists at the synthetic neighbour, so no move is advertised:
+        # the projection never manufactures one.
+        self.assertIsNone(neighbour["action"])
+
 
 class LocalMapGatewayPairTests(EvenniaTest):
     """The gateway renders as a matched node pair on both layers.

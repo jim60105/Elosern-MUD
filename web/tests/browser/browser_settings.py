@@ -72,6 +72,15 @@ INSTALLED_APPS = list(INSTALLED_APPS) + [
     "world.narrative.apps.NarrativeConfig",
     "world.quests.apps.QuestsConfig",
 ]
+# Production registers the project prototypes and the xyzgrid contrib's
+# ``xyz_room`` parent in one list (``server/conf/settings.py``). Sparse
+# settlement synchronization flattens each authored node prototype (its
+# ``prototype_parent`` is ``grid_room`` → ``xyz_room``) BEFORE any XYMap loads
+# and lazily registers the contrib's own prototypes, so this runtime must
+# publish the same module list or the deterministic seed fails with
+# "Found 0 matching prototypes" on a fresh database.
+PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototypes"]
+
 # The production settings register the project-authored trait types that the
 # combat/sexual handlers require; without them any materialization of a
 # project trait (for example ``SexualState``'s ``ordered_level``) fails.

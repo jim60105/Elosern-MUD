@@ -126,10 +126,85 @@ test("enforces local_map D10a bounds", () => {
   const coord = validLocalMapPanel({
     nodes: [
       validLocalMapNode(),
-      validLocalMapNode({ id: "room:2", label: "x", x: 1025, y: 0, visibility: "visible_unvisited", current: false }),
+      validLocalMapNode({
+        id: "room:2",
+        label: "x",
+        x: Protocol.LOCAL_MAP_COORD_MAX + 1,
+        y: 0,
+        visibility: "visible_unvisited",
+        current: false,
+      }),
     ],
   });
   assert.throws(() => Protocol.validateLocalMapPanel(coord));
+});
+
+test("accepts the metric settlement and wilderness frames, rejects invented geometry", () => {
+  // project-metric-local-maps: the real protocol envelope carries integer
+  // metres for a settlement and the 0..2699 wilderness frame. The shared
+  // bound must equal the server validator's (-10_000_000..10_000_000).
+  assert.equal(Protocol.LOCAL_MAP_COORD_MIN, -10000000);
+  assert.equal(Protocol.LOCAL_MAP_COORD_MAX, 10000000);
+  const settlement = validLocalMapPanel({
+    current_node: "grid:capital_altoria:6500:6350",
+    nodes: [
+      validLocalMapNode({ id: "grid:capital_altoria:6500:6350", x: 6500, y: 6350 }),
+      validLocalMapNode({
+        id: "grid:altoria:6500:6351",
+        label: "北門",
+        x: 6500,
+        y: 6351,
+        visibility: "visible_visited",
+        current: false,
+        action: { kind: "move", exit_ref: "n", destination: "grid:altoria:6500:6351" },
+      }),
+    ],
+    edges: [
+      validLocalMapEdge({
+        source: "grid:capital_altoria:6500:6350",
+        destination: "grid:altoria:6500:6351",
+      }),
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateLocalMapPanel(settlement));
+
+  const wilderness = validLocalMapPanel({
+    layer: "wilderness",
+    current_node: "wild:2699:2699",
+    nodes: [
+      validLocalMapNode({ id: "wild:2699:2699", x: 2699, y: 2699 }),
+      validLocalMapNode({
+        id: "wild:2698:2699",
+        label: "林地",
+        x: 2698,
+        y: 2699,
+        visibility: "visible_unvisited",
+        current: false,
+        action: { kind: "move", exit_ref: "w", destination: "wild:2698:2699" },
+      }),
+    ],
+    edges: [
+      validLocalMapEdge({ source: "wild:2699:2699", destination: "wild:2698:2699" }),
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateLocalMapPanel(wilderness));
+
+  // Malformed coordinates stay rejected: a fraction, a non-finite value, a
+  // numeric string, and the envelope just past each bound.
+  for (const bad of [
+    { x: 100.5 },
+    { x: Infinity },
+    { y: NaN },
+    { x: "100" },
+    { x: -10000001 },
+    { y: 10000001 },
+  ]) {
+    const node = validLocalMapNode(Object.assign({ x: 100, y: 0, current: true }, bad));
+    assert.throws(
+      () => Protocol.validateLocalMapPanel(validLocalMapPanel({ nodes: [node] })),
+      JSON.stringify(bad)
+    );
+  }
 });
 
 test("rejects malformed movement descriptors and unknown node ids", () => {
@@ -197,8 +272,8 @@ test("a structurally maximal realistic local_map payload fits the envelope", () 
       validLocalMapNode({
         id: nodeIds[i],
         label: "南門街道".repeat(4),
-        x: i % 2 === 0 ? -1024 : 1024,
-        y: i % 2 === 0 ? 1024 : -1024,
+        x: i % 2 === 0 ? Protocol.LOCAL_MAP_COORD_MIN : Protocol.LOCAL_MAP_COORD_MAX,
+        y: i % 2 === 0 ? Protocol.LOCAL_MAP_COORD_MAX : Protocol.LOCAL_MAP_COORD_MIN,
         visibility: i === 0 ? "current" : "remembered",
         current: i === 0,
         action:
@@ -252,8 +327,8 @@ test("local_map byte budget fails closed on the theoretical worst case", () => {
       validLocalMapNode({
         id: nodeIds[i],
         label: label,
-        x: 1024,
-        y: -1024,
+        x: Protocol.LOCAL_MAP_COORD_MAX,
+        y: Protocol.LOCAL_MAP_COORD_MIN,
         visibility: i === 0 ? "current" : "remembered",
         current: i === 0,
         action: i === 0 ? null : { kind: "move", exit_ref: "e".repeat(Protocol.LOCAL_MAP_MAX_EXIT_REF), destination: nodeIds[i] },

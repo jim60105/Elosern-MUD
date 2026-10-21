@@ -40,7 +40,7 @@ The production presentation registry SHALL register panel name `local_map` at sc
 
 #### Scenario: Shared bounds are exact on both validators
 - **WHEN** the server and client validators check a payload, sharing the bounds unchanged
-- **THEN** they enforce at most 64 `nodes`, at most 128 `edges`, at most 16 `legend` entries, node/edge/legend strings of at most 256 Unicode code points, `title` of at most 128 code points, node IDs of at most 128 characters, renderer-local `x`/`y` integers within `-1024..1024`, `known`/`traversable`/`current`/`anchor`/`landmark` as booleans, `visibility` as one of `current`, `visible_unvisited`, `visible_visited`, or `remembered`, and `action` as `null` or the exact `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node id>}` object
+- **THEN** they enforce at most 64 `nodes`, at most 128 `edges`, at most 16 `legend` entries, node/edge/legend strings of at most 256 Unicode code points, `title` of at most 128 code points, node IDs of at most 128 characters, renderer-local `x`/`y` integers within `-10000000..10000000`, `known`/`traversable`/`current`/`anchor`/`landmark` as booleans, `visibility` as one of `current`, `visible_unvisited`, `visible_visited`, or `remembered`, and `action` as `null` or the exact `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node id>}` object
 
 #### Scenario: Conformance is enforced on serialized size
 - **WHEN** both the Python and JavaScript validators assemble a payload
@@ -353,8 +353,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** the island declares a 16-unit node-label step — equal to its 16px chrome step — and a 16-unit marker-name step; the full-map overlay declares 16 and 16
 
 #### Scenario: A fitted drawing never shrinks text below its declared step
-- **WHEN** a fitted drawing's uniform scale would carry a label below the surface's declared step at the reference scale
-- **THEN** the drawing holds the label at the step rather than shrinking it, and pitch/footprint clearing accounts for the labels actually drawn: a fitted drawing SHALL never render a node label or marker name below its surface's declared step at the reference scale
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The coordinate-field layers are inert decoration
 - **WHEN** the lattice variant draws the redesign draft's coordinate-field layers
@@ -362,19 +362,16 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** every colour they use SHALL resolve to a design token and no draft hex value SHALL be hardcoded for any of them
 
 #### Scenario: The coordinate dot field states the lattice's coordinate space
-- **WHEN** the lattice variant paints its coordinate dot field
-- **THEN** the lattice SHALL paint one dot per coordinate cell across its whole canvas, beneath every connector edge, node marker, node label, and axis line, with horizontal and vertical dot pitch equal to the drawn column and row pitch, so one dot spacing is exactly one coordinate cell on each axis and the field states the coordinate space the lattice claims rather than a decorative texture
-- **AND** the field SHALL be registered to the exported placement, so for every drawn node a dot position coincides with that node's centre
-- **AND** because the field is painted beneath the markers, an occupied cell SHALL show its node marker and never a marker and a dot together
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A dot never reads as a fifth node state
 - **WHEN** the dot field renders beside the marker ladder
 - **THEN** the dot's radius SHALL scale with the marker ladder and SHALL remain strictly and materially smaller than the smallest node marker's radius, it SHALL carry no stroke, no label, and no state class, and the state legend SHALL gain no entry for it, so the legend's four states stay closed exactly as the beyond-state note rule requires
 
 #### Scenario: The vignette is the knowledge edge, not terrain
-- **WHEN** a map surface paints its vignette
-- **THEN** each map surface SHALL paint exactly ONE vignette treatment that darkens the canvas toward its edges, and that treatment SHALL be the knowledge edge — the limit of what the payload knows — and SHALL NOT be, or be styled as, terrain: a single full-canvas gradient wash with no fabricated geometry — no per-cell fill, no per-region fill, and no drawn shape tracing any terrain feature
-- **AND** the vignette SHALL NOT reduce the coordinate dot field below the presence floor at any point of the canvas, so the far-field dots it is meant to make faint stay visible rather than being erased
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The axis cross follows the stated convention
 - **WHEN** a surface considers drawing the axis cross
@@ -387,14 +384,12 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** these layers are decoration, not information: the coordinate claim they picture is carried redundantly by the node placement itself, by the header's axis orientation marks, and by the readout's coordinate figure, so no reader depends on them — but the lattice's geometry is its claim, so they SHALL NOT be invisible
 
 #### Scenario: The render model exports two placements
-- **WHEN** a payload is committed
-- **THEN** layout SHALL be computed in the DOM-independent render model, not as a rescaling of payload coordinates into a fixed pixel box, and the model SHALL export two placements for the same committed payload: a bounded integer lattice and a radial connected-graph
-- **AND** the renderer SHALL size the map canvas from the exported placement and from the surface's own declared canvas geometry
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The lattice placement is bounded and rank-compresses on overflow
-- **WHEN** the model computes the lattice placement
-- **THEN** it SHALL place only current-field-of-view nodes (`current`, `visible_unvisited`, `visible_visited`) on it, deriving each node's column and row from its payload coordinates relative to the minimum in-view coordinate, and SHALL export the lattice's column and row counts
-- **AND** when that span would exceed 64 columns or 64 rows, the model SHALL fall back to rank compression over the distinct sorted coordinate values, which cannot exceed the payload's node bound
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The radial placement is deterministic and edge-honest
 - **WHEN** the model computes the radial placement
@@ -404,23 +399,16 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** neither placement SHALL infer distances or geometry the payload does not carry: a radial edge length and a lattice cell step are both presentation geometry with no world meaning
 
 #### Scenario: Surfaces declare a fixed square canvas or a fitted view
-- **WHEN** a surface declares its canvas geometry
-- **THEN** a surface MAY declare a **fixed square canvas** — the island SHALL declare one of 240 CSS px, and the full-map surface declares none — or MAY instead declare a **fitted view** — the full-map surface SHALL declare one, and the island declares none
-- **AND** a fitted view SHALL show the placement's unchanged drawing — the same user-unit geometry, gutter, pitch, and type sizes the surface declares — through a uniformly scaled, translated window, and its opening fit, zoom bounds, pan, and recentre SHALL follow the full-map fit-view requirement
-- **AND** a surface that declares neither SHALL draw at the placement's own size
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A fixed square canvas never magnifies
-- **WHEN** a surface declares a fixed square canvas
-- **THEN** the canvas SHALL always render at exactly that size, its drawing SHALL be laid out in a square coordinate extent whose side is the larger of the declared size and the side the drawing requires, and the drawn uniform scale SHALL therefore be the declared size divided by that side: exactly 1 whenever the drawing fits and below 1 only when it does not, and NEVER above 1 — so no payload, however sparse, can inflate the designed marker radii, label size, marker-name size, or gutter offsets above the sizes the surface declares, and no maximum-upscale bound SHALL be needed or declared
-- **AND** such a surface SHALL fill its square by the pitch-before-margin and readable-window rules below, and SHALL NOT meet the fill by magnification
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The lattice fill grows pitch before taking margin
-- **WHEN** a fixed-square lattice fills its square
-- **THEN** the drawn square pitch SHALL start from the derived minimum pitch and SHALL grow, never shrink, toward the largest whole-unit pitch at which the node core — every lattice column and row plus the node-label band beneath the bottom row — fits inside the declared square less an inset: the edge-marker gutter band where the payload draws edge direction markers, and 8 CSS px on each side otherwise
-- **AND** the drawn pitch SHALL NOT exceed one and a half times the surface's declared pitch, so a sparse payload's coordinate cells stay recognisable as cells
-- **AND** whatever room remains after the pitch is chosen SHALL be taken as **coordinate margin**, padded symmetrically around the node core on both axes up to the square, with the edge-marker band remaining the canvas's outermost band and the padded extent between the core and that band being coordinate space that the dot field paints
-- **AND** where even the derived minimum pitch does not fit, the drawing SHALL keep that minimum pitch and the square extent SHALL grow to the required side
-- **AND** the island SHALL show a square window of side `canvasSize` over the drawing at scale 1, centred on the current node and clamped inside the drawing, clipped to the fixed canvas; every drawn label SHALL remain at least 16 CSS px at the reference, and the full-map surface SHALL keep the complete drawing reachable through its existing view operations
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The graph fill is a readable window
 - **WHEN** a fixed-square graph variant fills its square
@@ -432,44 +420,40 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** the canvas's own natural size SHALL NOT be able to breach the island's square however much the edge-marker gutter grows it: the gutter enlarges the drawing's required side, which the square window absorbs as clipping, never as a larger canvas or smaller text
 
 #### Scenario: The island measures nothing and overlaps nothing of its own
-- **WHEN** the island renders map content
-- **THEN** no island size, pitch, or scale SHALL be derived from a measurement of the island's anchor, of the island's other rows, or of any other surface, and the renderer SHALL NOT allow map content to overlap the island's title, its orientation marks, the readout line, or any other island content
-- **AND** node labels SHALL occupy a single line with an overflow indicator, and each node's full label SHALL remain available as its accessible name
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: No marker or label footprint ever intersects another
-- **WHEN** the renderer chooses geometry — column pitch, row pitch, and marker sizing on the lattice, and ring radii, angular slots, and marker sizing on the radial graph
-- **THEN** at every placement the model can produce for either variant, no rendered node marker's visual footprint and no rendered node label's visual footprint intersects the footprint of any other node's marker or label
-- **AND** this holds independently of clipping by the island's fixed square canvas, independently of any uniform scale and translation the full-map surface's fitted view applies at any zoom level it permits, and independently of any pitch the island's fill grows beyond the derived minimum (radial ring radii SHALL grow with ring member count so the angular arc between adjacent slots bounds the label footprint)
-- **AND** a connector edge between two node markers SHALL remain visually distinguishable rather than being fully occluded by the markers it connects
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The pitch is derived from what needs clearing
-- **WHEN** the lattice's minimum pitch is derived
-- **THEN** it SHALL be **derived from what actually needs clearing at the drawn placement, not asserted as a constant**, and the derivation SHALL be constructible from the model and the drawn label set alone so the non-overlap invariant holds at every placement the model can produce; three clearance terms SHALL be honoured
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The bare clearance term binds every adjacent pair
-- **WHEN** two lattice cells are adjacent
-- **THEN** the pitch SHALL clear the widest drawn footprint of each of the two markers — including any decoration drawn over a marker, such as the actionable halo, not merely the marker shape itself — with a strictly positive gap, SHALL leave a strictly positive visible connector segment between them, and SHALL keep each node's own label box clear of its own node's widest drawn footprint
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The vertical term clears labels above markers
-- **WHEN** an upper drawn node has a visible label and the cell directly below it contains a marker, even if that lower node has no visible label
-- **THEN** the pitch SHALL reserve the label baseline, its descent, the lower marker's widest footprint and a strictly positive gap; it SHALL grow rather than allow the upper label to overprint the lower marker
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The label term measures visible names in monospace cells
-- **WHEN** two horizontally adjacent cells BOTH draw visible label text
-- **THEN** the pitch SHALL additionally clear both label boxes actually drawn side by side with a half-em gap, `(cells(a) + cells(b)) / 2 × CELL_EM × labelFont + labelFont / 2` rounded up to a whole unit, where the visible (truncated) label is measured in monospace cells at the surface's declared label type size — a code point that the bundled monospace face draws one cell wide counts as one cell, and every other code point — East Asian Wide or Fullwidth characters, and characters the face lacks, which fall back to a wider face — counts as two cells, a cell being CELL_EM, the shipped face's Latin cell advance that the font manifest publishes — and the largest such need over every adjacent labelled pair binds
-- **AND** two truncated labels of `labelMax` wide glyphs plus the narrow overflow indicator therefore need `(2 × labelMax + 1) × CELL_EM × labelFont + labelFont / 2`, never less than the former worst-case term `(labelMax + 1) × labelFont + 3`, while shorter or narrower names ask only for the room they occupy
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The label term never binds on undrawn labels
-- **WHEN** the drawn label set contains no such adjacent pair — which a payload whose neighbouring cells state no place name of their own produces
-- **THEN** the label term SHALL NOT bind, and the derived minimum pitch SHALL NOT be inflated to clear labels that are not drawn
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The derived pitch is a floor, bought without truncation
-- **WHEN** the three terms have derived the minimum pitch
-- **THEN** a surface that declares a fixed square canvas MAY draw a larger pitch to fill its square, as the canvas-sizing rule states, and SHALL NEVER draw a smaller one, and the renderer SHALL NOT satisfy any term by truncating node labels more aggressively: `labelMax` is a legibility contract, and shortening it to buy pitch was rejected when the pitch was first derived
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The square cell keeps drawing and bearings in agreement
-- **WHEN** the clearance terms apply to a drawn lattice
-- **THEN** all applicable terms SHALL be satisfied by the same pitch on both axes, so a drawn lattice cell is **square**: an unequal pitch would draw a node at `(+1, +1)` along a different line than the edge direction marker for the same delta, which is computed from the raw coordinate delta, and the drawing and its bearings SHALL agree
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Map rendering logic is shared and variant-resolved
 - **WHEN** the minimap island and the full-map overlay render a committed payload
@@ -580,15 +564,12 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** their payload coordinates SHALL NOT influence either exported node placement
 
 #### Scenario: The lattice names its remembered places by edge direction marker
-- **WHEN** a remembered node's coordinates fall outside the drawn extent on the lattice variant
-- **THEN** the named edge direction marker SHALL BE the presentation: it SHALL render as the remembered-node diamond ornament (carrying the gold landmark treatment when flagged) placed where the ray from the current node through that node's **raw payload coordinate delta** crosses the canvas's marker-safe border, with the direction computed by a pure helper over the raw delta (`+y = 北`, eight octants with deterministic sector bounds) and never from rank-compressed columns or rows, since compression preserves order, not ratios
-- **AND** the marker SHALL convey direction only — no distance figure, angle, or coordinate readout — and SHALL carry no activation of its own
-- **AND** the island SHALL NOT render a remembered-node list on this variant: the list is removed outright, and no surface SHALL present a remembered node both as a marker and as a list entry
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Marker names stay inside the outermost gutter band
-- **WHEN** a surface draws edge direction markers — the island as well as the full-map overlay
-- **THEN** each marker SHALL carry its place name as visible text beside it, drawn wholly inside the marker gutter band that lies outside the canvas rect containing every node marker, every node label, the coordinate dot field's registered cells, and the axis — the rect the surface's coordinate-field padding grows, so the band stays the canvas's outermost band however much margin is taken — so a marker name can never intersect a node marker, a node label, or the axis line that surface now draws
-- **AND** markers and their names SHALL be positioned deterministically so that no marker overlaps another marker and no name overlaps another name
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A name's room is declared before it is drawn
 - **WHEN** a surface prepares to draw marker names
@@ -596,10 +577,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** each name SHALL then be fitted to what that same declared geometry reserved for it, and no surface SHALL draw a name longer than the room its own declaration set aside
 
 #### Scenario: The fit budget is measured in monospace cells
-- **WHEN** a marker name is fitted to its room
-- **THEN** the fit budget SHALL be the lesser of two terms measured in the same monospace cells (one for a code point the bundled monospace face draws one cell wide, two for every other code point, each CELL_EM of the shipped face's Latin cell advance) at the surface's declared name type size: the free span the marker holds along its own edge, and — only where that marker's name is drawn outward across the band — the declared outward name box, which SHALL be declared wide enough for `labelMax + 1` wide glyphs
-- **AND** a surface that declares band depth alone, drawing its names along the band, has no outward term and is bound by its span alone
-- **AND** the number that budgets the fit SHALL be the same number that sizes the drawn glyph, so a surface cannot size its text by one measure and reserve room by another
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Ambiguous names are dropped, never equalled
 - **WHEN** a name does not fit its budget
@@ -659,8 +638,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** only the minimap renderer is disabled, the browser requests at most one full resynchronization, and narrative and text input remain usable
 
 #### Scenario: In-view nodes occupy distinct lattice cells
-- **WHEN** a grid-layer payload places several in-view nodes at distinct coordinates
-- **THEN** each node occupies its own lattice cell, no two node markers overlap, and their relative row and column order matches the payload coordinates
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Distant remembered nodes do not distort the local view
 - **WHEN** the payload carries remembered nodes many cells away from the current node
@@ -711,8 +690,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** every marker name is rendered wholly inside the marker gutter band outside the canvas rect — the rect the coordinate-field padding grows, so the band stays outermost — so no marker name's box intersects any node marker, node label, or the drawn axis line, and no two marker names' boxes intersect each other
 
 #### Scenario: Rank compression never skews a marker's direction
-- **WHEN** an in-view span forces rank compression while a remembered remote sits at a lopsided raw delta such as (+100, +1)
-- **THEN** its edge marker renders on the near-due-east border rather than on the 45° diagonal that the compressed ranks would suggest
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A coordinate-free payload draws no edge markers and still presents its remembered nodes
 - **WHEN** an interior or instance payload with remembered nodes renders the radial graph on the island and on the full-map surface
@@ -759,20 +738,20 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the island renders no orientation marks and no coordinate figure, the map title renders exactly as on a coordinate-bearing layer, and the readout line — having nothing to state — states nothing and paints no box
 
 #### Scenario: A geometrically sparse payload stays bounded
-- **WHEN** a schema-valid payload places in-view nodes at coordinates whose span exceeds the lattice bound
-- **THEN** the model falls back to rank compression, the lattice stays within its bound, and every node is still rendered exactly once
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Adjacent node markers, labels, and connector edges never visually collide
-- **WHEN** a grid-layer payload places two or more nodes in adjacent lattice cells (sharing a row or a column), each carrying a label at the renderer's normal truncation length
-- **THEN** the rendered bounding box of each node's marker and label does not intersect the bounding box of any other node's marker or label, and the connector edge between two adjacent nodes remains visually distinguishable rather than being fully covered by their markers
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A densely populated lattice keeps readable collision-free geometry
-- **WHEN** the derived pitch of a dense lattice exceeds the island's 240px square
-- **THEN** its unchanged geometry is clipped through a scale-1 window around the current node, every drawn label remains at least 16 CSS px, and the full-map view operations reach the complete drawing without marker/label collisions
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A sparse lattice scaled up never reintroduces overlap
-- **WHEN** the payload's node core at its derived minimum pitch is smaller than the island's square, so an earlier revision of this surface would have scaled the whole SVG up to fill it
-- **THEN** no scale above 1 is produced at all: the island's fill is taken first as pitch grown from the derived minimum and then as symmetric coordinate margin around the node core, never as magnification, so the drawn scale is `canvas side / side ≤ 1` and the upward direction of the non-overlap question cannot arise
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A long remembered list keeps required island content in view
 - **WHEN** a graph-variant payload combines a two-ring in-view placement with the model's maximum of remembered nodes
@@ -783,8 +762,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the canvas stays 240 × 240 CSS px, its current-centered scale-1 window clips the oversized drawing, its effective text remains at least 16 CSS px, and the anchor has no scrollbar
 
 #### Scenario: A single-node room states orientation without any collision risk
-- **WHEN** the in-view lattice contains exactly one node
-- **THEN** its marker and label render with no neighboring node to collide with, and the fix's pitch and sizing changes produce no regression versus the single-node case
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The full-map overlay renders the same lattice at a larger scale
 - **WHEN** the player opens the full-map overlay while a committed `local_map` payload is available
@@ -827,17 +806,16 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the island renders no axis orientation mark and no coordinate figure, and on a layer resolving to the lattice (`grid`, `wilderness`) the mark renders alongside the current node's coordinate figure
 
 #### Scenario: The island's canvas claims its content width as coordinate margin
-- **WHEN** a wilderness payload whose three-by-three in-view core carries no remembered gateway and no horizontally adjacent labelled pair renders on the island, where its derived minimum pitch is 40 user units
-- **THEN** the drawn square pitch is 60 user units — the grown pitch reaches the 60-unit cap of one and a half times the declared pitch at the 240px square's roomier inset box (three columns, three rows, and the 14-unit label band fit 240px less its 16px inset) — so the node core spans 180 of the canvas's 240 CSS px instead of 120, the remaining room is painted as coordinate margin by the dot field registered to the 60-unit pitch, the uniform scale is exactly 1, and every marker radius and label renders at the size the island declares
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The island's name band is reserved as band depth, not as an outward box
-- **WHEN** the reported three-by-three wilderness shape renders with remembered gateways and vertically adjacent visible labels
-- **THEN** the marker band reserves name depth, the square pitch satisfies the derived vertical clearance as well as horizontal clearance, and the 240px current-centered window draws labels at 16 CSS px without overlap
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A sparse payload reads airy rather than magnified
-- **WHEN** the committed payload contains a single node and renders on the island
-- **THEN** the pitch grows only to its 60-unit cap of one and a half times the declared 40-unit pitch, the rest of the 240px square is coordinate margin, so roughly three and a half coordinate cells of dot field surround one marker drawn at its designed radius with its label at the island's declared 16-unit type size — exactly 16 CSS px, the island's own 16px chrome step and never above it — and neither the marker ladder nor the label is inflated
-- **AND** no maximum-upscale bound is declared for the island at all, and the island's canvas carries no width or height bound derived from a measurement
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The height budget is spent as an equivalent width bound
 - **WHEN** a two-column, sixty-four-row lattice renders on a natural mount, the island, and the full map
@@ -848,9 +826,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** both use a fixed 240-unit square window centered on the current node, render labels at exactly 16 CSS px at reference, and leave every full name reachable through the full map
 
 #### Scenario: The overlay keeps its geometry and gains only the coordinate field
-- **WHEN** the same committed payload renders in the full-map overlay, which declares neither a fixed square canvas nor an axis
-- **THEN** the overlay's column pitch, row pitch, label truncation length and marker scale are all exactly what they were before this change, its node-label and marker-name type steps rise to the same 16-unit legibility floor the island declares, no pitch-fit or footprint crop is applied to it, its drawing is shown through its fitted view rather than stretched to the overlay body's width, it paints no second vignette over its `mapcanvas` background, and it draws no axis — the one layer it carries beyond the markers is the coordinate dot field, because the dot pitch's meaning belongs to the lattice variant rather than to a surface
-- **AND** the conditional label term of the pitch derivation never binds there, because the widest truncated label (`2 × labelMax + 1` cells) plus its half-em gap at the overlay's label type size is smaller than either of its declared pitches
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Repeated budget measurements do not ratchet the canvas down
 - **WHEN** the island re-renders across many successive payload commits and `map` anchor resizes
@@ -893,12 +870,12 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the line is centred beneath the canvas at the island's smallest type step in the shared monospace font token, its colour resolves to a design token whose contrast against the island's panel background is at least 4.5:1, it draws no border, background fill, or padded box, and no draft hex value or draft-canvas pixel literal is hardcoded for it
 
 #### Scenario: The coordinate field draws one dot per cell, registered to the placement
-- **WHEN** a wilderness payload renders the lattice on the island and in the full-map overlay
-- **THEN** each surface paints a coordinate dot field across its whole canvas whose horizontal dot spacing equals that surface's drawn column pitch and whose vertical spacing equals its drawn row pitch, and for every drawn node a dot position coincides exactly with that node's centre, so one dot spacing is one coordinate cell and the field is registered to the exported placement rather than being an unregistered texture
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A field whose pitch stopped meaning one cell is rejected
-- **WHEN** the drawn pitch changes — because the payload's drawn label set moves the lattice from the field pitch to the label-cleared pitch, because the island's square fill grows the pitch beyond its derived minimum, or because a surface declares a different pitch
-- **THEN** the dot field's spacing changes with it on both axes and stays registered to the node centres, so no rendering exists in which the dot spacing and the coordinate cell step differ
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A coordinate field that went invisible fails
 - **WHEN** the island's lattice renders and the resolved colours of the dot field and the axis are measured against the canvas ground
@@ -925,24 +902,24 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the axis passes beneath that node's own marker, which is what an origin is, the drawn edge direction markers stay wholly outside the canvas rect that contains the axis, and the non-overlap invariant that names the axis is satisfied
 
 #### Scenario: The graph variant draws no coordinate field and no axis
-- **WHEN** an interior or instance payload renders the radial graph on either surface
-- **THEN** no coordinate dot field and no axis line is drawn anywhere on that surface, because a radial placement has no coordinate cells and asserts no axis, its markers, edges, and labels render exactly as before, and the full-map surface's legend popover lists the same entries as on a lattice payload
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: A node label never renders larger than the surface's own chrome
 - **WHEN** a sparse or crowded payload renders on the island
 - **THEN** every drawn node label is exactly its declared 16-unit step at reference scale, never smaller through SVG scaling and never larger than the island's title
 
 #### Scenario: The pitch clears exactly what the drawn label set needs
-- **WHEN** a wilderness payload suppresses shared-region labels and another payload shows distinct adjacent names
-- **THEN** horizontal clearance binds only for pairs of visible names, vertical clearance binds for every labeled upper node above a lower marker including an unlabeled one, and the square pitch satisfies all applicable footprint terms without more aggressive truncation
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Vertical clearance is derived even above an unlabeled marker
-- **WHEN** visible labels occur on vertically adjacent lattice rows
-- **THEN** the derived square pitch grows above the declared floor enough to keep every upper label clear of the marker beneath it, even if that marker has no label, and a fixed canvas clips rather than defeating clearance or reducing text size
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The drawn cell is square so the lattice and its bearings agree
-- **WHEN** a lattice payload places a node one cell east and one cell north of the current node while a remembered gateway sits at the same raw coordinate delta
-- **THEN** the node is drawn along the same line the edge direction marker's raw-delta ray follows, because the drawn column and row pitch are equal, and the dot field's cells are square on that surface
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: The decoration layers stay out of the audit and the accessibility tree
 - **WHEN** the browser geometry audit collects every node-marker box and every node-label box on the island's canvas, and a screen reader reads the island
@@ -957,12 +934,14 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** each layer's colour resolves to a design token already defined for the map surfaces, no new token is required, and no draft hex value and no draft-canvas pixel literal is hardcoded for any of them
 
 #### Scenario: The island scales once with the desktop chrome factor
-- **WHEN** the same payload renders on the island at 1451x790 and at 2560x1440
-- **THEN** the canvas is 240 × 240 CSS px at 1451x790 and 336 × 336 CSS px (±1) at 2560x1440 (the 1.4 cap), the SVG's viewBox, pitch, marker radii and label sizes in user units are identical for both, and the drawing is only uniformly magnified
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
 #### Scenario: Labels are budgeted in monospace cells
-- **WHEN** two horizontally adjacent lattice cells draw the labels `霧骨渡口` and `NPC 7`, and an edge marker's name mixes CJK and ASCII
-- **THEN** the pitch clears `(8 + 5) / 2 × CELL_EM × labelFont + labelFont / 2`, where `CELL_EM` is the shipped face's Latin cell advance in em, each CJK code point counting as two cells and each ASCII code point as one, and the marker name is fitted to its span and outward box by the same cell measure, so a monospace face whose wide glyphs are two Latin cells wide stays inside every reserved box
+- **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
+- **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
+
+
 
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
 The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity.
@@ -1195,9 +1174,8 @@ The full-map overlay SHALL present its map through a clipped viewport that takes
 - **THEN** zooming and panning SHALL change only a uniform scale and a translation of the whole drawing, never the placement, the pitch, the edge-marker gutter, the marker radii, the label and marker-name type sizes, the name fitting, or any other geometry the surface declares, so every rule the shared renderer states about that geometry — including the non-overlap invariant — holds at every zoom level
 
 #### Scenario: The view opens readable at scale one
-- **WHEN** the overlay opens
-- **THEN** the view SHALL open at one CSS pixel per user unit, so every declared 16-unit label remains at least 16 CSS px
-- **AND** a drawing smaller than the viewport SHALL be centred on each non-overflowing axis, and an oversized drawing SHALL open around the current node, clamped to the drawing's edges, rather than shrinking text to show all nodes at once
+- **WHEN** a physical sparse map opens or its viewport changes
+- **THEN** uniform fit/zoom/pan projects immutable metric coordinates; labels retain readable screen-space sizing, every node remains reachable through pan/zoom, and view state remains opening-local.
 
 #### Scenario: Zoom bounds and full reachability
 - **WHEN** the reader zooms the drawing
@@ -1249,13 +1227,12 @@ The full-map overlay SHALL present its map through a clipped viewport that takes
 - **AND** Escape while the popover is open SHALL close only the popover and SHALL NOT close the overlay; the next Escape closes the overlay
 
 #### Scenario: A tall map opens readable around the current node
-- **WHEN** the player opens an oversized tall lattice or wilderness map with named edge markers at 1451x790
-- **THEN** the current node is visible at a scale of 1, labels and marker names draw at least 16 CSS px, the overlay body has no scrollbar, and panning reaches every node and edge marker
+- **WHEN** a physical sparse map opens or its viewport changes
+- **THEN** uniform fit/zoom/pan projects immutable metric coordinates; labels retain readable screen-space sizing, every node remains reachable through pan/zoom, and view state remains opening-local.
 
 #### Scenario: A small map opens at its declared size, not magnified
-- **WHEN** the player opens the full-map overlay on a single-node payload
-- **THEN** the node is centred in the viewport, its marker and label render at the overlay's declared
-  sizes at one CSS pixel per user unit, and nothing is scaled above that
+- **WHEN** a physical sparse map opens or its viewport changes
+- **THEN** uniform fit/zoom/pan projects immutable metric coordinates; labels retain readable screen-space sizing, every node remains reachable through pan/zoom, and view state remains opening-local.
 
 #### Scenario: The remembered list never pushes the map out of view
 - **WHEN** the player opens the full-map overlay on an interior payload carrying sixteen remembered
@@ -1326,8 +1303,8 @@ The minimap island's title, orientation marks and readout SHALL render at the sh
 - **THEN** it SHALL be clipped through a current-centered scale-1 window rather than shrinking labels; all nodes and edges SHALL remain in the model, every node SHALL retain its full text alternative, and the full map SHALL make every full name and remembered gateway reachable at its readable scale floor through existing view controls
 
 #### Scenario: The derived pitch clears the drawn label set
-- **WHEN** the lattice pitch is derived
-- **THEN** it SHALL satisfy horizontal and vertical footprint clearance for the actual drawn label set
+- **WHEN** metric nodes have dense screen-space projections
+- **THEN** readable chrome/labels use label offsets, clipping or disclosure without independently moving physical centers, equalizing gaps, removing edges, or changing action identity.
 
 #### Scenario: Ordinary neighbourhood is readable
 - **WHEN** a three-by-three grid lattice of distinct two- and four-glyph room names with no remembered gateway renders on the island at 1451x790 and at 2560x1440
@@ -1336,7 +1313,6 @@ The minimap island's title, orientation marks and readout SHALL render at the sh
 #### Scenario: Dense knowledge stays available
 - **WHEN** a payload at the model's 64-node bound — 48 in-view nodes and 16 remembered gateways — renders on the island and then in the full-map overlay
 - **THEN** the island stays a 240 × 240 CSS px canvas retaining every in-view node with its full label as its text alternative and every remembered gateway; its drawn labels are at least 16 CSS px, and the overlay makes every full name reachable at 16 CSS px or more at every permitted zoom level
-
 ### Requirement: Current map location has one unambiguous footprint
 On the full-map overlay the current-location decoration SHALL be a ring concentric with the true current marker, drawn inside the current node's own group at 10.5 units × the marker scale with a hairline seal-toned stroke that does not scale with the drawing, so it can never read as another location.
 
@@ -1393,3 +1369,22 @@ For representable grid and anchor rooms with fixed canonical inputs, changing on
 - **THEN** the refreshed payload is identical to the immediately preceding payload for the same canonical inputs and remains available to the existing widget
 - **AND** player location, clock and knowledge remain unchanged by look and presentation
 - **AND** the adjacent-node movement descriptors remain usable under the existing `explore.move` action contract
+### Requirement: Metric coordinates survive authoritative transport and uniform projection
+Local-map transport SHALL accept physical settlement coordinates and the wilderness frame. Rendering SHALL preserve relative metric spacing under one uniform viewport scale, with pan and zoom; row/column rank compression SHALL be removed. Server coordinates and node/action identity SHALL remain authoritative.
+
+#### Scenario: Unequal gaps survive real rendering
+- **WHEN** nodes at (0,0), (100,0), (1000,0), and (1000,6500) pass server and browser validation and render in actual minimap/full-map components
+- **THEN** 100m and 900m gaps retain a 1:9 ratio at every zoom; fitting, panning and zooming uniformly transform both axes and do not mutate wire coordinates.
+
+#### Scenario: Expanded bounds
+- **WHEN** settlement (6500,6350) and wilderness (2699,2699) arrive over the real protocol
+- **THEN** both validate; malformed noninteger/nonfinite coordinates remain rejected without guessed geometry.
+
+#### Scenario: Visibility and remembered markers
+- **WHEN** a viewport pans across remembered and unknown hidden locations
+- **THEN** remembered boundary markers preserve physical orientation; unknown locations stay absent, movement descriptors retain actual traversable exits, and no action or knowledge is created by projection.
+
+#### Scenario: Coordinate-free interiors
+- **WHEN** an interior graph with no physical coordinates is shown
+- **THEN** its existing graph semantics remain without invented meter positions.
+

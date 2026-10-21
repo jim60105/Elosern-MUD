@@ -86,6 +86,9 @@ it never parses ASCII. The metric-coordinate cutover removes the ASCII source
 and this display path together.
 
 Local-map payload bounds (`web/webclient/presentation/local_map/validate.py`)
-are intentionally unchanged here: the shipped coordinates still fit the
-existing protocol window, and the viewport/projection contract is owned by
-`project-metric-local-maps`. Do not silently widen the protocol in this change.
+were intentionally left unchanged here: this change ships the sparse graph, not
+the projection. `project-metric-local-maps` now owns that cutover — it widens
+the shared transport envelope to integer metres and projects the payload at one
+uniform physical scale; see `docs/development/metric-local-maps.md`. The
+registered per-map extent still gates `grid:` identities, so the authored
+coordinate cutover itself remains `activate-metric-settlements`.

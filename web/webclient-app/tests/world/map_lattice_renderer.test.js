@@ -44,7 +44,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // fixture is 26.4558…).
     const svg = w.find("svg.local-map__lattice");
     expect(Number(svg.attributes("width"))).toBeCloseTo(247.91168824543144, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(110.91168824543144, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(131.91168824543144, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     // The payload lists 3 edges, but the third one ends at the remembered
     // node (grid:altoria:5:5), whose endpoint is not on the canvas — the
@@ -61,13 +61,13 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
   it("renders identical node/edge/legend content at the overlay's larger scale", () => {
     const w = mountLattice(OVERLAY_PROPS);
     const svg = w.find("svg.local-map__lattice");
-    // The natural canvas is 3 × 280px wide, 1 × 212px row pitch + 14px
-    // label band; the edge-marker gutter (model value 271.6480… at the
+    // The natural canvas is 3 × 280px wide, 1 × 280px row pitch + 14px
+    // label band (one uniform pitch on both axes); the edge-marker gutter (model value 271.6480… at the
     // overlay's name-bearing geometry, whose outward name box is 22
     // monospace cells at 16) grows it on every side (map-02 D3b).
     const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 16 + 2;
     expect(Number(svg.attributes("width"))).toBeCloseTo(840 + 2 * expectedGutter, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(226 + 2 * expectedGutter, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(294 + 2 * expectedGutter, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
     // webclient-full-map-fit-view D6: an overlay-scale mount without
@@ -120,9 +120,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
   it("keeps node markers and labels non-intersecting at the overlay's scale", () => {
     const w = mountLattice(OVERLAY_PROPS);
 
-    // Node centers from the model's col/row + the overlay's pitch
-    // (colPitch 280, rowPitch 212, rows=1): centers are col*280+140 and
-    // (1-1-row)*212+106, shifted by the edge-marker gutter the model
+    // Node centers from the model's col/row + the overlay's one uniform
+    // pitch (280 on both axes, rows=1): centers are col*280+140 and
+    // (1-1-row)*280+140, shifted by the edge-marker gutter the model
     // computes for this exact geometry (map-02 D3b — the renderer and the
     // test derive the gutter from the same model call, pinning their
     // composition; relative node geometry is gutter-invariant).
@@ -131,17 +131,17 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       LOCAL_MAP_SAMPLE.nodes.filter((n) => n.visibility === "remembered"),
       {
         canvasWidth: 3 * 280,
-        canvasHeight: 212 + 14,
-        current: { x: 420, y: 106 },
+        canvasHeight: 280 + 14,
+        current: { x: 420, y: 140 },
         markerHalf: 9 * 4.83,
         nameWidth: 22 * CELL_EM * 16,
         nameHeight: 16,
       },
     ).gutter;
     const centers = {
-      "grid:altoria:1:2": { x: 420 + gutter, y: 106 + gutter },
-      "grid:altoria:2:2": { x: 700 + gutter, y: 106 + gutter },
-      "grid:altoria:0:2": { x: 140 + gutter, y: 106 + gutter },
+      "grid:altoria:1:2": { x: 420 + gutter, y: 140 + gutter },
+      "grid:altoria:2:2": { x: 700 + gutter, y: 140 + gutter },
+      "grid:altoria:0:2": { x: 140 + gutter, y: 140 + gutter },
     };
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
@@ -232,9 +232,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // unvisited 5.5×4.83) leaves a positive visible segment.
     const e0 = w.get('[data-testid="local-map__edge--0"]');
     expect(Number(e0.attributes("x1"))).toBeCloseTo(420 + gutter, 6);
-    expect(Number(e0.attributes("y1"))).toBeCloseTo(106 + gutter, 6);
+    expect(Number(e0.attributes("y1"))).toBeCloseTo(140 + gutter, 6);
     expect(Number(e0.attributes("x2"))).toBeCloseTo(700 + gutter, 6);
-    expect(Number(e0.attributes("y2"))).toBeCloseTo(106 + gutter, 6);
+    expect(Number(e0.attributes("y2"))).toBeCloseTo(140 + gutter, 6);
     expect(280 - (8 + 1) * 4.83 - (4.5 + 1) * 4.83).toBeGreaterThan(0);
   });
 

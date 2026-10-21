@@ -3,8 +3,9 @@
  *
  * Runs with Node 24's built-in test runner and node:assert. Covers state
  * distinction without color alone, focus targets for remembered remote nodes,
- * the bounded integer lattice (with remembered nodes outside the canvas), and
- * the rank-compression fallback for geometrically sparse payloads.
+ * the metric lattice (with remembered nodes outside the canvas) and its
+ * uniform cell projection, which preserves unequal metric gaps instead of
+ * rank-compressing them.
  */
 
 "use strict";
@@ -154,7 +155,10 @@ test("a distant remembered node leaves the local spacing intact", () => {
   assert.equal(model.remembered.length, 1);
 });
 
-test("a geometrically sparse payload falls back to rank compression", () => {
+test("a geometrically sparse payload keeps its metric spacing, never a compressed rank", () => {
+  // 20 nodes 100 metres apart per axis: the cell is the smallest in-view
+  // coordinate delta (100), so every node's column is its own 100 m step —
+  // ranks were never equalized and the lattice bounds grew with the span.
   const nodes = [];
   for (let i = 0; i < 20; i += 1) {
     nodes.push(
@@ -169,17 +173,47 @@ test("a geometrically sparse payload falls back to rank compression", () => {
     );
   }
   const model = LocalMap.reducePanel(panel({ nodes: nodes, edges: [] }));
-  assert.ok(model.cols <= LocalMap.MAX_LATTICE);
-  assert.ok(model.rows <= LocalMap.MAX_LATTICE);
+  assert.equal(model.cell, 100);
+  assert.equal(model.cols, 20);
+  assert.equal(model.rows, 20);
   assert.equal(model.nodes.length, 20);
-  // Every node still renders exactly once, with rank-compressed coordinates.
   const cells = new Set(model.nodes.map((n) => n.col + ":" + n.row));
   assert.equal(cells.size, 20);
-  // Relative order is preserved: larger x => larger col, smaller y => row.
-  const first = model.nodes.find((n) => n.id === "room:0");
-  const last = model.nodes.find((n) => n.id === "room:19");
-  assert.ok(last.col > first.col);
-  assert.ok(last.row < first.row);
+  // Each node keeps its exact 100 m step: one lattice cell per 100 m, and
+  // larger x => larger col, smaller y => row.
+  nodes.forEach((source, i) => {
+    const placed = model.nodes.find((n) => n.id === source.id);
+    assert.equal(placed.col, i);
+    assert.equal(placed.row, 19 - i);
+    // The payload coordinate itself is never rewritten by the projection.
+    assert.equal(placed.x, source.x);
+    assert.equal(placed.y, source.y);
+  });
+});
+
+test("unequal metric gaps keep their exact ratio in the lattice", () => {
+  // The requirement's own frame: (0,0), (100,0), (1000,0), (1000,6500). A
+  // 100 m gap and a 900 m gap must project to 1 and 9 cells (1:9), never to
+  // an independently equalized pair of adjacent ranks.
+  const nodes = [
+    node({ id: "n0", label: "n0", x: 0, y: 0 }),
+    node({ id: "n1", label: "n1", x: 100, y: 0, visibility: "visible_visited", current: false }),
+    node({ id: "n2", label: "n2", x: 1000, y: 0, visibility: "visible_visited", current: false }),
+    node({ id: "n3", label: "n3", x: 1000, y: 6500, visibility: "visible_visited", current: false }),
+  ];
+  const layout = LocalMap.layoutNodes(nodes);
+  assert.equal(layout.cell, 100);
+  const byId = (id) => layout.nodes.find((n) => n.id === id);
+  assert.equal(byId("n0").col, 0);
+  assert.equal(byId("n1").col, 1);
+  assert.equal(byId("n2").col, 10);
+  assert.equal(byId("n3").col, 10);
+  assert.equal(byId("n3").row, 65);
+  // 100 m : 900 m == 1 : 9 cells, and 6500 m is 65 cells north.
+  assert.equal((byId("n2").col - byId("n1").col) / (byId("n1").col - byId("n0").col), 9);
+  assert.equal(byId("n3").row, 65);
+  assert.equal(layout.cols, 11);
+  assert.equal(layout.rows, 66);
 });
 
 test("a single-node payload yields a 1x1 lattice", () => {
@@ -595,18 +629,18 @@ test("edge markers stay silent without coordinates, extent, or candidates", () =
   assert.equal(edgeMarkersFor(inside.nodes, inside.remembered, geo).markers.length, 0);
 });
 
-test("edge markers never assume compressed ranks and stay deterministic", () => {
-  // Sparse payload forcing the lattice rank-compression fallback: raw deltas
-  // must still decide octants/edges — (100,1) is due east, never 45 degrees.
+test("edge markers never assume lattice cells and stay deterministic", () => {
+  // Sparse metric payload: raw deltas decide octants/edges — (100,1) is due
+  // east, never 45 degrees, and the lattice keeps its honest 100-cell span.
   const nodes = [
     { id: "c", label: "c", x: 0, y: 0, visibility: "current", current: true },
     { id: "far", label: "far", x: 100, y: 1, visibility: "visible_visited" },
   ];
-  const compressed = LocalMap.layoutNodes(nodes);
+  const projected = LocalMap.layoutNodes(nodes);
   assert.equal(
-    compressed.nodes.find((n) => n.id === "far").col,
-    1,
-    "rank compression would place x=100 one column from x=0"
+    projected.nodes.find((n) => n.id === "far").col,
+    100,
+    "the metric projection keeps x=100 one hundred columns from x=0"
   );
   const remembered = [
     // Strictly outside the in-view bbox (x 0..100, y 0..1); a remembered

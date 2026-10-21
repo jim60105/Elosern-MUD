@@ -172,8 +172,11 @@ var LINEAGE_MAX_TEXT = 128;
 var LOCAL_MAP_MAX_TITLE = 128;
 var LOCAL_MAP_MAX_NODE_ID = 128;
 var LOCAL_MAP_MAX_EXIT_REF = 64;
-var LOCAL_MAP_COORD_MIN = -1024;
-var LOCAL_MAP_COORD_MAX = 1024;
+// Shared metric coordinate envelope (project-metric-local-maps). Must stay
+// equal to COORD_MIN/COORD_MAX in the server validator; settlement frames are
+// integer metres and the wilderness frame is 0..2699 kilometre cells.
+var LOCAL_MAP_COORD_MIN = -10000000;
+var LOCAL_MAP_COORD_MAX = 10000000;
 var LOCAL_MAP_VISIBILITIES = [
   "current",
   "visible_unvisited",

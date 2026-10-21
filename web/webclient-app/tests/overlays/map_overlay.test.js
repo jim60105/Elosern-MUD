@@ -352,3 +352,64 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     });
   });
 });
+
+describe("MapOverlay metric projection (project-metric-local-maps)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+// project-metric-local-maps: a real metric frame — (0,0), (100,0), (1000,0)
+// and (1000,6500) plus a (100,100) diagonal control — with 100 m as the
+// smallest in-view coordinate delta.
+const METRIC_PAYLOAD = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:metric:0:0",
+  title: "度量城區",
+  nodes: [
+    { id: "grid:metric:0:0", label: "原點", x: 0, y: 0, visibility: "current", current: true, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:100:0", label: "東街", x: 100, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: { kind: "move", exit_ref: "e", destination: "grid:metric:100:0" } },
+    { id: "grid:metric:1000:0", label: "遠東", x: 1000, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:1000:6500", label: "北關", x: 1000, y: 6500, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:100:100", label: "東北", x: 100, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, action: null },
+  ],
+  edges: [
+    { source: "grid:metric:0:0", destination: "grid:metric:100:0", label: "e", known: true, traversable: true },
+    { source: "grid:metric:100:0", destination: "grid:metric:1000:0", label: "e", known: true, traversable: true },
+    { source: "grid:metric:1000:0", destination: "grid:metric:1000:6500", label: "n", known: true, traversable: true },
+    { source: "grid:metric:0:0", destination: "grid:metric:100:100", label: "ne", known: true, traversable: false },
+  ],
+  legend: ["你目前所在的位置", "尚未探索的相鄰位置", "曾經到過的位置", "記憶中的邊界"],
+};
+
+function nodeCenter(wrapper, id) {
+  const match = wrapper
+    .get(`[data-testid="local-map__node--${id}"]`)
+    .attributes("transform")
+    .match(/-?[\d.]+/g)
+    .map(Number);
+  return { x: match[0], y: match[1] };
+}
+
+  it("draws a metric payload on one uniform pitch and preserves its gap ratio", () => {
+    wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(METRIC_PAYLOAD) } });
+    const lattice = wrapper.findComponent(MapLattice);
+    // One physical scale for both axes: the surface declares the same pitch
+    // for columns and rows, so eastward and northward 100 m steps draw equal.
+    expect(lattice.props("colPitch")).toBe(lattice.props("rowPitch"));
+    expect(lattice.props("colPitch")).toBe(280);
+
+    const origin = nodeCenter(wrapper, "grid:metric:0:0");
+    const near = nodeCenter(wrapper, "grid:metric:100:0");
+    const far = nodeCenter(wrapper, "grid:metric:1000:0");
+    const diagonal = nodeCenter(wrapper, "grid:metric:100:100");
+    expect(near.x - origin.x).toBeCloseTo(280, 6);
+    expect(far.x - near.x).toBeCloseTo(9 * 280, 6);
+    expect(Math.abs(diagonal.y - origin.y)).toBeCloseTo(diagonal.x - origin.x, 6);
+  });
+});

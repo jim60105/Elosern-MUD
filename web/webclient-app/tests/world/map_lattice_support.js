@@ -61,7 +61,9 @@ import { LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
 
   export const OVERLAY_PROPS = {
     colPitch: 280,
-    rowPitch: 212,
+    // One uniform physical scale serves both axes (project-metric-local-maps),
+    // so the overlay declares the same 280-unit pitch for columns and rows.
+    rowPitch: 280,
     labelMax: 10,
     markerScale: 4.83,
     overlayChrome: true,

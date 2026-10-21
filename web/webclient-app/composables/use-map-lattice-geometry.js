@@ -115,7 +115,7 @@ export function useMapLatticeGeometry(props) {
 
   // Effective pitch derivation (design D4, webclient-map-legibility): the
   // label term clears the labels actually drawn, not a worst case. Every
-  // horizontally adjacent pair of drawn nodes that BOTH show label text needs
+  // pair of drawn nodes on one lattice row that BOTH show label text needs
   // half of each centred label box plus a half-em word gap, so two names read
   // as two names rather than one run-on phrase:
   // `(cells(a) + cells(b)) / 2 * CELL_EM * labelFont + labelFont / 2`, the
@@ -125,6 +125,12 @@ export function useMapLatticeGeometry(props) {
   // it falls back to a roughly 1em face. Two maximal labels (`labelMax` wide
   // glyphs plus the narrow "…") need at least the old worst-case term
   // `(labelMax + 1) * labelFont + 3`, so the bound never loosens for them.
+  //
+  // Metric projection (project-metric-local-maps): lattice `col`/`row` are
+  // cell units, and a cell is the smallest in-view coordinate delta, not one
+  // payload unit. A same-row pair can therefore sit more than one cell apart,
+  // so the term divides each pair's label need by its own cell separation:
+  // the binding value is the pitch at which the closest drawn pair clears.
   const labelClearancePitch = computed(() => {
     const labeled = drawnNodes.value
       .map((node) => ({ node, label: visibleNodeLabel(node) }))
@@ -134,8 +140,12 @@ export function useMapLatticeGeometry(props) {
       for (let j = i + 1; j < labeled.length; j++) {
         const a = labeled[i];
         const b = labeled[j];
-        if (a.node.row === b.node.row && Math.abs(a.node.col - b.node.col) === 1) {
-          need = Math.max(need, labelPairPitch(a.label, b.label, props.labelFont));
+        const separation = Math.abs(a.node.col - b.node.col);
+        if (a.node.row === b.node.row && separation > 0) {
+          need = Math.max(
+            need,
+            labelPairPitch(a.label, b.label, props.labelFont) / separation,
+          );
         }
       }
     }
@@ -145,20 +155,27 @@ export function useMapLatticeGeometry(props) {
   // when that lower node suppresses its own label (shared wilderness names).
   // The baseline reserves 11 * markerScale + 2 + labelFont; allow a quarter
   // type step below it for the bundled face's descent and three units of gap.
+  // As with the label term, a vertically aligned pair may be more than one
+  // cell apart under the metric projection, so the need is divided by that
+  // pair's own cell separation.
   const verticalClearancePitch = computed(() => {
-    const hasUpperLabel = drawnNodes.value.some((upper) =>
-      visibleNodeLabel(upper) && drawnNodes.value.some((lower) =>
-        upper.col === lower.col && upper.row === lower.row + 1,
-      ),
-    );
-    return hasUpperLabel
-      ? Math.ceil(2 * LABEL_BASELINE_HALF * props.markerScale + 2 + 1.25 * props.labelFont + 3)
-      : 0;
+    const need = 2 * LABEL_BASELINE_HALF * props.markerScale + 2 + 1.25 * props.labelFont + 3;
+    let binding = 0;
+    for (const upper of drawnNodes.value) {
+      if (!visibleNodeLabel(upper)) continue;
+      for (const lower of drawnNodes.value) {
+        const separation = upper.row - lower.row;
+        if (upper.col === lower.col && separation > 0) {
+          binding = Math.max(binding, need / separation);
+        }
+      }
+    }
+    return Math.ceil(binding);
   });
-  const isSquarePitch = computed(() => props.colPitch === props.rowPitch);
   // Placement sourcing (map-02 D2): the lattice variant draws the model's
-  // rank-compressed `col`/`row` grid; the graph variant draws the model's
-  // radial placement (design D1) at `markerScale`, so the D1 geometry
+  // metric `col`/`row` grid (one uniform cell = the smallest in-view
+  // coordinate delta, project-metric-local-maps); the graph variant draws the
+  // model's radial placement (design D1) at `markerScale`, so the D1 geometry
   // contract's footprints and the drawn footprints stay proportional and the
   // non-overlap invariant is scale-invariant under the caps. The canvas size
   // follows the active placement; `overflow: visible` lets the lattice
@@ -371,12 +388,19 @@ export function useMapLatticeGeometry(props) {
       });
     }
 
-    // canvasSize == null (overlay and bare mounts)
-    const pCol = Math.max(props.colPitch, labelClearancePitch.value,
-      isSquarePitch.value ? verticalClearancePitch.value : 0);
-    const pRow = isSquarePitch.value
-      ? Math.max(props.rowPitch, labelClearancePitch.value, verticalClearancePitch.value)
-      : Math.max(props.rowPitch, verticalClearancePitch.value);
+    // canvasSize == null (overlay and bare mounts). One uniform physical scale
+    // serves both axes (project-metric-local-maps): the drawn cell is square,
+    // so an eastward and a northward delta of one coordinate cell draw the
+    // same length and every compass bearing stays true. The declared pitches
+    // are minimums; the larger one (and every derived clearance) binds both
+    // axes.
+    const pCol = Math.max(
+      props.colPitch,
+      props.rowPitch,
+      labelClearancePitch.value,
+      verticalClearancePitch.value,
+    );
+    const pRow = pCol;
     const cW = colsVal * pCol;
     const cH = rowsVal * pRow;
 

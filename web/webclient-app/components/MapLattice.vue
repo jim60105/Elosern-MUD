@@ -46,6 +46,9 @@ const props = defineProps({
   // Lattice geometry. The defaults are the minimap's post-crowding-fix
   // values; the full-map overlay passes a larger set sized to the overlay
   // body's available width (900px host cap minus 52px of padding ≈ 848px).
+  // Both are declared minimums and the drawn lattice cell is square: the
+  // larger of the two binds both axes, because a coordinate-bearing map is
+  // projected at one uniform physical scale (project-metric-local-maps).
   colPitch: { type: Number, default: 58 },
   rowPitch: { type: Number, default: 44 },
   labelMax: { type: Number, default: 4 },
@@ -92,7 +95,7 @@ const props = defineProps({
   markerNames: { type: Boolean, default: false },
   edgeMarkers: { type: Object, default: null },
   // Layout variant (webclient-map-02-layout-variants D2/D3): "lattice" draws
-  // the model's rank-compressed grid placement, "graph" draws the model's
+  // the model's metric grid placement, "graph" draws the model's
   // radial (D1) placement. Both surfaces pass `model.layoutVariant` — the
   // variant is a renderer parameter sourced from the committed payload, and
   // it changes coordinate sourcing ONLY: markers, edges, labels, legend,

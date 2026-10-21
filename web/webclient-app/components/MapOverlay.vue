@@ -165,7 +165,7 @@ function handleMove(payload) {
           :local-map="localMap"
           :variant="localMap.layoutVariant || 'lattice'"
           :col-pitch="280"
-          :row-pitch="212"
+          :row-pitch="280"
           :label-max="10"
           :label-font="16"
           :marker-scale="2.2"
