@@ -153,6 +153,16 @@ def _exploration_fixture(character) -> None:
             join_party(npc, character)
             companions.append(npc)
 
+        if os.environ.get("ELOSERN_BROWSER_SLEEP_HANDOFF") == "1":
+            # The sleep-handoff journey needs committed physiology on the
+            # owner and every present member; other suites stay untouched.
+            from world.rules.fatigue import SleepPosture, write_fatigue_state
+            from world.rules.party import live_companions
+
+            write_fatigue_state(character, 360000, SleepPosture.AWAKE)
+            for member in live_companions(character):
+                write_fatigue_state(member, 360000, SleepPosture.AWAKE)
+
         if companions and os.environ.get("ELOSERN_BROWSER_EXPLORATION_PORTRAITS") == "1":
             # Opt-in admitted media for a party member (reuse-lineup-person-
             # focus 4.1): the first companion carries a real, server-served DONE
@@ -187,6 +197,14 @@ def _exploration_fixture(character) -> None:
     defeated_wolf.traits.hp.base = 0
     defeated_wolf.traits.hp.current = 0
     defeated_wolf.save()
+
+    if os.environ.get("ELOSERN_BROWSER_SLEEP_HANDOFF") == "1":
+        # The sleep-handoff journey needs the gate safe from living monsters
+        # (skip safety refuses sleep beside one); it shares the defeated-monster
+        # shape other suites already read as a dead target.
+        hostile.traits.hp.base = 0
+        hostile.traits.hp.current = 0
+        hostile.save()
 
     # A third exit from the south gate: an ephemeral instance cave (the
     # minimap fixture's spawn logic, re-used here so the exploration fixture
