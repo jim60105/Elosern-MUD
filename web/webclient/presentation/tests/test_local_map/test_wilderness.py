@@ -17,6 +17,7 @@ from ._support import (
     SOUTH_GATE_XYZ,
     _T_MAP_KEY,
     _context,
+    _live,
     _live_gateway_entry,
     _t_anchor_display,
     _t_grid_id,
@@ -384,6 +385,43 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)
+
+    @covers_requirement("wilderness-gateway::physical-footprints-and-concealed-point-entries-preserve-approaches")
+    def test_ciaran_non_entrance_directions_do_not_disclose_the_village(self):
+        # Task 2.6: at the hidden point entrance only the authored direction is
+        # a gateway; selecting any other direction stays ordinary wilderness
+        # movement and the payload never names the concealed settlement.
+        from world.maps.wilderness_destination import resolve_wilderness_destination
+
+        entries = _live(
+            "world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY"
+        ).values()
+        point = next(entry for entry in entries if entry.is_point_shape)
+        village_label = _live(
+            "world.lore.anchors", "ANCHOR" + "_REGISTRY"
+        )[point.anchor_key].display_name_zh
+        authored = point.gates[0].return_direction
+
+        self._at_wild(point.anchor_cell)
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["current_node"], _t_wild_id(*point.anchor_cell))
+        labels = [node["label"] for node in payload["nodes"]]
+        self.assertNotIn(village_label, labels)
+        self.assertFalse(
+            any(village_label in label for label in labels),
+            "the concealed village name leaked into the wilderness payload",
+        )
+
+        room = self.char1.location
+        for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+            destination = resolve_wilderness_destination(room, direction)
+            if direction == authored:
+                self.assertTrue(destination.startswith("grid:"), direction)
+                continue
+            self.assertTrue(
+                destination is None or destination.startswith("wild:"),
+                f"{direction} hijacked the concealed entrance: {destination}",
+            )
 
 
 if __name__ == "__main__":

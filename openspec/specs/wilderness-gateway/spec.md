@@ -73,8 +73,9 @@ source for all consumers.
 
 #### Scenario: Point-shape anchor opens every direction to its gate
 - **WHEN** an entry has exactly one `#` cell
-- **THEN** it is a point-shape anchor that owns no footprint cells and every direction at its
-  anchor cell is a gateway to its single registered gate
+- **THEN** it is a point-shape anchor that owns no footprint cells, and only the single gate's
+  authored `return_direction` at its anchor cell is a gateway; every other direction follows
+  ordinary provider validity and resolves as an ordinary wilderness step
 
 #### Scenario: Footprint-anchor gates are reachable only at their approach cells
 - **WHEN** an entry has more than one `#` cell
@@ -508,8 +509,9 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
 
 #### Scenario: Point-shape anchors need all neighbors provider-valid
 - **WHEN** a point-shape entry is validated
-- **THEN** its anchor cell SHALL have all eight wilderness neighbors provider-valid, so a
-  gateway is never advertised toward a cell the provider cannot honor
+- **THEN** its anchor cell and the neighbor its authored `return_direction` leads to SHALL be
+  provider-valid walkable terrain; the other seven neighbors follow ordinary terrain validity, so a
+  coastal cave may be authored next to water
 
 ### Requirement: Physical footprints and concealed point entries preserve approaches
 Urban routing masks SHALL rasterize authored irregular physical footprints. Capital south/east gates SHALL retain facing and exact transformed entrance geometry with exterior approaches outside the mask. Ciaran SHALL be a hidden point entrance without a village-wide wilderness obstacle.

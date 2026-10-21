@@ -16,12 +16,16 @@ The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east
 ## MODIFIED Requirements
 
 ### Requirement: ElosernWildernessMapProvider bounds the map to a 224x224 grid at 10 km per cell
+<!-- Requirement title retained verbatim: a MODIFIED block may not rename the requirement ID.
+     The body below is the current one-kilometre contract. -->
 `world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
 `WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`, a subclass
 of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
 `is_valid_coordinates` accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and
 `0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable terrain and NOT an anchor footprint cell of any
-`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`).
+`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`). The single shared rule
+is `is_valid_wilderness_cell`: frame, mainland polygon at the cell centre, off the closed summit
+ridge and authored waterways, and outside every live footprint.
 
 #### Scenario: Coordinates inside the bound and outside every footprint are valid
 - **WHEN** a land-side passable fixture and an ocean-margin fixture lie inside the frame
@@ -33,8 +37,9 @@ of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
 - **THEN** both return `False`
 
 #### Scenario: Anchor footprint cells are invalid
-- **WHEN** `is_valid_coordinates` is checked for the `capital_altoria` anchor cell `the declared Altoria anchor cell`,
-  a corner footprint cell `a declared Altoria mask cell`, and the two gate approach cells `the declared south approach cell` and `the declared east approach cell`
+- **WHEN** `is_valid_coordinates` is checked for the `capital_altoria` anchor cell `(860, 1080)`,
+  a corner footprint cell `(857, 1076)`, and the two gate approach cells `(860, 1077)` and
+  `(864, 1080)`
 - **THEN** the two footprint cells return `False` and the two approach cells return `True`
 
 #### Scenario: Registry patches change footprint validity without patching the provider
@@ -88,24 +93,27 @@ ensure the coordinate's deterministic monster population per the scenarios below
   not the value computed for `(x1, y1)`
 
 #### Scenario: at_prepare_room opens exactly the gate exit at an approach cell
-- **WHEN** `at_prepare_room(the declared south approach cell, caller, room)` is called on a `TerrainRoom` carrying the
+- **WHEN** `at_prepare_room((860, 1077), caller, room)` is called on a `TerrainRoom` carrying the
   eight directional exits
 - **THEN** the `"north"` exit's locks allow `traverse` and `view`, and no other exit's locks are
   modified by the hook
 
 #### Scenario: at_prepare_room touches no locks away from approach cells
 - **WHEN** `at_prepare_room` is called for an ordinary wilderness cell or for the opposite gate's
-  approach cell `the declared east approach cell`
-- **THEN** at the ordinary cell no exit's locks are modified, and at `the declared east approach cell` only the
-  `"south"` exit's locks are opened — an approach cell never opens another gate's exit
+  approach cell `(864, 1080)`
+- **THEN** at the ordinary cell no exit's locks are modified, and at `(864, 1080)` only the
+  `"west"` exit's locks are opened — an approach cell never opens another gate's exit
 
 #### Scenario: A point-shape anchor opens all eight exits
+<!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. A concealed
+     point entry now exposes only its authored entry direction. -->
 - **WHEN** a concealed point entry is prepared or resolved
-- **THEN** only its authored eligible entry direction is gateway-visible; unrelated directions follow ordinary terrain validity and unknown players learn no concealed destination.
+- **THEN** only its authored eligible entry direction is gateway-visible; unrelated directions
+  follow ordinary terrain validity and unknown players learn no concealed destination.
 
 #### Scenario: A gate lock does not leak when the pooled room moves to a non-approach coordinate
-- **WHEN** a pooled `TerrainRoom` was activated at `the declared south approach cell` (opening its `"north"` exit) and is
-  later activated at a coordinate that is not any approach cell
+- **WHEN** a pooled `TerrainRoom` was activated at `(860, 1077)` (opening its `"north"` exit) and
+  is later activated at a coordinate that is not any approach cell
 - **THEN** the stock activation pass recomputes every self-loop exit's locks from provider
   validity before `at_prepare_room` runs, and after activation no exit carries a hook-opened
   lock
@@ -145,7 +153,8 @@ ensure the coordinate's deterministic monster population per the scenarios below
 - **THEN** `at_prepare_room` SHALL NOT touch any exit's locks
 
 #### Scenario: Point anchors open all eight exits to match the resolver
+<!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The resolver
+     and the exit now agree on one authored entry direction, not eight. -->
 - **WHEN** a concealed point entry is prepared or resolved
-- **THEN** only its authored eligible entry direction is gateway-visible; unrelated directions follow ordinary terrain validity and unknown players learn no concealed destination.
-
-
+- **THEN** only its authored eligible entry direction is gateway-visible; unrelated directions
+  follow ordinary terrain validity and unknown players learn no concealed destination.

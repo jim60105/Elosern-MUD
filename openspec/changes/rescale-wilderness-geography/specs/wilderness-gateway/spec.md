@@ -20,15 +20,22 @@ Urban routing masks SHALL rasterize authored irregular physical footprints. Capi
 `WildernessEntryPoint` dataclasses and a module-level
 `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`, and SHALL expose the derived
 pure helpers `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the single geometry
-source for all consumers.
+source for all consumers. A point-shape entry's `approach_cell(gate)` IS its anchor cell, and only
+that gate's authored `return_direction` is a gateway. `gate.grid_xy` remains the destination
+`GridRoom`'s logical grid coordinate in this change; `activate-metric-settlements` owns the
+meter-coordinate cutover, so this change's transformed entrance geometry is carried by the sparse
+graph's authored physical positions, not by new grid coordinates.
 
 #### Scenario: The registry has exactly one v2 entry after this change
 - **WHEN** the declared metric settlement geometry is validated and used for routing
 - **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
 
 #### Scenario: Derived geometry matches the authored mask
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** the derived helpers are evaluated against the authored rows
+- **THEN** each entry's `footprint_cells` equals its own `#` cells at `origin_xy` (empty for a
+  point shape), `anchor_cell` is the floor-division midpoint of the `#` bounding box, and
+  `approach_cell(gate)` walks from the anchor along the gate's opposite face to the first cell
+  outside the footprint (the anchor cell itself for a point shape)
 
 #### Scenario: Gate identity is globally unique
 
@@ -38,8 +45,9 @@ source for all consumers.
   approach cell or point-shape anchor cell
 
 #### Scenario: A point-shape entry expresses cave semantics with no footprint
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** a `WILDERNESS_ENTRY_REGISTRY` entry's mask contains exactly one `#`
+- **THEN** `is_point_shape` is true, `footprint_cells` is empty, `approach_cell(gate)` is the
+  anchor cell, and the entry must author exactly one gate
 
 #### Scenario: Every entry's anchor_key resolves against ANCHOR_PLACEMENT_REGISTRY
 - **WHEN** every entry in `WILDERNESS_ENTRY_REGISTRY` is inspected
@@ -56,16 +64,23 @@ source for all consumers.
 - **THEN** no cell belongs to two entries
 
 #### Scenario: Gate and entry dataclass fields
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** the dataclasses are inspected
+- **THEN** `WildernessGate` carries exactly `return_direction`, `grid_xy` and `z_map_key`, and
+  `WildernessEntryPoint` carries exactly `anchor_key`, `shape`, `origin_xy` and `gates`; every
+  field is frozen, and `grid_xy` is this change's logical grid destination
 
 #### Scenario: Shape mask placement convention
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** a mask row and column are indexed
+- **THEN** `shape[row][column]` maps to wilderness cell
+  `(origin_xy[0] + column, origin_xy[1] + row)`; row 0 is the smallest Y and column 0 the
+  smallest X
 
 #### Scenario: Point-shape anchor opens every direction to its gate
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+<!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The body is
+     narrowed to the concealed-entry rule: only the authored direction is a gateway. -->
+- **WHEN** a point-shape entry's anchor cell is prepared or resolved
+- **THEN** only its authored `return_direction` is a gateway; every other direction at that
+  cell follows ordinary provider validity and resolves as an ordinary wilderness step
 
 #### Scenario: Footprint-anchor gates are reachable only at their approach cells
 - **WHEN** an entry has more than one `#` cell
@@ -74,8 +89,10 @@ source for all consumers.
   wilderness-side traveler takes to enter the anchor
 
 #### Scenario: Derived helper definitions
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** the module's public helpers are inspected
+- **THEN** `footprint_cells` and `anchor_cell` are properties of `WildernessEntryPoint`,
+  `approach_cell(gate)` is its method, `gate_for(return_direction)` returns the authored gate or
+  `None`, and `validate_wilderness_entries()` is the module's pure validation entry point
 
 #### Scenario: Anchor coverage is required but not exhaustive
 - **WHEN** the registry's `anchor_key` coverage is checked
@@ -85,12 +102,17 @@ source for all consumers.
   across the wilderness
 
 #### Scenario: Currently shipped registry contents
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** the shipped registry is read
+- **THEN** it holds `capital_altoria` (a 7x9 mask at origin (857,1076), 40 `#` cells, anchor
+  (860,1080), south gate `"n"` and east gate `"w"` on logical grid `(3,0)`/`(6,3)` of its own
+  map) and `village_ciaran` (one `#` cell at (1340,1220), one gate `"n"` on logical grid
+  `(0,1)`); no other entry is shipped
 
 #### Scenario: Anchor cell uses bounding-box midpoint floor division
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+- **WHEN** an entry's `#` cells span columns `min_x..max_x` and rows `min_y..max_y`
+- **THEN** `anchor_cell` is
+  `(origin_x + (min_x + max_x) // 2, origin_y + (min_y + max_y) // 2)` using Python floor
+  division, never rounding
 
 #### Scenario: Gate geometry pairs are unique registry-wide
 - **WHEN** all gates' `(approach_cell, return_direction)` pairs are collected
@@ -103,24 +125,29 @@ source for all consumers.
 `ElosernWildernessMapProvider.exit_typeclass`. A gateway step — recognized through one shared
 registry helper, true if and only if the traverser's current coordinates equal some entry's
 `approach_cell(gate)` and the exit's direction equals that gate's `return_direction` — SHALL
-move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`.
+move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`. In this change
+`grid_xy` is still the settled logical grid coordinate; `activate-metric-settlements` performs the
+meter-coordinate cutover of the authored settlement maps, so the gate's physical entrance position
+already comes from the sparse graph's metre table while the room lookup keeps the logical cell.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
-- **WHEN** a character at `the declared south approach cell` traverses the `"north"` exit
-- **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at grid
-  `(3050, 150, "capital_altoria")`
+- **WHEN** a character at `(860, 1077)` traverses the `"north"` exit
+- **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at logical
+  grid `(3, 0, "capital_altoria")` (its meter position (3050,150) arrives with
+  `activate-metric-settlements`)
 
 #### Scenario: Traversing south from the north approach cell returns through the north gate
 <!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The capital's
      second gate is now the East Gate, approached from the east and entered travelling west. -->
-- **WHEN** a character at `(63, 100)` traverses the `"west"` exit
+- **WHEN** a character at `(864, 1080)` traverses the `"west"` exit
 - **THEN** the character's new location is the `capital_altoria` East Gate `GridRoom` object at
-  grid `(6500, 3010, "capital_altoria")` (the same object instance that existed before the character
-  first entered the wilderness through it)
+  logical grid `(6, 3, "capital_altoria")` (the same object instance that existed before the
+  character first entered the wilderness through it; its meter position (6500,3010) arrives with
+  `activate-metric-settlements`)
 
 #### Scenario: The return direction at the wrong approach cell is not a gateway
-- **WHEN** a character at `the declared south approach cell` traverses `"west"`, or a character at `(63, 100)` traverses
-  `"east"`
+- **WHEN** a character at `(860, 1077)` traverses `"west"`, or a character at `(864, 1080)`
+  traverses `"east"`
 - **THEN** the traversal routes like the stock `WildernessExit` (ordinary coordinate movement to
   the provider-valid neighbor), reaching no grid room
 
@@ -170,7 +197,9 @@ move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`
 `world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
 DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL
 run it before mirroring, so malformed authored data fails at startup rather than producing an
-unwalkable or contradictory world. The shipped registry SHALL pass validation.
+unwalkable or contradictory world. The shipped registry SHALL pass validation. Validation uses the
+provider's shared walkability rule (frame, mainland, passable terrain, footprint exclusion) so an
+authored footprint or approach can never name impassable ground.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped
@@ -199,13 +228,14 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
 
 #### Scenario: Per-entry rejection conditions
 - **WHEN** `validate_wilderness_entries()` checks an entry
-- **THEN** it SHALL reject: an empty mask or one with no `#`; any `#` cell outside the
-  provider's valid rectangle; a footprint whose `#` cells are not 4-connected; a
-  `return_direction` that is not a canonical wilderness direction or is duplicated within one
-  entry; a footprint-entry gate whose approach-cell ray from `anchor_cell` crosses no footprint
-  cell or whose approach cell is not a provider-valid cell outside the footprint; a point-shape
-  entry with any number of gates other than exactly one; a `grid_xy` outside the extent of the
-  map named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`
+- **THEN** it SHALL reject: an empty mask or one with no `#`; any `#` cell outside the provider's
+  frame or on impassable terrain (sea, closed ridge, waterway); a footprint whose `#` cells are
+  not 4-connected; a `return_direction` that is not a canonical wilderness direction or is
+  duplicated within one entry; a footprint-entry gate whose approach-cell ray from `anchor_cell`
+  crosses no footprint cell or whose approach cell is not a walkable cell outside the footprint;
+  a point-shape entry with any number of gates other than exactly one, or whose anchor cell or
+  authored entry-direction neighbor is not walkable; a `grid_xy` outside the extent of the map
+  named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`
 
 #### Scenario: Mask shape and anchor cell well-formedness
 - **WHEN** an entry's mask and derived anchor cell are validated
@@ -222,7 +252,9 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
   slot, so a second gate on that room would silently displace the first at provisioning time
 
 #### Scenario: Point-shape anchors need all neighbors provider-valid
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
-
-
+<!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The authored
+     rule now covers the anchor cell and the authored entry direction's neighbor only. -->
+- **WHEN** a point-shape entry is validated
+- **THEN** its anchor cell and the neighbor its authored `return_direction` leads to SHALL be
+  provider-valid walkable terrain; the other seven neighbors follow ordinary terrain validity, so a
+  coastal cave may be authored next to water
