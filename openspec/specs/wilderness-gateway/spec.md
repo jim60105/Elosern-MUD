@@ -438,7 +438,7 @@ The wilderness traversal context SHALL remain distinct for the existing flight w
 - **WHEN** a character traverses an intra-city `CostedXYZExit` created by change 12's `sync_grid()`
   with this change's `("*", "*", "*")` wildcard prototype override
 - **THEN** `get_world_clock().tick` increases by exactly the resolved physical edge duration, and
-  no grid-traversal code reads `wilderness_move` ;  grid traversal is unaffected by the wilderness
+  no grid-traversal code reads the wilderness travel context ;  grid traversal is unaffected by the wilderness
   cost, charging the ordinary `move` cost instead
 
 #### Scenario: Amended 2026-08-01 change map-movement-clock background
@@ -448,7 +448,7 @@ The wilderness traversal context SHALL remain distinct for the existing flight w
   charge the authored non-distance connector duration or resolved outdoor edge duration through `CostedXYZExit` (the `sample-city-altoria`
   capability)
 - **AND** the distinctness claim that is this requirement's real subject is unchanged:
-  wilderness steps pay `wilderness_move`, grid steps pay `move`, and the two lineages never
+  wilderness steps pay the wilderness travel context, grid steps pay `move`, and the two lineages never
   read each other's constant; the amended scenario above asserts exactly that
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
