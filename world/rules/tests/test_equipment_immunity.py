@@ -218,7 +218,9 @@ class EquipmentImmunityStagingTests(_ImmunityScope):
         (entry,) = _entries_from_effect(str(entity.key), effects[0])
         self.assertEqual(entry.kind, "equipment_immune")
         self.assertEqual(entry.data, {"buff_key": "poisoned"})
-        self.assertIn("免疫", entry.text_template)
+        # The authored pool owns the wording; the entry must still deliver a
+        # rendered line for the neutralization.
+        self.assertTrue(entry.text_template.strip())
 
     def test_mixed_targets_gate_per_target(self):
         entity = _entity()

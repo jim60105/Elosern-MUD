@@ -269,7 +269,10 @@ class RevocationCastPathTests(EvenniaTest):
         self.assertEqual(entry.kind, "grants_revoked")
         self.assertEqual(entry.actor, str(caster.key))
         self.assertEqual(entry.target, str(target.key))
-        self.assertIn("收回", entry.text_template)
+        # The authored pool carries several interchangeable lines for the
+        # kind; the mechanic under test is that the staged line is target
+        # scoped, never which variant the deterministic selector picked.
+        self.assertIn("{target}", entry.text_template)
         self.assertEqual(target.skills.conferred_grants(), [])
         self.assertEqual(growth_rate_multiplier(target), 1.0)
         self.assertEqual(entity_active_buffs(target), {_UNRELATED_BUFF})

@@ -209,9 +209,9 @@ def _run_single_trial(
     rejected_count = 0
     original_resolve = ActionResolver.resolve
 
-    def observing_resolve(request):
+    def observing_resolve(request, *, narration_scope=""):
         nonlocal rejected_count
-        res = original_resolve(request)
+        res = original_resolve(request, narration_scope=narration_scope)
         if res.outcome != "success":
             rejected_count += 1
         return res

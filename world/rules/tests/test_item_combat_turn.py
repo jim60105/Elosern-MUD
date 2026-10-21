@@ -719,7 +719,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 journal=sentinel,
             )
 
-        def action_resolver(request):
+        def action_resolver(request, *, narration_scope=""):
             resolver_calls.append(request)
             self.defender.traits.hp.current = 0
             return SimpleNamespace(

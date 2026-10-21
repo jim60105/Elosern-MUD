@@ -96,8 +96,16 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
         clock = WorldClock()
         with patch(
             "world.rules.cast_settlement.read_world_clock", return_value=clock
-        ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
-            self.call(CmdCast(), _MIRROR_VEIL.key, f"{self.char1.key} 改變了")
+        ), patch(
+            "world.rules.cast_settlement.get_world_clock", return_value=clock
+        ), patch(
+            "commands.action.render_plain_text", return_value="RENDERED"
+        ) as rendered:
+            output = self.call(CmdCast(), _MIRROR_VEIL.key)
+        # The command renders the committed event log (the authored narration
+        # pool owns the wording) before any notification lines.
+        rendered.assert_called_once()
+        self.assertTrue(output.startswith("RENDERED"))
         # The pipeline's default cast cost lands on the clock for any
         # registered skill path.
         self.assertEqual(clock.tick, DEFAULT_CAST_SECONDS)
@@ -149,8 +157,14 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             {self.char1.key: self.char1, self.char2.key: self.char2},
         )
         self.char1.ndb.action_context = BattlefieldActionContext(field)
-        with patch("world.rules.disengage.roll_d100", return_value=100):
-            self.call(CmdCast(), "flee", "Char 嘗試脫離戰鬥。")
+        with patch(
+            "world.rules.disengage.roll_d100", return_value=100
+        ), patch(
+            "commands.action.render_plain_text", return_value="RENDERED"
+        ) as rendered:
+            output = self.call(CmdCast(), "flee")
+        rendered.assert_called_once()
+        self.assertTrue(output.startswith("RENDERED"))
         self.assertIn(self.char1.key, field.fled)
 
 

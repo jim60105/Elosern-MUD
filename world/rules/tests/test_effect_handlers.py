@@ -545,4 +545,6 @@ class CleanseHandlerTests(EvenniaTest):
         entry = log.entries[0]
         self.assertEqual(entry.kind, "buffs_cleansed")
         self.assertEqual(entry.data, {"count": 2})
-        self.assertEqual(entry.text_template, "{actor} 淨化了 {target} 的異常狀態。")
+        # The authored narration pool owns the wording; the mechanic under
+        # test is the reported count and that the line stays target scoped.
+        self.assertIn("{target}", entry.text_template)

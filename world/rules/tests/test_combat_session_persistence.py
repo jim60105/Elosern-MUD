@@ -466,7 +466,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         before = self.monster.traits.hp.current
 
-        def resolve(request):
+        def resolve(request, *, narration_scope=""):
             if request.actor.pk == self.player.pk:
                 self.monster.traits.hp.current = before - 1
                 return SimpleNamespace(outcome="success", event_log=None, notifications=())
