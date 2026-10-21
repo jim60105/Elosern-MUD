@@ -1,12 +1,14 @@
 """Pure tests for the authored narration catalog engine.
 
-No database, no Evennia runtime, no shipped content: every case uses
-file-local synthetic rows and bands, so the checks establish the engine's
-contract rather than echoing registry data.
+No database and no Evennia runtime. Engine cases use file-local synthetic rows
+and bands, so the checks establish the engine's contract rather than echoing
+registry data; the authored-family cases read the shipped data modules only to
+establish row shape, distinctness and bound adherence, never key content.
 """
 
 from __future__ import annotations
 
+import itertools
 import unittest
 
 from tools.spec_traceability import covers_requirement
@@ -31,8 +33,13 @@ from world.skills.narration import (
     family_key,
     slot_count,
 )
-from world.skills.narration.select import choose_line, narration_seed
+from world.skills.narration.data_divine_mystery import ROWS as DIVINE_MYSTERY_ROWS
+from world.skills.narration.data_enhancement import ROWS as ENHANCEMENT_ROWS
+from world.skills.narration.data_holy_rite import ROWS as HOLY_RITE_ROWS
+from world.skills.narration.data_martial import ROWS as MARTIAL_ROWS
+from world.skills.narration.select import action_line, choose_line, narration_seed
 from world.skills.narration.validation import build_catalog, validate_catalog
+from world.skills.narration.vocab import contains_ascii_digit
 from world.skills.registry import (
     SkillCategory,
     SkillDef,
@@ -40,6 +47,14 @@ from world.skills.registry import (
     TargetSpec,
 )
 from world.lore.elements import Element
+
+#: One authored module and the family key its rows resolve through.
+AUTHORED_FAMILIES = (
+    (MARTIAL_ROWS, "martial_arts"),
+    (HOLY_RITE_ROWS, "holy_rite"),
+    (DIVINE_MYSTERY_ROWS, "divine_mystery"),
+    (ENHANCEMENT_ROWS, "enhancement"),
+)
 
 
 def _skill(key: str, *, category: SkillCategory, element: Element | None = None,
@@ -93,15 +108,12 @@ class PoolInventoryTests(unittest.TestCase):
                 self.assertIn(kind, COMPACT_POOLS)
                 self.assertFalse(any(ch.isdigit() for ch in COMPACT_POOLS[kind]))
 
+class PendingFamilyDeclarationTests(unittest.TestCase):
     def test_pending_families_is_the_frozen_declared_set(self):
         self.assertEqual(
             PENDING_FAMILIES,
             frozenset(
                 {
-                    "martial_arts",
-                    "holy_rite",
-                    "divine_mystery",
-                    "enhancement",
                     "elemental_magic",
                     "sexual_act",
                 }
@@ -198,6 +210,23 @@ class LookupChainTests(unittest.TestCase):
         self.assertTrue(lines)
         self.assertTrue(all(slot_count(line) <= 1 for line in lines))
 
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
+    def test_a_row_kind_override_precedes_the_shared_pool(self):
+        row = _row("t_override", lines=("這道傷被穩穩記下了。",))
+        line = entry_line(
+            "damage",
+            {},
+            skill_key="t_override",
+            target_key="t",
+            actor="a",
+            target="t",
+            catalog={"t_override": row},
+            families={},
+        )
+        self.assertEqual(line, "這道傷被穩穩記下了。")
+
 
 class FamilyKeyTests(unittest.TestCase):
     def test_elemental_skills_split_by_element_and_shape(self):
@@ -240,6 +269,70 @@ class FamilyKeyTests(unittest.TestCase):
         self.assertIn(family_key(act), FAMILY_ROWS)
 
 
+class AuthoredFamilyRowTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+    )
+    def test_two_skills_of_one_family_select_different_openings(self):
+        for rows, family in AUTHORED_FAMILIES:
+            for first, second in itertools.combinations(rows, 2):
+                for scope in ("scope-one", "scope-two"):
+                    with self.subTest(
+                        family=family, first=first.key, second=second.key,
+                        scope=scope,
+                    ):
+                        self.assertNotEqual(
+                            action_line(
+                                first.key,
+                                family,
+                                scope=scope,
+                                target_key="t_target",
+                                actor="A",
+                                catalog=NARRATION_CATALOG,
+                                families={},
+                            ),
+                            action_line(
+                                second.key,
+                                family,
+                                scope=scope,
+                                target_key="t_target",
+                                actor="A",
+                                catalog=NARRATION_CATALOG,
+                                families={},
+                            ),
+                        )
+
+    def test_no_two_rows_in_one_family_share_a_line(self):
+        for rows, family in AUTHORED_FAMILIES:
+            with self.subTest(family=family):
+                lines = [line for row in rows for line in row.action]
+                self.assertEqual(len(lines), len(set(lines)))
+
+    @covers_requirement(
+        "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
+    )
+    def test_authored_rows_keep_the_shared_line_bounds(self):
+        for row in NARRATION_CATALOG.values():
+            self.assertTrue(row.action, row.key)
+            self.assertLessEqual(len(row.action), 2, row.key)
+            for line in row.action:
+                with self.subTest(key=row.key, line=line):
+                    self.assertEqual(slot_count(line), 1)
+                    self.assertFalse(contains_ascii_digit(line))
+                    self.assertTrue(
+                        composed_fits(line, "{target} 吃了這一擊。")
+                    )
+
+    @covers_requirement(
+        "action-narration::mechanical-entries-narrate-qualitatively-instead-of-listing-state-changes"
+    )
+    def test_a_kind_override_names_a_known_entry_kind(self):
+        for row in NARRATION_CATALOG.values():
+            for kind in row.kind_lines:
+                with self.subTest(key=row.key, kind=kind):
+                    self.assertIn(kind, NARRATION_KINDS)
+
+
 class CatalogValidationTests(unittest.TestCase):
     def _validate(self, **kwargs):
         defaults = dict(
@@ -280,7 +373,7 @@ class CatalogValidationTests(unittest.TestCase):
             )
 
     def test_a_pending_family_may_omit_its_rows(self):
-        skill = _skill("t_needed", category=SkillCategory.MARTIAL_ARTS)
+        skill = _skill("t_needed", category=SkillCategory.ELEMENTAL_MAGIC)
         self._validate(catalog={}, shipped={"t_needed": skill})
 
     @covers_requirement(
