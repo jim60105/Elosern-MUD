@@ -56,6 +56,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
     @covers_requirement(
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_the_four_non_elemental_families_have_exact_row_coverage(self):
         expected: set[str] = set()
@@ -66,7 +67,8 @@ class NarrationCoverageContractTests(unittest.TestCase):
         self.assertEqual(set(NARRATION_CATALOG), expected)
 
     @covers_requirement(
-        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
+        "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_every_authored_row_opens_its_own_skill(self):
         for key, row in NARRATION_CATALOG.items():
@@ -84,7 +86,8 @@ class NarrationCoverageContractTests(unittest.TestCase):
                 self.assertNotIn(line, FAMILY_ROWS[family].action)
 
     @covers_requirement(
-        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_a_missing_row_in_a_covered_family_stops_the_catalog_loading(self):
         for category in NON_ELEMENTAL_FAMILIES:
@@ -102,6 +105,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
     @covers_requirement(
         "action-narration::authored-lines-carry-a-declared-participant-slot-budget",
         "action-narration::narration-prose-contains-no-numeric-magnitude",
+        "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_a_family_row_that_breaks_a_shared_bound_fails_the_same_error(self):
         key = sorted(_active_keys(SkillCategory.MARTIAL_ARTS))[0]

@@ -271,7 +271,8 @@ class FamilyKeyTests(unittest.TestCase):
 
 class AuthoredFamilyRowTests(unittest.TestCase):
     @covers_requirement(
-        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
+        "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_two_skills_of_one_family_select_different_openings(self):
         for rows, family in AUTHORED_FAMILIES:
