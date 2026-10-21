@@ -25,6 +25,7 @@ from world.rules.time_skip import (
     DurationParseError,
     SkipRefused,
     SleepRefused,
+    accepted_wait_handoff_offer,
     advance_wait,
     begin_sleep,
     book_member_practice,
@@ -46,6 +47,12 @@ def _safe_to_skip(caller) -> bool:
         return True
     caller.msg(rejection_message(reason))
     return False
+
+
+def _with_handoff_offer(caller, message: str) -> str:
+    """Append the post-commit sleep handoff offer, when one now exists."""
+    offer = accepted_wait_handoff_offer(caller)
+    return message if offer is None else f"{message}\n{offer}"
 
 
 # ``rest <duration> [practice <skill>]``: a duration token plus an optional
@@ -124,7 +131,12 @@ class CmdRest(Command):
         except SkipRefused as error:
             self.caller.msg(rejection_message(error.reason))
             return
-        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
+        self.caller.msg(
+            _with_handoff_offer(
+                self.caller,
+                _render_skip_summary(result.elapsed_seconds, result.events),
+            )
+        )
         # The summary already carries each committed unlock line; record the
         # session unread marks from the same committed events.
         deliver_unlocks(
@@ -157,7 +169,12 @@ class CmdSleep(Command):
             return
         result = outcome.result
         assert result is not None
-        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
+        self.caller.msg(
+            _with_handoff_offer(
+                self.caller,
+                _render_skip_summary(result.elapsed_seconds, result.events),
+            )
+        )
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
@@ -203,7 +220,12 @@ class CmdWaitUntil(Command):
         except SkipRefused as error:
             self.caller.msg(rejection_message(error.reason))
             return
-        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
+        self.caller.msg(
+            _with_handoff_offer(
+                self.caller,
+                _render_skip_summary(result.elapsed_seconds, result.events),
+            )
+        )
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )

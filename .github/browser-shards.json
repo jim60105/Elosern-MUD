@@ -69,7 +69,9 @@
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_disabled_items_defend_send_no_packet",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_prompt_confirm_sends_one_exit_confirm",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
-        "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades"
+        "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades",
+        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_returns_control_and_survives_reload",
+        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_transfers_to_an_awake_companion"
       ],
       "files_b": [
         "web.tests.browser.test_browser_local_map_rendering.LocalMapBrowserTest.test_gate_room_renders_its_own_approach_cell_and_no_footprint",

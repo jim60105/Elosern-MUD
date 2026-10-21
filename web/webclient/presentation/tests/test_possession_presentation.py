@@ -29,6 +29,7 @@ from web.webclient.actions.exploration_actions import (
     _engage_adapter,
     _possess_adapter,
     _possess_release_adapter,
+    _wait_adapter,
     _talk_freeform_adapter,
     _talk_open_adapter,
     _talk_scripted_adapter,
@@ -61,6 +62,7 @@ from web.webclient.presentation.status import status_presenter
 from world.rules.combat_session import engage
 from world.quests.catalog import register_catalog
 from world.rules.clock import get_world_clock
+from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
 from world.rules.party import join_party
 from world.rules.possession import (
     POSSESSED_REFUSAL_MESSAGES,
@@ -69,9 +71,12 @@ from world.rules.possession import (
     REASON_NOT_CO_LOCATED,
     REASON_POSSESSED_ENGAGE,
     REASON_POSSESSED_TALK,
+    REASON_STALE_HANDOFF,
     enter_possession,
     release_possession,
+    sleep_handoff_candidates,
 )
+from world.rules.time_skip import enter_sleep
 
 
 class PossessionPresentationTests(EvenniaTest):
@@ -688,6 +693,203 @@ class PossessionPresentationTests(EvenniaTest):
         with self.assertRaises(PossessionGateError) as ctx:
             enter_possession(self.player, self.npc)
         self.assertEqual(ctx.exception.reason, REASON_NOT_CO_LOCATED)
+
+    def _sleeping_possession_with_candidate(self):
+        """Possess ``self.npc``, sleep it, and bind one awake candidate."""
+        candidate = create_object(LLMNPC, key="接手同伴", location=self.room1)
+        candidate.race = "human"
+        candidate.apply_race_baseline()
+        join_party(candidate, self.player)
+        write_fatigue_state(self.npc, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(candidate, 360000, SleepPosture.AWAKE)
+        enter_possession(self.player, self.npc)
+        entry = enter_sleep(self.npc)
+        self.assertTrue(entry.handoff_offered)
+        return candidate, entry
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    def test_sleep_handoff_adapter_rejects_a_stale_selection_with_current_choices(self):
+        """A candidate that left before confirmation changes no control or time."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        before_tick = int(get_world_clock().tick)
+        candidate.location = self.room2
+        result = _possess_adapter(
+            self.npc, {"npc_id": int(candidate.pk)}, session=None
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], REASON_STALE_HANDOFF)
+        self.assertNotIn("data", result)
+        self.assertEqual(int(get_world_clock().tick), before_tick)
+        self.assertEqual(
+            self.player.db.possession["npc_dbid"], int(self.npc.pk)
+        )
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    def test_sleep_handoff_stale_selection_is_a_protocol_valid_refusal(self):
+        """The dispatcher emits the stable refusal, never an internal error."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        candidate.location = self.room2
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": self.coordinator.epoch,
+            "request_id": "req-handoff-stale-choice",
+            "base_revision": self.coordinator.revision,
+            "action_id": "explore.possess",
+            "payload": {"npc_id": int(candidate.pk)},
+        }
+        handle_ui_action(
+            self.session,
+            self.npc,
+            envelope,
+            self.action_registry,
+            self.registry,
+        )
+        result = next(
+            kw["ui_action_result"][0][0]
+            for _args, kw in reversed(self.sent_messages)
+            if "ui_action_result" in kw
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], REASON_STALE_HANDOFF)
+        self.assertNotIn("data", result)
+        self.assertEqual(
+            self.player.db.possession["npc_dbid"], int(self.npc.pk)
+        )
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    def test_sleep_handoff_adapter_commits_and_repoints_the_epoch(self):
+        """A lawful candidate moves control once and the old epoch is refused."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        before_tick = int(get_world_clock().tick)
+        epoch_before = self.coordinator.epoch
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": self.coordinator.epoch,
+            "request_id": "req-handoff-1",
+            "base_revision": self.coordinator.revision,
+            "action_id": "explore.possess",
+            "payload": {"npc_id": int(candidate.pk)},
+        }
+        handle_ui_action(
+            self.session,
+            self.npc,
+            envelope,
+            self.action_registry,
+            self.registry,
+        )
+        result = next(
+            kw["ui_action_result"][0][0]
+            for _args, kw in reversed(self.sent_messages)
+            if "ui_action_result" in kw
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "handoff_pending")
+        self.assertIn("正在交接控制權", result["message"])
+        self.clock.advance(0.1)
+        self.assertEqual(self.session.puppet, candidate)
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(candidate.pk))
+        self.assertEqual(self.session.ndb.elosern_actor_id, str(candidate.pk))
+        self.assertNotEqual(self.coordinator.epoch, epoch_before)
+        self.assertIs(read_fatigue_state(self.npc).posture, SleepPosture.VOLUNTARY)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertEqual(int(get_world_clock().tick), before_tick)
+
+        # The retired epoch can no longer act, and control stays put.
+        stale_envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": epoch_before,
+            "request_id": "req-handoff-stale",
+            "base_revision": self.coordinator.revision,
+            "action_id": "explore.possess",
+            "payload": {"npc_id": int(self.npc.pk)},
+        }
+        handle_ui_action(
+            self.session,
+            candidate,
+            stale_envelope,
+            self.action_registry,
+            self.registry,
+        )
+        self.clock.advance(0.1)
+        stale = next(
+            kw["ui_action_result"][0][0]
+            for _args, kw in reversed(self.sent_messages)
+            if "ui_action_result" in kw
+        )
+        self.assertEqual(stale["outcome"], "stale")
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(candidate.pk))
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    def test_sleep_handoff_admission_never_claims_completion_on_failure(self):
+        """A candidate that turns stale before execution gets a refusal, not success."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        admission = _possess_adapter(
+            self.npc, {"npc_id": int(candidate.pk)}, session=self.session
+        )
+        self.assertEqual(admission["outcome"], "success")
+        self.assertEqual(admission["code"], "handoff_pending")
+        candidate.location = self.room2
+        self.clock.advance(0.1)
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(self.npc.pk))
+        self.assertEqual(self.session.puppet, self.npc)
+        messages = []
+        for args, kw in self.sent_messages:
+            if kw.get("text") and kw["text"][0]:
+                messages.append(str(kw["text"][0][0]))
+            elif args:
+                messages.append(str(args[0]))
+        self.assertTrue(
+            any("交接選項已經失效" in line for line in messages), messages
+        )
+
+    @covers_requirement(
+        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    def test_wait_adapter_recovers_a_sleeping_controlled_body(self):
+        """Recovery waiting stays available without any handoff selection."""
+        self._sleeping_possession_with_candidate()
+        reserve_before = read_fatigue_state(self.npc).reserve_units
+        before_tick = int(get_world_clock().tick)
+        result = _wait_adapter(self.npc, {"seconds": 600})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(int(get_world_clock().tick) - before_tick, 600)
+        self.assertEqual(
+            read_fatigue_state(self.npc).reserve_units,
+            min(reserve_before + 600 * 12, 360000),
+        )
+        self.assertIs(
+            read_fatigue_state(self.npc).posture, SleepPosture.VOLUNTARY
+        )
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(self.npc.pk))
+
+        # An explicit continuation wakes the body only after the committed sleep.
+        wake = _wait_adapter(self.npc, {"sleep": True})
+        self.assertEqual(wake["outcome"], "success")
+        self.assertIs(read_fatigue_state(self.npc).posture, SleepPosture.AWAKE)
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(self.npc.pk))
 
 
     @covers_requirement(

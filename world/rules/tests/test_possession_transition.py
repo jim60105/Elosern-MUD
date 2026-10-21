@@ -26,22 +26,28 @@ from world.rules.party import (
     leave_party,
     party_ids,
 )
+from world.rules.clock import get_world_clock
+from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
 from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
     REASON_NOT_CO_LOCATED,
     REASON_RELEASE_REFUSED,
     REASON_TRANSFER_REFUSED,
+    SLEEP_HANDOFF_POSSESS,
     UNPOSSESS_REFUSED_RETURN_MESSAGE,
     PossessionGateError,
     PossessionWriteError,
+    confirm_sleep_handoff,
     current_possession,
     enter_possession,
     release_for_party_change,
     release_on_disconnect,
     release_possession,
     restore_party_control,
+    sleep_handoff_candidates,
     snapshot_party_control,
 )
+from world.rules.time_skip import enter_sleep
 
 
 class BodyRejectingRoom(Room):
@@ -1419,3 +1425,221 @@ class PossessionTransitionCommandTests(EvenniaTest):
         # release_possession should repair player mirror without raising
         release_possession(self.char1, reason="handback")
         self.assertIsNone(self.char1.db.possession)
+
+
+class SleepHandoffTransitionTests(EvenniaTest):
+    """Companion-to-companion handoff completes as one compensated transition."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.npc = create_object(LLMNPC, key="沉睡同伴", location=self.room1)
+        join_party(self.npc, self.char1)
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        write_fatigue_state(self.npc, 360000, SleepPosture.AWAKE)
+        self.target = create_object(NPC, key="接手同伴", location=self.room1)
+        self.target.race = "human"
+        self.target.apply_race_baseline()
+        join_party(self.target, self.char1)
+        write_fatigue_state(self.target, 360000, SleepPosture.AWAKE)
+        enter_possession(self.char1, self.npc)
+        self.entry = enter_sleep(self.npc)
+        self.transition_id = sleep_handoff_candidates(
+            self.account, self.char1, self.npc
+        ).transition_id
+
+    def _confirm(self):
+        return confirm_sleep_handoff(
+            self.account,
+            self.char1,
+            self.npc,
+            int(self.target.pk),
+            transition_id=self.transition_id,
+            session=self.session,
+        )
+
+    def _assert_old_control_restored(self, tick_before):
+        self.assertEqual(int(get_world_clock().tick), tick_before)
+        self.assertEqual(current_possession(self.char1)["npc_dbid"], int(self.npc.pk))
+        self.assertEqual(int(self.npc.db.possessed_by), int(self.char1.pk))
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertTrue(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        self.assertIs(read_fatigue_state(self.npc).posture, SleepPosture.VOLUNTARY)
+
+    def _assert_target_untouched(self):
+        self.assertIsNone(self.target.db.possessed_by)
+        self.assertIs(self.target.location, self.room1)
+        self.assertIn(self.target, self.room1.contents)
+        self.assertFalse(self.target.cmdset.has(PossessedCharacterCmdSet))
+        self.assertNotIn(
+            f"id({self.account.id})", self.target.locks.get("puppet") or ""
+        )
+        self.assertFalse(self.target.attributes.has("prelogout_location"))
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_verified_companion_to_companion_handoff_keeps_one_mirrored_binding(self):
+        tick_before = int(get_world_clock().tick)
+        candidate = self._confirm()
+        self.assertEqual(candidate.dbid, int(self.target.pk))
+        self.assertEqual(candidate.kind, SLEEP_HANDOFF_POSSESS)
+        self.assertEqual(current_possession(self.char1)["npc_dbid"], int(self.target.pk))
+        self.assertEqual(int(self.target.db.possessed_by), int(self.char1.pk))
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertEqual(self.session.puppet, self.target)
+        self.assertTrue(self.target.cmdset.has(PossessedCharacterCmdSet))
+        self.assertFalse(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIn(f"id({self.account.id})", self.target.locks.get("puppet") or "")
+        self.assertNotIn(
+            f"id({self.account.id})", self.npc.locks.get("puppet") or ""
+        )
+        self.assertIs(read_fatigue_state(self.npc).posture, SleepPosture.VOLUNTARY)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(int(get_world_clock().tick), tick_before)
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_failure_after_the_first_handback_restores_the_old_control(self):
+        tick_before = int(get_world_clock().tick)
+        with patch(
+            "world.rules.possession._enter_possession",
+            side_effect=PossessionWriteError("write_failed", "synthetic post-release failure"),
+        ):
+            with self.assertRaises(PossessionWriteError):
+                self._confirm()
+        self._assert_old_control_restored(tick_before)
+        self._assert_target_untouched()
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_failure_after_the_target_puppet_restores_every_surface(self):
+        tick_before = int(get_world_clock().tick)
+        real_synchronize = __import__(
+            "web.webclient.presentation.ingress", fromlist=["synchronize_session"]
+        ).synchronize_session
+
+        def _fail_on_target(session, entity):
+            if entity is self.target:
+                raise RuntimeError("synthetic target synchronization failure")
+            return real_synchronize(session, entity)
+
+        with patch(
+            "web.webclient.presentation.ingress.synchronize_session",
+            side_effect=_fail_on_target,
+        ):
+            with self.assertRaises(PossessionWriteError):
+                self._confirm()
+        self._assert_old_control_restored(tick_before)
+        self._assert_target_untouched()
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_outer_failure_after_a_successful_return_restores_the_sleeper(self):
+        """A release that succeeded inside a rolled-back transaction is undone."""
+        import world.rules.possession as possession_module
+
+        tick_before = int(get_world_clock().tick)
+        logout_before = self.npc.attributes.get("prelogout_location")
+        real_return = possession_module._confirm_handoff_return
+
+        def _release_then_fail(commander, current_body):
+            real_return(commander, current_body)
+            raise RuntimeError("synthetic outer failure after release")
+
+        with patch(
+            "world.rules.possession._confirm_handoff_return",
+            side_effect=_release_then_fail,
+        ):
+            with self.assertRaises(PossessionWriteError):
+                confirm_sleep_handoff(
+                    self.account,
+                    self.char1,
+                    self.npc,
+                    int(self.char1.pk),
+                    transition_id=self.transition_id,
+                    session=self.session,
+                )
+        self._assert_old_control_restored(tick_before)
+        self.assertEqual(self.session.puppet, self.npc)
+        # The pre-existing puppet bookkeeping is restored, never a new residual.
+        self.assertEqual(
+            self.npc.attributes.get("prelogout_location"), logout_before
+        )
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_outer_failure_after_an_owner_transfer_restores_the_owner(self):
+        """An owner-origin entry that succeeded before rollback is undone."""
+        import world.rules.possession as possession_module
+
+        release_possession(self.char1, npc=self.npc, reason="handback")
+        entry = enter_sleep(self.char1)
+        self.assertTrue(entry.handoff_offered)
+        tick_before = int(get_world_clock().tick)
+        transition = sleep_handoff_candidates(
+            self.account, self.char1, self.char1
+        ).transition_id
+        real_enter = possession_module._enter_possession
+
+        def _enter_then_fail(commander, npc, *, contextual_body=None):
+            real_enter(commander, npc, contextual_body=contextual_body)
+            raise RuntimeError("synthetic outer failure after target puppet")
+
+        with patch(
+            "world.rules.possession._enter_possession", side_effect=_enter_then_fail
+        ):
+            with self.assertRaises(PossessionWriteError):
+                confirm_sleep_handoff(
+                    self.account,
+                    self.char1,
+                    self.char1,
+                    int(self.target.pk),
+                    transition_id=transition,
+                    session=self.session,
+                )
+        self.assertEqual(int(get_world_clock().tick), tick_before)
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIsNone(current_possession(self.char1))
+        self.assertIsNone(self.target.db.possessed_by)
+        self.assertFalse(self.target.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIs(self.target.location, self.room1)
+        self.assertIs(read_fatigue_state(self.char1).posture, SleepPosture.VOLUNTARY)
+
+    @covers_requirement(
+        "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
+    def test_disconnect_releases_a_sleeping_possession_through_the_existing_hook(self):
+        self.account.unpuppet_object(self.session)
+        release_on_disconnect(self.account)
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertIs(read_fatigue_state(self.npc).posture, SleepPosture.VOLUNTARY)

@@ -5,6 +5,7 @@ Pins the single-writer, mirrored, transactional possession binding
 """
 
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -24,6 +25,9 @@ from world.rules.party import (
     leave_party,
     party_ids,
 )
+from world.rules.clock import get_world_clock
+from world.rules.buffs import apply_buff
+from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
 from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
     REASON_ALREADY_POSSESSING,
@@ -31,13 +35,27 @@ from world.rules.possession import (
     REASON_IN_COMBAT,
     REASON_NOT_BOUND,
     REASON_NOT_CO_LOCATED,
+    REASON_NOT_POSSESSING,
+    REASON_NOT_SLEEPING,
+    REASON_SESSION_MISMATCH,
+    REASON_STALE_HANDOFF,
+    SLEEP_HANDOFF_POSSESS,
+    SLEEP_HANDOFF_RETURN,
     PossessionGateError,
     PossessionWriteError,
+    confirm_sleep_handoff,
     current_possession,
     enter_possession,
     release_for_party_change,
     release_on_disconnect,
     release_possession,
+    sleep_handoff_candidates,
+)
+from world.rules.time_skip import (
+    accepted_wait_handoff_offer,
+    advance_wait,
+    continue_sleep,
+    enter_sleep,
 )
 
 
@@ -382,3 +400,333 @@ class PossessionAutonomySilenceTests(EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "possessed")
         self.assertEqual(result["message"], "他現在無法回應你。")
+
+
+class SleepHandoffTests(EvenniaTest):
+    """Contextual sleep-driven handoff: candidates, confirmation, staleness."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.player.save()
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+
+    def _companion(self, key="同伴"):
+        npc = create_object(NPC, key=key, location=self.room1)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        join_party(npc, self.player)
+        write_fatigue_state(npc, 360000, SleepPosture.AWAKE)
+        return npc
+
+    def _sleeping_possession(self):
+        """Possess a companion and commit its voluntary sleep at zero time."""
+        sleeper = self._companion("沉睡者")
+        enter_possession(self.player, sleeper)
+        before = int(get_world_clock().tick)
+        entry = enter_sleep(sleeper)
+        self.assertEqual(int(get_world_clock().tick), before)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.VOLUNTARY)
+        return sleeper, entry
+
+    def _transition_id(self, sleeper):
+        return sleep_handoff_candidates(
+            self.account, self.player, sleeper
+        ).transition_id
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_sleep_entry_offers_the_awake_owner_as_a_return_choice(self):
+        sleeper, entry = self._sleeping_possession()
+        self.assertTrue(entry.handoff_offered)
+        self.assertEqual(
+            [candidate.kind for candidate in entry.handoff_candidates],
+            [SLEEP_HANDOFF_RETURN],
+        )
+        owner = entry.handoff_candidates[0]
+        self.assertEqual(owner.dbid, int(self.player.pk))
+        self.assertEqual(owner.reserve_percent, 100)
+        # Entry alone never takes control away from the selected body.
+        self.assertEqual(current_possession(self.player)["npc_dbid"], int(sleeper.pk))
+        options = sleep_handoff_candidates(
+            self.account, self.player, sleeper, session=self.session
+        )
+        self.assertTrue(options.available)
+        self.assertEqual(options.transition_id, self._transition_id(sleeper))
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_unselected_sleep_never_steals_control(self):
+        sleeper, _entry = self._sleeping_possession()
+        awake = self._companion("清醒者")
+        # An explicitly selected, uncontrolled member sleeps without an offer.
+        unselected_entry = enter_sleep(self.player, member_id=int(awake.pk))
+        self.assertFalse(unselected_entry.handoff_offered)
+        self.assertEqual(unselected_entry.handoff_candidates, ())
+        self.assertIs(read_fatigue_state(awake).posture, SleepPosture.VOLUNTARY)
+        self.assertEqual(current_possession(self.player)["npc_dbid"], int(sleeper.pk))
+        self.assertEqual(self.session.puppet, sleeper)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_owner_wake_never_steals_control(self):
+        witness = self._companion("見證者")
+        self.assertIsNone(current_possession(self.player))
+        owner_entry = enter_sleep(self.player)
+        self.assertTrue(owner_entry.handoff_offered)
+        self.assertEqual(
+            [candidate.dbid for candidate in owner_entry.handoff_candidates],
+            [int(witness.pk)],
+        )
+        continue_sleep(self.player, owner_entry)
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
+        self.assertIsNone(current_possession(self.player))
+        self.assertEqual(self.session.puppet, self.player)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
+    def test_forged_account_and_foreign_session_are_refused(self):
+        sleeper, _entry = self._sleeping_possession()
+        forged = SimpleNamespace(pk=987654)
+        options = sleep_handoff_candidates(forged, self.player, sleeper)
+        self.assertFalse(options.available)
+        self.assertEqual(options.reason, REASON_SESSION_MISMATCH)
+        foreign_session = SimpleNamespace(
+            logged_in=True, puppet=self.player, account=self.account
+        )
+        options = sleep_handoff_candidates(
+            self.account, self.player, sleeper, session=foreign_session
+        )
+        self.assertFalse(options.available)
+        self.assertEqual(options.reason, REASON_SESSION_MISMATCH)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
+    def test_stale_or_ineligible_candidates_are_rejected_with_current_choices(self):
+        sleeper, _entry = self._sleeping_possession()
+        candidate = self._companion("候選者")
+        transition_id = self._transition_id(sleeper)
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertIn(
+            (int(candidate.pk), SLEEP_HANDOFF_POSSESS),
+            [(item.dbid, item.kind) for item in options.candidates],
+        )
+
+        candidate.location = self.room2
+        with self.assertRaises(PossessionGateError) as ctx:
+            confirm_sleep_handoff(
+                self.account,
+                self.player,
+                sleeper,
+                int(candidate.pk),
+                transition_id=transition_id,
+            )
+        self.assertEqual(ctx.exception.reason, REASON_STALE_HANDOFF)
+        self.assertEqual(
+            [item.dbid for item in ctx.exception.candidates], [int(self.player.pk)]
+        )
+        self.assertEqual(current_possession(self.player)["npc_dbid"], int(sleeper.pk))
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
+    def test_wake_and_resleep_change_the_transition_identity(self):
+        sleeper, entry = self._sleeping_possession()
+        first = self._transition_id(sleeper)
+        continue_sleep(sleeper, entry)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.AWAKE)
+        enter_sleep(sleeper)
+        self.assertNotEqual(first, self._transition_id(sleeper))
+        with self.assertRaises(PossessionGateError) as ctx:
+            confirm_sleep_handoff(
+                self.account,
+                self.player,
+                sleeper,
+                int(self.player.pk),
+                transition_id=first,
+            )
+        self.assertEqual(ctx.exception.reason, REASON_STALE_HANDOFF)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_return_confirmation_hands_control_back_to_the_owner(self):
+        sleeper, _entry = self._sleeping_possession()
+        confirm_sleep_handoff(
+            self.account,
+            self.player,
+            sleeper,
+            int(self.player.pk),
+            transition_id=self._transition_id(sleeper),
+            session=self.session,
+        )
+        self.assertIsNone(current_possession(self.player))
+        self.assertIsNone(sleeper.db.possessed_by)
+        self.assertEqual(self.session.puppet, self.player)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.VOLUNTARY)
+        self.assertEqual(sleeper.location, self.room1)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder",
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
+    def test_ordinary_combat_gate_stays_while_contextual_handoff_is_lawful(self):
+        sleeper, _entry = self._sleeping_possession()
+        candidate = self._companion("接手者")
+        before = int(get_world_clock().tick)
+        with patch("world.rules.combat_session.is_in_active_session", return_value=True):
+            with self.assertRaises(PossessionGateError) as ctx:
+                enter_possession(self.player, candidate)
+            self.assertEqual(ctx.exception.reason, REASON_IN_COMBAT)
+            confirm_sleep_handoff(
+                self.account,
+                self.player,
+                sleeper,
+                int(candidate.pk),
+                transition_id=self._transition_id(sleeper),
+                session=self.session,
+            )
+        self.assertEqual(current_possession(self.player)["npc_dbid"], int(candidate.pk))
+        self.assertEqual(int(get_world_clock().tick), before)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.VOLUNTARY)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_sleeping_owner_can_hand_control_to_an_awake_companion(self):
+        awake = self._companion("清醒同伴")
+        entry = enter_sleep(self.player)
+        self.assertTrue(entry.handoff_offered)
+        self.assertEqual(
+            [(item.dbid, item.kind) for item in entry.handoff_candidates],
+            [(int(awake.pk), SLEEP_HANDOFF_POSSESS)],
+        )
+        confirm_sleep_handoff(
+            self.account,
+            self.player,
+            self.player,
+            int(awake.pk),
+            transition_id=self._transition_id(self.player),
+        )
+        self.assertEqual(current_possession(self.player)["npc_dbid"], int(awake.pk))
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY)
+        options = sleep_handoff_candidates(self.account, self.player, awake)
+        self.assertFalse(options.available)
+        self.assertEqual(options.reason, REASON_NOT_SLEEPING)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    def test_awake_controlled_body_reports_not_sleeping(self):
+        sleeper = self._companion("清醒的同伴")
+        enter_possession(self.player, sleeper)
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertFalse(options.available)
+        self.assertEqual(options.reason, REASON_NOT_SLEEPING)
+        self.assertIsNone(options.transition_id)
+        # Not controlling the body at all is its own stable reason.
+        other = self._companion("另一位同伴")
+        options = sleep_handoff_candidates(self.account, self.player, other)
+        self.assertEqual(options.reason, REASON_NOT_POSSESSING)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
+    def test_forced_sleep_episode_identity_never_replays(self):
+        sleeper, entry = self._sleeping_possession()
+        continue_sleep(sleeper, entry)
+        write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
+        first = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertTrue(first.available)
+        self.assertIn(
+            int(self.player.pk), [candidate.dbid for candidate in first.candidates]
+        )
+
+        # A forced sleeper wakes only after elapsed time; the next collapse runs
+        # in a later episode and cannot reuse the captured identity.
+        advance_wait(self.player, 6000)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.AWAKE)
+        write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
+        second = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertNotEqual(first.transition_id, second.transition_id)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_action_locked_candidate_is_not_lawful(self):
+        sleeper, _entry = self._sleeping_possession()
+        candidate = self._companion("麻痺者")
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertIn(int(candidate.pk), [item.dbid for item in options.candidates])
+        apply_buff(candidate, "paralysis")
+        options = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertNotIn(int(candidate.pk), [item.dbid for item in options.candidates])
+        with self.assertRaises(PossessionGateError) as ctx:
+            confirm_sleep_handoff(
+                self.account,
+                self.player,
+                sleeper,
+                int(candidate.pk),
+                transition_id=options.transition_id,
+            )
+        self.assertEqual(ctx.exception.reason, REASON_STALE_HANDOFF)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
+        "time-skip-commands::recovery-waiting-preserves-skip-safety",
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
+    def test_accepted_wait_offers_handoff_after_a_forced_collapse(self):
+        sleeper = self._companion("力竭者")
+        enter_possession(self.player, sleeper)
+        write_fatigue_state(sleeper, 24, SleepPosture.AWAKE)
+        advance_wait(self.player, 60)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.FORCED)
+        offer = accepted_wait_handoff_offer(sleeper)
+        self.assertIsNotNone(offer)
+        self.assertIn("回到自己的身體", offer)
+        self.assertIn("精神儲備", offer)

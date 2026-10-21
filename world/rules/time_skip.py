@@ -23,7 +23,7 @@ from uuid import uuid4
 
 from django.db import transaction
 
-from world.observability import log_info
+from world.observability import log_info, log_warn
 from world.rules.clock import (
     AdvanceSource,
     CLOCK_YAML,
@@ -93,6 +93,26 @@ NOT_SLEEPING_MESSAGE = "你並不在自願睡眠中。"
 MISSING_PHYSIOLOGY_MESSAGE = "你的身心狀態尚未建立，無法入睡。"
 FORCED_SLEEP_MESSAGE = "你正處於強制沉睡，無法主動入睡；可等待至甦醒。"
 HANDOFF_OFFERED_MESSAGE = "你進入睡眠；可先交接控制權，再繼續恢復。"
+
+
+def render_handoff_offer_message(candidates: Any) -> str:
+    """Render the textual handoff choices: fatigue percent and return/possess."""
+    from world.rules.possession import SLEEP_HANDOFF_RETURN
+
+    parts: list[str] = []
+    for candidate in candidates:
+        fatigue = (
+            ""
+            if candidate.reserve_percent is None
+            else f"（精神儲備 {candidate.reserve_percent}%）"
+        )
+        if candidate.kind == SLEEP_HANDOFF_RETURN:
+            parts.append(f"回到自己的身體{fatigue}")
+        else:
+            parts.append(f"接手 {candidate.name}{fatigue}")
+    if not parts:
+        return HANDOFF_OFFERED_MESSAGE
+    return f"{HANDOFF_OFFERED_MESSAGE}可交接：{'、'.join(parts)}。"
 
 
 # The four named dayparts accepted by ``wait`` and ``explore.wait``.
@@ -165,6 +185,7 @@ class SleepEntry:
     member: Any
     requested_seconds: int
     handoff_offered: bool
+    handoff_candidates: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -426,17 +447,41 @@ def _sleep_member(actor: Any, member_id: int | None) -> Any:
     )
 
 
-def _handoff_available(member: Any) -> bool:
-    """Whether an awake, co-located controlling body could take over control."""
+def _handoff_candidates(member: Any) -> tuple[Any, ...]:
+    """Offer sleep-driven handoff choices after the commit, for the controlled body.
+
+    Only the body a live session currently controls can hand control over: the
+    owner body itself, or a possessed companion. An explicitly selected but
+    uncontrolled companion, a stale possession flag, or a missing account
+    yields no offer rather than an exception. Because this runs after the
+    zero-time posture commit, a technical query failure must not turn an
+    accepted sleep entry into a refusal: it is logged and reported as no offer.
+    """
     try:
         commander = resolve_commander(member)
     except PartyScopeError:  # observability: ignore R2: a non-player-driven body simply has no controlling handoff candidate; this read writes nothing
-        return False
-    if commander is member:
-        return False
-    if getattr(commander, "location", None) is not getattr(member, "location", None):
-        return False
-    return not sleep_blocks_actions(commander)
+        return ()
+    from world.rules.possession import _resolve_account, begin_sleep_handoff
+
+    # The unpuppeted owner body no longer reports a live ``account`` link; the
+    # possession writer's canonical resolver reads the recorded account identity
+    # instead of guessing from sessions.
+    account = _resolve_account(commander, member)
+    if account is None:
+        return ()
+    try:
+        options = begin_sleep_handoff(account, commander, member)
+    except Exception as error:  # observability: ignore R2: the committed sleep stays accepted; the failed offer is logged here and reports no candidates
+        log_warn(
+            "sleep_handoff_offer_failed",
+            context={
+                "char": str(getattr(commander, "pk", "?")),
+                "member": str(getattr(member, "pk", "?")),
+            },
+            exc=error,
+        )
+        return ()
+    return options.candidates
 
 
 def enter_sleep(
@@ -459,7 +504,6 @@ def enter_sleep(
     if state is None:
         raise SleepRefused("missing_physiology", MISSING_PHYSIOLOGY_MESSAGE)
     requested = seconds_to_full_regen(member)
-    handoff = _handoff_available(member)
     snapshots = {
         (key, category): attribute_snapshot(member, key, category)
         for key, category in FATIGUE_ATTRIBUTE_SURFACES
@@ -475,11 +519,13 @@ def enter_sleep(
         for (key, category), snapshot in snapshots.items():
             restore_attribute_best_effort(member, key, snapshot)
         raise
+    candidates = _handoff_candidates(member)
     return SleepEntry(
         operation_id=operation_id or uuid4().hex,
         member=member,
         requested_seconds=requested,
-        handoff_offered=handoff,
+        handoff_offered=bool(candidates),
+        handoff_candidates=candidates,
     )
 
 
@@ -573,8 +619,23 @@ def begin_sleep(actor: Any) -> SleepOutcome:
         return SleepOutcome(entry, continue_sleep(actor, entry))
     entry = enter_sleep(actor)
     if entry.handoff_offered:
-        return SleepOutcome(entry, None, HANDOFF_OFFERED_MESSAGE)
+        return SleepOutcome(
+            entry, None, render_handoff_offer_message(entry.handoff_candidates)
+        )
     return SleepOutcome(entry, continue_sleep(actor, entry))
+
+
+def accepted_wait_handoff_offer(actor: Any) -> str | None:
+    """The contextual offer after an accepted wait, or ``None``.
+
+    A wait can settle the controlled body into forced sleep mid-interval. The
+    accepted operation is already committed, so the offer is recomputed from
+    that committed state; an unselected or unpossessed body yields nothing.
+    """
+    candidates = _handoff_candidates(actor)
+    if not candidates:
+        return None
+    return render_handoff_offer_message(candidates)
 
 
 __all__ = [
@@ -592,6 +653,7 @@ __all__ = [
     "SleepOutcome",
     "SleepRefused",
     "advance_wait",
+    "accepted_wait_handoff_offer",
     "begin_sleep",
     "book_member_practice",
     "continue_sleep",
@@ -599,6 +661,7 @@ __all__ = [
     "parse_duration",
     "preflight_practice_booking",
     "rejection_message",
+    "render_handoff_offer_message",
     "render_skip_summary",
     "seconds_to_full_regen",
     "seconds_to_natural_wake",

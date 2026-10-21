@@ -62,6 +62,7 @@ from world.rules.time_skip import (
     PracticeReject,
     SkipRefused,
     SleepRefused,
+    accepted_wait_handoff_offer,
     advance_wait,
     begin_sleep,
     book_member_practice,
@@ -952,6 +953,9 @@ def _wait_adapter(
     else:
         elapsed = result.elapsed_seconds
     message = render_skip_summary(elapsed, result.events)
+    offer = accepted_wait_handoff_offer(actor)
+    if offer is not None:
+        message = f"{message}\n{offer}"
     actor.msg(message)
     # The summary already carries each committed unlock line; record the
     # session unread marks from the same committed events.
@@ -1000,6 +1004,149 @@ def _perform_possess_transition(session: Any, player: Any, npc: Any) -> None:
         _clear_transition_pending(session)
 
 
+def _sleep_handoff_context(
+    actor: Any, session: Any
+) -> tuple[Any, Any, Any] | None:
+    """Resolve the committed sleep-driven handoff context, or ``None``.
+
+    The context is derived from committed state only: the authenticated actor
+    is the controlled body (the owner itself or a possessed companion), that
+    body is committed asleep, and the account/session still controls it. Any
+    other state keeps the ordinary possession path.
+    """
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+    from world.rules.possession import _resolve_account, sleep_handoff_candidates
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: no commander means no contextual handoff; the ordinary gate reports it
+        return None
+    account = _resolve_account(commander, actor)
+    if account is None:
+        return None
+    options = sleep_handoff_candidates(account, commander, actor, session=session)
+    if options.transition_id is None:
+        return None
+    return account, commander, options
+
+
+def _handoff_rejection(options: Any) -> dict[str, Any]:
+    from world.rules.possession import (
+        POSSESSION_REJECTION_MESSAGES,
+        REASON_NO_CANDIDATE,
+        REASON_STALE_HANDOFF,
+    )
+
+    code = REASON_NO_CANDIDATE if not options.candidates else REASON_STALE_HANDOFF
+    # The result data slot is contractually success-only; a stale selection is a
+    # plain stable rejection. The committed panels carry the current choices.
+    return _rejected(code, POSSESSION_REJECTION_MESSAGES[code])
+
+
+def _perform_handoff_transition(
+    session: Any,
+    account: Any,
+    commander: Any,
+    current_body: Any,
+    candidate_id: int,
+    transition_id: str,
+) -> None:
+    """Run the confirmed contextual handoff after the result-only reply."""
+    from web.webclient.actions.account_actions import _clear_transition_pending
+    from world.rules.possession import (
+        POSSESSION_REJECTION_MESSAGES,
+        PossessionGateError,
+        confirm_sleep_handoff,
+    )
+
+    try:
+        confirm_sleep_handoff(
+            account,
+            commander,
+            current_body,
+            candidate_id,
+            transition_id=transition_id,
+            session=session,
+        )
+    except PossessionGateError as error:  # observability: ignore R2: the stable handoff refusal IS the action result sent to the player, not a swallowed failure
+        if session is not None:
+            from web.webclient.presentation.ingress import synchronize_session
+
+            synchronize_session(session, getattr(session, "puppet", None) or commander)
+            session.msg(
+                POSSESSION_REJECTION_MESSAGES.get(error.reason, "交接選項已經失效，請重新選擇。")
+            )
+    except Exception as exc:
+        log_error(
+            "sleep_handoff_transition_failed",
+            context={
+                "char": str(getattr(commander, "pk", "?")),
+                "from": str(getattr(current_body, "pk", "?")),
+                "to": str(candidate_id),
+            },
+            exc=exc,
+        )
+        if session is not None:
+            from web.webclient.presentation.ingress import synchronize_session
+
+            synchronize_session(session, getattr(session, "puppet", None) or commander)
+            session.msg("交接操作失敗，請稍後再試。")
+    finally:
+        _clear_transition_pending(session)
+
+
+def _handoff_result(
+    session: Any,
+    account: Any,
+    commander: Any,
+    current_body: Any,
+    candidate: Any,
+    transition_id: str,
+) -> dict[str, Any]:
+    """Schedule the confirmed transfer, or run it directly without a session."""
+    from web.webclient.actions.account_actions import (
+        _set_transition_pending,
+        get_clock,
+    )
+    from world.rules.possession import SLEEP_HANDOFF_RETURN, confirm_sleep_handoff
+
+    # Admission only: the transfer is verified on the next reactor turn. The
+    # completed outcome arrives as the committed new-epoch presentation, and a
+    # failure sends the stable refusal from the deferred verifier.
+    message = "正在交接控制權……"
+    if session is not None:
+        get_clock().callLater(
+            0,
+            _perform_handoff_transition,
+            session,
+            account,
+            commander,
+            current_body,
+            candidate.dbid,
+            transition_id,
+        )
+        _set_transition_pending(session)
+        return {
+            "outcome": "success",
+            "code": "handoff_pending",
+            "message": message,
+            "no_presentation": True,
+        }
+    confirm_sleep_handoff(
+        account,
+        commander,
+        current_body,
+        candidate.dbid,
+        transition_id=transition_id,
+        session=None,
+    )
+    if candidate.kind == SLEEP_HANDOFF_RETURN:
+        completed = "你的意識回到了自己的身體。"
+    else:
+        completed = f"你接手了{candidate.name}的身體。"
+    return _success("handoff", completed, AFFECTED_FULL)
+
+
 def _possess_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Enter possession of a bound companion.
 
@@ -1022,6 +1169,28 @@ def _possess_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -
 
     if _transition_pending(session):
         return _rejected("transition_pending", "角色切換正在進行中，請稍候。")
+
+    context = _sleep_handoff_context(actor, session)
+    if context is not None:
+        account, commander, options = context
+        candidate = next(
+            (
+                item
+                for item in options.candidates
+                if item.dbid == int(payload["npc_id"])
+            ),
+            None,
+        )
+        if candidate is None:
+            return _handoff_rejection(options)
+        return _handoff_result(
+            session,
+            account,
+            commander,
+            actor,
+            candidate,
+            options.transition_id,
+        )
 
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
@@ -1087,6 +1256,30 @@ def _possess_release_adapter(actor: Any, payload: dict[str, Any], session: Any =
 
     if _transition_pending(session):
         return _rejected("transition_pending", "角色切換正在進行中，請稍候。")
+
+    # A sleeping controlled companion returns control through the same
+    # contextual confirmation when its awake owner is a lawful return choice.
+    context = _sleep_handoff_context(actor, session)
+    if context is not None:
+        account, commander, options = context
+        if actor is not commander:
+            candidate = next(
+                (
+                    item
+                    for item in options.candidates
+                    if item.dbid == int(commander.pk)
+                ),
+                None,
+            )
+            if candidate is not None:
+                return _handoff_result(
+                    session,
+                    account,
+                    commander,
+                    actor,
+                    candidate,
+                    options.transition_id,
+                )
 
     if is_possessed_actor(actor):
         player_id = int(actor.db.possessed_by)
