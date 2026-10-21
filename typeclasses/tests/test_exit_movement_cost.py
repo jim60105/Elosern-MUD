@@ -162,6 +162,58 @@ class PhysicalEdgeExitTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before + self.expected)
         self.assertNotEqual(MOVE, self.expected)
 
+    @covers_requirement("movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry")
+    def test_a_missing_authored_road_refuses_before_any_write(self):
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        graph = next(iter(SETTLEMENT_GRAPHS.values()))
+        linked = {(edge.source.node_id, edge.destination.node_id) for edge in graph.edges}
+        pair = next(
+            (source, destination)
+            for source in graph.nodes
+            for destination in graph.nodes
+            if source != destination and (source, destination) not in linked
+        )
+        source_node = graph.node(pair[0])
+        destination_node = graph.node(pair[1])
+        source = GridRoom.objects.filter_xyz(
+            (source_node.x, source_node.y, graph.map_id)
+        ).first()
+        destination = GridRoom.objects.filter_xyz(
+            (destination_node.x, destination_node.y, graph.map_id)
+        ).first()
+        exit_obj = create_object(
+            Exit, key="無路", location=source, destination=destination
+        )
+        self.char1.location = source
+        before = get_world_clock().tick
+        exit_obj.at_traverse(self.char1, destination)
+        self.assertIs(self.char1.location, source)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement("movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry")
+    def test_a_settlement_room_without_identity_refuses_before_any_write(self):
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        graph = next(iter(SETTLEMENT_GRAPHS.values()))
+        edge = next(iter(graph.edges))
+        source = GridRoom.objects.filter_xyz(
+            (edge.source.x, edge.source.y, graph.map_id)
+        ).first()
+        # A grid room on the declared surface but outside the authored identity
+        # table is broken geometry, not an interior connector.
+        stray, _ = GridRoom.create(
+            key="未編目", xyz=(graph.max_x + 1, graph.max_y + 1, graph.map_id)
+        )
+        exit_obj = create_object(
+            Exit, key="黑巷", location=source, destination=stray
+        )
+        self.char1.location = source
+        before = get_world_clock().tick
+        exit_obj.at_traverse(self.char1, stray)
+        self.assertIs(self.char1.location, source)
+        self.assertEqual(get_world_clock().tick, before)
+
 
 class MovementCostMixinSourceTests(EvenniaTestCase):
     """Source-inspection: at_post_traverse delegates to the shared

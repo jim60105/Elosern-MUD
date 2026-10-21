@@ -57,7 +57,8 @@ from world.maps.wilderness_provider import (
 )
 from world.observability import log_warn
 from world.rules.fatigue import (
-    FatigueRejectReason,
+    POSTURE_ATTRIBUTE,
+    RESERVE_ATTRIBUTE,
     FatigueStateError,
     outgoing_foot_speed_scale,
     read_fatigue_state,
@@ -190,18 +191,36 @@ def traversal_seconds(
 def _fatigue_scale(member: Any) -> Fraction:
     """Return a present member's outgoing foot-speed scale, or refuse.
 
-    A wholly absent reserve/posture pair is a body that has never been
-    constructed through the physiology initializer: it travels at base speed
-    (there is no authored state to read). Every other rejection — corrupt
-    values, forced/voluntary sleep — is an eligibility refusal, never a silent
-    healthy speed.
+    Only a wholly absent reserve/posture pair is a body that has never been
+    constructed through the physiology initializer, and only that body travels
+    at base speed (there is no authored state to read). A half-written pair is
+    corrupt state and refuses, exactly like a corrupt value or a
+    forced/voluntary sleep posture; neither is ever priced as healthy.
     """
 
+    attributes = getattr(member, "attributes", None)
+    if attributes is None or not callable(getattr(attributes, "has", None)):
+        # A plain synthetic probe has no attribute store at all: nothing was
+        # ever initialized, so it is the wholly-absent baseline.
+        return Fraction(1)
+    try:
+        has_reserve = attributes.has(RESERVE_ATTRIBUTE)
+        has_posture = attributes.has(POSTURE_ATTRIBUTE)
+    except Exception as error:  # observability: ignore R2: an unreadable attribute store is corrupt physiology, refused below as such; no state is written
+        raise MovementPreflightRefused(
+            "fatigue_state_invalid",
+            f"{member!r} has an unreadable mental-reserve state: {error}",
+        ) from error
+    if not has_reserve and not has_posture:
+        return Fraction(1)
+    if not (has_reserve and has_posture):
+        raise MovementPreflightRefused(
+            "fatigue_state_partial",
+            f"{member!r} has only one half of its mental-reserve state",
+        )
     try:
         state = read_fatigue_state(member)
     except FatigueStateError as error:
-        if error.reason is FatigueRejectReason.MISSING:
-            return Fraction(1)
         raise MovementPreflightRefused(
             "fatigue_state_invalid",
             f"{member!r} has an unreadable mental-reserve state: {error}",
@@ -263,6 +282,18 @@ def _grid_identity(room: Any) -> tuple[str, str] | None:
     if not node_id or not xyz or len(xyz) < 3:
         return None
     return (str(xyz[2]), str(node_id))
+
+
+def _grid_map_id(room: Any) -> str | None:
+    """Return the xyzgrid map key of a grid room, or ``None``."""
+
+    try:
+        xyz = getattr(room, "xyz", None)
+    except Exception:  # observability: ignore R2: a room without grid tags has no declared map, which the caller treats as a non-settlement connector
+        return None
+    if not xyz or len(xyz) < 3:
+        return None
+    return str(xyz[2])
 
 
 def _settlement_edge(source_room: Any, destination_room: Any):
@@ -516,15 +547,29 @@ def resolve_traversal_cost(
     if _is_grid_room(grid_source) and _is_grid_room(destination):
         source_identity = _grid_identity(grid_source)
         destination_identity = _grid_identity(destination)
-        if source_identity is not None and destination_identity is not None:
+        source_map = _grid_map_id(grid_source)
+        destination_map = _grid_map_id(destination)
+        authored_surface = (
+            source_map is not None
+            and source_map == destination_map
+            and map_data.settlement_graph(source_map) is not None
+        )
+        if authored_surface:
+            # A declared settlement map is a distance-bearing outdoor surface:
+            # both endpoints must carry their authored identity and the
+            # directed road must exist. Anything less is broken geometry, not
+            # an invented connector, so it refuses before writes.
+            if source_identity is None or destination_identity is None:
+                return resolution(TraversalStatus.UNRESOLVED, None)
             cost = settlement_edge_cost(grid_source, destination, members)
-            # Two authored nodes with no declared road are joined by an
-            # explicit non-distance connector (a door/instance exit), not an
-            # outdoor edge.
             return resolution(
-                TraversalStatus.RESOLVED if cost is not None else TraversalStatus.NON_DISTANCE,
+                TraversalStatus.RESOLVED
+                if cost is not None
+                else TraversalStatus.UNRESOLVED,
                 cost,
             )
+        # Grid rooms outside every declared settlement map are explicit
+        # non-distance connectors (instance interiors, builder-room doorways).
     return resolution(TraversalStatus.NON_DISTANCE, None)
 
 

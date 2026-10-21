@@ -378,6 +378,27 @@ class TerrainCalibrationTests(EvenniaTest):
         with self.assertRaises(travel_cost.MovementPreflightRefused):
             member_speed_m_per_hour(corrupt, "settlement")
 
+    @covers_requirement("movement-cost-charging::terrain-and-the-slowest-eligible-traveller-determine-speed")
+    def test_half_written_fatigue_state_refuses_instead_of_travelling_healthy(self):
+        from world.rules import travel_cost
+        from world.rules.fatigue import POSTURE_ATTRIBUTE, RESERVE_ATTRIBUTE
+
+        reserve_only = create_object(NPC, key="reserve only")
+        # Construction initializes the full pair; remove exactly one half to
+        # model a half-written physiology write.
+        reserve_only.attributes.remove(POSTURE_ATTRIBUTE)
+        posture_only = create_object(NPC, key="posture only")
+        posture_only.attributes.remove(RESERVE_ATTRIBUTE)
+        # A retained sleeping posture with no reserve is still partial state.
+        sleeping_half = create_object(NPC, key="sleeping half")
+        sleeping_half.attributes.remove(RESERVE_ATTRIBUTE)
+        sleeping_half.attributes.add(POSTURE_ATTRIBUTE, "forced")
+        for member in (reserve_only, posture_only, sleeping_half):
+            with self.subTest(member=member.key):
+                with self.assertRaises(travel_cost.MovementPreflightRefused) as caught:
+                    member_speed_m_per_hour(member, "settlement")
+                self.assertEqual(caught.exception.reason, "fatigue_state_partial")
+
 
 class GateApproachCostTests(EvenniaTest):
     """The authored gate segment across the scale boundary."""
