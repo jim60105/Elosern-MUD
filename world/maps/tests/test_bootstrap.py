@@ -576,11 +576,11 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         sync_wilderness()
         east_gate = self._gate_exits()[1][0]
         east_gate.at_traverse(self.char1, self._east_gate())
-        self.assertEqual(self.char1.location.coordinates, (63, 100))
+        self.assertEqual(self.char1.location.coordinates, (864, 1080))
         self.char1.move_to(self._east_gate())
         south_gate = self._gate_exits(self._south_gate())[1][0]
         south_gate.at_traverse(self.char1, self._south_gate())
-        self.assertEqual(self.char1.location.coordinates, (60, 97))
+        self.assertEqual(self.char1.location.coordinates, (860, 1077))
 
     def test_sync_wilderness_is_idempotent(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -594,6 +594,65 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 1)
         self.assertEqual(len(gates), 1)
         self.assertEqual(WildernessGateExit.objects.all().count(), 3)
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_sync_wilderness_materializes_no_frame_rooms(self):
+        # The 2700x2700 frame is virtual: boot creates the script and the
+        # registered gate exits, never a room per cell.
+        from typeclasses.rooms import TerrainRoom
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        sync_wilderness()
+
+        script, _ = self._gate_exits()
+        self.assertEqual(TerrainRoom.objects.count(), 0)
+        self.assertEqual(dict(script.db.rooms), {})
+
+    @covers_requirement("wilderness-gateway::physical-footprints-and-concealed-point-entries-preserve-approaches")
+    def test_gate_approach_segments_follow_the_authored_physical_geometry(self):
+        # The south and east gates measure their own exterior approach segment
+        # from the transformed metre position to the approach cell centre; the
+        # crossing is one segment, not a full wilderness cell plus a city hop.
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.maps.wilderness_destination import gate_approach_distance_m
+
+        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        south = gate_approach_distance_m(entry, entry.gate_for("n"))
+        east = gate_approach_distance_m(entry, entry.gate_for("w"))
+        self.assertAlmostEqual(south, 540.83, delta=0.1)
+        self.assertAlmostEqual(east, 1012.72, delta=0.1)
+        self.assertNotEqual(south, east)
+        # Both directions of a crossing measure the single authored segment.
+        self.assertEqual(
+            gate_approach_distance_m(entry, entry.gate_for("n")), south
+        )
+
+    @covers_requirement("wilderness-gateway::physical-footprints-and-concealed-point-entries-preserve-approaches")
+    def test_village_point_entrance_has_no_wilderness_footprint(self):
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.maps.wilderness_provider import WILDERNESS_NAME as NAME
+
+        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+        self.assertTrue(village.is_point_shape)
+        self.assertEqual(village.footprint_cells, frozenset())
+        # The anchor cell itself is walkable ground; the point entry is not a
+        # village-wide obstacle (only a registered gateway consumes the step).
+        from evennia.contrib.grid.wilderness.wilderness import (
+            create_wilderness,
+            enter_wilderness,
+        )
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        sync_wilderness()
+        provider = __import__(
+            "world.maps.wilderness_provider", fromlist=["ElosernWildernessMapProvider"]
+        ).ElosernWildernessMapProvider()
+        create_wilderness(name=NAME, mapprovider=provider)
+        self.assertTrue(
+            enter_wilderness(self.char1, coordinates=village.anchor_cell, name=NAME)
+        )
 
     def test_sync_wilderness_without_east_gate_degrades_gracefully(self):
         sync_wilderness()
@@ -648,7 +707,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         ][0]
 
         gate_exit.at_traverse(self.char1, entrance_room)
-        self.assertEqual(self.char1.location.coordinates, (40, 138))
+        self.assertEqual(self.char1.location.coordinates, (1340, 1220))
 
         north = [e for e in self.char1.location.exits if e.key == "north"][0]
         north.at_traverse(self.char1, self.char1.location)
@@ -677,23 +736,23 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(63, 100), name=WILDERNESS_NAME)
+        ok = enter_wilderness(self.char1, coordinates=(864, 1080), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(63, 100))
+        self.assertEqual(room.ndb.active_desc, terrain_description(864, 1080))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(63, 100))
+        self.assertEqual(room.ndb.active_desc, terrain_description(864, 1080))
         self.assertEqual(
             room.scene_archetype,
-            REGION_SCENE_ARCHETYPES[region_for_coordinates(63, 100)],
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(864, 1080)],
         )
         self.assertEqual(
             room.scene_identity,
-            wilderness_scene_identity(WILDERNESS_NAME, 63, 100),
+            wilderness_scene_identity(WILDERNESS_NAME, 864, 1080),
         )
 
     def test_sync_wilderness_heals_miskeyed_gate(self):

@@ -175,14 +175,14 @@ SYNTH_WILDERNESS_ENTRIES: dict[str, WildernessEntryPoint] = {
     "t_hollow_tarn": WildernessEntryPoint(
         anchor_key="t_hollow_tarn",
         shape=("###", "###", "###"),
-        origin_xy=(10, 140),
+        origin_xy=(500, 500),
         gates=(WildernessGate("s", (3, 3), _SYNTH_MAP_KEY),),
     ),
     # Point-shape entry: exactly one '#' cell and exactly one gate.
     "t_split_cairn": WildernessEntryPoint(
         anchor_key="t_split_cairn",
         shape=(".#.",),
-        origin_xy=(10, 122),
+        origin_xy=(520, 520),
         gates=(WildernessGate("n", (3, 2), _SYNTH_MAP_KEY),),
     ),
 }

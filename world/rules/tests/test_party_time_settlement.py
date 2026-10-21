@@ -81,8 +81,8 @@ MOVE = CLOCK_YAML["command_defaults"]["move"]
 #: approach is 13,500 s at 1.25 m/s plus (27,001 m - 16,875 m) at the 1.125 m/s
 #: light speed = 22,501 s, and one 10 km open-ground wilderness step is
 #: 12,000 s at 3 km/h while no fatigue threshold is crossed.
-EAST_GATE_SECONDS = 22501
-WILDERNESS_STEP_SECONDS = 12000
+EAST_GATE_SECONDS = 811
+WILDERNESS_STEP_SECONDS = 1200
 
 #: File-local synthetic timed buff: expires inside every advance under test
 #: and carries no modifiers, so it never changes gauge arithmetic.
@@ -574,9 +574,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(self.ella.location.coordinates, ENTRY_XY)
         self.assertEqual(self.kahn.location.coordinates, ENTRY_XY)
         self.assertEqual(get_world_clock().tick - before, EAST_GATE_SECONDS)
-        # 22,501 s at the fixture rates: 10 + floor(22.501), 10 +
-        # floor(45.002), 10 + floor(67.503).
-        self.assertEqual(self._gauges(self.ella), (32, 55, 77))
+        # 811 s at the fixture rates: 10 + floor(0.811), 10 +
+        # floor(1.622), 10 + floor(2.433).
+        self.assertEqual(self._gauges(self.ella), (10, 11, 12))
         self.assertNotIn(_PROBE_BUFF, entity_active_buffs(self.ella))
 
     @covers_requirement(
@@ -721,23 +721,14 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         # together, so the one advance settles all three in that order.
         self.assertEqual(calls[0], [self.ella, self.player, self.kahn])
         target = (source_coordinates[0] + 1, source_coordinates[1])
-        # The gate crossing consumed 180,008 units, leaving every member at
-        # 179,992 (light band). This 10,000 m open-ground cell (3,000 m/h at
-        # full speed) is then integrated: 4,499 s of light travel covers
-        # 3,374.25 m; 9,000 s of moderate travel covers 5,625 m; and the
-        # remaining 1,000.75 m at the severe 5/12 m/s covers 2,401.8 s. The
-        # exact 15,900.8 s total rounds once, to 15,901 s.
-        from fractions import Fraction
-
-        light_seconds, light_metres = 4499, Fraction(4499 * 3, 4)
-        moderate_seconds, moderate_metres = 9000, Fraction(9000 * 5, 8)
-        remaining_metres = 10_000 - light_metres - moderate_metres
-        severe_seconds = remaining_metres * Fraction(12, 5)
-        elapsed = ceil(light_seconds + moderate_seconds + severe_seconds)
-        self.assertEqual(elapsed, 15901)
+        # The short gate approach crosses no fatigue threshold, so this 1 km
+        # open-ground cell (3,000 m/h) costs the ordinary 1,200 s, integrated
+        # and rounded once.
+        elapsed = WILDERNESS_STEP_SECONDS
+        self.assertEqual(elapsed, 1200)
         for member in (self.ella, self.player, self.kahn):
             self.assertEqual(member.location.coordinates, target)
-            # 15,901 s at the fixture rates (hp 0.001, mp 0.002, sp 0.003).
+            # 1,200 s at the fixture rates (hp 0.001, mp 0.002, sp 0.003).
             self.assertEqual(
                 self._gauges(member),
                 (10 + int(0.001 * elapsed), 10 + int(0.002 * elapsed), 10 + int(0.003 * elapsed)),

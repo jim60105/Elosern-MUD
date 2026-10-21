@@ -71,8 +71,10 @@ class LocalMapWildernessTests(EvenniaTestCase):
             if not node["id"].startswith("wild:"):
                 continue
             decoded = node["id"].split(":")
-            self.assertLessEqual(int(decoded[2]), 223)
-            self.assertLessEqual(int(decoded[3]), 223)
+            from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
+
+            self.assertLessEqual(int(decoded[2]), WILDERNESS_MAX_X)
+            self.assertLessEqual(int(decoded[3]), WILDERNESS_MAX_Y)
 
     @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
     def test_wilderness_legend_appends_scale_note_after_the_states(self):
@@ -254,7 +256,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # the wilds this comes out."
         self.char1.location = self.east_gate
         record_arrival(self.char1)
-        self._at_wild((73, 100))
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 10, ey))
         payload = self._registry().render("local_map", _context(self.char1))
         remembered_ids = {node["id"] for node in payload["nodes"] if node["visibility"] == "remembered"}
         self.assertEqual(remembered_ids, set())
@@ -263,9 +266,10 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def test_walked_wilderness_ground_is_not_remembered(self):
         # Eight ordinary cells of one region -- the reported seven-chips
         # defect -- yields zero remembered nodes, not seven+ identical chips.
+        ex, ey = EAST_APPROACH
         for i in range(8):
-            self._at_wild((70 + i, 103))
-        self._at_wild((90, 103))
+            self._at_wild((ex + 10 + i, ey + 5))
+        self._at_wild((ex + 20, ey + 5))
         payload = self._registry().render("local_map", _context(self.char1))
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         self.assertEqual(remembered, [])
@@ -335,12 +339,16 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
     def test_a_cell_in_a_different_region_still_says_so(self):
         # A same-region in-view neighbour still gets the plain region label
         # (only registered gate approach cells get the far-side name).
-        self._at_wild((73, 100))
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 10, ey))
         payload = self._registry().render("local_map", _context(self.char1))
+        neighbor_id = f"wild:{WILDERNESS_NAME}:{ex + 11}:{ey}"
         neighbor = next(
-            node for node in payload["nodes"] if node["id"] == "wild:elosern:74:100"
+            node for node in payload["nodes"] if node["id"] == neighbor_id
         )
-        self.assertEqual(neighbor["label"], _t_region_display_for(73, 100))
+        self.assertEqual(neighbor["label"], _t_region_display_for(ex + 11, ey))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
@@ -356,7 +364,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         east_approach = entry.approach_cell(entry.gate_for("w"))
         self._at_wild(south_approach)  # the south gate's approach cell
         self._at_wild(east_approach)  # the east gate's approach cell
-        self._at_wild((90, 100))  # far from both
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 20, ey))  # far from both
         payload = self._registry().render("local_map", _context(self.char1))
         remembered = {
             node["id"]: node["label"]

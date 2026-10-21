@@ -104,3 +104,14 @@ every other lore registry, including idempotency across repeated calls.
 - **WHEN** `sync_all()` is called twice in succession
 - **THEN** exactly seven `LoreRecord` Scripts exist under the `"wilderness_regions"` category after
   the second call
+
+### Requirement: Terrain and political control follow authored geography
+Terrain, nominal claims and actual control SHALL remain separate layers. Central mountains SHALL bend broadly around X1310..1510, northern deep forest begin broadly near Y2200, and the southern coast SHALL support the principal bulk-commerce corridor without adding transport mechanics.
+
+#### Scenario: Anchor relationships
+- **WHEN** the geographic layers are inspected
+- **THEN** Altoria lies southwest in hills/river valleys, Valhalla northwest highland forest, Grandia eastern productive plains; Ciaran is underground western flank, Fionnen eastern flank and Eolas hidden northern mountain valley.
+
+#### Scenario: Pass and river constraints
+- **WHEN** southern mountain crossings and water networks are authored
+- **THEN** principal pass near (1410,980) uses explicit slower mountain trail/supply itinerary, never guaranteed all-road shortcut; capital river flows southwest toward kingdom ports and imperial rivers connect eastern plains to southeastern ports; no shipping gameplay appears.

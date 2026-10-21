@@ -53,8 +53,8 @@ MOVE = CLOCK_YAML["command_defaults"]["move"]
 #: Integrated physical durations for a full-reserve party: the east-gate
 #: approach is 13,500 s at 1.25 m/s then the light-stage 1.125 m/s to 22,501 s,
 #: and one 10 km open-ground wilderness step stays 12,000 s (no threshold).
-EAST_GATE_SECONDS = 22501
-WILDERNESS_STEP_SECONDS = 12000
+EAST_GATE_SECONDS = 811
+WILDERNESS_STEP_SECONDS = 1200
 
 
 def _east_gate_probe():

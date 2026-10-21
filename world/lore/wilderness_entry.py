@@ -27,10 +27,13 @@ DIRECTION_DELTAS: dict[str, tuple[int, int]] = {
     "nw": (-1, 1),
 }
 
-# Provider rectangle bounds are authored here as the validation input; the
-# provider itself owns the live constants (imported lazily by validation to
-# keep lore free of world.maps at module scope).
-_PROVIDER_MAX = 223
+# The provider owns the live frame bounds. They are imported lazily at call
+# time (module scope would be a lore -> world.maps import cycle), so the
+# authoring contract can never drift from the runtime frame it validates.
+def _provider_bounds() -> tuple[int, int]:
+    from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
+
+    return WILDERNESS_MAX_X, WILDERNESS_MAX_Y
 
 # Direction opposites (face = the footprint side a gate sits on).
 OPPOSITE_DIRECTION = {
@@ -66,9 +69,11 @@ class WildernessEntryPoint:
 
     ``shape`` is an ASCII mask of ``#`` (footprint cell) and ``.`` (outside);
     ``shape[0][0]`` corresponds to wilderness cell ``origin_xy``. Exactly one
-    ``#`` encodes a point-shape anchor (cave semantics): no footprint, every
-    direction at the anchor cell is a gateway to the single gate room, and
-    ``approach_cell(gate)`` IS the anchor cell.
+    ``#`` encodes a point-shape anchor (concealed cave/path semantics): no
+    footprint, ``approach_cell(gate)`` IS the anchor cell, and only the gate's
+    authored ``return_direction`` is a gateway. Every other direction at the
+    anchor cell is an ordinary terrain-validity wilderness step, so a concealed
+    entry never hijacks an unrelated route.
 
     ``anchor_key`` must exist in ``world.lore.anchor_placement.
     ANCHOR_PLACEMENT_REGISTRY``; ``validate_wilderness_entries`` enforces it
@@ -190,8 +195,21 @@ def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
 
 
 def _in_provider_rect(cell: tuple[int, int]) -> bool:
+    max_x, max_y = _provider_bounds()
     x, y = cell
-    return 0 <= x <= _PROVIDER_MAX and 0 <= y <= _PROVIDER_MAX
+    return 0 <= x <= max_x and 0 <= y <= max_y
+
+
+def _is_walkable_terrain(cell: tuple[int, int]) -> bool:
+    """Whether ``cell`` is land-side passable ground (the provider's rule).
+
+    Deferred import for the same lore/world.maps boundary reason as
+    :func:`_iter_map_extents`: the provider is the single owner of the terrain
+    model, and validation must never keep a second copy of it.
+    """
+    from world.maps.wilderness_provider import is_walkable_cell
+
+    return is_walkable_cell(cell)
 
 
 def validate_wilderness_entries(
@@ -243,11 +261,20 @@ def validate_wilderness_entries(
                         anchor_key,
                         f"footprint cell ({origin_x + col}, {origin_y + row}) outside provider rectangle",
                     )
+                if cell == "#" and not _is_walkable_terrain(
+                    (origin_x + col, origin_y + row)
+                ):
+                    fail(
+                        anchor_key,
+                        f"footprint cell ({origin_x + col}, {origin_y + row}) is not walkable terrain",
+                    )
 
         footprint = entry.footprint_cells
         anchor = entry.anchor_cell
         if anchor is None:  # pragma: no cover - ruled out by no-'#' check
             fail(anchor_key, "anchor_cell is undefined")
+        if not _is_walkable_terrain(anchor):
+            fail(anchor_key, f"anchor_cell {anchor} is not walkable terrain")
 
         if not entry.is_point_shape:
             # -- footprint is 4-connected.
@@ -300,7 +327,7 @@ def validate_wilderness_entries(
 
     # -- global cross-entry rules.
     def provider_valid_outside_footprints(cell: tuple[int, int]) -> bool:
-        if not _in_provider_rect(cell):
+        if not _in_provider_rect(cell) or not _is_walkable_terrain(cell):
             return False
         return not any(cell in other for other in all_footprints.values())
 
@@ -363,15 +390,18 @@ def validate_wilderness_entries(
                             anchor_key,
                             f"point anchor cell is {other_key!r} gate {other_gate.return_direction!r} approach cell",
                         )
-        # -- a point anchor advertises gateways in all eight directions; every
-        #    neighbor must be provider-valid.
+        # -- a point anchor advertises exactly one eligible entry direction;
+        #    the cell that direction leads to must be provider-valid. Other
+        #    directions are ordinary terrain steps and follow the provider's
+        #    own validity, so a coastal cave may be authored next to water.
         if entry.is_point_shape and entry.anchor_cell is not None:
-            for dx, dy in DIRECTION_DELTAS.values():
+            for gate in entry.gates:
+                dx, dy = DIRECTION_DELTAS[gate.return_direction]
                 neighbor = (entry.anchor_cell[0] + dx, entry.anchor_cell[1] + dy)
                 if not provider_valid_outside_footprints(neighbor):
                     fail(
                         anchor_key,
-                        f"point anchor {entry.anchor_cell} has provider-invalid neighbor {neighbor}",
+                        f"point anchor {entry.anchor_cell} has provider-invalid neighbor {neighbor} in its entry direction",
                     )
 
     # -- one grid room hosts one gate: two gates sharing a destination room
@@ -388,23 +418,43 @@ def validate_wilderness_entries(
 WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {
     "capital_altoria": WildernessEntryPoint(
         anchor_key="capital_altoria",
-        shape=("#####", "#####", "#####", "#####", "#####"),
-        origin_xy=(58, 98),
+        # The city's rasterized physical envelope at the one-kilometre
+        # wilderness scale (world-map-scale design §8/§10.3): an irregular
+        # 40 km² built-up mask inside a seven-by-nine-kilometre box, replacing
+        # the old 5x5 ten-kilometre block. The mask rows are contract: the
+        # derived anchor cell is the plaza cell (860, 1080), and the south and
+        # east gate rays leave the mask at (860, 1077) and (864, 1080).
+        shape=(
+            "#.....#",
+            "##...##",
+            ".#####.",
+            "#######",
+            "#######",
+            "####..#",
+            "#..#.##",
+            "####...",
+            "..##...",
+        ),
+        origin_xy=(857, 1076),
         gates=(
-            # 南門: a traveler at (60, 97) heading north enters the city.
+            # 南門: a traveler at (860, 1077) heading north enters the city.
             WildernessGate("n", (3, 0), "capital_altoria"),
-            # 東門: a traveler at (63, 100) heading west enters the city.
+            # 東門: a traveler at (864, 1080) heading west enters the city.
             WildernessGate("w", (6, 3), "capital_altoria"),
         ),
     ),
     "village_ciaran": WildernessEntryPoint(
         anchor_key="village_ciaran",
-        shape=("###", "###", "###"),
-        origin_xy=(39, 139),
+        # The hidden village is a point entrance, not a nine-square-kilometre
+        # obstacle at the new scale (design §9/§10.3): the plaza cell itself,
+        # entered only from its authored direction. The hidden path's physical
+        # position (35, 270) transforms inside this same cell.
+        shape=("#",),
+        origin_xy=(1340, 1220),
         gates=(
-            # 隱密小徑: a hidden-settlement footprint far from the capital's
-            # (58,98)-(62,102) mask; a traveler at (40, 138) heading north
-            # enters the village.
+            # 隱密小徑: a traveler at the anchor cell heading north follows the
+            # concealed path into the village. No other direction is a
+            # gateway.
             WildernessGate("n", (0, 1), "village_ciaran"),
         ),
     ),

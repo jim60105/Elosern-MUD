@@ -38,6 +38,7 @@ not reach, so it also publishes the matching snapshot/restore pair
 transaction that can fail.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,10 +54,9 @@ from world.maps.wilderness_population import (
     species_rule_for_coordinates,
 )
 from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
+    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
-    is_footprint_cell,
+    is_valid_wilderness_cell,
     region_for_coordinates,
 )
 from world.observability import log_info, log_warn
@@ -226,29 +226,31 @@ def _living_region_individuals(
 
 def _candidate_cells(
     region_key: str, rule: AmbientPlacementRule
-) -> tuple[tuple[int, int], ...]:
+) -> Iterator[tuple[int, int]]:
     """Every walkable cell the region's authored ambient rule legally covers.
 
-    Enumerated from the bounded map extent in one deterministic ascending order
-    — pure integer arithmetic plus the provider's footprint rule, one bounded
-    scan of 224x224 cells and no database read — and independent of whether a
-    room happens to be materialized there: the authored capacity is per covered
-    coordinate, so a region nobody has walked through yet still has exactly the
-    capacity its author gave it. Cells inside the contract-pinned hunting band,
-    or covered by any other ambient branch, keep their own branch and are never
-    provisioned into.
+    A lazy, deterministic ascending enumeration over the region's authored
+    search window (``REGION_SEARCH_BOXES``) — pure integer arithmetic plus the
+    provider's shared cell-validity rule, no database read and no whole-frame
+    scan. It is independent of whether a room happens to be materialized
+    there: the authored capacity is per covered coordinate, so a region nobody
+    has walked through yet still has exactly the capacity its author gave it.
+    Cells inside the contract-pinned hunting band, or covered by any other
+    ambient branch, keep their own branch and are never provisioned into.
+
+    Callers consume only as far as their shortfall needs; the exhausted case
+    is the one path that walks the whole window.
     """
-    cells: list[tuple[int, int]] = []
-    for x in range(WILDERNESS_MAX_X + 1):
-        for y in range(WILDERNESS_MAX_Y + 1):
+    x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region_key]
+    for x in range(x_min, x_max + 1):
+        for y in range(y_min, y_max + 1):
             if region_for_coordinates(x, y) != region_key:
                 continue
-            if is_footprint_cell((x, y)):
+            if not is_valid_wilderness_cell((x, y)):
                 continue
             if species_rule_for_coordinates(x, y) != rule:
                 continue
-            cells.append((x, y))
-    return tuple(cells)
+            yield (x, y)
 
 
 def _emit_unavailable(
@@ -364,13 +366,21 @@ def ensure_hunt_targets(
         )
         return HuntProvisionResult((), needed, available, PROVISION_NO_ELIGIBLE_VARIANT)
 
-    candidates = _candidate_cells(region_key, rule)
-    headroom = {
-        cell: max(0, rule.capacity - len(living.get(cell, ())))
-        for cell in candidates
-    }
     deficit = needed - available
-    if sum(headroom.values()) < deficit:
+    # Reserve the headroom cells BEFORE creating anything, so a capacity
+    # refusal stays write-free; stop as soon as the shortfall is coverable
+    # instead of walking the whole region window.
+    reserved: list[tuple[tuple[int, int], int]] = []
+    reserved_total = 0
+    for cell in _candidate_cells(region_key, rule):
+        headroom = max(0, rule.capacity - len(living.get(cell, ())))
+        if headroom == 0:
+            continue
+        reserved.append((cell, headroom))
+        reserved_total += headroom
+        if reserved_total >= deficit:
+            break
+    if reserved_total < deficit:
         _emit_unavailable(
             region_key,
             species_key,
@@ -384,8 +394,8 @@ def ensure_hunt_targets(
     created: list[int] = []
     cursor = 0
     remaining = deficit
-    for cell in candidates:
-        take = min(headroom[cell], remaining)
+    for cell, headroom in reserved:
+        take = min(headroom, remaining)
         for _ in range(take):
             individual = _spawn_species_individual(
                 world, cell, creatable[cursor % len(creatable)], _population_key(*cell)

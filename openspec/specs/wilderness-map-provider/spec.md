@@ -159,3 +159,18 @@ ensure the coordinate's deterministic monster population per the scenarios below
 - **WHEN** any room created by `ElosernWildernessMapProvider` is inspected
 - **THEN** every one of its eight directional exits is an instance of
   `typeclasses.exits.WildernessReturnExit`
+
+### Requirement: The continent remains virtual with bounded local lookup
+The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east/north axes and authoritative coastline/terrain validity. Sea, closed ridges, cliffs and water SHALL be impassable on foot. Ordinary movement SHALL use bounded local masks and sparse indices without whole-frame scans or room materialization.
+
+#### Scenario: Frame and sea margin
+- **WHEN** (-1,0), (2700,0), and ocean-margin (0,0) are queried
+- **THEN** all are invalid for foot movement; land-side ordinary cells are valid subject to local obstacles and footprints; seven million rooms are never pre-created.
+
+#### Scenario: Anchor and port land
+- **WHEN** all nine declared anchor centers and six harbor centers are evaluated
+- **THEN** all lie inside the mainland polygon while knowledge visibility remains authoritative and seven unbuilt anchors create no invented settlement maps.
+
+#### Scenario: The closed ridge and waterways are impassable
+- **WHEN** a summit-ridge cell away from every authored pass, or an ordinary river cell, is queried
+- **THEN** it is invalid for foot movement, while the authored pass window and declared fords are walkable.

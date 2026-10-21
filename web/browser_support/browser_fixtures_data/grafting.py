@@ -166,12 +166,16 @@ def graft_synth_wilderness_terrain() -> None:
     import world.lore.wilderness_regions as _regions
     import world.lore.monsters as _monsters
     from world.tests.synthetic_data import SYNTH_REGIONS
-    from world.maps.wilderness_provider import region_for_coordinates
+    from world.maps.wilderness_provider import (
+        WILDERNESS_MAX_X,
+        WILDERNESS_MAX_Y,
+        region_for_coordinates,
+    )
 
     partition_keys = {
         region_for_coordinates(x, y)
-        for x in range(0, 224, 7)
-        for y in range(0, 224, 7)
+        for x in range(0, WILDERNESS_MAX_X + 1, 60)
+        for y in range(0, WILDERNESS_MAX_Y + 1, 60)
     }
     template = next(iter(SYNTH_REGIONS.values()))
     for key in sorted(partition_keys):

@@ -510,3 +510,18 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
 - **WHEN** a point-shape entry is validated
 - **THEN** its anchor cell SHALL have all eight wilderness neighbors provider-valid, so a
   gateway is never advertised toward a cell the provider cannot honor
+
+### Requirement: Physical footprints and concealed point entries preserve approaches
+Urban routing masks SHALL rasterize authored irregular physical footprints. Capital south/east gates SHALL retain facing and exact transformed entrance geometry with exterior approaches outside the mask. Ciaran SHALL be a hidden point entrance without a village-wide wilderness obstacle.
+
+#### Scenario: Capital mask and approaches
+- **WHEN** capital geometry is rasterized at 1km scale
+- **THEN** the approximately 40km² physical city controls the irregular mask rather than old 5x5 cells; south/east approaches lie outside it and crossing geometry charges once.
+
+#### Scenario: Point direction does not hijack routes
+- **WHEN** a traveller selects an unrelated neighboring direction at Ciaran’s entry cell
+- **THEN** ordinary wilderness movement remains ordinary; only the authored eligible entrance direction resolves to the hidden path and unknown players receive no village disclosure.
+
+#### Scenario: Point entry validation follows ordinary terrain validity
+- **WHEN** a point-shape entry is validated
+- **THEN** its anchor cell and the cell its authored entry direction leads to SHALL be provider-valid walkable terrain; unrelated directions follow ordinary terrain validity.
