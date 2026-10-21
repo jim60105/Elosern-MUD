@@ -493,3 +493,201 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             self.assertEqual(len(text), 9)
 
         page.close()
+
+    @covers_requirement(
+        "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection"
+    )
+    @covers_requirement(
+        "webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre"
+    )
+    def test_metric_projection_keeps_gap_ratio_and_actions(self):
+        """Metric coordinates survive transport and project at one uniform scale.
+
+        Injects the requirement's own frame — (0,0), (100,0), (1000,0),
+        (1000,6500) plus a (100,100) diagonal control and an east-remembered
+        landmark — and checks the real island and full-map surfaces: the
+        100 m and 900 m gaps draw at exactly 1:9 on both axes, east and north
+        steps draw equal, remembered markers keep their bearing, the fitted
+        overlay zooms and recentres without rewriting the payload, and the
+        adjacent node keeps its exact move identity.
+        """
+        from .browser_helpers import install_outbound_recorder, sent_action_count
+
+        metric_panel = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "grid",
+            "title": "度量城區",
+            "current_node": "grid:metric:0:0",
+            "nodes": [
+                {"id": "grid:metric:0:0", "label": "原點", "x": 0, "y": 0, "visibility": "current", "current": True, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:metric:100:0", "label": "東街", "x": 100, "y": 0, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": {"kind": "move", "exit_ref": "e", "destination": "grid:metric:100:0"}},
+                {"id": "grid:metric:1000:0", "label": "遠東", "x": 1000, "y": 0, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:metric:1000:6500", "label": "北關", "x": 1000, "y": 6500, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:metric:100:100", "label": "東北", "x": 100, "y": 100, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:metric:6000:0", "label": "東境關隘", "x": 6000, "y": 0, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+            ],
+            "edges": [
+                {"source": "grid:metric:0:0", "destination": "grid:metric:100:0", "label": "e", "known": True, "traversable": True},
+                {"source": "grid:metric:100:0", "destination": "grid:metric:1000:0", "label": "e", "known": True, "traversable": True},
+                {"source": "grid:metric:1000:0", "destination": "grid:metric:1000:6500", "label": "n", "known": True, "traversable": True},
+                {"source": "grid:metric:0:0", "destination": "grid:metric:100:100", "label": "ne", "known": True, "traversable": False},
+            ],
+            "legend": [
+                "你目前所在的位置",
+                "尚未探索的相鄰位置",
+                "已經探索過的相鄰位置",
+                "記憶中的邊界",
+            ],
+        }
+
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+        install_outbound_recorder(page)
+        self._inject_panel(page, metric_panel)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+            == "grid:metric:0:0",
+            timeout=30000,
+        )
+
+        # 1. Transport: the accepted payload keeps every committed coordinate.
+        committed = {
+            node["id"]: (node["x"], node["y"]) for node in self._local_map_panel(page)["nodes"]
+        }
+        self.assertEqual(
+            committed,
+            {
+                "grid:metric:0:0": (0, 0),
+                "grid:metric:100:0": (100, 0),
+                "grid:metric:1000:0": (1000, 0),
+                "grid:metric:1000:6500": (1000, 6500),
+                "grid:metric:100:100": (100, 100),
+                "grid:metric:6000:0": (6000, 0),
+            },
+        )
+
+        def centers(scope):
+            return page.evaluate(
+                """(scope) => {
+                  const read = (id) => {
+                    const el = document.querySelector(
+                      `${scope} [data-testid="local-map__node--${id}"]`
+                    );
+                    if (!el) return null;
+                    const m = el.getAttribute("transform").match(/-?[\\d.]+/g);
+                    return { x: Number(m[0]), y: Number(m[1]) };
+                  };
+                  return {
+                    origin: read("grid:metric:0:0"),
+                    near: read("grid:metric:100:0"),
+                    far: read("grid:metric:1000:0"),
+                    north: read("grid:metric:1000:6500"),
+                    diagonal: read("grid:metric:100:100"),
+                  };
+                }""",
+                scope,
+            )
+
+        # 2. The island draws the metric gaps at one uniform scale.
+        island = centers('[data-testid="local-map"]')
+        unit = island["near"]["x"] - island["origin"]["x"]
+        self.assertGreater(unit, 0)
+        self.assertAlmostEqual(
+            island["far"]["x"] - island["near"]["x"],
+            9 * unit,
+            places=3,
+            msg="the 900 m gap must draw nine times the 100 m gap",
+        )
+        self.assertAlmostEqual(
+            island["far"]["y"] - island["north"]["y"],
+            65 * unit,
+            places=3,
+            msg="6500 m north must draw 65 cells on the same scale",
+        )
+        self.assertAlmostEqual(
+            abs(island["diagonal"]["y"] - island["origin"]["y"]),
+            island["diagonal"]["x"] - island["origin"]["x"],
+            places=3,
+            msg="one cell east and one cell north must draw equal lengths",
+        )
+
+        # 3. A remembered place keeps its physical bearing on the island.
+        mirror_text = page.locator(
+            '[data-testid="local-map-edge-markers-mirror"]'
+        ).inner_text()
+        self.assertIn("東境關隘", mirror_text)
+        self.assertIn("東", mirror_text)
+
+        # 4. The full-map overlay opens fitted at one CSS pixel per user unit.
+        page.locator('[data-testid="local-map__expand"]').click()
+        page.wait_for_selector('[data-testid="map-overlay-content"]', timeout=10000)
+        overlay_scope = '[data-testid="map-overlay-content"]'
+        box = page.evaluate(
+            """(scope) => {
+              const svg = document.querySelector(`${scope} svg.local-map__lattice`);
+              const vb = svg.getAttribute("viewBox").split(/[\\s,]+/).map(Number);
+              return { viewBox: vb, width: svg.getBoundingClientRect().width };
+            }""",
+            overlay_scope,
+        )
+        self.assertAlmostEqual(
+            box["width"] / box["viewBox"][2],
+            1,
+            places=2,
+            msg="the fitted overlay must open at scale 1",
+        )
+
+        overlay = centers(overlay_scope)
+        overlay_unit = overlay["near"]["x"] - overlay["origin"]["x"]
+        self.assertAlmostEqual(
+            overlay["far"]["x"] - overlay["near"]["x"], 9 * overlay_unit, places=3
+        )
+        self.assertAlmostEqual(
+            abs(overlay["diagonal"]["y"] - overlay["origin"]["y"]),
+            overlay["diagonal"]["x"] - overlay["origin"]["x"],
+            places=3,
+        )
+
+        page.locator('[data-testid="map-overlay-zoom-in"]').click()
+        page.wait_for_timeout(150)
+        zoomed = page.evaluate(
+            """(scope) => document
+              .querySelector(`${scope} svg.local-map__lattice`)
+              .getAttribute("viewBox").split(/[\\s,]+/).map(Number)""",
+            overlay_scope,
+        )
+        self.assertLess(zoomed[2], box["viewBox"][2], "zoom-in must narrow the window")
+        page.locator('[data-testid="map-overlay-recentre"]').click()
+        page.wait_for_timeout(150)
+        self.assertEqual(
+            {
+                node["id"]: (node["x"], node["y"])
+                for node in self._local_map_panel(page)["nodes"]
+            },
+            committed,
+            "zoom/recentre must never rewrite the payload's metric coordinates",
+        )
+
+        # 5. The adjacent node keeps its exact move identity. (Only the
+        #    overlay scale exposes keyboard activation by design.)
+        destination = page.locator(
+            '[data-testid="local-map__node--grid:metric:100:0"]'
+        )
+        self.assertEqual(destination.get_attribute("role"), "button")
+        destination.click()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "explore.move") >= 1:
+                break
+            page.wait_for_timeout(250)
+        sent = page.evaluate("window.__elosernSent || []")
+        payload = next(
+            args[0]["payload"]
+            for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "explore.move"
+        )
+        self.assertEqual(payload["exit_ref"], "e")
+        self.assertEqual(payload["current_node"], "grid:metric:0:0")
+        page.close()
