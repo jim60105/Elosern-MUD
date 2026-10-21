@@ -625,6 +625,19 @@ def begin_sleep(actor: Any) -> SleepOutcome:
     return SleepOutcome(entry, continue_sleep(actor, entry))
 
 
+def accepted_wait_handoff_offer(actor: Any) -> str | None:
+    """The contextual offer after an accepted wait, or ``None``.
+
+    A wait can settle the controlled body into forced sleep mid-interval. The
+    accepted operation is already committed, so the offer is recomputed from
+    that committed state; an unselected or unpossessed body yields nothing.
+    """
+    candidates = _handoff_candidates(actor)
+    if not candidates:
+        return None
+    return render_handoff_offer_message(candidates)
+
+
 __all__ = [
     "BOOKING_IN_COMBAT_MESSAGE",
     "DAYPARTS",
@@ -640,6 +653,7 @@ __all__ = [
     "SleepOutcome",
     "SleepRefused",
     "advance_wait",
+    "accepted_wait_handoff_offer",
     "begin_sleep",
     "book_member_practice",
     "continue_sleep",

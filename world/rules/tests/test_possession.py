@@ -50,7 +50,12 @@ from world.rules.possession import (
     release_possession,
     sleep_handoff_candidates,
 )
-from world.rules.time_skip import continue_sleep, enter_sleep
+from world.rules.time_skip import (
+    accepted_wait_handoff_offer,
+    advance_wait,
+    continue_sleep,
+    enter_sleep,
+)
 
 
 class PossessionGateMatrixTests(EvenniaTest):
@@ -631,3 +636,39 @@ class SleepHandoffTests(EvenniaTest):
         other = self._companion("另一位同伴")
         options = sleep_handoff_candidates(self.account, self.player, other)
         self.assertEqual(options.reason, REASON_NOT_POSSESSING)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    def test_forced_sleep_episode_identity_never_replays(self):
+        sleeper, entry = self._sleeping_possession()
+        continue_sleep(sleeper, entry)
+        write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
+        first = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertTrue(first.available)
+        self.assertIn(
+            int(self.player.pk), [candidate.dbid for candidate in first.candidates]
+        )
+
+        # A forced sleeper wakes only after elapsed time; the next collapse runs
+        # in a later episode and cannot reuse the captured identity.
+        advance_wait(self.player, 6000)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.AWAKE)
+        write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
+        second = sleep_handoff_candidates(self.account, self.player, sleeper)
+        self.assertNotEqual(first.transition_id, second.transition_id)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
+        "time-skip-commands::recovery-waiting-preserves-skip-safety",
+    )
+    def test_accepted_wait_offers_handoff_after_a_forced_collapse(self):
+        sleeper = self._companion("力竭者")
+        enter_possession(self.player, sleeper)
+        write_fatigue_state(sleeper, 24, SleepPosture.AWAKE)
+        advance_wait(self.player, 60)
+        self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.FORCED)
+        offer = accepted_wait_handoff_offer(sleeper)
+        self.assertIsNotNone(offer)
+        self.assertIn("回到自己的身體", offer)
+        self.assertIn("精神儲備", offer)

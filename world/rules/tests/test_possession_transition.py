@@ -1433,6 +1433,8 @@ class SleepHandoffTransitionTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         register_catalog()
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
         self.npc = create_object(LLMNPC, key="沉睡同伴", location=self.room1)
         join_party(self.npc, self.char1)
         self.npc.race = "human"
@@ -1538,6 +1540,81 @@ class SleepHandoffTransitionTests(EvenniaTest):
                 self._confirm()
         self._assert_old_control_restored(tick_before)
         self._assert_target_untouched()
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_outer_failure_after_a_successful_return_restores_the_sleeper(self):
+        """A release that succeeded inside a rolled-back transaction is undone."""
+        import world.rules.possession as possession_module
+
+        tick_before = int(get_world_clock().tick)
+        logout_before = self.npc.attributes.get("prelogout_location")
+        real_return = possession_module._confirm_handoff_return
+
+        def _release_then_fail(commander, current_body):
+            real_return(commander, current_body)
+            raise RuntimeError("synthetic outer failure after release")
+
+        with patch(
+            "world.rules.possession._confirm_handoff_return",
+            side_effect=_release_then_fail,
+        ):
+            with self.assertRaises(PossessionWriteError):
+                confirm_sleep_handoff(
+                    self.account,
+                    self.char1,
+                    self.npc,
+                    int(self.char1.pk),
+                    transition_id=self.transition_id,
+                    session=self.session,
+                )
+        self._assert_old_control_restored(tick_before)
+        self.assertEqual(self.session.puppet, self.npc)
+        # The pre-existing puppet bookkeeping is restored, never a new residual.
+        self.assertEqual(
+            self.npc.attributes.get("prelogout_location"), logout_before
+        )
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    def test_outer_failure_after_an_owner_transfer_restores_the_owner(self):
+        """An owner-origin entry that succeeded before rollback is undone."""
+        import world.rules.possession as possession_module
+
+        release_possession(self.char1, npc=self.npc, reason="handback")
+        entry = enter_sleep(self.char1)
+        self.assertTrue(entry.handoff_offered)
+        tick_before = int(get_world_clock().tick)
+        transition = sleep_handoff_candidates(
+            self.account, self.char1, self.char1
+        ).transition_id
+        real_enter = possession_module._enter_possession
+
+        def _enter_then_fail(commander, npc, *, contextual_body=None):
+            real_enter(commander, npc, contextual_body=contextual_body)
+            raise RuntimeError("synthetic outer failure after target puppet")
+
+        with patch(
+            "world.rules.possession._enter_possession", side_effect=_enter_then_fail
+        ):
+            with self.assertRaises(PossessionWriteError):
+                confirm_sleep_handoff(
+                    self.account,
+                    self.char1,
+                    self.char1,
+                    int(self.target.pk),
+                    transition_id=transition,
+                    session=self.session,
+                )
+        self.assertEqual(int(get_world_clock().tick), tick_before)
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIsNone(current_possession(self.char1))
+        self.assertIsNone(self.target.db.possessed_by)
+        self.assertFalse(self.target.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIs(self.target.location, self.room1)
+        self.assertIs(read_fatigue_state(self.char1).posture, SleepPosture.VOLUNTARY)
 
     @covers_requirement(
         "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"

@@ -720,11 +720,42 @@ class PossessionPresentationTests(EvenniaTest):
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], REASON_STALE_HANDOFF)
-        self.assertEqual(
-            [row["identity"] for row in result["data"]["candidates"]],
-            [int(self.player.pk)],
-        )
+        self.assertNotIn("data", result)
         self.assertEqual(int(get_world_clock().tick), before_tick)
+        self.assertEqual(
+            self.player.db.possession["npc_dbid"], int(self.npc.pk)
+        )
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    def test_sleep_handoff_stale_selection_is_a_protocol_valid_refusal(self):
+        """The dispatcher emits the stable refusal, never an internal error."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        candidate.location = self.room2
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": self.coordinator.epoch,
+            "request_id": "req-handoff-stale-choice",
+            "base_revision": self.coordinator.revision,
+            "action_id": "explore.possess",
+            "payload": {"npc_id": int(candidate.pk)},
+        }
+        handle_ui_action(
+            self.session,
+            self.npc,
+            envelope,
+            self.action_registry,
+            self.registry,
+        )
+        result = next(
+            kw["ui_action_result"][0][0]
+            for _args, kw in reversed(self.sent_messages)
+            if "ui_action_result" in kw
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], REASON_STALE_HANDOFF)
+        self.assertNotIn("data", result)
         self.assertEqual(
             self.player.db.possession["npc_dbid"], int(self.npc.pk)
         )
@@ -758,7 +789,8 @@ class PossessionPresentationTests(EvenniaTest):
             if "ui_action_result" in kw
         )
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "handoff")
+        self.assertEqual(result["code"], "handoff_pending")
+        self.assertIn("正在交接控制權", result["message"])
         self.clock.advance(0.1)
         self.assertEqual(self.session.puppet, candidate)
         self.assertEqual(self.player.db.possession["npc_dbid"], int(candidate.pk))
@@ -792,6 +824,31 @@ class PossessionPresentationTests(EvenniaTest):
         )
         self.assertEqual(stale["outcome"], "stale")
         self.assertEqual(self.player.db.possession["npc_dbid"], int(candidate.pk))
+
+    @covers_requirement(
+        "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    def test_sleep_handoff_admission_never_claims_completion_on_failure(self):
+        """A candidate that turns stale before execution gets a refusal, not success."""
+        candidate, _entry = self._sleeping_possession_with_candidate()
+        admission = _possess_adapter(
+            self.npc, {"npc_id": int(candidate.pk)}, session=self.session
+        )
+        self.assertEqual(admission["outcome"], "success")
+        self.assertEqual(admission["code"], "handoff_pending")
+        candidate.location = self.room2
+        self.clock.advance(0.1)
+        self.assertEqual(self.player.db.possession["npc_dbid"], int(self.npc.pk))
+        self.assertEqual(self.session.puppet, self.npc)
+        messages = []
+        for args, kw in self.sent_messages:
+            if kw.get("text") and kw["text"][0]:
+                messages.append(str(kw["text"][0][0]))
+            elif args:
+                messages.append(str(args[0]))
+        self.assertTrue(
+            any("交接選項已經失效" in line for line in messages), messages
+        )
 
     @covers_requirement(
         "time-skip-commands::recovery-waiting-preserves-skip-safety"

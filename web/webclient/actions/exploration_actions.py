@@ -62,6 +62,7 @@ from world.rules.time_skip import (
     PracticeReject,
     SkipRefused,
     SleepRefused,
+    accepted_wait_handoff_offer,
     advance_wait,
     begin_sleep,
     book_member_practice,
@@ -952,6 +953,9 @@ def _wait_adapter(
     else:
         elapsed = result.elapsed_seconds
     message = render_skip_summary(elapsed, result.events)
+    offer = accepted_wait_handoff_offer(actor)
+    if offer is not None:
+        message = f"{message}\n{offer}"
     actor.msg(message)
     # The summary already carries each committed unlock line; record the
     # session unread marks from the same committed events.
@@ -1026,21 +1030,6 @@ def _sleep_handoff_context(
     return account, commander, options
 
 
-def _handoff_candidates_data(options: Any) -> dict[str, Any]:
-    """The current choices, so a stale response re-renders exactly what is lawful."""
-    return {
-        "candidates": [
-            {
-                "identity": candidate.dbid,
-                "name": candidate.name,
-                "kind": candidate.kind,
-                "reserve_percent": candidate.reserve_percent,
-            }
-            for candidate in options.candidates
-        ]
-    }
-
-
 def _handoff_rejection(options: Any) -> dict[str, Any]:
     from world.rules.possession import (
         POSSESSION_REJECTION_MESSAGES,
@@ -1049,12 +1038,9 @@ def _handoff_rejection(options: Any) -> dict[str, Any]:
     )
 
     code = REASON_NO_CANDIDATE if not options.candidates else REASON_STALE_HANDOFF
-    return {
-        "outcome": "rejected",
-        "code": code,
-        "message": POSSESSION_REJECTION_MESSAGES[code],
-        "data": _handoff_candidates_data(options),
-    }
+    # The result data slot is contractually success-only; a stale selection is a
+    # plain stable rejection. The committed panels carry the current choices.
+    return _rejected(code, POSSESSION_REJECTION_MESSAGES[code])
 
 
 def _perform_handoff_transition(
@@ -1124,10 +1110,10 @@ def _handoff_result(
     )
     from world.rules.possession import SLEEP_HANDOFF_RETURN, confirm_sleep_handoff
 
-    if candidate.kind == SLEEP_HANDOFF_RETURN:
-        message = "你的意識回到了自己的身體。"
-    else:
-        message = f"你接手了{candidate.name}的身體。"
+    # Admission only: the transfer is verified on the next reactor turn. The
+    # completed outcome arrives as the committed new-epoch presentation, and a
+    # failure sends the stable refusal from the deferred verifier.
+    message = "正在交接控制權……"
     if session is not None:
         get_clock().callLater(
             0,
@@ -1142,7 +1128,7 @@ def _handoff_result(
         _set_transition_pending(session)
         return {
             "outcome": "success",
-            "code": "handoff",
+            "code": "handoff_pending",
             "message": message,
             "no_presentation": True,
         }
@@ -1154,7 +1140,11 @@ def _handoff_result(
         transition_id=transition_id,
         session=None,
     )
-    return _success("handoff", message, AFFECTED_FULL)
+    if candidate.kind == SLEEP_HANDOFF_RETURN:
+        completed = "你的意識回到了自己的身體。"
+    else:
+        completed = f"你接手了{candidate.name}的身體。"
+    return _success("handoff", completed, AFFECTED_FULL)
 
 
 def _possess_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:

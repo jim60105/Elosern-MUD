@@ -663,18 +663,38 @@ def _sleep_handoff_transition_id(current_body: Any, binding: Mapping[str, Any] |
     """Return the stable identity of the current sleep-control episode.
 
     The recorded episode is written by :func:`begin_sleep_handoff` once per
-    voluntary sleep entry. A body whose physiology predates this writer falls
-    back to its possession tick, which is still a committed, non-guessable
-    source (the possession writer owns it).
+    voluntary sleep entry. A forced-sleep episode has no voluntary entry, so it
+    falls back to its committed observation: the world tick, the posture, and
+    the exact reserve. A forced wake only happens after elapsed time, so a
+    later collapse can never reproduce the same identity.
     """
+    from world.rules.clock import read_world_clock
+    from world.rules.fatigue import read_optional_fatigue_state, SleepPosture
+
     attributes = getattr(current_body, "attributes", None)
     episode = None
     if attributes is not None:
         episode = attributes.get(SLEEP_HANDOFF_EPISODE_ATTRIBUTE, default=None)
-    if isinstance(episode, int) and not isinstance(episode, bool) and episode >= 0:
-        return f"{int(current_body.pk)}:{episode}"
+    clock = read_world_clock()
+    tick = 0 if clock is None else int(clock.tick)
+    posture = SleepPosture.AWAKE.value
+    reserve = 0
+    try:
+        state = read_optional_fatigue_state(current_body)
+    except Exception:  # observability: ignore R2: a malformed reserve only degrades the fallback identity to the committed tick/posture; no state is written
+        state = None
+    if state is not None:
+        posture = state.posture.value
+        reserve = int(state.reserve_units)
+    if (
+        posture == SleepPosture.VOLUNTARY.value
+        and isinstance(episode, int)
+        and not isinstance(episode, bool)
+        and episode >= 0
+    ):
+        return f"{int(current_body.pk)}:v:{episode}"
     since_tick = 0 if binding is None else int(binding.get("since_tick", 0))
-    return f"{int(current_body.pk)}:0:{since_tick}"
+    return f"{int(current_body.pk)}:f:{tick}:{posture}:{reserve}:{since_tick}"
 
 
 def record_sleep_handoff_episode(current_body: Any) -> None:
@@ -731,13 +751,23 @@ def _account_possession_holder(account: Any) -> Any | None:
 
 
 def _candidate_action_capable(candidate: Any) -> bool:
-    """Awake, living, and able to act: the shared eligibility for a candidate."""
+    """Awake, living, and able to act: reuse the shared capability decision."""
+    from world.rules.action.gates import capability_failure
+    from world.rules.buffs import blocks_action
     from world.rules.party_scope import is_knocked_out
 
     if _sleep_posture_blocks(candidate):
         return False
     try:
-        return not is_knocked_out(candidate)
+        if is_knocked_out(candidate):
+            return False
+        attributes = getattr(candidate, "attributes", None)
+        blocked = bool(
+            attributes is not None
+            and attributes.has("buffs")
+            and blocks_action(candidate)
+        )
+        return capability_failure(candidate, blocked) is None
     except Exception:  # observability: ignore R2: a candidate without readable HP is not action-capable; this display read writes nothing
         return False
 
@@ -892,6 +922,38 @@ def _restore_owner_control(player: Any, snapshot: Mapping[str, Any]) -> None:
     _restore_logout_attributes(player, snapshot["logout_attributes"])
 
 
+def _restore_owner_session(player: Any, account: Any, sessions: tuple[Any, ...]) -> None:
+    """Verify the owner is puppeted again on every original session.
+
+    A transfer from the owner's own body has no possession snapshot to restore,
+    so the non-transactional puppet effect is reversed here under a fresh
+    sequence, exactly like the release compensation. An unverifiable restore is
+    a truthful failure, never a silently divergent session.
+    """
+    if account is None:
+        return
+    from web.webclient.actions.dispatcher import retire_sequence
+    from web.webclient.presentation.ingress import (
+        reset_client_sequence,
+        synchronize_session,
+    )
+
+    for session in sessions:
+        retire_sequence(session)
+        reset_client_sequence(session)
+        if account.get_puppet(session) is not player:
+            try:
+                account.puppet_object(session, player)
+            except Exception as error:
+                raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
+        if account.get_puppet(session) is not player:
+            raise PossessionWriteError(
+                REASON_RELEASE_REFUSED,
+                "Cannot restore the owner body after a failed handoff",
+            )
+        synchronize_session(session, player)
+
+
 def _snapshot_handoff_target(target: Any) -> dict[str, Any]:
     """Capture every control surface a contextual transfer may touch."""
     return {
@@ -976,11 +1038,8 @@ def confirm_sleep_handoff(
     if target is None:
         raise PossessionGateError(REASON_STALE_HANDOFF, candidates=options.candidates)
 
-    old_control = (
-        snapshot_party_control(commander, current_body)
-        if candidate.kind != SLEEP_HANDOFF_RETURN
-        else None
-    )
+    old_control = snapshot_party_control(commander, current_body)
+    owner_sessions = tuple(_acting_sessions(current_body))
     owner_before = _snapshot_owner_control(commander)
     target_before = _snapshot_handoff_target(target)
     attempted = False
@@ -1011,11 +1070,23 @@ def confirm_sleep_handoff(
             # The enclosing transaction has rolled the durable mirrors back.
             # The puppet/cmdset/location effects are not transactional, so the
             # exact prior control state is restored here, outside the rollback.
-            if old_control is not None:
+            if current_body is not commander:
                 restore_party_control(commander, current_body, old_control)
+            else:
+                # The rollback restored the durable rows, but the idmapper
+                # cache still holds the attempted binding; reset both surfaces.
+                restore_possession_surfaces(
+                    commander, None, old_control["player"], old_control["npc"]
+                )
+            _restore_owner_control(commander, owner_before)
+            # An owner-origin transfer has no possession snapshot to restore:
+            # its own sessions must be verified back onto the owner body.
+            if current_body is commander:
+                _restore_owner_session(commander, account, owner_sessions)
+            # Restore the attempted target LAST: repuppeting an owner session
+            # unpuppets the target and stashes its occupied room again.
             if locked_candidate.kind != SLEEP_HANDOFF_RETURN:
                 _restore_handoff_target(target, target_before)
-            _restore_owner_control(commander, owner_before)
         if isinstance(error, (PossessionGateError, PossessionWriteError)):
             raise
         # observability: ignore R2: the write failure is re-raised as the stable PossessionWriteError below
