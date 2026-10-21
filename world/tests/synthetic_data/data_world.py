@@ -145,6 +145,7 @@ SYNTH_NATIONS: dict[str, Nation] = {
         "t_duskmari",
         240_000,
         0.04,
+        9_600,
         "苔沼合邦議長",
         "Synthetic militia notes.",
         "Synthetic federation notes.",
