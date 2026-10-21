@@ -325,15 +325,14 @@ The implementation worker is **luna** for every change, using `feat/<change-slug
 
 ## 17. Parallel implementation order
 
-Dependency-correct waves below. This batch supplies the physiology contract that the map batch's traversal change waits on, so the two batches interleave; the combined order is in the companion design. Changes sharing declared code conflicts serialize even inside a wave.
+Wave numbers below are the shared numbers from the combined eight-wave order in the companion design, so this batch occupies waves 1, 2, 3 and 5 and shares wave 3 with the map batch. Changes sharing declared code conflicts serialize even inside a wave.
 
 | Wave | Changes | Workers | Basis |
 | --- | --- | ---: | --- |
 | 1 | `establish-mental-reserve-core` | 1 | No prerequisites; new reserve module and entity state are isolated from map work |
 | 2 | `project-physiological-fatigue` | 1 | Needs wave 1 reserve; buff, status-query and party-scope surfaces serialize with later consumers |
-| 3 | `settle-party-sleep-and-wait` | 1 | Needs wave 2 projection plus the map batch's `charge-distance-based-travel`; owns clock, skip, exit and movement edits |
-| 4 | `integrate-sleeping-combat-rosters` | 1 | Needs wave 2 projection only, so it may run beside wave 3 |
-| 5 | `handoff-sleeping-party-control` | 1 | Declares conflicts with the sleep adapters and combat authority landed in waves 3 and 4 |
-| 6 | `settle-terminal-combat-fatigue` | 1 | Needs wave 4 rosters and wave 5 post-commit handoff routing |
+| 3 | `settle-party-sleep-and-wait`, `integrate-sleeping-combat-rosters` | 2 | Sleep needs wave 2 projection plus the map batch's `charge-distance-based-travel`; rosters need only wave 2, so they run beside sleep on disjoint surfaces |
+| 4 | `handoff-sleeping-party-control` | 1 | Declares conflicts with the sleep adapters and combat authority landed in wave 3 |
+| 5 | `settle-terminal-combat-fatigue` | 1 | Needs wave 3 rosters and wave 4 post-commit handoff routing |
 
-Waves 3 and 4 are the batch's only parallelism. Everything after them serializes: handoff depends on both, and terminal settlement closes the physiology contract that `integrate-fatigue-aware-traversal` then consumes.
+Wave 3 is the batch's only parallelism. Everything after it serializes: handoff depends on both wave 3 changes, and terminal settlement closes the physiology contract that `integrate-fatigue-aware-traversal` then consumes.
