@@ -321,7 +321,7 @@ The implementation worker is **luna** for every change, using `feat/<change-slug
 
 ### 16.1 Cross-batch contract with the map design
 
-`integrate-fatigue-aware-traversal` in the companion batch carries `depends-on: external:party-fatigue-and-sleep`. The integration step replaces that token with **`settle-terminal-combat-fatigue`**, which transitively requires every change in this batch. Replacing the token with any single earlier component would let traversal integrate against a partial physiology contract; the whole batch must be treated as one scheduling barrier. Re-run `openspec validate --all --strict` after the replacement.
+`integrate-fatigue-aware-traversal` in the companion batch carried `depends-on: external:party-fatigue-and-sleep` while this batch was still being planned. This batch is now implemented and archived, and the token has been replaced with **`settle-terminal-combat-fatigue`**, which transitively requires every change in this batch. Substituting any single earlier component would have let traversal integrate against a partial physiology contract; the whole batch must be treated as one scheduling barrier.
 
 ## 17. Parallel implementation order
 

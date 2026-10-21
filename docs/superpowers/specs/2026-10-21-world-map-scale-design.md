@@ -309,14 +309,9 @@ The implementation worker is **luna** for every change, using `feat/<change-slug
 
 ### 16.1 Cross-batch dependency on the fatigue design
 
-`integrate-fatigue-aware-traversal` consumes the fatigue API that the companion design owns, so it carries an unresolved token instead of a guessable name:
+`integrate-fatigue-aware-traversal` consumes the fatigue API that the companion design owns. During planning it carried the unresolved token `external:party-fatigue-and-sleep` until the companion batch existed. The companion batch has now landed, and the token was replaced with **`settle-terminal-combat-fatigue`** in `openspec/changes/integrate-fatigue-aware-traversal/proposal.md` and in every matrix row that quoted it (`integrate-fatigue-aware-traversal`, `rescale-wilderness-geography`, `activate-metric-settlements`).
 
-```text
-depends-on: charge-distance-based-travel
-depends-on: external:party-fatigue-and-sleep
-```
-
-The integration step replaces `external:party-fatigue-and-sleep` with **`settle-terminal-combat-fatigue`**. That change transitively requires every component of the companion batch, so one replacement preserves a full-design scheduling barrier and introduces no dependency cycle. Replace the token in `openspec/changes/integrate-fatigue-aware-traversal/proposal.md` and in every matrix row that quotes it, then re-run `openspec validate --all --strict`. Do not replace it before the companion batch exists, and do not substitute a narrower fatigue change, which would let traversal integrate against a partially landed physiology contract.
+That change transitively requires every component of the companion batch, so the single replacement preserves a full-design scheduling barrier and introduces no dependency cycle. Substituting a narrower fatigue change would have let traversal integrate against a partially landed physiology contract.
 
 ## 17. Parallel implementation order
 

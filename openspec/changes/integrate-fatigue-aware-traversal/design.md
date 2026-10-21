@@ -18,7 +18,7 @@ Prefer stable sparse authored identity and explicit physical segments to dense m
 
 - Shared bootstrap/exit consumers can retain old assumptions. Mitigation: enumerate consumers in tasks and execute end-to-end owning tests before handoff.
 - Persistent coordinates participate in identity. Mitigation: deterministic in-place synchronization, preflight conflict rejection, durable/cache rollback and repeat-start idempotence, never delete/recreate occupied rooms.
-- External companion proposal is not yet available. Mitigation: `external:party-fatigue-and-sleep` blocks fatigue integration and dependent runtime activations until its real change/API is bound.
+- The companion fatigue batch is now implemented. Mitigation: the dependency is bound to `settle-terminal-combat-fatigue`, which transitively requires every fatigue component, so traversal integrates against the complete physiology contract rather than a partial one.
 
 ## Migration Plan
 
