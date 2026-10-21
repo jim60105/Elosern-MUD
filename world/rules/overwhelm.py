@@ -16,6 +16,11 @@ from world.rules.unlock_notices import UnlockNotice
 from world.skills.effects import DamageEffect
 from world.skills.registry import SKILL_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.skills.narration import (
+    COMPACT_POOLS,
+    commanded_action_line,
+    overwhelm_summary_line,
+)
 
 
 OVERWHELM_YAML = yaml.safe_load(
@@ -362,22 +367,34 @@ def compress_event_logs(
                     if definition is not None
                     else commanded_action_key
                 )
+                try:
+                    marker_template = commanded_action_line(
+                        "item", actor=str(commanded_actor)
+                    )
+                except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
+                    marker_template = COMPACT_POOLS["commanded_action"]
                 marker = EventEntry(
                     kind="commanded_action",
                     actor=commanded_actor,
                     target=None,
                     data={"item": label},
-                    text_template="你使用了「{data[item]}」。",
+                    text_template=marker_template,
                 )
             else:
                 skill = SKILL_REGISTRY.get(commanded_action_key)
                 label = skill.label if skill is not None else commanded_action_key
+                try:
+                    marker_template = commanded_action_line(
+                        "skill", actor=str(commanded_actor)
+                    )
+                except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
+                    marker_template = COMPACT_POOLS["commanded_action"]
                 marker = EventEntry(
                     kind="commanded_action",
                     actor=commanded_actor,
                     target=None,
                     data={"skill": label},
-                    text_template="你施展了「{data[skill]}」。",
+                    text_template=marker_template,
                 )
             entries = (marker,) + entries
         preserved.append(replace(log, entries=entries))
@@ -388,6 +405,10 @@ def compress_event_logs(
         int(entry.data.get("amount", 0))
         for entry in damage_entries
     )
+    try:
+        summary_template = overwhelm_summary_line()
+    except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
+        summary_template = COMPACT_POOLS["overwhelm_resolution"]
     summary_entry = EventEntry(
         kind="overwhelm_resolution",
         actor=overwhelming_team,
@@ -397,11 +418,7 @@ def compress_event_logs(
             "hits": hits,
             "total_damage": total_damage,
         },
-        text_template=(
-            "{actor} 與 {target} 在壓倒性態勢判定下交戰 "
-            "{data[rounds]} 回合；雙方共命中 {data[hits]} 次，"
-            "造成 {data[total_damage]} 點傷害。"
-        ),
+        text_template=summary_template,
     )
     summary = EventLog(
         actor=overwhelming_team,

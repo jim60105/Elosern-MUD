@@ -4,10 +4,12 @@ import unittest
 
 from world.rules.action import RejectReason
 from world.rules.combat_result import (
+    CONTINUE_MESSAGE,
     settle_to_messages,
     settle_to_oob_result,
 )
 from world.rules.event_log import EventEntry, EventLog
+from world.rules.player_messages import terminal_outcome_message
 
 
 class CombatResultRenderingTests(unittest.TestCase):
@@ -28,14 +30,14 @@ class CombatResultRenderingTests(unittest.TestCase):
         )
         self.assertEqual(len(lines), 1)
         self.assertIn("造成了 5 點傷害", lines[0])
-        self.assertEqual(message, "行動完成，繼續戰鬥。")
+        self.assertEqual(message, CONTINUE_MESSAGE)
 
     def test_terminal_settlement_uses_stable_message(self):
         lines, message = settle_to_messages(
             {"outcome": "victory", "logs": [self._log()]}
         )
         self.assertEqual(len(lines), 1)
-        self.assertEqual(message, "戰鬥結束，你取得了勝利。")
+        self.assertEqual(message, terminal_outcome_message("victory"))
 
     def test_rejected_settlement_emits_no_prose(self):
         lines, message = settle_to_messages(
@@ -95,7 +97,7 @@ class CombatResultRenderingTests(unittest.TestCase):
         result = settle_to_oob_result({"outcome": "fled"})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "fled")
-        self.assertEqual(result["message"], "你脫離了戰鬥。")
+        self.assertEqual(result["message"], terminal_outcome_message("fled"))
         # A terminal outcome must publish a full snapshot, not a partial
         # update: the mode flips back to exploration.
         self.assertEqual(result["affected_panels"], ())

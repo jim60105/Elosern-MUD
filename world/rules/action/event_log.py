@@ -5,10 +5,20 @@ values, derives defeat/knock-out crossings over projected HP, and assembles
 the final ``EventLog``.
 """
 
+from dataclasses import replace
 from typing import Any
 
 from world.rules.event_log import EventEntry, EventLog
 from world.skills.registry import SkillDef
+from world.skills.narration import (
+    FALLBACK_TEMPLATES,
+    INTERNAL_KINDS,
+    action_line,
+    act_for_skill,
+    compose_first_line,
+    entry_line,
+    family_key,
+)
 
 from world.rules.action.contracts import (
     _entity_key,
@@ -21,50 +31,9 @@ from world.rules.action.contracts import (
 from world.rules.action.gates import _stored_trait_value
 
 
-_ENTRY_TEMPLATES = {
-    "resource_spend": "{actor} 消耗了資源。",
-    "self_return_clear": "{actor} 重整架勢，重返戰鬥位置。",
-    "session_stamp": "{actor} 立下了殉者之誓。",
-    "rite_blessing": "{actor} 祝聖了自身的武備。",
-    "rite_shelter": "{actor} 在聖所中獲得了庇護。",
-    "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
-    "disguise_set": "{actor} 改變了 {target} 的偽裝狀態。",
-    "disguise_lifted": "{actor} 解除了 {target} 的偽裝狀態。",
-    "reveal_lifted": "{actor} 看穿了 {target} 的偽裝。",
-    "reveal_noop": "{actor} 未能看穿 {target} 的偽裝。",
-    "buff_applied": "{actor} 對 {target} 施加了狀態效果。",
-    "grants_revoked": "{actor} 收回了 {target} 身上的一切授予。",
-    "self_buff_applied": "{actor} 凝聚精神，狀態獲得提升。",
-    "buffs_cleansed": "{actor} 淨化了 {target} 的異常狀態。",
-    "equipment_immune": "{target} 的裝備抵銷了{actor} 施加的負面效果——{target} 對此免疫。",
-    "sexual_transition": "{target} 的狀態發生了變化。",
-    "sexual_resist": "{target} 面對 {actor} 的意圖，做出了自己的選擇。",
-    "pleasure_gain": "{target} 的快感提升了。",
-    "sexual_counter": "{target} 的性行為計數提升了。",
-    "trait_delta": "{target} 的能力值發生了變化。",
-    "roll": "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。",
-    "damage": "{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
-    "heal": "{actor} 對 {target} 恢復了 {data[amount]} 點生命。",
-    "self_heal": "{actor} 恢復了 {data[amount]} 點生命。",
-    "target_defeated": "{actor} 擊敗了 {target}。",
-    "target_knocked_out": "{actor} 擊倒了 {target}。",
-    "disengage_attempt": "{actor} 嘗試脫離戰鬥。",
-    "skill_practice": "{actor} 累積了技能熟練度。",
-    "combat_kill_xp": "",
-    "knocked_out_mark": "",
-    "divine_pleasure_max": "{actor} 以神之律令，將 {target} 的快感推至頂點。",
-    "divine_climax_extension": "{actor} 以神之律令，延續了 {target} 的絕頂。",
-    "divine_drain": "{actor} 從 {target} 身上汲取了神域之力。",
-    "divine_drain_actor": "",
-    "divine_saturate_sensitivity": "{actor} 以神之律令，重塑了 {target} 的感官。",
-    "divine_clamp_shame": "{actor} 以神之律令，剝奪了 {target} 的羞恥。",
-    "divine_mark_submission": "{actor} 以神之律令，將 {target} 化為絕對從屬。",
-    "divine_restore_purity": "{actor} 以神之律令，使 {target} 回歸純淨。",
-    "pleasure_peak": "{actor} 使 {target} 的快感推至頂點。",
-    "gauge_transfer": "{actor} 對 {target} 發動了量表轉移。",
-    "gauge_transfer_actor": "",
-    "damage_divert": "",
-}
+#: Numberless fallbacks: the template every entry starts from before the
+#: narration pass selects its authored line. Internal-only kinds stay empty.
+_FALLBACK_TEMPLATES = FALLBACK_TEMPLATES
 
 
 def _entries_from_effect(
@@ -72,7 +41,7 @@ def _entries_from_effect(
     effect: PendingEffect,
 ) -> tuple[EventEntry, ...]:
     parts = effect.description.split("|")
-    if len(parts) < 2 or parts[0] not in _ENTRY_TEMPLATES:
+    if len(parts) < 2 or parts[0] not in _FALLBACK_TEMPLATES:
         raise ValueError(f"malformed pending-effect description {effect.description!r}")
     kind, target, *values = parts
     if kind == "resource_spend":
@@ -136,7 +105,7 @@ def _entries_from_effect(
             actor=actor_key,
             target=target,
             data={"raw_roll": raw_roll, "hit": bool(hit_flag)},
-            text_template=_ENTRY_TEMPLATES["roll"],
+            text_template=_FALLBACK_TEMPLATES["roll"],
         )
         if not hit_flag:
             return (roll_entry,)
@@ -147,7 +116,7 @@ def _entries_from_effect(
                 actor=actor_key,
                 target=target,
                 data={"amount": amount},
-                text_template=_ENTRY_TEMPLATES["damage"],
+                text_template=_FALLBACK_TEMPLATES["damage"],
             ),
         )
     elif kind == "disengage_attempt":
@@ -199,7 +168,7 @@ def _entries_from_effect(
         actor=actor_key,
         target=target,
         data=data,
-        text_template=_ENTRY_TEMPLATES[kind],
+        text_template=_FALLBACK_TEMPLATES[kind],
     )
     if kind != "resource_spend":
         return (entry,)
@@ -213,7 +182,7 @@ def _entries_from_effect(
                 "trait_key": data["resource_key"],
                 "delta": -data["amount"],
             },
-            text_template=_ENTRY_TEMPLATES["trait_delta"],
+            text_template=_FALLBACK_TEMPLATES["trait_delta"],
         ),
     )
 
@@ -277,17 +246,120 @@ def _defeated_entry(
         target=str(entity.key),
         data=data,
         text_template=(
-            _ENTRY_TEMPLATES["target_knocked_out"]
+            _FALLBACK_TEMPLATES["target_knocked_out"]
             if nonlethal
-            else _ENTRY_TEMPLATES["target_defeated"]
+            else _FALLBACK_TEMPLATES["target_defeated"]
         ),
     )
+
+
+def _max_hp_value(entity: Any) -> float | None:
+    """Read one entity's stored maximum HP without advancing a gauge."""
+    trait = getattr(getattr(entity, "traits", None), "hp", None)
+    if trait is None:
+        return None
+    maximum = getattr(trait, "max", None)
+    if maximum is None:
+        maximum = getattr(trait, "max_value", None)
+    if maximum is None:
+        data = getattr(trait, "_data", None)
+        if isinstance(data, dict):
+            maximum = (
+                data.get("base", 0) + data.get("mod", 0)
+            ) * data.get("mult", 1)
+    if maximum is None:
+        return None
+    try:
+        return float(maximum)
+    except (TypeError, ValueError):
+        return None
+
+
+def _max_hp_by_key(pending: list[PendingEffect]) -> dict[str, float]:
+    """Map participant keys to their stored maximum HP for band selection."""
+    maximums: dict[str, float] = {}
+    for effect in pending:
+        entity = effect.entity
+        key = getattr(entity, "key", None)
+        if key is None:
+            continue
+        key = str(key)
+        if key in maximums:
+            continue
+        maximum = _max_hp_value(entity)
+        if maximum is not None:
+            maximums[key] = maximum
+    return maximums
+
+
+def _narrate_entries(
+    entries: list[EventEntry],
+    skill: SkillDef,
+    scope: str,
+    max_hp_by_key: dict[str, float],
+) -> list[EventEntry]:
+    """Return the entries with their authored narration templates selected.
+
+    A lookup or rendering fault leaves that entry's numberless fallback in
+    place: presentation must never reject a legal action (design D11).
+    """
+    family = family_key(skill)
+    act = act_for_skill(skill.key)
+    narrated: list[EventEntry] = []
+    for ordinal, entry in enumerate(entries):
+        if entry.kind in INTERNAL_KINDS:
+            narrated.append(entry)
+            continue
+        target = entry.target or ""
+        try:
+            if entry.kind == "action_narration":
+                template = action_line(
+                    skill.key,
+                    family,
+                    scope=scope,
+                    target_key=target,
+                    actor=entry.actor,
+                )
+            else:
+                template = entry_line(
+                    entry.kind,
+                    entry.data,
+                    skill_key=skill.key,
+                    family=family,
+                    scope=scope,
+                    ordinal=ordinal,
+                    actor_key=entry.actor,
+                    target_key=target,
+                    actor=entry.actor,
+                    target=target,
+                    act=act,
+                    max_hp=max_hp_by_key.get(
+                        target
+                    ) or max_hp_by_key.get(entry.actor),
+                )
+                if ordinal == 0:
+                    template = compose_first_line(
+                        skill.key,
+                        family,
+                        template,
+                        scope=scope,
+                        target_key=target,
+                        actor=entry.actor,
+                        target=target,
+                    )
+        except Exception:  # observability: ignore R2: narration is presentation and degrades rather than reject a legal action (design D11)
+            narrated.append(entry)
+            continue
+        narrated.append(replace(entry, text_template=template))
+    return narrated
 
 
 def _step7_build_event_log(
     request: ActionRequest,
     skill: SkillDef,
     pending: list[PendingEffect],
+    *,
+    narration_scope: str = "",
 ) -> EventLog:
     try:
         entries: list[EventEntry] = []
@@ -326,6 +398,28 @@ def _step7_build_event_log(
             )
             if defeated is not None:
                 entries.append(defeated)
+        if not entries:
+            # A successful action whose effects staged nothing still tells the
+            # player which skill they used. This is the single entry narration
+            # may add (design D4).
+            entries.append(
+                EventEntry(
+                    kind="action_narration",
+                    actor=_entity_key(request.actor),
+                    target=None,
+                    data={},
+                    text_template="",
+                )
+            )
+        scope = narration_scope or str(
+            event_context.get("narration_scope", "") or ""
+        )
+        try:
+            entries = _narrate_entries(
+                entries, skill, scope, _max_hp_by_key(pending)
+            )
+        except Exception:  # observability: ignore R2: narration is presentation and degrades rather than reject a legal action (design D11)
+            pass
     except Exception as error:
         raise RejectedAction(
             RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,

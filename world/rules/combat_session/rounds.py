@@ -67,6 +67,7 @@ from world.rules.progression import (
     snapshot_practice_dedupe,
 )
 from world.rules.skip_safety import register_active_battlefield
+from world.skills.narration import COMPACT_POOLS, party_retreat_line
 
 
 def _knocked_out_ids(logs, battlefield) -> tuple[int, ...]:
@@ -1229,6 +1230,10 @@ def _party_retreat_event_log(
     attempt — and, for a contested attempt, its single roll — into the
     durable round record and the ordinary text output.
     """
+    try:
+        template = party_retreat_line(verdict == "escaped")
+    except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
+        template = COMPACT_POOLS["party_retreat"]
     entry = EventEntry(
         kind="party_retreat",
         actor=str(commander.key),
@@ -1239,11 +1244,7 @@ def _party_retreat_event_log(
             "allied_agility": detail["allied_agility"],
             "pursuer_agility": detail["pursuer_agility"],
         },
-        text_template=(
-            "整隊脫離了戰鬥。"
-            if verdict == "escaped"
-            else "整隊嘗試脫離戰鬥，但失敗了。"
-        ),
+        text_template=template,
     )
     return EventLog(str(commander.key), "", (), (entry,), 0)
 

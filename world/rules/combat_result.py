@@ -10,6 +10,7 @@ from typing import Any
 
 from world.rules.action import RejectReason
 from world.rules.event_log import render_plain_text
+from world.skills.narration import CONTINUE_MESSAGE
 from world.rules.player_messages import (
     rejection_message,
     terminal_outcome_message,
@@ -17,7 +18,6 @@ from world.rules.player_messages import (
 
 # Stable OOB result codes for nonterminal round outcomes.
 _ROUND_CODES = frozenset({"round", "continue"})
-CONTINUE_MESSAGE = "行動完成，繼續戰鬥。"
 
 
 def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:

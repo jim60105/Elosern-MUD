@@ -98,7 +98,10 @@ class ActionResolver:
         return ActionResult.success(None, None)
 
     @staticmethod
-    def resolve(request: ActionRequest) -> ActionResult:
+    def resolve(
+        request: ActionRequest, *, narration_scope: str = ""
+    ) -> ActionResult:
+        """Resolve one action; ``narration_scope`` seeds its prose only."""
         try:
             skill = _step1_ownership(request)
             _step2_resource_check(request.actor, skill, request.scale)
@@ -165,7 +168,12 @@ class ActionResolver:
                     practice_claims,
                     unlock_notices,
                 )
-            event_log = _step7_build_event_log(request, skill, pending)
+            event_log = _step7_build_event_log(
+                request,
+                skill,
+                pending,
+                narration_scope=narration_scope,
+            )
             try:
                 for planner in _EVENT_EFFECT_PLANNERS.values():
                     for effect in planner(request, event_log):

@@ -6,6 +6,7 @@ import unittest
 
 from world.rules.event_log import EventEntry, EventLog, render_plain_text
 from world.rules.overwhelm import compress_event_logs
+from world.skills.narration import OVERWHELM_SUMMARY_LINE
 
 from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 
@@ -122,6 +123,9 @@ class CompressionTests(unittest.TestCase):
         )
 
     @covers_requirement("event-log-compression::a-compressed-eventlog-renders-through-render-plain-text-with-no-llm-involvement")
+    @covers_requirement(
+        "action-narration::structural-combat-prose-is-authored-once-and-stays-stable"
+    )
     def test_damage_attribution_and_rendering_are_preserved(self):
         damage_one = entry("damage", amount=10)
         damage_two = entry("damage", amount=15)
@@ -137,11 +141,19 @@ class CompressionTests(unittest.TestCase):
         rendered = "\n".join(render_plain_text(item) for item in result)
         self.assertTrue(rendered)
         self.assertNotIn("{", rendered)
-        self.assertIn("雙方共命中", rendered)
+        self.assertFalse(
+            any(
+                character.isdigit()
+                for character in render_plain_text(result[0])
+            )
+        )
+        self.assertEqual(
+            result[0].entries[0].data,
+            {"rounds": 1, "hits": 2, "total_damage": 25},
+        )
         self.assertNotIn("壓制了", rendered)
         self.assertEqual(
-            render_plain_text(result[0]),
-            render_plain_text(result[0]),
+            result[0].entries[0].text_template, OVERWHELM_SUMMARY_LINE
         )
 
 
@@ -280,8 +292,18 @@ class MarkerTests(unittest.TestCase):
             commanded_action_kind="skill", commanded_action_key=_T_MARKER.key,
             commanded_window=(log,),
         )
-        rendered = render_plain_text(result[1])
-        self.assertTrue(rendered.startswith(f"你施展了「{_T_MARKER.label}」。"))
+        marker = result[1].entries[0]
+        self.assertEqual(marker.kind, "commanded_action")
+        self.assertEqual(marker.data, {"skill": _T_MARKER.label})
+        self.assertFalse(
+            any(
+                character.isdigit()
+                for character in marker.text_template.format(
+                    actor=marker.actor, target=marker.target, data=marker.data
+                )
+            )
+        )
+        self.assertNotIn("{data", marker.text_template)
 
 
 def _join_renderer(logs):

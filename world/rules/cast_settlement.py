@@ -480,7 +480,10 @@ def settle_out_of_combat_cast(
     coercion_restore: _CoercionRestoreState | None = None
     try:
         with transaction.atomic():
-            result = ActionResolver.resolve(request)
+            result = ActionResolver.resolve(
+                request,
+                narration_scope=f"field|{clock.tick}|{request.actor.key}",
+            )
             if result.outcome != "success":
                 return CastSettlement(result, (), ())
             notifications, coercion_restore = _scan_out_of_combat_sexual_coercion(

@@ -180,10 +180,25 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         from world.rules.clock import WorldClock
 
         clock = WorldClock()
+        captured = []
+        from world.rules.field_cast import cast_in_field as real_cast
+
+        def _capture(*args, **kwargs):
+            outcome = real_cast(*args, **kwargs)
+            captured.append(outcome)
+            return outcome
+
         with patch(
             "world.rules.cast_settlement.read_world_clock", return_value=clock
-        ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
-            self.call(CmdCast(), _T_SELF_CAST.key, f"{self.char1.key} 累積了技能熟練度。")
+        ), patch(
+            "world.rules.cast_settlement.get_world_clock", return_value=clock
+        ), patch("commands.action.cast_in_field", side_effect=_capture):
+            self.call(CmdCast(), _T_SELF_CAST.key)
+        entry_kinds = [
+            entry.kind
+            for entry in captured[-1].settlement.result.event_log.entries
+        ]
+        self.assertIn("skill_practice", entry_kinds)
         self.assertEqual(self.calls.count("quest"), 1)
 
     def test_combat_round_executes_the_planner(self):
