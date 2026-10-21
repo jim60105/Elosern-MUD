@@ -65,6 +65,7 @@
   - [開發資料庫重置手冊](/development/database-reset)
   - [OpenSpec 測試可追溯性](/development/spec-test-traceability)
   - [稀疏聚落圖與座標身分契約](/development/sparse-settlement-graphs)
+  - [公制座標區域地圖與均勻投影](/development/metric-local-maps)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
   - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)
