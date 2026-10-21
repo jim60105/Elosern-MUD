@@ -357,6 +357,18 @@ class TerminalSleepStatusBrowserTest(ManagedServerTearDownMixin, BrowserAcceptan
 
         target = SYNTH_HOSTILE_MONSTER_KEY
         page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
+        # Only the new terminal branch sends this defeat line for an engage,
+        # so observing it proves the zero-round settlement actually ran
+        # rather than merely that the initial sleeping state was rendered.
+        page.wait_for_function(
+            "() => { const b = window.__elosernBridge;"
+            " const lines = b && b.store && Array.isArray(b.store.narrative)"
+            " ? b.store.narrative : [];"
+            " return lines.some((l) => l && String(l.text || '')"
+            ".includes('你被擊敗了')); }",
+            timeout=30000,
+        )
+        self.assertIn("你被擊敗了", narrative_log_text(page))
         # The canonical all-forced-sleep opening settles through the ordinary
         # zero-round terminal writer, so the client returns to exploration
         # instead of an unusable combat mode.
