@@ -60,10 +60,13 @@ from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
     PracticeReject,
-    advance_skip,
+    SkipRefused,
+    SleepRefused,
+    advance_wait,
+    begin_sleep,
     book_member_practice,
     render_skip_summary,
-    seconds_to_full_regen,
+    rejection_message,
     unsafe_rejection,
 )
 from world.rules.unlock_notices import deliver_unlocks, notices_from_events
@@ -904,12 +907,15 @@ def _practice_adapter(actor: Any, payload: dict[str, Any], session: Any = None) 
 def _wait_adapter(
     actor: Any, payload: dict[str, Any], session: Any = None,
 ) -> dict[str, Any]:
-    """Recheck safety and advance the clock through the shared skip helper."""
+    """Recheck safety and run the shared interruptible skip operation."""
     del session
     rejection = unsafe_rejection(actor)
     if rejection is not None:
         return _rejected("unsafe_skip", rejection)
-    if "daypart" in payload:
+    sleep = payload.get("sleep") is True
+    if sleep:
+        seconds = None
+    elif "daypart" in payload:
         daypart = payload["daypart"]
         try:
             clock = get_world_clock()
@@ -920,32 +926,55 @@ def _wait_adapter(
     elif "seconds" in payload:
         seconds = payload["seconds"]
     else:
-        seconds = seconds_to_full_regen(actor)
-    dream_clock = get_world_clock() if payload.get("dream") else None
-    tick_from = int(dream_clock.tick) if dream_clock is not None else None
+        return _rejected("malformed_payload", "缺少等待時長。")
     try:
-        events = advance_skip(actor, seconds)
+        if sleep:
+            outcome = begin_sleep(actor)
+        else:
+            result = advance_wait(actor, seconds)
+    except SkipRefused as exc:
+        return _rejected("unsafe_skip", rejection_message(exc.reason) or "無法跳過時間。")
+    except SleepRefused as exc:
+        return _rejected(exc.code, exc.message)
     except Exception as exc:
-        log_error("skip_failed", context={"char": actor.pk, "seconds": seconds}, exc=exc)
+        log_error(
+            "skip_failed",
+            context={"char": actor.pk, "seconds": seconds, "sleep": sleep},
+            exc=exc,
+        )
         return _rejected("skip_failed", "無法跳過時間。")
-    settled_seconds = int(dream_clock.tick) - tick_from if dream_clock is not None else seconds
-    message = render_skip_summary(settled_seconds, events)
+    if sleep:
+        if outcome.message is not None:
+            actor.msg(outcome.message)
+            return _success("slept", outcome.message, AFFECTED_FULL)
+        result = outcome.result
+        elapsed = result.elapsed_seconds
+    else:
+        elapsed = result.elapsed_seconds
+    message = render_skip_summary(elapsed, result.events)
     actor.msg(message)
     # The summary already carries each committed unlock line; record the
     # session unread marks from the same committed events.
-    deliver_unlocks(actor, notices_from_events(events), announce=False)
+    deliver_unlocks(actor, notices_from_events(result.events), announce=False)
     # Rest-point nomination trigger (title-system D4 §7.1, change G): the
     # service helper gates on a day-boundary event and never raises. The
     # composition-root import is function-local (the dispatcher precedent).
     from server.title_nomination_service import schedule_rest_boundary_nomination
 
-    schedule_rest_boundary_nomination(actor, events)
-    if dream_clock is not None:
+    schedule_rest_boundary_nomination(actor, result.events)
+    if payload.get("dream"):
         from server.dream_service import enter_after_sleep
-        enter_after_sleep(
-            actor, tick_from=tick_from, tick_to=int(dream_clock.tick),
-            requested_seconds=seconds, events=events,
-        )
+        if result.voluntary and result.elapsed_seconds > 0:
+            clock = get_world_clock()
+            enter_after_sleep(
+                actor,
+                tick_from=int(clock.tick) - result.elapsed_seconds,
+                tick_to=int(clock.tick),
+                requested_seconds=result.requested_seconds,
+                elapsed_seconds=result.elapsed_seconds,
+                voluntary=result.voluntary,
+                events=result.events,
+            )
     return _success("skipped", message, AFFECTED_FULL)
 
 

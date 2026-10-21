@@ -112,8 +112,20 @@ def charge_movement(
                 "wilderness_move requires a resolved physical traversal"
             )
         cost = CLOCK_YAML["command_defaults"][cost_key]
+    from world.rules.fatigue import FatigueActivity, IntervalCompletion
+    from world.rules.mental_time import plan_for
+
+    members = tuple(resolution.members)
+    # The traversal is one indivisible interval: every source-present member
+    # settles foot-travel physiology for its full duration, and a body that
+    # depletes collapses only after the step has committed.
     get_world_clock().advance(
         cost,
         AdvanceSource.COMMAND,
-        list(resolution.members),
+        list(members),
+        mental=plan_for(
+            members,
+            awake_activity=FatigueActivity.FOOT_TRAVEL,
+            completion=IntervalCompletion.INDIVISIBLE,
+        ),
     )

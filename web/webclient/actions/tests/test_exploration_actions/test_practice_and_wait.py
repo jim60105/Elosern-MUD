@@ -266,7 +266,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unknown_daypart")
         with patch(
-            "web.webclient.actions.exploration_actions.advance_skip",
+            "web.webclient.actions.exploration_actions.advance_wait",
             side_effect=RuntimeError("boom"),
         ):
             result = _wait_adapter(self.player, {"seconds": 60})

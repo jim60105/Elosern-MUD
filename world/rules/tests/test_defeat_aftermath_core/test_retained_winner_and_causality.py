@@ -57,7 +57,7 @@ from world.rules.event_log import render_plain_text
 from world.rules.movement import charge_movement
 from world.rules.player_messages import terminal_outcome_message
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
-from world.rules.time_skip import advance_skip, seconds_to_full_regen
+from world.rules.time_skip import advance_wait, seconds_to_full_regen
 from world.rules.surfaces import read_counter_trait, write_counter_trait
 from tools.spec_traceability import covers_requirement
 from world.rules.tests._combat_session_helpers import (
@@ -158,7 +158,7 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
             if isinstance(occupant, Monster):
                 occupant.delete()
         self.assertIsNone(evaluate_skip_safety(self.player))
-        advance_skip(self.player, seconds_to_full_regen(self.player))
+        advance_wait(self.player, seconds_to_full_regen(self.player))
         self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
 
 

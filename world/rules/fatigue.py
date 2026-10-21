@@ -574,6 +574,24 @@ def read_fatigue_state(
     return validate_fatigue_state(reserve_units, posture, policy)
 
 
+def read_optional_fatigue_state(
+    entity: Any, policy: FatiguePolicy | None = None
+) -> FatigueState | None:
+    """Read one body's state, or ``None`` when physiology was never constructed.
+
+    A wholly absent reserve/posture pair is the construction baseline of a
+    non-physiological fixture; it carries no state to settle. A half-written
+    pair or any malformed value still fails closed through
+    :func:`read_fatigue_state`.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None or not callable(getattr(attributes, "has", None)):
+        return None
+    if not attributes.has(RESERVE_ATTRIBUTE) and not attributes.has(POSTURE_ATTRIBUTE):
+        return None
+    return read_fatigue_state(entity, policy)
+
+
 def write_fatigue_state(
     entity: Any,
     reserve_units: Any,

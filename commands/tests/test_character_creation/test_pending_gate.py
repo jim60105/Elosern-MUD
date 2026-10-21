@@ -73,7 +73,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         message_mock = Mock()
         self.char1.msg = message_mock
         try:
-            with patch("commands.skip.get_world_clock") as clock:
+            with patch("world.rules.time_skip.get_world_clock") as clock:
                 self.char1.execute_cmd("rest 5s", session=self.session)
             messages = " ".join(str(call.args[0]) for call in message_mock.call_args_list)
         finally:

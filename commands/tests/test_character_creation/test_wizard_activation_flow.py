@@ -350,10 +350,11 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         original_msg = self.char1.msg
         self.char1.msg = Mock()
         try:
-            with patch("commands.skip.get_world_clock") as get_clock:
-                get_clock.return_value.advance.return_value = []
-                self.char1.execute_cmd("rest 5s", session=self.session)
-            get_clock.return_value.advance.assert_called_once()
+            from world.rules.clock import get_world_clock
+
+            before = get_world_clock().tick
+            self.char1.execute_cmd("rest 5s", session=self.session)
+            self.assertEqual(get_world_clock().tick - before, 5)
         finally:
             self.char1.msg = original_msg
 

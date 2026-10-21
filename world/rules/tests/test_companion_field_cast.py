@@ -25,7 +25,11 @@ from world.rules.action import DEFAULT_CAST_SECONDS, RejectReason
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat_session import read_session
-from world.rules.fatigue import SleepPosture, write_fatigue_state
+from world.rules.fatigue import (
+    SleepPosture,
+    read_fatigue_state,
+    write_fatigue_state,
+)
 from world.rules.field_cast import cast_as_member
 from world.rules.party import join_party
 from world.rules.party_scope import (
@@ -224,6 +228,49 @@ class CompanionCastRuleTests(_CompanionCastCase):
         self.assertIn(_BUFF_KEY, entity_active_buffs(self.aila))
         self.assertNotIn(_BUFF_KEY, entity_active_buffs(self.commander))
         self.assertEqual(self.aila.traits.mp.current, 7)
+
+    @covers_requirement(
+        "companion-field-actions::companion-field-casts-cost-the-commander-s-"
+        "time-and-settle-the-party"
+    )
+    def test_a_depleted_caster_completes_the_full_action_then_collapses(self):
+        write_fatigue_state(self.aila, 12, SleepPosture.AWAKE)
+        outcome = self._cast(self.aila, _HEAL.key, targets=[self.commander])
+        # Full effects, costs and six seconds commit before the collapse; no
+        # part of the interval becomes retrospective sleep recovery.
+        self.assertEqual(outcome.settlement.result.outcome, "success")
+        self.assertEqual(outcome.settlement.result.time_cost_seconds, 6)
+        self.assertEqual(self.aila.traits.mp.current, 12)
+        self.assertEqual(int(self.commander.traits.hp.current), 40)
+        self.assertEqual(self.clock.tick, 6)
+        state = read_fatigue_state(self.aila)
+        self.assertEqual(state.reserve_units, 0)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+
+    @covers_requirement(
+        "companion-field-actions::companion-field-casts-cost-the-commander-s-"
+        "time-and-settle-the-party"
+    )
+    def test_only_the_unselected_depleted_companion_collapses(self):
+        write_fatigue_state(self.kahn, 12, SleepPosture.AWAKE)
+        outcome = self._cast(self.aila, _HEAL.key, targets=[self.commander])
+        self.assertEqual(outcome.settlement.result.outcome, "success")
+        self.assertEqual(self.clock.tick, 6)
+        self.assertIs(
+            read_fatigue_state(self.kahn).posture, SleepPosture.FORCED
+        )
+        self.assertIs(
+            read_fatigue_state(self.commander).posture, SleepPosture.AWAKE
+        )
+        self.assertIs(
+            read_fatigue_state(self.aila).posture, SleepPosture.AWAKE
+        )
+        # The forced-sleep projection carries the status notice; control did
+        # not move away from the commander.
+        self.assertIn(
+            "fatigue_forced_sleep", entity_active_buffs(self.kahn)
+        )
+        self.assertIs(resolve_commander(self.aila), self.commander)
 
     @covers_requirement(
         "party-member-authority::acting-purposes-exclude-knocked-out-members",

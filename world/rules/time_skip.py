@@ -16,9 +16,10 @@ beyond the configured maximum.
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
+from uuid import uuid4
 
 from django.db import transaction
 
@@ -27,10 +28,28 @@ from world.rules.clock import (
     AdvanceSource,
     CLOCK_YAML,
     ScheduledEvent,
+    _restore_advance_registry,
+    _restore_clock_tick,
+    _snapshot_clock_tick,
+    build_advance_snapshot_registry,
     get_world_clock,
+)
+from world.rules.fatigue import (
+    FatigueActivity,
+    SleepPosture,
+    get_policy,
+    project_fatigue_status,
+    read_optional_fatigue_state,
+    sleep_blocks_actions,
+    write_fatigue_state,
+)
+from world.rules.mental_time import (
+    plan_for,
+    planned_seconds,
 )
 from world.rules.party_scope import (
     PURPOSE_ACT,
+    PartyScopeError,
     authorize_member,
     party_in_combat,
     present_party_scope,
@@ -45,6 +64,30 @@ from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 class DurationParseError(ValueError):
     """Raised for an explicit rest duration with unsupported syntax."""
+
+
+class SkipRefused(RuntimeError):
+    """One accepted-operation admission was refused by the shared safety gate."""
+
+    def __init__(self, reason: SkipRejectReason) -> None:
+        super().__init__(reason.value)
+        self.reason = reason
+
+
+class SleepRefused(RuntimeError):
+    """One voluntary sleep entry or continuation is not eligible."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(code)
+        self.code = code
+        self.message = message
+
+
+ALREADY_ASLEEP_MESSAGE = "你正在沉睡，無法重新入睡。"
+NOT_SLEEPING_MESSAGE = "你並不在自願睡眠中。"
+MISSING_PHYSIOLOGY_MESSAGE = "你的身心狀態尚未建立，無法入睡。"
+FORCED_SLEEP_MESSAGE = "你正處於強制沉睡，無法主動入睡；可等待至甦醒。"
+HANDOFF_OFFERED_MESSAGE = "你進入睡眠；可先交接控制權，再繼續恢復。"
 
 
 # The four named dayparts accepted by ``wait`` and ``explore.wait``.
@@ -90,8 +133,65 @@ class PracticeBooking:
     message: str
 
 
+@dataclass(frozen=True)
+class SkipResult:
+    """One immutable accepted player-driven skip receipt.
+
+    ``requested_seconds`` is the explicit request limit, ``elapsed_seconds``
+    the actual committed interval after the earliest relevant boundary, and
+    the unperformed remainder is discarded. ``operation_id`` makes a retried
+    receipt idempotent without replaying time.
+    """
+
+    operation_id: str
+    requested_seconds: int
+    elapsed_seconds: int
+    events: tuple[ScheduledEvent, ...]
+    fatigue_commits: tuple[Any, ...] = ()
+    voluntary: bool = False
+    woke: bool = False
+
+
+@dataclass(frozen=True)
+class SleepEntry:
+    """One committed voluntary-sleep posture entry at zero elapsed time."""
+
+    operation_id: str
+    member: Any
+    requested_seconds: int
+    handoff_offered: bool
+
+
+@dataclass(frozen=True)
+class SleepOutcome:
+    """One explicit sleep request's accepted entry and/or committed result."""
+
+    entry: SleepEntry | None
+    result: SkipResult | None
+    message: str | None = None
+
+
 BOOKING_IN_COMBAT_MESSAGE = "戰鬥中無法排入修煉。"
 _BOOKING_MESSAGE = "{member}將在下次休息時修煉「{skill}」。"
+
+# A bounded in-process ledger of accepted results. A retried operation
+# identity returns its recorded receipt instead of replaying elapsed time;
+# a new explicit action always carries a new identity. The project has no
+# durable skip-operation model, so this deliberately does not invent one.
+_RESULT_LEDGER: dict[str, SkipResult] = {}
+_LEDGER_LIMIT = 64
+
+
+def _recorded(operation_id: str | None) -> SkipResult | None:
+    if operation_id is None:
+        return None
+    return _RESULT_LEDGER.get(operation_id)
+
+
+def _record(result: SkipResult) -> None:
+    _RESULT_LEDGER[result.operation_id] = result
+    while len(_RESULT_LEDGER) > _LEDGER_LIMIT:
+        _RESULT_LEDGER.pop(next(iter(_RESULT_LEDGER)))
 
 
 def preflight_practice_booking(
@@ -187,14 +287,35 @@ def parse_duration(text: str) -> int:
 
 
 def seconds_to_full_regen(entity: Any) -> int:
-    """Return the bounded seconds to fully regenerate every gauge."""
+    """Return the bounded seconds to fully regenerate gauges and mental reserve.
+
+    Voluntary sleep targets full HP/MP/SP and full reserve. The mental target
+    is the ceiling of the exact remaining reserve divided by the authored
+    sleep rate, so full gauges with a half-empty reserve still need 15,000
+    seconds (180,000 units at 12 units per second) rather than zero.
+    """
     seconds = 0
     for key in GAUGE_KEYS:
         gauge = getattr(entity.traits, key)
         rate = float(getattr(gauge, "rate", 0))
         if rate > 0 and gauge.value < gauge.max:
             seconds = max(seconds, math.ceil((gauge.max - gauge.value) / rate))
+    state = read_optional_fatigue_state(entity)
+    if state is not None:
+        policy = get_policy()
+        gap = max(0, policy.max_units - state.reserve_units)
+        seconds = max(seconds, math.ceil(gap / policy.rates[FatigueActivity.SLEEP]))
     return min(seconds, CLOCK_YAML["max_sleep_seconds"])
+
+
+def seconds_to_natural_wake(entity: Any) -> int | None:
+    """Return a forced sleeper's bounded seconds to its natural wake, else None."""
+    state = read_optional_fatigue_state(entity)
+    if state is None or state.posture is not SleepPosture.FORCED:
+        return None
+    policy = get_policy()
+    gap = max(0, policy.wake_units - state.reserve_units)
+    return math.ceil(gap / policy.rates[FatigueActivity.SLEEP])
 
 
 def render_skip_summary(seconds: int, events: list[ScheduledEvent]) -> str:
@@ -231,34 +352,44 @@ def unsafe_rejection(actor: Any) -> str | None:
     return _REJECTION_MESSAGES[reason]
 
 
-def advance_skip(
-    actor: Any, seconds: int, *, practice_skill: str | None = None
-) -> list[ScheduledEvent]:
-    """Advance the world clock exactly like ``rest``/``sleep``/``wait``.
+def advance_wait(
+    actor: Any,
+    seconds: int,
+    *,
+    practice_skill: str | None = None,
+    operation_id: str | None = None,
+) -> SkipResult:
+    """Admit and settle one ordinary awake wait/rest/wait-until interval.
 
-    ``seconds`` must already be safe and validated; this call performs the
-    single ``AdvanceSource.SKIP`` advance and returns the settled events.
-    The settled scope is the acting commander's present party
-    (``present_party_scope``), so a companion resting in the same room
-    regenerates, expires buffs, and settles its own practice booking in the
-    same advance (party-rest-move-settlement). A companion in another room is
-    never settled. Scope resolution happens before any booking write, so an
-    authority refusal cannot half-apply the declaration.
-    A declared skill must pass ``preflight_practice_booking`` before entry.
-    A declared skill replaces the caller's standing booking before the
-    advance; an unlabeled skip writes no booking and leaves every member's
-    standing booking for the clock's practice settlement, which stays the
-    sole progression writer. A failed combined book-and-skip restores the
-    caller's previous booking, while a failed unlabeled skip is restored by
-    the clock's own snapshot.
+    The shared safety gate is rechecked here, once. The present party is
+    resolved before any booking write, the request is truncated to the
+    earliest relevant forced-sleep/wake/registered-event boundary, and one
+    ``AdvanceSource.SKIP`` advance settles the actual elapsed interval. The
+    unperformed remainder is discarded. A declared skill replaces the caller's
+    standing booking before the advance; an unlabeled wait writes no booking
+    and leaves every member's standing booking to the clock's practice stage,
+    which settles only members whose sampled initial activity was awake.
     """
+    recorded = _recorded(operation_id)
+    if recorded is not None:
+        return recorded
+    if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 0:
+        raise ValueError("seconds must be a non-negative integer")
+    limit = min(seconds, MAX_SKIP_SECONDS)
+    reason = evaluate_skip_safety(actor)
+    if reason is not None:
+        raise SkipRefused(reason)
     entities = present_party_scope(actor)
+    clock = get_world_clock()
+    elapsed = planned_seconds(entities, limit, tick=clock.tick)
+    commits: list[Any] = []
+    mental = replace(plan_for(entities), record=commits)
     previous_booking = None
     if practice_skill is not None:
         previous_booking = actor.db.practice_booking
         actor.db.practice_booking = practice_skill
     try:
-        return get_world_clock().advance(seconds, AdvanceSource.SKIP, entities)
+        events = clock.advance(elapsed, AdvanceSource.SKIP, entities, mental=mental)
     except Exception:
         # Clock rollback already restored its entry snapshot, which contains
         # this declaration; restoring the previous booking here keeps a failed
@@ -266,6 +397,160 @@ def advance_skip(
         if practice_skill is not None:
             actor.db.practice_booking = previous_booking
         raise
+    result = SkipResult(
+        operation_id=operation_id or uuid4().hex,
+        requested_seconds=limit,
+        elapsed_seconds=elapsed,
+        events=tuple(events),
+        fatigue_commits=tuple(commits),
+    )
+    _record(result)
+    return result
+
+
+def _sleep_member(actor: Any, member_id: int | None) -> Any:
+    """Resolve the explicitly selected sleep body (default: the acting body)."""
+    if member_id is None:
+        return actor
+    return authorize_member(
+        resolve_commander(actor), member_id, PURPOSE_ACT, anchor=actor
+    )
+
+
+def _handoff_available(member: Any) -> bool:
+    """Whether an awake, co-located controlling body could take over control."""
+    try:
+        commander = resolve_commander(member)
+    except PartyScopeError:
+        return False
+    if commander is member:
+        return False
+    if getattr(commander, "location", None) is not getattr(member, "location", None):
+        return False
+    return not sleep_blocks_actions(commander)
+
+
+def enter_sleep(
+    actor: Any, *, member_id: int | None = None, operation_id: str | None = None
+) -> SleepEntry:
+    """Commit one voluntary sleep posture at zero elapsed time.
+
+    Only the explicitly selected body (default: the acting body) enters.
+    Handoff candidates are reported, never transferred: the dependent
+    control component owns the offer. A refusal commits neither posture nor
+    time.
+    """
+    reason = evaluate_skip_safety(actor)
+    if reason is not None:
+        raise SkipRefused(reason)
+    member = _sleep_member(actor, member_id)
+    if sleep_blocks_actions(member):
+        raise SleepRefused("already_asleep", ALREADY_ASLEEP_MESSAGE)
+    state = read_optional_fatigue_state(member)
+    if state is None:
+        raise SleepRefused("missing_physiology", MISSING_PHYSIOLOGY_MESSAGE)
+    write_fatigue_state(member, state.reserve_units, SleepPosture.VOLUNTARY)
+    project_fatigue_status(member)
+    return SleepEntry(
+        operation_id=operation_id or uuid4().hex,
+        member=member,
+        requested_seconds=seconds_to_full_regen(member),
+        handoff_offered=_handoff_available(member),
+    )
+
+
+def _wake_voluntary(member: Any) -> bool:
+    """Return a still-voluntary body to waking posture with its current reserve."""
+    state = read_optional_fatigue_state(member)
+    if state is None or state.posture is not SleepPosture.VOLUNTARY:
+        return False
+    write_fatigue_state(member, state.reserve_units, SleepPosture.AWAKE)
+    project_fatigue_status(member)
+    return True
+
+
+def continue_sleep(
+    actor: Any, entry: SleepEntry, *, operation_id: str | None = None
+) -> SkipResult:
+    """Explicitly continue one entered voluntary sleep up to its first boundary.
+
+    The entry identity names the accepted sleep; the continuation rechecks
+    safety and the selected body, truncates the recovery target at the
+    earliest relevant boundary, settles gauges plus per-member mental time,
+    and returns the body to waking posture only after the committed interval.
+    The wake write shares the enclosing transaction with the advance, so a
+    late failure restores the mental members and the tick together.
+    """
+    recorded = _recorded(operation_id)
+    if recorded is not None:
+        return recorded
+    reason = evaluate_skip_safety(actor)
+    if reason is not None:
+        raise SkipRefused(reason)
+    member = entry.member
+    state = read_optional_fatigue_state(member)
+    if state is None:
+        raise SleepRefused("missing_physiology", MISSING_PHYSIOLOGY_MESSAGE)
+    if state.posture is not SleepPosture.VOLUNTARY:
+        raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
+    entities = present_party_scope(actor)
+    clock = get_world_clock()
+    requested = seconds_to_full_regen(member)
+    elapsed = planned_seconds(entities, requested, tick=clock.tick)
+    commits: list[Any] = []
+    mental = replace(plan_for(entities), record=commits)
+    registry = build_advance_snapshot_registry(
+        clock, elapsed, AdvanceSource.SKIP, entities, mental_scope=entities
+    )
+    tick_snapshot = _snapshot_clock_tick(clock)
+    woke = False
+    try:
+        with transaction.atomic():
+            events = clock.advance(
+                elapsed, AdvanceSource.SKIP, entities, mental=mental
+            )
+            woke = _wake_voluntary(member)
+    except Exception:
+        _restore_clock_tick(clock, tick_snapshot)
+        _restore_advance_registry(registry, entities)
+        raise
+    result = SkipResult(
+        operation_id=operation_id or entry.operation_id,
+        requested_seconds=requested,
+        elapsed_seconds=elapsed,
+        events=tuple(events),
+        fatigue_commits=tuple(commits),
+        voluntary=True,
+        woke=woke,
+    )
+    _record(result)
+    return result
+
+
+def begin_sleep(actor: Any) -> SleepOutcome:
+    """Run the shared voluntary sleep request for either transport.
+
+    A forced sleeper cannot volunteer. An already-voluntary body continues its
+    entered sleep. A fresh entry with an awake controlling body to hand off to
+    commits posture at zero elapsed time and stops; the player cancels by
+    doing nothing or continues with another explicit request. Every other
+    fresh entry continues immediately.
+    """
+    state = read_optional_fatigue_state(actor)
+    if state is not None and state.posture is SleepPosture.FORCED:
+        raise SleepRefused("forced_sleep", FORCED_SLEEP_MESSAGE)
+    if state is not None and state.posture is SleepPosture.VOLUNTARY:
+        entry = SleepEntry(
+            operation_id=uuid4().hex,
+            member=actor,
+            requested_seconds=seconds_to_full_regen(actor),
+            handoff_offered=False,
+        )
+        return SleepOutcome(entry, continue_sleep(actor, entry))
+    entry = enter_sleep(actor)
+    if entry.handoff_offered:
+        return SleepOutcome(entry, None, HANDOFF_OFFERED_MESSAGE)
+    return SleepOutcome(entry, continue_sleep(actor, entry))
 
 
 __all__ = [
@@ -277,12 +562,21 @@ __all__ = [
     "PracticeBooking",
     "PracticeReject",
     "PracticeRejectReason",
-    "advance_skip",
+    "SkipRefused",
+    "SkipResult",
+    "SleepEntry",
+    "SleepOutcome",
+    "SleepRefused",
+    "advance_wait",
+    "begin_sleep",
     "book_member_practice",
+    "continue_sleep",
+    "enter_sleep",
     "parse_duration",
     "preflight_practice_booking",
     "rejection_message",
     "render_skip_summary",
     "seconds_to_full_regen",
+    "seconds_to_natural_wake",
     "unsafe_rejection",
 ]

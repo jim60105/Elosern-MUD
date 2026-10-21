@@ -18,6 +18,7 @@ from django.db import transaction
 
 from typeclasses.npcs import NPC
 from world.observability import log_warn
+from world.rules.mental_time import indivisible_plan as _indivisible_party_plan
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
 from world.rules.action import (
     ActionRequest,
@@ -497,6 +498,7 @@ def settle_out_of_combat_cast(
                     result.time_cost_seconds,
                     AdvanceSource.COMMAND,
                     scope,
+                    mental=_indivisible_party_plan(scope),
                 )
             )
     except Exception:

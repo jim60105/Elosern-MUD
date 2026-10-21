@@ -32,6 +32,7 @@ from world.tests.synthetic_data import (
 )
 from world.quests.runtime import QuestNotFound, QuestState
 from world.rules.clock import AdvanceSource, DaypartError
+from world.rules.time_skip import SkipResult, SleepEntry, SleepOutcome
 from world.rules.combat_session import CombatSessionError, SessionReason
 from world.rules.player_messages import (
     CONTINUE_COMBAT_MESSAGE,
@@ -678,14 +679,14 @@ class SkipCommandBranchTests(TestCase):
     def test_sleep_advances_until_regenerated_and_reports_daily_reset(self):
         command = _command(CmdSleep)
         event = SimpleNamespace(kind="daily_reset")
+        entry = SleepEntry("synthetic-entry", command.caller, 90, False)
+        result = SkipResult(
+            "synthetic-entry", 90, 90, (event,), voluntary=True, woke=True
+        )
         with patch("commands.skip._safe_to_skip", return_value=True), patch(
-            "commands.skip._seconds_to_full_regen", return_value=90
-        ), patch("commands.skip.get_world_clock") as clock, patch(
-            "commands.skip.present_party_scope", return_value=(command.caller,)
+            "commands.skip.begin_sleep", return_value=SleepOutcome(entry, result)
         ):
-            clock.return_value.advance.return_value = [event]
             command.func()
-        clock.return_value.advance.assert_called_once()
         command.caller.msg.assert_called_with("時間經過了 90 秒。 新的一天開始了。")
 
     def test_wait_validates_syntax_daypart_and_safety(self):
@@ -728,16 +729,16 @@ class SkipCommandBranchTests(TestCase):
     def test_wait_until_daypart_advances_and_reports_summary(self):
         command = _command(CmdWaitUntil, "until dawn")
         event = SimpleNamespace(kind="daily_reset")
+        result = SkipResult("synthetic-wait", 120, 120, (event,))
         with patch("commands.skip._safe_to_skip", return_value=True), patch(
             "commands.skip.seconds_until_daypart", return_value=120
-        ), patch("commands.skip.get_world_clock") as clock, patch(
-            "commands.skip.present_party_scope", return_value=(command.caller,)
+        ), patch(
+            "commands.skip.advance_wait", return_value=result
+        ) as advance, patch(
+            "commands.skip.get_world_clock"
         ):
-            clock.return_value.advance.return_value = [event]
             command.func()
-        clock.return_value.advance.assert_called_once_with(
-            120, AdvanceSource.SKIP, (command.caller,)
-        )
+        advance.assert_called_once_with(command.caller, 120)
         command.caller.msg.assert_called_with("時間經過了 120 秒。 新的一天開始了。")
 
 
