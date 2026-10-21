@@ -53,11 +53,16 @@ class DreamArtworkWireTest(EvenniaTest):
         self.registry = build_production_registry()
 
     def entered(self, actor):
-        """One real accepted zero-duration sleep associating an open session."""
+        """One real accepted positive-elapsed voluntary sleep session."""
         from server import dream_service as service
 
         return service.enter_after_sleep(
-            actor, tick_from=100, tick_to=100, requested_seconds=0
+            actor,
+            tick_from=100,
+            tick_to=700,
+            requested_seconds=600,
+            elapsed_seconds=600,
+            voluntary=True,
         )
 
     def context(self, actor=_UNSET):

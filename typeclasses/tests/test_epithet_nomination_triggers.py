@@ -64,11 +64,11 @@ class TypedRestTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("daily_reset", kinds)
     @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_rest_crossing_the_boundary_reports_daily_reset(self):
-        # commands/skip.py resolves the clock through its own module-level
-        # name; a fresh instance two seconds before the day boundary makes
-        # 23h cross exactly one boundary, which is the trigger's gate.
+        # The shared skip operation resolves the clock through
+        # world.rules.time_skip; a fresh instance two seconds before the day
+        # boundary makes 23h cross exactly one boundary, the trigger's gate.
         fresh = WorldClock(86400 - 2)
-        with patch("commands.skip.get_world_clock", return_value=fresh):
+        with patch("world.rules.time_skip.get_world_clock", return_value=fresh):
             self._run(CmdRest(), "23h")
         self.assertEqual(self.schedule.call_count, 1)
         events = self.schedule.call_args.args[1]

@@ -87,7 +87,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # daypart boundary rejects before any clock advance.
         time_before = store_state(page)["serverTime"]
         # The place card's 等待 opens the wait card (exploration-room-actions)
-        # with its three operations [等待直到黎明, 睡眠至完全恢復, 休息 N 小時]
+        # with its three operations [等待直到黎明, 睡眠至完全恢復, 等待 N 小時]
         # and the first row active — the direct daypart wait dispatches from
         # it, and the safety gate rejects it while the goblin stands at the
         # gate (the daypart value is irrelevant to the rejection).
@@ -104,12 +104,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # The bounded custom-duration form is parsed server-side and rejected
         # by the same safety gate.
-        # 休息 N 小時 is the wait card's third row: two ArrowDown steps reach
+        # 等待 N 小時 is the wait card's third row: two ArrowDown steps reach
         # it. The sent dawn wait closed the card, so it re-opens from 等待.
         self._reset_root(page)
         activate_overview_chip(page, "wait")  # the place card's 等待
         _press(page, "ArrowDown")  # 睡眠至完全恢復
-        _press(page, "ArrowDown")  # 休息 N 小時
+        _press(page, "ArrowDown")  # 等待 N 小時
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -155,13 +155,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         time_before = store_state(page)["serverTime"]
         # The wait card's three operations (exploration-room-actions): 等待
         # 直到黎明 dispatches its daypart wait directly — a no-op at the
-        # fixture's midnight clock — while 休息 N 小時 (wait-rest, the third
+        # fixture's midnight clock — while 等待 N 小時 (wait-rest, the third
         # row) opens the custom-duration form. Confirm the form's default
         # one-hour wait so the SKIP advance moves the fixture clock off
         # midnight.
         activate_overview_chip(page, "wait")  # the place card's 等待
         _press(page, "ArrowDown")  # 睡眠至完全恢復
-        _press(page, "ArrowDown")  # 休息 N 小時
+        _press(page, "ArrowDown")  # 等待 N 小時
         _press(page, "Enter")
         wait_for_store_state(
             page,

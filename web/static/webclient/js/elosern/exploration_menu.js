@@ -184,7 +184,7 @@
       },
       {
         key: "wait-rest",
-        label: "休息 N 小時",
+        label: "等待 N 小時",
         enabled: true,
         actionId: null,
         payload: null,

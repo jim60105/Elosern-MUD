@@ -29,6 +29,7 @@ from world.rules.equipment import (
     apply_inventory_plan,
     plan_inventory_delta,
 )
+from world.rules.mental_time import indivisible_plan
 from world.rules.event_log import EventEntry, EventLog
 from world.rules import item_effects
 from world.rules.item_effects import (
@@ -365,7 +366,10 @@ def use_item(
             if result.outcome == "success":
                 events = tuple(
                     world_clock.advance(
-                        item_effects.ITEM_USE_SECONDS, AdvanceSource.COMMAND, scope
+                        item_effects.ITEM_USE_SECONDS,
+                        AdvanceSource.COMMAND,
+                        scope,
+                        mental=indivisible_plan(scope),
                     )
                 )
     except Exception:

@@ -58,8 +58,30 @@ def associated_session(actor):
     return lifecycle.get_session(value["session_id"], owner_id(actor))
 
 
-def enter_after_sleep(actor, *, tick_from, tick_to, requested_seconds, events=()):
-    """Associate actual committed ticks, including accepted zero-duration sleep."""
+def enter_after_sleep(
+    actor,
+    *,
+    tick_from,
+    tick_to,
+    requested_seconds,
+    elapsed_seconds=None,
+    voluntary=False,
+    events=(),
+):
+    """Associate one real positive elapsed voluntary-sleep receipt.
+
+    Posture entry, repaired zero-duration recovery, forced sleep and any
+    interrupted non-positive result open no dream and write no association.
+    The caller owns the accepted receipt; this owner never advances time or
+    re-settles sleep.
+    """
+    elapsed = (
+        int(elapsed_seconds)
+        if elapsed_seconds is not None
+        else int(tick_to) - int(tick_from)
+    )
+    if not voluntary or elapsed <= 0:
+        return None
     with transaction.atomic():
         previous = associated_session(actor)
         if previous and previous.outcome != lifecycle.OUTCOME_CONFIRMED:
@@ -75,7 +97,7 @@ def enter_after_sleep(actor, *, tick_from, tick_to, requested_seconds, events=()
             "sleep": {
                 "tick_from": int(tick_from), "tick_to": int(tick_to),
                 "requested_seconds": int(requested_seconds),
-                "seconds": int(tick_to) - int(tick_from),
+                "seconds": elapsed,
                 "event_kinds": sorted({str(event.kind) for event in events}),
             },
             "scene": retained.get("scene", ""),

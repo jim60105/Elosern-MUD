@@ -722,11 +722,11 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 - **THEN** the completion publishes the safe stable reason and does not create a session or advance time
 
 ### Requirement: explore.wait obeys the shared skip safety and clock API
-The production action registry SHALL register `explore.wait`. Its payload SHALL accept exactly one of `daypart` (`midnight`, `dawn`, `noon`, `dusk`), `seconds` (a positive integer within the documented WebClient skip maximum), or `sleep` (the exact boolean true). The adapter SHALL recheck `evaluate_skip_safety(actor)` and call `get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])` with the seconds computed via the shared `world/rules` skip helper as the matching command does.
+The production registry SHALL register `explore.wait` with exactly one of `daypart` (`midnight`/`dawn`/`noon`/`dusk`), `seconds` (positive integer up to the WebClient skip maximum), or `sleep` (boolean true). The adapter SHALL recheck `evaluate_skip_safety(actor)` and run the same member-aware interruptible skip operation as text commands, with protocol bounds and elapsed receipts. Dream selection SHALL require real elapsed voluntary sleep; entry SHALL offer contextual handoff first.
 
 #### Scenario: Wait until dawn advances to the next occurrence
 - **WHEN** a safe actor submits `explore.wait` with `daypart: "dawn"`
-- **THEN** the clock advances by exactly `seconds_until_daypart(calendar, "dawn")` with `AdvanceSource.SKIP` and the summary reports the elapsed duration
+- **THEN** the clock advances only to the first relevant boundary within `seconds_until_daypart(calendar, "dawn")` with `AdvanceSource.SKIP` and the summary reports the elapsed duration
 
 #### Scenario: An unsafe skip rejects before any clock advance
 - **WHEN** an actor in a room with a living monster submits `explore.wait`
@@ -734,7 +734,7 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 
 #### Scenario: A custom duration is parsed server-side
 - **WHEN** a safe actor submits `explore.wait` with `seconds: 3600`
-- **THEN** the clock advances by exactly 3600 seconds with `AdvanceSource.SKIP`, and a value above the protocol bound is rejected before any advance
+- **THEN** the clock advances by up to 3600 actual seconds, stopping at the first relevant boundary with `AdvanceSource.SKIP`, and a value above the protocol bound is rejected before any advance
 
 #### Scenario: The duration bound is protocol-only
 - **WHEN** the `seconds` payload bound is documented
@@ -746,7 +746,7 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 
 #### Scenario: The shared skip helper keeps command and WebClient computations identical
 - **WHEN** the adapter computes the seconds to advance
-- **THEN** it goes through the shared `world/rules` skip helper that `rest`/`sleep`/`wait` also consume, so `seconds_until_daypart` for a daypart, the bounded full-regen computation for `sleep`, and the submitted `seconds` verbatim for a duration can never diverge between command and WebClient
+- **THEN** it goes through the shared `world/rules` skip helper that `rest`/`sleep`/`wait` also consume, so `seconds_until_daypart` for a daypart, the bounded full-regen computation for `sleep`, and the submitted `seconds` as a request limit for a duration can never diverge between command and WebClient
 
 #### Scenario: The wait summary is presented and one newer snapshot published
 - **WHEN** the clock advance returns its `ScheduledEvent`
@@ -857,14 +857,14 @@ The exploration menu's wilderness move rows SHALL use the canonical destination 
 - **THEN** each row's destination is the canonical arrival node, including the gateway south row that returns to the grid
 
 ### Requirement: The waiting surface offers exactly three operations
-The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, which first asks 進入夢境協作？ and then submits `explore.wait` with the exact `sleep` flag, plus the `dream` flag when the player answers 是; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
+The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, which submits `explore.wait` with the exact `sleep` flag, and offers handoff after zero-time posture entry, with optional dream collaboration only after an actual accepted elapsed sleep result; and 等待 N 小時, opening the bounded custom-duration form instead of dispatching.
 
 #### Scenario: The waiting frame renders the three operations
 - **WHEN** the player activates 等待 on the place card in exploration mode
-- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, and 休息 N 小時 followed by `✕ 返回`, with no separate dream row and no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
+- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, and 等待 N 小時 followed by `✕ 返回`, with no separate dream row and no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
 
 #### Scenario: The hours form dispatches whole seconds exactly once
-- **WHEN** the player enters `1.5` hours in the 休息 form and confirms
+- **WHEN** the player enters `1.5` hours in the 等待 form and confirms
 - **THEN** exactly one `ui_action` is submitted — `explore.wait` with `seconds: 5400` — the form closes, and no resulting world time is displayed before the server snapshot arrives
 
 #### Scenario: An out-of-bounds hours value errors without dispatching
@@ -880,7 +880,7 @@ The wait card, opened from the place card's 等待 button, SHALL offer exactly t
 - **THEN** it shows exactly those operations plus the trailing `✕ 返回` row, and the row that `aria-activedescendant` names carries the active-row fill
 
 #### Scenario: The custom hours form bounds, converts, and dispatches once
-- **WHEN** the player fills in the 休息 N 小時 form
+- **WHEN** the player fills in the 等待 N 小時 form
 - **THEN** it accepts hours with fractional input allowed, bounds the value to at least one second and at most the documented WebClient skip maximum (twelve hours), converts hours to whole seconds exactly once at the presentation boundary, and dispatches that value as the unchanged `explore.wait` `seconds` payload
 
 #### Scenario: The form shows no resulting world time and reports bounds in Chinese
@@ -892,7 +892,7 @@ The wait card, opened from the place card's 等待 button, SHALL offer exactly t
 - **THEN** the server-side skip maximum is unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
 
 ### Requirement: explore.practice books one declared skill for a member
-The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (a positive safe-integer party member id) and `skill` (a bounded non-space key of at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject an active combat session with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next SKIP advance that settles the member grows the booked skill.
+The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (positive safe-integer party member id) and `skill` (bounded non-space key, at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject active combat with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next eligible awake SKIP interval that settles the member grows the booked skill.
 
 #### Scenario: Declared practice grows only the booked skill
 - **WHEN** the commander books companion 艾拉's uncapped active `healing_light` through `explore.practice` and then waits 7200 seconds with 艾拉 present
@@ -920,7 +920,7 @@ The production action registry SHALL register `explore.practice` with a payload 
 
 #### Scenario: The whole-hour settlement stage stays the sole practice writer
 - **WHEN** a booking is recorded
-- **THEN** the adapter writes only the member's booking; practice progression is written only by the clock's whole-hour practice settlement stage on a later SKIP advance
+- **THEN** the adapter writes only the member's booking; practice progression is written only by the clock's whole-hour practice settlement stage on a later eligible awake SKIP advance
 
 #### Scenario: A failed advance rolls back clock and booking
 - **WHEN** the later SKIP advance that settles a booking raises after settlement started

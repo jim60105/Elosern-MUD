@@ -235,7 +235,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             messages = []
             player.msg = messages.append
             clock = WorldClock(6 * 3600)
-            with patch("commands.skip.get_world_clock", return_value=clock):
+            with patch("world.rules.time_skip.get_world_clock", return_value=clock):
                 rest = CmdRest()
                 rest.caller = player
                 rest.args = f"2h practice {practice_skill}"

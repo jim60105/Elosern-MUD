@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: explore.wait obeys the shared skip safety and clock API
-The production action registry SHALL register `explore.wait`. Its payload SHALL accept exactly one of `daypart` (`midnight`, `dawn`, `noon`, `dusk`), `seconds` (a positive integer within the documented WebClient skip maximum), or `sleep` (the exact boolean true). The adapter SHALL recheck `evaluate_skip_safety(actor)` and invoke the same member-aware interruptible skip operation as text commands, preserving protocol bounds and actual elapsed receipts. Optional dream selection SHALL be honored only after real elapsed voluntary sleep; sleep entry SHALL first offer contextual handoff.
+The production registry SHALL register `explore.wait` with exactly one of `daypart` (`midnight`/`dawn`/`noon`/`dusk`), `seconds` (positive integer up to the WebClient skip maximum), or `sleep` (boolean true). The adapter SHALL recheck `evaluate_skip_safety(actor)` and run the same member-aware interruptible skip operation as text commands, with protocol bounds and elapsed receipts. Dream selection SHALL require real elapsed voluntary sleep; entry SHALL offer contextual handoff first.
 
 #### Scenario: Wait until dawn advances to the next occurrence
 - **WHEN** a safe actor submits `explore.wait` with `daypart: "dawn"`
@@ -73,7 +73,7 @@ The wait card, opened from the place card's 等待 button, SHALL offer exactly t
 - **THEN** the server-side skip maximum is unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
 
 ### Requirement: explore.practice books one declared skill for a member
-The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (a positive safe-integer party member id) and `skill` (a bounded non-space key of at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject an active combat session with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next eligible positive-duration awake SKIP interval that settles the member grows the booked skill.
+The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (positive safe-integer party member id) and `skill` (bounded non-space key, at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject active combat with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next eligible awake SKIP interval that settles the member grows the booked skill.
 
 #### Scenario: Declared practice grows only the booked skill
 - **WHEN** the commander books companion 艾拉's uncapped active `healing_light` through `explore.practice` and then waits 7200 seconds with 艾拉 present

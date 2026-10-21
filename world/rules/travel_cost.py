@@ -60,8 +60,10 @@ from world.rules.fatigue import (
     POSTURE_ATTRIBUTE,
     RESERVE_ATTRIBUTE,
     FatigueStateError,
+    SleepPosture,
     outgoing_foot_speed_scale,
     read_fatigue_state,
+    read_optional_fatigue_state,
 )
 
 RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "movement.yaml"
@@ -95,6 +97,23 @@ class TraversalStatus(StrEnum):
     NON_DISTANCE = "non_distance"
     #: An outdoor lineage whose authored geometry could not be resolved.
     UNRESOLVED = "unresolved"
+
+
+SLEEPING_PARTY_MESSAGE = "同行成員正在沉睡，無法移動。"
+
+
+def refuse_sleeping_party(members: Sequence[Any]) -> None:
+    """Refuse any travel whose source-present party includes a forced sleeper.
+
+    The intended source-present follow scope is the same set the charge and
+    the follow step use, so an awake possessed member can neither carry nor
+    teleport a sleeping body. The refusal happens at preflight, before cost
+    resolution, waiver, relocation, time or location changes.
+    """
+    for member in members:
+        state = read_optional_fatigue_state(member)
+        if state is not None and state.posture is SleepPosture.FORCED:
+            raise MovementPreflightRefused("party_sleeping", SLEEPING_PARTY_MESSAGE)
 
 
 def _validate_rulebook() -> None:
@@ -480,6 +499,7 @@ def resolve_traversal_cost(
     caller's traversal source is not that room (a direct ``at_traverse`` call
     on an exit object); it defaults to ``source_location``.
     """
+    refuse_sleeping_party(members)
 
     source_is_wild = _is_wilderness_room(source_location)
     destination_is_wild = _is_wilderness_room(destination)

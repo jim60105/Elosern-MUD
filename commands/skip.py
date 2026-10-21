@@ -1,10 +1,10 @@
 """Player-facing deterministic rest, sleep, and wait commands.
 
-The duration parsing, full-regen computation, safety gate, and summary
-rendering all delegate to the shared ``world.rules.time_skip`` helper (design
-D7) so the WebClient ``explore.wait`` adapter and the typed commands can never
-diverge. The clock advance uses the module-level ``get_world_clock`` name so
-the deterministic command tests can keep patching it.
+Duration parsing, the safety gate, sleep entry/continuation, interruptible
+boundary composition, and summary rendering all delegate to the shared
+``world.rules.time_skip`` operations so the WebClient ``explore.wait`` adapter
+and the typed commands can never diverge. Read-only daypart arithmetic uses
+the module-level ``get_world_clock`` name.
 """
 
 import re
@@ -12,31 +12,31 @@ import re
 from commands.command import Command
 
 from world.rules.clock import (
-    AdvanceSource,
     DaypartError,
     get_world_clock,
     seconds_until_daypart,
 )
 from world.rules.party_scope import (
     PartyScopeError,
-    present_party_scope,
     resolve_member_token,
 )
 from world.rules.skip_safety import evaluate_skip_safety
 from world.rules.time_skip import (
     DurationParseError,
+    SkipRefused,
+    SleepRefused,
+    advance_wait,
+    begin_sleep,
     book_member_practice,
     parse_duration,
     preflight_practice_booking,
     rejection_message,
     render_skip_summary,
-    seconds_to_full_regen,
 )
 from world.rules.unlock_notices import deliver_unlocks, notices_from_events
 
 # Thin names retained for the deterministic command tests.
 _parse_duration = parse_duration
-_seconds_to_full_regen = seconds_to_full_regen
 _render_skip_summary = render_skip_summary
 
 
@@ -55,6 +55,7 @@ _REST_ARGS_RE = re.compile(
 )
 
 _REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
+_NO_DREAM_MESSAGE = "身體已完全恢復，沒有進入夢境。"
 
 # ``修煉 <技能> [= <成員>]``: one whitespace-free skill key plus an optional
 # member token naming a present party member (default: the caller).
@@ -113,31 +114,23 @@ class CmdRest(Command):
                 return
         # An accepted clause records the caller's standing booking (replacing
         # a previous one); a clause-less rest records nothing and settles only
-        # the present members' standing bookings. The clock's
-        # practice_settlement stage remains the sole consumer/writer.
-        entities = present_party_scope(self.caller)
-        previous_booking = None
-        if skill_key is not None:
-            previous_booking = self.caller.db.practice_booking
-            self.caller.db.practice_booking = skill_key
+        # the present members' standing bookings. The shared operation
+        # truncates the request at the earliest relevant boundary, and the
+        # clock's practice_settlement stage remains the sole consumer/writer.
         try:
-            events = get_world_clock().advance(
-                seconds, AdvanceSource.SKIP, entities
+            result = advance_wait(
+                self.caller, seconds, practice_skill=skill_key
             )
-        except Exception:
-            # The clock's rollback restores its entry snapshot, which already
-            # contains this declaration; restoring the caller's previous
-            # booking keeps a failed clause from replacing a standing one.
-            if skill_key is not None:
-                self.caller.db.practice_booking = previous_booking
-            raise
-        self.caller.msg(_render_skip_summary(seconds, events))
+        except SkipRefused as error:
+            self.caller.msg(rejection_message(error.reason))
+            return
+        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
         # The summary already carries each committed unlock line; record the
         # session unread marks from the same committed events.
         deliver_unlocks(
-            self.caller, notices_from_events(events), announce=False
+            self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, events)
+        _maybe_nominate_after_rest(self.caller, result.events)
 
 
 class CmdSleep(Command):
@@ -151,28 +144,41 @@ class CmdSleep(Command):
             return
         if not _safe_to_skip(self.caller):
             return
-        seconds = _seconds_to_full_regen(self.caller)
-        entities = present_party_scope(self.caller)
-        # An unlabeled skip records no booking and leaves the present
-        # members' standing bookings for the clock's practice stage.
-        clock = get_world_clock()
-        tick_from = int(clock.tick) if choice else None
-        events = clock.advance(seconds, AdvanceSource.SKIP, entities)
-        settled_seconds = int(clock.tick) - tick_from if choice else seconds
-        self.caller.msg(_render_skip_summary(settled_seconds, events))
+        try:
+            outcome = begin_sleep(self.caller)
+        except SkipRefused as error:
+            self.caller.msg(rejection_message(error.reason))
+            return
+        except SleepRefused as error:
+            self.caller.msg(error.message)
+            return
+        if outcome.message is not None:
+            self.caller.msg(outcome.message)
+            return
+        result = outcome.result
+        assert result is not None
+        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
         deliver_unlocks(
-            self.caller, notices_from_events(events), announce=False
+            self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, events)
+        _maybe_nominate_after_rest(self.caller, result.events)
         if choice:
-            from server.dream_service import enter_after_sleep
             from commands.dream import render_state
+            from server.dream_service import enter_after_sleep
+
+            if not result.voluntary or result.elapsed_seconds <= 0:
+                self.caller.msg(_NO_DREAM_MESSAGE)
+                return
             state = enter_after_sleep(
-                self.caller, tick_from=tick_from, tick_to=int(clock.tick),
-                requested_seconds=seconds, events=events,
+                self.caller,
+                tick_from=int(get_world_clock().tick) - result.elapsed_seconds,
+                tick_to=int(get_world_clock().tick),
+                requested_seconds=result.requested_seconds,
+                elapsed_seconds=result.elapsed_seconds,
+                voluntary=result.voluntary,
+                events=result.events,
             )
             self.caller.msg(render_state(state))
-
 
 class CmdWaitUntil(Command):
     key = "wait"
@@ -192,15 +198,16 @@ class CmdWaitUntil(Command):
             return
         if not _safe_to_skip(self.caller):
             return
-        entities = present_party_scope(self.caller)
-        # An unlabeled skip records no booking and leaves the present
-        # members' standing bookings for the clock's practice stage.
-        events = clock.advance(seconds, AdvanceSource.SKIP, entities)
-        self.caller.msg(_render_skip_summary(seconds, events))
+        try:
+            result = advance_wait(self.caller, seconds)
+        except SkipRefused as error:
+            self.caller.msg(rejection_message(error.reason))
+            return
+        self.caller.msg(_render_skip_summary(result.elapsed_seconds, result.events))
         deliver_unlocks(
-            self.caller, notices_from_events(events), announce=False
+            self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, events)
+        _maybe_nominate_after_rest(self.caller, result.events)
 
 
 class CmdPractice(Command):

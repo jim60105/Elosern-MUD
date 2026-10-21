@@ -33,6 +33,12 @@ from world.rules.clock import (
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
+from world.rules.fatigue import (
+    SleepPosture,
+    read_fatigue_state,
+    write_fatigue_state,
+)
+from world.rules.mental_time import plan_for
 from world.tests.raw_attributes import raw_attribute_value
 
 
@@ -307,7 +313,9 @@ class ClockTests(unittest.TestCase):
         clock = WorldClock()
         with patch("world.rules.clock._practice_settlement") as settle:
             clock.advance(10, AdvanceSource.SKIP, [entity])
-        settle.assert_called_once_with((entity,), 10, AdvanceSource.SKIP, 10)
+        settle.assert_called_once_with(
+            (entity,), 10, AdvanceSource.SKIP, 10, None
+        )
         _practice_settlement((entity,), 3600, AdvanceSource.SKIP, 3600)
         self.assertFalse(hasattr(entity, "skill_proficiency"))
         self.assertFalse(hasattr(entity, "db"))
@@ -341,6 +349,38 @@ class BookingEntity(Entity):
             practice_booking=booking, skill_proficiency={}
         )
         self.skills = SimpleNamespace(owned_keys=lambda: list(owned))
+
+
+class _FatigueAttrs:
+    """Minimal attribute store carrying one exact fatigue state."""
+
+    def __init__(self, reserve, posture):
+        self.values = {
+            "mental_reserve_units": reserve,
+            "sleep_posture": posture.value,
+        }
+
+    def has(self, key, category=None):
+        return key in self.values
+
+    def get(self, key, default=None, category=None):
+        return self.values.get(key, default)
+
+    def add(self, key, value, category=None):
+        self.values[key] = value
+
+    def remove(self, key, category=None):
+        self.values.pop(key, None)
+
+
+class _FatigueBookingEntity(BookingEntity):
+    """One booked entity whose sampled initial posture is controllable."""
+
+    def __init__(self, reserve, posture, **kwargs):
+        super().__init__(**kwargs)
+        self.attributes = _FatigueAttrs(reserve, posture)
+        # No BuffHandler: projection is a no-op for this pure settlement probe.
+        self.buffs = None
 
 
 class DeclaredPracticeSettlementTests(unittest.TestCase):
@@ -392,6 +432,34 @@ class DeclaredPracticeSettlementTests(unittest.TestCase):
             WorldClock().advance(28800, AdvanceSource.SKIP, [entity])
         grant.assert_not_called()
         self.assertIsNone(entity.db.practice_booking)
+
+    @covers_requirement(
+        "party-time-settlement::each-member-owns-one-standing-practice-booking"
+    )
+    @covers_requirement(
+        "party-time-settlement::per-member-mental-time-uses-actual-posture-and-"
+        "activity"
+    )
+    def test_sleeping_booking_is_preserved_while_awake_booking_settles(self):
+        sleeper = _FatigueBookingEntity(0, SleepPosture.FORCED)
+        awake = _FatigueBookingEntity(360000, SleepPosture.AWAKE)
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            WorldClock().advance(
+                7200,
+                AdvanceSource.SKIP,
+                [sleeper, awake],
+                mental=plan_for((sleeper, awake)),
+            )
+        grant.assert_called_once_with(awake, "fire_arrow", 2, unlocks_out=[])
+        self.assertEqual(sleeper.db.practice_booking, "fire_arrow")
+        self.assertIsNone(awake.db.practice_booking)
+
+    def test_zero_seconds_never_consumes_a_booking(self):
+        entity = BookingEntity()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            WorldClock().advance(0, AdvanceSource.SKIP, [entity])
+        grant.assert_not_called()
+        self.assertEqual(entity.db.practice_booking, "fire_arrow")
 
 
 class WorldClockPersistenceTests(EvenniaTestCase):
@@ -664,7 +732,7 @@ class WorldClockAtomicityTests(EvenniaTest):
             PRACTICE_XP_PER_STUDY_HOUR,
             practice_xp_amount,
         )
-        from world.rules.time_skip import advance_skip
+        from world.rules.time_skip import advance_wait
         from world.skills.registry import SKILL_REGISTRY
 
         self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
@@ -686,10 +754,68 @@ class WorldClockAtomicityTests(EvenniaTest):
         gain = 2 * PRACTICE_XP_PER_STUDY_HOUR * practice_xp_amount(
             self.player, SKILL_REGISTRY["fire_arrow"]
         )
-        advance_skip(self.player, 7200)
+        advance_wait(self.player, 7200)
         self.assertIsNone(self.player.db.practice_booking)
         self.assertAlmostEqual(
             self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain
+        )
+
+    @covers_requirement(
+        "party-time-settlement::skip-advances-settle-the-present-party"
+    )
+    @covers_requirement(
+        "world-clock::mental-intervals-compose-with-the-single-clock-writer"
+    )
+    def test_wide_mental_scope_settles_beyond_the_narrow_resource_scope(self):
+        other = create_object(
+            PlayerCharacter, key="mental-only companion", location=self.room1
+        )
+        other.race = "human"
+        other.apply_race_baseline()
+        other.traits.hp.current = 50
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(other, 360000, SleepPosture.AWAKE)
+        WorldClock().advance(
+            600,
+            AdvanceSource.COMMAND,
+            (self.player,),
+            mental=plan_for((self.player, other)),
+        )
+        # Both present members settle mental time exactly once; the companion
+        # outside the rite's narrow resource scope receives no gauge write.
+        self.assertEqual(read_fatigue_state(self.player).reserve_units, 357600)
+        self.assertEqual(read_fatigue_state(other).reserve_units, 357600)
+        self.assertEqual(other.traits.hp.current, 50)
+
+    @covers_requirement(
+        "world-clock::advance-persists-the-tick-and-entity-state-atomically"
+    )
+    @covers_requirement(
+        "world-clock::mental-intervals-compose-with-the-single-clock-writer"
+    )
+    def test_late_boundary_failure_restores_a_mental_only_member(self):
+        write_fatigue_state(self.player, 300000, SleepPosture.AWAKE)
+        write_fatigue_state(self.char2, 250000, SleepPosture.AWAKE)
+        before = (
+            read_fatigue_state(self.player),
+            read_fatigue_state(self.char2),
+        )
+        with (
+            patch(
+                "world.rules.clock._settle_boundary_stages",
+                side_effect=RuntimeError("simulated late failure"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            WorldClock().advance(
+                600,
+                AdvanceSource.COMMAND,
+                (self.player,),
+                mental=plan_for((self.player, self.char2)),
+            )
+        self.assertEqual(
+            (read_fatigue_state(self.player), read_fatigue_state(self.char2)),
+            before,
         )
 
 

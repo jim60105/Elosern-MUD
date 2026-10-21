@@ -633,9 +633,21 @@ def pray_step(entity: Any) -> dict[str, Any]:
         _snapshot_clock_tick,
         build_advance_snapshot_registry,
     )
+    from world.rules.fatigue import IntervalCompletion
+    from world.rules.mental_time import plan_for
+    from world.rules.party_scope import present_party_scope
 
+    # The rite's resource effects stay on its single participant; the actual
+    # elapsed noncombat time additionally settles the present party's mental
+    # intervals, so the enclosing rollback snapshots that wider scope too.
+    mental_scope = present_party_scope(entity)
+    rollback_scope = tuple({id(member): member for member in (entity, *mental_scope)}.values())
     registry = build_advance_snapshot_registry(
-        clock, rules.duration_seconds, AdvanceSource.COMMAND, (entity,)
+        clock,
+        rules.duration_seconds,
+        AdvanceSource.COMMAND,
+        (entity,),
+        mental_scope=mental_scope,
     )
     tick_snapshot = _snapshot_clock_tick(clock)
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
@@ -643,7 +655,14 @@ def pray_step(entity: Any) -> dict[str, Any]:
     church_snapshot = attribute_snapshot(entity, "church")
     try:
         with transaction.atomic():
-            clock.advance(rules.duration_seconds, AdvanceSource.COMMAND, (entity,))
+            clock.advance(
+                rules.duration_seconds,
+                AdvanceSource.COMMAND,
+                (entity,),
+                mental=plan_for(
+                    mental_scope, completion=IntervalCompletion.INDIVISIBLE
+                ),
+            )
 
             def _mutate(entry: dict[str, Any]) -> None:
                 entry["merit"] = int(entry["merit"]) + _scaled_pray_merit(
@@ -664,7 +683,7 @@ def pray_step(entity: Any) -> dict[str, Any]:
             )
     except Exception:
         _restore_clock_tick(clock, tick_snapshot)
-        _restore_advance_registry(registry, (entity,))
+        _restore_advance_registry(registry, rollback_scope)
         restore_attribute_best_effort(entity, "church", church_snapshot)
         raise
     return {"outcome": "prayed", "merit": int(written["merit"]), "tick": clock.tick}

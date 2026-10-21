@@ -75,7 +75,12 @@ class DreamSurfaceTests(EvenniaTest):
         super().tearDown()
 
     def enter(self, **overrides):
-        values = {"tick_from": 100, "tick_to": 100, "requested_seconds": 0}
+        values = {
+            "tick_from": 100,
+            "tick_to": 700,
+            "requested_seconds": 600,
+            "voluntary": True,
+        }
         values.update(overrides)
         return service.enter_after_sleep(self.actor, **values)
 
@@ -100,8 +105,9 @@ class DreamSurfaceTests(EvenniaTest):
     @covers_requirement(
         "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum",
         "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result",
+        "dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result",
     )
-    def test_zero_duration_real_sleep_and_ordinary_sleep(self):
+    def test_zero_elapsed_sleep_opens_no_dream(self):
         for gauge in ("hp", "mp", "sp"):
             trait = self.actor.traits.get(gauge)
             trait.current = trait.max
@@ -115,26 +121,38 @@ class DreamSurfaceTests(EvenniaTest):
         before = self.physical()
         with patch("commands.skip._maybe_nominate_after_rest"):
             command.func()
-        state = service.dream_state(self.actor)
-        self.assertEqual(state["sleep"]["seconds"], 0)
-        self.assertEqual(state["remaining"], 6)
+        self.assertIsNone(service.dream_state(self.actor))
         self.assertEqual(before, self.physical())
-        self.assertIn("dream awaken", render_state(state))
+        self.assertIn("沒有進入夢境", command.caller.msg.call_args_list[-1].args[0])
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     def test_browser_zero_sleep_choice_and_ordinary_rest_wait(self):
-        for payload in ({"sleep": True}, {"seconds": 5}, {"daypart": "dawn"}):
-            clock = SimpleNamespace(tick=100, calendar=self.clock.calendar)
-            with patch("web.webclient.actions.exploration_actions.advance_skip", return_value=[]), patch(
-                    "web.webclient.actions.exploration_actions.get_world_clock", return_value=clock), patch(
-                    "server.title_nomination_service.schedule_rest_boundary_nomination"):
-                self.assertEqual(_wait_adapter(self.actor, validate_wait_payload(payload))["outcome"], "success")
-            self.assertIsNone(service.dream_state(self.actor))
-        with patch("web.webclient.actions.exploration_actions.seconds_to_full_regen", return_value=0), patch(
+        from world.rules.time_skip import SkipResult, SleepEntry, SleepOutcome
+
+        empty = SkipResult("synthetic-wait", 5, 5, (), voluntary=False)
+        entry = SleepEntry("synthetic-sleep", self.actor, 0, False)
+        zero = SkipResult(
+            "synthetic-sleep", 0, 0, (), voluntary=True, woke=True
+        )
+        with patch("web.webclient.actions.exploration_actions.advance_wait", return_value=empty), patch(
+                "web.webclient.actions.exploration_actions.begin_sleep",
+                return_value=SleepOutcome(entry, zero)), patch(
                 "server.title_nomination_service.schedule_rest_boundary_nomination"):
-            result = _wait_adapter(self.actor, validate_wait_payload({"sleep": True, "dream": True}))
+            for payload in ({"sleep": True}, {"seconds": 5}):
+                self.assertEqual(
+                    _wait_adapter(
+                        self.actor, validate_wait_payload(payload)
+                    )["outcome"],
+                    "success",
+                )
+                self.assertIsNone(service.dream_state(self.actor))
+        with patch("web.webclient.actions.exploration_actions.begin_sleep", return_value=SleepOutcome(entry, zero)), patch(
+                "server.title_nomination_service.schedule_rest_boundary_nomination"):
+            result = _wait_adapter(
+                self.actor, validate_wait_payload({"sleep": True, "dream": True})
+            )
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(service.dream_state(self.actor)["sleep"]["seconds"], 0)
+        self.assertIsNone(service.dream_state(self.actor))
         for forged in ({"sleep": 1, "dream": True}, {"sleep": True, "dream": 1}, {"sleep": True, "dream": True, "seconds": 0}):
             with self.assertRaises(ValueError):
                 validate_wait_payload(forged)
@@ -152,42 +170,56 @@ class DreamSurfaceTests(EvenniaTest):
             command.func()
             clock.assert_not_called()
         with patch("web.webclient.actions.exploration_actions.unsafe_rejection", return_value="合成拒絕"), patch(
-                "web.webclient.actions.exploration_actions.advance_skip") as advance:
+                "web.webclient.actions.exploration_actions.begin_sleep") as advance:
             result = _wait_adapter(self.actor, {"sleep": True, "dream": True})
             advance.assert_not_called()
         self.assertEqual(result["outcome"], "rejected")
         self.assertIsNone(service.dream_state(self.actor))
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
+    @covers_requirement("dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result")
     def test_interrupted_committed_result_uses_actual_ticks_on_both_clients(self):
         for browser in (False, True):
-            clock = SimpleNamespace(tick=100)
-            def advance(*args, **kwargs):
-                clock.tick = 107
-                return [SimpleNamespace(kind="synthetic_interrupt")]
+            from typeclasses.npcs import NPC
+            from world.rules.clock import get_world_clock
+            from world.rules.fatigue import SleepPosture, write_fatigue_state
+            from world.rules.party import join_party
+
+            companion = create_object(
+                NPC, key=f"interrupted-{browser}", location=self.actor.location
+            )
+            join_party(companion, self.actor)
+            # The voluntary target is 30 s (360 units at 12/s), but the
+            # companion's natural wake falls at 7 s (84 units at 12/s).
+            write_fatigue_state(self.actor, 359640, SleepPosture.AWAKE)
+            write_fatigue_state(companion, 71916, SleepPosture.FORCED)
+            for gauge in ("hp", "mp", "sp"):
+                trait = self.actor.traits.get(gauge)
+                trait.current = trait.max
+                trait.rate = 0.0
+            clock = get_world_clock()
+            before = clock.tick
             if browser:
-                with patch("web.webclient.actions.exploration_actions.get_world_clock", return_value=clock), patch(
-                        "web.webclient.actions.exploration_actions.advance_skip", side_effect=advance) as call, patch(
-                        "web.webclient.actions.exploration_actions.seconds_to_full_regen", return_value=30), patch(
-                        "server.title_nomination_service.schedule_rest_boundary_nomination"):
+                with patch(
+                    "server.title_nomination_service.schedule_rest_boundary_nomination"
+                ):
                     _wait_adapter(self.actor, {"sleep": True, "dream": True})
             else:
-                clock.advance = Mock(side_effect=advance)
-                call = clock.advance
                 command = CmdSleep()
                 command.caller = self.actor
                 command.args = "dream"
-                with patch("commands.skip.get_world_clock", return_value=clock), patch(
-                        "commands.skip._seconds_to_full_regen", return_value=30), patch("commands.skip._maybe_nominate_after_rest"):
+                with patch("commands.skip._maybe_nominate_after_rest"):
                     command.func()
-            self.assertEqual(call.call_count, 1)
             state = service.dream_state(self.actor)
             self.assertEqual(state["sleep"]["seconds"], 7)
             self.assertEqual(state["sleep"]["requested_seconds"], 30)
-            self.assertEqual(state["sleep"]["event_kinds"], ["synthetic_interrupt"])
-            self.assertIn("時間經過了 7 秒。", [call.args[0] for call in self.actor.msg.call_args_list])
+            self.assertIn(
+                "時間經過了 7 秒。",
+                [call.args[0] for call in self.actor.msg.call_args_list],
+            )
             self.assertEqual(self.request("awaken").result["outcome"], "success")
-            self.assertEqual(clock.tick, 107)
+            self.assertEqual(get_world_clock().tick - before, 7)
+            self.actor.db.dream_surface = None
 
     @covers_requirement(
         "dream-explicit-presentation::dream-presentation-changes-no-live-character-effects",
@@ -198,11 +230,7 @@ class DreamSurfaceTests(EvenniaTest):
         "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
     )
     def test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke(self):
-        command = CmdSleep()
-        command.caller = self.actor
-        command.args = "dream"
-        with patch("commands.skip._seconds_to_full_regen", return_value=0), patch("commands.skip._maybe_nominate_after_rest"):
-            command.func()
+        self.enter()
         physical = self.physical()
         client = self.delivered()
         result = self.request("say", message="在無名港尋找失落的鐘聲。", client=client).result

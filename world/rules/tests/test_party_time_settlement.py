@@ -18,6 +18,7 @@ combat settlements keep their existing entity tuples.
 """
 
 from copy import deepcopy
+from math import ceil
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -48,6 +49,11 @@ from world.rules.clock import (
     get_world_clock,
     settle_combat_result,
 )
+from world.rules.fatigue import (
+    SleepPosture,
+    read_fatigue_state,
+    write_fatigue_state,
+)
 from world.rules.defeat_aftermath.aftermath import _recovery_scope
 from world.rules.defeat_aftermath.violation import (
     _advance_attempt_clock,
@@ -59,7 +65,7 @@ from world.rules.movement import charge_movement
 from world.rules.party import join_party
 from world.rules.possession import enter_possession
 from world.rules.targeting import RoomActionContext
-from world.rules.time_skip import advance_skip
+from world.rules.time_skip import advance_wait
 from world.skills.registry import TargetSpec
 from world.tests.raw_attributes import raw_attribute_value
 from world.tests.synthetic_data import (
@@ -261,13 +267,13 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         before = get_world_clock().tick
         real_run_stages = clock_module._run_stages
 
-        def run_then_raise(clock, seconds, source, entities):
-            real_run_stages(clock, seconds, source, entities)
+        def run_then_raise(clock, seconds, source, entities, **kwargs):
+            real_run_stages(clock, seconds, source, entities, **kwargs)
             raise RuntimeError("post-settlement failure")
 
         with patch("world.rules.clock._run_stages", side_effect=run_then_raise):
             with self.assertRaises(RuntimeError):
-                advance_skip(self.player, 3600)
+                advance_wait(self.player, 3600)
 
         self.assertEqual(get_world_clock().tick, before)
         self.assertEqual(self._gauges(self.player), (10, 10, 10))
@@ -283,7 +289,7 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
             patch("world.rules.clock.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            advance_skip(self.player, 60)
+            advance_wait(self.player, 60)
 
         info.assert_called_once()
         (event,), kwargs = info.call_args
@@ -311,6 +317,36 @@ class SkipPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         # a duplicated puppet entry would double the regenerated gauges.
         for member in (self.player, self.ella, self.kahn):
             self.assertEqual(self._gauges(member), (28, 46, 64))
+
+    @covers_requirement(
+        "party-time-settlement::no-accepted-time-means-no-mental-settlement"
+    )
+    def test_free_inspection_operations_advance_no_time_or_reserve(self):
+        from commands.economy import CmdInventory
+        from world.rules.status_query import build_status_read_model
+
+        write_fatigue_state(self.player, 300000, SleepPosture.AWAKE)
+        before_tick = get_world_clock().tick
+        before_state = read_fatigue_state(self.player)
+
+        # Status inspection and the inventory/menu surface are reads: neither
+        # game time nor reserve moves.
+        build_status_read_model(self.player)
+        inventory = CmdInventory()
+        inventory.caller = self.player
+        inventory.args = ""
+        inventory.func()
+
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(read_fatigue_state(self.player), before_state)
+
+        # Waiting uses ordinary awake cost with no special recovery, guard or
+        # ambush benefit: 600 s drains 2,400 units and selects no posture.
+        advance_wait(self.player, 600)
+        self.assertEqual(get_world_clock().tick - before_tick, 600)
+        state = read_fatigue_state(self.player)
+        self.assertEqual(state.reserve_units, 297600)
+        self.assertIs(state.posture, SleepPosture.AWAKE)
 
 
 class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
@@ -395,6 +431,55 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(self._gauges(self.ella), (10, 10, 10))
 
     @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
+    def test_present_forced_sleeper_blocks_a_plain_exit_with_zero_writes(self):
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        self.assertIsNone(self.door.at_traverse(self.player, self.room2))
+        self.assertIs(self.player.location, self.room1)
+        self.assertIs(self.ella.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(
+            read_fatigue_state(self.ella).reserve_units, 0
+        )
+
+    @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
+    def test_remote_forced_sleeper_does_not_block_the_present_party(self):
+        write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        self.door.at_traverse(self.player, self.room2)
+        self.assertIs(self.player.location, self.room2)
+        self.assertIs(self.ella.location, self.room2)
+        self.assertIs(self.kahn.location, self.room2)
+        self.assertEqual(get_world_clock().tick - before, MOVE)
+        self.assertEqual(read_fatigue_state(self.kahn).reserve_units, 0)
+
+    @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
+    def test_possessing_an_awake_member_cannot_carry_a_sleeper(self):
+        self.kahn.location = self.room1
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        enter_possession(self.player, self.kahn)
+        before = get_world_clock().tick
+        self.assertIsNone(self.door.at_traverse(self.kahn, self.room2))
+        for member in (self.kahn, self.player, self.ella):
+            self.assertIs(member.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-"
         "persisted-relocation-and-reconciles-every-evennia-cache-surface"
     )
@@ -408,8 +493,8 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         before = get_world_clock().tick
         real_advance = WorldClock.advance
 
-        def advance_then_raise(clock, seconds, source, entities):
-            real_advance(clock, seconds, source, entities)
+        def advance_then_raise(clock, seconds, source, entities, **kwargs):
+            real_advance(clock, seconds, source, entities, **kwargs)
             raise RuntimeError("post-advance failure")
 
         with patch.object(WorldClock, "advance", advance_then_raise):
@@ -482,6 +567,40 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertNotIn(_PROBE_BUFF, entity_active_buffs(self.ella))
 
     @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
+    def test_present_forced_sleeper_blocks_gate_entry_with_zero_writes(self):
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        self.assertFalse(self.gate.at_traverse(self.player, self.east_gate))
+        self.assertIs(self.player.location, self.east_gate)
+        self.assertIs(self.ella.location, self.east_gate)
+        self.assertIs(self.kahn.location, self.east_gate)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+    )
+    def test_present_forced_sleeper_blocks_a_wilderness_step(self):
+        self.gate.at_traverse(self.player, self.east_gate)
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = get_world_clock().tick
+        coordinates = self.player.location.coordinates
+        result = self._exit("east").at_traverse(
+            self.player, self.player.location
+        )
+        self.assertFalse(result)
+        self.assertEqual(self.player.location.coordinates, coordinates)
+        self.assertEqual(self.ella.location.coordinates, coordinates)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
         "cost-charging-function"
     )
@@ -506,9 +625,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         calls = []
         real_advance = WorldClock.advance
 
-        def spy(clock, seconds, source, entities):
+        def spy(clock, seconds, source, entities, **kwargs):
             calls.append(list(entities))
-            return real_advance(clock, seconds, source, entities)
+            return real_advance(clock, seconds, source, entities, **kwargs)
 
         with patch.object(WorldClock, "advance", spy):
             self._exit("east").at_traverse(self.player, self.player.location)
@@ -544,8 +663,8 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         source_coordinates = self.player.location.coordinates
         real_advance = WorldClock.advance
 
-        def advance_then_raise(clock, seconds, source, entities):
-            real_advance(clock, seconds, source, entities)
+        def advance_then_raise(clock, seconds, source, entities, **kwargs):
+            real_advance(clock, seconds, source, entities, **kwargs)
             raise RuntimeError("post-advance failure")
 
         with patch.object(WorldClock, "advance", advance_then_raise):
@@ -578,9 +697,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         calls = []
         real_advance = WorldClock.advance
 
-        def spy(clock, seconds, source, entities):
+        def spy(clock, seconds, source, entities, **kwargs):
             calls.append(list(entities))
-            return real_advance(clock, seconds, source, entities)
+            return real_advance(clock, seconds, source, entities, **kwargs)
 
         with patch.object(WorldClock, "advance", spy):
             self._exit("east").at_traverse(self.ella, self.ella.location)
@@ -589,13 +708,20 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         # together, so the one advance settles all three in that order.
         self.assertEqual(calls[0], [self.ella, self.player, self.kahn])
         target = (source_coordinates[0] + 1, source_coordinates[1])
+        # The gate crossing already consumed foot-travel reserve, leaving the
+        # party in the light stage (90% foot speed): the same 12,000-second
+        # normal-speed step now commits ceil(12000 / 0.9) = 13,334 seconds.
+        elapsed = ceil(12000 / 0.9)
         for member in (self.ella, self.player, self.kahn):
             self.assertEqual(member.location.coordinates, target)
-            # 12,000 s = 1,200 whole 10 s settlement quanta at the fixture rates.
-            self.assertEqual(self._gauges(member), (22, 34, 46))
+            # 13,334 s at the fixture rates (hp 0.001, mp 0.002, sp 0.003).
+            self.assertEqual(
+                self._gauges(member),
+                (10 + int(0.001 * elapsed), 10 + int(0.002 * elapsed), 10 + int(0.003 * elapsed)),
+            )
             self.assertEqual(script.db.itemcoordinates.get(member), target)
         self.assertEqual(
-            get_world_clock().tick - before, WILDERNESS_STEP_SECONDS
+            get_world_clock().tick - before, elapsed
         )
 
 
@@ -674,8 +800,8 @@ class FieldCastPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         clock = WorldClock()
         real_run_stages = clock_module._run_stages
 
-        def run_then_raise(clock_self, seconds, source, entities):
-            real_run_stages(clock_self, seconds, source, entities)
+        def run_then_raise(clock_self, seconds, source, entities, **kwargs):
+            real_run_stages(clock_self, seconds, source, entities, **kwargs)
             raise RuntimeError("post-settlement failure")
 
         with patch("world.rules.clock._run_stages", side_effect=run_then_raise):
@@ -717,8 +843,8 @@ class FieldCastPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertTrue(snapshot.objects[id(self.ella)].refresh_caches)
         real_advance = WorldClock.advance
 
-        def advance_then_raise(clock_self, seconds, source, entities):
-            real_advance(clock_self, seconds, source, entities)
+        def advance_then_raise(clock_self, seconds, source, entities, **kwargs):
+            real_advance(clock_self, seconds, source, entities, **kwargs)
             raise RuntimeError("post-advance failure")
 
         with patch.object(WorldClock, "advance", advance_then_raise):
@@ -873,8 +999,8 @@ class FieldItemUsePartySettlementTests(_PartySettlementFixture, EvenniaTest):
         clock = WorldClock()
         real_advance = WorldClock.advance
 
-        def advance_then_raise(clock_self, seconds, source, entities):
-            real_advance(clock_self, seconds, source, entities)
+        def advance_then_raise(clock_self, seconds, source, entities, **kwargs):
+            real_advance(clock_self, seconds, source, entities, **kwargs)
             raise RuntimeError("post-advance failure")
 
         with patch.object(WorldClock, "advance", advance_then_raise):
@@ -936,9 +1062,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
         calls = []
         real_advance = WorldClock.advance
 
-        def spy(clock_self, seconds, source, entities):
+        def spy(clock_self, seconds, source, entities, **kwargs):
             calls.append((seconds, source, entities))
-            return real_advance(clock_self, seconds, source, entities)
+            return real_advance(clock_self, seconds, source, entities, **kwargs)
 
         with (
             patch("world.rules.church.get_world_clock", return_value=clock),
@@ -986,9 +1112,9 @@ class UnchangedSettlementScopeTests(EvenniaTest):
         calls = []
         real_advance = WorldClock.advance
 
-        def spy(clock_self, seconds, source, entities):
+        def spy(clock_self, seconds, source, entities, **kwargs):
             calls.append((seconds, source, list(entities)))
-            return real_advance(clock_self, seconds, source, entities)
+            return real_advance(clock_self, seconds, source, entities, **kwargs)
 
         with patch.object(WorldClock, "advance", spy):
             _advance_attempt_clock(clock, 60, [self.char1], [])

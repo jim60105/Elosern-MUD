@@ -15,7 +15,16 @@ from evennia.utils.search import search_script
 
 from world.observability import log_info, log_warn
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
-from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+from world.rules.fatigue import (
+    FATIGUE_ATTRIBUTE_SURFACES,
+    FatigueActivity,
+    FatigueInterval,
+    IntervalCompletion,
+    predict_interval,
+    read_optional_fatigue_state,
+    settle_fatigue_intervals,
+    sleep_blocks_actions,
+)
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
 from world.rules.pleasure import saintess_trickle_step
@@ -103,6 +112,7 @@ class EventSourceRegistration:
 
     settle: Callable[[int, int], list["ScheduledEvent"]]
     surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None
+    next_boundary: Callable[[int, int], int | None] | None = None
 
 
 _EVENT_SOURCES: dict[str, EventSourceRegistration] = {}
@@ -276,6 +286,7 @@ def _practice_settlement(
     seconds: int,
     source: AdvanceSource,
     due_tick: int,
+    eligible: frozenset[int] | None = None,
 ) -> list[ScheduledEvent]:
     """Settle declared-practice bookings in closed form (D7: the real writer).
 
@@ -301,13 +312,21 @@ def _practice_settlement(
     advance discards it and no owner can deliver an unlock the commit did not
     keep.
     """
-    if source is not AdvanceSource.SKIP:
+    if source is not AdvanceSource.SKIP or seconds <= 0:
         return []
     hours = seconds // 3600
     events: list[ScheduledEvent] = []
     for entity in entities:
         db = getattr(entity, "db", None)
         if db is None:
+            continue
+        if eligible is not None:
+            if id(entity) not in eligible:
+                # A sleeping member's standing booking is preserved for a
+                # later eligible awake interval; it is never consumed by
+                # time the member spent asleep.
+                continue
+        elif sleep_blocks_actions(entity):
             continue
         booking = getattr(db, "practice_booking", None)
         if booking is None:
@@ -344,6 +363,8 @@ def register_event_source(
     kind: str,
     source: Callable[[int, int], list[ScheduledEvent]],
     surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None,
+    *,
+    next_boundary: Callable[[int, int], int | None] | None = None,
 ) -> None:
     """Register a boundary-query seam owned by a future subsystem.
 
@@ -355,7 +376,163 @@ def register_event_source(
     source registered with ``surfaces=None`` is a read-only seam (or a test
     seam) and is never snapshotted or restored by ``advance()``.
     """
-    _EVENT_SOURCES[kind] = EventSourceRegistration(source, surfaces)
+    _EVENT_SOURCES[kind] = EventSourceRegistration(source, surfaces, next_boundary)
+
+
+def next_registered_boundary(start_tick: int, end_tick: int) -> int | None:
+    """Return the earliest interactive-event offset declared before ``end_tick``.
+
+    A registered source may declare a pure ``next_boundary(start, end)``
+    query; it returns the absolute tick of its next interactive fact or
+    ``None``. The minimum offset is returned so an interruptible skip can stop
+    before the earliest relevant event without executing any writer.
+    """
+    offsets: list[int] = []
+    for registration in _EVENT_SOURCES.values():
+        query = registration.next_boundary
+        if query is None:
+            continue
+        due_tick = query(start_tick, end_tick)
+        if due_tick is None:
+            continue
+        offset = int(due_tick) - start_tick
+        if 0 < offset <= end_tick - start_tick:
+            offsets.append(offset)
+    return min(offsets) if offsets else None
+
+
+def _mental_state_or_none(entity: Any) -> Any:
+    """Read one member's fatigue state, or ``None`` when it was never initialized.
+
+    A wholly absent reserve/posture pair is the construction baseline of a
+    non-physiological fixture and is skipped. A half-written pair (or any
+    malformed value) is corrupt and fails closed through ``read_fatigue_state``.
+    """
+    return read_optional_fatigue_state(entity)
+
+
+def _is_dead(entity: Any) -> bool:
+    """Whether one member's stored HP is at or below zero (never resurrected)."""
+    try:
+        hp = entity.traits.hp
+        value = getattr(hp, "current", getattr(hp, "value", 0))
+        return float(value) <= 0
+    except Exception:  # observability: ignore R2: an entity without readable traits is a synthetic non-physiological fixture, not a dead actor; nothing is written for it
+        return False
+
+
+def _same_state(left: Any, right: Any) -> bool:
+    return (
+        left is not None
+        and right is not None
+        and left.reserve_units == right.reserve_units
+        and left.posture is right.posture
+    )
+
+
+@dataclass(frozen=True)
+class MentalPlan:
+    """Explicit per-member mental activity and policy for one accepted advance.
+
+    ``scope`` is the present co-located mental party; it is deliberately wider
+    than the ordinary resource ``entities`` when a rite or other narrow-scope
+    effect settles. ``activity_for`` samples one member's transient activity
+    at call time, so a posture committed earlier in the same advance is
+    reflected by later segments. ``completion`` is ``INDIVISIBLE`` for a field
+    action that must commit its whole duration before any collapse.
+    """
+
+    scope: tuple[Any, ...]
+    activity_for: Callable[[Any], FatigueActivity]
+    completion: IntervalCompletion = IntervalCompletion.INTERRUPTIBLE
+    #: Optional caller-owned list receiving the committed fatigue records.
+    record: list[Any] | None = None
+
+
+def _settle_mental(seconds: int, plan: MentalPlan | None) -> list[Any]:
+    """Settle one present party's mental intervals inside the clock transaction.
+
+    An ``INTERRUPTIBLE`` plan is segmented only across ordinary fatigue-stage
+    thresholds (never across an interaction boundary: the caller already
+    truncated the accepted interval). Each segment is committed through the
+    sole fatigue writer, so exact reserve consumption and every exclusive
+    projection survive one long advance. An ``INDIVISIBLE`` plan commits its
+    full duration once.
+    """
+    if plan is None:
+        return []
+    commits: list[Any] = []
+    for entity in plan.scope:
+        if getattr(entity, "_is_deleted", False):
+            continue
+        state = _mental_state_or_none(entity)
+        if state is None or _is_dead(entity):
+            continue
+        if plan.completion is not IntervalCompletion.INTERRUPTIBLE:
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        plan.activity_for(entity),
+                        seconds,
+                        state,
+                        plan.completion,
+                    ),
+                ),
+                context={"stage": "mental_settlement"},
+            )
+            commits.extend(settlement.commits)
+            continue
+        remaining = seconds
+        for _ in range(16):
+            activity = plan.activity_for(entity)
+            prediction = predict_interval(
+                state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
+            )
+            step = prediction.applicable_seconds
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        activity,
+                        step,
+                        state,
+                        IntervalCompletion.INTERRUPTIBLE,
+                    ),
+                ),
+                context={"stage": "mental_settlement"},
+            )
+            commit = settlement.commits[0]
+            commits.append(commit)
+            state = commit.end
+            remaining -= step
+            if remaining <= 0:
+                break
+            if step == 0 and _same_state(commit.end, commit.start):
+                raise RuntimeError(
+                    "mental settlement made no progress at a zero-second boundary"
+                )
+        else:
+            raise RuntimeError("mental settlement exceeded its internal segment bound")
+    if plan.record is not None:
+        plan.record.extend(commits)
+    return commits
+
+
+def _initial_practice_eligible(plan: MentalPlan | None) -> frozenset[int] | None:
+    """The members whose sampled initial activity permits study settlement."""
+    if plan is None:
+        return None
+    eligible: set[int] = set()
+    for entity in plan.scope:
+        if getattr(entity, "_is_deleted", False) or _is_dead(entity):
+            continue
+        if _mental_state_or_none(entity) is None:
+            eligible.add(id(entity))
+            continue
+        if plan.activity_for(entity) is not FatigueActivity.SLEEP:
+            eligible.add(id(entity))
+    return frozenset(eligible)
 
 
 def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any, ...]) -> list[ScheduledEvent]:
@@ -373,14 +550,22 @@ def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any,
     return events
 
 
-def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entities: tuple[Any, ...]) -> list[ScheduledEvent]:
+def _run_stages(
+    clock: "WorldClock",
+    seconds: int,
+    source: AdvanceSource,
+    entities: tuple[Any, ...],
+    mental: MentalPlan | None = None,
+) -> list[ScheduledEvent]:
+    practice_eligible = _initial_practice_eligible(mental)
     _settle_gauge_regen(entities, seconds)
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
+        _settle_mental(seconds, mental)
         _settle_buffs_and_decay(entities, seconds)
         events.extend(
             _practice_settlement(
-                entities, seconds, source, clock.tick + seconds
+                entities, seconds, source, clock.tick + seconds, practice_eligible
             )
         )
         # 聖光涓流 (saintess-vessel D2b): the holder's idle-band pin/oscillation
@@ -454,17 +639,23 @@ def build_advance_snapshot_registry(
     seconds: int,
     source: AdvanceSource,
     entities: Iterable[Any],
+    *,
+    mental_scope: Iterable[Any] = (),
 ) -> dict[int, SurfaceSnapshot]:
     """Build the merged pre-advance snapshot registry, keyed by object id.
 
     Merges, by object identity: (a) the existing caller-entity surfaces
-    (``_ADVANCE_ENTITY_SURFACES``, unchanged), then (b) every registered
-    stage kind's advance-surface contract in ``_STAGE_ORDER[5:]`` order. A
-    caller-supplied entity that a contract also discovers (a player with a
-    due quest, a schedule-tagged NPC) is snapshotted once with the union of
-    surfaces. Kinds registered without a contract are skipped entirely, so
-    plain advances never run contract DB queries; a raising contract fails
-    the advance before any write (fail-closed, no partial state).
+    (``_ADVANCE_ENTITY_SURFACES``, unchanged) for the ordinary resource scope
+    and the explicit ``mental_scope`` (the present party, wider than a rite's
+    narrow resource scope), then (b) every registered stage kind's
+    advance-surface contract in ``_STAGE_ORDER[5:]`` order. A caller-supplied
+    entity that a contract also discovers (a player with a due quest, a
+    schedule-tagged NPC) is snapshotted once with the union of surfaces. Kinds
+    registered without a contract are skipped entirely, so plain advances
+    never run contract DB queries; a raising contract fails the advance before
+    any write (fail-closed, no partial state). Enclosing outer owners SHALL
+    pass their resolved mental scope here so a post-advance failure restores
+    mental-only members too.
 
     This is the outer-owner seam: an outer ``transaction.atomic()`` wrapping
     ``advance()`` (the movement and cast settlement changes) SHALL build this
@@ -473,15 +664,22 @@ def build_advance_snapshot_registry(
     surfaces are covered whichever boundary fails.
     """
     registry: dict[int, SurfaceSnapshot] = {}
-    for entity in entities:
+
+    def _snapshot(entity: Any) -> None:
         if not hasattr(entity, "attributes"):
-            continue
+            return
         registry[id(entity)] = SurfaceSnapshot(
             attributes={
                 (key, category): attribute_snapshot(entity, key, category)
                 for key, category in _ADVANCE_ENTITY_SURFACES
             }
         )
+
+    for entity in entities:
+        _snapshot(entity)
+    for entity in mental_scope:
+        if id(entity) not in registry:
+            _snapshot(entity)
     for kind in _STAGE_ORDER[5:]:
         registration = _EVENT_SOURCES.get(kind)
         if registration is None or registration.surfaces is None:
@@ -718,7 +916,14 @@ class WorldClock:
     def calendar(self) -> WorldDateTime:
         return WorldDateTime.from_tick(self.tick)
 
-    def advance(self, seconds: int, source: AdvanceSource, entities: Iterable[Any]) -> list[ScheduledEvent]:
+    def advance(
+        self,
+        seconds: int,
+        source: AdvanceSource,
+        entities: Iterable[Any],
+        *,
+        mental: MentalPlan | None = None,
+    ) -> list[ScheduledEvent]:
         if seconds < 0:
             raise ValueError("seconds must be non-negative")
         if seconds > MAX_ADVANCE_SECONDS:
@@ -726,12 +931,15 @@ class WorldClock:
                 f"advance of {seconds}s exceeds the {MAX_ADVANCE_SECONDS}s bound"
             )
         scope = tuple(entities)
-        registry = build_advance_snapshot_registry(self, seconds, source, scope)
+        mental_scope = mental.scope if mental is not None else ()
+        registry = build_advance_snapshot_registry(
+            self, seconds, source, scope, mental_scope=mental_scope
+        )
         tick_snapshot = _snapshot_clock_tick(self)
         tick_from = self.tick
         try:
             with transaction.atomic():
-                events = _run_stages(self, seconds, source, scope)
+                events = _run_stages(self, seconds, source, scope, mental=mental)
                 self.tick += seconds
                 persist = getattr(self, "_persist", None)
                 if persist is not None:

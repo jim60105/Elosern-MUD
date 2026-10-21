@@ -57,7 +57,7 @@ from world.rules.event_log import render_plain_text
 from world.rules.movement import charge_movement
 from world.rules.player_messages import terminal_outcome_message
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
-from world.rules.time_skip import advance_skip, seconds_to_full_regen
+from world.rules.time_skip import advance_wait, seconds_to_full_regen
 from world.rules.surfaces import read_counter_trait, write_counter_trait
 from tools.spec_traceability import covers_requirement
 from world.rules.tests._combat_session_helpers import (
@@ -111,12 +111,21 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
             evaluate_skip_safety(self.player), SkipRejectReason.HOSTILE_PRESENT
         )
         # Movement has no HP gate (pinned behavior, no edit): the shared cost
-        # charge succeeds at the post-settlement wake state.
+        # charge succeeds at the post-settlement wake state. The physiology
+        # travel bar is separate from this HP/defeat pin, so start awake.
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
         before = self.clock.tick
+        hp_before = self.player.traits.hp.current
         charge_movement(
             self.player, "move", source_location=self.player.location
         )
-        self.assertGreater(self.clock.tick, before)
+        # A same-cell wilderness move resolves a zero-distance edge, so the
+        # pin is that the charge is admitted without an HP gate: no refusal,
+        # no HP change, and the tick never moves backwards.
+        self.assertGreaterEqual(self.clock.tick, before)
+        self.assertEqual(self.player.traits.hp.current, hp_before)
 
     @covers_requirement(
         "defeat-aftermath-recovery::a-retained-quest-bound-winner-forces-the-move-and-rest-route"
@@ -158,7 +167,7 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
             if isinstance(occupant, Monster):
                 occupant.delete()
         self.assertIsNone(evaluate_skip_safety(self.player))
-        advance_skip(self.player, seconds_to_full_regen(self.player))
+        advance_wait(self.player, seconds_to_full_regen(self.player))
         self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
 
 

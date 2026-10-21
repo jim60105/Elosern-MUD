@@ -63,10 +63,34 @@ def settle_shop_hours(start_tick: int, end_tick: int) -> list[ScheduledEvent]:
     return events
 
 
+def next_shop_boundary(start_tick: int, end_tick: int) -> int | None:
+    """Return the earliest shop open/close tick in ``(start_tick, end_tick]``.
+
+    Pure query over the same authored catalog and boundary arithmetic the
+    settlement uses, so an interruptible skip can stop before a real
+    interactive shop transition without running the writer.
+    """
+    due: list[int] = []
+    for shop_key, config in get_catalog().shop_configs.items():
+        due.extend(
+            tick
+            for tick, _ in _boundary_ticks(
+                shop_key,
+                config.open_hour,
+                config.close_hour,
+                start_tick,
+                end_tick,
+            )
+        )
+    return min(due) if due else None
+
+
 def register_shop_hours() -> None:
     """Register the ``shop_hours`` clock source idempotently.
 
     Read-only seam: settlement only emits events from the clock calendar and
     never writes durable state, so no advance-surface contract is declared.
     """
-    register_event_source("shop_hours", settle_shop_hours)
+    register_event_source(
+        "shop_hours", settle_shop_hours, next_boundary=next_shop_boundary
+    )
