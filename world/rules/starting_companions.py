@@ -36,6 +36,7 @@ from world.lore.player_presets import derive_companion_card
 from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.races import SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
+from world.rules.fatigue import initialize_fatigue_state
 from world.rules.npc_identity import live_key_taken_by_other
 from world.rules.affinity import NATURAL_CAP, seed_affinity
 # The lineage state and portrait finalization are consumed from their sole
@@ -157,6 +158,9 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
         )
     npc = create_object(LLMNPC, key=preset.display_name)
     try:
+        # Absent-only construction baseline; a rebuilt or refilled companion
+        # never has its valid reserve overwritten here.
+        initialize_fatigue_state(npc)
         npc.race = preset.race
         npc.subrace = preset.subrace
         npc.sex = preset.sex

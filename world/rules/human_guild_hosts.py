@@ -19,6 +19,7 @@ from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.maps.bootstrap import resolve_residence_route
 from world.observability import log_info
 from world.rules.equipment import toggle_equipment
+from world.rules.fatigue import initialize_fatigue_state
 from world.rules.npc_identity import (
     live_key_taken_by_other, validate_npc_name, validate_npc_title,
 )
@@ -208,5 +209,11 @@ def sync_persistent_adventurers(
                     "host": host.pk, "person": key, "profile": person.profile_key,
                     "home": rooms["home"].pk, "target": rooms["guild"].pk,
                 }: log_info("guild_adventurer_created", context=context))
+            # Authored synchronization establishes the construction baseline
+            # for a host that predates it (both attributes wholly absent).
+            # The initializer is absent-only: a valid reserve — including a
+            # fatigued one — and malformed state are left untouched, and no
+            # read-time default is materialized.
+            initialize_fatigue_state(host)
             hosts.append(host)
     return tuple(hosts)

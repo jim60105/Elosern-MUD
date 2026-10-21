@@ -1,0 +1,81 @@
+# Mental reserve and sleep posture policy (mental-reserve capability; design
+# 2026-10-21-party-fatigue-and-sleep-design sections 4.1, 5 and 6).
+#
+# A sectioned rule table: every row carries a unique `id` and a `section`
+# discriminator; the remaining keys are the row's data mapping, interpreted
+# by world/rules/fatigue.py through the shared loader family in
+# world/rules/rulebook/schema.py::load_sectioned_rules. The loader in
+# world/rules/fatigue.py fails closed on any deviation: unknown/duplicate
+# rows, a wrong row count, a scale that is not 100 units/percent, stage
+# bands that are not contiguous, a wake threshold that is not the moderate
+# band's floor, or a foot-speed scale outside (0, 1].
+#
+# Units: one stored reserve unit is 1/3600 percentage point, so 3,600 units
+# are one percentage point, 0 is empty, 360,000 is full, and 72,000 is the
+# 20 percent forced-sleep wake threshold. Rates are exact net units per game
+# second (they already include the cost of being awake; consumers never add
+# the ordinary awake cost again). Terrain adds no exertion multiplier.
+
+# Reserve scale rows.
+- id: reserve_units_per_percent
+  section: scale
+  value: 3600
+- id: reserve_max_units
+  section: scale
+  value: 360000
+- id: wake_threshold_units
+  section: scale
+  value: 72000
+
+# Activity rates: ordinary awake/wait/study -4, foot travel -8, awake combat
+# -12, actual sleep +12 units per second.
+- id: rate_awake
+  section: rate
+  activity: awake
+  units_per_second: -4
+- id: rate_foot_travel
+  section: rate
+  activity: foot_travel
+  units_per_second: -8
+- id: rate_awake_combat
+  section: rate
+  activity: awake_combat
+  units_per_second: -12
+- id: rate_sleep
+  section: rate
+  activity: sleep
+  units_per_second: 12
+
+# Exclusive awake fatigue stages. `minimum_units`/`maximum_units` are the
+# closed reserve interval the stage owns; the bands must tile 1..360000 and
+# the forced-sleep latch (posture) replaces the stage below the wake
+# threshold. `foot_speed_numerator`/`foot_speed_denominator` carry the exact
+# rational foot-speed scale (1, 9/10, 3/4, 1/2).
+- id: stage_normal
+  section: stage
+  stage: normal
+  minimum_units: 252000
+  maximum_units: 360000
+  foot_speed_numerator: 100
+  foot_speed_denominator: 100
+- id: stage_light
+  section: stage
+  stage: light
+  minimum_units: 144000
+  maximum_units: 251999
+  foot_speed_numerator: 90
+  foot_speed_denominator: 100
+- id: stage_moderate
+  section: stage
+  stage: moderate
+  minimum_units: 72000
+  maximum_units: 143999
+  foot_speed_numerator: 75
+  foot_speed_denominator: 100
+- id: stage_severe
+  section: stage
+  stage: severe
+  minimum_units: 1
+  maximum_units: 71999
+  foot_speed_numerator: 50
+  foot_speed_denominator: 100

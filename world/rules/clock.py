@@ -15,6 +15,7 @@ from evennia.utils.search import search_script
 
 from world.observability import log_info, log_warn
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
+from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
 from world.rules.pleasure import saintess_trickle_step
@@ -422,7 +423,9 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("skill_proficiency", None),
     ("skill_practice_day", None),
     ("practice_booking", None),
-) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
+) + FATIGUE_ATTRIBUTE_SURFACES + tuple(
+    (f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG
+)
 
 
 def _snapshot_clock_tick(clock: "WorldClock") -> tuple[int, tuple[bool, Any] | None]:
