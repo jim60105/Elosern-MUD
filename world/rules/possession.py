@@ -11,6 +11,7 @@ Documented order:
 
 from copy import deepcopy
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from django.db import transaction
@@ -118,6 +119,14 @@ REASON_TRANSFER_REFUSED = "transfer_refused"
 REASON_RELEASE_REFUSED = "release_refused"
 REASON_POSSESSED_TALK = "possessed_talk"
 REASON_POSSESSED_ENGAGE = "possessed_engage"
+# Sleep-driven contextual handoff (handoff-sleeping-party-control). The query
+# and confirmation share these stable codes so the text and browser transports
+# never invent a second vocabulary.
+REASON_NOT_POSSESSING = "not_possessing"
+REASON_NOT_SLEEPING = "not_sleeping"
+REASON_STALE_HANDOFF = "stale_handoff"
+REASON_NO_CANDIDATE = "no_candidate"
+REASON_SESSION_MISMATCH = "session_mismatch"
 
 # D10 stable refusal messages for possessed actor
 POSSESSED_REFUSAL_MESSAGES: dict[str, str] = {
@@ -134,6 +143,11 @@ POSSESSION_REJECTION_MESSAGES: dict[str, str] = {
     REASON_DIALOGUE_OPEN: "對方正在對話中，無法附身。",
     REASON_ALREADY_POSSESSING: "你目前已經在附身狀態。",
     REASON_TRANSFER_REFUSED: "此刻無法附身於他。",
+    REASON_NOT_POSSESSING: "你目前並未控制任何同伴的身體。",
+    REASON_NOT_SLEEPING: "目前的身體尚未入睡，不需要交接。",
+    REASON_STALE_HANDOFF: "交接選項已經失效，請重新選擇。",
+    REASON_NO_CANDIDATE: "目前沒有可以接手控制的清醒同伴。",
+    REASON_SESSION_MISMATCH: "這個操作必須由目前控制該身體的連線發出。",
 }
 
 UNPOSSESS_RELEASED_MESSAGE = "你的意識回到了自己的身體。"
@@ -147,9 +161,12 @@ class PossessionError(Exception):
 class PossessionGateError(PossessionError):
     """A deterministic entry gate rejected possession."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, candidates: tuple[Any, ...] = ()) -> None:
         super().__init__(reason)
         self.reason = reason
+        # A stale handoff confirmation carries the current choices so the
+        # caller can re-render them without substituting a different target.
+        self.candidates = tuple(candidates)
 
 
 class PossessionWriteError(PossessionError):
@@ -594,6 +611,430 @@ def _dialogue_open(npc: Any, player: Any) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Sleep-driven contextual handoff (handoff-sleeping-party-control)
+# ---------------------------------------------------------------------------
+
+
+#: Whether the sleeping body may hand control over, and to whom, is derived
+#: from committed state only. This monotonic per-body episode counter is owned
+#: by this module (the possession writer) and advanced once per voluntary sleep
+#: entry, so a captured choice can never become valid again after a wake and a
+#: later sleep.
+SLEEP_HANDOFF_EPISODE_ATTRIBUTE = "sleep_handoff_episode"
+
+#: Candidate semantics: returning to the owner body versus taking over an awake
+#: companion.
+SLEEP_HANDOFF_RETURN = "return"
+SLEEP_HANDOFF_POSSESS = "possess"
+
+
+@dataclass(frozen=True)
+class SleepHandoffCandidate:
+    """One lawful handoff choice derived from committed state."""
+
+    dbid: int
+    name: str
+    kind: str
+    reserve_percent: int | None
+
+
+@dataclass(frozen=True)
+class SleepHandoffOptions:
+    """The contextual choices of one sleeping controlled body, or its reason."""
+
+    transition_id: str | None
+    candidates: tuple[SleepHandoffCandidate, ...]
+    reason: str | None
+
+    @property
+    def available(self) -> bool:
+        """Whether confirmation of one of ``candidates`` can be attempted."""
+        return self.reason is None and bool(self.candidates)
+
+
+def _sleep_posture_blocks(entity: Any) -> bool:
+    """Whether one body's committed posture forbids ordinary actions."""
+    from world.rules.fatigue import sleep_blocks_actions
+
+    return sleep_blocks_actions(entity)
+
+
+def _sleep_handoff_transition_id(current_body: Any, binding: Mapping[str, Any] | None) -> str:
+    """Return the stable identity of the current sleep-control episode.
+
+    The recorded episode is written by :func:`begin_sleep_handoff` once per
+    voluntary sleep entry. A body whose physiology predates this writer falls
+    back to its possession tick, which is still a committed, non-guessable
+    source (the possession writer owns it).
+    """
+    attributes = getattr(current_body, "attributes", None)
+    episode = None
+    if attributes is not None:
+        episode = attributes.get(SLEEP_HANDOFF_EPISODE_ATTRIBUTE, default=None)
+    if isinstance(episode, int) and not isinstance(episode, bool) and episode >= 0:
+        return f"{int(current_body.pk)}:{episode}"
+    since_tick = 0 if binding is None else int(binding.get("since_tick", 0))
+    return f"{int(current_body.pk)}:0:{since_tick}"
+
+
+def record_sleep_handoff_episode(current_body: Any) -> None:
+    """Advance one body's sleep-control episode identity.
+
+    Called after a committed voluntary-sleep posture write. A malformed prior
+    value is replaced rather than trusted; the counter never decreases.
+    """
+    attributes = getattr(current_body, "attributes", None)
+    if attributes is None:
+        raise PossessionWriteError(REASON_WRITE_FAILED, "sleeping body has no attributes")
+    previous = attributes.get(SLEEP_HANDOFF_EPISODE_ATTRIBUTE, default=0)
+    if isinstance(previous, int) and not isinstance(previous, bool) and previous >= 0:
+        episode = previous + 1
+    else:
+        episode = 1
+    with transaction.atomic():
+        attributes.add(SLEEP_HANDOFF_EPISODE_ATTRIBUTE, episode)
+
+
+def _session_controls_body(session: Any, account: Any, body: Any) -> bool:
+    """Whether one authenticated session currently puppets ``body``."""
+    if session is None or body is None:
+        return False
+    if not getattr(session, "logged_in", False):
+        return False
+    if getattr(session, "puppet", None) is not body:
+        return False
+    session_account = getattr(session, "account", None)
+    account_pk = getattr(session_account, "pk", None)
+    return account_pk is not None and int(account_pk) == int(getattr(account, "pk", -1))
+
+
+def _sleep_handoff_owner(account: Any, commander: Any, current_body: Any) -> bool:
+    """Whether ``account`` is the canonical owner of ``commander``."""
+    from typeclasses.characters import PlayerCharacter
+
+    if account is None or not isinstance(commander, PlayerCharacter):
+        return False
+    owner = _resolve_account(commander, current_body)
+    if owner is None or not hasattr(owner, "pk") or not hasattr(account, "pk"):
+        return False
+    return int(owner.pk) == int(account.pk)
+
+
+def _account_possession_holder(account: Any) -> Any | None:
+    """Return the account character holding a possession, if any."""
+    if account is None:
+        return None
+    for char in _account_characters(account):
+        if current_possession(char) is not None:
+            return char
+    return None
+
+
+def _candidate_action_capable(candidate: Any) -> bool:
+    """Awake, living, and able to act: the shared eligibility for a candidate."""
+    from world.rules.party_scope import is_knocked_out
+
+    if _sleep_posture_blocks(candidate):
+        return False
+    try:
+        return not is_knocked_out(candidate)
+    except Exception:  # observability: ignore R2: a candidate without readable HP is not action-capable; this display read writes nothing
+        return False
+
+
+def _candidate_reserve_percent(candidate: Any) -> int | None:
+    """The candidate's display-only reserve percentage, or None when unknown."""
+    from world.rules.fatigue import read_optional_fatigue_state, reserve_percent
+
+    try:
+        state = read_optional_fatigue_state(candidate)
+    except Exception:  # observability: ignore R2: malformed physiology only leaves the display value unknown; eligibility is decided separately
+        return None
+    if state is None:
+        return None
+    return reserve_percent(state)
+
+
+def _sleep_handoff_candidate(member: Any, kind: str) -> SleepHandoffCandidate:
+    return SleepHandoffCandidate(
+        dbid=int(member.pk),
+        name=str(getattr(member, "key", "?")),
+        kind=kind,
+        reserve_percent=_candidate_reserve_percent(member),
+    )
+
+
+def _lawful_sleep_handoff_candidates(
+    commander: Any, current_body: Any
+) -> tuple[SleepHandoffCandidate, ...]:
+    """The ordered lawful choices: awake owner first, then awake companions."""
+    from world.rules.party import is_companion, live_companions
+
+    room = getattr(commander, "location", None)
+    candidates: list[SleepHandoffCandidate] = []
+
+    def lawful(member: Any) -> bool:
+        if member is current_body:
+            return False
+        if getattr(member, "location", None) is not room:
+            return False
+        if not _candidate_action_capable(member):
+            return False
+        if getattr(getattr(member, "db", None), "possessed_by", None) is not None:
+            return False
+        if member is not commander and not is_companion(member, commander):
+            return False
+        if _dialogue_open(member, commander):
+            return False
+        return True
+
+    if current_body is not commander and lawful(commander):
+        candidates.append(_sleep_handoff_candidate(commander, SLEEP_HANDOFF_RETURN))
+    companions = [
+        member
+        for member in live_companions(commander)
+        if member is not current_body and lawful(member)
+    ]
+    for member in sorted(companions, key=lambda obj: int(obj.pk)):
+        candidates.append(_sleep_handoff_candidate(member, SLEEP_HANDOFF_POSSESS))
+    return tuple(candidates)
+
+
+def _sleep_handoff_options(
+    account: Any, commander: Any, current_body: Any, *, session: Any = None
+) -> SleepHandoffOptions:
+    """Derive the contextual choices from committed state; never writes."""
+    from world.rules.party import is_companion
+
+    if not _sleep_handoff_owner(account, commander, current_body):
+        return SleepHandoffOptions(None, (), REASON_SESSION_MISMATCH)
+
+    binding = current_possession(commander)
+    if current_body is commander:
+        if binding is not None or getattr(getattr(commander, "db", None), "possessed_by", None) is not None:
+            return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+    else:
+        if binding is None or int(binding["npc_dbid"]) != int(current_body.pk):
+            return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+        possessed_by = getattr(getattr(current_body, "db", None), "possessed_by", None)
+        if not isinstance(possessed_by, int) or possessed_by != int(commander.pk):
+            return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+        if not is_companion(current_body, commander):
+            return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+
+    room = getattr(commander, "location", None)
+    if room is None or getattr(current_body, "location", None) is not room:
+        return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+    if not _sleep_posture_blocks(current_body):
+        return SleepHandoffOptions(None, (), REASON_NOT_SLEEPING)
+    if session is not None and not _session_controls_body(session, account, current_body):
+        return SleepHandoffOptions(None, (), REASON_SESSION_MISMATCH)
+
+    holder = _account_possession_holder(account)
+    if holder is not None and holder is not commander:
+        return SleepHandoffOptions(None, (), REASON_ALREADY_POSSESSING)
+
+    transition_id = _sleep_handoff_transition_id(current_body, binding)
+    candidates = _lawful_sleep_handoff_candidates(commander, current_body)
+    reason = None if candidates else REASON_NO_CANDIDATE
+    return SleepHandoffOptions(transition_id, candidates, reason)
+
+
+def sleep_handoff_candidates(
+    account: Any, commander: Any, current_body: Any, *, session: Any = None
+) -> SleepHandoffOptions:
+    """Return the lawful sleep-driven handoff choices of the controlled body.
+
+    A pure read: no time, posture, possession, draft, or session state is
+    written. ``commander`` is the owner body behind the control, ``current_body``
+    is the body the authenticated session currently puppets (the owner itself,
+    or a possessed companion), and ``session`` — when supplied — must be the
+    authenticated session that puppets that body.
+    """
+    return _sleep_handoff_options(account, commander, current_body, session=session)
+
+
+def begin_sleep_handoff(
+    account: Any, commander: Any, current_body: Any, *, session: Any = None
+) -> SleepHandoffOptions:
+    """Advance the sleep episode, then return its contextual choices.
+
+    Called only after the voluntary-sleep posture has committed, so the query
+    sees the committed state. An unsupported origin (an explicitly selected but
+    uncontrolled member) yields no offer rather than an exception.
+    """
+    if not _sleep_handoff_owner(account, commander, current_body):
+        return SleepHandoffOptions(None, (), REASON_SESSION_MISMATCH)
+    binding = current_possession(commander)
+    controlled = current_body is commander or (
+        binding is not None
+        and int(binding["npc_dbid"]) == int(getattr(current_body, "pk", -1))
+        and getattr(getattr(current_body, "db", None), "possessed_by", None)
+        == getattr(commander, "pk", None)
+    )
+    if not controlled:
+        return SleepHandoffOptions(None, (), REASON_NOT_POSSESSING)
+    record_sleep_handoff_episode(current_body)
+    return _sleep_handoff_options(account, commander, current_body, session=session)
+
+
+def _snapshot_owner_control(player: Any) -> dict[str, Any]:
+    """Capture the owner body's location and logout bookkeeping."""
+    return {
+        "location": getattr(player, "location", None),
+        "logout_attributes": _snapshot_logout_attributes(player),
+    }
+
+
+def _restore_owner_control(player: Any, snapshot: Mapping[str, Any]) -> None:
+    """Restore the owner body's location and logout bookkeeping."""
+    _restore_occupied_location(player, snapshot["location"])
+    _restore_logout_attributes(player, snapshot["logout_attributes"])
+
+
+def _snapshot_handoff_target(target: Any) -> dict[str, Any]:
+    """Capture every control surface a contextual transfer may touch."""
+    return {
+        "possessed_by": deepcopy(getattr(getattr(target, "db", None), "possessed_by", None)),
+        "lock": (target.locks.get("puppet") or "") if hasattr(target, "locks") else "",
+        "lock_before": deepcopy(getattr(getattr(target, "db", None), "possession_lock_before", None)),
+        "location": getattr(target, "location", None),
+        "logout_attributes": _snapshot_logout_attributes(target),
+    }
+
+
+def _restore_handoff_target(target: Any, snapshot: Mapping[str, Any]) -> None:
+    """Return an attempted target to its exact pre-transition control state."""
+    _unmount_cmdset(target)
+    if hasattr(target, "db"):
+        target.db.possessed_by = snapshot["possessed_by"]
+        target.db.possession_lock_before = snapshot["lock_before"]
+    if hasattr(target, "locks"):
+        if snapshot["lock"]:
+            target.locks.add(snapshot["lock"])
+        else:
+            target.locks.remove("puppet")
+    _restore_occupied_location(target, snapshot["location"])
+    _restore_logout_attributes(target, snapshot["logout_attributes"])
+
+
+def _handoff_lock_ids(account: Any, commander: Any, current_body: Any, target: Any) -> list[int]:
+    ids = {int(commander.pk), int(current_body.pk), int(target.pk)}
+    if account is not None:
+        ids.update(int(char.pk) for char in _account_characters(account))
+    return sorted(ids)
+
+
+def _confirm_handoff_return(commander: Any, current_body: Any) -> None:
+    """Hand control from the sleeping companion back to the awake owner."""
+    release_possession(commander, npc=current_body, reason="sleep_handoff")
+
+
+def _confirm_handoff_possess(commander: Any, current_body: Any, target: Any) -> None:
+    """Take over ``target`` from the sleeping controlled body.
+
+    The caller owns the outer transaction and the compensation snapshots, so
+    this is exactly the two existing verified hops: release the old body (when
+    there is one) and enter the new body under the validated contextual
+    exception.
+    """
+    if current_body is not commander:
+        release_possession(commander, npc=current_body, reason="sleep_handoff")
+    _enter_possession(commander, target, contextual_body=current_body)
+
+
+def confirm_sleep_handoff(
+    account: Any,
+    commander: Any,
+    current_body: Any,
+    candidate_id: int,
+    *,
+    transition_id: str,
+    session: Any = None,
+) -> SleepHandoffCandidate:
+    """Confirm one exact contextual handoff choice.
+
+    Every mutable gate is recomputed under the writer's row locks before any
+    side effect: authenticated account/session, the currently unavailable body,
+    commander, membership, co-location, awake/living/action state, account-wide
+    single possession, and the exact sleep episode identity. A stale or
+    ineligible choice refuses with the current choices attached; nothing is
+    substituted, and no time advances.
+    """
+    options = sleep_handoff_candidates(account, commander, current_body, session=session)
+    candidate = next(
+        (item for item in options.candidates if item.dbid == int(candidate_id)), None
+    )
+    if options.transition_id != transition_id or candidate is None:
+        raise PossessionGateError(REASON_STALE_HANDOFF, candidates=options.candidates)
+
+    target = (
+        commander
+        if candidate.dbid == int(commander.pk)
+        else _resolve_live_object(candidate.dbid)
+    )
+    if target is None:
+        raise PossessionGateError(REASON_STALE_HANDOFF, candidates=options.candidates)
+
+    old_control = (
+        snapshot_party_control(commander, current_body)
+        if candidate.kind != SLEEP_HANDOFF_RETURN
+        else None
+    )
+    owner_before = _snapshot_owner_control(commander)
+    target_before = _snapshot_handoff_target(target)
+    attempted = False
+    try:
+        with transaction.atomic():
+            list(
+                ObjectDB.objects.select_for_update().filter(
+                    id__in=_handoff_lock_ids(account, commander, current_body, target)
+                )
+            )
+            locked = sleep_handoff_candidates(
+                account, commander, current_body, session=session
+            )
+            locked_candidate = next(
+                (item for item in locked.candidates if item.dbid == candidate.dbid), None
+            )
+            if locked.transition_id != transition_id or locked_candidate is None:
+                raise PossessionGateError(
+                    REASON_STALE_HANDOFF, candidates=locked.candidates
+                )
+            attempted = True
+            if locked_candidate.kind == SLEEP_HANDOFF_RETURN:
+                _confirm_handoff_return(commander, current_body)
+            else:
+                _confirm_handoff_possess(commander, current_body, target)
+    except Exception as error:
+        if attempted:
+            # The enclosing transaction has rolled the durable mirrors back.
+            # The puppet/cmdset/location effects are not transactional, so the
+            # exact prior control state is restored here, outside the rollback.
+            if old_control is not None:
+                restore_party_control(commander, current_body, old_control)
+            if locked_candidate.kind != SLEEP_HANDOFF_RETURN:
+                _restore_handoff_target(target, target_before)
+            _restore_owner_control(commander, owner_before)
+        if isinstance(error, (PossessionGateError, PossessionWriteError)):
+            raise
+        # observability: ignore R2: the write failure is re-raised as the stable PossessionWriteError below
+        raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
+
+    log_info(
+        "sleep_handoff",
+        context={
+            "char": str(getattr(commander, "pk", "?")),
+            "from": str(getattr(current_body, "pk", "?")),
+            "to": str(candidate.dbid),
+            "kind": candidate.kind,
+            "transition": transition_id,
+        },
+    )
+    return candidate
+
+
+# ---------------------------------------------------------------------------
 # Core Writers
 # ---------------------------------------------------------------------------
 
@@ -604,14 +1045,51 @@ def is_possessed_actor(actor: Any) -> bool:
     return isinstance(val, int) and not isinstance(val, bool)
 
 
-def possession_verdict(player: Any, npc: Any) -> str | None:
+def _contextual_handoff_gate(player: Any, npc: Any, contextual_body: Any) -> bool:
+    """Whether the narrowly validated sleep-driven handoff exception applies.
+
+    The exception relaxes only the combat gate. It is reachable exclusively
+    through :func:`confirm_sleep_handoff`, after that function has validated the
+    account/session, the unavailable sleeping body, and the exact candidate:
+    every other entry gate (membership, co-location, dialogue, already
+    possessing, account scope) still runs unchanged.
+    """
+    from world.rules.party import is_companion
+
+    if contextual_body is None:
+        return False
+    if not _sleep_posture_blocks(contextual_body):
+        return False
+    room = getattr(player, "location", None)
+    if room is None or getattr(contextual_body, "location", None) is not room:
+        return False
+    if getattr(npc, "location", None) is not room:
+        return False
+    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+        return False
+    if _sleep_posture_blocks(npc):
+        return False
+    if npc is not player and not is_companion(npc, player):
+        return False
+    if contextual_body is not player and not is_companion(contextual_body, player):
+        return False
+    binding = current_possession(player)
+    if binding is not None and int(binding["npc_dbid"]) != int(contextual_body.pk):
+        return False
+    return True
+
+
+def possession_verdict(
+    player: Any, npc: Any, *, contextual_body: Any = None
+) -> str | None:
     """Evaluate deterministic entry gates for possessing ``npc`` from ``player``.
 
     Returns the rejection reason string if any gate fails, or ``None`` if all pass.
     Gates run in deterministic order:
     1. not_bound: target is a live bound companion of player
     2. not_co_located: player and npc share a non-null location
-    3. in_combat: neither side is in an active combat session
+    3. in_combat: neither side is in an active combat session, unless a
+       validated contextual sleep-driven handoff supplies ``contextual_body``
     4. dialogue_open: npc is not in an open dialogue session
     5. already_possessing: player, npc, or account's characters do not hold possession
     """
@@ -626,7 +1104,8 @@ def possession_verdict(player: Any, npc: Any) -> str | None:
     from world.rules.combat_session import is_in_active_session
 
     if is_in_active_session(player) or is_in_active_session(npc):
-        return REASON_IN_COMBAT
+        if not _contextual_handoff_gate(player, npc, contextual_body):
+            return REASON_IN_COMBAT
 
     if _dialogue_open(npc, player):
         return REASON_DIALOGUE_OPEN
@@ -643,19 +1122,11 @@ def possession_verdict(player: Any, npc: Any) -> str | None:
     return None
 
 
-def enter_possession(player: Any, npc: Any) -> None:
-    """Enter possession of bound companion ``npc`` from ``player``.
-
-    Gates run in deterministic order:
-    1. not_bound: target is a live bound companion of player
-    2. not_co_located: player and npc share a non-null location
-    3. in_combat: neither side is in an active combat session
-    4. dialogue_open: npc is not in an open dialogue session
-    5. already_possessing: player, npc, or account's characters do not hold possession
-
-    All writes are atomic and serialized under database row locking.
-    """
-    verdict = possession_verdict(player, npc)
+def _enter_possession(
+    player: Any, npc: Any, *, contextual_body: Any = None
+) -> None:
+    """Enter possession, optionally under a validated contextual handoff."""
+    verdict = possession_verdict(player, npc, contextual_body=contextual_body)
     if verdict is not None:
         raise PossessionGateError(verdict)
 
@@ -679,7 +1150,9 @@ def enter_possession(player: Any, npc: Any) -> None:
             list(ObjectDB.objects.select_for_update().filter(id__in=ids_to_lock))
 
             # Authoritative re-check of all mutable gates under row lock
-            locked_verdict = possession_verdict(player, npc)
+            locked_verdict = possession_verdict(
+                player, npc, contextual_body=contextual_body
+            )
             if locked_verdict is not None:
                 raise PossessionGateError(locked_verdict)
 
@@ -724,6 +1197,21 @@ def enter_possession(player: Any, npc: Any) -> None:
             "tick": str(tick),
         },
     )
+
+
+def enter_possession(player: Any, npc: Any) -> None:
+    """Enter possession of bound companion ``npc`` from ``player``.
+
+    Gates run in deterministic order:
+    1. not_bound: target is a live bound companion of player
+    2. not_co_located: player and npc share a non-null location
+    3. in_combat: neither side is in an active combat session
+    4. dialogue_open: npc is not in an open dialogue session
+    5. already_possessing: player, npc, or account's characters do not hold possession
+
+    All writes are atomic and serialized under database row locking.
+    """
+    _enter_possession(player, npc)
 
 
 def release_possession(

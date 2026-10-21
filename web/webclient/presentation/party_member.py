@@ -302,12 +302,37 @@ def _descriptor(
     }
 
 
-def _possession_descriptor(commander: Any, member: Any) -> dict[str, Any]:
-    """The possess/release descriptor for the viewed companion."""
+def _sleep_handoff_options(commander: Any, actor: Any) -> Any | None:
+    """The committed contextual handoff choices, or None outside that context."""
+    from world.rules.possession import sleep_handoff_candidates
+
+    account = getattr(commander, "account", None)
+    if account is None:
+        return None
+    try:
+        options = sleep_handoff_candidates(account, commander, actor)
+    except Exception:  # observability: ignore R2: a malformed read only keeps the ordinary descriptor; the panel never invents a choice
+        return None
+    return options if options.transition_id is not None else None
+
+
+def _possession_descriptor(commander: Any, member: Any, actor: Any = None) -> dict[str, Any]:
+    """The possess/release descriptor for the viewed companion.
+
+    During a committed sleep-driven handoff the lawful awake candidates replace
+    the ordinary refusal, so the party window exposes the same choices the text
+    surface does, including in combat. Every other state keeps the existing
+    gate verdict verbatim.
+    """
     member_id = int(member.pk)
     possession = current_possession(commander)
     if possession is not None and possession["npc_dbid"] == member_id:
         return _descriptor(ACTION_POSSESS_RELEASE, member_id=member_id, reason=None)
+    options = _sleep_handoff_options(commander, actor) if actor is not None else None
+    if options is not None and any(
+        candidate.dbid == member_id for candidate in options.candidates
+    ):
+        return _descriptor(ACTION_POSSESS, member_id=member_id, reason=None)
     verdict = possession_verdict(commander, member)
     if verdict is None:
         return _descriptor(ACTION_POSSESS, member_id=member_id, reason=None)
@@ -411,7 +436,7 @@ def _companion_section(actor: Any, commander: Any, member: Any) -> dict[str, Any
         "membership": membership_section(member, commander),
         "intimate": serialize_intimate(read_intimate_view(member)),
         "actions": [
-            _possession_descriptor(commander, member),
+            _possession_descriptor(commander, member, actor),
             _leave_descriptor(actor, commander, member),
             _npc_persona_descriptor(actor, member),
         ],

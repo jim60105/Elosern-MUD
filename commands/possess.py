@@ -15,19 +15,27 @@ from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
     REASON_NOT_BOUND,
     REASON_RELEASE_REFUSED,
+    REASON_SESSION_MISMATCH,
+    SLEEP_HANDOFF_RETURN,
     UNPOSSESS_RELEASED_MESSAGE,
     PossessionGateError,
     PossessionWriteError,
     _account_characters,
     _resolve_live_object,
+    confirm_sleep_handoff,
     current_possession,
     enter_possession,
     release_possession,
+    sleep_handoff_candidates,
 )
 
 _MISSING_TARGET = "你想附身誰？請指定一個同伴（possess <npc>）。"
 _AMBIGUOUS_TARGET = "這裡有好幾個目標，請說得更明確一些。"
 _NOT_NPC = "那不是你的同伴。"
+_HANDOFF_USAGE = "用法：handoff、handoff <編號>、handoff cancel"
+_HANDOFF_CANCELLED = "你取消了交接，控制權沒有改變。"
+_HANDOFF_NO_RECOVERY = "目前沒有可以接手的清醒同伴。可先等待恢復：sleep。"
+_HANDOFF_STALE = "交接選項已經失效，以下是最新的選項。"
 
 
 class CmdPossess(Command):
@@ -108,3 +116,119 @@ class CmdUnpossess(Command):
                 self.caller.msg("歸位操作失敗，請稍後再試。")
             return
         self.caller.msg(UNPOSSESS_RELEASED_MESSAGE)
+
+
+def _handoff_candidate_line(index: int, candidate) -> str:
+    fatigue = (
+        ""
+        if candidate.reserve_percent is None
+        else f"（精神儲備 {candidate.reserve_percent}%）"
+    )
+    if candidate.kind == SLEEP_HANDOFF_RETURN:
+        return f"{index}. 回到自己的身體{fatigue}"
+    return f"{index}. 接手 {candidate.name}{fatigue}"
+
+
+class CmdHandoff(Command):
+    """List or confirm a sleep-driven control handoff."""
+
+    key = "handoff"
+    aliases = ("交接",)
+    help_category = "General"
+
+    def _listing_store(self):
+        session = getattr(self, "session", None)
+        return getattr(session, "ndb", None) if session is not None else self.caller.ndb
+
+    def _clear_listing(self) -> None:
+        store = self._listing_store()
+        if store is not None:
+            store.sleep_handoff_listing = None
+
+    def _render(self, options) -> str:
+        lines = [_handoff_candidate_line(index, candidate) for index, candidate in enumerate(options.candidates, 1)]
+        lines.append(_HANDOFF_USAGE)
+        return "\n".join(lines)
+
+    def _show(self, options) -> None:
+        store = self._listing_store()
+        if store is not None:
+            store.sleep_handoff_listing = (
+                options.transition_id,
+                tuple(candidate.dbid for candidate in options.candidates),
+            )
+        self.caller.msg(self._render(options))
+
+    def func(self) -> None:
+        from world.rules.party_scope import PartyScopeError, resolve_commander
+
+        choice = self.args.strip()
+        try:
+            commander = resolve_commander(self.caller)
+        except PartyScopeError:
+            self.caller.msg(POSSESSION_REJECTION_MESSAGES[REASON_SESSION_MISMATCH])
+            return
+        account = _resolve_account(commander, self.caller)
+        options = sleep_handoff_candidates(
+            account, commander, self.caller, session=getattr(self, "session", None)
+        )
+        if choice in ("cancel", "取消"):
+            self._clear_listing()
+            self.caller.msg(_HANDOFF_CANCELLED)
+            return
+        if not options.candidates:
+            message = POSSESSION_REJECTION_MESSAGES.get(options.reason, _HANDOFF_NO_RECOVERY)
+            self.caller.msg(f"{message}\n{_HANDOFF_NO_RECOVERY}")
+            return
+        if not choice:
+            self._show(options)
+            return
+
+        store = self._listing_store()
+        listing = getattr(store, "sleep_handoff_listing", None) if store is not None else None
+        if (
+            not isinstance(listing, tuple)
+            or len(listing) != 2
+            or listing[0] != options.transition_id
+            or not choice.isdigit()
+            or not 1 <= int(choice) <= len(listing[1])
+        ):
+            self.caller.msg(_HANDOFF_STALE)
+            self._show(options)
+            return
+        candidate_id = listing[1][int(choice) - 1]
+        candidate = next(
+            (item for item in options.candidates if item.dbid == candidate_id), None
+        )
+        if candidate is None:
+            self.caller.msg(_HANDOFF_STALE)
+            self._show(options)
+            return
+        try:
+            confirm_sleep_handoff(
+                account,
+                commander,
+                self.caller,
+                candidate_id,
+                transition_id=listing[0],
+                session=getattr(self, "session", None),
+            )
+        except PossessionGateError as error:
+            message = POSSESSION_REJECTION_MESSAGES.get(error.reason, _HANDOFF_STALE)
+            current = sleep_handoff_candidates(
+                account, commander, self.caller, session=getattr(self, "session", None)
+            )
+            self.caller.msg(message)
+            if current.candidates:
+                self._show(current)
+            else:
+                self.caller.msg(_HANDOFF_NO_RECOVERY)
+            return
+        except PossessionWriteError:
+            self.caller.msg("交接操作失敗，請稍後再試。")
+            return
+        self._clear_listing()
+        if candidate.kind == SLEEP_HANDOFF_RETURN:
+            self.caller.msg(UNPOSSESS_RELEASED_MESSAGE)
+        else:
+            self.caller.msg(f"你接手了{candidate.name}的身體。")
