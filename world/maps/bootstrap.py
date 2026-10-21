@@ -724,7 +724,15 @@ def _apply_graph_plan(plan: _GraphPlan) -> SyncReport:
 
 
 def _invalidate_plan_caches(plans) -> None:
-    """Drop process-local coordinate projections for objects a failure touched."""
+    """Restore touched objects and drop their process-local projections.
+
+    A database rollback does not undo Evennia's tag/attribute/alias handler
+    caches or the loaded object's field values, so a failed convergence reloads
+    each surviving object and resets those caches before the coordinate
+    projections are dropped. Objects created inside the rolled-back transaction
+    no longer exist; their reload is ignored and they are never referenced
+    again by the caller.
+    """
 
     for plan in plans:
         objects = [
@@ -732,6 +740,17 @@ def _invalidate_plan_caches(plans) -> None:
             *(binding.exit_obj for binding in plan.roads if binding.exit_obj is not None),
         ]
         for obj in objects:
+            try:
+                obj.refresh_from_db()
+            except Exception:  # observability: ignore R2: rolled-back creations no longer exist
+                pass
+            for handler_name in ("tags", "aliases", "attributes", "locks"):
+                reset = getattr(getattr(obj, handler_name, None), "reset_cache", None)
+                if reset is not None:
+                    try:
+                        reset()
+                    except Exception:  # observability: ignore R2: handler cache reset is best-effort after rollback
+                        continue
             for cache in ("_xyz", "_xyz_destination", "_xymap"):
                 try:
                     if hasattr(obj, cache):
