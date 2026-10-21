@@ -17,7 +17,7 @@ the content so every act tells its own beat.
 - Author the act-specific overrides that the shared pools cannot know: the act's own bodily
   focus wording for its pleasure clause, its own counter phrasing where the act's declaration
   distinguishes performer from participant, and its own line for the transition events it fires.
-- Cover every sexual transition event name the catalog can emit (13 names, including the
+- Cover every sexual transition event name the catalog can emit (11 names, including the
   pair-event names selected from the participants' sexes) and every lifetime counter the catalog
   declares (8 names), each with performer and participant clauses; both pools are validated for
   exact key-set equality against the catalog-derived sets.

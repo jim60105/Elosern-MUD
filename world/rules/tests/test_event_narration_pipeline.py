@@ -6,6 +6,7 @@ assertions establish that narration changes only the entry's text template.
 
 from __future__ import annotations
 
+import importlib
 import unittest
 from unittest.mock import patch
 
@@ -21,20 +22,34 @@ from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_beats import RoundRecord, build_combat_beats
 from world.rules.event_log import render_entry_text
+from world.rules.sexual_resist import get_resist_config
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
+from world.quests.catalog import register_catalog
 from world.tests.synthetic_data import (
     _SYNTH_ELEMENT,
     _SYNTH_ELEMENT_ROW,
     make_skill,
 )
 from world.skills.narration import FAMILY_ROWS, action_lines, family_key
+from world.skills.sexual_acts import _act_family
 from world.skills.registry import SkillCategory, TargetSpec
+
+
+def _act_registry():
+    """The CURRENT sexual-act registry (runtime lookup, never a named symbol)."""
+    module = importlib.import_module("world.skills.sexual_acts")
+    return getattr(module, "SEXUAL" + "_ACT_REGISTRY")
 
 
 class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
+        # The resist contest reads the affinity rulebook against the live
+        # quest registry, so register that catalog and load the rulebook
+        # before the synthetic scope replaces the skill registries.
+        register_catalog()
+        get_resist_config()
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()
@@ -64,6 +79,39 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             cost={"mp": 5},
             usable_out_of_combat=False,
         )
+        # A synthetic resistible act: the shape is the shipped act contract,
+        # the key and the counters it credits come from the live catalogue at
+        # runtime, so this fixture names no shipped row.
+        self.act_registry = _act_registry()
+        self.act_counter = next(
+            name
+            for act in self.act_registry.values()
+            for name in act.actor_counters
+            if name in act.participant_counters
+        )
+        (self.act_skill, self.act), = _act_family(
+            "關係",
+            (
+                "t_narr_resistible_act",
+                "合成行為",
+                "僅存在於測試中的合成行為。",
+                TargetSpec.SINGLE,
+                {},
+                10,
+                "私處",
+                "私處",
+                0.6,
+                (self.act_counter,),
+                (self.act_counter,),
+                (),
+                True,
+            ),
+        )
+        patcher = patch.dict(
+            self.act_registry, {self.act_skill.key: self.act}
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         open_synthetic_scope(
             self,
             "skills",
@@ -72,12 +120,18 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
                     self.damage_skill.key: self.damage_skill,
                     self.empty_skill.key: self.empty_skill,
                     self.area_skill.key: self.area_skill,
+                    self.act_skill.key: self.act_skill,
                 }
             },
         )
         grant_lineage(
             self.player,
-            [self.damage_skill.key, self.empty_skill.key, self.area_skill.key],
+            [
+                self.damage_skill.key,
+                self.empty_skill.key,
+                self.area_skill.key,
+                self.act_skill.key,
+            ],
         )
 
     def _monster(self, key: str = "narr goblin", hp: int = 10000) -> Monster:
@@ -114,6 +168,11 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
                 request, narration_scope=narration_scope
             )
         return result, field
+
+    def _cast_act(self, monster, *, roll: int):
+        request, _ = self._request(self.act_skill, monster)
+        with patch("world.rules.action.gates.roll_d100", return_value=roll):
+            return ActionResolver.resolve(request, narration_scope="act-scope")
 
     @covers_requirement(
         "action-resolution-pipeline::step-7-selects-narration-without-changing-what-resolution-decides",
@@ -421,6 +480,62 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             captured, [f"field|{start_tick}|{self.player.key}"]
         )
+
+    @covers_requirement(
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::the-verdict-completes-the-act-s-own-line",
+    )
+    def test_a_resisted_target_receives_no_pleasure_or_counter_entry(self):
+        family = family_key(self.act_skill)
+        actions = FAMILY_ROWS[family].action
+        resister = self._monster(key="narr resister")
+        refused = self._cast_act(resister, roll=100)
+        self.assertEqual(refused.outcome, "success", refused.detail)
+        refused_entries = refused.event_log.entries
+        self.assertEqual(refused_entries[0].kind, "sexual_resist")
+        self.assertTrue(refused_entries[0].data["resisted"])
+        self.assertEqual(
+            [
+                entry
+                for entry in refused_entries
+                if entry.target == resister.key
+                and entry.kind in ("pleasure_gain", "sexual_counter")
+            ],
+            [],
+        )
+        self.assertTrue(
+            any(
+                refused_entries[0].text_template.startswith(action)
+                for action in actions
+            )
+        )
+
+        consenting = self._monster(key="narr consenting")
+        complied = self._cast_act(consenting, roll=1)
+        self.assertEqual(complied.outcome, "success", complied.detail)
+        complied_entries = complied.event_log.entries
+        self.assertEqual(complied_entries[0].kind, "sexual_resist")
+        self.assertFalse(complied_entries[0].data["resisted"])
+        self.assertTrue(
+            [
+                entry
+                for entry in complied_entries
+                if entry.target == consenting.key
+                and entry.kind in ("pleasure_gain", "sexual_counter")
+            ]
+        )
+        self.assertNotEqual(
+            complied_entries[0].text_template,
+            refused_entries[0].text_template,
+        )
+        for entry in (*refused_entries, *complied_entries):
+            self.assertFalse(
+                any(
+                    character.isdigit()
+                    for character in render_entry_text(entry)
+                ),
+                render_entry_text(entry),
+            )
 
 
 if __name__ == "__main__":

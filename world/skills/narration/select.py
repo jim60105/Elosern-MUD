@@ -30,6 +30,7 @@ from .pools import (
     PLEASURE_TARGET_LINES,
     SELF_HEAL_BAND_LINES,
     SEXUAL_COUNTER_ACTOR_LINES,
+    SEXUAL_COUNTER_LINES,
     SEXUAL_COUNTER_SHARED_LINES,
     TRAIT_DELTA_LINES,
     TRANSITION_LINES,
@@ -41,6 +42,7 @@ from .vocab import (
     MAX_RENDERED_CODE_POINTS,
     NarrationRow,
     PLEASURE_BANDS,
+    RoleClause,
     band_for,
 )
 
@@ -126,6 +128,26 @@ def _override_tiers(
             if lines:
                 tiers.append(lines)
     return tiers
+
+
+def is_performer(actor_key: str, target_key: str) -> bool:
+    """Whether one entry's participant is the cast's own actor."""
+    return bool(actor_key) and target_key == actor_key
+
+
+def _role_override(
+    skill_key: str,
+    kind: str,
+    *,
+    performer: bool,
+    catalog: Grid,
+) -> tuple[str, ...]:
+    """Return one row's role-specific clause for a kind, when it declares one."""
+    row = catalog.get(skill_key)
+    if row is None:
+        return ()
+    role_lines = row.performer_lines if performer else row.participant_lines
+    return role_lines.get(kind, ())
 
 
 def _family_chain(family: str | None) -> tuple[str, ...]:
@@ -218,6 +240,8 @@ def _special_lines(
     target_key: str,
     act: SexualActDef | None,
     band: str,
+    transitions: Mapping[str, tuple[str, ...]] = TRANSITION_LINES,
+    counters: Mapping[str, RoleClause] = SEXUAL_COUNTER_LINES,
 ) -> tuple[str, ...]:
     if kind == "roll":
         return HIT_LINES if bool(data.get("hit")) else MISS_LINES
@@ -233,15 +257,20 @@ def _special_lines(
     if kind == "pleasure_gain":
         table = (
             PLEASURE_ACTOR_LINES
-            if target_key and target_key == actor_key
+            if is_performer(actor_key, target_key)
             else PLEASURE_TARGET_LINES
         )
         return table.get(band, table["clear"])
     if kind == "sexual_counter":
         counter = str(data.get("counter", ""))
-        if act is not None and counter in act.participant_counters:
-            return SEXUAL_COUNTER_SHARED_LINES
-        return SEXUAL_COUNTER_ACTOR_LINES
+        clause = counters.get(counter)
+        if clause is not None:
+            performer = is_performer(actor_key, target_key)
+            shared = act is None or counter in act.participant_counters
+            return clause.for_role(performer or not shared)
+        if is_performer(actor_key, target_key):
+            return SEXUAL_COUNTER_ACTOR_LINES
+        return SEXUAL_COUNTER_SHARED_LINES
     if kind == "trait_delta":
         trait = str(data.get("trait_key", ""))
         if trait in TRAIT_DELTA_LINES:
@@ -249,7 +278,7 @@ def _special_lines(
         return KIND_POOLS["trait_delta"]
     if kind == "sexual_transition":
         event = str(data.get("event", ""))
-        return TRANSITION_LINES.get(event, KIND_POOLS["sexual_transition"])
+        return transitions.get(event, KIND_POOLS["sexual_transition"])
     if kind == "sexual_resist":
         if bool(data.get("resisted")):
             verdict = "resist"
@@ -277,12 +306,24 @@ def entry_line(
     max_hp: float | None = None,
     catalog: Grid = NARRATION_CATALOG,
     families: Grid = FAMILY_ROWS,
+    transitions: Mapping[str, tuple[str, ...]] = TRANSITION_LINES,
+    counters: Mapping[str, RoleClause] = SEXUAL_COUNTER_LINES,
 ) -> str:
     """Return the selected narration template for one non-first entry."""
     if kind in INTERNAL_KINDS:
         return ""
     band = band_for_entry(kind, data, max_hp)
     seed = narration_seed(scope, skill_key, kind, ordinal, target_key, band)
+    role_lines = _role_override(
+        skill_key,
+        kind,
+        performer=is_performer(actor_key, target_key),
+        catalog=catalog,
+    )
+    if role_lines:
+        chosen = choose_line(role_lines, seed, actor=actor, target=target)
+        if chosen is not None:
+            return chosen
     for lines in _override_tiers(skill_key, family, kind, catalog, families):
         chosen = choose_line(lines, seed, actor=actor, target=target)
         if chosen is not None:
@@ -294,6 +335,8 @@ def entry_line(
         target_key=target_key,
         act=act,
         band=band,
+        transitions=transitions,
+        counters=counters,
     )
     chosen = choose_line(special, seed, actor=actor, target=target)
     if chosen is not None:

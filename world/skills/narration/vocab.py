@@ -73,12 +73,17 @@ class NarrationRow:
     action clauses (one participant slot at most, so it can compose with an
     outcome clause inside the slot budget). ``kind_lines`` maps an entry kind
     to its authored override clauses; an empty mapping leaves the kind pools
-    in charge.
+    in charge. ``performer_lines`` and ``participant_lines`` map an entry kind
+    to the clause used when that entry's participant is the cast's actor or
+    another participant respectively; a sexual act uses them to name its own
+    bodily focus, which the shared role pools cannot know.
     """
 
     key: str
     action: tuple[str, ...] = ()
     kind_lines: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+    performer_lines: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+    participant_lines: Mapping[str, tuple[str, ...]] = MappingProxyType({})
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, str) or not self.key:
@@ -89,25 +94,78 @@ class NarrationRow:
             raise NarrationCatalogError(
                 f"narration row {self.key!r} action must be a tuple of strings"
             )
-        if not isinstance(self.kind_lines, Mapping):
+        object.__setattr__(
+            self,
+            "kind_lines",
+            _frozen_kind_lines(self.key, "kind_lines", self.kind_lines),
+        )
+        object.__setattr__(
+            self,
+            "performer_lines",
+            _frozen_kind_lines(self.key, "performer_lines", self.performer_lines),
+        )
+        object.__setattr__(
+            self,
+            "participant_lines",
+            _frozen_kind_lines(
+                self.key, "participant_lines", self.participant_lines
+            ),
+        )
+
+
+def _frozen_kind_lines(
+    row_key: str, field: str, lines_by_kind: Mapping[str, tuple[str, ...]]
+) -> Mapping[str, tuple[str, ...]]:
+    """Return one row field as an immutable kind-to-clauses mapping."""
+    if not isinstance(lines_by_kind, Mapping):
+        raise NarrationCatalogError(
+            f"narration row {row_key!r} {field} must be a mapping"
+        )
+    frozen: dict[str, tuple[str, ...]] = {}
+    for kind, lines in lines_by_kind.items():
+        if not isinstance(kind, str) or not kind:
             raise NarrationCatalogError(
-                f"narration row {self.key!r} kind_lines must be a mapping"
+                f"narration row {row_key!r} declares an invalid entry kind"
             )
-        frozen: dict[str, tuple[str, ...]] = {}
-        for kind, lines in self.kind_lines.items():
-            if not isinstance(kind, str) or not kind:
+        if not isinstance(lines, tuple) or any(
+            not isinstance(line, str) for line in lines
+        ):
+            raise NarrationCatalogError(
+                f"narration row {row_key!r} {field} {kind!r} must be a "
+                "tuple of strings"
+            )
+        frozen[kind] = lines
+    return MappingProxyType(frozen)
+
+
+@dataclass(frozen=True)
+class RoleClause:
+    """One pooled narration entry with a performer and a participant clause.
+
+    The performer clause speaks in the acting body's own voice; the
+    participant clause describes a body that received the act. A pooled entry
+    keyed by a lifetime counter carries both so the selector can pick by role
+    without a second table.
+    """
+
+    performer: tuple[str, ...]
+    participant: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for name in ("performer", "participant"):
+            lines = getattr(self, name)
+            if not isinstance(lines, tuple) or not lines:
                 raise NarrationCatalogError(
-                    f"narration row {self.key!r} declares an invalid entry kind"
+                    f"role clause {name} must be a non-empty tuple of strings"
                 )
-            if not isinstance(lines, tuple) or any(
-                not isinstance(line, str) for line in lines
-            ):
+            if any(not isinstance(line, str) for line in lines):
                 raise NarrationCatalogError(
-                    f"narration row {self.key!r} kind {kind!r} must be a "
-                    "tuple of strings"
+                    f"role clause {name} must be a tuple of strings"
                 )
-            frozen[kind] = lines
-        object.__setattr__(self, "kind_lines", MappingProxyType(frozen))
+
+    def for_role(self, performer: bool) -> tuple[str, ...]:
+        """Return the clause voiced for the performer or the participant."""
+        return self.performer if performer else self.participant
 
 
 def slot_count(line: str) -> int:
@@ -277,6 +335,7 @@ __all__ = [
     "NarrationCatalogError",
     "NarrationRow",
     "PLEASURE_BANDS",
+    "RoleClause",
     "band_for",
     "composed_fits",
     "contains_ascii_digit",

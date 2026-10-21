@@ -23,10 +23,11 @@ be empty.
 
 ### Requirement: The verdict completes the act's own line
 
-A sexual cast's opening line SHALL be composed of the act's attempt line and exactly one verdict
-clause selected from the resist entry's payload, differentiating resisted, auto-complied and
-complied outcomes. The resist entry SHALL render for every target regardless of verdict, and a
-resisted target SHALL receive no pleasure or counter entry.
+A contested sexual cast's opening line SHALL be composed of the act's attempt line and exactly
+one verdict clause selected from the resist entry's payload: resisted, auto-complied, or
+complied. A cast that produces no resist entry SHALL open with the attempt line directly against
+its first outcome clause instead. The resist entry SHALL render for every contested target
+regardless of verdict, and a resisted target SHALL receive no pleasure or counter entry.
 
 #### Scenario: The same act reads as a refusal or as consent
 
@@ -41,12 +42,18 @@ resisted target SHALL receive no pleasure or counter entry.
 - **THEN** the rendered clause states that the target yielded rather than choosing, and it is
   distinguishable from the ordinary complied clause
 
+#### Scenario: A cast with no resist entry opens without a verdict
+
+- **WHEN** a self-target or non-resistible act resolves and stages no resist entry
+- **THEN** its opening line composes the act attempt clause with the act's first outcome clause
+  and carries no verdict clause
+
 ### Requirement: Sexual transition and counter prose covers exactly what the catalog can emit
 
-The transition clause pool's key set SHALL equal the union of every act's sexual events and every
-pair-event name, and the counter clause pool's key set SHALL equal the union of every act's
-performer and participant counters, each with a performer and a participant clause. Both SHALL be
-validated at import against the catalog-derived sets.
+The transition clause pool's key set SHALL equal the union of every act's sexual events, every
+pair-event name, and every event name an act's own skill row stages. The counter clause pool's key
+set SHALL equal the union of every act's performer and participant counters, each with a performer
+and a participant clause. Both SHALL be validated at import against the catalog-derived sets.
 
 #### Scenario: A new event name without a clause fails the import
 
@@ -93,3 +100,35 @@ silently re-open an exemption.
 
 - **WHEN** the pending-family set is changed to contain any family
 - **THEN** the pinning test fails, naming the family that was re-opened
+
+## MODIFIED Requirements
+
+### Requirement: Every elemental spell has its own action narration
+
+Each ACTIVE elemental-magic skill SHALL declare its own authored action narration, in its
+element's register and shaped by the spell's own form, and SHALL render that line as the
+opening of its resolved action instead of the element-and-shape line. The catalog's
+pending-family set SHALL no longer contain elemental magic.
+
+#### Scenario: Two fire spells open differently
+
+- **WHEN** two ACTIVE fire spells resolve against the same target under the same narration
+  scope
+- **THEN** each log's opening line comes from that spell's own row and the two lines differ
+
+#### Scenario: An area spell addresses the field, not one body
+
+- **WHEN** an ACTIVE area spell resolves against several targets
+- **THEN** its opening line is rendered once for the whole cast and does not read as a
+  single-target strike
+
+#### Scenario: A newly added spell fails at import without a row
+
+- **WHEN** an ACTIVE elemental-magic skill exists in the shipped registry with no authored
+  narration row
+- **THEN** catalog loading raises a named narration-catalog error naming that spell
+
+#### Scenario: The pending-family set now names only sexual acts
+
+- **WHEN** the catalog loads after this change or any later narration change
+- **THEN** no elemental-magic category appears in the declared pending-family set

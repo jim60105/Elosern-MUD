@@ -11,6 +11,7 @@ act rows without racing the base registry.
 """
 
 from collections.abc import Iterable, Mapping
+from types import MappingProxyType
 
 from world.skills.effects import SexualMasteryEffect
 from world.skills.registry import SKILL_REGISTRY, SkillDef, validate_prerequisite_graph
@@ -58,6 +59,14 @@ _register_rows(
         *interspecies.INTERSPECIES_ACTS,
         *divine.DIVINE_ACTS,
     )
+)
+
+#: The paired ``SkillDef`` rows frozen at registration time. Consumers that
+#: must read what an act declares without the live (synthetic-scope
+#: replaceable) ``SKILL_REGISTRY`` binding read this snapshot — narration
+#: import validation derives the event vocabulary from it.
+SHIPPED_ACT_SKILLS: Mapping[str, SkillDef] = MappingProxyType(
+    {key: SKILL_REGISTRY[key] for key in SEXUAL_ACT_REGISTRY}
 )
 
 # Act rows never declare prerequisites (they unlock through sexual state,
@@ -140,6 +149,7 @@ def gated_counter_keys() -> frozenset[str]:
 
 
 __all__ = [
+    "SHIPPED_ACT_SKILLS",
     "SEXUAL_ACT_REGISTRY",
     "SexualActDef",
     "_act_family",

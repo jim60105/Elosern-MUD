@@ -6,9 +6,10 @@ roles). Selection, bounds and pipeline integration are unchanged.
 
 ## D1. The act row authors the attempt; the verdict clause completes it
 
-`sexual_resist` is always the cast's first entry and always carries a verdict. A row's `action`
-therefore describes what the caster does and where the touch is aimed, ending on a turn that
-reads naturally before any of the three verdict clauses:
+For a contested cast (a resistible act against another target) `sexual_resist` is the cast's
+first entry and always carries a verdict. A row's `action` therefore describes what the caster
+does and where the touch is aimed, ending on a turn that reads naturally before any of the three
+verdict clauses:
 
 ```
 <act attempt clause> + <verdict clause: comply | auto_comply | resist>
@@ -18,22 +19,31 @@ One row per act is enough for every verdict, and a resisted cast never claims co
 have. The act's *failed* shape (every target resisted) is the resist clause on every resist
 entry; the opening carries the attempt once and the later entries carry only the clause.
 
+A self-target or non-resistible cast never stages a resist entry, so its opening composes the
+same attempt line directly against its first outcome clause (the act's own pleasure line). The
+attempt wording stays valid there because it still describes the act rather than a resolved
+contact.
+
 Rejected: authoring separate comply/resist sentences per act. It triples the rows to say the
 same thing, and it lets the two halves drift (an act line that asserts contact plus a resist
 clause that denies it).
 
 ## D2. Per-act overrides use facts the act already declares
 
-- **Bodily focus**: `SexualActDef.actor_part`/`target_part` select the act's own wording for
-  its `pleasure_gain` clause; the shared four-band pool supplies the intensity.
+- **Bodily focus**: each row voices its own `pleasure_gain` clause for the acting body and for
+  the receiving body (`performer_lines`/`participant_lines`), because only the act knows where
+  it is aimed. An act that declares no own clause — the divine mysteries, which narrate from
+  the `divine_*` pools — still renders from the shared role pools, whose four bands supply the
+  intensity. The band id stays part of the selection seed, so a row that authors more than one
+  role variant still varies with intensity even though its own clause carries no numbers.
 - **Counters**: `actor_counters` means the performer did something (`duo_act_count` for the
   acting body), `participant_counters` means both bodies recorded it. The row supplies one
   performer clause and one participant clause per counter it declares; the selector picks by
   whether the entry's participant is the caster and by which tuple declares the counter.
-- **Events**: `sexual_events` and the `pair_events` values name the transition; the transition
-  pool holds one clause per name. The pair-event names (`first_vaginal_penetration`,
-  `penetrative_sex_with_female`, `penetrative_sex_with_male`, `partner_vaginal_sex`,
-  `partner_deep_vaginal_sex`) each need a clause even though only two acts fire them today,
+- **Events**: `sexual_events`, the event effects an act's skill row stages, and the
+  `pair_events` values name the transition; the transition pool holds one clause per name.
+  The three pair-event names (`first_vaginal_penetration`, `penetrative_sex_with_female`,
+  `penetrative_sex_with_male`) each need a clause even though only two acts fire them today,
   because the selection happens at cast time from the participants' sexes.
 
 ## D3. Coverage is derived from the catalog, not hand-listed
@@ -41,8 +51,8 @@ clause that denies it).
 At import:
 
 - every key of `SEXUAL_ACT_REGISTRY` has a row;
-- the transition pool's key set equals the union of every act's `sexual_events` and every
-  `pair_events` value — 13 names today;
+- the transition pool's key set equals the union of every act's `sexual_events`, every event
+  effect its skill row stages, and every `pair_events` value — 11 names today;
 - the counter pool's key set equals the union of every act's `actor_counters` and
   `participant_counters` — 8 names today, each with both a performer and a participant clause.
 
@@ -83,7 +93,7 @@ a shard owner, so no manifest entry and no new test module is added.
 
 ## Risks / Trade-offs
 
-- **Content sensitivity and volume.** 66 rows plus 29 pool clauses in one day. Lines stay short
+- **Content sensitivity and volume.** 66 rows plus 27 pool clauses in one day. Lines stay short
   (one clause), and the six act-line modules keep the authoring order identical to the registry,
   so review is a straight comparison against `world/skills/sexual_acts/*.py`.
 - **Pair event names are symmetric.** The same event name may describe two orientations; the

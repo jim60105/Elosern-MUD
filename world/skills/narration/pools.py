@@ -15,7 +15,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Mapping
 
-from .vocab import NarrationRow
+from .vocab import NarrationRow, RoleClause
 
 #: Kinds that exist only as structured records and always render ``""``.
 INTERNAL_KINDS = frozenset(
@@ -512,6 +512,94 @@ SEXUAL_COUNTER_SHARED_LINES = (
     "{target} 的經歷裡多了一頁共同的記錄。",
 )
 
+#: One performer clause and one participant clause per lifetime counter any
+#: act can credit. The key set is derived from the act catalogue and validated
+#: for exact equality at import, so a new counter cannot narrate generically.
+SEXUAL_COUNTER_LINES: Mapping[str, RoleClause] = MappingProxyType(
+    {
+        "duo_act_count": RoleClause(
+            performer=(
+                "{actor} 記得自己的身體剛才做了什麼。",
+                "{actor} 把這一刻收進了自己的記憶。",
+            ),
+            participant=(
+                "{target} 與對方的身體一起記住了這一刻。",
+                "{target} 的經歷裡多了一頁兩個人的紀錄。",
+            ),
+        ),
+        "group_act_count": RoleClause(
+            performer=(
+                "{actor} 在眾人之間留下了自己的那一份。",
+                "{actor} 記得自己主動走進了這場熱鬧。",
+            ),
+            participant=(
+                "{target} 與在場的人共有這一頁。",
+                "{target} 的身上留著一屋子人的溫度。",
+            ),
+        ),
+        "hostile_act_count": RoleClause(
+            performer=(
+                "{actor} 知道自己把刀鋒換成了別的手段。",
+                "{actor} 把這一手收進記憶裡。",
+            ),
+            participant=(
+                "{target} 與對手之間多了一筆帳。",
+                "{target} 的身上留下了敵意的痕跡。",
+            ),
+        ),
+        "interspecies_act_count": RoleClause(
+            performer=(
+                "{actor} 記得自己主動碰過那副陌生的身體。",
+                "{actor} 的手上還留著不屬於人的溫度。",
+            ),
+            participant=(
+                "{target} 的身上留下了異種的痕跡。",
+                "{target} 與那副陌生的身體之間有了紀錄。",
+            ),
+        ),
+        "masturbation_count": RoleClause(
+            performer=(
+                "{actor} 一個人把這件事做完了。",
+                "{actor} 記得這是只屬於自己的時刻。",
+            ),
+            participant=(
+                "{target} 成了那場獨處的一部分。",
+                "{target} 的身上留下了獨處的餘溫。",
+            ),
+        ),
+        "toy_use_count": RoleClause(
+            performer=(
+                "{actor} 記得那具玩具碰過自己哪裡。",
+                "{actor} 的身體記下了玩具的觸感。",
+            ),
+            participant=(
+                "{target} 知道那具玩具也碰過自己。",
+                "{target} 的身上留著器具壓過的痕跡。",
+            ),
+        ),
+        "exposure_act_count": RoleClause(
+            performer=(
+                "{actor} 把自己攤在光裡，這一刻被記下了。",
+                "{actor} 記得自己主動掀開了遮掩。",
+            ),
+            participant=(
+                "{target} 也看見了這一身毫無遮掩。",
+                "{target} 的眼裡多了一幕不該看的畫面。",
+            ),
+        ),
+        "watched_count": RoleClause(
+            performer=(
+                "{actor} 知道自己被看著。",
+                "{actor} 記得那些落在自己身上的視線。",
+            ),
+            participant=(
+                "{target} 被收進了旁人的眼底。",
+                "{target} 知道有人正看著這一幕。",
+            ),
+        ),
+    }
+)
+
 TRAIT_DELTA_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "hp": (
@@ -569,6 +657,23 @@ TRANSITION_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "{target} 被不屬於人的溫度包住。",
             "{target} 的經驗裡多了一道異樣的痕跡。",
         ),
+        "first_vaginal_penetration": (
+            "{target} 的身子越過了一道再回不去的界線。",
+            "{target} 從這一刻起不再是原本的樣子。",
+        ),
+        "penetrative_sex_with_female": (
+            "{target} 與對方的身體在這一下裡分不出彼此。",
+            "{target} 的界線被另一副身體徹底打開。",
+        ),
+        "penetrative_sex_with_male": (
+            "{target} 與對方之間那條界線不再存在。",
+            "{target} 在貼合之中失去了距離。",
+        ),
+        "stimulus_applied": (
+            "{target} 的感官被直接撩起。",
+            "{target} 的皮膚忽然變得格外敏感。",
+            "{target} 被一股看不見的力道掃過全身。",
+        ),
     }
 )
 
@@ -617,6 +722,11 @@ SPECIAL_POOLS: Mapping[str, tuple[str, ...]] = MappingProxyType(
         },
         "sexual_counter_actor": SEXUAL_COUNTER_ACTOR_LINES,
         "sexual_counter_shared": SEXUAL_COUNTER_SHARED_LINES,
+        **{
+            f"sexual_counter:{name}:{role}": clause.for_role(role == "performer")
+            for name, clause in SEXUAL_COUNTER_LINES.items()
+            for role in ("performer", "participant")
+        },
         **{
             f"trait_delta:{key}": lines
             for key, lines in TRAIT_DELTA_LINES.items()
@@ -682,6 +792,7 @@ __all__ = [
     "PLEASURE_ACTOR_LINES",
     "PLEASURE_TARGET_LINES",
     "SEXUAL_COUNTER_ACTOR_LINES",
+    "SEXUAL_COUNTER_LINES",
     "SEXUAL_COUNTER_SHARED_LINES",
     "SELF_HEAL_BAND_LINES",
     "SPECIAL_POOLS",

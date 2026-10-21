@@ -1,8 +1,9 @@
 """Data-contract test: shipped narration coverage contract over the skill and act registries
-The shipped catalog validates against the shipped skill and act registries, the elemental
-and non-elemental ACTIVE families carry exactly their authored rows, each element's rows
-stay in their own register, and every active skill outside those families still resolves
-through a family tier.
+The shipped catalog validates against the shipped skill and act registries, the elemental,
+non-elemental and sexual-act ACTIVE families carry exactly their authored rows, each
+element's rows stay in their own register, the sexual transition and counter pools are keyed
+by exactly what the act catalogue emits, and every active skill still resolves through a
+family tier.
 """
 
 from __future__ import annotations
@@ -14,15 +15,26 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 import world.skills.sexual_acts  # noqa: F401  (registers the act rows)
+from world.skills.sexual_acts import SHIPPED_ACT_SKILLS, SEXUAL_ACT_REGISTRY
 from world.skills.narration import (
     FAMILY_ROWS,
     NARRATION_CATALOG,
     PENDING_FAMILIES,
+    SEXUAL_COUNTER_LINES,
+    TRANSITION_LINES,
     NarrationCatalogError,
     NarrationRow,
     family_key,
     slot_count,
 )
+from world.skills.narration.data_sexual_combat import ROWS as SEXUAL_COMBAT_ROWS
+from world.skills.narration.data_sexual_divine import ROWS as SEXUAL_DIVINE_ROWS
+from world.skills.narration.data_sexual_interspecies import (
+    ROWS as SEXUAL_INTERSPECIES_ROWS,
+)
+from world.skills.narration.data_sexual_partner import ROWS as SEXUAL_PARTNER_ROWS
+from world.skills.narration.data_sexual_shame import ROWS as SEXUAL_SHAME_ROWS
+from world.skills.narration.data_sexual_solo import ROWS as SEXUAL_SOLO_ROWS
 from world.skills.narration.data_dark import ROWS as DARK_ROWS
 from world.skills.narration.data_earth import ROWS as EARTH_ROWS
 from world.skills.narration.data_fire import ROWS as FIRE_ROWS
@@ -32,7 +44,12 @@ from world.skills.narration.data_lightning import ROWS as LIGHTNING_ROWS
 from world.skills.narration.data_water import ROWS as WATER_ROWS
 from world.skills.narration.data_wind import ROWS as WIND_ROWS
 from world.skills.narration.select import action_line
-from world.skills.narration.validation import validate_catalog
+from world.skills.narration.validation import (
+    declared_sexual_counters,
+    declared_sexual_events,
+    validate_catalog,
+    validate_sexual_pools,
+)
 from world.skills.registry import (
     SHIPPED_SKILL_REGISTRY,
     SKILL_REGISTRY,
@@ -64,6 +81,15 @@ ELEMENT_MODULES = (
     DARK_ROWS,
 )
 
+#: One authored module per sexual-act line, in the act registry's own order.
+SEXUAL_MODULES = (
+    SEXUAL_SOLO_ROWS,
+    SEXUAL_SHAME_ROWS,
+    SEXUAL_PARTNER_ROWS,
+    SEXUAL_COMBAT_ROWS,
+    SEXUAL_INTERSPECIES_ROWS,
+    SEXUAL_DIVINE_ROWS,
+)
 
 def _active_keys(category: SkillCategory) -> set[str]:
     return {
@@ -98,14 +124,36 @@ class NarrationCoverageContractTests(unittest.TestCase):
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
         "action-narration::every-elemental-spell-has-its-own-action-narration",
+        "action-narration::every-sexual-act-has-its-own-action-narration",
     )
     def test_the_covered_families_have_exact_row_coverage(self):
-        expected: set[str] = set()
+        expected: set[str] = set(SEXUAL_ACT_REGISTRY)
         for category in COVERED_FAMILIES:
             keys = _active_keys(category)
             self.assertTrue(keys, category)
             expected |= keys
         self.assertEqual(set(NARRATION_CATALOG), expected)
+
+    @covers_requirement(
+        "action-narration::every-sexual-act-has-its-own-action-narration"
+    )
+    def test_the_six_act_modules_carry_exactly_the_shipped_acts(self):
+        self.assertEqual(
+            {row.key for rows in SEXUAL_MODULES for row in rows},
+            set(SEXUAL_ACT_REGISTRY),
+        )
+        for rows in SEXUAL_MODULES:
+            with self.subTest(first=rows[0].key):
+                self.assertTrue(rows)
+                self.assertEqual(
+                    {row.key for row in rows},
+                    {
+                        key
+                        for key in SEXUAL_ACT_REGISTRY
+                        if SKILL_REGISTRY[key].group
+                        == SKILL_REGISTRY[rows[0].key].group
+                    },
+                )
 
     @covers_requirement(
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
@@ -167,10 +215,11 @@ class NarrationCoverageContractTests(unittest.TestCase):
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
         "action-narration::every-elemental-spell-has-its-own-action-narration",
+        "action-narration::every-sexual-act-has-its-own-action-narration",
     )
     def test_every_authored_row_opens_its_own_skill(self):
         for key, row in NARRATION_CATALOG.items():
-            skill = SHIPPED_SKILL_REGISTRY[key]
+            skill = SKILL_REGISTRY[key]
             family = family_key(skill)
             with self.subTest(key=key):
                 line = action_line(
@@ -202,6 +251,39 @@ class NarrationCoverageContractTests(unittest.TestCase):
                 self.assertIn(key, str(caught.exception))
 
     @covers_requirement(
+        "action-narration::every-sexual-act-has-its-own-action-narration"
+    )
+    def test_a_missing_act_row_stops_the_catalog_loading(self):
+        key = sorted(SEXUAL_ACT_REGISTRY)[0]
+        catalog = {
+            other: row
+            for other, row in NARRATION_CATALOG.items()
+            if other != key
+        }
+        with self.assertRaises(NarrationCatalogError) as caught:
+            validate_catalog(catalog)
+        self.assertIn(key, str(caught.exception))
+
+    @covers_requirement(
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit"
+    )
+    def test_the_transition_pool_matches_the_events_the_acts_emit(self):
+        validate_sexual_pools(SEXUAL_ACT_REGISTRY, SHIPPED_ACT_SKILLS)
+        self.assertEqual(
+            set(TRANSITION_LINES),
+            declared_sexual_events(SEXUAL_ACT_REGISTRY, SHIPPED_ACT_SKILLS),
+        )
+        self.assertEqual(
+            set(SEXUAL_COUNTER_LINES),
+            declared_sexual_counters(SEXUAL_ACT_REGISTRY),
+        )
+        for name, clause in SEXUAL_COUNTER_LINES.items():
+            with self.subTest(counter=name):
+                self.assertTrue(clause.performer)
+                self.assertTrue(clause.participant)
+                self.assertNotEqual(clause.performer, clause.participant)
+
+    @covers_requirement(
         "action-narration::authored-lines-carry-a-declared-participant-slot-budget",
         "action-narration::narration-prose-contains-no-numeric-magnitude",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
@@ -228,11 +310,20 @@ class NarrationCoverageContractTests(unittest.TestCase):
         for key, skill in active:
             with self.subTest(key=key):
                 self.assertIn(family_key(skill), FAMILY_ROWS)
-                if key not in NARRATION_CATALOG:
-                    self.assertTrue(
-                        skill.category is SkillCategory.SEXUAL_ACT
-                        or skill.category.value in PENDING_FAMILIES
-                    )
+        for key, skill in SHIPPED_SKILL_REGISTRY.items():
+            if skill.kind is not SkillKind.ACTIVE:
+                continue
+            with self.subTest(key=key):
+                self.assertIn(key, NARRATION_CATALOG)
+        for key in SEXUAL_ACT_REGISTRY:
+            with self.subTest(key=key):
+                self.assertIn(key, NARRATION_CATALOG)
+
+    @covers_requirement(
+        "action-narration::the-pending-family-set-is-empty-and-stays-pinned"
+    )
+    def test_the_pending_family_set_is_empty(self):
+        self.assertEqual(PENDING_FAMILIES, frozenset())
 
     def test_a_sexual_act_family_carries_its_line(self):
         acts = [
@@ -258,6 +349,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
             clear=True,
         ):
             validate_catalog(NARRATION_CATALOG, shipped=SHIPPED_SKILL_REGISTRY)
+            validate_sexual_pools(SEXUAL_ACT_REGISTRY, SHIPPED_ACT_SKILLS)
 
 
 if __name__ == "__main__":
