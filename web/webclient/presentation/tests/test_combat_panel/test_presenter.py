@@ -16,7 +16,10 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_session import engage
-from world.rules.progression import FREEFORM_CAST_SCALES
+from world.rules.progression import (
+    FREEFORM_CAST_SCALES,
+    proficiency_cap,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.rules.tests._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
 from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_SKILLS
@@ -348,11 +351,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_panel_advertises_freeform_scales_only_for_masters(self):
         # Entitlement is the registry-idiom element-mastery passive the
-        # scoped catalog carries for the burst's borrowed element; the rung
-        # set spans the whole ladder because the kit burst is a lineage
-        # canopy (nobody consumes it, so the tip cap never clamps it). The
-        # ladder's mp_costs scale the burst's own registered cost; the
-        # innate rows (no element) reveal nothing.
+        # scoped catalog carries for the burst's borrowed element; the kit
+        # burst is a lineage trunk, not a canopy — the kit's own comet
+        # consumes it at Lv.3, so its derived tip cap clamps the advertised
+        # rung set to those three. The ladder's mp_costs scale the burst's
+        # own registered cost; the innate rows (no element) reveal nothing.
         grant_lineage(
             self.player,
             [T_EMBER],
@@ -367,11 +370,18 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
         base_mp = int(SYNTH_SKILLS["t_ember_burst"].cost["mp"])
         burst = by_key[T_EMBER]
+        cap = proficiency_cap(T_EMBER)
+        # The kit's own comet consumes the burst at Lv.3; pin the derived cap
+        # and the Lv.3 rungs by value so a cap regression cannot make this
+        # assertion agree with itself.
+        self.assertEqual(cap, 3)
+        unlocked = (0.25, 0.5, 1.0)
         self.assertEqual(
             [entry["mp_cost"] for entry in burst["freeform_scales"]],
             [
                 max(1, math.floor(base_mp * scale + 0.5))
                 for scale, _label in FREEFORM_CAST_SCALES
+                if scale in unlocked
             ],
         )
         # The innate rows carry no element, so they reveal no rungs; the

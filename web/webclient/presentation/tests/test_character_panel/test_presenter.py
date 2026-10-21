@@ -16,6 +16,7 @@ from world.rules.party import join_party
 from world.rules.status_query import StatusQueryError
 from world.rules.unlock_notices import MemberUnlocks
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_SKILLS
 from ._support import (
     BRANCH,
     T_EMBER,
@@ -30,6 +31,7 @@ from ._support import (
     _flattened_keys,
     _innate_key,
     _live_skill_registry,
+    _mastery_row,
     _scope_extra,
     _unlock_free_act_keys,
 )
@@ -295,7 +297,27 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def test_the_selected_skill_carries_its_lineage_position(self):
         selected = self._render(skill_key=T_EMBER, tab="skills")["selected_skill"]
         self.assertEqual(selected["key"], T_EMBER)
-        self.assertEqual(selected["lineage"], {"prerequisites": [], "next": []})
+        # The kit burst is a root; two scoped rows consume it at Lv.3 — the
+        # kit's canopy spell and this suite's mastery consumer.
+        mastery = _mastery_row()
+        self.assertEqual(
+            selected["lineage"],
+            {
+                "prerequisites": [],
+                "next": [
+                    {
+                        "key": "t_ember_comet",
+                        "label": SYNTH_SKILLS["t_ember_comet"].label,
+                        "min_level": 3,
+                    },
+                    {
+                        "key": mastery.key,
+                        "label": mastery.label,
+                        "min_level": 3,
+                    },
+                ],
+            },
+        )
         # A non-master sees no ladder at all (the field is omitted).
         self.assertNotIn("freeform_ladder", selected)
 

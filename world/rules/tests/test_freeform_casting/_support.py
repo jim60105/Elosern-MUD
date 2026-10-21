@@ -90,7 +90,16 @@ from .._combat_session_helpers import (
 from ..combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
-_T_CAST = SYNTH_SKILLS["t_ember_burst"]  # ACTIVE elemental mp-12 damage spell
+#: ACTIVE elemental mp-12 damage spell with no consumer: the kit's own
+#: ``t_ember_burst`` is consumed by ``t_ember_comet`` at Lv.3, so its derived
+#: tip cap clamps the ladder to three rungs. These cases own the freeform
+#: ladder itself, so they need a row whose cap is the global proficiency cap.
+_T_CAST = replace(
+    SYNTH_SKILLS["t_ember_burst"],
+    key="t_ember_spark",
+    label="燼火苗",
+    description="不受血緣上限拘束的合成燼火。",
+)
 
 
 _T_ELEMENT = _T_CAST.element.key
@@ -239,6 +248,7 @@ _T_GLOW = replace(
 
 
 _EXTRA_SKILLS = {
+    _T_CAST.key: _T_CAST,
     _T_STORM.key: _T_STORM,
     _T_TYRANT.key: _T_TYRANT,
     _T_TIDE.key: _T_TIDE,
