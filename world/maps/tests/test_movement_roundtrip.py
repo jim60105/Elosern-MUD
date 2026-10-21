@@ -20,10 +20,11 @@ MOVE = CLOCK_YAML["command_defaults"]["move"]
 #:   南門->南大道 904.49m=724s, 南大道->大道北段 953.43m=763s,
 #:   大道北段->中央廣場 882.84m=707s, 中央廣場->公會前 892.70m=715s,
 #:   公會前->東市 1011.19m=809s, 東市->東門 1131.37m=906s.
-#: Gate approach (east gate -> approach cell center) = 21,601 s; one 10 km
-#: open-ground wilderness step = 12,000 s.
+#: Gate approach (east gate -> approach cell center) at 1.25 m/s for the first
+#: 13,500 s then 1.125 m/s = 22,501 s; one 10 km open-ground wilderness step
+#: = 12,000 s (no threshold crossed).
 CITY_EDGE_SECONDS = (724, 763, 707, 715, 809, 906)
-GATE_APPROACH_SECONDS = 21601
+GATE_APPROACH_SECONDS = 22501
 WILDERNESS_STEP_SECONDS = 12000
 
 

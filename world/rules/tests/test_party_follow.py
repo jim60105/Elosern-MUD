@@ -33,10 +33,16 @@ from world.rules.party import (
 )
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Resolved physical durations: east-gate approach 21,601 s at 1.25 m/s, and
-#: one 10 km open-ground wilderness step 12,000 s.
-EAST_GATE_SECONDS = 21601
+#: Integrated physical durations: the east-gate approach is 13,500 s at 1.25
+#: m/s plus the remainder at the light-stage 1.125 m/s = 22,501 s, and one
+#: 10 km open-ground wilderness step is 12,000 s (no threshold crossed).
+EAST_GATE_SECONDS = 22501
 WILDERNESS_STEP_SECONDS = 12000
+#: The same open-ground step after a gate approach: the party starts light
+#: (179,992 units), so 4,499 s at 0.75 m/s covers 3,374.25 m, 9,000 s at
+#: 0.625 m/s covers 5,625 m, and the last 1,000.75 m at 5/12 m/s needs
+#: 2,401.8 s; the exact 15,900.8 s total rounds once to 15,901 s.
+STEP_SECONDS_AFTER_GATE = 15901
 
 
 def _east_gate_probe():
@@ -380,15 +386,22 @@ class WildernessFollowTests(EvenniaTest):
         self._exit("east").at_traverse(self.char1, self.char1.location)
         self.assertEqual(self.char1.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
         self.assertEqual(companion.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
-        self.assertEqual(self._tick(), before + WILDERNESS_STEP_SECONDS)
+        self.assertEqual(self._tick(), before + STEP_SECONDS_AFTER_GATE)
 
     @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
     def test_return_follows_companions_to_the_grid_room(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
         companion = self._companion("return npc")
         self.gate.at_traverse(self.char1, self.east_gate)
         self._exit("east").at_traverse(self.char1, self.char1.location)
+        write_fatigue_state(self.char1, 360000, SleepPosture.AWAKE)
         self._exit("west").at_traverse(self.char1, self.char1.location)
+        # The outbound legs leave the party short of the return approach; the
+        # follow contract under test needs a rested body, so restore the full
+        # reserve before the return.
+        write_fatigue_state(self.char1, 360000, SleepPosture.AWAKE)
         before = self._tick()
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.east_gate)
@@ -396,10 +409,13 @@ class WildernessFollowTests(EvenniaTest):
         self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
 
     def test_return_clears_the_wilderness_registration(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         companion = self._companion("leak npc")
         self.gate.at_traverse(self.char1, self.east_gate)
+        write_fatigue_state(self.char1, 360000, SleepPosture.AWAKE)
         self._exit("west").at_traverse(self.char1, self.char1.location)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         self.assertNotIn(companion, script.db.itemcoordinates)
