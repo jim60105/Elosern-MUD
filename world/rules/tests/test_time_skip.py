@@ -10,6 +10,7 @@ from tools.spec_traceability import covers_requirement
 import math
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -217,6 +218,15 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(read_fatigue_state(self.player).reserve_units, 357600)
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
 
+    def test_daypart_length_wait_is_not_capped_at_twelve_hours(self):
+        # A next-day daypart request may be up to one full game day; only the
+        # explicit-duration and browser paths own the twelve-hour bound.
+        before = get_world_clock().tick
+        result = advance_wait(self.player, 72000)
+        self.assertEqual(result.requested_seconds, 72000)
+        self.assertEqual(result.elapsed_seconds, 72000)
+        self.assertEqual(get_world_clock().tick - before, 72000)
+
     def test_first_wake_truncates_and_discards_the_remainder(self):
         sleeper = self._companion(0, SleepPosture.FORCED)
         before = get_world_clock().tick
@@ -323,6 +333,18 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before)
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY)
         self.assertEqual(entry.requested_seconds, 0)
+
+    def test_entry_projection_failure_restores_the_prior_physiology(self):
+        before = read_fatigue_state(self.player)
+        with patch(
+            "world.rules.time_skip.project_fatigue_status",
+            side_effect=RuntimeError("synthetic projection failure"),
+        ), self.assertRaises(RuntimeError):
+            enter_sleep(self.player)
+        self.assertEqual(read_fatigue_state(self.player), before)
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.AWAKE
+        )
 
     @covers_requirement(
         "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-"

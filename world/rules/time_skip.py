@@ -35,6 +35,7 @@ from world.rules.clock import (
     get_world_clock,
 )
 from world.rules.fatigue import (
+    FATIGUE_ATTRIBUTE_SURFACES,
     FatigueActivity,
     SleepPosture,
     get_policy,
@@ -57,6 +58,10 @@ from world.rules.party_scope import (
 )
 from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
+from world.rules.surfaces import (
+    attribute_snapshot,
+    restore_attribute_best_effort,
+)
 from world.rules.traits import GAUGE_KEYS
 from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT
 from world.skills.registry import SKILL_REGISTRY, SkillKind
@@ -375,7 +380,11 @@ def advance_wait(
         return recorded
     if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 0:
         raise ValueError("seconds must be a non-negative integer")
-    limit = min(seconds, MAX_SKIP_SECONDS)
+    # The caller owns the request bound: explicit durations are parsed/capped,
+    # the browser validates its protocol bound, and a daypart wait may legally
+    # span up to one full game day (MAX_ADVANCE_SECONDS). Applying the
+    # twelve-hour rest cap here would silently truncate a next-day daypart.
+    limit = seconds
     reason = evaluate_skip_safety(actor)
     if reason is not None:
         raise SkipRefused(reason)
@@ -449,13 +458,28 @@ def enter_sleep(
     state = read_optional_fatigue_state(member)
     if state is None:
         raise SleepRefused("missing_physiology", MISSING_PHYSIOLOGY_MESSAGE)
-    write_fatigue_state(member, state.reserve_units, SleepPosture.VOLUNTARY)
-    project_fatigue_status(member)
+    requested = seconds_to_full_regen(member)
+    handoff = _handoff_available(member)
+    snapshots = {
+        (key, category): attribute_snapshot(member, key, category)
+        for key, category in FATIGUE_ATTRIBUTE_SURFACES
+    }
+    try:
+        with transaction.atomic():
+            write_fatigue_state(member, state.reserve_units, SleepPosture.VOLUNTARY)
+            project_fatigue_status(member)
+    except Exception:
+        # The projection requires its caller to own the transaction; restore
+        # the durable and cached physiology so a failed entry leaves no
+        # partially committed sleep posture behind.
+        for (key, category), snapshot in snapshots.items():
+            restore_attribute_best_effort(member, key, snapshot)
+        raise
     return SleepEntry(
         operation_id=operation_id or uuid4().hex,
         member=member,
-        requested_seconds=seconds_to_full_regen(member),
-        handoff_offered=_handoff_available(member),
+        requested_seconds=requested,
+        handoff_offered=handoff,
     )
 
 

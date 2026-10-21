@@ -14,7 +14,11 @@ from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.clock import AdvanceSource, _STAGE_ORDER, register_event_source
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
-from world.rules.shop_hours import _boundary_ticks, settle_shop_hours
+from world.rules.shop_hours import (
+    _boundary_ticks,
+    next_shop_boundary,
+    settle_shop_hours,
+)
 from world.rules.caravan_arrivals import settle_caravan_arrivals
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
@@ -113,6 +117,29 @@ class ShopHoursArithmeticTests(unittest.TestCase):
             _boundary_ticks("shop", 8, 20, 10 * self.HOUR, 12 * self.HOUR),
             [],
         )
+
+    def test_next_boundary_query_is_the_earliest_pure_transition(self):
+        from types import SimpleNamespace
+
+        catalog = SimpleNamespace(
+            shop_configs={
+                "synthetic_shop": SimpleNamespace(open_hour=8, close_hour=20)
+            }
+        )
+        with patch(
+            "world.rules.shop_hours.get_catalog", return_value=catalog
+        ):
+            self.assertEqual(
+                next_shop_boundary(7 * self.HOUR, 21 * self.HOUR),
+                8 * self.HOUR,
+            )
+            self.assertEqual(
+                next_shop_boundary(9 * self.HOUR, 20 * self.HOUR),
+                20 * self.HOUR,
+            )
+            self.assertIsNone(
+                next_shop_boundary(21 * self.HOUR, 23 * self.HOUR)
+            )
 
     def test_same_day_crossed_emits_open_then_close(self):
         ticks = _boundary_ticks("shop", 8, 20, 7 * self.HOUR, 21 * self.HOUR)
