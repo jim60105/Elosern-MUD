@@ -421,7 +421,7 @@ def _handoff_available(member: Any) -> bool:
     """Whether an awake, co-located controlling body could take over control."""
     try:
         commander = resolve_commander(member)
-    except PartyScopeError:
+    except PartyScopeError:  # observability: ignore R2: a non-player-driven body simply has no controlling handoff candidate; this read writes nothing
         return False
     if commander is member:
         return False

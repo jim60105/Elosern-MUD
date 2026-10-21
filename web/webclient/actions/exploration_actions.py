@@ -932,9 +932,9 @@ def _wait_adapter(
             outcome = begin_sleep(actor)
         else:
             result = advance_wait(actor, seconds)
-    except SkipRefused as exc:
+    except SkipRefused as exc:  # observability: ignore R2: the stable skip refusal IS the action result, not a swallowed failure
         return _rejected("unsafe_skip", rejection_message(exc.reason) or "無法跳過時間。")
-    except SleepRefused as exc:
+    except SleepRefused as exc:  # observability: ignore R2: the stable sleep refusal IS the action result, not a swallowed failure
         return _rejected(exc.code, exc.message)
     except Exception as exc:
         log_error(
