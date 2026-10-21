@@ -34,9 +34,17 @@ from world.skills.narration import (
     slot_count,
 )
 from world.skills.narration.data_divine_mystery import ROWS as DIVINE_MYSTERY_ROWS
+from world.skills.narration.data_dark import ROWS as DARK_ROWS
+from world.skills.narration.data_earth import ROWS as EARTH_ROWS
 from world.skills.narration.data_enhancement import ROWS as ENHANCEMENT_ROWS
+from world.skills.narration.data_fire import ROWS as FIRE_ROWS
 from world.skills.narration.data_holy_rite import ROWS as HOLY_RITE_ROWS
+from world.skills.narration.data_ice import ROWS as ICE_ROWS
+from world.skills.narration.data_light import ROWS as LIGHT_ROWS
+from world.skills.narration.data_lightning import ROWS as LIGHTNING_ROWS
 from world.skills.narration.data_martial import ROWS as MARTIAL_ROWS
+from world.skills.narration.data_water import ROWS as WATER_ROWS
+from world.skills.narration.data_wind import ROWS as WIND_ROWS
 from world.skills.narration.select import action_line, choose_line, narration_seed
 from world.skills.narration.validation import build_catalog, validate_catalog
 from world.skills.narration.vocab import contains_ascii_digit
@@ -48,13 +56,28 @@ from world.skills.registry import (
 )
 from world.lore.elements import Element
 
-#: One authored module and the family key its rows resolve through.
+#: One authored module and the family label its element or category owns.
+ELEMENTAL_MODULES = (
+    (FIRE_ROWS, "elemental_magic:fire"),
+    (WATER_ROWS, "elemental_magic:water"),
+    (WIND_ROWS, "elemental_magic:wind"),
+    (EARTH_ROWS, "elemental_magic:earth"),
+    (LIGHTNING_ROWS, "elemental_magic:lightning"),
+    (ICE_ROWS, "elemental_magic:ice"),
+    (LIGHT_ROWS, "elemental_magic:light"),
+    (DARK_ROWS, "elemental_magic:dark"),
+)
+
+#: One authored non-elemental module and the family key its rows resolve through.
 AUTHORED_FAMILIES = (
     (MARTIAL_ROWS, "martial_arts"),
     (HOLY_RITE_ROWS, "holy_rite"),
     (DIVINE_MYSTERY_ROWS, "divine_mystery"),
     (ENHANCEMENT_ROWS, "enhancement"),
 )
+
+#: Every authored module, used by the whole-catalog distinctness checks.
+AUTHORED_MODULES = (*ELEMENTAL_MODULES, *AUTHORED_FAMILIES)
 
 
 def _skill(key: str, *, category: SkillCategory, element: Element | None = None,
@@ -109,15 +132,13 @@ class PoolInventoryTests(unittest.TestCase):
                 self.assertFalse(any(ch.isdigit() for ch in COMPACT_POOLS[kind]))
 
 class PendingFamilyDeclarationTests(unittest.TestCase):
+    @covers_requirement(
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+    )
     def test_pending_families_is_the_frozen_declared_set(self):
         self.assertEqual(
             PENDING_FAMILIES,
-            frozenset(
-                {
-                    "elemental_magic",
-                    "sexual_act",
-                }
-            ),
+            frozenset({"sexual_act"}),
         )
 
 
@@ -275,7 +296,7 @@ class AuthoredFamilyRowTests(unittest.TestCase):
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
     )
     def test_two_skills_of_one_family_select_different_openings(self):
-        for rows, family in AUTHORED_FAMILIES:
+        for rows, family in AUTHORED_MODULES:
             for first, second in itertools.combinations(rows, 2):
                 for scope in ("scope-one", "scope-two"):
                     with self.subTest(
@@ -304,10 +325,16 @@ class AuthoredFamilyRowTests(unittest.TestCase):
                         )
 
     def test_no_two_rows_in_one_family_share_a_line(self):
-        for rows, family in AUTHORED_FAMILIES:
+        for rows, family in AUTHORED_MODULES:
             with self.subTest(family=family):
                 lines = [line for row in rows for line in row.action]
                 self.assertEqual(len(lines), len(set(lines)))
+
+    def test_the_light_register_never_borrows_a_holy_rite_line(self):
+        rite_lines = {line for row in HOLY_RITE_ROWS for line in row.action}
+        light_lines = {line for row in LIGHT_ROWS for line in row.action}
+        with self.subTest(element="light"):
+            self.assertFalse(rite_lines & light_lines)
 
     @covers_requirement(
         "action-narration::authored-lines-carry-a-declared-participant-slot-budget"
@@ -375,7 +402,11 @@ class CatalogValidationTests(unittest.TestCase):
 
     def test_a_pending_family_may_omit_its_rows(self):
         skill = _skill("t_needed", category=SkillCategory.ELEMENTAL_MAGIC)
-        self._validate(catalog={}, shipped={"t_needed": skill})
+        self._validate(
+            catalog={},
+            shipped={"t_needed": skill},
+            pending=frozenset({"elemental_magic"}),
+        )
 
     @covers_requirement(
         "action-narration::authored-lines-carry-a-declared-participant-slot-budget"

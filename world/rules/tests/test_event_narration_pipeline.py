@@ -23,9 +23,13 @@ from world.rules.combat_beats import RoundRecord, build_combat_beats
 from world.rules.event_log import render_entry_text
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
-from world.tests.synthetic_data import make_skill
-from world.skills.narration import FAMILY_ROWS
-from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import (
+    _SYNTH_ELEMENT,
+    _SYNTH_ELEMENT_ROW,
+    make_skill,
+)
+from world.skills.narration import FAMILY_ROWS, action_lines, family_key
+from world.skills.registry import SkillCategory, TargetSpec
 
 
 class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
@@ -51,6 +55,15 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             cost={},
             usable_out_of_combat=True,
         )
+        self.area_skill = make_skill(
+            "t_narr_area",
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            element=_SYNTH_ELEMENT_ROW,
+            target_spec=TargetSpec.AREA,
+            effects=(f"damage:{_SYNTH_ELEMENT}:magic",),
+            cost={"mp": 5},
+            usable_out_of_combat=False,
+        )
         open_synthetic_scope(
             self,
             "skills",
@@ -58,12 +71,13 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
                 "skills": {
                     self.damage_skill.key: self.damage_skill,
                     self.empty_skill.key: self.empty_skill,
+                    self.area_skill.key: self.area_skill,
                 }
             },
         )
         grant_lineage(
             self.player,
-            [self.damage_skill.key, self.empty_skill.key],
+            [self.damage_skill.key, self.empty_skill.key, self.area_skill.key],
         )
 
     def _monster(self, key: str = "narr goblin", hp: int = 10000) -> Monster:
@@ -140,6 +154,54 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             first.text_template,
         )
         self.assertIn("{target}", first.text_template)
+
+    @covers_requirement(
+        "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration"
+    )
+    def test_an_area_spell_opens_once_on_the_field_not_on_one_body(self):
+        foes = [self._monster(key=f"narr foe {index}") for index in range(3)]
+        field = Battlefield(
+            {
+                "party": frozenset({self.player.key}),
+                "foes": frozenset(foe.key for foe in foes),
+            },
+            {self.player.key: self.player, **{foe.key: foe for foe in foes}},
+        )
+        request = ActionRequest(
+            self.player,
+            self.area_skill.key,
+            foes,
+            BattlefieldActionContext(field),
+        )
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            result = ActionResolver.resolve(
+                request, narration_scope="area-scope"
+            )
+        self.assertEqual(result.outcome, "success", result.detail)
+        entries = result.event_log.entries
+        action_tier = action_lines(
+            self.area_skill.key, family_key(self.area_skill)
+        )
+        openings = [
+            entry
+            for entry in entries
+            if any(
+                entry.text_template.startswith(action)
+                for action in action_tier
+            )
+        ]
+        self.assertEqual(len(openings), 1)
+        self.assertIs(openings[0], entries[0])
+        selected_action = next(
+            action
+            for action in action_tier
+            if openings[0].text_template.startswith(action)
+        )
+        self.assertNotIn("{target}", selected_action)
+        self.assertEqual(
+            {entry.target for entry in entries if entry.kind == "damage"},
+            {foe.key for foe in foes},
+        )
 
     @covers_requirement(
         "action-narration::variant-selection-is-deterministic-and-consumes-no-gameplay-randomness"
