@@ -39,7 +39,7 @@ ROWS: tuple[NarrationRow, ...] = (
         "ring_of_reflux",
         action=(
             "{actor} 在水面畫出一個環，讓流動重新歸位。",
-            "{actor} 輕推一下，水便繞著對方回轉。",
+            "{actor} 輕推一下，水便繞著對方迴轉。",
         ),
     ),
     NarrationRow(

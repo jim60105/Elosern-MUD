@@ -40,7 +40,7 @@ ROWS: tuple[NarrationRow, ...] = (
         "rite_bless_water",
         action=(
             "{actor} 舉起聖水，讓禱詞落進水面。",
-            "{actor} 在聖水上畫下祝福，再洒向對方。",
+            "{actor} 在聖水上畫下祝福，再灑向對方。",
         ),
     ),
     NarrationRow(

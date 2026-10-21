@@ -97,7 +97,7 @@ ELEMENTAL_ACTIONS: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyTyp
                 "succor": (
                     "{actor} 讓雷光在體內流轉。",
                     "{actor} 的動作快得只剩殘影。",
-                    "{actor} 借著電光穩住了身形。",
+                    "{actor} 藉著電光穩住了身形。",
                 ),
             }
         ),
