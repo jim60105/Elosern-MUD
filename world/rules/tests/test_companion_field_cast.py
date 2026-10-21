@@ -25,9 +25,11 @@ from world.rules.action import DEFAULT_CAST_SECONDS, RejectReason
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat_session import read_session
+from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.field_cast import cast_as_member
 from world.rules.party import join_party
 from world.rules.party_scope import (
+    REASON_MEMBER_ASLEEP,
     REASON_MEMBER_CANNOT_ACT,
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
@@ -232,6 +234,16 @@ class CompanionCastRuleTests(_CompanionCastCase):
         with self.assertRaises(PartyScopeError) as caught:
             self._cast(self.kahn, _HEAL.key, targets=[self.commander])
         self.assertEqual(caught.exception.reason, REASON_MEMBER_CANNOT_ACT)
+        self.assertEqual(self.kahn.traits.mp.current, 20)
+        self.assertEqual(int(self.commander.traits.hp.current), 10)
+        self.assertEqual(self.clock.tick, 0)
+        self.assertIsNone(read_session(self.commander))
+
+    def test_a_sleeping_caster_is_refused_with_zero_effects_and_time(self):
+        write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)
+        with self.assertRaises(PartyScopeError) as caught:
+            self._cast(self.kahn, _HEAL.key, targets=[self.commander])
+        self.assertEqual(caught.exception.reason, REASON_MEMBER_ASLEEP)
         self.assertEqual(self.kahn.traits.mp.current, 20)
         self.assertEqual(int(self.commander.traits.hp.current), 10)
         self.assertEqual(self.clock.tick, 0)

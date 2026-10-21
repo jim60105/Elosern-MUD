@@ -7,6 +7,16 @@ from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import build_production_registry
 from web.webclient.presentation.status import STATUS_SCHEMA_VERSION, status_presenter
+from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+
+def _stored_physiology(entity):
+    """The persisted physiology and buff cache, for a no-write assertion."""
+    return (
+        entity.attributes.get("mental_reserve_units"),
+        entity.attributes.get("sleep_posture"),
+        dict(entity.attributes.get("buffs", default={}) or {}),
+    )
 
 
 class StatusPanelPresenterTests(EvenniaTest):
@@ -65,3 +75,41 @@ class StatusPanelPresenterTests(EvenniaTest):
         self.assertEqual(rendered["schema_version"], STATUS_SCHEMA_VERSION)
         self.assertFalse(rendered["available"])
         self.assertEqual(rendered["reason"]["code"], "presentation_unavailable")
+
+    def test_possession_identifies_both_physiological_subjects_without_writes(self):
+        owner = self.player
+        controlled = create_object(
+            PlayerCharacter, key="相伴者", location=self.room1
+        )
+        controlled.race = "human"
+        controlled.apply_race_baseline()
+        write_fatigue_state(owner, 288000, SleepPosture.AWAKE)
+        write_fatigue_state(controlled, 7200, SleepPosture.FORCED)
+        controlled.db.possessed_by = owner.pk
+        before = (_stored_physiology(owner), _stored_physiology(controlled))
+
+        payload = status_presenter(self._context(controlled))
+        self.assertEqual(payload["schema_version"], 4)
+        # Resources stay owner-keyed; the actor identity names the controlled
+        # body, so no owner gauge can be relabelled as the companion's truth.
+        self.assertEqual(payload["actor"]["identity"], str(controlled.pk))
+        self.assertEqual(
+            payload["resources"]["hp"]["current"], int(owner.traits.hp.current)
+        )
+        rows = {row["identity"]: row for row in payload["fatigue"]}
+        self.assertEqual(set(rows), {str(owner.pk), str(controlled.pk)})
+        self.assertEqual(rows[str(owner.pk)]["reserve_percent"], 80)
+        self.assertEqual(rows[str(owner.pk)]["stage"], "normal")
+        self.assertIsNone(rows[str(owner.pk)]["restriction"])
+        self.assertEqual(rows[str(controlled.pk)]["reserve_percent"], 2)
+        self.assertEqual(rows[str(controlled.pk)]["stage"], "forced_sleep")
+        self.assertEqual(rows[str(controlled.pk)]["severity"], "critical")
+        self.assertIsNotNone(rows[str(controlled.pk)]["restriction"])
+
+        # Reading twice advances nothing: no fabricated countdown, no wake,
+        # and no buff-cache write on either body.
+        second = status_presenter(self._context(controlled))
+        self.assertEqual(second["fatigue"], payload["fatigue"])
+        self.assertEqual(
+            (_stored_physiology(owner), _stored_physiology(controlled)), before
+        )

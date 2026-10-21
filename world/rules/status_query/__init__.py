@@ -51,6 +51,10 @@ from world.rules.status_query.conditions import (  # noqa: F401
     condition_source,
     condition_values,
 )
+from world.rules.status_query.fatigue import (  # noqa: F401
+    SLEEP_RESTRICTION_MESSAGE,
+    build_fatigue_subject,
+)
 from world.rules.status_query.models import (  # noqa: F401
     _COUNTER_KEYS,
     _EQUIPMENT_SLOTS,
@@ -67,6 +71,7 @@ from world.rules.status_query.models import (  # noqa: F401
     CharacterSkillRow,
     CharacterTraitView,
     ConditionValue,
+    FatigueSubjectView,
     GaugeValue,
     IntimateView,
     StatBreakdownRow,

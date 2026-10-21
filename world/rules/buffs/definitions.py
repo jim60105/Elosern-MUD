@@ -38,6 +38,11 @@ class RecoveryRatePolicy:
 
 MARKER_VOCABULARY = frozenset({"ground", "positional"})
 ROUND_ORDER_VOCABULARY = frozenset({"advance_to_head", "retreat_to_tail"})
+#: Protection vocabularies a definition may declare. ``physiological`` marks a
+#: canonical physiology projection: external removal (every selector, cleanse,
+#: dispel) may never remove it, and it carries no independent timed expiry.
+PROTECTION_VOCABULARY = frozenset({"physiological"})
+PHYSIOLOGICAL_PROTECTION = "physiological"
 
 
 @dataclass(frozen=True)
@@ -53,6 +58,7 @@ class BuffDefinition:
     marker: str | None = None
     round_order: dict[str, str] | None = None
     charges: int | None = None
+    protection: str | None = None
 
 
 @dataclass(frozen=True)
@@ -256,6 +262,30 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
                     f"{path}: buff {key!r} charges must be a positive integer"
                 )
             charges = charges_val
+        protection = None
+        if "protection" in entry:
+            protection_val = entry["protection"]
+            if (
+                isinstance(protection_val, bool)
+                or not isinstance(protection_val, str)
+                or protection_val not in PROTECTION_VOCABULARY
+            ):
+                raise ValueError(
+                    f"{path}: buff {key!r} has invalid protection {protection_val!r}; "
+                    f"must be in {sorted(PROTECTION_VOCABULARY)}"
+                )
+            # A protected projection is canonical state, never an authored
+            # timed status: an independent duration would let it expire while
+            # the owning physiology still reports the stage.
+            if entry.get("duration") is not None:
+                raise ValueError(
+                    f"{path}: protected buff {key!r} must not declare a duration"
+                )
+            if polarity != "debuff":
+                raise ValueError(
+                    f"{path}: protected buff {key!r} must declare debuff polarity"
+                )
+            protection = protection_val
         definitions[key] = BuffDefinition(
             key=key,
             duration=entry.get("duration"),
@@ -266,6 +296,7 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
             marker=marker,
             round_order=round_order,
             charges=charges,
+            protection=protection,
         )
     return definitions
 

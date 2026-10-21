@@ -46,7 +46,11 @@ from world.lore.items import (
     ItemRarity,
     LiturgicalRole,
 )
-from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    PHYSIOLOGICAL_PROTECTION,
+    BuffDefinition,
+)
 
 _RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "equipment_effects.yaml"
 
@@ -347,6 +351,20 @@ def _validate_entry(
     if contradicted:
         raise EquipmentEffectsRulebookError(
             f"effects.{item_key} both immunises and attaches: {sorted(contradicted)}"
+        )
+    # Authored immunity must never erase canonical physiology: a physiology
+    # projection is not an authored debuff, so refusing to grant it would make
+    # the projection disagree with the persisted posture. The invariant is
+    # resolved at definition validation instead of bypassing the grant guard.
+    physiology = sorted(
+        key
+        for key in immune
+        if buff_definitions[key].protection == PHYSIOLOGICAL_PROTECTION
+    )
+    if physiology:
+        raise EquipmentEffectsRulebookError(
+            f"effects.{item_key}.immune may not name protected physiological "
+            f"buff keys: {physiology}"
         )
     for buff_key in attached:
         buff_definition = buff_definitions.get(buff_key)

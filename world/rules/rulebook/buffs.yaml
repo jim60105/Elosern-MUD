@@ -505,3 +505,28 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
+# 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
+# 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
+# 所以名義時間經過也不會獨立過期。數值在 combat_modifiers.yaml 的
+# fatigue_*_penalty 列，絕不改寫基礎數值。
+- key: fatigue_light
+  stacking: refresh
+  polarity: debuff
+  protection: physiological
+  modifiers: {}
+- key: fatigue_moderate
+  stacking: refresh
+  polarity: debuff
+  protection: physiological
+  modifiers: {}
+- key: fatigue_severe
+  stacking: refresh
+  polarity: debuff
+  protection: physiological
+  modifiers: {}
+- key: fatigue_forced_sleep
+  stacking: refresh
+  polarity: debuff
+  protection: physiological
+  modifiers: {}

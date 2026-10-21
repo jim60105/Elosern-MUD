@@ -44,6 +44,13 @@ const props = defineProps({
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
+// The committed status v4 physiological subject rows: the status source's own
+// body plus (under possession) the controlled body, each already carrying its
+// member identity, display-rounded reserve and registry label. The component
+// never derives a stage or percent itself.
+const fatigueRows = computed(() =>
+  Array.isArray(props.status?.fatigue) ? props.status.fatigue : [],
+);
 </script>
 
 <template>
@@ -57,6 +64,19 @@ const transitionCss = computed(() => props.motionLevel !== "off");
         :epoch="epoch"
         :display-hp="displayHp"
       />
+      <div
+        v-if="fatigueRows.length > 0"
+        class="fatigue"
+        data-testid="status-panel__fatigue"
+      >
+        <span
+          v-for="row in fatigueRows"
+          :key="row.identity"
+          class="fatigue__row"
+          :data-stage="row.stage"
+          :data-identity="row.identity"
+        >{{ row.name }}：精神儲備 {{ row.reserve_percent }}%（{{ row.label }}）<template v-if="row.restriction">，{{ row.restriction }}</template></span>
+      </div>
     </div>
   </Transition>
 </template>
@@ -138,5 +158,18 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 .vitals-reveal-leave-to {
   opacity: 0;
   transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));
+}
+.fatigue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(2px * var(--ui-scale)) calc(10px * var(--ui-scale));
+  min-width: 0;
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.35;
+  color: var(--paper-100);
+  opacity: 0.82;
+}
+.fatigue__row {
+  white-space: nowrap;
 }
 </style>

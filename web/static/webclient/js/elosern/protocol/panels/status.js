@@ -1,4 +1,5 @@
-// Status v3 presenter wire contract, including read-model provenance.
+// Status v4 presenter wire contract, including read-model provenance and the
+// physiological fatigue subject rows.
 // Split from the combat panel module.
 
 "use strict";
@@ -22,6 +23,9 @@ var MAX_LOCATION_LABEL = C.MAX_LOCATION_LABEL;
 var MAX_CONDITION_COUNT = C.MAX_CONDITION_COUNT;
 var MAX_CONDITION_LABEL = C.MAX_CONDITION_LABEL;
 var MAX_MODIFIER_KEYS = C.MAX_MODIFIER_KEYS;
+var STATUS_FATIGUE_MAX_SUBJECTS = C.STATUS_FATIGUE_MAX_SUBJECTS;
+var STATUS_FATIGUE_MAX_RESTRICTION = C.STATUS_FATIGUE_MAX_RESTRICTION;
+var STATUS_FATIGUE_STAGES = C.STATUS_FATIGUE_STAGES;
 var COMBAT_MODES = C.COMBAT_MODES;
 var SEVERITIES = C.SEVERITIES;
 
@@ -88,16 +92,71 @@ function validateStatusCondition(value) {
   return value;
 }
 
-// Exact available status panel v3 schema (composed full title optional).
+// One physiological subject row: the member's own identity, display-rounded
+// reserve percent, the exact-units stage, and the fixed restriction line.
+function validateFatigueSubject(value) {
+  requireExactFields(
+    value,
+    "fatigue subject",
+    ["identity", "name", "reserve_percent", "stage", "label", "severity", "restriction"],
+    []
+  );
+  requireString(value.identity, "fatigue subject.identity", MAX_ACTOR_IDENTITY);
+  if (value.identity.length === 0) {
+    throw new Error("fatigue subject.identity must be nonempty");
+  }
+  requireString(value.name, "fatigue subject.name", MAX_ACTOR_NAME);
+  if (value.name.length === 0) {
+    throw new Error("fatigue subject.name must be nonempty");
+  }
+  requireInt(value.reserve_percent, "fatigue subject.reserve_percent", 0, 100);
+  requireString(value.stage, "fatigue subject.stage", 32);
+  if (STATUS_FATIGUE_STAGES.indexOf(value.stage) === -1) {
+    throw new Error("fatigue subject.stage is not a stable stage");
+  }
+  requireString(value.label, "fatigue subject.label", MAX_CONDITION_LABEL);
+  if (!value.label.trim()) {
+    throw new Error("fatigue subject.label must be nonempty");
+  }
+  if (SEVERITIES.indexOf(value.severity) === -1) {
+    throw new Error("fatigue subject.severity is not a stable severity");
+  }
+  if (value.restriction === null) {
+    if (value.stage === "forced_sleep" || value.stage === "sleeping") {
+      throw new Error("a sleeping subject must state its restriction");
+    }
+  } else {
+    requireString(
+      value.restriction,
+      "fatigue subject.restriction",
+      STATUS_FATIGUE_MAX_RESTRICTION
+    );
+    if (!value.restriction.trim()) {
+      throw new Error("fatigue subject.restriction must be nonempty");
+    }
+  }
+  return value;
+}
+
+// Exact available status panel v4 schema (composed full title optional).
 function validateStatusPanel(payload) {
   requireExactFields(
     payload,
     "status panel",
-    ["schema_version", "available", "actor", "resources", "conditions", "disguise_active", "combat"],
+    [
+      "schema_version",
+      "available",
+      "actor",
+      "resources",
+      "conditions",
+      "fatigue",
+      "disguise_active",
+      "combat",
+    ],
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 3) {
+  if (payload.schema_version !== 4) {
     throw new Error("unsupported status panel schema_version");
   }
 
@@ -152,6 +211,22 @@ function validateStatusPanel(payload) {
   }
   for (var index = 0; index < conditions.length; index++) {
     validateStatusCondition(conditions[index]);
+  }
+
+  var fatigue = payload.fatigue;
+  if (!Array.isArray(fatigue) || fatigue.length > STATUS_FATIGUE_MAX_SUBJECTS) {
+    throw new Error(
+      "fatigue exceeds the maximum of " + STATUS_FATIGUE_MAX_SUBJECTS + " subjects"
+    );
+  }
+  var seenIdentities = {};
+  for (var fatigueIndex = 0; fatigueIndex < fatigue.length; fatigueIndex++) {
+    validateFatigueSubject(fatigue[fatigueIndex]);
+    var identity = fatigue[fatigueIndex].identity;
+    if (Object.prototype.hasOwnProperty.call(seenIdentities, identity)) {
+      throw new Error("fatigue subjects must identify distinct bodies");
+    }
+    seenIdentities[identity] = true;
   }
 
   requireBool(payload.disguise_active, "disguise_active");

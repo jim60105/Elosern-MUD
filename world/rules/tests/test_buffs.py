@@ -39,7 +39,18 @@ from world.rules.buffs import (
     remove_by_selector,
     tick_buffs,
 )
+from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.sexual_state import _apply_climax_phase_set
+from world.rules import fatigue
+from world.rules.fatigue import (
+    FatigueActivity,
+    FatigueInterval,
+    SleepPosture,
+    project_fatigue_status,
+    read_fatigue_state,
+    settle_fatigue_intervals,
+    write_fatigue_state,
+)
 
 # Importing the reaction engine registers the canonical phase dispatcher, so
 # the consumption tests below exercise the same registered-transition path the
@@ -720,6 +731,115 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         )
 
 
+class PhysiologicalProjectionTests(_BuffFixtureMixin, EvenniaTestCase):
+    """The exact, exclusive, protected fatigue projection (delta behavior)."""
+
+    def _projected(self, entity):
+        return entity_active_buffs(entity) & fatigue.PHYSIOLOGICAL_BUFF_KEYS
+
+    def _write(self, entity, reserve, posture=SleepPosture.AWAKE):
+        write_fatigue_state(entity, reserve, posture)
+        project_fatigue_status(entity)
+
+    @covers_requirement(
+        "cleanse-effect-handler::status-removal-is-expressed-as-one-selector-driven-operation-returning-a-count"
+    )
+    def test_exact_thresholds_project_one_stage_with_the_declared_modifiers(self):
+        entity = self._entity()
+        agility_base = entity.traits.agility.base
+        cases = (
+            (360000, set(), {}),
+            (252000, set(), {}),
+            (251999, {"fatigue_light"}, {"agility": "-5%", "accuracy": -5}),
+            (144000, {"fatigue_light"}, {"agility": "-5%", "accuracy": -5}),
+            (143999, {"fatigue_moderate"}, {"agility": "-10%", "accuracy": -10}),
+            (72000, {"fatigue_moderate"}, {"agility": "-10%", "accuracy": -10}),
+            (71999, {"fatigue_severe"}, {"agility": "-20%", "accuracy": -20}),
+            (0, {"fatigue_forced_sleep"}, {}),
+        )
+        for reserve, expected, expected_modifiers in cases:
+            posture = SleepPosture.FORCED if reserve == 0 else SleepPosture.AWAKE
+            with self.subTest(reserve=reserve):
+                self._write(entity, reserve, posture)
+                self.assertEqual(self._projected(entity), expected)
+                self.assertEqual(evaluate_combat_modifiers(entity), expected_modifiers)
+                # Projection is a display/debuff projection, never a stored
+                # base-stat rewrite.
+                self.assertEqual(entity.traits.agility.base, agility_base)
+
+    def test_replacement_never_overlaps_and_survives_time_and_reload(self):
+        entity = self._entity()
+        self._write(entity, 71999)
+        self.assertEqual(self._projected(entity), {"fatigue_severe"})
+        self._write(entity, 0, SleepPosture.FORCED)
+        self.assertEqual(self._projected(entity), {"fatigue_forced_sleep"})
+        self._write(entity, 72000)
+        self.assertEqual(self._projected(entity), {"fatigue_moderate"})
+        # No independent nominal expiry: a huge elapsed tick leaves the
+        # projection mounted, and reload re-reads the same persisted cache.
+        tick_buffs(entity, 10**6)
+        self.assertEqual(self._projected(entity), {"fatigue_moderate"})
+        self.assertIsNone(entity.buffs.all["fatigue_moderate"].remaining_seconds)
+        entity.flush_cached_instance(entity)
+        self.assertEqual(self._projected(entity), {"fatigue_moderate"})
+
+    def test_settlement_projects_the_committed_stage_atomically(self):
+        entity = self._entity()
+        write_fatigue_state(entity, 1, SleepPosture.AWAKE)
+        start = read_fatigue_state(entity)
+        settlement = settle_fatigue_intervals(
+            (FatigueInterval(entity, FatigueActivity.AWAKE, 1, start),)
+        )
+        self.assertIs(settlement.commits[0].transition, fatigue.TransitionReason.DEPLETION)
+        self.assertEqual(read_fatigue_state(entity).posture, SleepPosture.FORCED)
+        self.assertEqual(self._projected(entity), {"fatigue_forced_sleep"})
+        self.assertEqual(entity.buffs.all["fatigue_forced_sleep"].duration, -1)
+
+        sleeper = read_fatigue_state(entity)
+        settle_fatigue_intervals(
+            (FatigueInterval(entity, FatigueActivity.SLEEP, 6000, sleeper),)
+        )
+        self.assertEqual(read_fatigue_state(entity).reserve_units, 72000)
+        self.assertEqual(read_fatigue_state(entity).posture, SleepPosture.AWAKE)
+        self.assertEqual(self._projected(entity), {"fatigue_moderate"})
+
+    def test_projection_failure_rolls_back_physiology_and_buff_cache(self):
+        entity = self._entity()
+        write_fatigue_state(entity, 144001, SleepPosture.AWAKE)
+        project_fatigue_status(entity)
+        self.assertEqual(self._projected(entity), {"fatigue_light"})
+        start = read_fatigue_state(entity)
+        with patch(
+            "world.rules.fatigue.apply_buff",
+            side_effect=RuntimeError("injected projection fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                settle_fatigue_intervals(
+                    (FatigueInterval(entity, FatigueActivity.AWAKE, 1, start),)
+                )
+        self.assertEqual(read_fatigue_state(entity), start)
+        self.assertEqual(self._projected(entity), {"fatigue_light"})
+
+    def test_projection_definitions_must_be_protected(self):
+        definition = _dc_replace(
+            BUFF_DEFINITIONS["fatigue_light"],
+            key="t_unprotected_projection",
+            protection=None,
+        )
+        BUFF_DEFINITIONS[definition.key] = definition
+        self.addCleanup(lambda: BUFF_DEFINITIONS.pop(definition.key, None))
+        original = dict(fatigue.PROJECTION_BUFF_KEYS)
+        fatigue.PROJECTION_BUFF_KEYS = {
+            **original,
+            fatigue.FatigueStage.LIGHT: definition.key,
+        }
+        fatigue._PROJECTION_DEFINITIONS_VALIDATED = False
+        self.addCleanup(setattr, fatigue, "PROJECTION_BUFF_KEYS", original)
+        self.addCleanup(setattr, fatigue, "_PROJECTION_DEFINITIONS_VALIDATED", True)
+        with self.assertRaises(fatigue.FatigueRulebookError):
+            fatigue._validate_projection_definitions()
+
+
 class RemoveBySelectorTests(_BuffFixtureMixin, EvenniaTestCase):
     """The selector-driven removal (item-effect-model design §5.6, D3)."""
 
@@ -796,6 +916,26 @@ class RemoveBySelectorTests(_BuffFixtureMixin, EvenniaTestCase):
         apply_buff(entity, "focus")
         self.assertEqual(cleanse_debuffs(entity), 1)
         self.assertEqual(self._polarities(entity), {"focus"})
+
+    def test_protected_physiology_is_excluded_from_every_selector(self):
+        entity = self._entity()
+        apply_buff(entity, "poisoned")
+        apply_buff(entity, "focus")
+        write_fatigue_state(entity, 71999, SleepPosture.AWAKE)
+        project_fatigue_status(entity)
+        before = read_fatigue_state(entity)
+
+        # Negative removes only the ordinary debuff, and its count excludes
+        # the protected projection.
+        self.assertEqual(remove_by_selector(entity, "negative"), 1)
+        self.assertEqual(self._polarities(entity), {"focus", "fatigue_severe"})
+        # All removes only the remaining ordinary buff.
+        self.assertEqual(remove_by_selector(entity, "all"), 1)
+        self.assertEqual(self._polarities(entity), {"fatigue_severe"})
+        # The protected definition's own concrete key removes zero.
+        self.assertEqual(remove_by_selector(entity, "fatigue_severe"), 0)
+        self.assertEqual(read_fatigue_state(entity), before)
+        self.assertEqual(self._polarities(entity), {"fatigue_severe"})
 
 
 class BuffEntryPointStructuralTests(unittest.TestCase):

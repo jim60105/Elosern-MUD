@@ -11,6 +11,12 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.buffs import apply_buff, _handle_cleanse, growth_rate_multiplier
+from world.rules.fatigue import (
+    SleepPosture,
+    project_fatigue_status,
+    read_fatigue_state,
+    write_fatigue_state,
+)
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -426,6 +432,22 @@ class CleanseHandlerTests(EvenniaTest):
         )
         self.assertNotIn("poisoned", self.entity.buffs.all)
         self.assertIn("focus", self.entity.buffs.all)
+
+    @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
+    def test_cleanse_never_removes_protected_physiology(self):
+        apply_buff(self.entity, "poisoned")
+        write_fatigue_state(self.entity, 71999, SleepPosture.AWAKE)
+        project_fatigue_status(self.entity)
+        state_before = read_fatigue_state(self.entity)
+        effects = self._stage_and_commit(
+            _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
+        )
+        self.assertNotIn("poisoned", self.entity.buffs.all)
+        self.assertIn("fatigue_severe", self.entity.buffs.all)
+        self.assertEqual(
+            effects[0].description, "buffs_cleansed|cleanse-target|1"
+        )
+        self.assertEqual(read_fatigue_state(self.entity), state_before)
 
     def test_cleanse_with_no_active_debuffs_stages_nothing(self):
         effects = _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)

@@ -244,3 +244,16 @@
 - id: mane_misdirection_accuracy
   when: {buff_active: mane_misdirection}
   then: {accuracy: -5}
+
+# 生理性疲勞的戰鬥修正（project-physiological-fatigue）：精神儲備投影的排他
+# 階段在此結算；敏捷為既有百分比詞彙，準度為既有的平坦加減值詞彙。
+# 基礎數值永遠不改寫，移動也只讀疲勞自身的步速倍率，不重複套用敏捷。
+- id: fatigue_light_penalty
+  when: {buff_active: fatigue_light}
+  then: {agility: "-5%", accuracy: -5}
+- id: fatigue_moderate_penalty
+  when: {buff_active: fatigue_moderate}
+  then: {agility: "-10%", accuracy: -10}
+- id: fatigue_severe_penalty
+  when: {buff_active: fatigue_severe}
+  then: {agility: "-20%", accuracy: -20}

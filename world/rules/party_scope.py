@@ -38,6 +38,7 @@ from world.rules.player_control import is_player_driven
 REASON_NOT_PARTY_MEMBER = "not_party_member"
 REASON_MEMBER_NOT_PRESENT = "member_not_present"
 REASON_MEMBER_CANNOT_ACT = "member_cannot_act"
+REASON_MEMBER_ASLEEP = "member_asleep"
 
 #: Bag/equipment reorganization; admits a knocked-out member.
 PURPOSE_ORGANIZE = "organize"
@@ -54,6 +55,7 @@ PARTY_SCOPE_MESSAGES: dict[str, str] = {
     REASON_NOT_PARTY_MEMBER: "對方不是你的隊伍成員。",
     REASON_MEMBER_NOT_PRESENT: "對方不在這裡。",
     REASON_MEMBER_CANNOT_ACT: "對方目前無法行動。",
+    REASON_MEMBER_ASLEEP: "對方正在沉睡，無法行動。",
 }
 
 
@@ -200,8 +202,16 @@ def authorize_member(
         raise PartyScopeError(REASON_MEMBER_NOT_PRESENT)
     if room is None or getattr(member, "location", None) is not room:
         raise PartyScopeError(REASON_MEMBER_NOT_PRESENT)
-    if purpose == PURPOSE_ACT and member is not commander and is_knocked_out(member):
-        raise PartyScopeError(REASON_MEMBER_CANNOT_ACT)
+    if purpose == PURPOSE_ACT:
+        # Actual sleep (voluntary or forced) is a physiological action bar,
+        # not merely a knocked-out HP state: a forged direct request naming a
+        # sleeping body rejects here before any effect, cost or time exists.
+        from world.rules.fatigue import sleep_blocks_actions
+
+        if sleep_blocks_actions(member):
+            raise PartyScopeError(REASON_MEMBER_ASLEEP)
+        if member is not commander and is_knocked_out(member):
+            raise PartyScopeError(REASON_MEMBER_CANNOT_ACT)
     return member
 
 

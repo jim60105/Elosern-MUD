@@ -324,6 +324,10 @@ def capability_failure(
     """
     if blocked_by_buff:
         return RejectReason.ACTION_FORBIDDEN, _entity_key(actor)
+    from world.rules.fatigue import sleep_blocks_actions
+
+    if sleep_blocks_actions(actor):
+        return RejectReason.ASLEEP, _entity_key(actor)
     bundle = (
         evaluate_combat_modifiers_no_create(actor)
         if modifiers is None

@@ -31,6 +31,8 @@ from world.rules.buffs.definitions import (  # noqa: F401
     BLOCKING_BUFF_KEYS,
     BUFF_DEFINITIONS,
     MARKER_VOCABULARY,
+    PHYSIOLOGICAL_PROTECTION,
+    PROTECTION_VOCABULARY,
     ROUND_ORDER_VOCABULARY,
     BuffDefinition,
     RecoveryRatePolicy,

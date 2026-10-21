@@ -14,6 +14,7 @@ from .buff_class import get_charges, update_charges
 from .definitions import (
     BUFF_DEFINITIONS,
     BLOCKING_BUFF_KEYS,
+    PHYSIOLOGICAL_PROTECTION,
     _REMOVE_SELECTORS,
     _parse_percent_value,
     get_recovery_policy,
@@ -403,11 +404,19 @@ def remove_by_selector(entity, selector: str) -> int:
     through the same ``dispel=True`` external-removal path the cleanse
     handler already uses. A selector matching nothing writes nothing and
     returns ``0``. An empty result is a legitimate outcome, not an error.
+    Protected physiological projections are excluded from every selector,
+    including their own concrete key: canonical reserve/posture is the only
+    writer of that state, so a general cleanse can never erase its cause.
     """
     if selector not in _REMOVE_SELECTORS and selector not in BUFF_DEFINITIONS:
         raise ValueError(f"unknown buff removal selector {selector!r}")
 
     def _matches(definition_key: str) -> bool:
+        if (
+            BUFF_DEFINITIONS[definition_key].protection
+            == PHYSIOLOGICAL_PROTECTION
+        ):
+            return False
         if selector == "all":
             return True
         if selector == "negative":
@@ -519,6 +528,8 @@ def _handle_cleanse(
             buff
             for buff in _active_buff_instances(target)
             if BUFF_DEFINITIONS[buff.definition_key].polarity == "debuff"
+            and BUFF_DEFINITIONS[buff.definition_key].protection
+            is None
         )
         if not debuffs:
             continue

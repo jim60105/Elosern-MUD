@@ -132,9 +132,9 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 3 })
+      unavailableStatusPanel({ schema_version: 4 })
     ),
-    unavailableStatusPanel({ schema_version: 3 })
+    unavailableStatusPanel({ schema_version: 4 })
   );
   const badReason = unavailableStatusPanel();
   badReason.reason = { code: "x" };
@@ -145,7 +145,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 2 })
+      unavailableStatusPanel({ schema_version: 3 })
     )
   );
   // An internal reason carries a bounded correlation ID.
@@ -154,7 +154,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
       "status",
       Protocol.PANEL_ALLOWLIST.status,
       unavailableStatusPanel({
-        schema_version: 3,
+        schema_version: 4,
         reason: {
           code: "internal_presenter_error",
           message: "此介面暫時無法使用",
@@ -169,6 +169,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
   assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 1 })));
   assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 3 })));
   const partialResources = validStatusPanel();
   partialResources.resources = { hp: { current: 1, maximum: 2 } };
   assert.throws(() => Protocol.validateStatusPanel(partialResources));
@@ -336,6 +337,77 @@ test("enforces status field-specific bounds", () => {
           ],
         })
       )
+  );
+});
+
+test("status v4 fatigue rows identify each body and reject untruthful forms", () => {
+  const row = (overrides) => Object.assign(
+    {
+      identity: "42",
+      name: "影行者",
+      reserve_percent: 80,
+      stage: "normal",
+      label: "合成充沛",
+      severity: "informational",
+      restriction: null,
+    },
+    overrides
+  );
+  // Both subjects ride one payload: the owner row and the controlled body's
+  // forced-sleep row, each with its own identity and restriction text.
+  assert.doesNotThrow(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({
+        fatigue: [
+          row({}),
+          row({ identity: "77", name: "艾拉", reserve_percent: 2, stage: "forced_sleep", restriction: "沉睡中，無法行動" }),
+        ],
+      })
+    )
+  );
+  // A sleeping stage must state why the body cannot act.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({ fatigue: [row({ stage: "forced_sleep" })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({ fatigue: [row({ stage: "sleeping", restriction: "" })] })
+    )
+  );
+  // The stage vocabulary is closed and the percent is a bounded integer.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ stage: "exhausted" })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ reserve_percent: 101 })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ reserve_percent: 1.5 })] }))
+  );
+  // Identity/name are nonempty and rows name distinct bodies.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ identity: "" })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ name: "" })] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({ fatigue: [row({}), row({})] })
+    )
+  );
+  // Exact field set: no extra keys, and at most the party-sized bound.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ note: "extra" })] }))
+  );
+  const tooMany = [];
+  for (let i = 0; i < Protocol.STATUS_FATIGUE_MAX_SUBJECTS + 1; i++) {
+    tooMany.push(row({ identity: String(i + 1) }));
+  }
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: tooMany }))
   );
 });
 
