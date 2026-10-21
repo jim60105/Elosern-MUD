@@ -30,12 +30,14 @@ Awake reserve selects exclusive stages: normal ``252000..360000``, light
 ``144000..251999``, moderate ``72000..143999`` and severe ``1..71999``. The
 latched forced-sleep posture replaces the ordinary stage; voluntary sleep
 reports its own sleeping stage. :func:`fatigue_stage` answers the
-instantaneous state, so reserve ``252000`` is normal. :func:`foot_speed_scale`
-answers the scale that governs the interval *beginning* at that state, so it
-returns light ``9/10`` at exactly ``252000`` (the next unit consumed is
-light); movement therefore integrates the real changing speed (a full-reserve
-6 h walk at 4.5 km/h covers 25,987.5 m, not 27,000 m). Travel and actions are
-forbidden while any sleep posture is latched; targeting stays permitted.
+instantaneous state, so reserve ``252000`` is normal, and
+:func:`foot_speed_scale` answers that stage's scale (``1`` at ``252000``).
+Movement integrates a segment through :func:`outgoing_foot_speed_scale`, the
+scale governing the interval *beginning* at the state: at exactly ``252000``
+the next unit consumed is already light, so that query returns ``9/10`` and a
+full-reserve 6 h walk at 4.5 km/h covers 25,987.5 m, not 27,000 m. Travel and
+actions are forbidden while any sleep posture is latched; targeting stays
+permitted.
 
 Prediction API for rules consumers
 ----------------------------------
@@ -661,12 +663,32 @@ def fatigue_stage(
 def foot_speed_scale(
     state: FatigueState, policy: FatiguePolicy | None = None
 ) -> Fraction:
-    """Return the exact foot-speed scale for the interval starting at ``state``.
+    """Return the exact foot-speed scale of the state's instantaneous stage.
 
-    Sleeping bodies cannot travel (``TRAVEL_FORBIDDEN``). An awake reserve
-    exactly on a stage floor still reports that floor's stage through
-    :func:`fatigue_stage`, but travel from that instant consumes the lower
-    stage, so this returns the lower band's scale at the floor itself.
+    Sleeping bodies cannot travel (``TRAVEL_FORBIDDEN``). A movement segment
+    that starts exactly on a stage floor consumes the lower stage's speed for
+    its whole first unit, so callers integrating an interval use
+    :func:`outgoing_foot_speed_scale` instead.
+    """
+    resolved = _resolve_policy(policy)
+    state = _require_state(state, resolved)
+    if state.posture is not SleepPosture.AWAKE:
+        raise FatigueStateError(
+            FatigueRejectReason.TRAVEL_FORBIDDEN,
+            f"a {state.posture.value} body cannot travel",
+        )
+    return resolved.band_for(state.reserve_units).foot_speed_scale
+
+
+def outgoing_foot_speed_scale(
+    state: FatigueState, policy: FatiguePolicy | None = None
+) -> Fraction:
+    """Return the scale governing the travel interval that starts at ``state``.
+
+    The instantaneous stage of a reserve exactly on a band floor is the higher
+    band, but the next unit consumed belongs to the lower band, so movement
+    segments that begin on a floor travel at the lower band's scale. This is
+    the scale a movement consumer applies to one accepted whole-second segment.
     """
     resolved = _resolve_policy(policy)
     state = _require_state(state, resolved)

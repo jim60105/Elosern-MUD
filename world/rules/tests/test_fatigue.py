@@ -14,6 +14,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from django.db import transaction
 from evennia.utils.create import create_object
 from evennia.utils.idmapper.models import flush_cache
 from evennia.utils.test_resources import EvenniaTest
@@ -44,6 +45,7 @@ from world.rules.fatigue import (
     foot_speed_scale,
     initialize_fatigue_state,
     next_fatigue_boundary,
+    outgoing_foot_speed_scale,
     predict_interval,
     read_fatigue_state,
     settle_fatigue_intervals,
@@ -196,15 +198,23 @@ class StageAndScaleTests(TestCase):
         self.assertEqual(fatigue_stage(_state(0, FORCED)).value, "forced_sleep")
         self.assertEqual(fatigue_stage(_state(300000, VOLUNTARY)).value, "sleeping")
 
-    def test_foot_speed_scale_applies_the_next_consumed_band_at_a_floor(self):
+    def test_foot_speed_scale_projects_the_instantaneous_stage(self):
         self.assertEqual(foot_speed_scale(_state(FULL)), Fraction(1))
         self.assertEqual(foot_speed_scale(_state(252001)), Fraction(1))
-        # 252000 is still the normal stage, but the next unit consumed is light.
-        self.assertEqual(foot_speed_scale(_state(252000)), Fraction(9, 10))
-        self.assertEqual(foot_speed_scale(_state(144000)), Fraction(3, 4))
+        self.assertEqual(foot_speed_scale(_state(252000)), Fraction(1))
+        self.assertEqual(foot_speed_scale(_state(251999)), Fraction(9, 10))
+        self.assertEqual(foot_speed_scale(_state(144000)), Fraction(9, 10))
         self.assertEqual(foot_speed_scale(_state(143999)), Fraction(3, 4))
-        self.assertEqual(foot_speed_scale(_state(72000)), Fraction(1, 2))
+        self.assertEqual(foot_speed_scale(_state(72000)), Fraction(3, 4))
         self.assertEqual(foot_speed_scale(_state(71999)), Fraction(1, 2))
+
+    def test_outgoing_segment_scale_uses_the_next_consumed_band_at_a_floor(self):
+        self.assertEqual(outgoing_foot_speed_scale(_state(FULL)), Fraction(1))
+        self.assertEqual(outgoing_foot_speed_scale(_state(252001)), Fraction(1))
+        self.assertEqual(outgoing_foot_speed_scale(_state(252000)), Fraction(9, 10))
+        self.assertEqual(outgoing_foot_speed_scale(_state(144000)), Fraction(3, 4))
+        self.assertEqual(outgoing_foot_speed_scale(_state(72000)), Fraction(1, 2))
+        self.assertEqual(outgoing_foot_speed_scale(_state(71999)), Fraction(1, 2))
 
     def test_sleeping_postures_forbid_travel_and_actions_but_not_targeting(self):
         for posture in (VOLUNTARY, FORCED):
@@ -214,6 +224,8 @@ class StageAndScaleTests(TestCase):
             with self.assertRaises(fatigue.FatigueStateError) as caught:
                 foot_speed_scale(state)
             self.assertIs(caught.exception.reason, FatigueRejectReason.TRAVEL_FORBIDDEN)
+            with self.assertRaises(fatigue.FatigueStateError):
+                outgoing_foot_speed_scale(state)
         self.assertTrue(travel_allowed(_state(1)))
         self.assertTrue(actions_allowed(_state(1)))
 
@@ -324,7 +336,7 @@ class BoundaryAndPredictionTests(TestCase):
             )
             accepted = prediction.applicable_seconds
             self.assertGreater(accepted, 0)
-            distance += speed * foot_speed_scale(state) * accepted
+            distance += speed * outgoing_foot_speed_scale(state) * accepted
             state = predict_interval(
                 state, FatigueActivity.FOOT_TRAVEL, accepted
             ).end
@@ -535,6 +547,46 @@ class ConstructionTests(EvenniaTest):
                 corrupt.attributes.get(fatigue.RESERVE_ATTRIBUTE), "oops"
             )
 
+    def test_synchronization_failure_restores_initialized_hosts(self):
+        first = create_object(NPC, key="t_sync_first")
+        second = create_object(NPC, key="t_sync_second")
+        for host in (first, second):
+            host.attributes.remove(fatigue.RESERVE_ATTRIBUTE)
+            host.attributes.remove(fatigue.POSTURE_ATTRIBUTE)
+        lookup = {"t_sync_a": first, "t_sync_b": second}
+        real_initialize = hosts.initialize_fatigue_state
+        initialized = []
+
+        def faulty(host, policy=None):
+            if len(initialized) == 1:
+                raise RuntimeError("injected synchronization failure")
+            initialized.append(host)
+            return real_initialize(host, policy)
+
+        with (
+            patch.object(hosts, "validate_adventurers"),
+            patch.object(
+                hosts,
+                "find_persistent_adventurer",
+                side_effect=lambda key: lookup[key],
+            ),
+            patch.object(hosts, "initialize_fatigue_state", side_effect=faulty),
+            self.assertRaises(RuntimeError),
+        ):
+            hosts.sync_persistent_adventurers(
+                people={"t_sync_a": object(), "t_sync_b": object()},
+                profiles={},
+                qualifications=(),
+            )
+        self.assertEqual(initialized, [first])
+        self.assertFalse(first.attributes.has(fatigue.RESERVE_ATTRIBUTE))
+        self.assertFalse(first.attributes.has(fatigue.POSTURE_ATTRIBUTE))
+        first.flush_cached_instance(first)
+        flush_cache()
+        reloaded = NPC.objects.get(id=first.id)
+        self.assertFalse(reloaded.attributes.has(fatigue.RESERVE_ATTRIBUTE))
+        self.assertFalse(reloaded.attributes.has(fatigue.POSTURE_ATTRIBUTE))
+
 
 class SettlementTests(EvenniaTest):
     """The sole fatigue writer: validation, atomicity, rollback and events."""
@@ -557,11 +609,15 @@ class SettlementTests(EvenniaTest):
             ),
         )
         with patch("world.rules.fatigue.log_info") as logged:
-            with self.captureOnCommitCallbacks(execute=True):
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
                 settlement = settle_fatigue_intervals(
                     intervals,
                     context={"commander": "t_commander", "tick": 42, "session": "t_s"},
                 )
+                logged.assert_not_called()
+            self.assertEqual(len(callbacks), 3)
+            for callback in callbacks:
+                callback()
         self.assertEqual(
             [commit.end.reserve_units for commit in settlement.commits],
             [FULL - 4800, FULL - 2400, 7200],
@@ -747,17 +803,30 @@ class SettlementTests(EvenniaTest):
             attributes = registry[id(entity)].attributes
             self.assertIn((fatigue.RESERVE_ATTRIBUTE, None), attributes)
             self.assertIn((fatigue.POSTURE_ATTRIBUTE, None), attributes)
-        settle_fatigue_intervals(
-            (
-                FatigueInterval(
-                    first, FatigueActivity.AWAKE, 600, read_fatigue_state(first)
-                ),
-                FatigueInterval(
-                    second, FatigueActivity.FOOT_TRAVEL, 600, read_fatigue_state(second)
-                ),
-            )
-        )
-        self.assertNotEqual(read_fatigue_state(first), before[0])
+        with patch("world.rules.fatigue.log_info") as logged:
+            with self.captureOnCommitCallbacks(execute=True):
+                with self.assertRaises(RuntimeError):
+                    with transaction.atomic():
+                        settle_fatigue_intervals(
+                            (
+                                FatigueInterval(
+                                    first,
+                                    FatigueActivity.AWAKE,
+                                    600,
+                                    read_fatigue_state(first),
+                                ),
+                                FatigueInterval(
+                                    second,
+                                    FatigueActivity.FOOT_TRAVEL,
+                                    600,
+                                    read_fatigue_state(second),
+                                ),
+                            )
+                        )
+                        self.assertNotEqual(read_fatigue_state(first), before[0])
+                        self.assertNotEqual(read_fatigue_state(second), before[1])
+                        raise RuntimeError("later enclosing write failed")
+            logged.assert_not_called()
         _restore_advance_registry(registry, (first, second))
         self.assertEqual(
             (read_fatigue_state(first), read_fatigue_state(second)), before
