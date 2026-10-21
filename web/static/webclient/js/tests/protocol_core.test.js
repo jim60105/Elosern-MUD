@@ -376,6 +376,23 @@ test("status v4 fatigue rows identify each body and reject untruthful forms", ()
       validStatusPanel({ fatigue: [row({ stage: "sleeping", restriction: "" })] })
     )
   );
+  // Empty arrays and awake-stage restrictions would silently hide or
+  // contradict physiology; both directions are rejected.
+  assert.throws(() =>
+    Protocol.validateStatusPanel(validStatusPanel({ fatigue: [] }))
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({ fatigue: [row({ restriction: "沉睡中，無法行動" })] })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateStatusPanel(
+      validStatusPanel({
+        fatigue: [row({ stage: "severe", restriction: "沉睡中，無法行動" })],
+      })
+    )
+  );
   // The stage vocabulary is closed and the percent is a bounded integer.
   assert.throws(() =>
     Protocol.validateStatusPanel(validStatusPanel({ fatigue: [row({ stage: "exhausted" })] }))

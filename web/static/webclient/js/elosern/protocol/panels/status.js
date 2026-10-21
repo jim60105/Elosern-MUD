@@ -121,11 +121,12 @@ function validateFatigueSubject(value) {
   if (SEVERITIES.indexOf(value.severity) === -1) {
     throw new Error("fatigue subject.severity is not a stable severity");
   }
-  if (value.restriction === null) {
-    if (value.stage === "forced_sleep" || value.stage === "sleeping") {
-      throw new Error("a sleeping subject must state its restriction");
-    }
-  } else {
+  var sleepingStage =
+    value.stage === "forced_sleep" || value.stage === "sleeping";
+  if (sleepingStage !== (value.restriction !== null)) {
+    throw new Error("fatigue subject.restriction disagrees with its stage");
+  }
+  if (value.restriction !== null) {
     requireString(
       value.restriction,
       "fatigue subject.restriction",
@@ -214,7 +215,10 @@ function validateStatusPanel(payload) {
   }
 
   var fatigue = payload.fatigue;
-  if (!Array.isArray(fatigue) || fatigue.length > STATUS_FATIGUE_MAX_SUBJECTS) {
+  if (!Array.isArray(fatigue) || fatigue.length < 1) {
+    throw new Error("fatigue must name at least the status source's body");
+  }
+  if (fatigue.length > STATUS_FATIGUE_MAX_SUBJECTS) {
     throw new Error(
       "fatigue exceeds the maximum of " + STATUS_FATIGUE_MAX_SUBJECTS + " subjects"
     );
