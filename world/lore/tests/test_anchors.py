@@ -6,7 +6,12 @@ from tools.spec_traceability import covers_requirement
 import unittest
 from collections import Counter
 
-from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
+from world.lore.anchors import (
+    ANCHOR_GEOGRAPHY_REGISTRY,
+    ANCHOR_REGISTRY,
+    AnchorKind,
+    GeographicAnchor,
+)
 
 
 class AnchorRegistryTests(unittest.TestCase):
@@ -28,3 +33,28 @@ class AnchorRegistryTests(unittest.TestCase):
         for anchor in ANCHOR_REGISTRY.values():
             if anchor.kind == AnchorKind.ELVEN_VILLAGE:
                 self.assertIsNone(anchor.nation_key)
+
+    @covers_requirement(
+        "continental-geography::the-known-continent-has-frozen-geographic-declarations"
+    )
+    def test_geographic_cells_are_the_authored_table_for_all_nine_anchors(self):
+        self.assertEqual(
+            {key: entry.cell for key, entry in ANCHOR_GEOGRAPHY_REGISTRY.items()},
+            {
+                "capital_altoria": (860, 1080),
+                "capital_grandia": (1970, 1280),
+                "capital_valhalla": (780, 1910),
+                "village_ciaran": (1340, 1220),
+                "village_fionnen": (1490, 1510),
+                "village_eolas": (1410, 2150),
+                "dungeon_eternal_night": (900, 2350),
+                "dungeon_dragon_nest": (2340, 1220),
+                "dungeon_arcane_ruins": (480, 1160),
+            },
+        )
+        self.assertEqual(set(ANCHOR_GEOGRAPHY_REGISTRY), set(ANCHOR_REGISTRY))
+        self.assertTrue(GeographicAnchor.__dataclass_params__.frozen)
+        for key, entry in ANCHOR_GEOGRAPHY_REGISTRY.items():
+            with self.subTest(anchor=key):
+                self.assertEqual(entry.anchor_key, key)
+                self.assertTrue(entry.geographic_constraint)
