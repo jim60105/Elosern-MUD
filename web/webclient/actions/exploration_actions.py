@@ -857,7 +857,7 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
     if monster is None:
         return _rejected("no_monster", "這裡沒有這個對象。")
     try:
-        engage(actor, monster)
+        engaged = engage(actor, monster)
     except CombatSessionError as error:
         log_warn("engage_rejected", context={"char": actor.pk, "monster": monster.pk}, exc=error)
         reason = error.args[0] if error.args else None
@@ -868,6 +868,16 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
         if reason is SessionReason.NOT_PRESENT:
             return _rejected("no_monster", "這裡沒有這個對象。")
         return _rejected("engage_failed", "無法開始戰鬥。")
+    settlement = engaged.get("settlement")
+    if settlement is not None:
+        # The all-forced-sleep opening already settled through the ordinary
+        # terminal writer; present its outcome and republish the full state
+        # instead of advertising an active combat session.
+        from world.rules.combat_result import settle_to_messages
+
+        _, terminal = settle_to_messages(settlement)
+        actor.msg(terminal)
+        return _success("engaged", terminal, AFFECTED_FULL)
     from world.skills.narration import engagement_opening_line
 
     try:

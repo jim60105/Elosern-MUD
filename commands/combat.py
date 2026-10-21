@@ -298,6 +298,16 @@ class CmdEngage(Command):
             }.get(reason, "無法開始戰鬥。")
             self.caller.msg(message)
             return
+        settlement = result.get("settlement")
+        if settlement is not None:
+            # A canonical all-forced-sleep opening already ended through the
+            # ordinary terminal writer, so present that result instead of
+            # claiming an active battle the player cannot act in.
+            lines, message = settle_to_messages(settlement)
+            for line in lines:
+                self.caller.msg(line)
+            self.caller.msg(message)
+            return
         self.caller.msg("戰鬥開始！請選擇你的行動（cast <技能>[=<目標>]）。")
 
 

@@ -171,6 +171,7 @@ SNAPSHOTTED_SURFACES = frozenset(
         "reward_claims",
         "action_evidence",
         "church",
+        "fatigue",
     }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}

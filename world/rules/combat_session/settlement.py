@@ -90,6 +90,309 @@ def _round_cap() -> int:
     return int(COMBAT_YAML.get("max_rounds", 100))
 
 
+def terminal_posture_segments(
+    record: CombatSessionRecord,
+    actor_id: int,
+) -> tuple[tuple[bool, int], ...]:
+    """Return ``(asleep, seconds)`` intervals over the completed combat time.
+
+    The engagement posture (``initial_sleep_ids``) and every explicit
+    completed-round boundary transition (``sleep_transitions``) are replayed
+    chronologically at the authored six-second round length, so a member
+    awakened part way through the fight never receives the whole interval as
+    sleep. A zero-length tail keeps a transition observed at the final
+    boundary, so it still determines the terminal posture.
+    """
+    transitions = sorted(
+        (transition.round_index, transition.asleep)
+        for transition in record.sleep_transitions
+        if transition.actor_id == actor_id
+    )
+    asleep = actor_id in record.initial_sleep_ids
+    segments: list[tuple[bool, int]] = []
+    cursor = 0
+    for round_index, next_asleep in transitions:
+        segments.append((asleep, (round_index - cursor) * _ROUND_SECONDS))
+        cursor = round_index
+        asleep = next_asleep
+    segments.append((asleep, (record.rounds_elapsed - cursor) * _ROUND_SECONDS))
+    return tuple(segments)
+
+
+def _defeated_participant_ids(
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> set[int]:
+    """The participants whose defeat is already established at settlement."""
+    defeated = set(record.knocked_out_ids)
+    if battlefield is not None:
+        for key, entity in battlefield.roster.items():
+            if key in getattr(battlefield, "knocked_out", ()):
+                pk = getattr(entity, "pk", None)
+                if isinstance(pk, int) and not isinstance(pk, bool):
+                    defeated.add(pk)
+    return defeated
+
+
+def _settle_terminal_fatigue(
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+    participants: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """Settle every eligible member's mental time once, in round order.
+
+    The eligible scope is the allied party (a player character and its
+    effective companions own physiology; a monster's construction baseline is
+    not a playable reserve). Each member's recorded posture timeline is
+    replayed forward from its engagement posture, because clamping makes the
+    order significant, and each segment settles through the sole fatigue
+    writer with terminal-combat completion. An awake interval that reaches
+    zero latches forced sleep only at the terminal boundary, and natural wake
+    is evaluated afterwards from the committed reserve — never inside the
+    fight and never for an already defeated body.
+    """
+    from world.rules.fatigue import (
+        FatigueActivity,
+        FatigueInterval,
+        IntervalCompletion,
+        SleepPosture,
+        project_fatigue_status,
+        read_optional_fatigue_state,
+        settle_fatigue_intervals,
+        write_fatigue_state,
+    )
+
+    allied = {int(pk) for pk in record.player_ids}
+    defeated = _defeated_participant_ids(record, battlefield)
+    commits: list[Any] = []
+    for entity in participants:
+        pk = getattr(entity, "pk", None)
+        if not isinstance(pk, int) or isinstance(pk, bool) or int(pk) not in allied:
+            continue
+        if getattr(entity, "_is_deleted", False):
+            continue
+        state = read_optional_fatigue_state(entity)
+        if state is None:
+            continue
+        has_evidence = int(pk) in record.initial_sleep_ids or any(
+            transition.actor_id == int(pk) for transition in record.sleep_transitions
+        )
+        if has_evidence:
+            segments = terminal_posture_segments(record, int(pk))
+        else:
+            # No engagement evidence: only the live posture is authoritative,
+            # and the record still contributes the elapsed combat time.
+            segments = (
+                (
+                    state.posture is not SleepPosture.AWAKE,
+                    record.rounds_elapsed * _ROUND_SECONDS,
+                ),
+            )
+        sleeping_posture = (
+            state.posture
+            if state.posture is not SleepPosture.AWAKE
+            else SleepPosture.FORCED
+        )
+        current = state
+        first_asleep = segments[0][0]
+        if first_asleep and current.posture is SleepPosture.AWAKE:
+            # The recorded engagement posture is the timeline's start; the
+            # live posture is only its terminal end. Restoring it here keeps
+            # the fatigue writer's compatibility check honest without
+            # inventing a reserve change.
+            current = write_fatigue_state(
+                entity, current.reserve_units, sleeping_posture
+            )
+        elif not first_asleep and current.posture is not SleepPosture.AWAKE:
+            current = write_fatigue_state(
+                entity, current.reserve_units, SleepPosture.AWAKE
+            )
+        for asleep, seconds in segments:
+            target = sleeping_posture if asleep else SleepPosture.AWAKE
+            if current.posture is not target:
+                current = write_fatigue_state(
+                    entity, current.reserve_units, target
+                )
+            if seconds <= 0:
+                continue
+            activity = (
+                FatigueActivity.SLEEP if asleep else FatigueActivity.AWAKE_COMBAT
+            )
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        activity,
+                        seconds,
+                        current,
+                        IntervalCompletion.TERMINAL_COMBAT,
+                    ),
+                ),
+                context={
+                    "stage": "terminal_combat",
+                    "session": record.session_id,
+                },
+            )
+            commits.extend(settlement.commits)
+            current = settlement.commits[0].end
+        if (
+            current.posture is SleepPosture.FORCED
+            and int(pk) not in defeated
+            and _stored_trait_value(entity.traits.hp) > 0
+        ):
+            # Natural wake is a post-combat fact: commit the whole sleep
+            # interval without reinterpretation, then release a forced sleeper
+            # that has reached the authored wake threshold. A defeated body
+            # never wakes and never becomes an eligible handoff candidate.
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        FatigueActivity.SLEEP,
+                        0,
+                        current,
+                        IntervalCompletion.INDIVISIBLE,
+                    ),
+                ),
+                context={
+                    "stage": "terminal_combat_wake",
+                    "session": record.session_id,
+                },
+            )
+            commits.extend(settlement.commits)
+            current = settlement.commits[-1].end
+        # A no-op segment (for example sleeping at full reserve) writes no
+        # interval, so reconcile the projection once from the final state.
+        project_fatigue_status(entity, current)
+    return tuple(commits)
+
+
+def _all_present_allies_forced_asleep(
+    actor: Any,
+    battlefield: Battlefield,
+) -> bool:
+    """Whether every present, living allied party participant is forced asleep."""
+    from world.rules.fatigue import SleepPosture, read_optional_fatigue_state
+
+    player_team = battlefield.team_of(str(actor.key))
+    allies: list[Any] = []
+    for key in battlefield.teams[player_team]:
+        entity = battlefield.roster.get(key)
+        if entity is None or key in battlefield.fled:
+            continue
+        if _stored_trait_value(entity.traits.hp) <= 0:
+            continue
+        allies.append(entity)
+    if not allies:
+        return False
+    for entity in allies:
+        state = read_optional_fatigue_state(entity)
+        if state is None or state.posture is not SleepPosture.FORCED:
+            return False
+    return True
+
+
+def settle_forced_sleep_opening(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> dict[str, Any] | None:
+    """Enter ordinary zero-round terminal settlement for an all-sleep opening.
+
+    Returns ``None`` for every other engagement. The ordinary terminal writer
+    supplies hostile defeat or exam FAIL, existing aftermath and diagnostics,
+    and the durable settled marker; no combat round, enemy action or spectator
+    loop runs. Invalid targets are rejected by engagement validation before
+    this seam is reached.
+    """
+    if not _all_present_allies_forced_asleep(actor, battlefield):
+        return None
+    outcome = "defeat" if record.mode == "hostile" else "exam_failed"
+    return _settle_with_restore(actor, record, battlefield, outcome)
+
+
+def _controlled_body(actor: Any) -> tuple[Any, Any] | None:
+    """Return ``(controlled body, commander)`` for the actor's live control."""
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+    from world.rules.possession import current_possession
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a non-player-driven body has no control binding to hand over; this read writes nothing
+        return None
+    binding = current_possession(commander)
+    if binding is not None:
+        npc = ObjectDB.objects.filter(id=binding["npc_dbid"]).first()
+        if npc is not None:
+            try:
+                if resolve_commander(npc) is commander:
+                    return npc, commander
+            except PartyScopeError:  # observability: ignore R2: a stale possession mirror is not a controllable body; the owner body is used instead
+                pass
+    return commander, commander
+
+
+def _emit_terminal_sleep_handoff(actor: Any, session_id: str) -> None:
+    """Offer sleep-control transfer from committed terminal state, never raises.
+
+    Runs only from ``transaction.on_commit``: the sleep posture, defeat sets
+    and aftermath removal are final, so an awake, co-located, living party
+    member is a real candidate. A notification failure is reported and never
+    propagates, because the settlement has already committed.
+    """
+    from world.rules.fatigue import sleep_blocks_actions
+    from world.rules.party_scope import is_knocked_out, present_party_scope
+
+    try:
+        if not hasattr(actor, "db"):
+            return
+        controlled_body = _controlled_body(actor)
+        if controlled_body is None:
+            return
+        controlled, commander = controlled_body
+        if getattr(controlled, "_is_deleted", False):
+            return
+        if _stored_trait_value(controlled.traits.hp) <= 0:
+            return
+        if not sleep_blocks_actions(controlled):
+            return
+        candidates = [
+            member
+            for member in present_party_scope(commander)
+            if member is not controlled
+            and not getattr(member, "_is_deleted", False)
+            and not is_knocked_out(member)
+            and getattr(member, "location", None)
+            is getattr(controlled, "location", None)
+            and not sleep_blocks_actions(member)
+        ]
+        if not candidates:
+            return
+        from world.rules.time_skip import HANDOFF_OFFERED_MESSAGE
+
+        controlled.msg(HANDOFF_OFFERED_MESSAGE)
+        log_info(
+            "terminal_sleep_handoff",
+            context={
+                "char": str(getattr(commander, "pk", "?")),
+                "body": str(getattr(controlled, "pk", "?")),
+                "session": session_id,
+                "candidates": ",".join(
+                    str(getattr(member, "pk", "?")) for member in candidates
+                ),
+            },
+        )
+    except Exception as error:  # observability: ignore R2: a post-commit notification failure must never re-enter settlement compensation
+        log_warn(
+            "terminal_sleep_handoff_failed",
+            exc=error,
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "session": session_id,
+            },
+        )
+
+
 def _continue_or_settle(
     actor: Any,
     record: CombatSessionRecord,
@@ -197,6 +500,11 @@ def settle_session(
             )
             if not participants and _stored_trait_value(actor.traits.hp) > 0:
                 participants = [actor]
+            # Physiology settles from the recorded round-boundary posture
+            # evidence inside this same transaction, once for the accumulated
+            # combat seconds. The clock's COMBAT source deliberately does not
+            # settle mental time, so this is the sole terminal fatigue write.
+            _settle_terminal_fatigue(record, battlefield, tuple(participants))
             events = settle_combat_result(
                 SimpleNamespace(
                     total_seconds=record.rounds_elapsed * _ROUND_SECONDS
@@ -278,6 +586,14 @@ def settle_session(
                     "settlement_done", context=boundary
                 )
             )
+            # The sleep-control offer is evaluated only after the outermost
+            # commit, from the committed survivor state (aftermath removal and
+            # any terminal defeat included); a rolled-back unit emits nothing.
+            transaction.on_commit(
+                lambda actor=actor, session_id=record.session_id: (
+                    _emit_terminal_sleep_handoff(actor, session_id)
+                )
+            )
     except Exception:
         # Any exception escaping the transaction — a body failure or the
         # context manager's own commit/exit failure — must undo the
@@ -354,20 +670,27 @@ class _SettlementRestore:
     actor: Any
     attributes: tuple[tuple[str, tuple[bool, Any]], ...]
     battlefield_buffs: tuple[tuple[Any, tuple[bool, Any]], ...]
+    fatigue: tuple[tuple[Any, dict[tuple[str, str | None], tuple[bool, Any]]], ...]
     traits: tuple[tuple[Any, Any], ...]
     exam_host: tuple[Any, Any] | None
     action_context: Any
     battlefield: Battlefield | None
+    clock: Any
+    clock_tick: tuple[int, tuple[bool, Any] | None] | None
 
     def restore(self) -> None:
         """Reinstate every snapshotted surface, in the round path's order."""
         from world.rules.action import _restore_attribute
+        from world.rules.clock import _restore_clock_tick
         from world.rules.skip_safety import register_active_battlefield
 
         for key, snapshot in self.attributes:
             _restore_attribute(self.actor, key, snapshot)
         for entity, snapshot in self.battlefield_buffs:
             _restore_attribute(entity, "buffs", snapshot)
+        for entity, snapshots in self.fatigue:
+            for (key, category), snapshot in snapshots.items():
+                _restore_attribute(entity, key, snapshot, category)
         for entity, snapshot in self.traits:
             from world.rules.surfaces import restore_traits
 
@@ -380,6 +703,10 @@ class _SettlementRestore:
         self.actor.ndb.action_context = self.action_context
         if self.battlefield is not None:
             register_active_battlefield(self.battlefield)
+        if self.clock is not None and self.clock_tick is not None:
+            # A later write of the same unit rolls the durable tick back, but
+            # the idmapper-cached Script attribute is not transaction-aware.
+            _restore_clock_tick(self.clock, self.clock_tick)
 
 
 def _snapshot_settlement_restore(
@@ -389,12 +716,31 @@ def _snapshot_settlement_restore(
 ) -> _SettlementRestore:
     """Snapshot every in-process surface a terminal settlement may touch."""
     from world.rules.action import _attribute_snapshot
+    from world.rules.clock import _snapshot_clock_tick, read_world_clock
+    from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
 
     attributes: list[tuple[str, tuple[bool, Any]]] = [
         ("active_combat", _attribute_snapshot(actor, "active_combat")),
         ("last_combat_receipt", _attribute_snapshot(actor, "last_combat_receipt")),
         ("buffs", _attribute_snapshot(actor, "buffs")),
     ]
+    fatigue_entities: list[Any] = [actor]
+    if battlefield is not None:
+        fatigue_entities.extend(
+            entity
+            for entity in battlefield.roster.values()
+            if entity is not actor
+        )
+    fatigue_snapshots = tuple(
+        (
+            entity,
+            {
+                (key, category): _attribute_snapshot(entity, key, category)
+                for key, category in FATIGUE_ATTRIBUTE_SURFACES
+            },
+        )
+        for entity in fatigue_entities
+    )
     battlefield_buff_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
     if battlefield is not None:
         for entity in battlefield.roster.values():
@@ -418,14 +764,18 @@ def _snapshot_settlement_restore(
             from world.rules.guild_exams import snapshot_exam_host_surfaces
 
             exam_host = (host, snapshot_exam_host_surfaces(host))
+    clock = read_world_clock()
     return _SettlementRestore(
         actor=actor,
         attributes=tuple(attributes),
         battlefield_buffs=tuple(battlefield_buff_snapshots),
+        fatigue=fatigue_snapshots,
         traits=tuple(trait_snapshots),
         exam_host=exam_host,
         action_context=actor.ndb.action_context,
         battlefield=battlefield,
+        clock=clock,
+        clock_tick=_snapshot_clock_tick(clock) if clock is not None else None,
     )
 
 
