@@ -163,6 +163,17 @@ def _exploration_fixture(character) -> None:
             for member in live_companions(character):
                 write_fatigue_state(member, 360000, SleepPosture.AWAKE)
 
+        if os.environ.get("ELOSERN_BROWSER_TERMINAL_FATIGUE") == "1":
+            # The terminal-fatigue journey opens a canonical engagement whose
+            # whole present party is forced asleep: the ordinary zero-round
+            # terminal writer must settle it and the sleeping status stays
+            # visible afterwards. Only this opt-in run sees it.
+            from world.rules.fatigue import SleepPosture, write_fatigue_state
+            from world.rules.party import live_companions
+
+            for member in (character, *live_companions(character)):
+                write_fatigue_state(member, 50000, SleepPosture.FORCED)
+
         if companions and os.environ.get("ELOSERN_BROWSER_EXPLORATION_PORTRAITS") == "1":
             # Opt-in admitted media for a party member (reuse-lineup-person-
             # focus 4.1): the first companion carries a real, server-served DONE

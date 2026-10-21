@@ -292,3 +292,91 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             int(store_state(page)["panels"]["status"]["actor"]["identity"]),
             candidate_id,
         )
+
+
+class TerminalSleepStatusBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
+    """A zero-round all-forced-sleep opening settles and keeps sleep visible."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    def setUp(self) -> None:
+        runtime = fixtures.create_runtime()
+        for key, value in (
+            ("ELOSERN_BROWSER_EXPLORATION", "1"),
+            ("ELOSERN_BROWSER_SYNTH_CATALOGS", "1"),
+            ("ELOSERN_BROWSER_COMPANION_LINEUP", "1"),
+            ("ELOSERN_BROWSER_TERMINAL_FATIGUE", "1"),
+        ):
+            runtime.env[key] = value
+        self.server = ManagedServer(runtime=runtime)
+        self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
+        super().setUp()
+
+    def _wait_exploration_available(self, page):
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("exploration") or {}).get(
+                "available"
+            )
+            is True,
+            timeout=30000,
+        )
+
+    @covers_requirement(
+        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    def test_all_forced_sleep_engagement_settles_and_keeps_sleep_status(self):
+        page = self.logged_in_page()
+        page.set_viewport_size({"width": 1451, "height": 790})
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        def every_party_member_asleep(state):
+            rows = (
+                ((state.get("panels") or {}).get("status") or {}).get("fatigue")
+                or []
+            )
+            return bool(rows) and all(
+                row.get("stage") == "forced_sleep" and row.get("restriction")
+                for row in rows
+            )
+
+        wait_for_store_state(page, every_party_member_asleep, timeout=30000)
+        identities = {
+            row["identity"]
+            for row in store_state(page)["panels"]["status"]["fatigue"]
+        }
+
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_HOSTILE_MONSTER_KEY,
+        )
+
+        target = SYNTH_HOSTILE_MONSTER_KEY
+        page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
+        # The canonical all-forced-sleep opening settles through the ordinary
+        # zero-round terminal writer, so the client returns to exploration
+        # instead of an unusable combat mode.
+        wait_for_store_state(
+            page,
+            lambda s: s.get("mode") != "combat"
+            and ((s.get("panels") or {}).get("exploration") or {}).get("available")
+            is True,
+            timeout=30000,
+        )
+        wait_for_store_state(page, every_party_member_asleep, timeout=30000)
+        self.assertEqual(
+            {
+                row["identity"]
+                for row in store_state(page)["panels"]["status"]["fatigue"]
+            },
+            identities,
+        )
+        # Every present party participant is asleep, so the post-commit offer
+        # has no lawful candidate and must not fire.
+        self.assertNotIn("可交接", narrative_log_text(page))
+        rows = store_state(page)["panels"]["status"]["fatigue"]
+        self.assertTrue(all(row.get("restriction") for row in rows))
