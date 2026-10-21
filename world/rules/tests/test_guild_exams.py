@@ -792,6 +792,40 @@ class ExamSettlementRecoveryTests(ExamHostFixture, EvenniaTestCase):
         self.assertIsNone(read_session(self.player))
         self._assert_host_restored(baseline)
 
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+    )
+    def test_all_forced_sleep_candidate_enters_exam_fail_without_a_round(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            project_fatigue_status,
+            write_fatigue_state,
+        )
+
+        self._give_merit(50)
+        baseline = self._host_normal()
+        write_fatigue_state(self.player, 50000, SleepPosture.FORCED)
+        project_fatigue_status(self.player)
+        with patch(
+            "world.rules.combat_session.settlement.log_info"
+        ) as logged:
+            with self.captureOnCommitCallbacks(execute=True):
+                record = start_guild_exam(self.player, self.host, "E")
+        self.assertEqual(record.state, ExamState.FAILED)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self._assert_host_restored(baseline)
+        events = [call.args[0] for call in logged.call_args_list]
+        # No invented combat seconds: the zero-round opening settles once and
+        # the ordinary defeat aftermath is not part of an examination.
+        self.assertEqual(events.count("settlement_done"), 1)
+        # A reload after the committed terminal outcome settles nothing more.
+        tick = get_world_clock().tick
+        restore_active_session(self.player)
+        self.assertEqual(get_world_clock().tick, tick)
+        self.assertEqual(len(_read_exams(self.player)), 1)
+
 
 class ExamScheduleIntegrationTests(ExamHostFixture, EvenniaTestCase):
     """A departure crossed during the exam replays once after release."""

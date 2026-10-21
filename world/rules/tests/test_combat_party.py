@@ -15,6 +15,7 @@ pins the battlefield-shaped snapshot/restore covering ``fled`` AND
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -50,8 +51,15 @@ from world.rules.combat_session import (
     read_session,
     reconstruct_battlefield,
     request_party_exit,
+    restore_active_session,
     submit_player_action,
     submit_player_item_use,
+)
+from world.rules.combat_session.records import SleepTransition
+from world.rules.combat_session.settlement import (
+    _settle_with_restore,
+    settle_session,
+    terminal_posture_segments,
 )
 from world.rules.combat_session.policies import _party_round_provider
 from world.rules.disengage import FLEE_SKILL_KEY
@@ -1820,3 +1828,452 @@ class SleepingPartyFlowTests(BattlefieldIsolation, EvenniaTestCase):
         # second combat charge.
         self.assertEqual(combat_seconds[0], 3 * 6)
         self.assertEqual(combat_seconds.count(3 * 6), 1)
+
+
+class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
+    """Delta: physiology settles once, from recorded posture intervals."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room = create_object(Room, key="terminal fatigue arena")
+        self.player = _player("terminal fatigue player")
+        self.player.location = self.room
+        self.monster = _monster("terminal fatigue goblin", hp=10000, atk=1)
+        self.monster.location = self.room
+
+    @staticmethod
+    def _write(entity, reserve, posture):
+        from world.rules.fatigue import project_fatigue_status, write_fatigue_state
+
+        write_fatigue_state(entity, reserve, posture)
+        project_fatigue_status(entity)
+
+    @staticmethod
+    def _state(entity):
+        from world.rules.fatigue import read_fatigue_state
+
+        return read_fatigue_state(entity)
+
+    def _engage(self):
+        engage(self.player, self.monster)
+        return read_session(self.player)
+
+    def _settle(self, record, outcome="victory"):
+        return settle_session(
+            self.player,
+            record,
+            reconstruct_battlefield(self.player, record),
+            outcome,
+        )
+
+    def _roll_round(self):
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch(
+            "world.rules.combat.damage.roll_d100", return_value=100
+        ), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            return submit_player_action(
+                self.player, BASIC_ATTACK_KEY, [self.monster]
+            )
+
+    def _manual_record(self, allies, *, initial_sleep=(), knocked_out=(), rounds=10):
+        from world.rules.combat_session import CombatSessionRecord
+
+        return CombatSessionRecord(
+            session_id="hostile:terminal-fatigue:manual",
+            mode="hostile",
+            room_id=int(self.room.pk),
+            player_ids=tuple(int(member.pk) for member in allies),
+            enemy_ids=(int(self.monster.pk),),
+            fled_ids=(),
+            knocked_out_ids=tuple(int(pk) for pk in knocked_out),
+            rounds_elapsed=rounds,
+            exam_id=None,
+            initial_sleep_ids=tuple(int(pk) for pk in initial_sleep),
+        )
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening",
+    )
+    def test_ten_live_rounds_leave_low_reserve_untouched_until_terminal(self):
+        from world.rules.combat_session.settlement import _ROUND_SECONDS, _round_cap
+        from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
+        from world.rules.fatigue import SleepPosture
+
+        # The ordinary cap and round duration are unchanged by terminal
+        # fatigue; only the terminal settlement consumes physiology.
+        self.assertEqual(_round_cap(), 100)
+        self.assertEqual(_ROUND_SECONDS, 6)
+        self._write(self.player, 360, SleepPosture.AWAKE)
+        record = self._engage()
+        tick_before = get_world_clock().tick
+        for expected_round in range(1, 11):
+            result = self._roll_round()
+            self.assertEqual(result["outcome"], "round")
+            self.assertEqual(
+                self._state(self.player).reserve_units, 360, expected_round
+            )
+            self.assertEqual(get_world_clock().tick, tick_before)
+            self.assertEqual(read_session(self.player).rounds_elapsed, expected_round)
+
+        record = read_session(self.player)
+        advances = []
+        real_advance = WorldClock.advance
+
+        def capture(clock, seconds, source, entities, **kwargs):
+            advances.append((int(seconds), source))
+            return real_advance(clock, seconds, source, entities, **kwargs)
+
+        with patch.object(WorldClock, "advance", capture):
+            result = self._settle(record)
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(advances.count((60, AdvanceSource.COMBAT)), 1)
+        # Terminal consumption clamps once; no retrospective sleeping time.
+        state = self._state(self.player)
+        self.assertEqual(state.reserve_units, 0)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+        self.assertEqual(get_world_clock().tick, tick_before + 60)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_ten_asleep_rounds_restore_then_wake_at_the_terminal_threshold(self):
+        from world.rules.fatigue import SleepPosture, fatigue_stage
+
+        companion = _companion(self.player, "terminally sleeping ally", hp=500)
+        self._write(companion, 71280, SleepPosture.FORCED)
+        self._engage()
+        for _ in range(10):
+            self.assertEqual(self._roll_round()["outcome"], "round")
+        self.assertEqual(self._state(companion).reserve_units, 71280)
+
+        self._settle(read_session(self.player))
+        state = self._state(companion)
+        self.assertEqual(state.reserve_units, 72000)
+        self.assertIs(state.posture, SleepPosture.AWAKE)
+        self.assertEqual(fatigue_stage(state).value, "moderate")
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_explicit_mid_battle_wake_splits_the_terminal_interval(self):
+        from world.rules.fatigue import SleepPosture
+
+        companion = _companion(self.player, "partly sleeping ally", hp=500)
+        self._write(companion, 100000, SleepPosture.FORCED)
+        record = self._engage()
+        self.assertIn(int(companion.pk), record.initial_sleep_ids)
+        split = replace(
+            record,
+            rounds_elapsed=10,
+            sleep_transitions=(SleepTransition(4, int(companion.pk), False),),
+        )
+        self.assertEqual(
+            terminal_posture_segments(split, int(companion.pk)),
+            ((True, 24), (False, 36)),
+        )
+        self._settle(split)
+        state = self._state(companion)
+        # 24 s asleep (+288) then 36 s awake (-432): a net 144-unit loss,
+        # never crediting the whole fight as sleep.
+        self.assertEqual(state.reserve_units, 100000 - 144)
+        self.assertIs(state.posture, SleepPosture.AWAKE)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_four_sleepers_and_six_awake_members_settle_their_own_rates(self):
+        from typeclasses.npcs import NPC
+
+        from world.rules.fatigue import SleepPosture
+
+        sleepers = [
+            create_object(NPC, key=f"terminal sleeper {index}", location=self.room)
+            for index in range(4)
+        ]
+        awake = [
+            create_object(NPC, key=f"terminal awake {index}", location=self.room)
+            for index in range(5)
+        ]
+        for member in [*sleepers, *awake]:
+            member.race = _race_key()
+            member.apply_race_baseline()
+            member.traits.hp.base = 100
+            member.traits.hp.current = 100
+        for sleeper in sleepers:
+            self._write(sleeper, 50000, SleepPosture.FORCED)
+        allies = [self.player, *sleepers, *awake]
+        record = self._manual_record(
+            allies, initial_sleep=[member.pk for member in sleepers]
+        )
+        self._settle(record)
+        for sleeper in sleepers:
+            self.assertEqual(self._state(sleeper).reserve_units, 50000 + 720)
+            # Below the 20% wake threshold: still forced asleep.
+            self.assertIs(self._state(sleeper).posture, SleepPosture.FORCED)
+        for member in [self.player, *awake]:
+            self.assertEqual(self._state(member).reserve_units, 360000 - 720)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_a_below_threshold_surviving_sleeper_stays_stationary_after_victory(self):
+        from world.rules.fatigue import SleepPosture, travel_allowed
+
+        companion = _companion(self.player, "stationary victory sleeper", hp=500)
+        self._write(companion, 50000, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, companion], initial_sleep=[companion.pk]
+        )
+        self._settle(record)
+        state = self._state(companion)
+        self.assertEqual(state.reserve_units, 50720)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+        self.assertFalse(travel_allowed(state))
+        self.assertIs(self._state(self.player).posture, SleepPosture.AWAKE)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_recovery_never_wakes_an_established_defeated_sleeper(self):
+        from world.rules.fatigue import SleepPosture
+
+        companion = _companion(self.player, "defeated sleeper", hp=1)
+        self._write(companion, 71999, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, companion],
+            initial_sleep=[companion.pk],
+            knocked_out=[companion.pk],
+        )
+        self._settle(record)
+        state = self._state(companion)
+        self.assertEqual(state.reserve_units, 71999 + 720)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_reloading_a_settled_session_never_settles_again(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.fatigue import SleepPosture
+
+        companion = _companion(self.player, "reload sleeper", hp=500)
+        self._write(companion, 100000, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, companion], initial_sleep=[companion.pk]
+        )
+        self._settle(record)
+        settled_tick = get_world_clock().tick
+        self.assertIsNone(read_session(self.player))
+        restore_active_session(self.player)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(self._state(companion).reserve_units, 100720)
+        self.assertEqual(get_world_clock().tick, settled_tick)
+
+    @covers_requirement(
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+    )
+    def test_late_failure_restores_every_member_then_retries_once(self):
+        from world.rules.combat_session import _persist
+        from world.rules.clock import get_world_clock
+        from world.rules.fatigue import SleepPosture
+
+        companion = _companion(self.player, "rollback sleeper", hp=500)
+        self._write(companion, 100000, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, companion], initial_sleep=[companion.pk]
+        )
+        _persist(self.player, record)
+        tick_before = get_world_clock().tick
+        checkpoints = {
+            # After the physiology projection, before the clock advance.
+            "projection": (
+                "world.rules.combat_session.settlement.settle_combat_result"
+            ),
+            # After the clock advance and every participant write.
+            "later_write": (
+                "world.narrative.projector.select_and_record_protection_event"
+            ),
+        }
+        for name, target in checkpoints.items():
+            with self.subTest(checkpoint=name), patch(
+                target, side_effect=RuntimeError(name)
+            ), patch(
+                "world.rules.combat_session.settlement.log_info"
+            ) as logged:
+                with self.assertRaises(RuntimeError):
+                    _settle_with_restore(
+                        self.player,
+                        read_session(self.player),
+                        reconstruct_battlefield(self.player, read_session(self.player)),
+                        "victory",
+                    )
+            events = [call.args[0] for call in logged.call_args_list]
+            self.assertNotIn("settlement_done", events)
+            self.assertNotIn("terminal_sleep_handoff", events)
+            self.assertEqual(get_world_clock().tick, tick_before)
+            # A cold read (cache reset) sees the rolled-back durable rows, and
+            # the live in-process instances see the restored snapshots.
+            for entity in (self.player, companion):
+                entity.attributes.reset_cache()
+            self.assertEqual(self._state(self.player).reserve_units, 360000)
+            self.assertEqual(self._state(self.player).posture.value, "awake")
+            self.assertEqual(self._state(companion).reserve_units, 100000)
+            self.assertIs(self._state(companion).posture, SleepPosture.FORCED)
+            self.assertIsNotNone(read_session(self.player))
+
+        result = _settle_with_restore(
+            self.player,
+            read_session(self.player),
+            reconstruct_battlefield(self.player, read_session(self.player)),
+            "victory",
+        )
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(self._state(companion).reserve_units, 100720)
+        self.assertEqual(get_world_clock().tick, tick_before + 60)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_terminal_handoff_offer_is_post_commit_and_lists_real_survivors(self):
+        from world.rules.fatigue import SleepPosture
+
+        awake = _companion(self.player, "awake handoff ally", hp=500)
+        removed = _companion(self.player, "removed handoff ally", hp=1)
+        self._write(self.player, 50000, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, awake, removed],
+            initial_sleep=[self.player.pk],
+            knocked_out=[removed.pk],
+        )
+        with patch(
+            "world.rules.combat_session.settlement.log_info"
+        ) as logged:
+            with self.captureOnCommitCallbacks(execute=True):
+                self._settle(record)
+        offers = [
+            call
+            for call in logged.call_args_list
+            if call.args and call.args[0] == "terminal_sleep_handoff"
+        ]
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0].kwargs["context"]["candidates"], str(awake.pk))
+        self.assertNotIn(
+            str(removed.pk), offers[0].kwargs["context"]["candidates"]
+        )
+
+    @covers_requirement(
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+    )
+    def test_rolled_back_settlement_emits_no_handoff_offer(self):
+        from world.rules.fatigue import SleepPosture
+
+        awake = _companion(self.player, "unoffered handoff ally", hp=500)
+        self._write(self.player, 50000, SleepPosture.FORCED)
+        record = self._manual_record(
+            [self.player, awake], initial_sleep=[self.player.pk]
+        )
+        with patch(
+            "world.narrative.projector.select_and_record_protection_event",
+            side_effect=RuntimeError("late terminal failure"),
+        ), patch(
+            "world.rules.combat_session.settlement.log_info"
+        ) as logged:
+            with self.assertRaises(RuntimeError):
+                _settle_with_restore(
+                    self.player,
+                    record,
+                    reconstruct_battlefield(self.player, record),
+                    "victory",
+                )
+        events = [call.args[0] for call in logged.call_args_list]
+        self.assertNotIn("terminal_sleep_handoff", events)
+
+
+class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
+    """Delta: an all-forced-sleep opening enters ordinary zero-round defeat."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room = create_object(Room, key="forced sleep opening arena")
+        self.player = _player("forced sleep opening player")
+        self.player.location = self.room
+        self.monster = _monster("forced sleep opening goblin", hp=500, atk=1)
+        self.monster.location = self.room
+        from world.rules.fatigue import (
+            SleepPosture,
+            project_fatigue_status,
+            write_fatigue_state,
+        )
+
+        write_fatigue_state(self.player, 50000, SleepPosture.FORCED)
+        project_fatigue_status(self.player)
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
+    )
+    def test_opening_defeat_runs_once_with_zero_combat_seconds(self):
+        from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
+
+        tick_before = get_world_clock().tick
+        advances = []
+        real_advance = WorldClock.advance
+
+        def capture(clock, seconds, source, entities, **kwargs):
+            advances.append((int(seconds), source))
+            return real_advance(clock, seconds, source, entities, **kwargs)
+
+        with patch.object(WorldClock, "advance", capture), patch(
+            "world.rules.combat_session.settlement.log_info"
+        ) as logged:
+            with self.captureOnCommitCallbacks(execute=True):
+                result = engage(self.player, self.monster)
+        settlement = result["settlement"]
+        self.assertEqual(settlement["outcome"], "defeat")
+        self.assertEqual(settlement["rounds_elapsed"], 0)
+        self.assertIsNone(read_session(self.player))
+        combat_advances = [
+            seconds for seconds, source in advances if source is AdvanceSource.COMBAT
+        ]
+        self.assertEqual(combat_advances, [0])
+        events = [call.args[0] for call in logged.call_args_list]
+        self.assertEqual(events.count("settlement_done"), 1)
+
+        # A reload after the committed terminal outcome settles nothing more.
+        tick = get_world_clock().tick
+        restore_active_session(self.player)
+        restore_active_session(self.player)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(get_world_clock().tick, tick)
+        self.assertGreaterEqual(get_world_clock().tick, tick_before)
+
+    @covers_requirement(
+        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    def test_invalid_target_rejects_before_any_defeat_or_time(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.fatigue import read_fatigue_state
+
+        elsewhere = create_object(Room, key="forced sleep elsewhere")
+        far_monster = _monster("forced sleep far goblin", hp=500)
+        far_monster.location = elsewhere
+        tick_before = get_world_clock().tick
+        state_before = read_fatigue_state(self.player)
+        with self.assertRaises(CombatSessionError) as caught:
+            engage(self.player, far_monster)
+        self.assertEqual(caught.exception.args[0], SessionReason.NOT_PRESENT)
+        self.assertIsNone(read_session(self.player))
+        self.assertEqual(get_world_clock().tick, tick_before)
+        self.assertEqual(read_fatigue_state(self.player), state_before)
