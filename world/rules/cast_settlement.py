@@ -44,6 +44,7 @@ from world.rules.clock import (
     read_world_clock,
 )
 from world.rules.event_log import EventLog
+from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
 from world.rules.party_scope import present_party_scope
 from world.rules.progression import (
     restore_practice_dedupe,
@@ -84,7 +85,7 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("title_epithet_removals", None),
     ("action_evidence", None),
     ("church", None),
-)
+) + FATIGUE_ATTRIBUTE_SURFACES
 
 
 @dataclass(frozen=True)

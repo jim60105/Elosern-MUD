@@ -14,6 +14,7 @@ from world.lore.sex import DEFAULT_SEX
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
 from world.rules.affinity import RelationHandler
+from world.rules.fatigue import initialize_fatigue_state
 from world.rules.persona import PersonaStore
 from world.rules.sexual_state import SexualState
 
@@ -72,6 +73,10 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         """Initialize storage without guessing a race or threat tier."""
         super().at_object_creation()
         self.db.disguised_stats = None
+        # Deterministic construction establishes the full/awake mental-reserve
+        # baseline exactly once; it never refills a body that already owns a
+        # (valid or malformed) reserve value.
+        initialize_fatigue_state(self)
         # Materialize the handler; traits are populated explicitly once identity is known.
         self.traits
 

@@ -19,12 +19,19 @@ from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.maps.bootstrap import resolve_residence_route
 from world.observability import log_info
 from world.rules.equipment import toggle_equipment
+from world.rules.fatigue import (
+    FATIGUE_ATTRIBUTE_SURFACES,
+    POSTURE_ATTRIBUTE,
+    RESERVE_ATTRIBUTE,
+    initialize_fatigue_state,
+)
 from world.rules.npc_identity import (
     live_key_taken_by_other, validate_npc_name, validate_npc_title,
 )
 from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import get_rulebook, resolve_schedule, set_npc_schedule
 from world.rules.progression import apply_lineage_auto_seed
+from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import _trait_config
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
@@ -168,45 +175,79 @@ def sync_persistent_adventurers(
     with transaction.atomic():
         # Preflight every existing identity and route before the first creation.
         existing = {key: find_persistent_adventurer(key) for key in people}
+        # The baseline initializer mutates a reused host that predates the
+        # reserve contract, so a later failure in this transaction must also
+        # restore that host's in-process attribute cache (the durable rows roll
+        # back on their own). Only wholly absent states are ever written, so
+        # only those hosts need a snapshot.
+        absent_state_hosts = [
+            host
+            for host in existing.values()
+            if host is not None
+            and not host.attributes.has(RESERVE_ATTRIBUTE)
+            and not host.attributes.has(POSTURE_ATTRIBUTE)
+        ]
+        fatigue_snapshots = [
+            (
+                host,
+                {
+                    key: attribute_snapshot(host, key, category)
+                    for key, category in FATIGUE_ATTRIBUTE_SURFACES
+                },
+            )
+            for host in absent_state_hosts
+        ]
         routes = {key: resolve_residence_route(row.home_key, "altoria_guild_hall")
                   for key, row in people.items() if existing[key] is None}
         hosts = []
-        for key, person in people.items():
-            host = existing[key]
-            if host is None:
-                rooms = routes[key]
-                profile = profiles[person.profile_key]
-                host = create_object(LLMNPC, key=person.name, location=rooms["home"])
-                host.attributes.add(PERSON_ATTRIBUTE, key)
-                host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, person.profile_key)
-                host.npc_title = person.title
-                host.race, host.subrace, host.sex = "human", person.subrace, "other"
-                host.db.profession = person.profession
-                host.db.guild_rank = person.rank
-                host._apply_trait_config(_trait_config({
-                    **dict(zip(_BASE_KEYS, person.bases, strict=True)), "guild_merit": 0,
-                }))
-                ensure_npc_canonical_age(host, age=profile.age, apparent_age=profile.apparent_age)
-                initialize_npc_persona(host, profile.card.to_record(),
-                                      {"kind": "profile", "profile": person.profile_key})
-                declared = (*UTILITY_SKILLS, person.sword_skill, *person.sword_branches)
-                host.db.skills = {
-                    "active": [k for k in declared if SKILL_REGISTRY[k].kind is SkillKind.ACTIVE],
-                    "passive": [k for k in declared if SKILL_REGISTRY[k].kind is SkillKind.PASSIVE],
-                }
-                apply_lineage_auto_seed(host)
-                host.db.inventory = list(person.equipment)
-                for item_key in person.equipment:
-                    outcome = toggle_equipment(host, item_key)
-                    if outcome.outcome == "rejected":
-                        raise GuildHostIntegrityError(f"person {key!r} equipment rejected: {outcome.reason}")
-                set_npc_schedule(host, _bound_schedule(person, rooms))
-                if live_key_taken_by_other(host):
-                    host.key = f"{person.name}-{host.pk}"
-                host.save()
-                transaction.on_commit(lambda context={
-                    "host": host.pk, "person": key, "profile": person.profile_key,
-                    "home": rooms["home"].pk, "target": rooms["guild"].pk,
-                }: log_info("guild_adventurer_created", context=context))
-            hosts.append(host)
+        try:
+            for key, person in people.items():
+                host = existing[key]
+                if host is None:
+                    rooms = routes[key]
+                    profile = profiles[person.profile_key]
+                    host = create_object(LLMNPC, key=person.name, location=rooms["home"])
+                    host.attributes.add(PERSON_ATTRIBUTE, key)
+                    host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, person.profile_key)
+                    host.npc_title = person.title
+                    host.race, host.subrace, host.sex = "human", person.subrace, "other"
+                    host.db.profession = person.profession
+                    host.db.guild_rank = person.rank
+                    host._apply_trait_config(_trait_config({
+                        **dict(zip(_BASE_KEYS, person.bases, strict=True)), "guild_merit": 0,
+                    }))
+                    ensure_npc_canonical_age(host, age=profile.age, apparent_age=profile.apparent_age)
+                    initialize_npc_persona(host, profile.card.to_record(),
+                                          {"kind": "profile", "profile": person.profile_key})
+                    declared = (*UTILITY_SKILLS, person.sword_skill, *person.sword_branches)
+                    host.db.skills = {
+                        "active": [k for k in declared if SKILL_REGISTRY[k].kind is SkillKind.ACTIVE],
+                        "passive": [k for k in declared if SKILL_REGISTRY[k].kind is SkillKind.PASSIVE],
+                    }
+                    apply_lineage_auto_seed(host)
+                    host.db.inventory = list(person.equipment)
+                    for item_key in person.equipment:
+                        outcome = toggle_equipment(host, item_key)
+                        if outcome.outcome == "rejected":
+                            raise GuildHostIntegrityError(f"person {key!r} equipment rejected: {outcome.reason}")
+                    set_npc_schedule(host, _bound_schedule(person, rooms))
+                    if live_key_taken_by_other(host):
+                        host.key = f"{person.name}-{host.pk}"
+                    host.save()
+                    transaction.on_commit(lambda context={
+                        "host": host.pk, "person": key, "profile": person.profile_key,
+                        "home": rooms["home"].pk, "target": rooms["guild"].pk,
+                    }: log_info("guild_adventurer_created", context=context))
+                # Authored synchronization establishes the construction baseline
+                # for a host that predates it (both attributes wholly absent).
+                # The initializer is absent-only: a valid reserve — including a
+                # fatigued one — and malformed state are left untouched, and no
+                # read-time default is materialized.
+                initialize_fatigue_state(host)
+                hosts.append(host)
+        except Exception:
+            for host, surfaces in fatigue_snapshots:
+                for key, snapshot in surfaces.items():
+                    restore_attribute_best_effort(host, key, snapshot)
+            raise
     return tuple(hosts)

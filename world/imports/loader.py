@@ -19,6 +19,7 @@ from world.lore.npc_card import normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules import profession_config
+from world.rules.fatigue import initialize_fatigue_state
 from world.rules.npc_identity import validate_npc_title
 from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import set_npc_schedule
@@ -315,6 +316,9 @@ def _instantiate_validated_character(
     if issubclass(typeclass, NPC):
         normalize_card(record["persona"])
     entity = create_object(typeclass, key=record["key"])
+    # Authored construction establishes the full/awake fatigue baseline once;
+    # the initializer is absent-only, so it never refills an imported body.
+    initialize_fatigue_state(entity)
     entity.race = record["race"]
     entity.subrace = record.get("subrace")
     entity.sex = record["sex"]
