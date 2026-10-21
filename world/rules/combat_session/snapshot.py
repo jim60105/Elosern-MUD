@@ -20,6 +20,9 @@ from world.rules.combat_session.records import CombatSessionRecord
 # Surfaces the outer round-and-settlement transaction snapshots on every
 # participant. ``instance_pin`` is excluded because it lives on rooms, not
 # combatants; the session room is snapshotted with it separately.
+# ``fatigue`` covers the terminal mental-reserve writer (reserve, posture and
+# the projected buffs), so a late failure restores every touched member's
+# physiology together with the clock and session metadata.
 _ROUND_ENTITY_SURFACES = frozenset(SNAPSHOTTED_SURFACES - {"instance_pin"})
 _ROOM_SURFACES = frozenset({"instance_pin"})
 

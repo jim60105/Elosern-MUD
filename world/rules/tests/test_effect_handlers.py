@@ -134,6 +134,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "reward_claims",
                     "action_evidence",
                     "church",
+                    "fatigue",
                 }
             ),
         )

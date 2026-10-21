@@ -593,6 +593,12 @@ def start_guild_exam(
         key: attribute_snapshot(actor, key)
         for key in ("guild_exams", "active_combat", "guild_rank")
     }
+    from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+
+    actor_fatigue_snapshots = {
+        (key, category): attribute_snapshot(actor, key, category)
+        for key, category in FATIGUE_ATTRIBUTE_SURFACES
+    }
     actor_traits_snapshot = snapshot_traits(actor)
     host_snapshot = snapshot_exam_host_surfaces(host)
     try:
@@ -601,6 +607,7 @@ def start_guild_exam(
             activate_exam_restriction(host, exam_id, target_rank)
             begin_exam_schedule_hold(host, exam_id, start_tick)
             from world.rules.traits import restore_gauges_to_full
+            from world.rules.fatigue import sleep_blocks_actions
 
             # Simulated battle: both sides enter at full applicable pools.
             restore_gauges_to_full(actor)
@@ -615,6 +622,13 @@ def start_guild_exam(
                 knocked_out_ids=(),
                 rounds_elapsed=0,
                 exam_id=exam_id,
+                initial_sleep_ids=tuple(
+                    sorted(
+                        int(entity.pk)
+                        for entity in (actor, host)
+                        if sleep_blocks_actions(entity)
+                    )
+                ),
             )
             exam_record = GuildExamRecord(
                 exam_id=exam_id,
@@ -631,15 +645,34 @@ def start_guild_exam(
             from world.rules.combat_session import reconstruct_battlefield
             from world.rules.skip_safety import register_active_battlefield
 
-            register_active_battlefield(reconstruct_battlefield(actor, session))
+            battlefield = reconstruct_battlefield(actor, session)
+            register_active_battlefield(battlefield)
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
             apply_affinity_change(host, actor, AffinitySource.GUILD, 1)
-            transaction.on_commit(lambda context={
-                "exam": exam_id, "host": host.pk, "char": actor.pk,
-                "target": target_rank, "branch": branch_key, "tick": start_tick,
-                "session": session.session_id,
-            }: log_info("guild_exam_started", context=context))
+            from world.rules.combat_session.settlement import (
+                settle_forced_sleep_opening,
+            )
+
+            opening = settle_forced_sleep_opening(actor, session, battlefield)
+            if opening is not None:
+                # The canonical all-forced-sleep opening failed the
+                # examination immediately through the ordinary exam policy;
+                # return the terminal record instead of an ACTIVE one.
+                exam_record = next(
+                    (
+                        candidate
+                        for candidate in _read_exams(actor)
+                        if candidate.exam_id == exam_id
+                    ),
+                    exam_record,
+                )
+            else:
+                transaction.on_commit(lambda context={
+                    "exam": exam_id, "host": host.pk, "char": actor.pk,
+                    "target": target_rank, "branch": branch_key, "tick": start_tick,
+                    "session": session.session_id,
+                }: log_info("guild_exam_started", context=context))
     except Exception:
         from world.rules.skip_safety import unregister_participants
         from world.rules.surfaces import restore_attribute_best_effort
@@ -647,6 +680,8 @@ def start_guild_exam(
         unregister_participants((int(actor.pk), int(host.pk)))
         for key, snapshot in actor_snapshots.items():
             restore_attribute_best_effort(actor, key, snapshot)
+        for (key, category), snapshot in actor_fatigue_snapshots.items():
+            restore_attribute_best_effort(actor, key, snapshot, category)
         restore_traits(actor, actor_traits_snapshot)
         restore_exam_host_surfaces(host, host_snapshot)
         raise

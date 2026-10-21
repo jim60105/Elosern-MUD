@@ -237,6 +237,19 @@ def engage_group(
         initial_sleep_ids=initial_sleep_ids,
     )
     battlefield = reconstruct_battlefield(actor, record)
+    # A canonical engagement whose whole present allied party is already in
+    # forced sleep has no eligible command to collect. Enter the ordinary
+    # zero-round terminal writer now: no round, enemy action or spectator
+    # loop is fabricated, and existing defeat aftermath and diagnostics run.
+    from world.rules.combat_session.settlement import settle_forced_sleep_opening
+
+    settlement = settle_forced_sleep_opening(actor, record, battlefield)
+    if settlement is not None:
+        return {
+            "record": record,
+            "overwhelming_team": classify_overwhelm(battlefield),
+            "settlement": settlement,
+        }
     _persist(actor, record)
     register_active_battlefield(battlefield)
     # Hostility ends a conversation (webclient-align-07): the session is

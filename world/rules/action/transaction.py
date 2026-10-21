@@ -204,6 +204,16 @@ def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
         snapshot["active_combat"] = _attribute_snapshot(obj, "active_combat")
     if "church" in surfaces:
         snapshot["church"] = _attribute_snapshot(obj, "church")
+    if "fatigue" in surfaces:
+        # The mental-reserve physiology is its own declared surface: reserve
+        # and posture are not part of the entity trait/buff snapshot, and the
+        # terminal combat settlement writes them directly.
+        from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+
+        snapshot["fatigue"] = tuple(
+            (key, category, _attribute_snapshot(obj, key, category))
+            for key, category in FATIGUE_ATTRIBUTE_SURFACES
+        )
     return snapshot
 
 
@@ -243,6 +253,9 @@ def _restore_touched(
         _restore_attribute(obj, "active_combat", snapshot["active_combat"])
     if "church" in surfaces and "church" in snapshot:
         _restore_attribute(obj, "church", snapshot["church"])
+    if "fatigue" in surfaces and "fatigue" in snapshot:
+        for key, category, value in snapshot["fatigue"]:
+            _restore_attribute(obj, key, value, category)
 
 
 def _restore_touched_best_effort(
