@@ -14,8 +14,7 @@ remove.
   arts, 14 holy rites, 11 divine mysteries, 1 enhancement), each with one or two variants in
   the family's own register.
 - Add per-skill overrides for the kinds where the skill's identity matters more than the
-  shared pool (a rite's blessing/shelter outcome, a divine mystery's authority line, a
-  martial discipline's hit and miss phrasing).
+  shared pool (a rite's blessing/shelter outcome, a divine mystery's authority line).
 - Remove the four non-elemental categories from the catalog's frozen pending-family set, so a
   newly added martial, rite, mystery or enhancement skill without a row now fails at import
   instead of silently narrating at the category tier.

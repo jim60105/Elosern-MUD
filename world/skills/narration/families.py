@@ -1,10 +1,11 @@
 """Family-tier narration rows: the fallback every active skill resolves to.
 
-Per-skill and per-act rows land in the three follow-up changes. Until then a
-skill's own family carries its action clause: an element-and-shape line for
-elemental magic, a line-of-act clause for sexual acts, and one category clause
-for every other family. The family tier never replaces an authored per-skill
-row; it only keeps a skill narrating from day one.
+The four non-elemental families now narrate from their own per-skill rows; the
+family tier stays as the documented fallback under them. For the two families
+whose rows have not landed yet, a skill's own family carries its action
+clause: an element-and-shape line for elemental magic and a line-of-act clause
+for sexual acts. The family tier never replaces an authored per-skill row; it
+only keeps a skill narrating from day one.
 """
 
 from __future__ import annotations
@@ -25,10 +26,6 @@ from .vocab import NarrationRow
 #: a test pins it, so re-opening an exemption fails.
 PENDING_FAMILIES = frozenset(
     {
-        "martial_arts",
-        "holy_rite",
-        "divine_mystery",
-        "enhancement",
         "elemental_magic",
         "sexual_act",
     }

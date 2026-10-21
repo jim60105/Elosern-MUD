@@ -1,10 +1,11 @@
 """The frozen narration catalog aggregate.
 
-Per-skill rows are empty in this change: the family tier carries every active
-skill until the three follow-up changes author their rows. Keeping the empty
-aggregate here means the lookup chain, the validator, and the selector are
-exercised by the shipped import from day one, and each follow-up change only
-adds data modules.
+The per-skill rows of the four non-elemental families land here: martial arts,
+holy rites, divine mysteries and enhancement. The elemental-magic and
+sexual-act families are still carried by their family tier until their own
+changes author their rows. Keeping one aggregate means the lookup chain, the
+validator, and the selector stay exercised by the shipped import, and each
+follow-up change only adds data modules.
 """
 
 from __future__ import annotations
@@ -12,13 +13,25 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Mapping
 
+from .data_divine_mystery import ROWS as DIVINE_MYSTERY_ROWS
+from .data_enhancement import ROWS as ENHANCEMENT_ROWS
+from .data_holy_rite import ROWS as HOLY_RITE_ROWS
+from .data_martial import ROWS as MARTIAL_ROWS
 from .families import FAMILY_ROWS
-from .validation import validate_catalog
+from .validation import build_catalog, validate_catalog
 from .vocab import NarrationRow
 
 #: Authored per-skill narration rows, keyed by the skill registry's own keys.
-#: The follow-up changes fill this mapping from ``data_*.py`` modules.
-NARRATION_CATALOG: Mapping[str, NarrationRow] = MappingProxyType({})
+NARRATION_CATALOG: Mapping[str, NarrationRow] = MappingProxyType(
+    build_catalog(
+        (
+            *MARTIAL_ROWS,
+            *HOLY_RITE_ROWS,
+            *DIVINE_MYSTERY_ROWS,
+            *ENHANCEMENT_ROWS,
+        )
+    )
+)
 
 # Fail closed at import: a bad row, a broken bound, or a missing row for a
 # non-pending active skill stops the server rather than silently rendering a

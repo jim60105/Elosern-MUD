@@ -22,8 +22,9 @@ information, and it would make the line count impossible to review in one day.
 - **Holy rites (14)**: liturgical light — consecration, shelter, absolution; the line names the
   rite's act, never a mechanic.
 - **Divine mysteries (11)**: the authority of the divine speaking through the caster; the
-  existing `divine_*` kind pools already carry the law-giving imagery, so rows add only the
-  invocation.
+  shared `skill_granted` and `buff_applied` pools already carry the law-giving imagery, so
+  rows add only the invocation, plus the mystery's own outcome clause where the shared pool
+  would read generically.
 - **Enhancement (1)**: the body answering its own training.
 
 Each family module mirrors the registry's `data_*.py` shape: a module docstring naming the
