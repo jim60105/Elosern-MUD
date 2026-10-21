@@ -40,15 +40,15 @@ random or wall-clock input, and SHALL return the same value for the same input o
   coordinate
 
 #### Scenario: The central mountain band spans the full valid Y range
-- **WHEN** `region_for_coordinates(x, y)` is called with `x` inside the central mountain band and `y`
-  at both the minimum and maximum valid values (excluding the northern deep-forest band, which is
-  checked first)
-- **THEN** both calls return `"central_mountains"`
+- **WHEN** `region_for_coordinates(x, y)` is evaluated around X1310..1510 below the northern forest
+- **THEN** the mountain region follows the authored bending corridor (its centre shifts per row)
+  instead of a fixed rectangular band, and it is never a continuous summit wall: the closed ridge
+  is a one-cell cliff wall broken only at the authored passes
 
 #### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
 - **WHEN** `region_for_coordinates` is called with the `"capital_altoria"` entry's derived
-  `anchor_cell` `(60, 100)` and with every gate's derived `approach_cell` (`(60, 97)` and
-  `(60, 103)`)
+  `anchor_cell` `(860, 1080)` and with every gate's derived `approach_cell` (`(860, 1077)` and
+  `(864, 1080)`)
 - **THEN** every call returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own
   statement that Altoria's territory is "西部丘陵、谷地與西南海岸"
 
@@ -70,12 +70,11 @@ doc's offline-playability criterion.
   terrain_flavor_zh`'s own variants
 
 #### Scenario: A fixed coordinate produces a literal, spec-pinned string
-- **WHEN** `terrain_description(60, 103)` is called (`capital_altoria`'s north-gate approach cell —
-  the wilderness-side landing of the 北門 gate under the footprint registry — which
+- **WHEN** `terrain_description(860, 1080)` is called (the `capital_altoria` anchor cell, which
   `region_for_coordinates` resolves to `"western_hills_valleys"`)
-- **THEN** it returns exactly `"谷地間河流蜿蜒，兩岸散落著手工業者的作坊與磨坊。"` — the literal second
-  (index `1`) entry of `WILDERNESS_REGION_REGISTRY["western_hills_valleys"].terrain_flavor_zh`, per
-  `(60 * 92821 + 103 * 68917) % 3 == 1`. A reimplementation using different formula constants or
+- **THEN** it returns exactly `"低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。"` — the literal third
+  (index `2`) entry of `WILDERNESS_REGION_REGISTRY["western_hills_valleys"].terrain_flavor_zh`, per
+  `(860 * 92821 + 1080 * 68917) % 3 == 2`. A reimplementation using different formula constants or
   reworded flavor text — either of which would still satisfy every other scenario in this
   requirement — SHALL fail this scenario, which is the point: it is what pins the formula and the
   registry text together against silent drift, the same concern that ruled out a `hash()`-based

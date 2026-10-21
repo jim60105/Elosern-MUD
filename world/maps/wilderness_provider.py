@@ -94,7 +94,12 @@ WATERWAY_FORDS: dict[str, tuple[tuple[int, int], ...]] = {
 #: ``WILDERNESS_REGION_REGISTRY`` has a window.
 REGION_SEARCH_BOXES: dict[str, tuple[int, int, int, int]] = {
     "north_deep_forest": (0, WILDERNESS_MAX_X, _NORTH_FOREST_Y_MIN, WILDERNESS_MAX_Y),
-    "central_mountains": (_RIDGE_MIN_X, _RIDGE_MAX_X, 0, _NORTH_FOREST_Y_MIN - 1),
+    "central_mountains": (
+        _MOUNTAIN_RIDGE_BASE_X - 2 * _MOUNTAIN_RIDGE_STEP - _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        _MOUNTAIN_RIDGE_BASE_X + 2 * _MOUNTAIN_RIDGE_STEP + _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        0,
+        _NORTH_FOREST_Y_MIN - 1,
+    ),
     "eastern_plains": (0, WILDERNESS_MAX_X, _COASTAL_Y_MAX + 1, _NORTH_FOREST_Y_MIN - 1),
     "southeast_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
     "southwest_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),

@@ -23,8 +23,10 @@ from world.maps.room_art import (
 )
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
+    REGION_SEARCH_BOXES,
     RIDGE_PASSES,
     WILDERNESS_NAME,
+    _rasterize_routes,
     WATERWAY_FORDS,
     WILDERNESS_KM_PER_CELL,
     WILDERNESS_MAX_X,
@@ -189,8 +191,12 @@ class TerrainModelTests(unittest.TestCase):
         # Every ford lies on its own river, and every river starts and ends on
         # the coastal region it drains into (capital river -> southwest coast;
         # imperial rivers -> southeast coast).
+        raster = _rasterize_routes(WATERWAY_ROUTES)
         for name, fords in WATERWAY_FORDS.items():
             for ford in fords:
+                # The ford is on its authored river before the exemption is
+                # subtracted, so a typo cannot silently remove a crossing.
+                self.assertIn(ford, raster, name)
                 self.assertFalse(is_inland_water_cell(ford), name)
                 self.assertTrue(is_land_cell(ford), name)
         capital = WATERWAY_ROUTES["capital_river"]
@@ -205,6 +211,31 @@ class TerrainModelTests(unittest.TestCase):
         self.assertFalse(is_valid_wilderness_cell(river_cell))
         self.assertFalse(is_inland_water_cell(WATERWAY_FORDS["capital_river"][0]))
         self.assertTrue(is_valid_wilderness_cell(WATERWAY_FORDS["capital_river"][0]))
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_region_search_windows_cover_their_region(self):
+        # Sparse-index consumers enumerate only the region window, so every
+        # cell the classifier assigns to a region must lie inside its window.
+        probes = [
+            (x, y)
+            for x in range(0, WILDERNESS_MAX_X + 1, 60)
+            for y in range(0, WILDERNESS_MAX_Y + 1, 60)
+        ] + [
+            (x, y)
+            for y in range(0, 2200, 137)
+            for x in (
+                _ridge_center_x(y) - 100,
+                _ridge_center_x(y),
+                _ridge_center_x(y) + 100,
+            )
+        ]
+        for cell in probes:
+            region = region_for_coordinates(*cell)
+            x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region]
+            self.assertTrue(
+                x_min <= cell[0] <= x_max and y_min <= cell[1] <= y_max,
+                (region, cell, REGION_SEARCH_BOXES[region]),
+            )
 
     def test_description_always_matches_its_regions_variants(self):
         for cell in (SEA_MARGIN, EAST_APPROACH, LAND_A, LAND_B, LAND_C, FRAME_CORNER):

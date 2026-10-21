@@ -86,8 +86,8 @@ The production presentation registry SHALL register panel name `local_map` at sc
 
 #### Scenario: An anchor footprint renders as absent ground, not a walkable cell
 - **WHEN** the puppet stands at any wilderness cell adjacent to the `capital_altoria` footprint and
-  NOT on a gate approach cell (e.g. `(57, 100)` facing east toward `(58, 100)`, or `(59, 97)`
-  facing north toward `(59, 98)` — `(60, 97)`/`(60, 103)` face the footprint too but their
+  NOT on a gate approach cell (e.g. `(856, 1080)` facing east toward `(857, 1080)`, or `(859, 1077)`
+  facing north toward `(859, 1078)` — `(860, 1077)`/`(864, 1080)` face the footprint too but their
   footprint-facing direction is the registered gateway, which renders per the gateway rules) and
   the panel is built
 - **THEN** no `wild:` node with a footprint cell's coordinate exists in the payload, the direction
@@ -1051,7 +1051,7 @@ For every gate of every entry in the wilderness entry registry, the minimap SHAL
 - **THEN** it SHALL scan the preferred slot first when it is free and inside the payload coordinate bounds, then rings of ascending Manhattan distance from it in ascending Y-offset then ascending X-offset order, taking the first slot that is inside the coordinate bounds and free
 
 #### Scenario: Wilderness side shows the gate room
-- **WHEN** the puppet stands at a registered gate approach cell (e.g. `(60, 103)` for the north
+- **WHEN** the puppet stands at a registered gate approach cell (e.g. `(864, 1080)` for the east
   gate) and the `local_map` panel is built
 - **THEN** the gateway direction carries the gate room's `grid:` node with the room's name as label,
   an action whose destination equals the node id, and the geometric wild cell for that direction is

@@ -8,17 +8,20 @@ area, using the project-owned `TerrainRoom` and `WildernessReturnExit` typeclass
 
 
 ### Requirement: ElosernWildernessMapProvider bounds the map to a 224x224 grid at 10 km per cell
-`world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 10`,
-`WILDERNESS_MAX_X = 223`, `WILDERNESS_MAX_Y = 223`, and `ElosernWildernessMapProvider`, a subclass
+`world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
+`WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`, a subclass
 of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
 `is_valid_coordinates` accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and
-`0 <= y <= WILDERNESS_MAX_Y` that are NOT an anchor footprint cell of any
-`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`).
+`0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable terrain and NOT an anchor footprint cell
+of any `WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`). The shared rule
+is `is_valid_wilderness_cell`: frame, mainland polygon at the cell centre, off the closed summit
+ridge and authored waterways, and outside every live footprint.
 
 #### Scenario: Coordinates inside the bound and outside every footprint are valid
-- **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (0, 0))` and
-  `(WILDERNESS_MAX_X, WILDERNESS_MAX_Y)` are checked
-- **THEN** both return `True`
+- **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (500, 700))` and the
+  two frame corners `(0, 0)` / `(WILDERNESS_MAX_X, WILDERNESS_MAX_Y)` are checked
+- **THEN** only the land-side non-footprint cell returns `True`; the ocean-margin corners return
+  `False` even though they are inside the frame
 
 #### Scenario: Coordinates outside the bound are invalid
 - **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (-1, 0))` and
@@ -26,8 +29,9 @@ of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
 - **THEN** both return `False`
 
 #### Scenario: Anchor footprint cells are invalid
-- **WHEN** `is_valid_coordinates` is checked for the `capital_altoria` anchor cell `(60, 100)`,
-  a corner footprint cell `(58, 98)`, and the two gate approach cells `(60, 97)` and `(60, 103)`
+- **WHEN** `is_valid_coordinates` is checked for the `capital_altoria` anchor cell `(860, 1080)`,
+  a corner footprint cell `(857, 1076)`, and the two gate approach cells `(860, 1077)` and
+  `(864, 1080)`
 - **THEN** the two footprint cells return `False` and the two approach cells return `True`
 
 #### Scenario: Registry patches change footprint validity without patching the provider
@@ -38,8 +42,9 @@ of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
   the registry restores validity
 
 #### Scenario: The bound approximates world_info.md's stated continent area
-- **WHEN** `(WILDERNESS_MAX_X + 1) * WILDERNESS_KM_PER_CELL` is computed for both axes and squared
-- **THEN** the result is within 1% of `world_info.md`'s stated ~5,000,000 km² continent area
+- **WHEN** the coastline polygon and enclosing frame areas are computed
+- **THEN** the mainland polygon's shoelace area is exactly 5,000,000 km² and the 2700-cell frame is
+  7,290,000 km² including ocean; raster counts need not equal vector area
 
 #### Scenario: Point-shape entries contribute no footprint
 - **WHEN** a `WILDERNESS_ENTRY_REGISTRY` entry has point shape
@@ -81,26 +86,26 @@ ensure the coordinate's deterministic monster population per the scenarios below
   not the value computed for `(x1, y1)`
 
 #### Scenario: at_prepare_room opens exactly the gate exit at an approach cell
-- **WHEN** `at_prepare_room((60, 97), caller, room)` is called on a `TerrainRoom` carrying the
+- **WHEN** `at_prepare_room((860, 1077), caller, room)` is called on a `TerrainRoom` carrying the
   eight directional exits
 - **THEN** the `"north"` exit's locks allow `traverse` and `view`, and no other exit's locks are
   modified by the hook
 
 #### Scenario: at_prepare_room touches no locks away from approach cells
 - **WHEN** `at_prepare_room` is called for an ordinary wilderness cell or for the opposite gate's
-  approach cell `(60, 103)`
-- **THEN** at the ordinary cell no exit's locks are modified, and at `(60, 103)` only the
-  `"south"` exit's locks are opened — an approach cell never opens another gate's exit
+  approach cell `(864, 1080)`
+- **THEN** at the ordinary cell no exit's locks are modified, and at `(864, 1080)` only the
+  `"west"` exit's locks are opened — an approach cell never opens another gate's exit
 
 #### Scenario: A point-shape anchor opens all eight exits
-- **WHEN** the registry is patched with a point-shape entry anchored at `(120, 120)` and
-  `at_prepare_room((120, 120), caller, room)` is called on a `TerrainRoom` carrying the eight
-  directional exits
-- **THEN** all eight exits' locks allow `traverse` and `view`, matching the resolver's
-  every-direction gateway advertisement at that cell
+- **WHEN** the registry is patched with a point-shape entry anchored at `(500, 500)` and
+  `at_prepare_room((500, 500), caller, room)` is called on a `TerrainRoom` carrying the eight
+  directional exits, all initially closed
+- **THEN** only the single gate's authored `return_direction` exit allows `traverse` and `view`,
+  matching the resolver's authored-direction gateway advertisement at that cell
 
 #### Scenario: A gate lock does not leak when the pooled room moves to a non-approach coordinate
-- **WHEN** a pooled `TerrainRoom` was activated at `(60, 97)` (opening its `"north"` exit) and is
+- **WHEN** a pooled `TerrainRoom` was activated at `(860, 1077)` (opening its `"north"` exit) and is
   later activated at a coordinate that is not any approach cell
 - **THEN** the stock activation pass recomputes every self-loop exit's locks from provider
   validity before `at_prepare_room` runs, and after activation no exit carries a hook-opened
@@ -142,10 +147,10 @@ ensure the coordinate's deterministic monster population per the scenarios below
 
 #### Scenario: Point anchors open all eight exits to match the resolver
 - **WHEN** `coordinates` equal a point-shape entry's `anchor_cell`
-- **THEN** `at_prepare_room` SHALL instead set ALL EIGHT directional exits' locks to
-  `traverse:true();view:true()` — the resolver advertises the entry's single gate in every
-  direction at a point anchor, and the hook keeps offered exits identical to resolver truth
-  regardless of which neighbors the stock validity pass happened to unlock
+- **THEN** `at_prepare_room` SHALL open only the single gate's authored `return_direction` exit to
+  `traverse:true();view:true()` — the resolver advertises that one authored direction at a point
+  anchor, and every other direction stays ordinary terrain validity — so offered exits remain
+  identical to resolver truth
 
 ### Requirement: ElosernWildernessMapProvider uses TerrainRoom and WildernessReturnExit
 `ElosernWildernessMapProvider.room_typeclass` SHALL be `typeclasses.rooms.TerrainRoom` and
