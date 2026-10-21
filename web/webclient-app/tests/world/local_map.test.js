@@ -731,6 +731,39 @@ function nodeCenter(wrapper, id) {
     expect([placed.x, placed.y]).toEqual([1000, 6500]);
   });
 
+  it("keeps fractional metric extents finite with one scale on both axes", () => {
+    // (250,350) is 2.5 cells east and 3.5 cells north of the origin at the
+    // 100 m cell, so the model exports fractional counts; the island must
+    // still project every centre affinely with one physical scale per axis.
+    const fractional = {
+      ...METRIC_PAYLOAD,
+      current_node: "grid:metric:0:0",
+      nodes: [
+        METRIC_PAYLOAD.nodes[0],
+        METRIC_PAYLOAD.nodes[1],
+        { id: "grid:metric:0:100", label: "北街", x: 0, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, action: null },
+        { id: "grid:metric:250:350", label: "西北", x: 250, y: 350, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+      ],
+      edges: [],
+    };
+    const model = localMapModelFor(fractional);
+    expect(model.cell).toBe(100);
+    expect(model.cols).toBe(3.5);
+    expect(model.rows).toBe(4.5);
+    wrapper = mount(LocalMap, { props: { localMap: model } });
+    const origin = nodeCenter(wrapper, "grid:metric:0:0");
+    const east = nodeCenter(wrapper, "grid:metric:100:0");
+    const north = nodeCenter(wrapper, "grid:metric:0:100");
+    const far = nodeCenter(wrapper, "grid:metric:250:350");
+    for (const point of [origin, east, north, far]) {
+      expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
+    }
+    const unit = east.x - origin.x;
+    expect(Math.abs(north.y - origin.y)).toBeCloseTo(unit, 6);
+    expect(far.x - origin.x).toBeCloseTo(2.5 * unit, 6);
+    expect(Math.abs(far.y - origin.y)).toBeCloseTo(3.5 * unit, 6);
+  });
+
   it("keeps adjacent-node action identity while projecting metric geometry", async () => {
     wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(METRIC_PAYLOAD) } });
     const adjacent = wrapper.get('[data-testid="local-map__node--grid:metric:100:0"]');

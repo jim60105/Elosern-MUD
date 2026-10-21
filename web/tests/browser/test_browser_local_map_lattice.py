@@ -527,7 +527,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 {"id": "grid:metric:1000:0", "label": "遠東", "x": 1000, "y": 0, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": None},
                 {"id": "grid:metric:1000:6500", "label": "北關", "x": 1000, "y": 6500, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": None},
                 {"id": "grid:metric:100:100", "label": "東北", "x": 100, "y": 100, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
-                {"id": "grid:metric:6000:0", "label": "東境關隘", "x": 6000, "y": 0, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+                {"id": "grid:metric:7000:-100", "label": "東境關隘", "x": 7000, "y": -100, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+                {"id": "grid:metric:6500:6350", "label": "度量北坊", "x": 6500, "y": 6350, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": None},
             ],
             "edges": [
                 {"source": "grid:metric:0:0", "destination": "grid:metric:100:0", "label": "e", "known": True, "traversable": True},
@@ -566,7 +567,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 "grid:metric:1000:0": (1000, 0),
                 "grid:metric:1000:6500": (1000, 6500),
                 "grid:metric:100:100": (100, 100),
-                "grid:metric:6000:0": (6000, 0),
+                "grid:metric:7000:-100": (7000, -100),
+                "grid:metric:6500:6350": (6500, 6350),
             },
         )
 
@@ -661,6 +663,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             overlay_scope,
         )
         self.assertLess(zoomed[2], box["viewBox"][2], "zoom-in must narrow the window")
+        # Zoom is a view transform only: every drawn centre keeps its user-unit
+        # position and its gap ratio, so no two centres move independently.
+        zooms = centers(overlay_scope)
+        for key in ("origin", "near", "far", "north", "diagonal"):
+            self.assertEqual(zooms[key], overlay[key], f"{key} moved under zoom")
         page.locator('[data-testid="map-overlay-recentre"]').click()
         page.wait_for_timeout(150)
         self.assertEqual(
@@ -694,4 +701,39 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(payload["exit_ref"], "e")
         self.assertEqual(payload["current_node"], "grid:metric:0:0")
+
+        # 6. The wilderness frame's expanded bound renders too: a (2699,2699)
+        #    payload commits through the real client validator and draws.
+        wilderness_panel = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "wilderness",
+            "title": "東境荒野",
+            "current_node": "wild:elosern:2699:2699",
+            "nodes": [
+                {"id": "wild:elosern:2699:2699", "label": "東境荒野", "x": 2699, "y": 2699, "visibility": "current", "current": True, "anchor": False, "landmark": False, "action": None},
+                {"id": "wild:elosern:2698:2699", "label": "林地", "x": 2698, "y": 2699, "visibility": "visible_unvisited", "current": False, "anchor": False, "landmark": False, "action": {"kind": "move", "exit_ref": "w", "destination": "wild:elosern:2698:2699"}},
+            ],
+            "edges": [
+                {"source": "wild:elosern:2699:2699", "destination": "wild:elosern:2698:2699", "label": "w", "known": True, "traversable": True},
+            ],
+            "legend": ["你目前所在的位置", "尚未探索的相鄰位置"],
+        }
+        self._inject_panel(page, wilderness_panel)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+            == "wild:elosern:2699:2699",
+            timeout=30000,
+        )
+        corner = page.evaluate(
+            """() => {
+              const el = document.querySelector(
+                '[data-testid="local-map"] [data-testid="local-map__node--wild:elosern:2699:2699"]'
+              );
+              const m = el.getAttribute("transform").match(/-?[\d.]+/g);
+              return { x: Number(m[0]), y: Number(m[1]) };
+            }"""
+        )
+        self.assertTrue(all(isinstance(value, (int, float)) for value in corner.values()))
         page.close()
