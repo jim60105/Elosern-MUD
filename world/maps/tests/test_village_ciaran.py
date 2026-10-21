@@ -1,4 +1,4 @@
-"""Data-contract test: village sparse map declaration.
+"""Data-contract test: village ciaran map data contract
 
 Pins the village's approved integer-metre node positions (world-map-scale
 design §9), its ten-node nine-edge tree, sole anchor, authored exit octants,

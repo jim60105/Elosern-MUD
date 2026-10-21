@@ -422,7 +422,9 @@ def remap_grid_identities(
         if not changed:
             continue
         if journal is not None:
-            journal.append(character)
+            # The snapshot restores the durable value even if the failed
+            # transaction's rollback is not observable through the handler.
+            journal.append((character, deepcopy(current)))
         _write_knowledge(
             character, {"schema_version": SCHEMA_VERSION, "visited": remapped}
         )

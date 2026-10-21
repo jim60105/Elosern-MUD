@@ -1,4 +1,4 @@
-"""Data-contract test: capital sparse map declaration.
+"""Data-contract test: capital xymap data contract
 
 Pins the capital's approved integer-metre node positions (world-map-scale
 design §8), its fixed connected topology, anchor, options, authored exit

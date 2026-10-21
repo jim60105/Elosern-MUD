@@ -150,6 +150,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         with (
             patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch("world.maps.map_data.settlement_graph", return_value=None),
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(COORD_MAX, COORD_MAX),
+            ),
             patch("web.webclient.presentation.local_map.grid.MAX_NODES", 9),
             patch(
                 "typeclasses.rooms.GridRoom.objects.filter_xyz",
@@ -193,6 +198,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         with (
             patch.object(type(self.plaza), "xyz", (edge, edge, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch("world.maps.map_data.settlement_graph", return_value=None),
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(COORD_MAX, COORD_MAX),
+            ),
             # A map whose registered bounds reach the payload edge is the
             # only way a room coordinate at the envelope edge can be legal.
             patch(
@@ -345,6 +355,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         with (
             patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch("world.maps.map_data.settlement_graph", return_value=None),
+            patch(
+                "world.rules.map_knowledge._registered_grid_bounds",
+                return_value=(COORD_MAX, COORD_MAX),
+            ),
             patch("web.webclient.presentation.local_map.grid.MAX_NODES", 4),
             patch(
                 "typeclasses.rooms.GridRoom.objects.filter_xyz",

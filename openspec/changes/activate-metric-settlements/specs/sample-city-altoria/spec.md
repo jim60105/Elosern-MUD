@@ -43,16 +43,14 @@ Altoria SHALL use the following integer-meter node positions in its local logica
 
 ### Requirement: The sample city has exactly thirteen rooms in a fixed, connected topology
 `world/maps/altoria_capital.py` SHALL declare the sparse map declaration for `zcoord="capital_altoria"` describing
-exactly twenty-one rooms at the coordinates: `(3050, 150)`, `(1250, 760)`, `(2150, 920)`, `(3140, 1050)`, `(3970, 1120)`, `(4830, 970)`,
-`(2350, 1900)`, `(3350, 1980)`, `(1300, 2600)`, `(2420, 2700)`, `(3500, 2850)`, `(4380, 3000)`, `(5380, 2850)`, `(6500, 3010)`, `(2300, 3820)`, `(3480, 3700)`, `(4560, 3920)`,
-`(3500, 4850)`, `(4690, 5010)`, `(5650, 5200)`, `(4500, 6350)`, connected by exactly twenty-six links such that every room is
+exactly twenty-one rooms on the approved metric coordinates and exactly twenty-six links such that every room is
 reachable from every other room.
 
 #### Scenario: The map parses to exactly thirteen nodes
 <!-- Scenario name retained verbatim; the count it asserts is the one in the text above. -->
 - **WHEN** `world/maps/altoria_capital.py`'s sparse node/road declaration is parsed with
   the sparse graph validator
-- **THEN** exactly twenty-one nodes exist, at exactly the coordinates listed above
+- **THEN** exactly twenty-one nodes exist, at exactly the coordinates `(3050, 150)`, `(1250, 760)`, `(2150, 920)`, `(3140, 1050)`, `(3970, 1120)`, `(4830, 970)`, `(2350, 1900)`, `(3350, 1980)`, `(1300, 2600)`, `(2420, 2700)`, `(3500, 2850)`, `(4380, 3000)`, `(5380, 2850)`, `(6500, 3010)`, `(2300, 3820)`, `(3480, 3700)`, `(4560, 3920)`, `(3500, 4850)`, `(4690, 5010)`, `(5650, 5200)`, `(4500, 6350)`
 
 #### Scenario: Every room is reachable from every other room
 - **WHEN** sparse shortest-path calculation is run against the validated sparse graph

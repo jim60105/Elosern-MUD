@@ -305,8 +305,10 @@ class LocalMapPresenterTests(EvenniaTestCase):
         record_arrival(actor)
         # Move away and deep into the city so a remembered grid node forms.
         from typeclasses.rooms import GridRoom as _Grid
+        from world.maps.map_data import SETTLEMENT_GRAPHS
 
-        north = _Grid.objects.filter_xyz(xyz=(2, 3, _T_MAP_KEY)).first()
+        market = SETTLEMENT_GRAPHS[_T_MAP_KEY].node("market_street").coordinate
+        north = _Grid.objects.filter_xyz(xyz=(*market, _T_MAP_KEY)).first()
         actor.location = north
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))

@@ -1057,3 +1057,328 @@ class SparseSettlementSyncTests(EvenniaTest):
             XYZExit.objects.filter_xyz(xyz=("*", "*", "capital_altoria")).count(),
             52,
         )
+
+
+#: The pre-cutover compact bindings, used only to seed a real cutover database.
+OLD_COORDINATES = {
+    "capital_altoria": {
+        "south_gate": (3, 0),
+        "quay": (1, 1),
+        "riverbank_road": (2, 1),
+        "south_avenue": (3, 1),
+        "inn_lane": (4, 1),
+        "bath_forecourt": (5, 1),
+        "old_wall_ruins": (2, 2),
+        "north_avenue": (3, 2),
+        "craft_alley": (1, 3),
+        "market_street": (2, 3),
+        "central_plaza": (3, 3),
+        "guild_forecourt": (4, 3),
+        "east_market": (5, 3),
+        "east_gate": (6, 3),
+        "training_ground": (2, 4),
+        "holy_steps": (3, 4),
+        "great_temple": (4, 4),
+        "noble_quarter": (3, 5),
+        "upper_gate": (4, 5),
+        "academy": (5, 5),
+        "palace_forecourt": (4, 6),
+    },
+    "village_ciaran": {
+        "hidden_path": (0, 1),
+        "village_plaza": (1, 1),
+        "stream_path": (1, 0),
+        "stream_bend": (2, 0),
+        "training_clearing": (2, 1),
+        "herb_garden": (3, 1),
+        "old_tree_north": (1, 2),
+        "elder_tree": (1, 3),
+        "weaving_slope": (2, 2),
+        "silver_leaf_slope": (2, 3),
+    },
+}
+
+
+class MetricCutoverTests(EvenniaTest):
+    """The real pre-cutover database converges in place onto metres."""
+
+    def _count_grid_rooms(self):
+        return GridRoom.objects.all_family().count()
+
+    def _count_city_exits(self):
+        from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
+
+        return XYZExit.objects.all_family().count()
+
+    def _seed_precutover_rooms(self):
+        from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY
+
+        ids = {}
+        for map_id, graph in SETTLEMENT_GRAPHS.items():
+            ids[map_id] = {}
+            for node_id in graph.nodes:
+                coordinate = OLD_COORDINATES[map_id][node_id]
+                room, errors = GridRoom.create(
+                    key=f"舊{map_id}:{node_id}",
+                    xyz=(*coordinate, map_id),
+                )
+                self.assertFalse(errors, errors)
+                room.sparse_node_id = node_id
+                room.tags.add(
+                    f"{map_id}:{node_id}", category=NODE_IDENTITY_TAG_CATEGORY
+                )
+                room.save()
+                ids[map_id][node_id] = room.id
+        return ids
+
+    def _object(self, pk):
+        from evennia.objects.models import ObjectDB
+
+        return ObjectDB.objects.get(pk=pk)
+
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
+    def test_cutover_preserves_identity_references_and_knowledge(self):
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.npcs import NPC
+        from world.maps.bootstrap import SyncReport
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        plaza_id = ids["capital_altoria"]["central_plaza"]
+        plaza = self._object(plaza_id)
+
+        occupant = create_object(NPC, key="測試居民", location=plaza)
+        native = create_object(PlayerCharacter, key="測試歸鄉者", location=plaza)
+        native.home = plaza
+        native.save()
+        external = create_object(Room, key="測試外部", location=None)
+        inbound = create_object(Exit, key="測試入境", location=external, destination=plaza)
+        native.attributes.add(
+            "map_knowledge",
+            {
+                "schema_version": 1,
+                "visited": {
+                    "grid:capital_altoria:3:3": {
+                        "first_seen_tick": 5,
+                        "last_seen_tick": 9,
+                    },
+                    "grid:capital_altoria:3500:2850": {
+                        "first_seen_tick": 7,
+                        "last_seen_tick": 11,
+                    },
+                },
+            },
+        )
+
+        report = sync_grid()
+
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
+        self.assertGreater(report.updated + report.created, 0)
+        moved = self._object(plaza_id)
+        self.assertEqual(
+            moved.xyz,
+            (
+                *SETTLEMENT_GRAPHS["capital_altoria"].node("central_plaza").coordinate,
+                "capital_altoria",
+            ),
+        )
+        self.assertEqual(occupant.db_location_id, plaza_id)
+        self.assertEqual(native.db_location_id, plaza_id)
+        self.assertEqual(native.db_home_id, plaza_id)
+        self.assertEqual(inbound.db_destination_id, plaza_id)
+        self.assertIsNone(
+            GridRoom.objects.filter_xyz(xyz=(3, 3, "capital_altoria")).first()
+        )
+
+        visits = native.attributes.get("map_knowledge")["visited"]
+        self.assertEqual(
+            visits,
+            {
+                "grid:capital_altoria:3500:2850": {
+                    "first_seen_tick": 5,
+                    "last_seen_tick": 11,
+                }
+            },
+        )
+
+        before = {
+            (map_id, node_id): self._object(pk).xyz
+            for map_id, nodes in ids.items()
+            for node_id, pk in nodes.items()
+        }
+        second = sync_grid()
+        self.assertEqual(second, SyncReport())
+        self.assertEqual(
+            before,
+            {
+                (map_id, node_id): self._object(pk).xyz
+                for map_id, nodes in ids.items()
+                for node_id, pk in nodes.items()
+            },
+        )
+
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    def test_failed_cutover_restores_durable_and_cached_state(self):
+        from typeclasses.characters import PlayerCharacter
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        south_id = ids["capital_altoria"]["south_gate"]
+        south = self._object(south_id)
+        old_xyz = south.xyz
+
+        snapshot = {
+            "schema_version": 1,
+            "visited": {
+                "grid:capital_altoria:3:0": {
+                    "first_seen_tick": 1,
+                    "last_seen_tick": 2,
+                }
+            },
+        }
+        first = create_object(PlayerCharacter, key="測試甲", location=south)
+        second = create_object(PlayerCharacter, key="測試乙", location=south)
+        first.attributes.add(KNOWLEDGE_ATTR, snapshot)
+        second.attributes.add(KNOWLEDGE_ATTR, snapshot)
+
+        import world.rules.map_knowledge as knowledge
+
+        real = knowledge._write_knowledge
+        calls = {"n": 0}
+
+        def fail_second(character, record):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("injected knowledge write fault")
+            return real(character, record)
+
+        with patch.object(knowledge, "_write_knowledge", side_effect=fail_second):
+            with self.assertRaises(RuntimeError):
+                sync_grid()
+
+        self.assertEqual(self._object(south_id).xyz, old_xyz)
+        self.assertEqual(
+            GridRoom.objects.filter_xyz(xyz=(3, 0, "capital_altoria")).first().id,
+            south_id,
+        )
+        for character in (first, second):
+            self.assertEqual(character.attributes.get(KNOWLEDGE_ATTR), snapshot)
+
+    @covers_requirement(
+        "sample-city-altoria::altoria-uses-approved-metric-outdoor-positions"
+    )
+    def test_upgrade_removes_retired_ascii_registration_without_deleting_rooms(self):
+        from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        grid, errors = XYZGrid.create("XYZGrid")
+        self.assertFalse(errors, errors)
+        grid.db.map_data = {
+            "capital_altoria": {
+                "zcoord": "capital_altoria",
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+            "synthetic_keep": {
+                "zcoord": "synthetic_keep",
+                "map": "+ 0\n0 #\n+ 0\n",
+                "prototypes": {},
+            },
+        }
+        grid.save()
+
+        sync_grid()
+
+        self.assertNotIn("capital_altoria", grid.db.map_data)
+        self.assertIn("synthetic_keep", grid.db.map_data)
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._count_city_exits(), 70)
+
+    @covers_requirement(
+        "grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all"
+    )
+    @covers_requirement(
+        "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
+    )
+    def test_real_startup_converges_places_scene_art_and_quest_targets(self):
+        from evennia.utils.search import search_object_by_tag
+        from typeclasses.characters import PlayerCharacter
+        from world.lore.settlements.places import PLACE_REGISTRY
+        from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+        from world.maps.room_art import grid_scene_identity
+        from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+        create_object(Room, key=LIMBO_KEY, location=None)
+        ids = self._seed_precutover_rooms()
+        plaza_id = ids["capital_altoria"]["central_plaza"]
+        observer = create_object(
+            PlayerCharacter, key="測試旅人", location=self._object(plaza_id)
+        )
+        observer.attributes.add(
+            KNOWLEDGE_ATTR,
+            {
+                "schema_version": 1,
+                "visited": {
+                    "grid:capital_altoria:3:3": {
+                        "first_seen_tick": 4,
+                        "last_seen_tick": 8,
+                    }
+                },
+            },
+        )
+
+        at_server_start()
+
+        self.assertEqual(self._count_grid_rooms(), 31)
+        self.assertEqual(self._object(plaza_id).sparse_node_id, "central_plaza")
+        self.assertEqual(
+            observer.attributes.get(KNOWLEDGE_ATTR)["visited"],
+            {
+                "grid:capital_altoria:3500:2850": {
+                    "first_seen_tick": 4,
+                    "last_seen_tick": 8,
+                }
+            },
+        )
+        # Scene-art indices follow the moved room, not a stale coordinate.
+        plaza = self._object(plaza_id)
+        self.assertEqual(
+            plaza.scene_identity,
+            grid_scene_identity("capital_altoria", *plaza.xyz[:2]),
+        )
+        # A quest GRID locator resolves through the new metre coordinate.
+        self.assertEqual(
+            GridRoom.objects.filter_xyz(
+                xyz=(*SETTLEMENT_GRAPHS["capital_altoria"].node("great_temple").coordinate,
+                     "capital_altoria")
+            ).first().sparse_node_id,
+            "great_temple",
+        )
+        # Every service place's exterior resolves to its converged room and
+        # every interior keeps its bidirectional doorway.
+        for place in PLACE_REGISTRY.values():
+            zcoord = SETTLEMENT_REGISTRY[place.settlement_key].zcoord
+            exterior = GridRoom.objects.filter_xyz(
+                xyz=(*place.exterior_xy, zcoord)
+            ).first()
+            with self.subTest(place=place.key):
+                self.assertIsNotNone(exterior)
+                interior = search_object_by_tag(place.key)
+                self.assertEqual(len(interior), 1)
+                self.assertTrue(
+                    any(
+                        exit_obj.destination == exterior
+                        for exit_obj in interior[0].exits
+                    )
+                )

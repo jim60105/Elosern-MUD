@@ -111,7 +111,7 @@ class LoreSyncTests(EvenniaTestCase):
         probe = WildernessEntryPoint(
             "capital_altoria",
             ("#",),
-            (120, 120),
+            (860, 1080),
             (WildernessGate("n", (3050, 150), "capital_altoria"),),
         )
         with (

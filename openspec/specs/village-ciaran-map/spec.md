@@ -14,7 +14,7 @@ entrance node, a central plaza, and eight further exterior nodes reflecting
 the branch's culture and dwellings. The plaza SHALL spawn as the settlement's
 sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
 intra-village link SHALL spawn as the project's costed grid exit so
-movement inside the village charges the ordinary move cost.
+movement inside the village charges the distance-derived move cost.
 
 #### Scenario: The village grid spawns connected with one anchor
 - **WHEN** grid synchronization runs
@@ -24,8 +24,7 @@ movement inside the village charges the ordinary move cost.
 
 #### Scenario: Village movement is costed like city movement
 - **WHEN** a character walks between two village rooms
-- **THEN** the move charges the same ordinary cost a capital street move
-  charges
+- **THEN** the move charges its actual physical edge cost at the same baseline speed as capital streets
 
 #### Scenario: The village occupies a coordinate space of its own
 - **WHEN** a coordinate is queried in each settlement's map
@@ -33,15 +32,14 @@ movement inside the village charges the ordinary move cost.
   neither settlement's rooms appear in the other's shortest paths
 
 #### Scenario: The village stays a tree as it grows
-- **WHEN** the parsed village map's links are counted against its nodes
+- **WHEN** the validated sparse village graph's links are counted against its nodes
 - **THEN** there is exactly one fewer link than there are nodes, and removing
   any link disconnects the map
 
 #### Scenario: The six original coordinates are undisturbed
 - **WHEN** the expanded map is parsed
 - **THEN** the entrance, the plaza and the four original dwelling approaches
-  occupy exactly the coordinates they occupied before, so no landed place's
-  exterior moves
+  occupy the approved meter coordinates while their existing dbids and every landed place attachment remain intact
 
 #### Scenario: Growth adds leaves, never a loop or crossroads
 - **WHEN** the village map grows
@@ -53,7 +51,7 @@ movement inside the village charges the ordinary move cost.
 #### Scenario: Village text reads as a lived-in forest settlement
 - **WHEN** the village's room keys and descriptions are authored
 - **THEN** they SHALL be Traditional Chinese and SHALL read as a lived-in
-  forest settlement rather than as a town: no walls, no gates, no
+  underground settlement with skylit basins and ravines: no walls, no city gates, no
   marketplace and no signed premises
 
 ### Requirement: The village has exactly one concealed entrance
@@ -113,3 +111,29 @@ entry that gives them a second entry to check against.
 - **WHEN** a traveller stands on the village's gate approach cell and moves
   in the gate's return direction
 - **THEN** they arrive at the village's entrance node
+
+### Requirement: Ciaran uses metric skylit underground geography
+Ciaran SHALL retain its ten-node nine-road branching topology at the following meter positions, with roughly 0.4km² living space for 100 elves. Main living chambers SHALL remain underground; outdoor nodes SHALL occupy skylit collapse basins or ravines, retaining the concealed path without walls or city gates.
+
+#### Scenario: Exact metric positions
+- **WHEN** village nodes synchronize
+- **THEN** old-to-new bindings equal this table, without collisions or compass-octant changes.
+
+| Location | Old local coordinate | New local coordinate, meters |
+| --- | --- | --- |
+| 隱密小徑 | (0, 1) | (35, 270) |
+| 村中廣場 | (1, 1) | (220, 305) |
+| 溪畔小徑 | (1, 0) | (245, 135) |
+| 溪畔下游 | (2, 0) | (430, 85) |
+| 練刀場 | (2, 1) | (405, 335) |
+| 藥草園 | (3, 1) | (590, 300) |
+| 村北古樹下 | (1, 2) | (200, 465) |
+| 長老古樹下 | (1, 3) | (165, 650) |
+| 織房坡 | (2, 2) | (390, 495) |
+| 銀葉坡 | (2, 3) | (440, 665) |
+
+
+
+#### Scenario: Underground setting and route
+- **WHEN** the village and entrance-to-elder route are inspected
+- **THEN** surrounding forest/gathering land lies beyond the living footprint, daylight/trees occur at openings, the village is never an ordinary exposed forest settlement, and the healthy straight-edge route is approximately seven minutes.

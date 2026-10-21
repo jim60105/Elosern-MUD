@@ -519,7 +519,7 @@ def _plan_settlement_graph(graph: SparseSettlementGraph) -> _GraphPlan:
             claimed.add(int(room.id))
             try:
                 old_coordinate = (int(room.xyz[0]), int(room.xyz[1]))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # observability: ignore R2: a room without readable coordinates has no old binding to remap; the plan continues
                 old_coordinate = None
             if old_coordinate is not None and old_coordinate != node.coordinate:
                 plan.remapped_coordinates[old_coordinate] = node.coordinate
@@ -776,14 +776,22 @@ def _invalidate_plan_caches(plans, characters=()) -> None:
     again by the caller.
     """
 
-    for character in characters:
-        for handler_name in ("attributes",):
-            reset = getattr(getattr(character, handler_name, None), "reset_cache", None)
-            if reset is not None:
-                try:
-                    reset()
-                except Exception:  # observability: ignore R2: handler cache reset is best-effort after rollback
-                    continue
+    for character, snapshot in characters:
+        # Restore the journalled value first: a rolled-back transaction may
+        # still leave the handler cache reading a newer record, and this is
+        # the same pre-cutover value the rollback restored durably.
+        try:
+            from world.rules.map_knowledge import KNOWLEDGE_ATTR
+
+            character.attributes.add(KNOWLEDGE_ATTR, snapshot)
+        except Exception:  # observability: ignore R2: restoring the pre-cutover snapshot is best-effort after rollback
+            pass
+        reset = getattr(getattr(character, "attributes", None), "reset_cache", None)
+        if reset is not None:
+            try:
+                reset()
+            except Exception:  # observability: ignore R2: handler cache reset is best-effort after rollback
+                continue
     for plan in plans:
         objects = [
             *(binding.room for binding in plan.nodes if binding.room is not None),
