@@ -125,6 +125,13 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZR
     # explicit call-site / map-option override can still supersede.
     map_display = False
 
+    # The stable authored identity of this node in its sparse settlement graph
+    # (implement-sparse-settlement-graphs). Coordinates are a mutable binding;
+    # this value is what the synchronizer matches on, so a coordinate move
+    # keeps the room, its occupants and every object reference intact.
+    # ``autocreate=False`` keeps an identity read non-mutating.
+    sparse_node_id: str | None = AttributeProperty(default=None, autocreate=False)
+
     def at_object_receive(self, obj, source_location, move_type="move", **kwargs):
         super().at_object_receive(obj, source_location, move_type=move_type, **kwargs)
         from typeclasses.characters import PlayerCharacter

@@ -19,7 +19,24 @@ from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
 from evennia.utils import ansi, list_to_string
 from evennia.utils.utils import delay
 
-PathData = namedtuple("PathData", ("target", "xymap", "directions", "step_sequence", "task"))
+from world.maps.map_data import settlement_graph
+from world.maps.sparse_graph import graph_from_xymap
+
+PathData = namedtuple("PathData", ("target", "graph", "directions", "legs", "task"))
+
+
+def _route_graph(z_map_key):
+    """Return the declared sparse graph, else adapt the live contrib map.
+
+    Synthetic/builder maps still arrive through the xyzgrid contrib; the
+    transient adapter gives them the same route contract without making the
+    ASCII lattice the routing authority for declared settlements.
+    """
+
+    graph = settlement_graph(z_map_key)
+    if graph is not None:
+        return graph
+    return graph_from_xymap(get_xyzgrid().get_map(z_map_key))
 
 
 class CmdGoto(_CmdGoto):
@@ -68,7 +85,6 @@ class CmdGoto(_CmdGoto):
             caller.msg("已清除前往路徑。")
             return
 
-        xyzgrid = get_xyzgrid()
         try:
             xyz_start = caller.location.xyz
         except AttributeError:
@@ -90,10 +106,14 @@ class CmdGoto(_CmdGoto):
             self.caller.msg("目標地點不在網格上，無法自動移動過去。")
             return
 
-        xymap = xyzgrid.get_map(xyz_start[2])
+        graph = _route_graph(xyz_start[2])
+        if graph is None:
+            self.caller.msg("目前位置不在已宣告的聚落圖上，無法計算路徑。")
+            return
         xy_start = xyz_start[:2]
         xy_end = xyz_end[:2]
-        directions, step_sequence = xymap.get_shortest_path(xy_start, xy_end)
+        legs = list(graph.plan_between_coordinates(xy_start, xy_end))
+        directions = [leg.direction for leg in legs]
 
         caller.msg(
             f"前往 {target.get_display_name(caller)} 共有 {len(directions)} 步："
@@ -104,9 +124,9 @@ class CmdGoto(_CmdGoto):
             caller,
             self.session,
             target=target,
-            xymap=xymap,
+            graph=graph,
             directions=directions,
-            step_sequence=step_sequence,
+            legs=legs,
             step=goto_mode,
         )
 
@@ -115,9 +135,9 @@ class CmdGoto(_CmdGoto):
         caller,
         session,
         target=None,
-        xymap=None,
+        graph=None,
         directions=None,
-        step_sequence=None,
+        legs=None,
         step=True,
     ):
         """上游自動移動（zh-tw 訊息；配合「前往」/「goto」/「path」語意）。"""
@@ -128,25 +148,25 @@ class CmdGoto(_CmdGoto):
                 path_data.task.cancel()
             path_data = caller.ndb.xy_path_data = PathData(
                 target=target,
-                xymap=xymap,
+                graph=graph,
                 directions=directions,
-                step_sequence=step_sequence,
+                legs=legs,
                 task=None,
             )
 
         if step and path_data:
-            step_sequence = path_data.step_sequence
+            legs = path_data.legs
+            graph = path_data.graph
 
             try:
-                direction = path_data.directions.pop(0)
-                current_node = path_data.step_sequence.pop(0)
-                first_link = path_data.step_sequence.pop(0)
+                leg = legs.pop(0)
+                path_data.directions.pop(0)
             except IndexError:
                 caller.msg("已到達目標。", session=session)
                 caller.ndb.xy_path_data = None
                 return
 
-            expected_xyz = (current_node.X, current_node.Y, current_node.Z)
+            expected_xyz = (leg.source.x, leg.source.y, graph.map_id)
             location = caller.location
             try:
                 xyz_start = location.xyz
@@ -172,12 +192,12 @@ class CmdGoto(_CmdGoto):
 
                 xy_start = xyz_start[:2]
                 xy_end = xyz_end[:2]
-                directions, step_sequence = path_data.xymap.get_shortest_path(xy_start, xy_end)
+                legs = list(graph.plan_between_coordinates(xy_start, xy_end))
+                directions = [step.direction for step in legs]
 
                 try:
-                    direction = directions.pop(0)
-                    current_node = step_sequence.pop(0)
-                    first_link = step_sequence.pop(0)
+                    leg = legs.pop(0)
+                    directions.pop(0)
                 except IndexError:
                     caller.msg("已到達目標。", session=session)
                     caller.ndb.xy_path_data = None
@@ -185,51 +205,26 @@ class CmdGoto(_CmdGoto):
 
                 path_data = caller.ndb.xy_path_data = PathData(
                     target=path_data.target,
-                    xymap=path_data.xymap,
+                    graph=graph,
                     directions=directions,
-                    step_sequence=step_sequence,
+                    legs=legs,
                     task=None,
                 )
 
-            interrupt_node_or_link = None
-
-            while step_sequence:
-                if not interrupt_node_or_link and step_sequence[0].interrupt_path:
-                    interrupt_node_or_link = step_sequence[0]
-                if hasattr(step_sequence[0], "node_index"):
-                    break
-                step_sequence.pop(0)
-
-            exit_name, *_ = first_link.spawn_aliases.get(
-                direction, current_node.direction_spawn_defaults.get(direction, ("unknown",))
-            )
-
+            exit_name = leg.exit_key
             exit_obj = caller.search(exit_name)
             if not exit_obj:
                 caller.msg(f"目前位置找不到出口 '{exit_name}'。前往已中止。")
                 caller.ndb.xy_path_data = None
                 return
 
-            if interrupt_node_or_link:
-                if hasattr(interrupt_node_or_link, "node_index"):
-                    message = exit_obj.destination.attributes.get(
-                        "xyz_path_interrupt_msg", default=self.default_xyz_path_interrupt_msg
-                    )
-                    caller.execute_cmd(exit_name, session=session)
-                else:
-                    message = exit_obj.attributes.get(
-                        "xyz_path_interrupt_msg", default=self.default_xyz_path_interrupt_msg
-                    )
-                caller.msg(message)
-                return
-
             caller.execute_cmd(exit_name, session=session)
 
             caller.ndb.xy_path_data = PathData(
                 target=path_data.target,
-                xymap=path_data.xymap,
+                graph=path_data.graph,
                 directions=path_data.directions,
-                step_sequence=path_data.step_sequence,
+                legs=path_data.legs,
                 task=delay(self.auto_step_delay, self._auto_step, caller, session),
             )
 

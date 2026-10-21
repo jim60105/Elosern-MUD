@@ -20,7 +20,7 @@ from world.lore.monster_species import (
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.registry_refs import ref, ref_many
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
-from world.maps.map_data import XYMAP_DATA_LIST
+from world.maps.map_data import KNOWN_GRID_MAP_KEYS
 
 
 class QuestType(StrEnum):
@@ -100,12 +100,6 @@ MAX_ROLE_REF_LENGTH = 64
 #: contain at least one, so an ASCII placeholder cannot masquerade as zh-TW text.
 _CJK_START = "\u4e00"
 _CJK_END = "\u9fff"
-
-
-KNOWN_GRID_MAP_KEYS: frozenset[str] = frozenset(
-    map_data["zcoord"]
-    for map_data in XYMAP_DATA_LIST
-)
 
 
 @dataclass(frozen=True)
