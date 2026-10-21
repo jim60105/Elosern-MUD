@@ -75,8 +75,8 @@ class NodeIDGrammarTests(_RegisteredVocabularyTests):
             "grid:other:2:0",  # unregistered z-map-key
             f"grid:{self.map}:-1:0",  # negative coordinate
             "wild:other:1:2",  # unregistered wilderness name
-            f"wild:{self.wild}:224:0",  # x beyond WILDERNESS_MAX_X
-            f"wild:{self.wild}:0:224",  # y beyond WILDERNESS_MAX_Y
+            f"wild:{self.wild}:2700:0",  # x beyond WILDERNESS_MAX_X
+            f"wild:{self.wild}:0:2700",  # y beyond WILDERNESS_MAX_Y
             f"wild:{self.wild}:1:2:3",  # extra component
             "room:0",  # zero dbref
             "room:-5",

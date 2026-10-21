@@ -33,16 +33,12 @@ from world.rules.party import (
 )
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Integrated physical durations: the east-gate approach is 13,500 s at 1.25
-#: m/s plus the remainder at the light-stage 1.125 m/s = 22,501 s, and one
-#: 10 km open-ground wilderness step is 12,000 s (no threshold crossed).
-EAST_GATE_SECONDS = 22501
-WILDERNESS_STEP_SECONDS = 12000
-#: The same open-ground step after a gate approach: the party starts light
-#: (179,992 units), so 4,499 s at 0.75 m/s covers 3,374.25 m, 9,000 s at
-#: 0.625 m/s covers 5,625 m, and the last 1,000.75 m at 5/12 m/s needs
-#: 2,401.8 s; the exact 15,900.8 s total rounds once to 15,901 s.
-STEP_SECONDS_AFTER_GATE = 15901
+#: Integrated physical durations: the east-gate approach is 1,012.72 m at
+#: 1.25 m/s = 811 s, and one 1 km open-ground wilderness step is 1,200 s.
+#: The approach is far too short to cross a fatigue threshold, so the
+#: following step keeps the same ordinary duration.
+EAST_GATE_SECONDS = 811
+WILDERNESS_STEP_SECONDS = 1200
 
 
 def _east_gate_probe():
@@ -386,7 +382,7 @@ class WildernessFollowTests(EvenniaTest):
         self._exit("east").at_traverse(self.char1, self.char1.location)
         self.assertEqual(self.char1.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
         self.assertEqual(companion.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
-        self.assertEqual(self._tick(), before + STEP_SECONDS_AFTER_GATE)
+        self.assertEqual(self._tick(), before + WILDERNESS_STEP_SECONDS)
 
     @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")

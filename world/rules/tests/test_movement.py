@@ -50,7 +50,7 @@ _FLIGHT_KEY = "flight"
 
 #: One cardinal 10 km wilderness step over the deterministic western hills
 #: terrain (open ground, 3 km/h) = 10,000 m / 3,000 m·h⁻¹ · 3600 = 12,000 s.
-WILDERNESS_STEP_SECONDS = 12000
+WILDERNESS_STEP_SECONDS = 1200
 
 
 def wilderness_rooms(source_xy=(60, 60), destination_xy=(61, 60)):

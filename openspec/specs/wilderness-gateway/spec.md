@@ -11,28 +11,29 @@ provisioning wired into server startup.
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
 `world/lore/wilderness_entry.py` SHALL define the frozen `WildernessGate` and
-`WildernessEntryPoint` dataclasses and a module-level
-`WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`, and SHALL expose the derived
-pure helpers `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the single geometry
-source for all consumers.
+`WildernessEntryPoint` dataclasses and `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`,
+exposing `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the geometry source. A
+point-shape entry's approach cell IS its anchor; only its `return_direction` is a gateway. `grid_xy`
+stays logical; `activate-metric-settlements` owns the meter cutover, and entrance geometry comes
+from the sparse graph.
 
 #### Scenario: The registry has exactly one v2 entry after this change
 <!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
      scenario. The "exactly one" wording is historical; the assertion below is the current
      two-entry state. -->
 - **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
-- **THEN** it contains exactly two entries; the `"capital_altoria"` entry has a 5×5 mask of `#`,
-  `origin_xy` `(58, 98)`, and gates exactly `("n" → (3,0)), ("w" → (6,3))` on map
-  `capital_altoria`; the `"village_ciaran"` entry has a smaller mask and one gate returning to
-  the village's entrance node; and no test asserts that any other `ANCHOR_PLACEMENT_REGISTRY`
-  key must also appear
+- **THEN** it contains exactly two entries; the `"capital_altoria"` entry has a 7×9 mask with 40
+  `#` cells, `origin_xy` `(857, 1076)`, and gates exactly `("n" → (3,0)), ("w" → (6,3))` on map
+  `capital_altoria`; the `"village_ciaran"` entry is a point shape at `(1340, 1220)` with one gate
+  returning to the village's entrance node; and no test asserts that any other
+  `ANCHOR_PLACEMENT_REGISTRY` key must also appear
 
 #### Scenario: Derived geometry matches the authored mask
 - **WHEN** `footprint_cells`, `anchor_cell`, and `approach_cell` are read for the
   `"capital_altoria"` entry
-- **THEN** `footprint_cells` is the 25-cell set `58 <= x <= 62 and 98 <= y <= 102`, `anchor_cell`
-  is `(60, 100)`, the `"n"` gate's approach cell is `(60, 97)`, and the `"w"` gate's approach
-  cell is `(63, 100)`
+- **THEN** `footprint_cells` is the authored 40-cell mask at origin `(857, 1076)`, `anchor_cell`
+  is `(860, 1080)`, the `"n"` gate's approach cell is `(860, 1077)`, and the `"w"` gate's approach
+  cell is `(864, 1080)`
 
 #### Scenario: Gate identity is globally unique
 
@@ -73,8 +74,9 @@ source for all consumers.
 
 #### Scenario: Point-shape anchor opens every direction to its gate
 - **WHEN** an entry has exactly one `#` cell
-- **THEN** it is a point-shape anchor that owns no footprint cells and every direction at its
-  anchor cell is a gateway to its single registered gate
+- **THEN** it is a point-shape anchor that owns no footprint cells, and only the single gate's
+  authored `return_direction` at its anchor cell is a gateway; every other direction follows
+  ordinary provider validity and resolves as an ordinary wilderness step
 
 #### Scenario: Footprint-anchor gates are reachable only at their approach cells
 - **WHEN** an entry has more than one `#` cell
@@ -98,11 +100,11 @@ source for all consumers.
 
 #### Scenario: Currently shipped registry contents
 - **WHEN** the registry's current authored contents are inspected
-- **THEN** it holds two entries: `"capital_altoria"`, a 5×5 all-`#` mask at origin `(58, 98)`
-  (anchor cell `(60, 100)`) with gates `return_direction="n"` → `(3, 0, "capital_altoria")`
-  (approach cell `(60, 97)`) and `return_direction="w"` → `(6, 3, "capital_altoria")`
-  (approach cell `(63, 100)`); and `"village_ciaran"`, a smaller mask placed well clear of the
-  capital's footprint, with a single gate returning to the village's entrance node
+- **THEN** it holds two entries: `"capital_altoria"`, a 7×9 mask with 40 `#` cells at origin
+  `(857, 1076)` (anchor cell `(860, 1080)`) with gates `return_direction="n"` →
+  `(3, 0, "capital_altoria")` (approach cell `(860, 1077)`) and `return_direction="w"` →
+  `(6, 3, "capital_altoria")` (approach cell `(864, 1080)`); and `"village_ciaran"`, a point
+  entrance at `(1340, 1220)` with a single gate returning to the village's entrance node
 
 #### Scenario: Anchor cell uses bounding-box midpoint floor division
 - **WHEN** `anchor_cell` is computed
@@ -115,23 +117,23 @@ source for all consumers.
   overlaps another entry's footprint
 
 ### Requirement: WildernessGateExit moves a traversing object from a grid room into the wilderness
-`typeclasses.exits.py::WildernessGateExit`, an ordinary `Exit`, SHALL fully override `at_traverse`
-to call `evennia.contrib.grid.wilderness.wilderness.enter_wilderness(traversing_object,
-coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
-name=WILDERNESS_NAME)` instead of moving to a fixed `destination`, where `<its anchor_key>` is
-read from `self.db.anchor_key` and `<its gate>` is the registered gate whose `return_direction`
-equals `self.db.gate_direction`.
+`typeclasses.exits.py::WildernessGateExit` SHALL fully override `at_traverse` to call
+`evennia.contrib.grid.wilderness.wilderness.enter_wilderness(traversing_object,
+coordinates=WILDERNESS_ENTRY_REGISTRY[<anchor_key>].approach_cell(<gate>), name=WILDERNESS_NAME)`
+instead of moving to a fixed `destination`, where `<anchor_key>` is `self.db.anchor_key` and
+`<gate>` is the gate whose `return_direction` equals `self.db.gate_direction`; point-shape entries
+land on their anchor cell.
 
 #### Scenario: Traversing a gate exit places the object at that gate's approach cell
 - **WHEN** a character traverses a `WildernessGateExit` configured for
   `("capital_altoria", gate facing 南門)`
 - **THEN** the character's new location is a `TerrainRoom` whose `.coordinates` equals the `"n"`
-  gate's `approach_cell` `(60, 97)` (the cell outside the footprint, never a footprint cell), and
+  gate's `approach_cell` `(860, 1077)` (the cell outside the footprint, never a footprint cell), and
   its map-knowledge record contains the corresponding `wild:elosern:<x>:<y>` node
 
 #### Scenario: Traversing the other gate lands at the other gate's approach cell
-- **WHEN** a character traverses the `WildernessGateExit` provisioned on the North Gate room
-- **THEN** the arrival coordinates equal the `"s"` gate's `approach_cell` `(60, 103)`,
+- **WHEN** a character traverses the `WildernessGateExit` provisioned on the East Gate room
+- **THEN** the arrival coordinates equal the `"w"` gate's `approach_cell` `(864, 1080)`,
   independent of which gate was used before
 
 #### Scenario: A successful traversal advances the world clock by the wilderness_move cost
@@ -199,26 +201,26 @@ equals `self.db.gate_direction`.
 ### Requirement: WildernessReturnExit routes every registered approach-cell-and-direction pair back to the grid
 `typeclasses.exits.py::WildernessReturnExit`, subclassing the stock
 `evennia.contrib.grid.wilderness.wilderness.WildernessExit`, SHALL be
-`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — recognized through one shared
-registry helper, true if and only if the traverser's current coordinates equal some entry's
-`approach_cell(gate)` and the exit's direction equals that gate's `return_direction` — SHALL
-move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`.
+`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — one shared registry helper's match
+on `approach_cell(gate)` and that gate's `return_direction` — SHALL move the traverser to the
+`GridRoom` at the gate's `grid_xy`/`z_map_key`. `grid_xy` is logical until
+`activate-metric-settlements` performs the meter cutover.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
-- **WHEN** a character at `(60, 97)` traverses the `"north"` exit
+- **WHEN** a character at `(860, 1077)` traverses the `"north"` exit
 - **THEN** the character's new location is the `capital_altoria` 南門 `GridRoom` object at grid
   `(3, 0, "capital_altoria")`
 
 #### Scenario: Traversing south from the north approach cell returns through the north gate
 <!-- Scenario name retained verbatim: a MODIFIED block may not rename a scenario. The capital's
      second gate is now the East Gate, approached from the east and entered travelling west. -->
-- **WHEN** a character at `(63, 100)` traverses the `"west"` exit
+- **WHEN** a character at `(864, 1080)` traverses the `"west"` exit
 - **THEN** the character's new location is the `capital_altoria` East Gate `GridRoom` object at
   grid `(6, 3, "capital_altoria")` (the same object instance that existed before the character
   first entered the wilderness through it)
 
 #### Scenario: The return direction at the wrong approach cell is not a gateway
-- **WHEN** a character at `(60, 97)` traverses `"south"`, or a character at `(63, 100)` traverses
+- **WHEN** a character at `(860, 1077)` traverses `"south"`, or a character at `(864, 1080)` traverses
   `"east"`
 - **THEN** the traversal routes like the stock `WildernessExit` (ordinary coordinate movement to
   the provider-valid neighbor), reaching no grid room
@@ -452,10 +454,11 @@ The wilderness traversal context SHALL remain distinct for the existing flight w
   read each other's constant; the amended scenario above asserts exactly that
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
-`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
-DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL
-run it before mirroring, so malformed authored data fails at startup rather than producing an
-unwalkable or contradictory world. The shipped registry SHALL pass validation.
+`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()`, a pure DB-free
+check of the whole registry, and `world/lore/sync.py`'s mirror step SHALL run it before mirroring,
+so malformed data fails at startup instead of producing an unwalkable world. It uses the provider's
+shared walkability rule — frame, mainland, passable terrain, footprint exclusion — so no authored
+footprint or approach names impassable ground. The shipped registry SHALL pass.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped
@@ -485,11 +488,12 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
 #### Scenario: Per-entry rejection conditions
 - **WHEN** `validate_wilderness_entries()` checks an entry
 - **THEN** it SHALL reject: an empty mask or one with no `#`; any `#` cell outside the
-  provider's valid rectangle; a footprint whose `#` cells are not 4-connected; a
+  provider's frame or on impassable terrain; a footprint whose `#` cells are not 4-connected; a
   `return_direction` that is not a canonical wilderness direction or is duplicated within one
   entry; a footprint-entry gate whose approach-cell ray from `anchor_cell` crosses no footprint
-  cell or whose approach cell is not a provider-valid cell outside the footprint; a point-shape
-  entry with any number of gates other than exactly one; a `grid_xy` outside the extent of the
+  cell or whose approach cell is not a walkable cell outside the footprint; a point-shape
+  entry with any number of gates other than exactly one, or whose anchor cell or authored
+  entry-direction neighbour is not walkable; a `grid_xy` outside the extent of the
   map named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`
 
 #### Scenario: Mask shape and anchor cell well-formedness
@@ -508,5 +512,21 @@ unwalkable or contradictory world. The shipped registry SHALL pass validation.
 
 #### Scenario: Point-shape anchors need all neighbors provider-valid
 - **WHEN** a point-shape entry is validated
-- **THEN** its anchor cell SHALL have all eight wilderness neighbors provider-valid, so a
-  gateway is never advertised toward a cell the provider cannot honor
+- **THEN** its anchor cell and the neighbor its authored `return_direction` leads to SHALL be
+  provider-valid walkable terrain; the other seven neighbors follow ordinary terrain validity, so a
+  coastal cave may be authored next to water
+
+### Requirement: Physical footprints and concealed point entries preserve approaches
+Urban routing masks SHALL rasterize authored irregular physical footprints. Capital south/east gates SHALL retain facing and exact transformed entrance geometry with exterior approaches outside the mask. Ciaran SHALL be a hidden point entrance without a village-wide wilderness obstacle.
+
+#### Scenario: Capital mask and approaches
+- **WHEN** capital geometry is rasterized at 1km scale
+- **THEN** the approximately 40km² physical city controls the irregular mask rather than old 5x5 cells; south/east approaches lie outside it and crossing geometry charges once.
+
+#### Scenario: Point direction does not hijack routes
+- **WHEN** a traveller selects an unrelated neighboring direction at Ciaran’s entry cell
+- **THEN** ordinary wilderness movement remains ordinary; only the authored eligible entrance direction resolves to the hidden path and unknown players receive no village disclosure.
+
+#### Scenario: Point entry validation follows ordinary terrain validity
+- **WHEN** a point-shape entry is validated
+- **THEN** its anchor cell and the cell its authored entry direction leads to SHALL be provider-valid walkable terrain; unrelated directions follow ordinary terrain validity.

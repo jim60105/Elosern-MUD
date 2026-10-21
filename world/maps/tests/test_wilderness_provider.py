@@ -1,5 +1,8 @@
-"""Tests for the deterministic terrain model and bounded map provider (map-wilderness,
-wilderness-anchor-footprint)."""
+"""Data-contract test: authored continental terrain, waterway and anchor-region data contract
+
+Mechanics (purity, bound validity, pooled-room preparation and gate locks) live
+here beside the authored geography rows they must agree with
+(map-wilderness, wilderness-anchor-footprint, rescale-wilderness-geography)."""
 
 from tools.spec_traceability import covers_requirement
 
@@ -20,11 +23,20 @@ from world.maps.room_art import (
 )
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
+    REGION_SEARCH_BOXES,
+    RIDGE_PASSES,
+    WILDERNESS_NAME,
+    _rasterize_routes,
+    WATERWAY_FORDS,
     WILDERNESS_KM_PER_CELL,
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
-    WILDERNESS_NAME,
     ElosernWildernessMapProvider,
+    _ridge_center_x,
+    is_closed_ridge_cell,
+    is_inland_water_cell,
+    is_land_cell,
+    is_valid_wilderness_cell,
     region_for_coordinates,
     terrain_description,
 )
@@ -32,6 +44,16 @@ from world.tests.synthetic_data import (
     SYNTH_WILDERNESS_ENTRIES,
     synthetic_registries,
 )
+
+#: Land-side walkable cells used by the mechanics tests. They are file-local
+#: fixtures (not shipped content): one in Altoria's river valley, one on the
+#: southern coast, and one on the eastern plain.
+LAND_A = (500, 700)
+LAND_B = (1000, 900)
+LAND_C = (2000, 1000)
+SEA_MARGIN = (0, 0)
+FRAME_CORNER = (WILDERNESS_MAX_X, WILDERNESS_MAX_Y)
+
 
 #: Live-catalog resolvers read the registries through attribute strings
 #: assembled at call time, so this file never names a shipped catalog symbol
@@ -77,49 +99,148 @@ EAST_APPROACH = live_anchor_entry().approach_cell(live_anchor_entry().gate_for("
 
 class TerrainModelTests(unittest.TestCase):
     def test_functions_are_pure(self):
-        for x, y in ((0, 0), EAST_APPROACH, (123, 189), (223, 223)):
-            self.assertEqual(region_for_coordinates(x, y), region_for_coordinates(x, y))
-            self.assertEqual(terrain_description(x, y), terrain_description(x, y))
+        for cell in ((0, 0), EAST_APPROACH, (1410, 980), LAND_A, (2699, 2699)):
+            self.assertEqual(region_for_coordinates(*cell), region_for_coordinates(*cell))
+            self.assertEqual(terrain_description(*cell), terrain_description(*cell))
 
+    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
     def test_every_registered_region_key_is_reachable(self):
-        reached = set()
-        for x in range(WILDERNESS_MAX_X + 1):
-            for y in range(WILDERNESS_MAX_Y + 1):
-                reached.add(region_for_coordinates(x, y))
+        # A coarse stride over the whole frame plus the frame edges: every
+        # region is hundreds of kilometres across, so a 60-cell lattice cannot
+        # miss one, and the check stays a bounded local lookup test rather
+        # than a 7.29-million-cell sweep.
+        reached = {
+            region_for_coordinates(x, y)
+            for x in range(0, WILDERNESS_MAX_X + 1, 60)
+            for y in range(0, WILDERNESS_MAX_Y + 1, 60)
+        }
+        reached |= {
+            region_for_coordinates(0, 0),
+            region_for_coordinates(WILDERNESS_MAX_X, 0),
+            region_for_coordinates(0, WILDERNESS_MAX_Y),
+            region_for_coordinates(WILDERNESS_MAX_X, WILDERNESS_MAX_Y),
+        }
         self.assertEqual(reached, set(live_region_registry()))
 
     @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
-    def test_central_mountain_band_spans_full_y(self):
-        # The band's x-range is the partition's own geometry constant; the
-        # behavior claim is stability (one key across the full y range) and
-        # separation (adjacent columns outside the band resolve elsewhere).
-        import world.maps.wilderness_provider as provider_module
-
-        band_low, band_high = getattr(provider_module, "_MOUNTAIN_X")
-        band_key = region_for_coordinates((band_low + band_high) // 2, 0)
-        self.assertIn(band_key, live_region_registry())
-        for x in (band_low, band_high):
-            for y in (0, 149, 189):
-                self.assertEqual(region_for_coordinates(x, y), band_key)
-        self.assertNotEqual(region_for_coordinates(band_low - 1, 0), band_key)
-        self.assertNotEqual(region_for_coordinates(band_high + 1, 0), band_key)
+    def test_central_mountain_region_bends_with_the_authored_corridor(self):
+        # The corridor follows the bending summit centre; it is neither a fixed
+        # rectangular band nor a continuous summit wall (the pass windows below
+        # are open ground).
+        for y in (150, 700, 1200, 2100):
+            centre = _ridge_center_x(y)
+            self.assertEqual(region_for_coordinates(centre, y), "central_mountains")
+            self.assertNotEqual(
+                region_for_coordinates(centre - 300, y), "central_mountains"
+            )
+            self.assertNotEqual(
+                region_for_coordinates(centre + 300, y), "central_mountains"
+            )
+        self.assertNotEqual(_ridge_center_x(100), _ridge_center_x(1200))
 
     @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
-    def test_settlement_derived_anchor_cells_resolve_to_one_region(self):
+    def test_settlement_derived_anchor_cells_resolve_to_altoria_territory(self):
         entry = live_anchor_entry()
         cells = {entry.anchor_cell} | {
             entry.approach_cell(gate) for gate in entry.gates
         }
         self.assertEqual(cells, {CAPITAL_ANCHOR, SOUTH_APPROACH, EAST_APPROACH})
-        regions = {region_for_coordinates(x, y) for x, y in cells}
-        # The settlement sits in one region, and that region is a registry row.
-        self.assertEqual(len(regions), 1)
-        self.assertIn(next(iter(regions)), live_region_registry())
+        # Delta scenario: Altoria's anchor and both gate approaches are the
+        # western hills and valleys (the signed anchor relationships).
+        for cell in cells:
+            self.assertEqual(region_for_coordinates(*cell), "western_hills_valleys")
+
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    def test_anchor_centres_resolve_their_authored_terrain(self):
+        # Region keys are the terrain layer; nominal claims stay in
+        # ``world.lore.nations``. The authored anchor relationships pin which
+        # terrain each canonical anchor cell belongs to.
+        from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+
+        expected = {
+            "capital_altoria": "western_hills_valleys",
+            "capital_valhalla": "northwest_highland_forest",
+            "capital_grandia": "eastern_plains",
+            "village_ciaran": "central_mountains",
+            "village_fionnen": "central_mountains",
+            "village_eolas": "central_mountains",
+        }
+        for anchor_key, region_key in expected.items():
+            cell = ANCHOR_GEOGRAPHY_REGISTRY[anchor_key].cell
+            self.assertEqual(region_for_coordinates(*cell), region_key, anchor_key)
+
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    def test_principal_pass_is_open_mountain_trail_and_ridge_blocks_elsewhere(self):
+        from world.rules.travel_cost import WILDERNESS_TERRAIN, terrain_speed_m_per_hour
+
+        # The principal pass near (1410, 980) is open ground in the mountain
+        # region, costed as mountain trail: an explicit slower crossing, never
+        # an all-road shortcut.
+        self.assertIn(980, range(*RIDGE_PASSES[1]))
+        self.assertFalse(is_closed_ridge_cell((1410, 980)))
+        self.assertEqual(region_for_coordinates(1410, 980), "central_mountains")
+        mountain = terrain_speed_m_per_hour(WILDERNESS_TERRAIN["central_mountains"])
+        self.assertLess(mountain, terrain_speed_m_per_hour("road"))
+        # Away from an authored pass the summit ridge is a closed cliff wall.
+        self.assertTrue(is_closed_ridge_cell((_ridge_center_x(1200), 1200)))
+
+    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
+    def test_rivers_are_authored_water_with_declared_fords(self):
+        from world.maps.wilderness_provider import WATERWAY_ROUTES
+
+        # Every ford lies on its own river, and every river starts and ends on
+        # the coastal region it drains into (capital river -> southwest coast;
+        # imperial rivers -> southeast coast).
+        raster = _rasterize_routes(WATERWAY_ROUTES)
+        for name, fords in WATERWAY_FORDS.items():
+            for ford in fords:
+                # The ford is on its authored river before the exemption is
+                # subtracted, so a typo cannot silently remove a crossing.
+                self.assertIn(ford, raster, name)
+                self.assertFalse(is_inland_water_cell(ford), name)
+                self.assertTrue(is_land_cell(ford), name)
+        capital = WATERWAY_ROUTES["capital_river"]
+        self.assertEqual(region_for_coordinates(*capital[-1]), "southwest_coast")
+        for name in ("imperial_river", "imperial_east_branch"):
+            self.assertEqual(
+                region_for_coordinates(*WATERWAY_ROUTES[name][-1]), "southeast_coast"
+            )
+        # A river cell is impassable water; its declared ford is ordinary land.
+        river_cell = (900, 1042)
+        self.assertTrue(is_inland_water_cell(river_cell))
+        self.assertFalse(is_valid_wilderness_cell(river_cell))
+        self.assertFalse(is_inland_water_cell(WATERWAY_FORDS["capital_river"][0]))
+        self.assertTrue(is_valid_wilderness_cell(WATERWAY_FORDS["capital_river"][0]))
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_region_search_windows_cover_their_region(self):
+        # Sparse-index consumers enumerate only the region window, so every
+        # cell the classifier assigns to a region must lie inside its window.
+        probes = [
+            (x, y)
+            for x in range(0, WILDERNESS_MAX_X + 1, 60)
+            for y in range(0, WILDERNESS_MAX_Y + 1, 60)
+        ] + [
+            (x, y)
+            for y in range(0, 2200, 137)
+            for x in (
+                _ridge_center_x(y) - 100,
+                _ridge_center_x(y),
+                _ridge_center_x(y) + 100,
+            )
+        ]
+        for cell in probes:
+            region = region_for_coordinates(*cell)
+            x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region]
+            self.assertTrue(
+                x_min <= cell[0] <= x_max and y_min <= cell[1] <= y_max,
+                (region, cell, REGION_SEARCH_BOXES[region]),
+            )
 
     def test_description_always_matches_its_regions_variants(self):
-        for x, y in ((0, 0), EAST_APPROACH, (111, 50), (200, 200), (223, 223)):
-            region = live_region_registry()[region_for_coordinates(x, y)]
-            self.assertIn(terrain_description(x, y), region.terrain_flavor_zh)
+        for cell in (SEA_MARGIN, EAST_APPROACH, LAND_A, LAND_B, LAND_C, FRAME_CORNER):
+            region = live_region_registry()[region_for_coordinates(*cell)]
+            self.assertIn(terrain_description(*cell), region.terrain_flavor_zh)
 
     @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
     def test_terrain_description_at_east_gate_approach_follows_the_registry(self):
@@ -133,6 +254,15 @@ class TerrainModelTests(unittest.TestCase):
         self.assertIn(description, region.terrain_flavor_zh)
         self.assertEqual(description, terrain_description(*EAST_APPROACH))
         self.assertEqual(region_key, region_for_coordinates(*CAPITAL_ANCHOR))
+
+    @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
+    def test_description_formula_is_pinned_at_a_literal_coordinate(self):
+        # (860 * 92821 + 1080 * 68917) % 3 == 2 selects the third western-hills
+        # variant: the arithmetic constants and the flavor text are contract.
+        self.assertEqual(
+            terrain_description(860, 1080),
+            "低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。",
+        )
 
     def test_no_llm_or_random_dependency_in_source(self):
         source = inspect.getsource(__import__("world.maps.wilderness_provider"))
@@ -174,16 +304,72 @@ class MapProviderTests(EvenniaTest):
         except LockException:
             return False
 
-    def test_coordinate_bounds(self):
-        self.assertTrue(self.provider.is_valid_coordinates(None, (0, 0)))
-        self.assertTrue(self.provider.is_valid_coordinates(None, (223, 223)))
+    @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
+    def test_coordinate_frame_and_sea_margin(self):
+        # Delta scenario: outside the frame and the ocean margin are all
+        # invalid, while land-side ordinary cells are valid. Frame corners
+        # being in bounds never implies land validity.
+        self.assertTrue(self.provider.is_valid_coordinates(None, LAND_A))
         self.assertFalse(self.provider.is_valid_coordinates(None, (-1, 0)))
-        self.assertFalse(self.provider.is_valid_coordinates(None, (224, 0)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, (WILDERNESS_MAX_X + 1, 0)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, SEA_MARGIN))
+        self.assertFalse(self.provider.is_valid_coordinates(None, (2700, 0)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, FRAME_CORNER))
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_closed_ridge_and_water_are_impassable_with_authored_crossings(self):
+        # A summit-ridge cell away from every pass is refused; the pass cell is
+        # walked; a river cell is refused and its ford is walked.
+        self.assertFalse(
+            self.provider.is_valid_coordinates(None, (_ridge_center_x(1200), 1200))
+        )
+        self.assertTrue(self.provider.is_valid_coordinates(None, (1410, 980)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, (900, 1042)))
+        self.assertTrue(
+            self.provider.is_valid_coordinates(
+                None, WATERWAY_FORDS["capital_river"][0]
+            )
+        )
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_anchor_and_port_centres_are_land_side(self):
+        from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
+        from world.lore.wilderness_regions import HARBOR_SITE_REGISTRY
+
+        for anchor in ANCHOR_GEOGRAPHY_REGISTRY.values():
+            self.assertTrue(is_land_cell(anchor.cell), anchor.anchor_key)
+        for harbor in HARBOR_SITE_REGISTRY.values():
+            self.assertTrue(is_land_cell(harbor.cell), harbor.key)
+        # Declaration reveals nothing: no settlement map is invented for the
+        # seven unbuilt anchors.
+        self.assertLessEqual(
+            set(live_entry_registry()), set(ANCHOR_GEOGRAPHY_REGISTRY)
+        )
+
+    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
+    def test_validity_check_is_bounded_local_work(self):
+        # One validity answer costs one mainland solve plus constant-time
+        # ridge/water/footprint lookups -- never a frame scan or room
+        # materialization.
+        from world.maps import wilderness_provider as provider_module
+
+        original = provider_module.is_land_cell
+        calls = []
+
+        def counted(cell):
+            calls.append(cell)
+            return original(cell)
+
+        with patch.object(provider_module, "is_land_cell", counted):
+            for index in range(100):
+                provider_module.is_valid_wilderness_cell((LAND_A[0] + index, LAND_A[1]))
+        self.assertEqual(len(calls), 100)
+        self.assertEqual(TerrainRoom.objects.count(), 0)
 
     @covers_requirement("wilderness-map-provider::elosernwildernessmapprovider-bounds-the-map-to-a-224x224-grid-at-10-km-per-cell")
     def test_anchor_footprint_cells_are_invalid_and_approach_cells_are_valid(self):
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
-        self.assertFalse(self.provider.is_valid_coordinates(None, (58, 98)))
+        self.assertFalse(self.provider.is_valid_coordinates(None, (857, 1076)))
         self.assertTrue(self.provider.is_valid_coordinates(None, SOUTH_APPROACH))
         self.assertTrue(self.provider.is_valid_coordinates(None, EAST_APPROACH))
 
@@ -220,28 +406,30 @@ class MapProviderTests(EvenniaTest):
             SYNTH_WILDERNESS_ENTRIES["t_hollow_tarn"],
             anchor_key="t_rebound_block",
             shape=("##", "##"),
-            origin_xy=(150, 150),
+            origin_xy=(400, 400),
         )
         original = getattr(wilderness_entry_module, attribute)
         try:
             setattr(wilderness_entry_module, attribute, {block.anchor_key: block})
-            self.assertFalse(self.provider.is_valid_coordinates(None, (150, 150)))
+            self.assertFalse(self.provider.is_valid_coordinates(None, (400, 400)))
             self.assertTrue(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
         finally:
             setattr(wilderness_entry_module, attribute, original)
         self.assertFalse(self.provider.is_valid_coordinates(None, CAPITAL_ANCHOR))
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
-    def test_bound_area_matches_continent_size(self):
+    def test_frame_area_and_mainland_area_are_the_declared_contract(self):
+        from world.lore.wilderness_regions import mainland_area_km2
+
         side_km = (WILDERNESS_MAX_X + 1) * WILDERNESS_KM_PER_CELL
-        area = side_km * side_km
-        self.assertAlmostEqual(area, 5_000_000, delta=5_000_000 * 0.01)
+        self.assertEqual(side_km * side_km, 7_290_000)
+        self.assertEqual(mainland_area_km2(), 5_000_000)
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_get_location_name_matches_region_registry(self):
-        for x, y in (EAST_APPROACH, (111, 189), (200, 30), (0, 220)):
-            expected = live_region_registry()[region_for_coordinates(x, y)].display_name_zh
-            self.assertEqual(self.provider.get_location_name((x, y)), expected)
+        for cell in (EAST_APPROACH, LAND_A, LAND_B, LAND_C):
+            expected = live_region_registry()[region_for_coordinates(*cell)].display_name_zh
+            self.assertEqual(self.provider.get_location_name(cell), expected)
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_enter_wilderness_prepares_terrain_room(self):
@@ -282,10 +470,6 @@ class MapProviderTests(EvenniaTest):
     def test_at_prepare_room_is_population_noop_without_wilderness_script(self):
         from typeclasses.monsters import Monster
 
-        from world.maps.wilderness_provider import (
-            terrain_description as _terrain_description,
-        )
-
         room = create_object(TerrainRoom, key="scriptless")
         self.assertIsNone(room.wilderness)
         self.provider.at_prepare_room(EAST_APPROACH, None, room)
@@ -293,13 +477,13 @@ class MapProviderTests(EvenniaTest):
             room.scene_archetype,
             REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
         )
-        self.assertEqual(room.ndb.active_desc, _terrain_description(*EAST_APPROACH))
+        self.assertEqual(room.ndb.active_desc, terrain_description(*EAST_APPROACH))
         self.assertEqual(Monster.objects.all().count(), 0)
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_at_prepare_room_opens_exactly_the_gate_exit_at_an_approach_cell(self):
         room = self._eight_exits(create_object(TerrainRoom, key="approach-a"))
-        # Stock would close the north exit at (60, 97): its neighbor (60, 98)
+        # Stock would close the north exit at the south approach: its neighbor
         # is a footprint cell. Simulate that pre-state, then run the hook.
         for exit_obj in room.exits:
             exit_obj.locks.add("traverse:false();view:false()")
@@ -319,7 +503,7 @@ class MapProviderTests(EvenniaTest):
         room = self._eight_exits(create_object(TerrainRoom, key="approach-b"))
         for exit_obj in room.exits:
             exit_obj.locks.add("traverse:false();view:false()")
-        self.provider.at_prepare_room((200, 100), None, room)
+        self.provider.at_prepare_room(LAND_A, None, room)
         for exit_obj in room.exits:
             self.assertFalse(self._locks_allow(exit_obj, "traverse"))
 
@@ -334,19 +518,26 @@ class MapProviderTests(EvenniaTest):
         self.assertFalse(self._locks_allow(by_key[LONG_DIRECTIONS["n"]], "traverse"))
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
-    def test_a_point_shape_anchor_opens_all_eight_exits(self):
+    def test_a_point_shape_anchor_opens_only_its_authored_direction(self):
         # The kit's point-shaped t_split_cairn replaces the whole registry
         # inside the scope, so every approach lookup sees only the synthetic
-        # point anchor.
+        # point anchor. Only the authored gate direction becomes visible; an
+        # unrelated direction stays ordinary terrain validity and never
+        # hijacks a route.
         point = SYNTH_WILDERNESS_ENTRIES["t_split_cairn"]
+        authored = point.gates[0].return_direction
         room = self._eight_exits(create_object(TerrainRoom, key="point-anchor"))
         for exit_obj in room.exits:
             exit_obj.locks.add("traverse:false();view:false()")
         with synthetic_registries("wilderness_entries"):
             self.provider.at_prepare_room(point.anchor_cell, None, room)
-        for exit_obj in room.exits:
-            self.assertTrue(self._locks_allow(exit_obj, "traverse"))
-            self.assertTrue(self._locks_allow(exit_obj, "view"))
+        by_key = {exit_obj.key: exit_obj for exit_obj in room.exits}
+        self.assertTrue(self._locks_allow(by_key[LONG_DIRECTIONS[authored]], "traverse"))
+        self.assertTrue(self._locks_allow(by_key[LONG_DIRECTIONS[authored]], "view"))
+        for key, exit_obj in by_key.items():
+            if key == LONG_DIRECTIONS[authored]:
+                continue
+            self.assertFalse(self._locks_allow(exit_obj, "traverse"), key)
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_gate_lock_does_not_leak_when_the_pooled_room_moves(self):
@@ -360,12 +551,12 @@ class MapProviderTests(EvenniaTest):
         room_a = self.char1.location
         north = next(exit_obj for exit_obj in room_a.exits if exit_obj.key == "north")
         self.assertTrue(self._locks_allow(north, "traverse"))
-        # Re-activate the SAME pooled room at a non-approach cell whose north
-        # neighbor is provider-invalid (y = 223, the rect edge): the stock
-        # lock pass recomputes every self-loop exit's lock from validity and
-        # the hook adds nothing there -- the hook-opened north lock cannot
-        # survive the coordinate change.
-        room_a.set_active_coordinates((100, 223), self.char1)
+        # Re-activate the SAME pooled room at the principal pass cell, whose
+        # north neighbor is a closed ridge cell: the stock lock pass recomputes
+        # every self-loop exit's lock from validity and the hook adds nothing
+        # there -- the hook-opened north lock cannot survive the coordinate
+        # change.
+        room_a.set_active_coordinates((1400, 990), self.char1)
         self.assertFalse(self._locks_allow(north, "traverse"))
         self.assertFalse(self._locks_allow(north, "view"))
 
@@ -415,14 +606,14 @@ class MapProviderTests(EvenniaTest):
         script.db.unused_rooms.append(room_a)
         # Re-enter at a coordinate in a different region: the pooled room is
         # reused and must reflect the new region, never the stale first value.
-        enter_wilderness(self.char1, coordinates=(200, 100), name=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=LAND_C, name=WILDERNESS_NAME)
         self.assertIs(self.char1.location, room_a)
         self.assertEqual(
             self.char1.location.scene_archetype,
-            REGION_SCENE_ARCHETYPES[region_for_coordinates(200, 100)],
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*LAND_C)],
         )
         self.assertEqual(
-            self.char1.location.ndb.active_desc, terrain_description(200, 100)
+            self.char1.location.ndb.active_desc, terrain_description(*LAND_C)
         )
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
@@ -435,8 +626,8 @@ class MapProviderTests(EvenniaTest):
         self.provider.at_prepare_room(EAST_APPROACH, None, room)
         room.room_art_key = sorted(ROOM_ART_KEY_SET)[0]
         identity_a = room.scene_identity
-        # Equal archetypes, different coordinates: both cells are hills/plains.
-        coordinate_b = (200, 100)
+        # Equal archetypes, different coordinates: both cells are Altoria hills.
+        coordinate_b = (860, 1090)
         self.assertEqual(
             REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
             REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinate_b)],

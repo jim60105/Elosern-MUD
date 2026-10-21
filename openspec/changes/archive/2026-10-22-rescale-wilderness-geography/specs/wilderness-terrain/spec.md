@@ -32,12 +32,15 @@ random or wall-clock input, and SHALL return the same value for the same input o
 
 #### Scenario: The central mountain band spans the full valid Y range
 - **WHEN** the authored bending corridor is queried around X1310..1510 below northern forest
-- **THEN** mountain, foothill, valley and subsidiary-ridge geography is respected; it is never a continuous summit wall or full-frame rectangular band.
+- **THEN** mountain, foothill, valley and subsidiary-ridge geography is respected; it is never a
+  continuous summit wall or full-frame rectangular band. The region centre follows the authored
+  bend per row, the deep forest region starts at Y2200, and the closed summit ridge is a one-cell
+  cliff wall broken only at the authored passes.
 
 #### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
 - **WHEN** `region_for_coordinates` is called with the `"capital_altoria"` entry's derived
-  `anchor_cell` `the declared Altoria anchor cell` and with every gate's derived `approach_cell` (`the declared south approach cell` and
-  `the declared east approach cell`)
+  `anchor_cell` `(860, 1080)` and with every gate's derived `approach_cell` (`(860, 1077)` and
+  `(864, 1080)`)
 - **THEN** every call returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own
   statement that Altoria's territory is "西部丘陵、谷地與西南海岸"
 

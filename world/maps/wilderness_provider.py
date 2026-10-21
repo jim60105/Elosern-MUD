@@ -1,9 +1,25 @@
-"""Deterministic wilderness terrain model and map provider (map-wilderness)."""
+"""Deterministic wilderness terrain model and map provider (map-wilderness).
+
+The runtime wilderness is the virtual 2700 by 2700 one-kilometre frame declared
+by ``world.lore.wilderness_regions`` (world-map-scale design §5-§6): cells are
+logical areas, never materialized in bulk, and every validity/lookup query is
+bounded local work over integer arithmetic plus the ten-vertex mainland
+polygon. Sea, the cliff-walled central ridge and the authored inland waterways
+are impassable on foot; ordinary land outside those features is walkable.
+
+Terrain, political claim and actual control stay separate layers: this module
+returns a terrain region key, and ``world.lore.nations`` owns the nominal
+claims. Nothing here reads the database, a clock, or a random source.
+"""
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessMapProvider
 
 from typeclasses.rooms import TerrainRoom
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.lore.wilderness_regions import (
+    CONTINENT_FRAME_CELLS,
+    WILDERNESS_REGION_REGISTRY,
+    is_on_mainland,
+)
 from world.maps.room_art import (
     REGION_SCENE_ARCHETYPES,
     wilderness_scene_identity,
@@ -14,20 +30,92 @@ from world.maps.room_art import (
 # delta: registry patches change validity without patching the provider).
 from world.lore import wilderness_entry as _wilderness_entry_module
 
-# D-4: 10 km per wilderness cell, 224 cells per axis (0-indexed to 223).
-# 224 * 10 km = 2,240 km per side; 2,240^2 = 5,017,600 km^2, within 0.35% of the
-# stated ~5,000,000 km^2 continent area.
-WILDERNESS_KM_PER_CELL = 10
-WILDERNESS_MAX_X = 223
-WILDERNESS_MAX_Y = 223
+# One logical kilometre per wilderness cell over the declared 2700-cell frame
+# (0-indexed to 2699). The area inside the frame is ocean plus land; the
+# mainland polygon itself carries the 5,000,000 km² land target.
+WILDERNESS_KM_PER_CELL = 1
+WILDERNESS_MAX_X = CONTINENT_FRAME_CELLS - 1
+WILDERNESS_MAX_Y = CONTINENT_FRAME_CELLS - 1
 
 WILDERNESS_NAME = "elosern"
 
-# D-1: seven rectangular bounds, checked top-to-bottom.
-_MOUNTAIN_X = (100, 123)  # 24-column central band, full Y range
-_NORTH_FOREST_Y_MIN = 190  # top 34 rows, full X range -- checked first, dominates the mountain band
-_COASTAL_Y_MAX = 40  # southern strip, both sides of the mountains
-_HIGHLAND_Y_MIN = 150  # west side only, between the coast and the northern forest
+# The central mountain system (world-map-scale design §6): a bending
+# north-south corridor broadly around X 1310..1510 whose roughly 200 km width
+# includes foothills, valleys and subsidiary ridges. The summit ridge inside it
+# is a one-cell-wide cliff wall; only the authored passes below cross it.
+_MOUNTAIN_CORRIDOR_HALF_WIDTH = 100
+_MOUNTAIN_RIDGE_BASE_X = 1410
+_MOUNTAIN_RIDGE_PERIOD = 60
+_MOUNTAIN_RIDGE_STEP = 10
+_RIDGE_MIN_X = 1300
+_RIDGE_MAX_X = 1520
+# The ridge stops at the northern deep forest, whose ground is walkable.
+_RIDGE_NORTH_LIMIT_Y = 2200
+
+# Authored crossings of the summit ridge as inclusive Y windows: the principal
+# pass near (1410, 980), a southern high trail, and a northern trail. A crossing
+# is mountain trail ground (slower, supplies needed), never an all-road
+# shortcut; the centre cell of the principal pass is (1410, 980).
+RIDGE_PASSES: tuple[tuple[int, int], ...] = (
+    (410, 425),
+    (970, 990),
+    (1770, 1785),
+)
+
+# Terrain-region thresholds (authoring constraints from design §6): northern
+# deep forest begins broadly at Y 2200, the southern bulk-commerce corridor is
+# the coastal strip, and the northwest highland forest covers Valhalla's
+# highlands. Exact single-region boundaries are authoring discretion.
+_NORTH_FOREST_Y_MIN = 2200
+_COASTAL_Y_MAX = 500
+_HIGHLAND_Y_MIN = 1700
+
+# Authored inland water networks (design §6): the capital's river runs southwest
+# to the kingdom ports, and the imperial network connects the eastern plain to
+# the southeastern ports. Water is impassable on foot; the declared fords are
+# the ordinary crossings, not a transport mechanic.
+WATERWAY_ROUTES: dict[str, tuple[tuple[int, int], ...]] = {
+    "capital_river": ((1150, 1060), (860, 1040), (600, 800), (310, 360)),
+    "imperial_river": ((1950, 1260), (1990, 1100), (2070, 700), (2060, 250)),
+    "imperial_east_branch": ((2070, 700), (2200, 600), (2390, 460)),
+}
+
+WATERWAY_FORDS: dict[str, tuple[tuple[int, int], ...]] = {
+    "capital_river": ((860, 1040), (600, 800), (400, 497)),
+    "imperial_river": ((1990, 1100), (2067, 600)),
+    "imperial_east_branch": ((2300, 526),),
+}
+
+#: Authored enumeration windows per region, as
+#: ``(x_min, x_max, y_min, y_max)`` inclusive. They are a superset of each
+#: region's cells (the classifier still decides membership) and exist so
+#: sparse-index consumers such as ambient provisioning enumerate only the
+#: relevant band instead of scanning the whole frame. Every region key of
+#: ``WILDERNESS_REGION_REGISTRY`` has a window.
+REGION_SEARCH_BOXES: dict[str, tuple[int, int, int, int]] = {
+    "north_deep_forest": (0, WILDERNESS_MAX_X, _NORTH_FOREST_Y_MIN, WILDERNESS_MAX_Y),
+    "central_mountains": (
+        _MOUNTAIN_RIDGE_BASE_X - 2 * _MOUNTAIN_RIDGE_STEP - _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        _MOUNTAIN_RIDGE_BASE_X + 2 * _MOUNTAIN_RIDGE_STEP + _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        0,
+        _NORTH_FOREST_Y_MIN - 1,
+    ),
+    "eastern_plains": (0, WILDERNESS_MAX_X, _COASTAL_Y_MAX + 1, _NORTH_FOREST_Y_MIN - 1),
+    "southeast_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
+    "southwest_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
+    "northwest_highland_forest": (
+        0,
+        WILDERNESS_MAX_X,
+        _HIGHLAND_Y_MIN,
+        _NORTH_FOREST_Y_MIN - 1,
+    ),
+    "western_hills_valleys": (
+        0,
+        WILDERNESS_MAX_X,
+        _COASTAL_Y_MAX + 1,
+        _HIGHLAND_Y_MIN - 1,
+    ),
+}
 
 # Short registry direction -> the contrib's exit key long form (the stock
 # set_active_coordinates pass keys exits "north".."northwest").
@@ -53,6 +141,41 @@ _EXIT_OPEN = "traverse:true();view:true()"
 _FOOTPRINT_CACHE: dict[tuple[tuple[str, object], ...], frozenset] = {}
 
 
+def _rasterize_segment(
+    start: tuple[int, int], end: tuple[int, int]
+) -> set[tuple[int, int]]:
+    """Every integer cell on the straight segment between two cell points.
+
+    Deterministic integer interpolation (no floats, no library): the walk takes
+    one step per axis major, so the rasterized waterway is continuous.
+    """
+    x0, y0 = start
+    x1, y1 = end
+    steps = max(abs(x1 - x0), abs(y1 - y0))
+    if steps == 0:
+        return {(x0, y0)}
+    return {
+        (x0 + (x1 - x0) * index // steps, y0 + (y1 - y0) * index // steps)
+        for index in range(steps + 1)
+    }
+
+
+def _rasterize_routes(
+    routes: dict[str, tuple[tuple[int, int], ...]],
+) -> frozenset[tuple[int, int]]:
+    cells: set[tuple[int, int]] = set()
+    for points in routes.values():
+        for start, end in zip(points, points[1:]):
+            cells |= _rasterize_segment(start, end)
+    return frozenset(cells)
+
+
+_WATERWAY_CELLS = _rasterize_routes(WATERWAY_ROUTES) - frozenset(
+    cell for fords in WATERWAY_FORDS.values() for cell in fords
+)
+_FORD_CELLS = frozenset(cell for fords in WATERWAY_FORDS.values() for cell in fords)
+
+
 def _footprint_union() -> frozenset:
     """Every anchor footprint cell in the live registry (point shapes: none)."""
     registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
@@ -73,20 +196,98 @@ def is_footprint_cell(coordinates: tuple[int, int]) -> bool:
     return coordinates in _footprint_union()
 
 
+def _ridge_center_x(y: int) -> int:
+    """The summit ridge's X centre at row ``y`` (a deterministic bend)."""
+    bend = (y // _MOUNTAIN_RIDGE_PERIOD) % 5 - 2
+    return _MOUNTAIN_RIDGE_BASE_X + bend * _MOUNTAIN_RIDGE_STEP
+
+
+def _ridge_span(y: int) -> tuple[int, int]:
+    """The ridge's inclusive X span at row ``y``.
+
+    Spanning every column between this row's centre and the next row's centre
+    keeps the wall 8-connected, so no diagonal gap can slip through it.
+    """
+    current = _ridge_center_x(y)
+    following = _ridge_center_x(y + 1)
+    return (min(current, following), max(current, following))
+
+
+def is_closed_ridge_cell(coordinates: tuple[int, int]) -> bool:
+    """Whether ``(x, y)`` is an impassable summit-ridge/cliff cell.
+
+    The ridge bends through the central corridor north of the deep forest; the
+    authored pass windows are open ground, so land crossings require one of
+    them.
+    """
+    x, y = coordinates
+    if not (_RIDGE_MIN_X <= x <= _RIDGE_MAX_X) or y >= _RIDGE_NORTH_LIMIT_Y:
+        return False
+    if any(low <= y <= high for low, high in RIDGE_PASSES):
+        return False
+    low, high = _ridge_span(y)
+    return low <= x <= high
+
+
+def is_inland_water_cell(coordinates: tuple[int, int]) -> bool:
+    """Whether ``(x, y)`` is impassable river water (a ford is not water)."""
+    return coordinates in _WATERWAY_CELLS
+
+
+def is_land_cell(coordinates: tuple[int, int]) -> bool:
+    """Whether the cell's centre lies inside the mainland polygon.
+
+    A cell is an area; its representative centre is offset half a kilometre
+    into the cell (``world.lore.wilderness_regions.cell_center_m``).
+    """
+    x, y = coordinates
+    return is_on_mainland(x + 0.5, y + 0.5)
+
+
+def is_passable_terrain(coordinates: tuple[int, int]) -> bool:
+    """Whether the cell is walkable ground (not a ridge wall or water)."""
+    return not is_closed_ridge_cell(coordinates) and not is_inland_water_cell(
+        coordinates
+    )
+
+
+def is_walkable_cell(coordinates: tuple[int, int]) -> bool:
+    """Whether ``(x, y)`` is in-frame, mainland and passable on foot."""
+    x, y = coordinates
+    if not (0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y):
+        return False
+    return is_land_cell((x, y)) and is_passable_terrain((x, y))
+
+
+def is_valid_wilderness_cell(coordinates: tuple[int, int]) -> bool:
+    """The single wilderness-cell validity rule every consumer shares.
+
+    In-frame, land-side, passable terrain, and not an anchor footprint cell of
+    the live ``WILDERNESS_ENTRY_REGISTRY`` (point shapes contribute no
+    footprint). The provider, the canonical destination resolver and the local
+    map all read this one rule.
+    """
+    return is_walkable_cell(coordinates) and not is_footprint_cell(coordinates)
+
+
 def region_for_coordinates(x: int, y: int) -> str:
     """Return the terrain region key for ``(x, y)``.
 
     Pure integer partition over the two coordinates alone -- no database read,
-    no randomness, no wall-clock input. Same input always returns the same key.
+    no randomness, no wall-clock input. Same input always returns the same key,
+    and every cell inside the frame (including sea cells) resolves to a
+    registered region. The central mountain region follows the authored
+    bending corridor rather than a rectangular band.
     """
 
     if y >= _NORTH_FOREST_Y_MIN:
         return "north_deep_forest"
-    if _MOUNTAIN_X[0] <= x <= _MOUNTAIN_X[1]:
+    centre = _ridge_center_x(y)
+    if abs(x - centre) <= _MOUNTAIN_CORRIDOR_HALF_WIDTH:
         return "central_mountains"
-    if x > _MOUNTAIN_X[1]:  # east of the mountains
+    if x > centre:  # east of the mountains
         return "southeast_coast" if y <= _COASTAL_Y_MAX else "eastern_plains"
-    # x < _MOUNTAIN_X[0] -- west of the mountains
+    # x < centre -- west of the mountains
     if y <= _COASTAL_Y_MAX:
         return "southwest_coast"
     if y >= _HIGHLAND_Y_MIN:
@@ -109,7 +310,7 @@ def terrain_description(x: int, y: int) -> str:
 
 
 class ElosernWildernessMapProvider(WildernessMapProvider):
-    """Bounded 224x224 wilderness map at 10 km/cell over the deterministic terrain model."""
+    """Bounded 2700x2700 wilderness frame at 1 km/cell over the terrain model."""
 
     room_typeclass = TerrainRoom
 
@@ -128,13 +329,11 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         return WildernessReturnExit
 
     def is_valid_coordinates(self, wilderness, coordinates):
-        x, y = coordinates
-        if not (0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y):
-            return False
-        # Anchor footprints are not walkable wild ground; the stock per-exit
-        # lock pass and at_traverse_coordinates re-check both inherit this
-        # single boundary rule (wilderness-anchor-footprint design D2).
-        return coordinates not in _footprint_union()
+        # The shared rule: frame, mainland, passable terrain, no anchor
+        # footprint. The stock per-exit lock pass and at_traverse_coordinates
+        # re-check, the canonical resolver and the local map all inherit this
+        # single boundary rule; no query scans the frame.
+        return is_valid_wilderness_cell(tuple(coordinates))
 
     def get_location_name(self, coordinates):
         return WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh
@@ -177,12 +376,16 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         exits_by_key = {exit_obj.key: exit_obj for exit_obj in room.exits}
         for entry in registry.values():
             if entry.is_point_shape:
-                # Cave semantics: every direction at the anchor cell is the
-                # gateway, so all eight stay offered regardless of what the
-                # stock validity pass computed (the delta pins this).
+                # Concealed point entry: only the authored eligible entry
+                # direction is a gateway. Unrelated directions stay ordinary
+                # terrain-validity steps, so a cave never hijacks a route.
                 if coordinates == entry.anchor_cell:
-                    for exit_obj in exits_by_key.values():
-                        exit_obj.locks.add(_EXIT_OPEN)
+                    for gate in entry.gates:
+                        exit_obj = exits_by_key.get(
+                            LONG_DIRECTIONS[gate.return_direction]
+                        )
+                        if exit_obj is not None:
+                            exit_obj.locks.add(_EXIT_OPEN)
                 continue
             for gate in entry.gates:
                 if entry.approach_cell(gate) != coordinates:

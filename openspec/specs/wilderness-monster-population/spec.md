@@ -69,19 +69,19 @@ wall-clock input.
 
 ### Requirement: A hunting band around the capital's north gate always hosts a low-tier monster
 Every provider-valid coordinate within Chebyshev distance 3 of the `capital_altoria` entry's
-north-gate `approach_cell` `(60, 103)` — the cell a traveler lands on leaving the 北門 toward the
+east-gate `approach_cell` `(864, 1080)` — the cell a traveler lands on leaving the 東門 toward the
 open wilderness — SHALL be present in the population at `low` tier, independent of the density
 formula, so the introductory hunt (討伐低階魔物) is reliably completable immediately after leaving
-the North Gate. Cells inside any anchor footprint are outside the provider's valid set and are not
+the East Gate. Cells inside any anchor footprint are outside the provider's valid set and are not
 band members.
 
-#### Scenario: The north-gate approach coordinate is always populated at low tier
-- **WHEN** `population_for_coordinates(60, 103)` is called
+#### Scenario: The east-gate approach coordinate is always populated at low tier
+- **WHEN** `population_for_coordinates(864, 1080)` is called
 - **THEN** it returns a `MonsterPopulation` with `tier == "low"`
 
-#### Scenario: The hunting band is contiguous over valid ground around the north gate
+#### Scenario: The hunting band is contiguous over valid ground around the east gate
 - **WHEN** `population_for_coordinates` is called for every provider-valid coordinate within
-  Chebyshev distance 3 of `(60, 103)`
+  Chebyshev distance 3 of `(864, 1080)`
 - **THEN** every result is a `MonsterPopulation` with `tier == "low"`, never `None`, and the
   footprint cells of `capital_altoria` inside the band's square are skipped rather than populated
 

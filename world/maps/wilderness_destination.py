@@ -6,10 +6,11 @@ arrival node. This module is the one resolver that derives the arrival node
 from the current coordinates, direction, and the gateway rules of
 ``WILDERNESS_ENTRY_REGISTRY``, mirroring ``WildernessReturnExit.at_traverse``
 (typeclasses/exits.py): a registered (approach-cell, return-direction) pair
-resolves to its gate's ``grid:`` room; a point-shape anchor answers every
-direction with its single gate; every other provider-valid direction steps one
-cell; a provider-invalid neighbor (out of the rectangle or an anchor footprint
-cell) resolves to ``None``, matching the stock step refusal.
+resolves to its gate's ``grid:`` room; a point-shape anchor answers only its
+single gate's authored direction; every other provider-valid direction steps
+one cell; a provider-invalid neighbor (outside the frame, at sea, on the closed
+ridge or a waterway, or on an anchor footprint cell) resolves to ``None``,
+matching the stock step refusal.
 
 The gateway lookup (:func:`find_gateway`) and the neighbor-validity rule
 (:func:`wilderness_neighbor`) are the single shared helpers the return exit
@@ -33,10 +34,8 @@ from world.lore.wilderness_entry import (
 )
 from world.maps.map_data import settlement_graph
 from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
     WILDERNESS_NAME,
-    is_footprint_cell,
+    is_valid_wilderness_cell,
 )
 from world.rules.map_knowledge import encode_grid, encode_wild
 
@@ -83,18 +82,14 @@ def normalize_wilderness_direction(value: Any) -> str | None:
     return None
 
 
-def _in_provider_rect(x: int, y: int) -> bool:
-    return 0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y
-
-
 def is_provider_valid_coordinates(coordinates: tuple[int, int]) -> bool:
-    """Whether the provider accepts ``coordinates`` (rect minus footprints).
+    """Whether the provider accepts ``coordinates``.
 
-    The same boundary rule ``ElosernWildernessMapProvider.is_valid_coordinates``
-    applies -- rectangle check plus live-registry footprint exclusion -- so the
-    resolver's adjacency truth is the provider's, not a second opinion.
+    Exactly ``ElosernWildernessMapProvider.is_valid_coordinates``'s rule --
+    frame, mainland, passable terrain, and live-registry footprint exclusion --
+    so the resolver's adjacency truth is the provider's, not a second opinion.
     """
-    return _in_provider_rect(*coordinates) and not is_footprint_cell(coordinates)
+    return is_valid_wilderness_cell(coordinates)
 
 
 def wilderness_neighbor(x: int, y: int, direction: str) -> tuple[int, int] | None:
@@ -223,11 +218,16 @@ def _gateway_from_entry(
 
     Footprint entry: the coordinates must equal one gate's approach cell and
     the direction must equal that gate's ``return_direction``. Point-shape
-    entry: the coordinates must equal the anchor cell; ANY direction matches
-    the single gate (cave semantics).
+    entry: the coordinates must equal the anchor cell and the direction must
+    equal the single gate's authored ``return_direction`` -- an unrelated
+    direction stays an ordinary wilderness step, so a concealed entry never
+    hijacks a route.
     """
     if entry.is_point_shape:
-        return entry.gates[0] if entry.anchor_cell == coordinates and entry.gates else None
+        if entry.anchor_cell != coordinates or not entry.gates:
+            return None
+        gate = entry.gates[0]
+        return gate if gate.return_direction == direction else None
     for gate in entry.gates:
         if gate.return_direction == direction and entry.approach_cell(gate) == coordinates:
             return gate

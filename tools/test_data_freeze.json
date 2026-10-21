@@ -193,6 +193,10 @@
       "reason": "wilderness region data contract"
     },
     {
+      "path": "world/maps/tests/test_wilderness_provider.py",
+      "reason": "authored continental terrain, waterway and anchor-region data contract"
+    },
+    {
       "path": "world/maps/tests/test_altoria_capital.py",
       "reason": "capital xymap data contract"
     },

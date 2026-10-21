@@ -56,14 +56,13 @@ SOUTH_GATE_XYZ = (
     _ENTRY.gate_for("n").z_map_key,
 )
 
-#: Physical durations at the current 10 km wilderness cell span, from the
+#: Physical durations at the one-kilometre wilderness cell span, from the
 #: authored meter positions (world-map-scale §8):
-#:   east gate local (6500,3010) -> absolute (608000,1005160); approach cell
-#:   (63,100) center (635000,1005000): 27,000.47 m costs 13,500 s at 1.25 m/s
-#:   plus the remainder at the light-stage 1.125 m/s = 22,501 s.
-#:   one 10 km cardinal wilderness step over open ground (3 km/h) = 12,000 s.
-GATE_APPROACH_SECONDS = 22501
-WILDERNESS_STEP_SECONDS = 12000
+#:   east gate local (6500,3010) -> absolute (863500,1080660); approach cell
+#:   (864,1080) center (864500,1080500): 1,012.72 m costs 811 s at 1.25 m/s.
+#:   one 1 km cardinal wilderness step over open ground (3 km/h) = 1,200 s.
+GATE_APPROACH_SECONDS = 811
+WILDERNESS_STEP_SECONDS = 1200
 
 
 class CityWildernessRoundTripTests(EvenniaTest):

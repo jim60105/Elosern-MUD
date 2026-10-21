@@ -1,10 +1,29 @@
 # Continental geography and coordinate units
 
 `world/lore/` owns the frozen physical geography of the known continent. These
-declarations are authoring contracts only: they spawn no rooms, are independent
-of persistent room lifecycle, and do not activate the runtime wilderness scale.
-`world/maps/wilderness_provider.py` keeps its current 224-cell, 10 km provider
-until the projection, cost and physiology changes land.
+declarations are authoring contracts only: they spawn no rooms and are
+independent of persistent room lifecycle. `rescale-wilderness-geography`
+activates them in `world/maps/wilderness_provider.py`: the runtime provider is
+now the same 2700 by 2700 one-kilometre frame, and the variable cell span the
+travel-cost core reads is `WILDERNESS_KM_PER_CELL = 1`.
+
+## Runtime terrain and validity
+
+The provider owns one shared cell-validity rule
+(`is_valid_wilderness_cell`): inside the frame, inside the mainland polygon
+evaluated at the cell centre, off the cliff-walled central summit ridge, off
+the authored inland waterways, and outside every live anchor footprint. Sea,
+ridge and water are impassable on foot; three authored pass windows
+(`RIDGE_PASSES`, the principal one near `(1410, 980)`) and the declared
+`WATERWAY_FORDS` are ordinary walkable ground. Every query is bounded local
+arithmetic — no frame scan, no room materialization.
+
+`region_for_coordinates` classifies the whole frame into the seven registry
+regions with the authored bending mountain corridor; `terrain_description`
+stays the pinned `(x * 92821 + y * 68917) % len(variants)` form. Altoria's
+rasterized footprint is a 40 km² irregular mask and Ciaran is a hidden point
+entrance with one authored entry direction, so unrelated directions there stay
+ordinary wilderness steps.
 
 ## Declarations
 

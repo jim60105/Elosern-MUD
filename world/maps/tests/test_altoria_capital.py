@@ -231,17 +231,17 @@ class AltoriaCapitalMapTests(EvenniaTestCase):
         from world.rules.travel_cost import distance_traversal_cost
 
         entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-        # 南門: gate local (3050,150) -> absolute (604550,1002300); approach
-        # cell (60,97) center (605000,975000): hypot(450, 27300).
+        # 南門: gate local (3050,150) -> absolute (860050,1077800); approach
+        # cell (860,1077) center (860500,1077500): hypot(450, 300).
         south = gate_approach_distance_m(entry, entry.gate_for("n"))
-        self.assertAlmostEqual(south, hypot(450, 27300), places=6)
-        # 東門: gate local (6500,3010) -> absolute (608000,1005160); approach
-        # cell (63,100) center (635000,1005000): hypot(27000, 160).
+        self.assertAlmostEqual(south, hypot(450, 300), places=6)
+        # 東門: gate local (6500,3010) -> absolute (863500,1080660); approach
+        # cell (864,1080) center (864500,1080500): hypot(1000, 160).
         east = gate_approach_distance_m(entry, entry.gate_for("w"))
-        self.assertAlmostEqual(east, hypot(27000, 160), places=6)
+        self.assertAlmostEqual(east, hypot(1000, 160), places=6)
         # One authored segment, charged in either direction at 1.25 m/s.
-        self.assertEqual(distance_traversal_cost(south, "settlement", [_Probe()]).seconds, 21843)
-        self.assertEqual(distance_traversal_cost(east, "settlement", [_Probe()]).seconds, 21601)
+        self.assertEqual(distance_traversal_cost(south, "settlement", [_Probe()]).seconds, 433)
+        self.assertEqual(distance_traversal_cost(east, "settlement", [_Probe()]).seconds, 811)
 
 
 class _Probe:

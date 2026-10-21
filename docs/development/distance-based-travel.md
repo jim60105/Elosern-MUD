@@ -33,9 +33,11 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
   取物理位置（含彎道折線全長）；羅盤方向仍由邏輯座標決定，所以座標搬遷不會悄悄
   改寫出口方位。`PHYSICAL_POSITIONS` 以座標為鍵，必須與 `NODE_IDS` 的格位完全
   一致，否則 `build_sparse_graph()` 在寫入前拒絕。
-- 荒野距離 = 歐氏格距 × 宣告格距（現在 `WILDERNESS_KM_PER_CELL × 1000` 公尺）。
-  斜向不是一格：`(1,1)` 格的斜向距離是 `√2 × 格距`。地形取兩端較慢者，因此同一
-  條邊雙向同價。
+- 荒野距離 = 歐氏格距 × 宣告格距（`WILDERNESS_KM_PER_CELL × 1000` 公尺；自
+  `rescale-wilderness-geography` 起為每格 1 公里）。斜向不是一格：`(1,1)` 格的
+  斜向距離是 `√2 × 格距`。地形取兩端較慢者，因此同一條邊雙向同價。荒野格是否
+  可通行由 `world.maps.wilderness_provider.is_valid_wilderness_cell` 單一判定
+  （外框、大陸多邊形、封閉山脊、內陸水道與錨點足跡）。
 - 城門跨越只算一段：由聚落錨點轉換
   `world_anchor_center + local_position - local_anchor_position` 得到城門的絕對
   公尺位置，再量到外部 approach cell 的中心。進城與出城共用同一段，不另外加整格

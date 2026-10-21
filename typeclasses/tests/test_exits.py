@@ -68,9 +68,9 @@ SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 #: 1.25 m/s plus the remainder at the light-stage 1.125 m/s = 22,501 s; the
 #: south approach (27,303.71 m) integrates to 22,770 s; and one 10 km
 #: open-ground wilderness step stays 12,000 s (no threshold crossed).
-EAST_GATE_SECONDS = 22501
-SOUTH_GATE_SECONDS = 22770
-WILDERNESS_STEP_SECONDS = 12000
+EAST_GATE_SECONDS = 811
+SOUTH_GATE_SECONDS = 433
+WILDERNESS_STEP_SECONDS = 1200
 
 
 class WildernessGatewayExitTests(EvenniaTest):

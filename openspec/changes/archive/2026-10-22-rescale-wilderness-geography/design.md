@@ -23,3 +23,15 @@ Prefer stable sparse authored identity and explicit physical segments to dense m
 ## Migration Plan
 
 No database schema/data migration or compatibility layer. luna uses `feat/rescale-wilderness-geography` in `.worktrees/rescale-wilderness-geography`. Apply prerequisite changes first; synchronization converges owned declarations in place before accepting play. If synchronization fails, restore the whole transaction/cache snapshot and keep the prior authoritative runtime, rather than partially activating coordinates.
+
+Pre-release cutover policy: ordinary wilderness rooms and monster-site individuals
+created under the old 224-cell frame are not migrated. A fresh world (or a
+GM-driven reclamation of the old wilderness rooms/sites) is the prerequisite;
+`--keepdb` is not a migration strategy.
+
+Spec-sync procedure: this change pre-syncs its ADDED requirements (and the
+MODIFIED requirement text) into `openspec/specs/` so `covers_requirement` IDs are
+valid during implementation. Archiving therefore moves the change directory and
+must not re-apply the delta (`openspec archive --skip-specs`, or the repository's
+equivalent directory move), because the ADDED headers already exist in the main
+specs. This mirrors how `establish-continental-geography` was archived.

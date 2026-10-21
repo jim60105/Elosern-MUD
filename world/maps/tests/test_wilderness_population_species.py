@@ -24,11 +24,10 @@ from world.maps.wilderness_population import (
     species_rule_for_coordinates,
 )
 from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
+    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
-    is_footprint_cell,
+    is_valid_wilderness_cell,
     region_for_coordinates,
 )
 from world.rules.combat_session import engage
@@ -44,9 +43,9 @@ _VARIANTS = tuple(SYNTH_MONSTER_VARIANTS)
 ORDINARY, STRONGER = _VARIANTS[0], _VARIANTS[1]
 _WITNESS_TIER = next(iter(SYNTH_MONSTER_TIERS))
 
-#: A walkable south-western wild cell, outside every anchor footprint and far
+#: A walkable eastern-plain wild cell, outside every anchor footprint and far
 #: from the contract-pinned hunting band.
-PROBE = (30, 30)
+PROBE = (2000, 1000)
 BAND_RADIUS = 3
 
 
@@ -57,11 +56,16 @@ def _in_band(cell: tuple[int, int]) -> bool:
 
 
 def _first_cell(region: str, *, inside_band: bool) -> tuple[int, int]:
-    """A walkable cell of ``region`` inside or outside the hunting band."""
-    for x in range(WILDERNESS_MAX_X + 1):
-        for y in range(WILDERNESS_MAX_Y + 1):
+    """A walkable cell of ``region`` inside or outside the hunting band.
+
+    Enumerated over the region's authored search window, so the fixture lookup
+    stays a bounded local search rather than a frame sweep.
+    """
+    x_min, x_max, y_min, y_max = REGION_SEARCH_BOXES[region]
+    for x in range(x_min, x_max + 1):
+        for y in range(y_min, y_max + 1):
             cell = (x, y)
-            if is_footprint_cell(cell) or region_for_coordinates(x, y) != region:
+            if not is_valid_wilderness_cell(cell) or region_for_coordinates(x, y) != region:
                 continue
             if _in_band(cell) is inside_band:
                 return cell
@@ -70,13 +74,16 @@ def _first_cell(region: str, *, inside_band: bool) -> tuple[int, int]:
 
 def _cell_outside_every_rule(rules) -> tuple[int, int]:
     """A walkable cell whose region carries no authored rule."""
-    for x in range(WILDERNESS_MAX_X + 1):
-        for y in range(WILDERNESS_MAX_Y + 1):
-            cell = (x, y)
-            if is_footprint_cell(cell) or _in_band(cell):
-                continue
-            if region_for_coordinates(x, y) not in rules:
-                return cell
+    for region, (x_min, x_max, y_min, y_max) in REGION_SEARCH_BOXES.items():
+        if region in rules:
+            continue
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
+                cell = (x, y)
+                if not is_valid_wilderness_cell(cell) or _in_band(cell):
+                    continue
+                if region_for_coordinates(x, y) == region:
+                    return cell
     raise AssertionError("every region carries an authored rule")
 
 
@@ -278,8 +285,6 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         for dx in range(-BAND_RADIUS, BAND_RADIUS + 1):
             for dy in range(-BAND_RADIUS, BAND_RADIUS + 1):
                 cell = (CAPITAL_ENTRY_XY[0] + dx, CAPITAL_ENTRY_XY[1] + dy)
-                if is_footprint_cell(cell):
-                    continue
                 with self.subTest(cell=cell):
                     self.assertIsNone(species_rule_for_coordinates(*cell))
         # ... and a region with no authored rule keeps the tier-example branch.

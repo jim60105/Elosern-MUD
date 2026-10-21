@@ -70,7 +70,7 @@ _WITNESS_TIER = next(iter(SYNTH_MONSTER_TIERS))
 
 #: A walkable south-western wild cell: outside the capital's and the village's
 #: anchor footprints and far from the contract-pinned hunting band.
-PROBE = (30, 30)
+PROBE = (500, 700)
 NEST_KEY = "t_probe_nest"
 CAMP_KEY = "t_probe_camp"
 HOUR = 3600

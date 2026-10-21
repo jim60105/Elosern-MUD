@@ -425,9 +425,9 @@ class WildernessGateExit(Exit):
 
 class WildernessReturnExit(WildernessExit):
     """The wilderness's own exit typeclass: routes every registered
-    (approach_cell, return_direction) pair -- or, for a point-shape anchor,
-    every direction at its anchor cell -- back into its gate's grid room via
-    the shared ``find_gateway`` helper (the same single source the canonical
+    (approach_cell, return_direction) pair -- or, for a point-shape anchor, its
+    single authored entry direction -- back into its gate's grid room via the
+    shared ``find_gateway`` helper (the same single source the canonical
     resolver reads), and routes everything else like a stock WildernessExit.
     The clock cost is charged on EVERY successful traversal --
     special-cased return branch and ordinary fallback alike -- so no wilderness

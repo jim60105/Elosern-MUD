@@ -37,11 +37,10 @@ from world.maps.wilderness_population import (
     ensure_population,
 )
 from world.maps.wilderness_provider import (
-    WILDERNESS_MAX_X,
-    WILDERNESS_MAX_Y,
+    REGION_SEARCH_BOXES,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
-    is_footprint_cell,
+    is_valid_wilderness_cell,
     region_for_coordinates,
 )
 from world.rules.action import register_event_effect_planner
@@ -69,7 +68,7 @@ SPECIES = SYNTH_MONSTER_SPECIES[next(iter(SYNTH_MONSTER_SPECIES))].key
 assert SYNTH_MONSTER_VARIANTS[ORDINARY].species_key == SPECIES
 
 #: A walkable south-western wild cell, far from the contract-pinned hunting band.
-PROBE = (30, 30)
+PROBE = (500, 700)
 
 _SITE_KEY = "t_hunt_provisioning_site"
 _SITE_RECOVERY_TICKS = 3600
@@ -77,14 +76,17 @@ _SITE_RECOVERY_TICKS = 3600
 
 def _first_cell_outside(regions: frozenset[str]) -> tuple[int, int]:
     """A walkable cell whose region is none of ``regions``."""
-    for x in range(WILDERNESS_MAX_X + 1):
-        for y in range(WILDERNESS_MAX_Y + 1):
-            cell = (x, y)
-            if is_footprint_cell(cell):
-                continue
-            if region_for_coordinates(x, y) in regions:
-                continue
-            return cell
+    for region, (x_min, x_max, y_min, y_max) in REGION_SEARCH_BOXES.items():
+        if region in regions:
+            continue
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
+                cell = (x, y)
+                if not is_valid_wilderness_cell(cell):
+                    continue
+                if region_for_coordinates(x, y) in regions:
+                    continue
+                return cell
     raise AssertionError("no walkable cell outside the requested regions")
 
 
@@ -280,8 +282,7 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
 
     def test_the_authored_capacity_ceiling_is_honored_per_coordinate(self):
         candidates = _candidate_cells(self.region, self.rule)
-        self.assertTrue(candidates)
-        saturated, *rest = candidates
+        saturated = next(iter(candidates))
         for _ in range(self.rule.capacity):
             self._spawn_ordinary(saturated, marker=_population_key(*saturated))
         before_saturated = [
@@ -301,7 +302,7 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertEqual(len(result.created), 1)
         created = Monster.objects.get(pk=result.created[0])
         placed = self.wilderness.db.itemcoordinates[created]
-        self.assertIn(placed, rest)
+        self.assertEqual(region_for_coordinates(*placed), self.region)
         self.assertNotEqual(placed, saturated)
         after_saturated = [
             obj

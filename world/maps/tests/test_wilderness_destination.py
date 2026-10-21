@@ -68,6 +68,8 @@ def live_anchor_entry():
 
 
 CAPITAL = live_anchor_entry()
+LAND = (500, 700)
+SEA = (0, 0)
 SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))
 EAST_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("w"))
 
@@ -99,18 +101,18 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_ordinary_directions_resolve_to_adjacent_wild_cells(self):
-        # (50, 50) is away from every gateway and footprint, so every
+        # The land fixture is away from every gateway and footprint, so every
         # direction is an ordinary wild step.
-        room = self._terrain(50, 50)
+        room = self._terrain(*LAND)
         expected = {
-            "n": (50, 51),
-            "ne": (51, 51),
-            "e": (51, 50),
-            "se": (51, 49),
-            "s": (50, 49),
-            "sw": (49, 49),
-            "w": (49, 50),
-            "nw": (49, 51),
+            "n": (500, 701),
+            "ne": (501, 701),
+            "e": (501, 700),
+            "se": (501, 699),
+            "s": (500, 699),
+            "sw": (499, 699),
+            "w": (499, 700),
+            "nw": (499, 701),
         }
         for direction, (nx, ny) in expected.items():
             self.assertEqual(
@@ -121,14 +123,14 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_contrib_exit_keys_resolve_through_the_normalizer(self):
-        room = self._terrain(60, 96)
+        room = self._terrain(*LAND)
         self.assertEqual(
             resolve_wilderness_destination(room, "north"),
-            encode_wild(WILDERNESS_NAME, 60, 97),
+            encode_wild(WILDERNESS_NAME, 500, 701),
         )
         self.assertEqual(
             resolve_wilderness_destination(room, "southwest"),
-            encode_wild(WILDERNESS_NAME, 59, 95),
+            encode_wild(WILDERNESS_NAME, 499, 699),
         )
         self.assertEqual(normalize_wilderness_direction("northwest"), "nw")
         self.assertEqual(normalize_wilderness_direction("se"), "se")
@@ -140,14 +142,17 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         self.assertEqual(normalize_wilderness_direction("N"), "n")
         self.assertEqual(
             resolve_wilderness_destination(room, "NORTH"),
-            encode_wild(WILDERNESS_NAME, 60, 97),
+            encode_wild(WILDERNESS_NAME, 500, 701),
         )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_out_of_bounds_steps_resolve_to_none(self):
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(0, 0), "s"))
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(0, 0), "sw"))
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(0, 0), "w"))
+        # Ocean-margin cells are provider-invalid, so no step leaves them.
+        for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+            self.assertIsNone(
+                resolve_wilderness_destination(self._terrain(*SEA), direction),
+                direction,
+            )
         self.assertIsNone(
             resolve_wilderness_destination(self._terrain(WILDERNESS_MAX_X, WILDERNESS_MAX_Y), "n")
         )
@@ -161,10 +166,10 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_unroutable_rooms_and_directions_resolve_to_none(self):
         self.assertIsNone(resolve_wilderness_destination(types.SimpleNamespace(), "n"))
-        room = self._terrain(5, 5)
+        room = self._terrain(*LAND)
         del room.ndb.active_coordinates
         self.assertIsNone(resolve_wilderness_destination(room, "n"))
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(5, 5), "up"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(*LAND), "up"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_a_gate_step_resolves_to_its_grid_room(self):
@@ -212,12 +217,12 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         # face footprint cells that are no gate's approach. Offsets derive
         # from the entry's own 5x5 block around its anchor cell.
         ax, ay = CAPITAL.anchor_cell
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 3, ay), "e"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 4, ay), "e"))
         # One row off the east gate's own approach row: still a footprint
         # cell, but not the registered (approach_cell, "w") gateway pair.
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax + 3, ay + 1), "w"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax + 4, ay + 1), "w"))
         # The diagonal ray toward a mask corner is refused the same way.
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 3, ay - 3), "ne"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 4, ay - 4), "ne"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_a_diagonal_step_never_cuts_an_impassable_corner(self):
@@ -232,7 +237,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         entry = WildernessEntryPoint(
             anchor_key="t_l_shape",
             shape=("##.", "#.."),
-            origin_xy=(10, 10),
+            origin_xy=(500, 600),
             gates=(),
         )
         with patch.dict(
@@ -243,36 +248,36 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             "_FOOTPRINT_CACHE",
             {},
         ):
-            # West orthogonal (11,10) is a footprint cell.
-            self.assertIsNone(wilderness_neighbor(12, 10, "nw"))
-            # South orthogonal (10,11) is a footprint cell on the other axis.
-            self.assertIsNone(wilderness_neighbor(10, 12, "se"))
+            # West orthogonal (501,600) is a footprint cell.
+            self.assertIsNone(wilderness_neighbor(502, 600, "nw"))
+            # South orthogonal (500,601) is a footprint cell on the other axis.
+            self.assertIsNone(wilderness_neighbor(500, 602, "se"))
             # A cardinal step along the open side stays legal.
-            self.assertEqual(wilderness_neighbor(12, 10, "n"), (12, 11))
+            self.assertEqual(wilderness_neighbor(502, 600, "n"), (502, 601))
             self.assertIsNone(
-                resolve_wilderness_destination(self._terrain(12, 10), "nw")
+                resolve_wilderness_destination(self._terrain(502, 600), "nw")
             )
             self.assertEqual(
-                resolve_wilderness_destination(self._terrain(12, 10), "n"),
-                encode_wild(WILDERNESS_NAME, 12, 11),
+                resolve_wilderness_destination(self._terrain(502, 600), "n"),
+                encode_wild(WILDERNESS_NAME, 502, 601),
             )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_south_away_from_any_gateway_is_an_ordinary_step(self):
-        room = self._terrain(5, 5)
+        room = self._terrain(*LAND)
         self.assertEqual(
             resolve_wilderness_destination(room, "s"),
-            encode_wild(WILDERNESS_NAME, 5, 4),
+            encode_wild(WILDERNESS_NAME, 500, 699),
         )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_injected_gateway_rule_only_applies_where_it_advertises(self):
         # An injected rule whose gates do not cover the room's coordinates
         # never applies, mirroring the return exit's lookup.
-        room = self._terrain(5, 5)
+        room = self._terrain(*LAND)
         self.assertEqual(
             resolve_wilderness_destination(room, "s", CAPITAL),
-            encode_wild(WILDERNESS_NAME, 5, 4),
+            encode_wild(WILDERNESS_NAME, 500, 699),
         )
         # And at an approach cell of ANOTHER gate of the same injected entry,
         # the injected rule still cannot hijack: (60, 97) "n" belongs to the
@@ -299,20 +304,25 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         self.assertIsNone(find_gateway(EAST_APPROACH, "e"))
         # Other cells are no gateway in any direction.
         for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
-            self.assertIsNone(find_gateway((50, 50), direction), direction)
+            self.assertIsNone(find_gateway(LAND, direction), direction)
             self.assertIsNone(find_gateway(CAPITAL.anchor_cell, direction), direction)
 
-    def test_find_gateway_answers_every_direction_at_a_point_anchor(self):
+    def test_find_gateway_answers_only_the_authored_direction_at_a_point_anchor(self):
         # The kit's point-shaped t_split_cairn replaces the whole registry
-        # inside the scope, so every lookup sees only the synthetic point.
+        # inside the scope. Only its authored direction is a gateway; every
+        # unrelated direction stays an ordinary wilderness step.
         point = SYNTH_WILDERNESS_ENTRIES["t_split_cairn"]
+        authored = point.gates[0].return_direction
         with synthetic_registries("wilderness_entries"):
+            hit = find_gateway(point.anchor_cell, authored)
+            self.assertIsNotNone(hit)
+            self.assertEqual(hit[1].grid_xy, point.gates[0].grid_xy)
             for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
-                hit = find_gateway(point.anchor_cell, direction)
-                self.assertIsNotNone(hit, direction)
-                self.assertEqual(hit[1].grid_xy, point.gates[0].grid_xy, direction)
+                if direction == authored:
+                    continue
+                self.assertIsNone(find_gateway(point.anchor_cell, direction), direction)
             px, py = point.anchor_cell
-            self.assertIsNone(find_gateway((px + 1, py), "n"))
+            self.assertIsNone(find_gateway((px + 1, py), authored))
 
     def test_wilderness_neighbor_matches_the_single_delta_table(self):
         # The exported geometry is the resolver's own: every direction steps
@@ -321,7 +331,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
         for direction, (dx, dy) in DIRECTION_DELTAS.items():
             self.assertEqual(
-                wilderness_neighbor(50, 50, direction), (50 + dx, 50 + dy), direction
+                wilderness_neighbor(*LAND, direction), (500 + dx, 700 + dy), direction
             )
         self.assertEqual(
             set(DIRECTION_DELTAS),
@@ -330,35 +340,39 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_wilderness_neighbor_returns_none_at_edges_and_footprints(self):
-        self.assertIsNone(wilderness_neighbor(0, 0, "sw"))
-        self.assertIsNone(wilderness_neighbor(0, 0, "s"))
-        self.assertIsNone(wilderness_neighbor(0, 0, "w"))
-        self.assertIsNone(wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, "ne"))
-        self.assertEqual(wilderness_neighbor(0, 0, "ne"), (1, 1))
-        self.assertEqual(
-            wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, "sw"),
-            (WILDERNESS_MAX_X - 1, WILDERNESS_MAX_Y - 1),
-        )
-        # Footprint exclusion: (57, 100) east -> (58, 100) is a mask cell.
+        # Ocean margin: every direction is refused, not just the frame edge.
+        for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+            self.assertIsNone(wilderness_neighbor(*SEA, direction), direction)
+            self.assertIsNone(
+                wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, direction),
+                direction,
+            )
+        # Footprint exclusion: the cell just west of the capital's mask cannot
+        # step east into it.
         ax, ay = CAPITAL.anchor_cell
-        self.assertIsNone(wilderness_neighbor(ax - 3, ay, "e"))
-        self.assertEqual(wilderness_neighbor(SOUTH_APPROACH[0], SOUTH_APPROACH[1] - 1, "n"), SOUTH_APPROACH)
+        self.assertIsNone(wilderness_neighbor(ax - 4, ay, "e"))
+        self.assertEqual(
+            wilderness_neighbor(SOUTH_APPROACH[0], SOUTH_APPROACH[1] - 1, "n"),
+            SOUTH_APPROACH,
+        )
+        # The closed ridge refuses a step into its cliff wall.
+        self.assertIsNone(wilderness_neighbor(1400, 990, "n"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_resolver_ordinary_steps_agree_with_wilderness_neighbor(self):
         # Every ordinary (non-gateway) resolution is exactly the shared
         # neighbor cell encoded -- no second delta table anywhere.
-        room = self._terrain(50, 50)
+        room = self._terrain(*LAND)
         for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
-            nx, ny = wilderness_neighbor(50, 50, direction)
+            nx, ny = wilderness_neighbor(*LAND, direction)
             self.assertEqual(
                 resolve_wilderness_destination(room, direction),
                 encode_wild(WILDERNESS_NAME, nx, ny),
                 direction,
             )
-        edge = self._terrain(0, 0)
+        edge = self._terrain(*SEA)
         for direction in ("s", "sw", "w"):
-            self.assertIsNone(wilderness_neighbor(0, 0, direction), direction)
+            self.assertIsNone(wilderness_neighbor(*SEA, direction), direction)
             self.assertIsNone(resolve_wilderness_destination(edge, direction), direction)
 
 
