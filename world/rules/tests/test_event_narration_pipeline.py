@@ -482,7 +482,8 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::the-verdict-completes-the-act-s-own-line",
     )
     def test_a_resisted_target_receives_no_pleasure_or_counter_entry(self):
         family = family_key(self.act_skill)

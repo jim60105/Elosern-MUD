@@ -526,7 +526,8 @@ def _act_stub(
 
 class SexualRowTests(unittest.TestCase):
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::the-verdict-completes-the-act-s-own-line",
     )
     def test_every_verdict_keeps_the_act_clause_and_changes_only_the_verdict(
         self,
@@ -566,7 +567,8 @@ class SexualRowTests(unittest.TestCase):
         self.assertEqual(len(set(composed)), 3)
 
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::the-verdict-completes-the-act-s-own-line",
     )
     def test_the_auto_complied_clause_is_not_the_ordinary_complied_clause(self):
         complied = entry_line(
@@ -586,7 +588,8 @@ class SexualRowTests(unittest.TestCase):
         self.assertIn("{target}", auto)
 
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::the-verdict-completes-the-act-s-own-line",
     )
     def test_a_cast_without_a_resist_entry_opens_on_its_own_outcome(self):
         row = NarrationRow(
@@ -622,7 +625,8 @@ class SexualRowTests(unittest.TestCase):
                 self.assertNotIn(verdict_line, composed)
 
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::participant-role-selects-the-sexual-counter-and-pleasure-clause",
     )
     def test_a_row_voices_the_performer_and_the_participant_separately(self):
         row = NarrationRow(
@@ -713,7 +717,8 @@ class SexualRowTests(unittest.TestCase):
 
 class SexualPoolSelectionTests(unittest.TestCase):
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::participant-role-selects-the-sexual-counter-and-pleasure-clause",
     )
     def test_a_pooled_counter_voices_the_entries_own_participant(self):
         pool = {
@@ -747,7 +752,8 @@ class SexualPoolSelectionTests(unittest.TestCase):
         self.assertEqual(other, "{target} 記下被做的事。")
 
     @covers_requirement(
-        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration"
+        "action-narration::sexual-verdicts-and-participant-roles-drive-the-sexual-narration",
+        "action-narration::participant-role-selects-the-sexual-counter-and-pleasure-clause",
     )
     def test_a_performer_only_counter_never_renders_the_participant_clause(self):
         pool = {
@@ -810,7 +816,8 @@ class SexualPoolSelectionTests(unittest.TestCase):
 
 class SexualPoolCoverageTests(unittest.TestCase):
     @covers_requirement(
-        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit",
     )
     def test_the_pools_accept_exactly_the_declared_names(self):
         act = _act_stub(
@@ -830,7 +837,8 @@ class SexualPoolCoverageTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit",
     )
     def test_an_event_without_a_clause_fails_validation_naming_it(self):
         act = _act_stub(events=("t_missing_event",))
@@ -839,7 +847,8 @@ class SexualPoolCoverageTests(unittest.TestCase):
         self.assertIn("t_missing_event", str(caught.exception))
 
     @covers_requirement(
-        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit",
     )
     def test_a_counter_without_clauses_fails_validation_naming_it(self):
         act = _act_stub(actor_counters=("t_missing_counter",))
@@ -848,7 +857,8 @@ class SexualPoolCoverageTests(unittest.TestCase):
         self.assertIn("t_missing_counter", str(caught.exception))
 
     @covers_requirement(
-        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries"
+        "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit",
     )
     def test_an_unemitted_pool_entry_fails_validation_naming_it(self):
         with self.assertRaises(NarrationCatalogError) as caught:
@@ -858,6 +868,19 @@ class SexualPoolCoverageTests(unittest.TestCase):
                 counters={},
             )
         self.assertIn("t_orphan_event", str(caught.exception))
+
+    @covers_requirement(
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit"
+    )
+    def test_a_counter_without_both_role_clauses_fails_naming_it(self):
+        act = _act_stub(actor_counters=("t_counter",))
+        with self.assertRaises(NarrationCatalogError) as caught:
+            validate_sexual_pools(
+                {"t_act": act},
+                transitions={},
+                counters={"t_counter": ("一。",)},
+            )
+        self.assertIn("t_counter", str(caught.exception))
 
     def test_a_role_clause_requires_both_roles(self):
         for keyword in (

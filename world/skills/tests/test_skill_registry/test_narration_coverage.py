@@ -124,6 +124,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
         "action-narration::authored-narration-is-a-catalog-validated-against-the-shipped-registries",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
         "action-narration::every-elemental-spell-has-its-own-action-narration",
+        "action-narration::every-sexual-act-has-its-own-action-narration",
     )
     def test_the_covered_families_have_exact_row_coverage(self):
         expected: set[str] = set(SEXUAL_ACT_REGISTRY)
@@ -133,6 +134,9 @@ class NarrationCoverageContractTests(unittest.TestCase):
             expected |= keys
         self.assertEqual(set(NARRATION_CATALOG), expected)
 
+    @covers_requirement(
+        "action-narration::every-sexual-act-has-its-own-action-narration"
+    )
     def test_the_six_act_modules_carry_exactly_the_shipped_acts(self):
         self.assertEqual(
             {row.key for rows in SEXUAL_MODULES for row in rows},
@@ -211,6 +215,7 @@ class NarrationCoverageContractTests(unittest.TestCase):
         "action-narration::a-resolved-action-opens-with-its-own-skill-s-action-narration",
         "action-narration::every-non-elemental-active-skill-has-its-own-action-narration",
         "action-narration::every-elemental-spell-has-its-own-action-narration",
+        "action-narration::every-sexual-act-has-its-own-action-narration",
     )
     def test_every_authored_row_opens_its_own_skill(self):
         for key, row in NARRATION_CATALOG.items():
@@ -245,6 +250,9 @@ class NarrationCoverageContractTests(unittest.TestCase):
                     validate_catalog(catalog)
                 self.assertIn(key, str(caught.exception))
 
+    @covers_requirement(
+        "action-narration::every-sexual-act-has-its-own-action-narration"
+    )
     def test_a_missing_act_row_stops_the_catalog_loading(self):
         key = sorted(SEXUAL_ACT_REGISTRY)[0]
         catalog = {
@@ -256,6 +264,9 @@ class NarrationCoverageContractTests(unittest.TestCase):
             validate_catalog(catalog)
         self.assertIn(key, str(caught.exception))
 
+    @covers_requirement(
+        "action-narration::sexual-transition-and-counter-prose-covers-exactly-what-the-catalog-can-emit"
+    )
     def test_the_transition_pool_matches_the_events_the_acts_emit(self):
         validate_sexual_pools(SEXUAL_ACT_REGISTRY, SHIPPED_ACT_SKILLS)
         self.assertEqual(
@@ -308,6 +319,9 @@ class NarrationCoverageContractTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIn(key, NARRATION_CATALOG)
 
+    @covers_requirement(
+        "action-narration::the-pending-family-set-is-empty-and-stays-pinned"
+    )
     def test_the_pending_family_set_is_empty(self):
         self.assertEqual(PENDING_FAMILIES, frozenset())
 
