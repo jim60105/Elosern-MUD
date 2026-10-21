@@ -63,6 +63,13 @@ SOUTH_GATE_XYZ = (
 EAST_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("w"))
 SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 
+#: Resolved physical durations at the current 10 km wilderness cell span:
+#: east-gate approach 21,601 s (27,000.47 m at 1.25 m/s), south-gate approach
+#: 21,843 s (27,303.71 m), and one 10 km open-ground wilderness step 12,000 s.
+EAST_GATE_SECONDS = 21601
+SOUTH_GATE_SECONDS = 21843
+WILDERNESS_STEP_SECONDS = 12000
+
 
 class WildernessGatewayExitTests(EvenniaTest):
     def setUp(self):
@@ -96,7 +103,7 @@ class WildernessGatewayExitTests(EvenniaTest):
 
         self.assertIsInstance(self.char1.location, TerrainRoom)
         self.assertEqual(self.char1.location.coordinates, EAST_APPROACH)
-        self.assertEqual(self._tick(), before + 9000)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_each_gate_exit_lands_on_its_own_gate_approach_cell(self):
@@ -170,7 +177,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.east_gate)
-        self.assertEqual(self._tick(), before + 9000)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
     def test_north_from_south_approach_returns_to_the_south_gate_room(self):
@@ -179,7 +186,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         self._exit("north").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.south_gate)
-        self.assertEqual(self._tick(), before + 9000)
+        self.assertEqual(self._tick(), before + SOUTH_GATE_SECONDS)
 
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_intermediate_steps_each_advance_clock_by_one_wilderness_move(self):
@@ -189,11 +196,11 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIsInstance(self.char1.location, TerrainRoom)
         expected = self._tick()
         for _ in range(3):
-            expected += 9000
+            expected += WILDERNESS_STEP_SECONDS
             self._exit("east").at_traverse(self.char1, self.char1.location)
             self.assertEqual(self._tick(), expected)
 
-    def test_eight_leg_round_trip_advances_clock_by_exactly_72000(self):
+    def test_eight_leg_round_trip_advances_clock_by_each_resolved_edge(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
         from typeclasses.monsters import Monster
 
@@ -205,7 +212,12 @@ class WildernessGatewayExitTests(EvenniaTest):
         for _ in range(3):
             self._exit("west").at_traverse(self.char1, self.char1.location)
         self._exit("west").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(self._tick(), before + 8 * 9000)
+        self.assertEqual(
+            self._tick(),
+            before
+            + 2 * EAST_GATE_SECONDS
+            + 6 * WILDERNESS_STEP_SECONDS,
+        )
         self.assertIs(self.char1.location, self.east_gate)
         # The return-exit cleanup drops the player, but each visited coordinate
         # keeps its deterministic population monster (wilderness-monster-

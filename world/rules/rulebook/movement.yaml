@@ -1,0 +1,29 @@
+# Distance-bearing travel calibration (world-map-scale design §10).
+#
+# Unit contract: every authored speed is integer meters per hour, so a duration
+# is exact until the single upward rounding of one committed traversal. Never
+# infer meters from the legacy seconds constants in clock.yaml; the wilderness
+# cell span is declared by the map provider (WILDERNESS_KM_PER_CELL) and passed
+# explicitly into the shared calculation.
+terrain_meters_per_hour:
+  # Settlement walking and good wilderness road: 1.25 m/s.
+  settlement: 4500
+  road: 4500
+  # Open off-road ground: 3 km/h.
+  open_ground: 3000
+  # Passable forest path/woodland: 2 km/h.
+  woodland: 2000
+  # Rough mountain trail: 1.5 km/h.
+  mountain_trail: 1500
+
+# Deterministic wilderness terrain model keys (world.lore.wilderness_regions)
+# mapped onto the travel contexts above. A region added without a row here is a
+# startup error, never a silent default speed.
+wilderness_terrain:
+  north_deep_forest: woodland
+  central_mountains: mountain_trail
+  southeast_coast: open_ground
+  eastern_plains: open_ground
+  southwest_coast: open_ground
+  northwest_highland_forest: woodland
+  western_hills_valleys: open_ground

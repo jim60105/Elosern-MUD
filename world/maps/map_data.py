@@ -24,17 +24,23 @@ module.
 from types import MappingProxyType
 
 from world.maps.altoria_capital import NODE_IDS as _CAPITAL_NODE_IDS
+from world.maps.altoria_capital import (
+    PHYSICAL_POSITIONS as _CAPITAL_PHYSICAL_POSITIONS,
+)
 from world.maps.altoria_capital import ROADS as _CAPITAL_ROADS
 from world.maps.altoria_capital import XYMAP_DATA as _CAPITAL_XYMAP_DATA
 from world.maps.sparse_graph import build_sparse_graph
 from world.maps.village_ciaran import NODE_IDS as _VILLAGE_NODE_IDS
+from world.maps.village_ciaran import (
+    PHYSICAL_POSITIONS as _VILLAGE_PHYSICAL_POSITIONS,
+)
 from world.maps.village_ciaran import ROADS as _VILLAGE_ROADS
 from world.maps.village_ciaran import XYMAP_DATA as _VILLAGE_XYMAP_DATA
 
 XYMAP_DATA_LIST = [_CAPITAL_XYMAP_DATA, _VILLAGE_XYMAP_DATA]
 
 
-def _build_graph(map_data, node_ids, roads):
+def _build_graph(map_data, node_ids, roads, physical_positions):
     return build_sparse_graph(
         map_id=str(map_data["zcoord"]),
         prototypes=map_data["prototypes"],
@@ -42,16 +48,23 @@ def _build_graph(map_data, node_ids, roads):
         roads=roads,
         options=map_data.get("options"),
         exit_prototype=map_data["prototypes"].get(("*", "*", "*"), {}),
+        physical_positions=physical_positions,
     )
 
 
 SETTLEMENT_GRAPHS = MappingProxyType(
     {
         str(_CAPITAL_XYMAP_DATA["zcoord"]): _build_graph(
-            _CAPITAL_XYMAP_DATA, _CAPITAL_NODE_IDS, _CAPITAL_ROADS
+            _CAPITAL_XYMAP_DATA,
+            _CAPITAL_NODE_IDS,
+            _CAPITAL_ROADS,
+            _CAPITAL_PHYSICAL_POSITIONS,
         ),
         str(_VILLAGE_XYMAP_DATA["zcoord"]): _build_graph(
-            _VILLAGE_XYMAP_DATA, _VILLAGE_NODE_IDS, _VILLAGE_ROADS
+            _VILLAGE_XYMAP_DATA,
+            _VILLAGE_NODE_IDS,
+            _VILLAGE_ROADS,
+            _VILLAGE_PHYSICAL_POSITIONS,
         ),
     }
 )

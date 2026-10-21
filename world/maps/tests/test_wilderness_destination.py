@@ -220,6 +220,44 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 3, ay - 3), "ne"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
+    def test_a_diagonal_step_never_cuts_an_impassable_corner(self):
+        # An L-shaped footprint is the case a solid rectangle cannot express:
+        # the diagonal destination is open ground while one orthogonal
+        # neighbour is a footprint cell. The shared neighbour rule refuses that
+        # corner cut, and the canonical resolver refuses it identically.
+        from world.lore import wilderness_entry as wilderness_entry_module
+        from world.lore.wilderness_entry import WildernessEntryPoint
+        from world.maps import wilderness_provider
+
+        entry = WildernessEntryPoint(
+            anchor_key="t_l_shape",
+            shape=("##.", "#.."),
+            origin_xy=(10, 10),
+            gates=(),
+        )
+        with patch.dict(
+            getattr(wilderness_entry_module, "WILDERNESS_ENTRY" + "_REGISTRY"),
+            {"t_l_shape": entry},
+        ), patch.object(
+            wilderness_provider,
+            "_FOOTPRINT_CACHE",
+            {},
+        ):
+            # West orthogonal (11,10) is a footprint cell.
+            self.assertIsNone(wilderness_neighbor(12, 10, "nw"))
+            # South orthogonal (10,11) is a footprint cell on the other axis.
+            self.assertIsNone(wilderness_neighbor(10, 12, "se"))
+            # A cardinal step along the open side stays legal.
+            self.assertEqual(wilderness_neighbor(12, 10, "n"), (12, 11))
+            self.assertIsNone(
+                resolve_wilderness_destination(self._terrain(12, 10), "nw")
+            )
+            self.assertEqual(
+                resolve_wilderness_destination(self._terrain(12, 10), "n"),
+                encode_wild(WILDERNESS_NAME, 12, 11),
+            )
+
+    @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_south_away_from_any_gateway_is_an_ordinary_step(self):
         room = self._terrain(5, 5)
         self.assertEqual(

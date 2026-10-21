@@ -33,7 +33,10 @@ from world.rules.party import (
 )
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
+#: Resolved physical durations: east-gate approach 21,601 s at 1.25 m/s, and
+#: one 10 km open-ground wilderness step 12,000 s.
+EAST_GATE_SECONDS = 21601
+WILDERNESS_STEP_SECONDS = 12000
 
 
 def _east_gate_probe():
@@ -366,7 +369,7 @@ class WildernessFollowTests(EvenniaTest):
         self.assertEqual(first.location.coordinates, ENTRY_XY)
         self.assertIsInstance(second.location, TerrainRoom)
         self.assertEqual(second.location.coordinates, ENTRY_XY)
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
 
     @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
@@ -377,7 +380,7 @@ class WildernessFollowTests(EvenniaTest):
         self._exit("east").at_traverse(self.char1, self.char1.location)
         self.assertEqual(self.char1.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
         self.assertEqual(companion.location.coordinates, (ENTRY_XY[0] + 1, ENTRY_XY[1]))
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + WILDERNESS_STEP_SECONDS)
 
     @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
     @covers_requirement("party-system::companions-follow-the-player-through-every-exit-traversal")
@@ -390,7 +393,7 @@ class WildernessFollowTests(EvenniaTest):
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.east_gate)
         self.assertIs(companion.location, self.east_gate)
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
 
     def test_return_clears_the_wilderness_registration(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript

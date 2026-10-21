@@ -200,11 +200,13 @@ rejected. During an active persistent combat session, CmdCast SHALL NOT advance 
   `settle_combat_result(..., AdvanceSource.COMBAT)` at terminal settlement
 
 ### Requirement: move and converse command-default time costs are declared as rulebook data only
-`world/rules/rulebook/clock.yaml`'s `command_defaults` mapping SHALL declare valid authored `move` and
-`converse` durations (design doc §6.5's flat defaults). `move` SHALL be consumed by every successful
-traversal of a `typeclasses.exits.Exit` or `typeclasses.exits.CostedXYZExit` instance by a
-`PlayerCharacter`, via `world.rules.movement.charge_movement()` (the `movement-cost-charging`
-capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia command.
+`world/rules/rulebook/clock.yaml`'s `command_defaults` SHALL declare valid
+authored `move` and `converse` durations (design doc §6.5's flat defaults);
+`move` supplies only non-distance connector defaults. Distance-bearing outdoor
+traversal of a `typeclasses.exits.Exit` or `CostedXYZExit` instance by a
+`PlayerCharacter` consumes resolved physical durations via
+`world.rules.movement.charge_movement()`. No bespoke `move` or `converse`
+Evennia command SHALL be added.
 
 #### Scenario: move and converse defaults are declared
 - **WHEN** `rulebook/clock.yaml`'s `command_defaults` is inspected
@@ -225,7 +227,7 @@ capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia co
 #### Scenario: A successful exit traversal advances the clock by the move cost
 - **WHEN** a `PlayerCharacter` successfully traverses a `typeclasses.exits.Exit` or
   `typeclasses.exits.CostedXYZExit` instance
-- **THEN** `WorldClock.tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`
+- **THEN** `WorldClock.tick` increases by exactly the resolved physical duration for an outdoor edge or the authored connector duration otherwise
 
 #### Scenario: converse remains unconsumed
 - **WHEN** `world/rules/rulebook/clock.yaml`'s `converse` value is inspected for any consumer added by

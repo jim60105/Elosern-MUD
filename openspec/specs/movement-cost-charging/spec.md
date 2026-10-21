@@ -1,25 +1,72 @@
 ## Purpose
 
-Define the single, shared movement-cost charging entry point: `charge_movement()` resolves a cost from
-`CLOCK_YAML["command_defaults"]` and advances the world clock only for a `PlayerCharacter`, and every
-non-teleport exit lineage charges successful player movement through it via
+Define the single, shared movement-cost charging entry point: `charge_movement()` resolves a
+distance-bearing outdoor traversal's physical duration from authored geometry and the slowest
+eligible source-present traveller's terrain speed (or a non-distance connector's authored
+`command_defaults` duration) and advances the world clock only for a player-driven traverser.
+Every non-teleport exit lineage charges successful player movement through it via
 `MovementCostMixin.at_post_traverse` — never through a bespoke, inline `advance()` call.
 
 ## Requirements
 
+### Requirement: Distance-bearing traversal uses authored physical geometry
+Distance-bearing outdoor traversal SHALL use Euclidean straight-edge length or full authored meter polyline length and terrain speed. The entire committed duration SHALL round upward once. Coordinate-free interior connectors SHALL retain explicit durations without invented district-length door distances.
+
+#### Scenario: Healthy segment and bent road
+- **WHEN** a healthy party traverses (0,0) to (60,80), then separately (0,0)->(0,60)->(80,60)
+- **THEN** the 100m straight edge costs 80s at 1.25m/s; the 140m bent edge costs 112s; no hidden detour/elevation factor applies.
+
+#### Scenario: Once-only rounding
+- **WHEN** two physical legs take 0.4s each
+- **THEN** the traversal commits 1s, not 2s; coordinate precision introduces no per-meter commands.
+
+#### Scenario: Scale is explicit
+- **WHEN** the same road calculation consumes declared wilderness cell spans of 10000m and 1000m
+- **THEN** cardinal durations are 8000s and 800s respectively; no seconds-to-meters inference, fallback, or dual runtime authority exists.
+
+### Requirement: Terrain and the slowest eligible traveller determine speed
+Healthy settlement and good-road speed SHALL be 1.25m/s; open ground 3km/h, passable woodland 2km/h, rough mountain trail 1.5km/h. The slowest eligible source-present intended traveller SHALL determine party speed, including the commander body under possession.
+
+#### Scenario: Terrain calibration
+- **WHEN** healthy party traverses 1km road/open/woodland/mountain
+- **THEN** costs are 800/1200/1800/2400 seconds; five or six healthy members add no headcount penalty and combat agility or averaging never defines travel speed.
+
+#### Scenario: Restricted member
+- **WHEN** a present member sustains 1m/s while others sustain 1.25m/s over 100m
+- **THEN** cost is 100s; remote members are excluded from eligibility, charges and speed.
+
+#### Scenario: Diagonal and blocked corner
+- **WHEN** a 1km-grid road diagonal is evaluated
+- **THEN** it costs ceil(800 sqrt(2))=1132s; either impassable orthogonal neighbor rejects the diagonal before writes, consistently in resolver and traversal.
+
+### Requirement: Physical gate approaches are charged exactly once
+Gate crossings SHALL use authored absolute-meter approach geometry and the settlement anchor transform. Eligibility and edge resolution SHALL precede relocation. A crossing SHALL charge its physical segment once without adding duplicate wilderness and city hops.
+
+#### Scenario: Cross-layer approach
+- **WHEN** gate and approach lie at absolute (1000,1000) and (1300,1400)
+- **THEN** 500m at healthy road speed costs 400s in either direction; no extra full-cell step is charged.
+
+#### Scenario: No automatic travel-day quota
+- **WHEN** unreduced road costs are aggregated
+- **THEN** six walking hours correspond to 27km and 1200km to about 267 walking hours or 45 six-hour walking days; a seventh walking hour is legal, no unperformed rests/sleep are charged, no route automation or exact fifty-day relocation is introduced.
+
+#### Scenario: Existing flight waiver
+- **WHEN** an allowed owned flight user crosses wilderness
+- **THEN** the existing wilderness time waiver persists without a new flight speed; settlement walking is charged, flash_step alone does not waive wilderness time, and legality still runs before the waiver.
+
 ### Requirement: charge_movement() is the single, shared movement-cost charging function
 `world/rules/movement.py` SHALL provide `charge_movement(traversing_object,
 cost_key: str, *, source_location, wilderness_source_coordinates=None) -> None`.
-It resolves the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calls
-`get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` when
-`is_player_driven(traversing_object)` is true, doing nothing otherwise.
-`entities` is the traverser followed by the followers the follow step moves
-from `source_location`.
+It prices distance-bearing traversal from the preflight record and
+non-distance connectors from their authored duration, and calls
+`get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` only when
+`is_player_driven(traversing_object)`; `entities` is the traverser plus
+the followers the follow step moves from `source_location`.
 
 #### Scenario: charge_movement advances the clock by the resolved cost for a PlayerCharacter
 - **WHEN** `charge_movement(player_character, "move")` is called
 - **THEN** `get_world_clock().tick` after the call equals its value before the call plus
-  `CLOCK_YAML["command_defaults"]["move"]`
+  the resolved physical traversal duration (or authored non-distance connector duration)
 
 #### Scenario: charge_movement is a no-op for a non-PlayerCharacter traverser
 - **WHEN** `charge_movement(npc, "move")` is called for an `NPC`-typeclassed (not `PlayerCharacter`)
@@ -28,7 +75,7 @@ from `source_location`.
 
 #### Scenario: A possessed NPC charges movement like a player
 - **WHEN** `charge_movement(npc, "move")` is called for an NPC that is possessed and puppeted
-- **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["move"]` with
+- **THEN** the clock advances by the resolved physical traversal duration (or authored non-distance connector duration) with
   `AdvanceSource.COMMAND`, settling the possessed NPC first and then the commander's body and
   every companion co-located with it in the source room
 
@@ -44,13 +91,13 @@ from `source_location`.
 #### Scenario: The waiver does not extend to other cost keys
 - **WHEN** `charge_movement(player_character, "move")` is called on the same flight-owning
   `PlayerCharacter`
-- **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["move"]` exactly as it would for a
+- **THEN** the clock advances by the resolved physical traversal duration (or authored non-distance connector duration) exactly as it would for a
   non-flight-owning entity
 
 #### Scenario: A non-flight-owning PlayerCharacter still pays the wilderness_move cost
 - **WHEN** `charge_movement(player_character, "wilderness_move")` is called on a `PlayerCharacter` not
   owning `flight`
-- **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["wilderness_move"]`
+- **THEN** the clock advances by the resolved physical edge duration
 
 #### Scenario: Movement-event clock advancement is exclusive to charge_movement
 - **WHEN** any function or inline call site in this project is inspected for movement-event clock
@@ -154,20 +201,20 @@ evennia.contrib.grid.xyzgrid.xyzroom.XYZExit)`, likewise with `movement_cost_key
 
 #### Scenario: Exit charges move on successful traversal
 - **WHEN** a `PlayerCharacter` successfully traverses a plain `typeclasses.exits.Exit` instance
-- **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`
+- **THEN** `get_world_clock().tick` increases by exactly the resolved physical traversal duration (or authored non-distance connector duration)
 
 #### Scenario: CostedXYZExit charges move and preserves XYZExit's own coordinate behavior
 - **WHEN** a `CostedXYZExit` is created via `CostedXYZExit.create(key=..., location=..., destination=
   ...)` and a `PlayerCharacter` successfully traverses it
 - **THEN** `isinstance(exit_obj, evennia.contrib.grid.xyzgrid.xyzroom.XYZExit)` is `True`,
-  `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`, and the
+  `get_world_clock().tick` increases by exactly the resolved physical traversal duration (or authored non-distance connector duration), and the
   traversing object's location is the exit's destination
 
 #### Scenario: An instance-room exit pair charges move with no code change beyond Exit's own retrofit
 - **WHEN** an origin/return `Exit` pair is created with `typeclasses.exits.Exit.create()` (the exact
   call shape `world/maps/instance.py::spawn_instance_room()`, change 14, uses) and a
   `PlayerCharacter` successfully traverses either exit of the pair
-- **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]` per
+- **THEN** `get_world_clock().tick` increases by exactly the resolved physical traversal duration (or authored non-distance connector duration) per
   successful traversal, with no edit to change 14's own `spawn_instance_room()` required
 
 #### Scenario: Exit inherits the mixin's default cost key unmodified

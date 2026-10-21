@@ -262,6 +262,37 @@ NODE_IDS = {
     (4, 6): "palace_forecourt",
 }
 
+# Authored absolute meter position per coordinate (world-map-scale design §8).
+# Pre-activation the xyzgrid rooms stay on their compact display coordinates;
+# travel geometry already measures these approved positions, and the
+# metric-coordinate cutover later relocates the rooms onto them. The table is
+# keyed by the same coordinate as ``NODE_IDS``/``PROTOTYPES`` and must describe
+# exactly those cells (``build_sparse_graph()`` rejects drift both ways); the
+# stable identity remains ``NODE_IDS``, never a second name table.
+PHYSICAL_POSITIONS = {
+    (1, 1): (1250, 760),
+    (1, 3): (1300, 2600),
+    (2, 1): (2150, 920),
+    (2, 2): (2350, 1900),
+    (2, 3): (2420, 2700),
+    (2, 4): (2300, 3820),
+    (3, 0): (3050, 150),
+    (3, 1): (3140, 1050),
+    (3, 2): (3350, 1980),
+    (3, 3): (3500, 2850),
+    (3, 4): (3480, 3700),
+    (3, 5): (3500, 4850),
+    (4, 1): (3970, 1120),
+    (4, 3): (4380, 3000),
+    (4, 4): (4560, 3920),
+    (4, 5): (4690, 5010),
+    (4, 6): (4500, 6350),
+    (5, 1): (4830, 970),
+    (5, 3): (5380, 2850),
+    (5, 5): (5650, 5200),
+    (6, 3): (6500, 3010),
+}
+
 # Explicit roads (stable endpoint identities, one directed road per travel
 # direction). The sparse route adapter uses these edges and their physical
 # lengths instead of a coordinate lattice; the ASCII map above remains the

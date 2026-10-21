@@ -137,7 +137,7 @@ equals `self.db.gate_direction`.
 #### Scenario: A successful traversal advances the world clock by the wilderness_move cost
 - **WHEN** a character successfully traverses a `WildernessGateExit`
 - **THEN** `get_world_clock().tick` after the traversal equals its value before the traversal
-  plus `CLOCK_YAML["command_defaults"]["wilderness_move"]`
+  plus the resolved physical traversal duration
 
 #### Scenario: An unsuccessful traversal does not advance the clock and records nothing
 - **WHEN** `enter_wilderness()` returns `False` (for example, the gate's landing cell is somehow
@@ -276,7 +276,7 @@ destination node.
 #### Scenario: Traversing south from the registered entry coordinate advances the clock and records the grid node
 - **WHEN** a character successfully traverses the `"south"` exit at a registered entry coordinate
 - **THEN** `get_world_clock().tick` after the traversal equals its value before the traversal plus
-  `CLOCK_YAML["command_defaults"]["wilderness_move"]`, and the character's map-knowledge record
+  the resolved physical traversal duration, and the character's map-knowledge record
   contains the returned grid room's `grid:` node
 
 #### Scenario: An ordinary intermediate step advances the clock and records the wilderness node
@@ -284,18 +284,12 @@ destination node.
   `wilderness_xy` successfully traverses any directional exit (an ordinary wilderness step, taking
   neither special-cased branch)
 - **THEN** `get_world_clock().tick` after the traversal equals its value before the traversal plus
-  `CLOCK_YAML["command_defaults"]["wilderness_move"]`, and the character's map-knowledge record
+  the resolved physical traversal duration, and the character's map-knowledge record
   contains the destination's `wild:` node
 
 #### Scenario: An N-step round trip advances the clock by exactly N times wilderness_move
-- **WHEN** a character enters the wilderness through `WildernessGateExit`, takes three consecutive
-  intermediate steps in one direction, three consecutive steps back in the opposite direction, and
-  finally traverses `"south"` from the registered entry coordinate back to the grid — eight successful
-  traversals in total, only two of which (the entry and the final return) take a special-cased
-  routing branch
-- **THEN** `get_world_clock().tick` after the whole round trip equals its value before the trip plus
-  exactly `8 * CLOCK_YAML["command_defaults"]["wilderness_move"]` — proving no step, including the six
-  ordinary intermediate ones, is free
+- **WHEN** a party completes an N-edge round trip
+- **THEN** the clock advances by the sum of all individually resolved edge durations, including diagonal and approach distances, subject to the existing flight waiver; arrivals record actual nodes.
 
 #### Scenario: A failed traversal does not advance the clock and records nothing
 - **WHEN** a traversal through `WildernessReturnExit` fails its underlying validity/veto check (for
@@ -334,16 +328,8 @@ destination node.
 - **THEN** it SHALL NOT advance the clock and SHALL NOT record an observation
 
 #### Scenario: Background — the both-branches fix closes a free-step defect
-- **WHEN** `ElosernWildernessMapProvider.exit_typeclass = WildernessReturnExit` installs this
-  class on all eight directional exits at every wilderness coordinate (the
-  `wilderness-map-provider` capability)
-- **THEN** advancing the clock only from the registered return branch would make every
-  intermediate step of a continent crossing cost nothing — contradicting the whole point of
-  wiring wilderness movement to `WorldClock` at all
-- **AND** folding both call sites onto the one shared completion helper (rather than each
-  duplicating `get_world_clock().advance()` independently) is this change's own contribution:
-  the same fix, now expressed once instead of twice, and consistent with how every other
-  movement lineage in the project charges (`movement-cost-charging` capability)
+- **WHEN** the authored eight-edge round trip succeeds
+- **THEN** its cost equals the sum of its eight resolved physical edge durations and every actual arrival is recorded once, retaining the existing flight waiver.
 
 ### Requirement: Leaving the wilderness through WildernessReturnExit triggers ordinary cleanup
 When a traversing object leaves a `TerrainRoom` through `WildernessReturnExit`'s grid-routing branch,
@@ -442,10 +428,7 @@ to that gate's `return_direction`**.
   carry the wilderness return wording with the entry's `display_name_zh` in aliases
 
 ### Requirement: wilderness_move is a new, distinct clock cost, not a reuse of the grid's move constant
-`world/rules/rulebook/clock.yaml::command_defaults` SHALL include the distinct authored `wilderness_move`
-(seconds) key, independent of the existing `move` entry. No code in this change SHALL read `move` for
-wilderness traversal, and no code from change 12 (grid traversal) SHALL be modified to read
-`wilderness_move`.
+The wilderness traversal context SHALL remain distinct for the existing flight waiver. Physical outdoor edge distance and sustainable speed SHALL determine duration; no fixed wilderness seconds authority SHALL remain. Non-distance connectors SHALL use explicit authored durations.
 
 #### Scenario: wilderness_move is present and distinct from move
 - **WHEN** `world/rules/rulebook/clock.yaml` is inspected after this change lands
@@ -454,18 +437,18 @@ wilderness traversal, and no code from change 12 (grid traversal) SHALL be modif
 #### Scenario: Grid traversal is unaffected
 - **WHEN** a character traverses an intra-city `CostedXYZExit` created by change 12's `sync_grid()`
   with this change's `("*", "*", "*")` wildcard prototype override
-- **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`, and
-  no grid-traversal code reads `wilderness_move` ;  grid traversal is unaffected by the wilderness
+- **THEN** `get_world_clock().tick` increases by exactly the resolved physical edge duration, and
+  no grid-traversal code reads the wilderness travel context ;  grid traversal is unaffected by the wilderness
   cost, charging the ordinary `move` cost instead
 
 #### Scenario: Amended 2026-08-01 change map-movement-clock background
 - **WHEN** the previous wording's claim that intra-city grid traversal "remains unwired to the
   clock" is re-read
 - **THEN** that statement is false, since `map-movement-clock` wires every intra-city link to
-  charge `command_defaults.move` through `CostedXYZExit` (the `sample-city-altoria`
+  charge the authored non-distance connector duration or resolved outdoor edge duration through `CostedXYZExit` (the `sample-city-altoria`
   capability)
 - **AND** the distinctness claim that is this requirement's real subject is unchanged:
-  wilderness steps pay `wilderness_move`, grid steps pay `move`, and the two lineages never
+  wilderness steps pay the wilderness travel context, grid steps pay `move`, and the two lineages never
   read each other's constant; the amended scenario above asserts exactly that
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence

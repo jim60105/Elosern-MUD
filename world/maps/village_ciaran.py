@@ -136,6 +136,21 @@ NODE_IDS = {
     (2, 3): "silver_leaf_slope",
 }
 
+# Authored absolute meter position per coordinate (world-map-scale design §9),
+# the same pre-activation contract as the capital's table.
+PHYSICAL_POSITIONS = {
+    (0, 1): (35, 270),
+    (1, 0): (245, 135),
+    (1, 1): (220, 305),
+    (1, 2): (200, 465),
+    (1, 3): (165, 650),
+    (2, 0): (430, 85),
+    (2, 1): (405, 335),
+    (2, 2): (390, 495),
+    (2, 3): (440, 665),
+    (3, 1): (590, 300),
+}
+
 ROADS = (
     ("hidden_path", "village_plaza"),
     ("village_plaza", "hidden_path"),
