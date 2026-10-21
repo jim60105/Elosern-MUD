@@ -420,7 +420,12 @@ class EconomyCommandBranchTests(TestCase):
     def test_inventory_reports_wallet_empty_and_grouped_items(self):
         command = _command(CmdInventory)
         command.caller.db.wallet = None
-        with patch("commands.economy.list_items", return_value=[]):
+        # A plain mock caller is not a PlayerCharacter, so the purse-owner
+        # resolution (possessed-companion shop access) is stubbed here; this
+        # case owns the wallet/grouping formatting only.
+        with patch(
+            "commands.economy.resolve_commander", return_value=command.caller
+        ), patch("commands.economy.list_items", return_value=[]):
             command.func()
         self.assertEqual(
             [call.args[0] for call in command.caller.msg.call_args_list],
@@ -429,7 +434,9 @@ class EconomyCommandBranchTests(TestCase):
 
         command.caller.msg.reset_mock()
         command.caller.db.wallet = 7
-        with patch("commands.economy.list_items", return_value=["sword", "meal", "meal"]):
+        with patch(
+            "commands.economy.resolve_commander", return_value=command.caller
+        ), patch("commands.economy.list_items", return_value=["sword", "meal", "meal"]):
             command.func()
         self.assertEqual(command.caller.msg.call_args_list[0].args[0], "錢包：7 銅")
         self.assertEqual(command.caller.msg.call_args_list[1].args[0], "  meal ×2\n  sword ×1")
@@ -457,6 +464,8 @@ class EconomyCommandBranchTests(TestCase):
         command.caller.db.wallet = 0
         scope = synthetic_registries("items", extra={"items": {gear.key: gear}})
         with patch(
+            "commands.economy.resolve_commander", return_value=command.caller
+        ), patch(
             "commands.economy.list_items",
             return_value=[gear.key, "t_ember_spray"],
         ), scope, patch.dict(
