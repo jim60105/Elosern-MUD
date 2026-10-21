@@ -604,6 +604,56 @@ class TerrainCalibrationTests(EvenniaTest):
             [Fraction(4500), Fraction(1500)],
         )
 
+    @covers_requirement("movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance")
+    def test_fatigue_consumption_carries_across_terrain_legs(self):
+        from fractions import Fraction
+
+        from world.rules import travel_cost
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+
+        member = create_object(NPC, key="split-leg walker")
+        initialize_fatigue_state(member)
+        write_fatigue_state(member, 252320, SleepPosture.AWAKE)
+
+        def synthetic(state, terrain):
+            if state is not None and state.reserve_units > 252000:
+                return Fraction(4500)
+            return Fraction(2250)
+
+        with patch.object(travel_cost, "_state_speed_m_per_hour", synthetic):
+            split = plan_traversal(
+                ((50.0, "settlement"), (50.0, "settlement")), [member]
+            )
+            whole = plan_traversal(((100.0, "settlement"),), [member])
+        # The 40 s threshold is reached inside the first leg; the second leg
+        # must see the consumed reserve, so the split plan equals the whole
+        # 100 m edge (40 s + 80 s) instead of charging 40 s twice.
+        self.assertEqual(split.seconds, 120)
+        self.assertEqual(split.seconds, whole.seconds)
+
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_depletion_across_combined_legs_is_refused(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+
+        member = create_object(NPC, key="cross-leg walker")
+        initialize_fatigue_state(member)
+        # 800 units = 100 s at 8 units/s; severe speed on open ground is
+        # 5/12 m/s, so each 40 m leg costs 96 s and the pair 192 s.
+        write_fatigue_state(member, 800, SleepPosture.AWAKE)
+        with self.assertRaises(MovementPreflightRefused) as caught:
+            plan_traversal(((40.0, "open_ground"), (40.0, "open_ground")), [member])
+        self.assertEqual(caught.exception.reason, "pre_destination_depletion")
+        # Either leg alone is affordable; only the combined traversal is not.
+        self.assertLess(plan_traversal(((40.0, "open_ground"),), [member]).seconds, 100)
+
     @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
     def test_a_non_distance_connector_refuses_exhaustion_before_arrival(self):
         from world.rules.fatigue import (

@@ -333,29 +333,25 @@ class TraversalPlan:
     members: tuple[Any, ...]
 
 
-def _advance_predicted_state(
-    state: FatigueState | None, seconds: Fraction
-) -> FatigueState | None:
-    """Apply one exact boundary offset to a predicted state (no writes).
+def _predicted_state(reserve_units: int, elapsed: Fraction) -> FatigueState:
+    """The predicted state of one body after exact fractional ``elapsed``.
 
-    Only a computed member/terrain boundary calls this, and every boundary
-    offset is ``(reserve - floor) / rate``, so ``rate * seconds`` is always an
-    exact whole number of reserve units. The posture latches forced at zero.
+    Foot-travel consumption is exactly linear in elapsed time, so every
+    segment start (including the start of a later terrain leg) is derived from
+    the member's initial reserve and the traversal's exact elapsed time rather
+    than from a per-segment state that flooring would drift. The stored state
+    is integral: the reserve is truncated and the residual fraction still
+    belongs to the same band, while a fully consumed reserve is the forced
+    latch.
     """
 
-    if state is None:
-        return None
     rate = Fraction(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
-    reserve = Fraction(state.reserve_units) + rate * seconds
-    if reserve.denominator != 1:
-        raise TravelRulebookError(
-            "a boundary offset must consume a whole mental-reserve unit"
+    exact = Fraction(reserve_units) + rate * elapsed
+    if exact <= 0:
+        return FatigueState(
+            reserve_units=0, posture=SleepPosture.FORCED
         )
-    units = int(reserve)
-    return FatigueState(
-        reserve_units=units,
-        posture=SleepPosture.AWAKE if units > 0 else SleepPosture.FORCED,
-    )
+    return FatigueState(reserve_units=int(exact), posture=SleepPosture.AWAKE)
 
 
 def plan_traversal(
@@ -378,10 +374,13 @@ def plan_traversal(
         raise MovementPreflightRefused(
             "no_travellers", "a distance-bearing traversal needs at least one traveller"
         )
-    states: tuple[FatigueState | None, ...] = tuple(
-        _fatigue_state(member) for member in members
+    initial_states = tuple(_fatigue_state(member) for member in members)
+    initial_reserves = tuple(
+        None if state is None else state.reserve_units for state in initial_states
     )
+    rate = Fraction(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
     total_distance = Fraction(0)
+    elapsed = Fraction(0)
     segments: list[TraversalSegment] = []
     for distance_m, terrain in legs:
         if distance_m < 0:
@@ -389,22 +388,45 @@ def plan_traversal(
         remaining = Fraction(distance_m)
         total_distance += remaining
         while remaining > 0:
+            states = tuple(
+                None if reserve is None else _predicted_state(reserve, elapsed)
+                for reserve in initial_reserves
+            )
+            if any(
+                state is not None and state.posture is SleepPosture.FORCED
+                for state in states
+            ):
+                # A member exhausted on an earlier leg: the destination is
+                # still ahead, so this departure can never complete.
+                raise MovementPreflightRefused(
+                    "pre_destination_depletion", DEPLETION_MESSAGE
+                )
             speeds = [_state_speed_m_per_hour(state, terrain) for state in states]
             speed = min(speeds)
             if speed <= 0:
                 raise TravelRulebookError("travel speed must be positive")
             metres_per_second = speed / 3600
-            boundaries = [
-                boundary
-                for state in states
-                if state is not None
-                for boundary in (
-                    next_fatigue_boundary(state, FatigueActivity.FOOT_TRAVEL),
+            # Each boundary offset is measured against the exact fractional
+            # reserve (not its truncated state), so a carried fraction from an
+            # earlier leg is never dropped.
+            boundaries: list[tuple[Fraction, BoundaryKind]] = []
+            for reserve, state in zip(initial_reserves, states):
+                if reserve is None or state is None:
+                    continue
+                boundary = next_fatigue_boundary(
+                    state, FatigueActivity.FOOT_TRAVEL
                 )
-                if boundary is not None
-            ]
+                if boundary is None:
+                    continue
+                exact_reserve = Fraction(reserve) + rate * elapsed
+                boundaries.append(
+                    (
+                        (exact_reserve - boundary.reserve_units) / -rate,
+                        boundary.kind,
+                    )
+                )
             boundary_seconds = (
-                min(item.offset_seconds for item in boundaries) if boundaries else None
+                min(offset for offset, _ in boundaries) if boundaries else None
             )
             if boundary_seconds is None:
                 segments.append(
@@ -414,6 +436,7 @@ def plan_traversal(
                         speed_m_per_hour=speed,
                     )
                 )
+                elapsed += remaining / metres_per_second
                 break
             coverable = metres_per_second * boundary_seconds
             if remaining <= coverable:
@@ -426,11 +449,11 @@ def plan_traversal(
                         speed_m_per_hour=speed,
                     )
                 )
+                elapsed += remaining / metres_per_second
                 break
             if boundary_seconds <= 0 or any(
-                item.kind is BoundaryKind.DEPLETION
-                and item.offset_seconds == boundary_seconds
-                for item in boundaries
+                kind is BoundaryKind.DEPLETION and offset == boundary_seconds
+                for offset, kind in boundaries
             ):
                 # A member reaches zero (or already is) before this leg -- and
                 # therefore before the destination -- completes.
@@ -445,10 +468,7 @@ def plan_traversal(
                 )
             )
             remaining -= coverable
-            states = tuple(
-                _advance_predicted_state(state, boundary_seconds) for state in states
-            )
-    elapsed = sum((segment.seconds for segment in segments), Fraction(0))
+            elapsed += boundary_seconds
     return TraversalPlan(
         distance_m=total_distance,
         segments=tuple(segments),

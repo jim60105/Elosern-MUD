@@ -233,6 +233,24 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertEqual(state.reserve_units, 0)
         self.assertIs(state.posture, SleepPosture.FORCED)
 
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_a_rested_but_forced_sleeping_connector_traveller_is_refused_before_writes(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        npc = self._companion()
+        # Plenty of reserve, but the forced-sleep latch alone forbids travel;
+        # the shared preflight (not the later post-relocation charge) must
+        # refuse the plain connector.
+        write_fatigue_state(npc, 300000, SleepPosture.FORCED)
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        before = get_world_clock().tick
+        self.assertIsNone(exit_obj.at_traverse(self.char1, self.room2))
+        self.assertIs(self.char1.location, self.room1)
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.char1)
+
     @covers_requirement("movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces")
     def test_late_failure_restores_each_traveller_mental_state(self):
         from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
