@@ -1011,13 +1011,13 @@ def _sleep_handoff_context(
     other state keeps the ordinary possession path.
     """
     from world.rules.party_scope import PartyScopeError, resolve_commander
-    from world.rules.possession import sleep_handoff_candidates
+    from world.rules.possession import _resolve_account, sleep_handoff_candidates
 
     try:
         commander = resolve_commander(actor)
     except PartyScopeError:  # observability: ignore R2: no commander means no contextual handoff; the ordinary gate reports it
         return None
-    account = getattr(commander, "account", None)
+    account = _resolve_account(commander, actor)
     if account is None:
         return None
     options = sleep_handoff_candidates(account, commander, actor, session=session)

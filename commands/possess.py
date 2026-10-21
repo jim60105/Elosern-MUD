@@ -21,6 +21,7 @@ from world.rules.possession import (
     PossessionGateError,
     PossessionWriteError,
     _account_characters,
+    _resolve_account,
     _resolve_live_object,
     confirm_sleep_handoff,
     current_possession,

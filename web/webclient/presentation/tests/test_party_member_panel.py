@@ -20,6 +20,7 @@ party-panel-v3-view-member precedent):
 
 from copy import deepcopy
 import unittest
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -58,6 +59,9 @@ from world.quests.runtime import QuestRecord, QuestState, to_storage
 from world.quests.tests._fixtures import QuestRegistryIsolation, escort, quest, register
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
+from world.rules.fatigue import SleepPosture, write_fatigue_state
+from world.rules.possession import enter_possession
+from world.rules.time_skip import enter_sleep
 from world.rules.party import (
     ESCORT_BOUND_MESSAGE,
     HANDBACK_FIRST_MESSAGE,
@@ -519,6 +523,69 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         ]
         add_temporary_source(npc, owner, record.quest_id, "escortee")
         return npc, record
+
+    @covers_requirement(
+        "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
+    )
+    def test_sleep_handoff_enables_lawful_candidates_and_the_return_descriptor(self):
+        """A committed sleep handoff replaces the ordinary refusal for candidates."""
+        self.player.account = self.account
+        self.account.characters.add(self.player)
+        self.session.puppet = self.player
+        self.player.sessions.add(self.session)
+        sleeper = _companion("沉睡同伴", self.room)
+        join_party(sleeper, self.player)
+        write_fatigue_state(sleeper, 360000, SleepPosture.AWAKE)
+        candidate = _companion("清醒同伴", self.room)
+        join_party(candidate, self.player)
+        write_fatigue_state(candidate, 360000, SleepPosture.AWAKE)
+        enter_possession(self.player, sleeper)
+        entry = enter_sleep(sleeper)
+        self.assertTrue(entry.handoff_offered)
+
+        # The sleeping body keeps its existing release control.
+        own = self._render(actor=sleeper, member=sleeper)
+        release = next(
+            action
+            for action in own["companion"]["actions"]
+            if action["action_id"] == ACTION_POSSESS_RELEASE
+        )
+        self.assertTrue(release["enabled"])
+
+        # An awake candidate is enabled although the account already possesses.
+        candidate_panel = self._render(actor=sleeper, member=candidate)
+        possess = next(
+            action
+            for action in candidate_panel["companion"]["actions"]
+            if action["action_id"] == ACTION_POSSESS
+        )
+        self.assertTrue(possess["enabled"])
+        self.assertIsNone(possess["reason"])
+
+        # A candidate that falls asleep drops back to the ordinary refusal.
+        write_fatigue_state(candidate, 3600, SleepPosture.VOLUNTARY)
+        candidate_panel = self._render(actor=sleeper, member=candidate)
+        possess = next(
+            action
+            for action in candidate_panel["companion"]["actions"]
+            if action["action_id"] == ACTION_POSSESS
+        )
+        self.assertFalse(possess["enabled"])
+        self.assertTrue(possess["reason"])
+
+        # The lawful contextual choice also survives an active combat gate.
+        write_fatigue_state(candidate, 360000, SleepPosture.AWAKE)
+        with patch(
+            "world.rules.combat_session.is_in_active_session",
+            side_effect=lambda actor: actor is sleeper,
+        ):
+            candidate_panel = self._render(actor=sleeper, member=candidate)
+            possess = next(
+                action
+                for action in candidate_panel["companion"]["actions"]
+                if action["action_id"] == ACTION_POSSESS
+            )
+        self.assertTrue(possess["enabled"])
 
     @covers_requirement(
         "webclient-party-member-panel::the-party-member-panel-is-an-exact-read-only-version-1-panel"

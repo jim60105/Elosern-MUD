@@ -304,9 +304,9 @@ def _descriptor(
 
 def _sleep_handoff_options(commander: Any, actor: Any) -> Any | None:
     """The committed contextual handoff choices, or None outside that context."""
-    from world.rules.possession import sleep_handoff_candidates
+    from world.rules.possession import _resolve_account, sleep_handoff_candidates
 
-    account = getattr(commander, "account", None)
+    account = _resolve_account(commander, actor)
     if account is None:
         return None
     try:
