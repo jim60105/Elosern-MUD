@@ -477,9 +477,10 @@ def build_sparse_graph(
     ``node_ids`` is the authored identity table (coordinate → stable slug) and
     must describe exactly the prototype coordinates: a missing or extra entry is
     a graph error, so identity and room data cannot drift apart silently.
-    ``physical_positions`` is the authored meter position table keyed by stable
-    identity; it must describe exactly the same identities, and it is the only
-    source of edge lengths when present.
+    ``physical_positions`` is the authored meter position table keyed by the
+    same coordinate as ``node_ids``; it must describe exactly those cells, and
+    it is the only source of edge lengths when present (identity is still the
+    stable slug, never a second name table).
     """
 
     prototype_coords = {
@@ -497,16 +498,16 @@ def build_sparse_graph(
         )
     if physical_positions is not None:
         declared = set(physical_positions)
-        identities = set(node_ids.values())
-        if declared != identities:
-            missing = sorted(identities - declared)
-            extra = sorted(declared - identities)
+        coordinates = set(node_ids)
+        if declared != coordinates:
+            missing = sorted(coordinates - declared)
+            extra = sorted(declared - coordinates)
             raise SparseGraphError(
-                f"map {map_id!r} physical position table disagrees with node identities "
-                f"(identities without physical positions: {missing}; "
-                f"unknown physical identities: {extra})"
+                f"map {map_id!r} physical position table disagrees with node coordinates "
+                f"(coordinates without physical positions: {missing}; "
+                f"unknown physical coordinates: {extra})"
             )
-        for node_id, position in physical_positions.items():
+        for coordinate, position in physical_positions.items():
             if (
                 not isinstance(position, tuple)
                 or len(position) != 2
@@ -514,7 +515,7 @@ def build_sparse_graph(
                 or not _is_int(position[1])
             ):
                 raise SparseGraphError(
-                    f"map {map_id!r} physical position for {node_id!r} "
+                    f"map {map_id!r} physical position for {coordinate!r} "
                     "must be an integer pair"
                 )
     nodes = [
@@ -524,7 +525,7 @@ def build_sparse_graph(
             y=coordinate[1],
             prototype=dict(prototypes[coordinate]),
             physical=(
-                physical_positions[node_ids[coordinate]]
+                physical_positions[coordinate]
                 if physical_positions is not None
                 else None
             ),

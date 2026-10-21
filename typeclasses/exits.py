@@ -281,7 +281,7 @@ class MovementCostMixin:
                     destination=target_location,
                     traverse=traverse_stock,
                 )
-        except MovementPreflightRefused as error:
+        except MovementPreflightRefused as error:  # observability: ignore R2: a refused preflight is the documented clean-refusal path; the structured event below is its observable surface and the traversal proceeds with no writes
             log_traversal_refusal("movement_cost_mixin", traversing_object, error.reason)
             return None
 
@@ -412,7 +412,7 @@ class WildernessGateExit(Exit):
                     wilderness_coordinates=landing_cell,
                     traverse=gate_traversal,
                 )
-        except MovementPreflightRefused as error:
+        except MovementPreflightRefused as error:  # observability: ignore R2: a refused preflight is the documented clean-refusal path; the structured event below is its observable surface and the traversal proceeds with no writes
             log_traversal_refusal("wilderness_gate_exit", traversing_object, error.reason)
             return False
 
@@ -559,7 +559,7 @@ class WildernessReturnExit(WildernessExit):
                     wilderness_source_coordinates=wilderness_source_coordinates,
                     traverse=traverse,
                 )
-        except MovementPreflightRefused as error:
+        except MovementPreflightRefused as error:  # observability: ignore R2: a refused preflight is the documented clean-refusal path; the structured event below is its observable surface and the traversal proceeds with no writes
             log_traversal_refusal(
                 "wilderness_return_exit", traversing_object, error.reason
             )

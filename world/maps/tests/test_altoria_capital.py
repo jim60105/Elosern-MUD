@@ -3,9 +3,8 @@ Parsing and topology checks for the capital_altoria sample city."""
 
 from tools.spec_traceability import covers_requirement
 
-import unittest
-
 from evennia.contrib.grid.xyzgrid.xymap import XYMap
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.maps.altoria_capital import PROTOTYPES, XYMAP_DATA
 from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -99,8 +98,9 @@ EXPECTED_DIAGONALS = {
 }
 
 
-class AltoriaCapitalMapTests(unittest.TestCase):
+class AltoriaCapitalMapTests(EvenniaTestCase):
     def setUp(self):
+        super().setUp()
         self.map = XYMap(dict(XYMAP_DATA), Z="capital_altoria", xyzgrid=None)
         self.map.parse()
 
@@ -221,3 +221,28 @@ class AltoriaCapitalMapTests(unittest.TestCase):
             with self.subTest(coordinate=coordinate):
                 self.assertNotIn("interior", prototype["desc"].lower())
                 self.assertNotIn("inside", prototype["desc"].lower())
+
+    @covers_requirement("movement-cost-charging::physical-gate-approaches-are-charged-exactly-once")
+    def test_gate_approach_segments_pin_their_absolute_meter_endpoints(self):
+        from math import hypot
+
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+        from world.maps.wilderness_destination import gate_approach_distance_m
+        from world.rules.travel_cost import distance_traversal_cost
+
+        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        # 南門: gate local (3050,150) -> absolute (604550,1002300); approach
+        # cell (60,97) center (605000,975000): hypot(450, 27300).
+        south = gate_approach_distance_m(entry, entry.gate_for("n"))
+        self.assertAlmostEqual(south, hypot(450, 27300), places=6)
+        # 東門: gate local (6500,3010) -> absolute (608000,1005160); approach
+        # cell (63,100) center (635000,1005000): hypot(27000, 160).
+        east = gate_approach_distance_m(entry, entry.gate_for("w"))
+        self.assertAlmostEqual(east, hypot(27000, 160), places=6)
+        # One authored segment, charged in either direction at 1.25 m/s.
+        self.assertEqual(distance_traversal_cost(south, "settlement", [_Probe()]).seconds, 21843)
+        self.assertEqual(distance_traversal_cost(east, "settlement", [_Probe()]).seconds, 21601)
+
+
+class _Probe:
+    """An uninitialized body: the base speed, no fatigue attributes."""

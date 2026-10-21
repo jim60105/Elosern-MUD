@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from evennia.contrib.grid.xyzgrid.xymap import XYMap
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.village_ciaran import MAPSTR, PROTOTYPES, XYMAP_DATA
@@ -59,8 +60,9 @@ def _undirected_edges(node_map):
     return edges
 
 
-class VillageCiaranMapTests(unittest.TestCase):
+class VillageCiaranMapTests(EvenniaTestCase):
     def setUp(self):
+        super().setUp()
         self.map = XYMap(dict(XYMAP_DATA), Z="village_ciaran", xyzgrid=None)
         self.map.parse()
 

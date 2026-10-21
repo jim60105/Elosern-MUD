@@ -39,7 +39,10 @@ from world.rules.possession import (
 from world.quests.room_observation import observe_room_entry
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
+#: Resolved physical durations: east-gate approach 21,601 s at 1.25 m/s, and
+#: one 10 km open-ground wilderness step 12,000 s.
+EAST_GATE_SECONDS = 21601
+WILDERNESS_STEP_SECONDS = 12000
 
 
 def _east_gate_probe():
@@ -295,7 +298,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertEqual(self.npc.location.coordinates, ENTRY_XY)
         self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
         self.assertEqual(self.other.location.coordinates, ENTRY_XY)
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
         self.assertEqual(self._script().itemcoordinates.get(self.char1), ENTRY_XY)
         visited = self.char1.attributes.get("map_knowledge")["visited"]
         self.assertIn(f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}", visited)
@@ -319,7 +322,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertIn(self.char1, self.char1.location.contents)
         self.assertEqual(self.other.location.coordinates, target)
         self.assertEqual(self._script().itemcoordinates.get(self.char1), target)
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + WILDERNESS_STEP_SECONDS)
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
@@ -335,7 +338,7 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertIs(self.npc.location, self.east_gate)
         self.assertIs(self.char1.location, self.east_gate)
         self.assertIs(self.other.location, self.east_gate)
-        self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
+        self.assertEqual(self._tick(), before + EAST_GATE_SECONDS)
         itemcoordinates = self._script().itemcoordinates
         for member in (self.npc, self.char1, self.other):
             self.assertNotIn(member, itemcoordinates)

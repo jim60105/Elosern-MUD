@@ -127,29 +127,40 @@ class PhysicalEdgeExitTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        from math import ceil
+
         from world.maps.bootstrap import sync_grid
+        from world.maps.map_data import SETTLEMENT_GRAPHS
+        from world.rules.travel_cost import TERRAIN_SPEEDS
 
         sync_grid()
-        self.south_gate = GridRoom.objects.filter_xyz((3, 0, "capital_altoria")).first()
-        self.south_avenue = GridRoom.objects.filter_xyz(
-            (3, 1, "capital_altoria")
+        graph = next(iter(SETTLEMENT_GRAPHS.values()))
+        edge = next(iter(graph.edges))
+        self.source = GridRoom.objects.filter_xyz(
+            (edge.source.x, edge.source.y, graph.map_id)
         ).first()
+        self.destination = GridRoom.objects.filter_xyz(
+            (edge.destination.x, edge.destination.y, graph.map_id)
+        ).first()
+        # Independent arithmetic from the authored meter length and speed.
+        self.expected = ceil(
+            edge.length * 3600 / TERRAIN_SPEEDS["settlement"]
+        )
 
     @covers_requirement(
         "movement-cost-charging::distance-bearing-traversal-uses-authored-physical-geometry",
         "movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value",
     )
     def test_a_plain_exit_between_authored_nodes_charges_the_physical_edge(self):
-        # 南門 (3050,150) -> 南大道 (3140,1050) = 904.49 m at 1.25 m/s = 724 s.
         exit_obj = create_object(
-            Exit, key="上山", location=self.south_gate, destination=self.south_avenue
+            Exit, key="步道", location=self.source, destination=self.destination
         )
-        self.char1.location = self.south_gate
+        self.char1.location = self.source
         before = get_world_clock().tick
-        exit_obj.at_traverse(self.char1, self.south_avenue)
-        self.assertIs(self.char1.location, self.south_avenue)
-        self.assertEqual(get_world_clock().tick, before + 724)
-        self.assertNotEqual(MOVE, 724)
+        exit_obj.at_traverse(self.char1, self.destination)
+        self.assertIs(self.char1.location, self.destination)
+        self.assertEqual(get_world_clock().tick, before + self.expected)
+        self.assertNotEqual(MOVE, self.expected)
 
 
 class MovementCostMixinSourceTests(EvenniaTestCase):

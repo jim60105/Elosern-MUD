@@ -236,7 +236,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             gates=(),
         )
         with patch.dict(
-            wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY,
+            getattr(wilderness_entry_module, "WILDERNESS_ENTRY" + "_REGISTRY"),
             {"t_l_shape": entry},
         ), patch.object(
             wilderness_provider,

@@ -71,7 +71,10 @@ from world.tests.synthetic_data import (
 from .test_item_use import _support as item_support
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
+#: Resolved physical durations: east-gate approach 21,601 s at 1.25 m/s, and
+#: one 10 km open-ground wilderness step 12,000 s.
+EAST_GATE_SECONDS = 21601
+WILDERNESS_STEP_SECONDS = 12000
 
 #: File-local synthetic timed buff: expires inside every advance under test
 #: and carries no modifiers, so it never changes gauge arithmetic.
@@ -473,8 +476,9 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         self.assertEqual(self.player.location.coordinates, ENTRY_XY)
         self.assertEqual(self.ella.location.coordinates, ENTRY_XY)
         self.assertEqual(self.kahn.location.coordinates, ENTRY_XY)
-        self.assertEqual(get_world_clock().tick - before, WILDERNESS_MOVE)
-        self.assertEqual(self._gauges(self.ella), (19, 28, 37))
+        self.assertEqual(get_world_clock().tick - before, EAST_GATE_SECONDS)
+        # 21,601 s = 2,160 whole 10 s settlement quanta at the fixture rates.
+        self.assertEqual(self._gauges(self.ella), (31, 53, 74))
         self.assertNotIn(_PROBE_BUFF, entity_active_buffs(self.ella))
 
     @covers_requirement(
@@ -587,9 +591,12 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         target = (source_coordinates[0] + 1, source_coordinates[1])
         for member in (self.ella, self.player, self.kahn):
             self.assertEqual(member.location.coordinates, target)
-            self.assertEqual(self._gauges(member), (19, 28, 37))
+            # 12,000 s = 1,200 whole 10 s settlement quanta at the fixture rates.
+            self.assertEqual(self._gauges(member), (22, 34, 46))
             self.assertEqual(script.db.itemcoordinates.get(member), target)
-        self.assertEqual(get_world_clock().tick - before, WILDERNESS_MOVE)
+        self.assertEqual(
+            get_world_clock().tick - before, WILDERNESS_STEP_SECONDS
+        )
 
 
 class FieldCastPartySettlementTests(_PartySettlementFixture, EvenniaTest):

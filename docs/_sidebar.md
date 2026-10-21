@@ -66,6 +66,7 @@
   - [OpenSpec 測試可追溯性](/development/spec-test-traceability)
   - [稀疏聚落圖與座標身分契約](/development/sparse-settlement-graphs)
   - [公制座標區域地圖與均勻投影](/development/metric-local-maps)
+  - [距離制旅行與地形耗時](/development/distance-based-travel)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
   - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)

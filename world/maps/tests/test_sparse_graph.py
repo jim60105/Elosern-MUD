@@ -193,7 +193,7 @@ class PhysicalGeometryTests(unittest.TestCase):
                 prototypes=prototypes,
                 node_ids=node_ids,
                 roads=[("start", "end")],
-                physical_positions={"start": (0, 0)},
+                physical_positions={(0, 0): (0, 0)},
             )
         with self.assertRaises(SparseGraphError):
             build_sparse_graph(
@@ -201,7 +201,7 @@ class PhysicalGeometryTests(unittest.TestCase):
                 prototypes=prototypes,
                 node_ids=node_ids,
                 roads=[("start", "end")],
-                physical_positions={"start": (0, 0), "end": (10, 0), "extra": (1, 1)},
+                physical_positions={(0, 0): (0, 0), (1, 0): (10, 0), (1, 1): (1, 1)},
             )
 
     def test_lengths_use_physical_positions_while_direction_uses_logical_ones(self):
@@ -213,7 +213,7 @@ class PhysicalGeometryTests(unittest.TestCase):
             },
             node_ids={(0, 0): "start", (1, 0): "end"},
             roads=[("start", "end")],
-            physical_positions={"start": (0, 0), "end": (1000, 0)},
+            physical_positions={(0, 0): (0, 0), (1, 0): (1000, 0)},
         )
         edge = graph.edge("start", "end")
         self.assertEqual(edge.length, 1000)
