@@ -37,7 +37,13 @@ _RECORD_FIELDS = frozenset(
 # round (``None`` for every ordinary engagement). Older durable records
 # without them stay valid, so none is required.
 _OPTIONAL_RECORD_FIELDS = frozenset(
-    {"settled_tick", "martyr_key", "opening_first_actor"}
+    {
+        "settled_tick",
+        "martyr_key",
+        "opening_first_actor",
+        "initial_sleep_ids",
+        "sleep_transitions",
+    }
 )
 
 
@@ -61,6 +67,28 @@ class CombatSessionRecord:
     settled_tick: int | None = None
     martyr_key: tuple[str, ...] | None = None
     opening_first_actor: str | None = None
+    # Sleep is a live posture, never a stored knockout: ``initial_sleep_ids``
+    # records the posture the roster carried at engagement and
+    # ``sleep_transitions`` the explicit posture changes observed at completed
+    # round boundaries. Together they are the terminal accounting evidence;
+    # no round reads them back as a gate and none of them mutates physiology.
+    initial_sleep_ids: tuple[int, ...] = ()
+    sleep_transitions: tuple["SleepTransition", ...] = ()
+
+
+@dataclass(frozen=True)
+class SleepTransition:
+    """One explicit sleep posture observed at a completed-round boundary.
+
+    ``round_index`` is the number of completed rounds at which the posture was
+    observed, ``actor_id`` a session participant, and ``asleep`` the observed
+    posture. The entries let a terminal consumer reconstruct each body's sleep
+    intervals without any per-round reserve mutation.
+    """
+
+    round_index: int
+    actor_id: int
+    asleep: bool
 
 
 def _parse_id_list(values: Any, field: str) -> tuple[int, ...]:
@@ -191,6 +219,57 @@ def _parse_stamp_list(values: Any, field: str) -> tuple[str, ...] | None:
     return tuple(items)
 
 
+def _parse_sleep_transitions(raw: Any) -> tuple[SleepTransition, ...]:
+    """Parse and validate the optional boundary-posture evidence list."""
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes)) or not hasattr(raw, "__iter__"):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "record field 'sleep_transitions' must be a list",
+        )
+    transitions: list[SleepTransition] = []
+    seen: set[tuple[int, int]] = set()
+    for item in raw:
+        if not hasattr(item, "get") or isinstance(item, (str, bytes)):
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                "a sleep transition must be a dict",
+            )
+        if set(item) != {"round", "actor", "asleep"}:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                "a sleep transition carries exactly round, actor and asleep",
+            )
+        round_index = _require_int(item["round"], "sleep transition round")
+        actor_id = _require_int(item["actor"], "sleep transition actor")
+        asleep = item["asleep"]
+        if not isinstance(asleep, bool):
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                "a sleep transition's asleep value must be a boolean",
+            )
+        key = (round_index, actor_id)
+        if key in seen:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                f"duplicate sleep transition for round {round_index} actor {actor_id}",
+            )
+        if transitions and key <= (
+            transitions[-1].round_index,
+            transitions[-1].actor_id,
+        ):
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                "sleep transitions must be ordered by round then actor",
+            )
+        seen.add(key)
+        transitions.append(
+            SleepTransition(round_index, actor_id, asleep)
+        )
+    return tuple(transitions)
+
+
 def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
     """Strictly parse one storage dict, raising ``CombatSessionError`` on violations."""
     if not isinstance(data, dict):
@@ -258,6 +337,10 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
             SessionReason.MALFORMED_SESSION,
             "opening_first_actor must be a non-empty string or None",
         )
+    initial_sleep_ids = _parse_id_list(
+        data.get("initial_sleep_ids", []), "initial_sleep_ids"
+    )
+    sleep_transitions = _parse_sleep_transitions(data.get("sleep_transitions"))
     record = CombatSessionRecord(
         session_id=session_id,
         mode=mode,
@@ -275,6 +358,8 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         settled_tick=settled_tick,
         martyr_key=martyr_key,
         opening_first_actor=opening_first_actor,
+        initial_sleep_ids=initial_sleep_ids,
+        sleep_transitions=sleep_transitions,
     )
     _validate_participant_shape(record)
     return record
@@ -299,13 +384,28 @@ def _validate_participant_shape(record: CombatSessionRecord) -> None:
         raise CombatSessionError(
             SessionReason.DUPLICATE_PARTICIPANT, "duplicate enemy dbref"
         )
-    for field in ("fled_ids", "knocked_out_ids"):
+    for field in ("fled_ids", "knocked_out_ids", "initial_sleep_ids"):
         allowed = set(record.player_ids) | set(record.enemy_ids)
         stray = set(getattr(record, field)) - allowed
         if stray:
             raise CombatSessionError(
                 SessionReason.MALFORMED_SESSION,
                 f"{field} references unknown dbrefs {sorted(stray)}",
+            )
+    if len(set(record.initial_sleep_ids)) != len(record.initial_sleep_ids):
+        raise CombatSessionError(
+            SessionReason.DUPLICATE_PARTICIPANT, "duplicate initial sleep dbref"
+        )
+    for transition in record.sleep_transitions:
+        if transition.actor_id not in set(record.player_ids) | set(record.enemy_ids):
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                f"sleep transition references unknown dbref {transition.actor_id}",
+            )
+        if not 1 <= transition.round_index <= record.rounds_elapsed:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                "a sleep transition must name a completed round",
             )
     if record.draft_entries:
         stray_draft = set(record.draft_entries) - set(record.player_ids)
@@ -346,7 +446,64 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
             None if record.martyr_key is None else list(record.martyr_key)
         ),
         "opening_first_actor": record.opening_first_actor,
+        "initial_sleep_ids": list(record.initial_sleep_ids),
+        "sleep_transitions": [
+            {
+                "round": transition.round_index,
+                "actor": transition.actor_id,
+                "asleep": transition.asleep,
+            }
+            for transition in record.sleep_transitions
+        ],
     }
+
+
+def participant_sleep_state(battlefield: Any) -> dict[int, bool]:
+    """Return every roster participant's live sleep posture, keyed by dbref.
+
+    A no-create read: it consults the persisted posture directly through
+    :func:`world.rules.fatigue.sleep_blocks_actions` and never materializes or
+    repairs physiology, so an ordinary round cannot tick reserve or time.
+    """
+    from world.rules.fatigue import sleep_blocks_actions
+
+    state: dict[int, bool] = {}
+    for entity in battlefield.roster.values():
+        pk = getattr(entity, "pk", None)
+        if isinstance(pk, int) and not isinstance(pk, bool):
+            state[pk] = sleep_blocks_actions(entity)
+    return state
+
+
+def recorded_sleep_state(record: CombatSessionRecord) -> dict[int, bool]:
+    """Return the sleep posture the record's own evidence currently declares."""
+    state = {pk: True for pk in record.initial_sleep_ids}
+    for transition in record.sleep_transitions:
+        state[transition.actor_id] = transition.asleep
+    return state
+
+
+def boundary_sleep_evidence(
+    record: CombatSessionRecord,
+    battlefield: Any,
+    round_index: int,
+) -> tuple[SleepTransition, ...]:
+    """Return the record's transitions with this boundary's changes appended.
+
+    The completed round observes every present participant's posture once and
+    records an explicit transition only where it differs from the last
+    recorded posture, so the evidence stays a sparse timeline and a quiet
+    round adds nothing. Reading is the only thing this does: no reserve,
+    projected status or clock value is written.
+    """
+    observed = participant_sleep_state(battlefield)
+    known = recorded_sleep_state(record)
+    transitions = list(record.sleep_transitions)
+    for actor_id in sorted(observed):
+        asleep = observed[actor_id]
+        if known.get(actor_id, False) != asleep:
+            transitions.append(SleepTransition(round_index, actor_id, asleep))
+    return tuple(transitions)
 
 
 def format_session_id(actor: Any, mode: str, tick: int) -> str:

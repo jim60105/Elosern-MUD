@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -140,6 +141,90 @@ class CombatSessionRecordTests(unittest.TestCase):
             with self.subTest(data=data):
                 with self.assertRaises(CombatSessionError):
                     from_storage(data)
+
+    def _sleep_base(self):
+        return {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 5,
+            "player_ids": [1, 3],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 2,
+            "exam_id": None,
+            "round_revision": 2,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+
+    def test_sleep_evidence_is_optional_and_round_trips(self):
+        from world.rules.combat_session.records import SleepTransition
+
+        # Older durable records without the evidence stay valid.
+        base = from_storage(self._sleep_base())
+        self.assertEqual(base.initial_sleep_ids, ())
+        self.assertEqual(base.sleep_transitions, ())
+        evidence = from_storage(
+            {
+                **self._sleep_base(),
+                "initial_sleep_ids": [3],
+                "sleep_transitions": [
+                    {"round": 1, "actor": 3, "asleep": False},
+                    {"round": 2, "actor": 2, "asleep": True},
+                ],
+            }
+        )
+        self.assertEqual(evidence.initial_sleep_ids, (3,))
+        self.assertEqual(
+            evidence.sleep_transitions,
+            (SleepTransition(1, 3, False), SleepTransition(2, 2, True)),
+        )
+        self.assertEqual(
+            to_storage(evidence)["sleep_transitions"],
+            [
+                {"round": 1, "actor": 3, "asleep": False},
+                {"round": 2, "actor": 2, "asleep": True},
+            ],
+        )
+        # The evidence round-trips through the durable JSON boundary.
+        self.assertEqual(
+            from_storage(to_storage(evidence)), evidence
+        )
+
+    def test_malformed_sleep_evidence_fails_closed(self):
+        bad_cases = [
+            {"initial_sleep_ids": "nope"},
+            {"initial_sleep_ids": [3, 3]},
+            {"initial_sleep_ids": [99]},
+            {"sleep_transitions": "nope"},
+            {"sleep_transitions": [None]},
+            {"sleep_transitions": [{"round": 1, "actor": 3}]},
+            {"sleep_transitions": [{"round": 1, "actor": 3, "asleep": "yes"}]},
+            {"sleep_transitions": [{"round": 0, "actor": 3, "asleep": True}]},
+            {"sleep_transitions": [{"round": 3, "actor": 3, "asleep": True}]},
+            {"sleep_transitions": [{"round": 1, "actor": 99, "asleep": True}]},
+            {
+                "sleep_transitions": [
+                    {"round": 1, "actor": 3, "asleep": True},
+                    {"round": 1, "actor": 3, "asleep": False},
+                ]
+            },
+            {
+                "sleep_transitions": [
+                    {"round": 2, "actor": 3, "asleep": True},
+                    {"round": 1, "actor": 2, "asleep": True},
+                ]
+            },
+            {"sleep_transitions": [{"round": True, "actor": 3, "asleep": True}]},
+        ]
+        for mutation in bad_cases:
+            data = {**self._sleep_base(), **mutation}
+            with self.subTest(data=data):
+                with self.assertRaises(CombatSessionError):
+                    from_storage(data)
+
 
 class CombatSessionIdTests(EvenniaTest):
     def test_deterministic_session_ids(self):
@@ -710,6 +795,228 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(restored.draft_version, 1)
         self.assertIn(self.player.pk, restored.draft_entries)
         self.assertNotIn(companion.pk, restored.draft_entries)
+
+    @covers_requirement("player-combat-session::reconnect-and-restart-restore-confirmed-selection-progress-without-execution")
+    @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    @covers_requirement("player-combat-session::sleeping-roster-members-remain-present-without-commands")
+    def test_reconnect_restores_a_sleeping_member_without_time_or_synthetic_knockout(self):
+        """Delta: sleeping roster members remain present without commands."""
+        from world.rules.buffs import entity_active_buffs
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session import (
+            confirm_actor_command,
+            preflight_draft_entries,
+            reconstruct_battlefield,
+        )
+        from world.rules.fatigue import (
+            PHYSIOLOGICAL_BUFF_KEYS,
+            SleepPosture,
+            project_fatigue_status,
+            read_fatigue_state,
+            sleep_blocks_actions,
+            write_fatigue_state,
+        )
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        companion = self._waiting_companion()
+        walker = create_object(NPC, key="awake draft companion", location=self.room)
+        walker.race = self.player.race
+        walker.apply_race_baseline()
+        join_party(walker, self.player)
+        write_fatigue_state(companion, 0, SleepPosture.FORCED)
+        project_fatigue_status(companion)
+        engage(self.player, self.monster)
+        before = read_fatigue_state(companion)
+        before_buffs = entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS
+        tick_before = get_world_clock().tick
+
+        # The sleeping member is recorded as initial posture evidence, is a
+        # roster member, and is not a required command actor.
+        record = read_session(self.player)
+        session_id = record.session_id
+        self.assertEqual(record.initial_sleep_ids, (int(companion.pk),))
+        battlefield = reconstruct_battlefield(self.player, record)
+        self.assertIn(str(companion.key), battlefield.roster)
+        self.assertTrue(sleep_blocks_actions(companion))
+        progress = preflight_draft_entries(self.player, record, battlefield)
+        self.assertNotIn(int(companion.pk), progress["required_actors"])
+        self.assertIn(int(walker.pk), progress["required_actors"])
+
+        # A partial draft from the awake commander survives the restart: the
+        # awake companion is still unselected, so no round runs.
+        command = {
+            "kind": "tactical",
+            "payload": {"tactical_key": "defend", "target_id": None},
+        }
+        confirm_actor_command(
+            self.player, session_id, 0, 0, self.player.pk, command
+        )
+        _BATTLEFIELDS.clear()
+        restore_active_session(self.player)
+
+        restored = read_session(self.player)
+        self.assertEqual(restored.session_id, session_id)
+        self.assertEqual(restored.rounds_elapsed, 0)
+        self.assertEqual(restored.initial_sleep_ids, (int(companion.pk),))
+        self.assertEqual(restored.sleep_transitions, ())
+        self.assertIn(self.player.pk, restored.draft_entries)
+        self.assertNotIn(int(companion.pk), restored.knocked_out_ids)
+        self.assertTrue(sleep_blocks_actions(companion))
+        after = read_fatigue_state(companion)
+        self.assertEqual(
+            (after.reserve_units, after.posture),
+            (before.reserve_units, before.posture),
+        )
+        self.assertEqual(
+            entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS,
+            before_buffs,
+        )
+        self.assertEqual(get_world_clock().tick, tick_before)
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    @covers_requirement("player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening")
+    def test_completed_rounds_record_an_explicit_wake_without_physiology_or_clock(self):
+        """Delta: live rounds neither simulate fatigue nor block a real state effect."""
+        from world.rules.buffs import entity_active_buffs
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session import (
+            preflight_draft_entries,
+            reconstruct_battlefield,
+            submit_player_action,
+        )
+        from world.rules.fatigue import (
+            PHYSIOLOGICAL_BUFF_KEYS,
+            SleepPosture,
+            project_fatigue_status,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+
+        companion = self._waiting_companion()
+        companion.traits.hp.base = 500
+        companion.traits.hp.current = 500
+        # Just below the forced-sleep wake threshold: an ordinary round must
+        # never tick it awake.
+        write_fatigue_state(companion, 5999, SleepPosture.FORCED)
+        project_fatigue_status(companion)
+        engage(self.player, self.monster)
+        self.monster.traits.hp.base = 500
+        self.monster.traits.hp.current = 500
+        before = read_fatigue_state(companion)
+        before_buffs = entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS
+        tick_before = get_world_clock().tick
+
+        with self._dice():
+            result = submit_player_action(
+                self.player, BASIC_ATTACK_KEY, [self.monster]
+            )
+        self.assertEqual(result["outcome"], "round")
+        record = read_session(self.player)
+        self.assertEqual(record.rounds_elapsed, 1)
+        # The sleeping companion was not required and recorded no transition:
+        # the round did not awaken it, tick fatigue or advance the clock.
+        self.assertEqual(record.sleep_transitions, ())
+        after = read_fatigue_state(companion)
+        self.assertEqual(
+            (after.reserve_units, after.posture),
+            (before.reserve_units, before.posture),
+        )
+        self.assertEqual(
+            entity_active_buffs(companion) & PHYSIOLOGICAL_BUFF_KEYS,
+            before_buffs,
+        )
+        self.assertEqual(get_world_clock().tick, tick_before)
+
+        # A future explicit state effect (no gameplay waking ability is
+        # authored) changes eligibility; the next boundary records it.
+        write_fatigue_state(companion, 6000, SleepPosture.AWAKE)
+        project_fatigue_status(companion)
+        battlefield = reconstruct_battlefield(self.player, record)
+        progress = preflight_draft_entries(self.player, record, battlefield)
+        self.assertIn(int(companion.pk), progress["required_actors"])
+
+        with self._dice():
+            commander_result = submit_player_action(
+                self.player, BASIC_ATTACK_KEY, [self.monster]
+            )
+        self.assertEqual(commander_result["outcome"], "draft")
+        with self._dice():
+            awakened_result = submit_player_action(
+                self.player,
+                BASIC_ATTACK_KEY,
+                [self.monster],
+                commanded_actor=companion,
+            )
+        self.assertEqual(awakened_result["outcome"], "round")
+        record = read_session(self.player)
+        self.assertEqual(record.rounds_elapsed, 2)
+        self.assertEqual(
+            [(item.round_index, item.actor_id, item.asleep)
+             for item in record.sleep_transitions],
+            [(2, int(companion.pk), False)],
+        )
+        # The wake transition is evidence only: the boundary wrote no
+        # physiology and advanced no world time.
+        after_wake = read_fatigue_state(companion)
+        self.assertEqual((after_wake.reserve_units, after_wake.posture),
+                         (6000, SleepPosture.AWAKE))
+        self.assertEqual(get_world_clock().tick, tick_before)
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_failed_round_restores_initial_sleep_evidence(self):
+        from world.rules.combat_session import submit_player_action
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+
+        from ._combat_session_helpers import fail_on_round_persist
+
+        companion = self._waiting_companion()
+        write_fatigue_state(companion, 5999, SleepPosture.FORCED)
+        engage(self.player, self.monster)
+        self.monster.traits.hp.base = 500
+        self.monster.traits.hp.current = 500
+        before = read_fatigue_state(companion)
+        incoming = {
+            "rounds_elapsed": 0,
+            "sleep_transitions": (),
+            "initial_sleep_ids": (int(companion.pk),),
+        }
+        with (
+            self._dice(),
+            patch(
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist(),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        record = read_session(self.player)
+        self.assertEqual(record.rounds_elapsed, incoming["rounds_elapsed"])
+        self.assertEqual(record.sleep_transitions, incoming["sleep_transitions"])
+        self.assertEqual(record.initial_sleep_ids, incoming["initial_sleep_ids"])
+        after = read_fatigue_state(companion)
+        self.assertEqual(
+            (after.reserve_units, after.posture),
+            (before.reserve_units, before.posture),
+        )
+        self.assertIn(self.player.pk, record.draft_entries)
+
+    @staticmethod
+    @contextmanager
+    def _dice():
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+        ):
+            yield
 
     @covers_requirement("player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits")
     def test_no_eligible_actors_collection_paused_and_party_exits(self):

@@ -207,11 +207,22 @@ def engage_group(
         if _stored_trait_value(target.traits.hp) <= 0:
             raise CombatSessionError(SessionReason.TARGET_DEAD)
 
+    from world.rules.fatigue import sleep_blocks_actions
     from world.rules.party import combat_companions
 
-    companions = [
-        int(companion.pk) for companion in combat_companions(actor)
-    ]
+    companion_entities = combat_companions(actor)
+    companions = [int(companion.pk) for companion in companion_entities]
+    # A sleeping body still joins the roster: sleep is a live posture that
+    # excludes its own commands, never a knockout or an absence. The initial
+    # posture is recorded as terminal-accounting evidence only; the live
+    # posture stays the eligibility authority.
+    initial_sleep_ids = tuple(
+        sorted(
+            int(entity.pk)
+            for entity in (actor, *companion_entities, *targets)
+            if sleep_blocks_actions(entity)
+        )
+    )
     record = CombatSessionRecord(
         session_id=session_id_for(actor, "hostile"),
         mode="hostile",
@@ -223,6 +234,7 @@ def engage_group(
         rounds_elapsed=0,
         exam_id=None,
         opening_first_actor=opening_first_actor,
+        initial_sleep_ids=initial_sleep_ids,
     )
     battlefield = reconstruct_battlefield(actor, record)
     _persist(actor, record)

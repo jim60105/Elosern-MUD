@@ -835,7 +835,9 @@ class TargetMetricTests(unittest.TestCase):
             traits={"hp": hp},
             effective_traits={key: effective for key in STATIC_KEYS},
             resources=resources,
-            capability=CapabilityState(blocked_by_buff=False, actions_per_turn=1),
+            capability=CapabilityState(
+                blocked_by_buff=False, actions_per_turn=1, asleep=False
+            ),
             buffs=(),
         )
 

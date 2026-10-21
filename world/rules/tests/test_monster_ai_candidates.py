@@ -1034,6 +1034,22 @@ class CandidateRestrictionTests(EvenniaTestCase):
     def _own(self, *keys):
         self.monster.db.skills = {"active": list(keys), "passive": []}
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
+    @covers_requirement("monster-ai-legal-candidates::monster-decisions-observe-sleep-inability-without-losing-targets")
+    def test_a_sleeping_opponent_remains_a_legal_present_target(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        self._own(STRIKE.key)
+        sleeper = self._participant("t_cand_sleeper")
+        write_fatigue_state(sleeper, 0, SleepPosture.FORCED)
+        result = self._enumerate((sleeper,))
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(sleeper),)],
+        )
+        # Sleep never changes the health fact terminal rules read.
+        self.assertGreater(sleeper.traits.hp.current, 0)
+
     @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_the_seal_narrows_to_the_first_bearer_in_player_first_order(self):
         self._own(STRIKE.key)

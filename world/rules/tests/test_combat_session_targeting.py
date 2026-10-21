@@ -168,3 +168,213 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
                 submit_player_action(self.player, FLEE_SKILL_KEY, [])
         self.assertEqual(ctx.exception.args[0], "personal_flee_forbidden")
         self.assertIsNotNone(self.player.db.active_combat)
+
+
+class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
+    """Delta: sleep keeps presence and authority while excluding its commands."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            "monster_tiers",
+            extra=_scope_extra(),
+        )
+        super().setUp()
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        self.room = create_object(Room, key="sleeping roster arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.companion = create_object(
+            NPC, key="awake companion", location=self.room
+        )
+        self.companion.race = self.player.race
+        self.companion.apply_race_baseline()
+        self.companion.traits.hp.base = 100
+        self.companion.traits.hp.current = 100
+        self.companion.traits.mp.base = 50
+        self.companion.traits.mp.current = 50
+        join_party(self.companion, self.player)
+        grant_lineage(self.companion, [_T_ANY_SINGLE])
+        self.monster = _monster("sleeping goblin", hp=500)
+        self.monster.location = self.room
+
+    @covers_requirement(
+        "player-combat-session::commander-may-select-only-currently-controllable-allied-actors"
+    )
+    @covers_requirement(
+        "player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership"
+    )
+    @covers_requirement(
+        "player-combat-session::sleeping-roster-members-remain-present-without-commands"
+    )
+    def test_sleeping_commander_keeps_ownership_but_no_command_of_any_kind(self):
+        from world.rules.combat_session import (
+            _persist,
+            confirm_actor_command,
+            get_required_combat_actors,
+            reconstruct_battlefield,
+            submit_player_item_use,
+            to_storage,
+        )
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+
+        self.assertEqual(record.player_ids[0], self.player.pk)
+        self.assertIsNotNone(read_session(self.player))
+        self.assertIsNone(read_session(self.companion))
+        self.assertEqual(record.initial_sleep_ids, (int(self.player.pk),))
+        self.assertNotIn(int(self.player.pk), record.knocked_out_ids)
+        field = reconstruct_battlefield(self.player, record)
+        self.assertIn(str(self.player.key), field.roster)
+        self.assertTrue(field.is_eligible(str(self.player.key)))
+        required = set(get_required_combat_actors(record, field))
+        self.assertNotIn(int(self.player.pk), required)
+        self.assertIn(int(self.companion.pk), required)
+
+        cases = (
+            lambda: submit_player_action(
+                self.player, _T_ANY_SINGLE, [self.monster]
+            ),
+            lambda: submit_player_item_use(self.player, "t_moss_tonic"),
+            lambda: confirm_actor_command(
+                self.player,
+                record.session_id,
+                0,
+                0,
+                self.player.pk,
+                {
+                    "kind": "tactical",
+                    "payload": {"tactical_key": "defend", "target_id": None},
+                },
+            ),
+        )
+        for case in cases:
+            with self.assertRaises(CombatSessionError) as caught:
+                case()
+            self.assertEqual(
+                caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR
+            )
+        unchanged = read_session(self.player)
+        self.assertEqual(unchanged.draft_entries, {})
+        self.assertEqual(unchanged.draft_version, 0)
+        self.assertEqual(unchanged.rounds_elapsed, 0)
+
+        companion_mp = self.companion.traits.mp.current
+        player_mp = self.player.traits.mp.current
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            result = submit_player_action(
+                self.player,
+                _T_ANY_SINGLE,
+                [self.monster],
+                commanded_actor=self.companion,
+            )
+        self.assertEqual(result["outcome"], "round")
+        self.assertLess(self.companion.traits.mp.current, companion_mp)
+        self.assertEqual(self.player.traits.mp.current, player_mp)
+        self.assertIsNotNone(read_session(self.player))
+
+        knocked = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "knocked_out_ids": [int(self.companion.pk)],
+            }
+        )
+        _persist(self.player, knocked)
+        knocked_field = reconstruct_battlefield(self.player, knocked)
+        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))
+        self.assertNotIn(
+            int(self.companion.pk),
+            get_required_combat_actors(knocked, knocked_field),
+        )
+
+    @covers_requirement(
+        "party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die"
+    )
+    @covers_requirement(
+        "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership"
+    )
+    @covers_requirement(
+        "battlefield-action-context::sleep-prohibits-actions-while-retaining-ordinary-target-legality"
+    )
+    def test_sleeping_companion_remains_targetable_and_takes_real_damage(self):
+        from world.rules.action import ActionRequest
+        from world.rules.combat import run_round
+        from world.rules.combat_session import (
+            _context_for,
+            get_required_combat_actors,
+            reconstruct_battlefield,
+        )
+        from world.rules.combat_session.policies import _party_round_provider
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        write_fatigue_state(self.companion, 0, SleepPosture.FORCED)
+        self.companion.traits.hp.base = 50
+        self.companion.traits.hp.current = 50
+        self.monster.traits.atk_phys.base = 20
+        self.monster.traits.agility.base = 100
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+        self.assertTrue(field.is_eligible(str(self.companion.key)))
+        self.assertNotIn(
+            int(self.companion.pk),
+            get_required_combat_actors(record, field),
+        )
+
+        context = _context_for(field, record)
+        provider = _party_round_provider(
+            {
+                int(self.player.pk): ActionRequest(
+                    self.player, _T_ANY_SINGLE, [self.monster], context
+                )
+            },
+            field,
+            record,
+        )
+        hp_before = self.companion.traits.hp.current
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            logs = run_round(field, provider)
+        targets = [
+            entry.target
+            for log in logs
+            for entry in log.entries
+            if entry.kind == "damage"
+        ]
+        self.assertIn(str(self.companion.key), targets)
+        self.assertLess(self.companion.traits.hp.current, hp_before)
+        self.assertNotIn(int(self.companion.pk), record.knocked_out_ids)
+        self.assertGreater(self.companion.traits.hp.current, 0)
+
+        # A sleeper also genuinely knocked out keeps the knockout state and
+        # exclusion: sleep creates no immunity or priority of its own.
+        from world.rules.combat_session import (
+            _persist,
+            from_storage,
+            to_storage,
+        )
+        from world.rules.combat_view import build_combat_view
+
+        knocked = from_storage(
+            {
+                **to_storage(read_session(self.player)),
+                "knocked_out_ids": [int(self.companion.pk)],
+            }
+        )
+        _persist(self.player, knocked)
+        states = {
+            row.identity: row.state
+            for row in build_combat_view(self.player).participants
+        }
+        self.assertEqual(states[int(self.companion.pk)], "knocked_out")
+        knocked_field = reconstruct_battlefield(self.player, knocked)
+        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))

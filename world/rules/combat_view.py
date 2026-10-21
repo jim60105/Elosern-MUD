@@ -61,6 +61,9 @@ MAX_DISPLAY_NAME_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 512
 MAX_PARTICIPANT_CONDITIONS = 8
 MAX_PARTICIPANT_CONDITION_LABEL = 128
+#: Participant states a beneficial or freely-targeted skill may still name.
+#: A sleeping body is present and targetable; only removal states are not.
+TARGETABLE_STATES = frozenset({"active", "asleep"})
 MAX_ITEM_SUMMARY_CODE_POINTS = 512
 
 # Stable action keys in approved keyboard order (v7).
@@ -238,6 +241,12 @@ def _participant_state(entity: Any, identity: int, record: Any) -> str:
 
     if _stored_trait_value(entity.traits.hp) <= 0:
         return "defeated"
+    from world.rules.fatigue import sleep_blocks_actions
+
+    # Sleep is its own readable state, never a defeat: the body is present and
+    # targetable, it simply takes no command and acts for nobody.
+    if sleep_blocks_actions(entity):
+        return "asleep"
     return "active"
 
 
@@ -246,15 +255,27 @@ def participant_conditions(entity: Any) -> tuple[ConditionRow, ...]:
         model = build_status_read_model(entity)
     except (StatusQueryError, MissingDisplayMetadataError):
         return ()
-    rows = tuple(
+    rows: list[ConditionRow] = []
+    for subject in model.fatigue:
+        if subject.restriction is not None:
+            rows.append(
+                ConditionRow(
+                    code="asleep",
+                    label=subject.restriction,
+                    severity="informational",
+                )
+            )
+            break
+    rows.extend(
         ConditionRow(code=row.code, label=row.label, severity=row.severity)
         for row in model.conditions[:MAX_PARTICIPANT_CONDITIONS]
     )
+    rows = rows[:MAX_PARTICIPANT_CONDITIONS]
     if any(
         sum(1 for _ in row.label) > MAX_PARTICIPANT_CONDITION_LABEL for row in rows
     ):
         return ()
-    return rows
+    return tuple(rows)
 
 
 def _bound(value: str, maximum: int, field: str) -> str:
@@ -656,7 +677,7 @@ def _build_skills(
             int(target.pk)
             for target in preview.valid_targets
             if any(
-                p.identity == int(target.pk) and p.state == "active"
+                p.identity == int(target.pk) and p.state in TARGETABLE_STATES
                 for p in participants
             )
         )

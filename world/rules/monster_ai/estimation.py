@@ -1897,7 +1897,9 @@ class _Decision:
 
         The horizon is the recipient's one next action opportunity: a mount the
         recipient cannot act under, one already mounted, and one whose effect
-        has run out are each worth nothing rather than a repeated full value.
+        has run out are each worth nothing rather than a repeated full value,
+        and a sleeping recipient has no next opportunity at all. The
+        recipient stays a target either way.
         So is a mount whose projected change an already-active mount of the
         same key outweighs, because it adds nothing the recipient does not
         already hold. A mount whose key the model cannot value contributes its
@@ -1922,6 +1924,7 @@ class _Decision:
             or not facts.alive
             or not facts.present
             or not facts.in_range
+            or facts.capability.asleep
             or self.reads.capability(entity).actions_per_turn <= 0
         ):
             self._limits.add(EstimationLimit.CONTROL_NO_OPPORTUNITY)
@@ -2039,16 +2042,22 @@ class _Decision:
         """Return one faction's eligible baseline action opportunities.
 
         The denominator the opportunity term is normalized by: every eligible
-        member's current action allowance, which already folds whatever locks
-        it carries. A faction with none left is floored at one, so a fully
-        locked side contributes no denial rather than dividing by zero.
+        awake member's current action allowance, which already folds whatever
+        locks it carries. A sleeping member has no opportunity to deny, so it
+        leaves the sum while staying a target. A faction with none left is
+        floored at one, so a fully locked side contributes no denial rather
+        than dividing by zero.
         """
         members = self.enemies if relation is Relation.ENEMY else self.allies
         total = 0.0
         for entity in members:
-            total += max(
-                float(self.reads.capability(entity).actions_per_turn), 0.0
-            )
+            capability = self.reads.capability(entity)
+            if capability.asleep:
+                # A sleeping body's action allowance is not an opportunity
+                # the plan can deny, so it leaves the denominator too; the
+                # body itself stays a target and keeps its capacity.
+                continue
+            total += max(float(capability.actions_per_turn), 0.0)
         return max(total, 1.0)
 
 

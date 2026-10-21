@@ -36,6 +36,7 @@ from world.rules.combat_session.policies import _party_round_provider
 from world.rules.combat_session.lifecycle import _persist
 from world.rules.combat_session.records import (
     CombatSessionRecord,
+    boundary_sleep_evidence,
     read_session,
     read_session_uncached,
     read_last_combat_receipt,
@@ -951,11 +952,18 @@ def _finalize_resolved_round(
     new_knocked_out_ids = tuple(sorted(set(record.knocked_out_ids) | set(knocked)))
     current = read_session(actor)
     base = current if current is not None else record
+    completed_round = base.rounds_elapsed + 1
     new_record = replace(
         base,
         fled_ids=new_fled_ids,
         knocked_out_ids=new_knocked_out_ids,
-        rounds_elapsed=base.rounds_elapsed + 1,
+        rounds_elapsed=completed_round,
+        # Sleep-carried activity evidence only: the boundary observes each
+        # present body's persisted posture and records an explicit change. It
+        # never settles reserve, projects a fatigue stage or advances time.
+        sleep_transitions=boundary_sleep_evidence(
+            base, battlefield, completed_round
+        ),
         # One committed round is consumed exactly once: the consumed revision,
         # the emptied draft and the spent opening-order policy all land
         # together with the round they belong to.
@@ -1182,7 +1190,7 @@ def _eligible_allied_actors(
     """Return the session's currently able-to-act allied members.
 
     ``get_required_combat_actors`` is the session's own eligibility predicate
-    — present, not fled, not knocked out, alive, unblocked and not
+    — present, not fled, not knocked out, alive, awake, unblocked and not
     action-forbidden — so the retreat's agility minimum and its
     no-acting-ally branch agree with draft collection instead of re-deriving
     a competing definition. A knocked-out companion is not among them, which

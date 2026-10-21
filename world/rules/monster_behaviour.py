@@ -1322,7 +1322,10 @@ def _utility_action(
     scored: tuple[Any, ...] = ()
     candidates = None
     estimates = EstimateSet()
-    if not snapshot.actor.capability.blocked_by_buff:
+    if not (
+        snapshot.actor.capability.blocked_by_buff
+        or snapshot.actor.capability.asleep
+    ):
         # Permitted read-only capability validation: an actor that cannot act
         # at all proposes nothing and writes nothing. The round engine's own
         # capability gate stays the authority on whether its provider is even

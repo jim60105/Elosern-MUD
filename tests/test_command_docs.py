@@ -798,6 +798,26 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("生理性疲勞", cast_description)
 
     @covers_requirement("game-command-docs::accurate-command-details")
+    def test_combat_docs_state_terminal_physiology_and_sleeping_command_rules(self):
+        """Combat prose agrees with the terminal-only physiology contract."""
+        actions = self.entries["combat actions"]["說明"]
+        self.assertIn("沉睡", actions)
+        self.assertIn("必要成員", actions)
+        command = self.entries["combat command"]["說明"]
+        # Every command kind is unavailable to a sleeping member, while the
+        # sleeping commander keeps authority over an awake companion.
+        self.assertIn("沉睡", command)
+        self.assertIn("不能接受", command)
+        combat_section = self.reference.split("## 戰鬥", 1)[1].split("### engage", 1)[0]
+        self.assertIn("6 秒", combat_section)
+        self.assertIn("不推進世界時間", combat_section)
+        self.assertIn("不會因回合流逝而自然醒來", combat_section)
+        self.assertIn("沉睡中，無法行動", combat_section)
+        overview = self.overview.split("## 戰鬥", 1)[1].split("## 技能施放", 1)[0]
+        self.assertIn("終局結算", overview)
+        self.assertIn("沉睡中，無法行動", overview)
+
+    @covers_requirement("game-command-docs::accurate-command-details")
     def test_practice_entry_documents_the_standing_booking(self):
         entry = self.entries["修煉"]
         self.assertEqual(entry["指令"], "修煉")

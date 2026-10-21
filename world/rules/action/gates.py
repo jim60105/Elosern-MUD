@@ -311,6 +311,7 @@ def capability_failure(
     blocked_by_buff: bool,
     *,
     modifiers: dict[str, Any] | None = None,
+    asleep: bool | None = None,
 ) -> tuple[RejectReason, str] | None:
     """Return the action-capability rejection, or ``None``.
 
@@ -321,12 +322,19 @@ def capability_failure(
     blocks_action(actor)``, whose stored-attribute guard short-circuits before
     any handler access), while the no-create readers project it from the
     persisted buff cache.
+
+    ``asleep`` is the caller's own read of the sleep posture when it already
+    holds one (a decision's memoized capability projection); omitting it keeps
+    the resolver's authoritative live read. The fact forbids the action either
+    way; only where it was read differs.
     """
     if blocked_by_buff:
         return RejectReason.ACTION_FORBIDDEN, _entity_key(actor)
-    from world.rules.fatigue import sleep_blocks_actions
+    if asleep is None:
+        from world.rules.fatigue import sleep_blocks_actions
 
-    if sleep_blocks_actions(actor):
+        asleep = sleep_blocks_actions(actor)
+    if asleep:
         return RejectReason.ASLEEP, _entity_key(actor)
     bundle = (
         evaluate_combat_modifiers_no_create(actor)

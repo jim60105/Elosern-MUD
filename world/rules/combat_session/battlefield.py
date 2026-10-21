@@ -14,6 +14,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.buffs import active_buff_keys_from_storage, BLOCKING_BUFF_KEYS
 from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+from world.rules.fatigue import sleep_blocks_actions
 from world.rules.party import bound_owner_of, is_companion
 from world.rules.combat_session.records import CombatSessionRecord
 
@@ -98,6 +99,7 @@ def is_actor_eligible_to_act(
     - Alive (stored HP > 0).
     - Not blocked by a blocking buff.
     - Not action-forbidden (``actions_per_turn`` > 0).
+    - Awake (a sleeping body takes no ordinary command).
     """
     actor_pk = getattr(actor, "pk", None)
     if actor_pk is None or actor_pk not in record.player_ids:
@@ -114,6 +116,8 @@ def is_actor_eligible_to_act(
     # Ability-to-act check
     blocked = bool(active_buff_keys_from_storage(actor) & BLOCKING_BUFF_KEYS)
     if blocked:
+        return False
+    if sleep_blocks_actions(actor):
         return False
     modifiers = evaluate_combat_modifiers_no_create(actor)
     if modifiers.get("actions_per_turn", 1) == 0:
@@ -161,13 +165,22 @@ def authorize_combat_actor(
        - Must be co-located with commander.
        - Must be eligible to act (not fled, not knocked out, HP > 0, ability to act).
     4. Otherwise, rejects with ``FORBIDDEN_ACTOR``.
+
+    The self path additionally refuses a sleeping body. Sleep is the one
+    exclusion the command collection needs on the commander's own entry (a
+    sleeping commander keeps authenticated authority and may still command an
+    awake ally), while every other self-path precondition keeps its existing
+    behavior.
     """
     if commander.pk not in record.player_ids:
         raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
     if getattr(actor, "pk", None) not in record.player_ids:
         raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
     is_self = actor is commander or actor.pk == commander.pk
-    if not is_self:
+    if is_self:
+        if sleep_blocks_actions(actor):
+            raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+    else:
         # Bound party membership validation
         owner = bound_owner_of(actor)
         if not (is_companion(actor, commander) or (owner is not None and owner.pk == commander.pk)):

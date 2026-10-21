@@ -506,6 +506,14 @@ class DecisionSnapshotReadTests(unittest.TestCase):
             {},
             "a repeated plan must not re-read any participant's inputs",
         )
+        # The sleep fact rides the decision's memoized capability projection, so
+        # validation adds no posture read; a NEW decision observes changes.
+        self.actor.attributes.values["sleep_posture"] = "forced"
+        fresh = DecisionReads()
+        fresh_snapshot, _fresh_reads, _fresh_roster, _fresh_context = _entry(
+            self.actor, context, participants, reads=fresh
+        )
+        self.assertTrue(fresh_snapshot.actor.capability.asleep)
         for index, member in enumerate(members):
             self.assertEqual(
                 member.trait_reads,

@@ -155,6 +155,30 @@ class ContextActionsSchemaTests(unittest.TestCase):
                 validate_context_actions(panel)
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
+    def test_accepts_the_asleep_participant_state_with_the_sleep_restriction(self):
+        from world.rules.status_query import SLEEP_RESTRICTION_MESSAGE
+
+        panel = _valid_panel(
+            participants=[
+                _valid_participant(
+                    state="asleep",
+                    conditions=[
+                        {
+                            "code": "asleep",
+                            "label": SLEEP_RESTRICTION_MESSAGE,
+                            "severity": "informational",
+                        }
+                    ],
+                )
+            ]
+        )
+        normalized = validate_context_actions(panel)
+        self.assertEqual(normalized["participants"][0]["state"], "asleep")
+        self.assertEqual(
+            normalized["participants"][0]["conditions"][0]["code"], "asleep"
+        )
+
     def test_participant_conditions_are_exact_bounded_rows(self):
         row = {"code": "t_ash_burn", "label": "合成灼燒", "severity": "harmful"}
         panel = _valid_panel(participants=[_valid_participant(conditions=[row] * 8)])
