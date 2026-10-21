@@ -795,6 +795,7 @@ class ExamSettlementRecoveryTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
     def test_all_forced_sleep_candidate_enters_exam_fail_without_a_round(self):
         from world.rules.fatigue import (

@@ -1899,6 +1899,7 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening",
+        "player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals",
     )
     def test_ten_live_rounds_leave_low_reserve_untouched_until_terminal(self):
         from world.rules.combat_session.settlement import _ROUND_SECONDS, _round_cap
@@ -1940,7 +1941,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(get_world_clock().tick, tick_before + 60)
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals",
     )
     def test_ten_asleep_rounds_restore_then_wake_at_the_terminal_threshold(self):
         from world.rules.fatigue import SleepPosture, fatigue_stage
@@ -1959,7 +1961,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(fatigue_stage(state).value, "moderate")
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals",
     )
     def test_explicit_mid_battle_wake_splits_the_terminal_interval(self):
         from world.rules.fatigue import SleepPosture
@@ -1985,7 +1988,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIs(state.posture, SleepPosture.AWAKE)
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals",
     )
     def test_four_sleepers_and_six_awake_members_settle_their_own_rates(self):
         from typeclasses.npcs import NPC
@@ -2020,7 +2024,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertEqual(self._state(member).reserve_units, 360000 - 720)
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath",
     )
     def test_a_below_threshold_surviving_sleeper_stays_stationary_after_victory(self):
         from world.rules.fatigue import SleepPosture, travel_allowed
@@ -2038,7 +2043,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIs(self._state(self.player).posture, SleepPosture.AWAKE)
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath",
     )
     def test_recovery_never_wakes_an_established_defeated_sleeper(self):
         from world.rules.fatigue import SleepPosture
@@ -2056,7 +2062,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIs(state.posture, SleepPosture.FORCED)
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-fatigue-joins-the-complete-idempotent-round-transaction",
     )
     def test_reloading_a_settled_session_never_settles_again(self):
         from world.rules.clock import get_world_clock
@@ -2076,7 +2083,8 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(get_world_clock().tick, settled_tick)
 
     @covers_requirement(
-        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit",
+        "player-combat-session::terminal-fatigue-joins-the-complete-idempotent-round-transaction",
     )
     def test_late_failure_restores_every_member_then_retries_once(self):
         from world.rules.combat_session import _persist
@@ -2166,6 +2174,7 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
+        "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
     def test_opening_defeat_runs_once_with_zero_combat_seconds(self):
         from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
@@ -2203,7 +2212,8 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertGreaterEqual(get_world_clock().tick, tick_before)
 
     @covers_requirement(
-        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
+        "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
     def test_invalid_target_rejects_before_any_defeat_or_time(self):
         from world.rules.clock import get_world_clock
@@ -2222,7 +2232,8 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_fatigue_state(self.player), state_before)
 
     @covers_requirement(
-        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit",
+        "player-combat-session::terminal-fatigue-joins-the-complete-idempotent-round-transaction",
     )
     def test_failed_opening_leaves_no_session_or_skip_registration(self):
         from world.rules.clock import get_world_clock
@@ -2279,7 +2290,8 @@ class TerminalHandoffOfferTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath",
     )
     def test_offer_is_post_commit_and_uses_the_verified_candidates(self):
         from world.rules.fatigue import (
@@ -2319,7 +2331,8 @@ class TerminalHandoffOfferTests(BattlefieldIsolation, EvenniaTest):
         self.assertIn("交接", delivered.call_args.args[0])
 
     @covers_requirement(
-        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit",
+        "player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath",
     )
     def test_rolled_back_settlement_emits_no_offer(self):
         from world.rules.fatigue import (

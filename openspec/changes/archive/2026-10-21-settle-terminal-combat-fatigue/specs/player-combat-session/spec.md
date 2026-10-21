@@ -3,12 +3,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: Combat time settles once at terminal session outcome
-Session rounds SHALL accumulate without command-default cast time. On enemy defeat, player defeat,
-successful party retreat, nonlethal exam outcome, or bounded terminal condition, the total rounds times six
-seconds SHALL settle once through `settle_combat_result()`. Mental intervals SHALL settle once for eligible participants from their recorded activity accounting, with natural wake evaluated only after live combat ends and without reviving established defeated entities. Then active session/context state SHALL
-be cleared. The settlement SHALL be idempotent: a
-terminal outcome SHALL record a durable settled marker so a restart that re-reads the session can
-never settle the same rounds a second time.
+Session rounds SHALL accumulate without command-default cast time. Every terminal outcome (either
+side's defeat, party retreat, nonlethal exam, bounded condition) SHALL settle rounds times six
+seconds once via `settle_combat_result()` and settle mental intervals once from recorded activity
+accounting, waking naturally only after live combat ends and never for defeated bodies. Session
+state SHALL then clear. A durable settled marker SHALL keep settlement idempotent across restart.
 
 #### Scenario: Three-round victory advances eighteen seconds once
 - **WHEN** a hostile session ends after three completed rounds
