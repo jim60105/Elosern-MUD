@@ -88,7 +88,7 @@ def graft_synth_innate_skills() -> None:
         FactionConstraint,
         SkillCategory,
         TargetSpec,
-        validate_prerequisite_graph,
+        rebuild_prerequisite_caches,
     )
     from world.tests.synthetic_data import SYNTH_SKILLS
 
@@ -121,8 +121,10 @@ def graft_synth_innate_skills() -> None:
     )
     # The graft mutates the live skill catalog after the install rebuilt the
     # lineage caches. Rebuild them once for the extended catalog so the
-    # read model sees exactly the rows that are now registered.
-    validate_prerequisite_graph(SKILL_REGISTRY)
+    # read model sees exactly the rows that are now registered. This is a
+    # cache boundary, not a catalog content audit: the rows are synthetic and
+    # content validation reads catalogs the harness may itself be swapping.
+    rebuild_prerequisite_caches(SKILL_REGISTRY)
 
 
 def graft_synth_status_display() -> None:

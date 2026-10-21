@@ -1233,13 +1233,18 @@ module label）；受管面板／文字煙霧測試位於
 `.github/browser-shards.json`。fixture 煙霧永遠不能取代原驗收 change 的 UI 證據。
 
 **Lineage index lifecycle**：`world.skills.registry` 在 import 時以
-`validate_prerequisite_graph` 建 reverse-edge cache；lineage 讀模型的 Kahn 排序同時讀
-live row 的 prerequisites 與這份 cache，兩者必須描述同一份 catalog。合成 kit 對 mutable
-skill registry 是原地替換（process install 的 `clear`＋`update`、scope 的
-`patch.dict`、browser harness 的 innate graft），因此每個 catalog mutation boundary
-都要重建一次 cache：install 完成後、graft 完成後、scope 進入時，以及 ExitStack 還原
-shipped rows 之後。漏掉任何一個邊界會讓 valid synthetic graph 的 indegree 無法 drain，
-`_topological_order` 便誤報「registry validator should have rejected」的 cycle；
+`validate_prerequisite_graph` 做完整 catalog 內容驗證並建 reverse-edge cache；lineage
+讀模型的 Kahn 排序同時讀 live row 的 prerequisites 與這份 cache，兩者必須描述同一份
+catalog。合成 kit 對 mutable skill registry 是原地替換（process install 的
+`clear`＋`update`、scope 的 `patch.dict`、browser harness 的 innate graft），因此每個
+catalog mutation boundary 都要重建一次 cache：install 完成後、graft 完成後、scope 進入
+時，以及 ExitStack 還原 shipped rows 之後。邊界一律呼叫
+`rebuild_prerequisite_caches`：它只驗證 registry 自身的圖形結構（dangling prerequisite、
+`min_proficiency >= 1`、無環）並安裝 cache。內容規則（eligibility、divine mystery）讀
+其他 catalog（species、races），只留在 import 時的 `validate_prerequisite_graph` 與
+sexual-act sidecar 的擴充後驗證；在 swap 邊界重跑它會拿 shipped rows 對上仍為合成的
+依賴（或反之）而誤判。漏掉任何一個邊界會讓 valid synthetic graph 的 indegree 無法
+drain，`_topological_order` 便誤報「registry validator should have rejected」的 cycle；
 `系譜 艾拉` 與 GM 角色 lineage 區塊的 unavailable 即為此症状。修正只放在 mutation 邊界，
 read path 不做 query-time repair、也不新增第二份 cache。
 

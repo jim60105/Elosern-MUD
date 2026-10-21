@@ -204,12 +204,15 @@ def _revalidate_skill_lineage() -> None:
     """Rebuild the skill registry's load-time lineage caches for the live rows."""
     # The kit never names a shipped catalog symbol literally; resolve the live
     # binding by attribute string, exactly as the discovery pass does.
-    from world.skills.registry import validate_prerequisite_graph
+    from world.skills.registry import rebuild_prerequisite_caches
 
     registry = getattr(
         importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
     )
-    validate_prerequisite_graph(registry)
+    # Graph-structure rebuild only: catalog CONTENT validation runs once at
+    # package import, and would read other live catalogs that this scope may
+    # itself still be swapping on either side of the boundary.
+    rebuild_prerequisite_caches(registry)
 
 
 def _late_binder_sweep(logical: str, replacement: object, original: object) -> None:

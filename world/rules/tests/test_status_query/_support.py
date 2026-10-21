@@ -177,6 +177,9 @@ _ROW_REST = (
     _file_skill(_T_REST[0], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT),
     _file_skill(_T_REST[1], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT, group="天賦"),
     _file_skill(_T_REST[2], _MARTIAL_TEMPLATE, category=SkillCategory.ENHANCEMENT, group="身法"),
+    # Category-grouping carrier only: it intentionally omits the shipped
+    # divine-capability content rule (synthetic catalog boundaries rebuild the
+    # lineage graph only; shipped content validation stays at package import).
     _file_skill(_T_REST[3], _MARTIAL_TEMPLATE, category=SkillCategory.DIVINE_MYSTERY),
     _file_skill(_T_REST[4], _MARTIAL_TEMPLATE, category=SkillCategory.UTILITY),
 )

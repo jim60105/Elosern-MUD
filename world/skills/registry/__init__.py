@@ -49,6 +49,7 @@ from world.skills.registry.validation import (
     _LINEAGE_PREREQS,
     declared_prerequisites,
     prerequisite_consumers,
+    rebuild_prerequisite_caches,
     validate_prerequisite_graph,
 )
 from world.skills.registry.vocab import (
@@ -127,5 +128,6 @@ __all__ = [
     "TargetSpec",
     "declared_prerequisites",
     "prerequisite_consumers",
+    "rebuild_prerequisite_caches",
     "validate_prerequisite_graph",
 ]

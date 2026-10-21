@@ -34,6 +34,105 @@ def declared_prerequisites(skill_key: str) -> tuple[SkillPrerequisite, ...]:
     return _LINEAGE_PREREQS.get(skill_key, ())
 
 
+def _collect_edges(
+    registry: dict[str, SkillDef],
+) -> tuple[
+    dict[str, tuple[SkillPrerequisite, ...]],
+    dict[str, list[tuple[str, int]]],
+]:
+    """Return ``(declared edges, reverse edges)``, rejecting broken edges.
+
+    Structural rules 1 and 3 (design §9.3): every named prerequisite exists
+    in ``registry`` and every ``min_proficiency`` is >= 1. These read only
+    the registry itself, so every catalog boundary may enforce them.
+    """
+    consumers: dict[str, list[tuple[str, int]]] = {}
+    prereqs: dict[str, tuple[SkillPrerequisite, ...]] = {}
+    for key, skill in registry.items():
+        if not skill.prerequisites:
+            continue
+        prereqs[key] = tuple(skill.prerequisites)
+        for prereq in skill.prerequisites:
+            if prereq.skill_key not in registry:
+                raise ValueError(
+                    f"skill {key!r} declares prerequisite {prereq.skill_key!r} "
+                    "which is not in SKILL_REGISTRY"
+                )
+            if prereq.min_proficiency < 1:
+                raise ValueError(
+                    f"skill {key!r} declares min_proficiency "
+                    f"{prereq.min_proficiency} for {prereq.skill_key!r}; the "
+                    "threshold must be >= 1"
+                )
+            consumers.setdefault(prereq.skill_key, []).append(
+                (key, prereq.min_proficiency)
+            )
+    return prereqs, consumers
+
+
+def _validate_acyclic(
+    registry: dict[str, SkillDef],
+    prereqs: dict[str, tuple[SkillPrerequisite, ...]],
+    consumers: dict[str, list[tuple[str, int]]],
+) -> None:
+    """Kahn topological sort over prerequisite edges (prereq -> consumer)."""
+    indegree = {key: len(prereqs.get(key, ())) for key in registry}
+    queue = sorted(key for key, degree in indegree.items() if degree == 0)
+    visited = 0
+    while queue:
+        current = queue.pop(0)
+        visited += 1
+        for consumer_key, _ in sorted(consumers.get(current, ())):
+            indegree[consumer_key] -= 1
+            if indegree[consumer_key] == 0:
+                queue.append(consumer_key)
+                queue.sort()
+    if visited != len(registry):
+        cycle = sorted(key for key, degree in indegree.items() if degree > 0)
+        raise ValueError(
+            "skill prerequisite graph is cyclic; the offending nodes are "
+            f"{cycle!r} (every listed skill either prereqs a cycle member or "
+            "is consumed by one)"
+        )
+
+
+def _install_caches(
+    consumers: dict[str, list[tuple[str, int]]],
+    prereqs: dict[str, tuple[SkillPrerequisite, ...]],
+) -> dict[str, tuple[tuple[str, int], ...]]:
+    """Replace both lineage caches and return the sorted reverse map."""
+    reverse = {
+        key: tuple(sorted(edges, key=lambda edge: (edge[1], edge[0])))
+        for key, edges in consumers.items()
+    }
+    _LINEAGE_CONSUMERS.clear()
+    _LINEAGE_CONSUMERS.update(reverse)
+    _LINEAGE_PREREQS.clear()
+    _LINEAGE_PREREQS.update(prereqs)
+    return reverse
+
+
+def rebuild_prerequisite_caches(
+    registry: dict[str, SkillDef],
+) -> dict[str, tuple[tuple[str, int], ...]]:
+    """Rebuild the lineage caches for a swapped catalog.
+
+    The synthetic test-data kit substitutes the live registry in place and
+    must rebuild these caches at every catalog boundary. The graph structure
+    (dangling prerequisites, thresholds, cycles) is enforced here because it
+    reads only the registry itself, and a malformed swap must still fail
+    closed. Catalog CONTENT validation stays with
+    :func:`validate_prerequisite_graph` at package import: it reads other
+    catalogs (species, races) that a kit scope may itself be swapping, so
+    re-running it while a scope unwinds would validate the restored shipped
+    rows against dependencies that are still synthetic (or the reverse) and
+    reject references that are valid outside that moment.
+    """
+    prereqs, consumers = _collect_edges(registry)
+    _validate_acyclic(registry, prereqs, consumers)
+    return _install_caches(consumers, prereqs)
+
+
 def validate_prerequisite_graph(
     registry: dict[str, SkillDef],
 ) -> dict[str, tuple[tuple[str, int], ...]]:
@@ -54,8 +153,6 @@ def validate_prerequisite_graph(
     (merging); the rules above are degree-independent. Idempotent, so the
     sexual-act sidecar re-runs it after extending the registry.
     """
-    consumers: dict[str, list[tuple[str, int]]] = {}
-    prereqs: dict[str, tuple[SkillPrerequisite, ...]] = {}
     from world.skills.eligibility import validate_skill_eligibility
 
     for key, skill in registry.items():
@@ -71,52 +168,8 @@ def validate_prerequisite_graph(
                 for effect in skill.effects
             ):
                 raise ValueError(f"skill {key!r}: invalid divine mystery cost/effects")
-        if not skill.prerequisites:
-            continue
-        prereqs[key] = tuple(skill.prerequisites)
-        for prereq in skill.prerequisites:
-            if prereq.skill_key not in registry:
-                raise ValueError(
-                    f"skill {key!r} declares prerequisite {prereq.skill_key!r} "
-                    "which is not in SKILL_REGISTRY"
-                )
-            if prereq.min_proficiency < 1:
-                raise ValueError(
-                    f"skill {key!r} declares min_proficiency "
-                    f"{prereq.min_proficiency} for {prereq.skill_key!r}; the "
-                    "threshold must be >= 1"
-                )
-            consumers.setdefault(prereq.skill_key, []).append(
-                (key, prereq.min_proficiency)
-            )
 
-    # Kahn topological sort over the prerequisite edges (prereq -> consumer).
-    indegree = {key: len(prereqs.get(key, ())) for key in registry}
-    queue = sorted(key for key, degree in indegree.items() if degree == 0)
-    visited = 0
-    while queue:
-        current = queue.pop(0)
-        visited += 1
-        for consumer_key, _ in sorted(consumers.get(current, ())):
-            indegree[consumer_key] -= 1
-            if indegree[consumer_key] == 0:
-                queue.append(consumer_key)
-                queue.sort()
-    if visited != len(registry):
-        cycle = sorted(key for key, degree in indegree.items() if degree > 0)
-        raise ValueError(
-            "skill prerequisite graph is cyclic; the offending nodes are "
-            f"{cycle!r} (every listed skill either prereqs a cycle member or "
-            "is consumed by one)"
-        )
-
-    reverse = {
-        key: tuple(sorted(edges, key=lambda edge: (edge[1], edge[0])))
-        for key, edges in consumers.items()
-    }
-    _LINEAGE_CONSUMERS.clear()
-    _LINEAGE_CONSUMERS.update(reverse)
-    _LINEAGE_PREREQS.clear()
-    _LINEAGE_PREREQS.update(prereqs)
-    return reverse
+    prereqs, consumers = _collect_edges(registry)
+    _validate_acyclic(registry, prereqs, consumers)
+    return _install_caches(consumers, prereqs)
 
