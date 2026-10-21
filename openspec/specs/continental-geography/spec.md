@@ -24,6 +24,8 @@ The system SHALL declare one known continent with an irregular mainland, rounded
 | 9 | 100 | 1050 |
 | 10 | 300 | 350 |
 
+
+
 #### Scenario: Nine geographic anchors
 - **WHEN** canonical positions are resolved
 - **THEN** they equal this table, their cell centers are on land, and placement does not spawn rooms or reveal hidden knowledge.
@@ -40,6 +42,8 @@ The system SHALL declare one known continent with an irregular mainland, rounded
 | `dungeon_dragon_nest` | 龍之巢穴 | 2340 | 1220 | Remote eastern Grandia |
 | `dungeon_arcane_ruins` | 魔導遺跡 | 480 | 1160 | Western Altoria hills and ancient/mineral sites |
 
+
+
 #### Scenario: Six reserved harbor sites
 - **WHEN** functional ports are inspected
 - **THEN** all centers lie on land at the following cells; none creates named anchors, cities, quests or population.
@@ -52,6 +56,8 @@ The system SHALL declare one known continent with an irregular mainland, rounded
 | Imperial southeastern main port | 2070 | 241 | Agricultural and magical-goods exports |
 | Imperial southeastern secondary port | 2400 | 454 | Eastern coastal collection |
 | Imperial southern secondary port | 1700 | 101 | Southern coastal transfer |
+
+
 
 ### Requirement: Population and territory targets preserve authored settlement scale
 The continent SHALL retain approximately 30,000,000 inhabitants on approximately 5,000,000 km², including approximately 300 elves as rounded totals. National territory shares SHALL be area targets separate from terrain and actual control.
