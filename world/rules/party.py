@@ -327,6 +327,11 @@ def follow_scope(
     predicate against the source room or wilderness registration. Any
     resolution failure degrades to no followers rather than raising from a
     traversal hook.
+
+    A source-present forced sleeper stays in this scope: the movement
+    preflight refuses the whole departure from the same scope instead of
+    silently leaving the sleeper behind (fatigue-aware traversal). The
+    predicate is the one travel scope, speed, charge and follow step share.
     """
     from world.rules.party_scope import PartyScopeError, resolve_commander
 
@@ -364,6 +369,29 @@ def follow_scope(
         except Exception:  # observability: ignore R2: co-location probe isolation on a traversal-hook hot path; degrades to leaving that member behind
             continue
     return commander, followers
+
+
+def travel_scope(
+    traverser: Any,
+    source_location: Any,
+    wilderness_source_coordinates: tuple[int, int] | None = None,
+) -> tuple[Any, ...]:
+    """The traverser plus every source-present member the follow step moves.
+
+    This is the one canonical traveller tuple for a traversal: movement speed,
+    pre-destination admission, the clock charge and the settlement snapshot all
+    read it, so they can never disagree about who is travelling. Remote party
+    members are excluded. It never raises: ``follow_scope`` degrades to no
+    followers on a resolution failure.
+    """
+
+    _, followers = follow_scope(
+        traverser,
+        source_location,
+        wilderness_source_coordinates,
+        log_unresolved=False,
+    )
+    return (traverser, *followers)
 
 
 def follow_companions(

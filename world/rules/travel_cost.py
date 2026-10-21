@@ -19,12 +19,24 @@ calculation authority:
   speed; a corrupt state or a posture that forbids travel refuses the
   traversal at preflight instead of being priced as healthy.
 
+The duration is integrated, not sampled once: :func:`plan_traversal` walks the
+ordered ``(distance, terrain)`` legs and recomputes the slowest sustainable
+speed at every member fatigue threshold and every terrain boundary, applying a
+changed speed only to the remaining distance. Segment durations stay exact
+fractions and the whole traversal rounds upward exactly once, which is the
+same whole-second interval the clock's fatigue settlement commits. A member
+predicted to exhaust mental reserve strictly before the destination refuses
+the departure with ``pre_destination_depletion``; reaching exactly zero at
+arrival is accepted and the external forced-sleep latch applies there.
+Processing is per authored boundary, never per meter or per second.
+
 Only ``seconds`` is an authority. ``clock.yaml``'s ``command_defaults`` remain
 the explicit durations for non-distance connectors (a Limbo bridge, an
 instance-room doorway, a plain room pair); a distance-bearing outdoor lineage
 either resolves here or is refused before any write. ``wilderness_move`` is
 retained as the distinct wilderness flight-waiver context key only and is never
-a seconds authority.
+a seconds authority. An explicit connector's authored duration is admission
+checked against the same pre-destination depletion rule.
 
 The preflight boundary is the :func:`preflight_movement_cost` context manager:
 every exit lineage resolves one immutable :class:`TraversalCost` before
@@ -36,7 +48,7 @@ from the caller's source location and the traverser's current location.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -59,8 +71,13 @@ from world.observability import log_warn
 from world.rules.fatigue import (
     POSTURE_ATTRIBUTE,
     RESERVE_ATTRIBUTE,
+    BoundaryKind,
+    FatigueActivity,
+    FatigueState,
     FatigueStateError,
     SleepPosture,
+    get_policy,
+    next_fatigue_boundary,
     outgoing_foot_speed_scale,
     read_fatigue_state,
     read_optional_fatigue_state,
@@ -101,6 +118,9 @@ class TraversalStatus(StrEnum):
 
 SLEEPING_PARTY_MESSAGE = "同行成員正在沉睡，無法移動。"
 
+#: One refusal message for every pre-destination mental exhaustion.
+DEPLETION_MESSAGE = "隊伍成員的精神儲備不足以支撐這趟旅行。"
+
 
 def refuse_sleeping_party(members: Sequence[Any]) -> None:
     """Refuse any travel whose source-present party includes a forced sleeper.
@@ -114,6 +134,28 @@ def refuse_sleeping_party(members: Sequence[Any]) -> None:
         state = read_optional_fatigue_state(member)
         if state is not None and state.posture is SleepPosture.FORCED:
             raise MovementPreflightRefused("party_sleeping", SLEEPING_PARTY_MESSAGE)
+
+
+def refuse_pre_destination_depletion(seconds: int, members: Sequence[Any]) -> None:
+    """Refuse a fixed-duration traversal a present member cannot survive.
+
+    Non-distance connectors keep their authored ``clock.yaml`` duration, so
+    their integrated duration is that constant. Exactly zero at arrival is
+    accepted (the external forced sleep then applies at the destination);
+    anything that exhausts strictly before arrival refuses here, before the
+    exit relocates, charges time, or records knowledge.
+    """
+    if seconds <= 0:
+        return
+    rate = abs(int(get_policy().rates[FatigueActivity.FOOT_TRAVEL]))
+    for member in members:
+        state = _fatigue_state(member)
+        if state is None:
+            continue
+        if Fraction(state.reserve_units, rate) < seconds:
+            raise MovementPreflightRefused(
+                "pre_destination_depletion", DEPLETION_MESSAGE
+            )
 
 
 def _validate_rulebook() -> None:
@@ -186,29 +228,8 @@ def terrain_speed_m_per_hour(terrain: str) -> int:
         raise TravelRulebookError(f"unknown travel terrain {terrain!r}") from error
 
 
-def traversal_seconds(
-    leg_lengths_m: Iterable[float], speed_m_per_hour: Fraction | int
-) -> int:
-    """Return one committed traversal's duration, rounded upward exactly once.
-
-    Each polyline leg is measured in meters and divided by the party's exact
-    speed; the legs are summed as exact fractions before the single ceiling, so
-    two 0.4-second legs commit 1 second, never 2. Per-meter rounding is
-    therefore impossible by construction.
-    """
-
-    speed = Fraction(speed_m_per_hour)
-    if speed <= 0:
-        raise TravelRulebookError("travel speed must be positive")
-    total = sum(
-        (Fraction(length) * 3600 / speed for length in leg_lengths_m),
-        Fraction(0),
-    )
-    return ceil(total)
-
-
-def _fatigue_scale(member: Any) -> Fraction:
-    """Return a present member's outgoing foot-speed scale, or refuse.
+def _fatigue_state(member: Any) -> FatigueState | None:
+    """Return one present member's validated fatigue state, or refuse.
 
     Only a wholly absent reserve/posture pair is a body that has never been
     constructed through the physiology initializer, and only that body travels
@@ -221,7 +242,7 @@ def _fatigue_scale(member: Any) -> Fraction:
     if attributes is None or not callable(getattr(attributes, "has", None)):
         # A plain synthetic probe has no attribute store at all: nothing was
         # ever initialized, so it is the wholly-absent baseline.
-        return Fraction(1)
+        return None
     try:
         has_reserve = attributes.has(RESERVE_ATTRIBUTE)
         has_posture = attributes.has(POSTURE_ATTRIBUTE)
@@ -231,32 +252,46 @@ def _fatigue_scale(member: Any) -> Fraction:
             f"{member!r} has an unreadable mental-reserve state: {error}",
         ) from error
     if not has_reserve and not has_posture:
-        return Fraction(1)
+        return None
     if not (has_reserve and has_posture):
         raise MovementPreflightRefused(
             "fatigue_state_partial",
             f"{member!r} has only one half of its mental-reserve state",
         )
     try:
-        state = read_fatigue_state(member)
+        return read_fatigue_state(member)
     except FatigueStateError as error:
         raise MovementPreflightRefused(
             "fatigue_state_invalid",
             f"{member!r} has an unreadable mental-reserve state: {error}",
         ) from error
+
+
+def _state_speed_m_per_hour(state: FatigueState | None, terrain: str) -> Fraction:
+    """One predicted member state's sustainable speed on ``terrain``.
+
+    A ``None`` state is the wholly-absent construction baseline and travels at
+    the base terrain speed for the whole traversal (it never transitions). A
+    stored state uses the external fatigue owner's outgoing scale, so a segment
+    that begins exactly on a band floor already travels at the lower band.
+    """
+
+    speed = Fraction(terrain_speed_m_per_hour(terrain))
+    if state is None:
+        return speed
     try:
-        return outgoing_foot_speed_scale(state)
+        return speed * outgoing_foot_speed_scale(state)
     except FatigueStateError as error:
         raise MovementPreflightRefused(
             "travel_forbidden",
-            f"{member!r} may not travel: {error}",
+            f"a member may not travel: {error}",
         ) from error
 
 
 def member_speed_m_per_hour(member: Any, terrain: str) -> Fraction:
     """Return one member's sustainable speed on ``terrain`` (exact fraction)."""
 
-    return Fraction(terrain_speed_m_per_hour(terrain)) * _fatigue_scale(member)
+    return _state_speed_m_per_hour(_fatigue_state(member), terrain)
 
 
 def party_speed_m_per_hour(members: Sequence[Any], terrain: str) -> Fraction:
@@ -274,18 +309,164 @@ def party_speed_m_per_hour(members: Sequence[Any], terrain: str) -> Fraction:
     return min(member_speed_m_per_hour(member, terrain) for member in members)
 
 
+@dataclass(frozen=True, slots=True)
+class TraversalSegment:
+    """One constant-speed piece of an integrated traversal.
+
+    ``seconds`` and ``distance_m`` are exact fractions: the pieces are summed
+    before the traversal's single upward rounding, so a subsecond boundary is
+    never rounded per segment.
+    """
+
+    seconds: Fraction
+    distance_m: Fraction
+    speed_m_per_hour: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class TraversalPlan:
+    """One integrated traversal: constant-speed segments plus its commitment."""
+
+    distance_m: Fraction
+    segments: tuple[TraversalSegment, ...]
+    seconds: int
+    members: tuple[Any, ...]
+
+
+def _advance_predicted_state(
+    state: FatigueState | None, seconds: Fraction
+) -> FatigueState | None:
+    """Apply one exact boundary offset to a predicted state (no writes).
+
+    Only a computed member/terrain boundary calls this, and every boundary
+    offset is ``(reserve - floor) / rate``, so ``rate * seconds`` is always an
+    exact whole number of reserve units. The posture latches forced at zero.
+    """
+
+    if state is None:
+        return None
+    rate = Fraction(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
+    reserve = Fraction(state.reserve_units) + rate * seconds
+    if reserve.denominator != 1:
+        raise TravelRulebookError(
+            "a boundary offset must consume a whole mental-reserve unit"
+        )
+    units = int(reserve)
+    return FatigueState(
+        reserve_units=units,
+        posture=SleepPosture.AWAKE if units > 0 else SleepPosture.FORCED,
+    )
+
+
+def plan_traversal(
+    legs: Sequence[tuple[float, str]], members: Sequence[Any]
+) -> TraversalPlan:
+    """Integrate one traversal across ordered ``(distance_m, terrain)`` legs.
+
+    Every member's state is read once; the party speed is then recomputed at
+    each member threshold and each terrain boundary, and only the remaining
+    distance uses a changed speed. Segments are keyed by those authored
+    boundaries, never by meter or second. The exact segment durations are
+    summed before the traversal's single upward rounding, so prediction and
+    the whole-second fatigue settlement agree on the committed duration.
+    A member predicted to exhaust strictly before the final destination
+    refuses the departure; reaching exactly zero at arrival is accepted and
+    the external forced sleep applies there.
+    """
+
+    if not members:
+        raise MovementPreflightRefused(
+            "no_travellers", "a distance-bearing traversal needs at least one traveller"
+        )
+    states: tuple[FatigueState | None, ...] = tuple(
+        _fatigue_state(member) for member in members
+    )
+    total_distance = Fraction(0)
+    segments: list[TraversalSegment] = []
+    for distance_m, terrain in legs:
+        if distance_m < 0:
+            raise TravelRulebookError("travel distance must not be negative")
+        remaining = Fraction(distance_m)
+        total_distance += remaining
+        while remaining > 0:
+            speeds = [_state_speed_m_per_hour(state, terrain) for state in states]
+            speed = min(speeds)
+            if speed <= 0:
+                raise TravelRulebookError("travel speed must be positive")
+            metres_per_second = speed / 3600
+            boundaries = [
+                boundary
+                for state in states
+                if state is not None
+                for boundary in (
+                    next_fatigue_boundary(state, FatigueActivity.FOOT_TRAVEL),
+                )
+                if boundary is not None
+            ]
+            boundary_seconds = (
+                min(item.offset_seconds for item in boundaries) if boundaries else None
+            )
+            if boundary_seconds is None:
+                segments.append(
+                    TraversalSegment(
+                        seconds=remaining / metres_per_second,
+                        distance_m=remaining,
+                        speed_m_per_hour=speed,
+                    )
+                )
+                break
+            coverable = metres_per_second * boundary_seconds
+            if remaining <= coverable:
+                # The remaining distance fits before the next boundary (the
+                # exact-zero-at-arrival case lands here and is accepted).
+                segments.append(
+                    TraversalSegment(
+                        seconds=remaining / metres_per_second,
+                        distance_m=remaining,
+                        speed_m_per_hour=speed,
+                    )
+                )
+                break
+            if boundary_seconds <= 0 or any(
+                item.kind is BoundaryKind.DEPLETION
+                and item.offset_seconds == boundary_seconds
+                for item in boundaries
+            ):
+                # A member reaches zero (or already is) before this leg -- and
+                # therefore before the destination -- completes.
+                raise MovementPreflightRefused(
+                    "pre_destination_depletion", DEPLETION_MESSAGE
+                )
+            segments.append(
+                TraversalSegment(
+                    seconds=boundary_seconds,
+                    distance_m=coverable,
+                    speed_m_per_hour=speed,
+                )
+            )
+            remaining -= coverable
+            states = tuple(
+                _advance_predicted_state(state, boundary_seconds) for state in states
+            )
+    elapsed = sum((segment.seconds for segment in segments), Fraction(0))
+    return TraversalPlan(
+        distance_m=total_distance,
+        segments=tuple(segments),
+        seconds=ceil(elapsed),
+        members=tuple(members),
+    )
+
+
 def distance_traversal_cost(
     distance_m: float, terrain: str, members: Sequence[Any]
 ) -> TraversalCost:
-    """The shared calculation: geometry + terrain + party speed → seconds."""
+    """The shared calculation: geometry + terrain + integrated party speed."""
 
-    if distance_m < 0:
-        raise TravelRulebookError("travel distance must not be negative")
-    speed = party_speed_m_per_hour(members, terrain)
+    plan = plan_traversal(((distance_m, terrain),), members)
     return TraversalCost(
         distance_m=float(distance_m),
         terrain=terrain,
-        seconds=traversal_seconds([distance_m], speed),
+        seconds=plan.seconds,
         members=tuple(members),
     )
 
@@ -590,6 +771,14 @@ def resolve_traversal_cost(
             )
         # Grid rooms outside every declared settlement map are explicit
         # non-distance connectors (instance interiors, builder-room doorways).
+    # An explicit connector's authored duration is still a traversal a member
+    # must survive: refuse departure before any write exactly as a physical
+    # edge does, with the same exact-zero-at-arrival allowance.
+    from world.rules.clock import CLOCK_YAML
+
+    authored_seconds = CLOCK_YAML.get("command_defaults", {}).get(cost_key)
+    if isinstance(authored_seconds, int):
+        refuse_pre_destination_depletion(authored_seconds, members)
     return resolution(TraversalStatus.NON_DISTANCE, None)
 
 
@@ -648,6 +837,28 @@ def consume_preflight_resolution(
     return None
 
 
+def active_traversal_members(
+    traversing_object: Any, source_location: Any
+) -> tuple[Any, ...] | None:
+    """The innermost preflight traveller tuple for this traversal, if any.
+
+    The settlement snapshot reuses exactly the scope the preflight priced and
+    the charge will settle, so a post-relocation rollback restores the same
+    travellers it may have written. It falls back to an independent scope
+    resolution only for a direct call outside an exit lineage.
+    """
+
+    traverser_id = getattr(traversing_object, "id", None)
+    source_id = getattr(source_location, "id", None)
+    for resolution in reversed(_ACTIVE_RESOLUTIONS.get()):
+        if (
+            resolution.traverser_id == traverser_id
+            and resolution.source_location_id == source_id
+        ):
+            return resolution.members
+    return None
+
+
 def source_present_members(
     traversing_object: Any,
     source_location: Any,
@@ -660,15 +871,11 @@ def source_present_members(
     followed party can never disagree; remote party members are excluded.
     """
 
-    from world.rules.party import follow_scope
+    from world.rules.party import travel_scope
 
-    _, followers = follow_scope(
-        traversing_object,
-        source_location,
-        wilderness_source_coordinates,
-        log_unresolved=False,
+    return travel_scope(
+        traversing_object, source_location, wilderness_source_coordinates
     )
-    return (traversing_object, *followers)
 
 
 def log_traversal_refusal(source: str, traversing_object: Any, reason: str) -> None:
@@ -685,26 +892,32 @@ def log_traversal_refusal(source: str, traversing_object: Any, reason: str) -> N
 
 
 __all__ = [
+    "DEPLETION_MESSAGE",
     "MovementPreflightRefused",
     "TRAVEL_YAML",
     "TERRAIN_SPEEDS",
     "TraversalCost",
+    "TraversalPlan",
     "TraversalResolution",
+    "TraversalSegment",
     "TraversalStatus",
     "TravelRulebookError",
     "WILDERNESS_TERRAIN",
+    "active_traversal_members",
     "consume_preflight_resolution",
     "distance_traversal_cost",
     "gate_approach_cost",
     "log_traversal_refusal",
     "member_speed_m_per_hour",
     "party_speed_m_per_hour",
+    "plan_traversal",
     "preflight_movement_cost",
+    "refuse_pre_destination_depletion",
+    "refuse_sleeping_party",
     "resolve_traversal_cost",
     "settlement_edge_cost",
     "source_present_members",
     "terrain_speed_m_per_hour",
-    "traversal_seconds",
     "wilderness_cell_size_m",
     "wilderness_distance_m",
     "wilderness_step_cost",

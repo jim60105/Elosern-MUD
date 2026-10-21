@@ -93,9 +93,14 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
+        # A constructed character needs its trait set before the clock can
+        # settle physiology for it (the dead-member guard reads HP).
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
 
     def _companion(self):
         npc = create_object(NPC, key="同伴", location=self.room1)
+        npc.traits.add("hp", trait_type="gauge", base=500, min=0, rate=0)
         join_party(npc, self.char1)
         return npc
 
@@ -201,6 +206,60 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertIs(npc.location, self.room2)
         self.assertEqual(get_world_clock().tick, before)
         self.assertIsNone(npc.attributes.get("map_knowledge"))
+
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_an_exhausted_connector_traveller_is_refused_with_zero_writes(self):
+        from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        before = get_world_clock().tick
+        # The plain connector costs 30 s = 240 units of foot-travel reserve.
+        write_fatigue_state(self.char1, 200, SleepPosture.AWAKE)
+        self.assertIsNone(exit_obj.at_traverse(self.char1, self.room2))
+        self.assertIs(self.char1.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.char1)
+        self.assertEqual(
+            read_fatigue_state(self.char1).reserve_units, 200
+        )
+        # Exactly zero at arrival commits the traversal and latches the
+        # external forced sleep at the destination.
+        write_fatigue_state(self.char1, 240, SleepPosture.AWAKE)
+        exit_obj.at_traverse(self.char1, self.room2)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+        state = read_fatigue_state(self.char1)
+        self.assertEqual(state.reserve_units, 0)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+
+    @covers_requirement("movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces")
+    def test_late_failure_restores_each_traveller_mental_state(self):
+        from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+
+        npc = self._companion()
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        write_fatigue_state(self.char1, 300000, SleepPosture.AWAKE)
+        write_fatigue_state(npc, 300000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        import world.rules.party as party_module
+
+        real_follow = party_module.follow_companions
+
+        def follow_then_raise(*args, **kwargs):
+            real_follow(*args, **kwargs)
+            raise RuntimeError("post-follow step failed")
+
+        with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
+            with self.assertRaises(RuntimeError):
+                exit_obj.at_traverse(self.char1, self.room2)
+        self.assertIs(self.char1.location, self.room1)
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        for member in (self.char1, npc):
+            state = read_fatigue_state(member)
+            self.assertEqual(state.reserve_units, 300000)
+            self.assertIs(state.posture, SleepPosture.AWAKE)
 
 
 class MovementSettlementWildernessTests(EvenniaTest):

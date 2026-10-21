@@ -126,6 +126,7 @@ def settle_movement(
     destination: Any | None = None,
     wilderness_coordinates: tuple[int, int] | None = None,
     wilderness_source_coordinates: tuple[int, int] | None = None,
+    window_seconds: int | None = None,
 ) -> Any:
     """Run one traversal as an all-or-nothing movement settlement.
 
@@ -148,6 +149,13 @@ def settle_movement(
     cannot distinguish success from a relocated failure, so its return value
     stays uninspected (design D1/Non-Goals).
 
+    ``window_seconds`` is the preflight record's committed traversal duration.
+    The clock charge of a long edge runs bounded internal advances inside this
+    same outer transaction, so the pre-advance registry is built for at least
+    that full window (never less than the one-day single-call bound); a failure
+    in any internal advance restores every surface the whole traversal may have
+    written.
+
     On an exception the boundary compensates after the outer rollback and
     re-raises; on a falsy relocated return it compensates and returns the
     falsy result, so the WebClient ``move_failed`` / Telnet error paths report
@@ -159,6 +167,7 @@ def settle_movement(
         destination=destination,
         wilderness_coordinates=wilderness_coordinates,
         wilderness_source_coordinates=wilderness_source_coordinates,
+        window_seconds=window_seconds,
     )
     try:
         from world.quests.escort_events import escort_event_boundary
@@ -295,6 +304,7 @@ def _snapshot_movement_state(
     destination: Any | None,
     wilderness_coordinates: tuple[int, int] | None,
     wilderness_source_coordinates: tuple[int, int] | None,
+    window_seconds: int | None = None,
 ) -> MovementSnapshot:
     """Record every pre-move surface the settlement may write (design D2)."""
     wilderness = None
@@ -358,20 +368,31 @@ def _snapshot_movement_state(
 
     if is_player_driven(traversing_object):
         clock = get_world_clock()
-        # Widened to the one-day advance bound: the exact charge cost is not
-        # known here, and a widened window is a strict superset of what the
-        # actual advance can write (every registered contract's discovery
-        # queries are window-independent today).
+        # The one-day advance bound is the floor; a longer committed edge
+        # widens the window to its full planned duration, so a registered
+        # contract whose surface falls due late in the traversal is still
+        # snapshotted even though the charge advances in bounded pieces.
+        window = max(MAX_ADVANCE_SECONDS, window_seconds or 0)
         # The travelling party is exactly the set the charge and the follow
         # step settle: the traverser plus every follower resolved from the
-        # pre-move source (companions and, under possession, the commander's
-        # body). party-rest-move-settlement.
-        snapshot_entities = [
-            traversing_object,
-            *(state.entity for state in companions),
-        ]
+        # pre-move source. The preflight record's traveller tuple is reused
+        # when the exit opened this settlement, so the snapshot, the speed,
+        # the admission and the charge can never disagree about the scope.
+        from world.rules.travel_cost import active_traversal_members
+
+        priced_members = active_traversal_members(
+            traversing_object, source_location
+        )
+        snapshot_entities = list(
+            priced_members
+            if priced_members is not None
+            else (
+                traversing_object,
+                *(state.entity for state in companions),
+            )
+        )
         registry = build_advance_snapshot_registry(
-            clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, snapshot_entities
+            clock, window, AdvanceSource.COMMAND, snapshot_entities
         )
         for entity in snapshot_entities:
             entity_attrs = {

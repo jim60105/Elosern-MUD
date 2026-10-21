@@ -28,8 +28,19 @@ from world.lore.sync import sync_all
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
+from world.rules.fatigue import (
+    SleepPosture,
+    read_fatigue_state,
+    write_fatigue_state,
+)
 from world.rules.map_knowledge import parse_knowledge, record_arrival
-from world.rules.party import FOLLOW_LOST_MESSAGE, follow_companions, join_party, party_ids
+from world.rules.party import (
+    FOLLOW_LOST_MESSAGE,
+    follow_companions,
+    join_party,
+    party_ids,
+    travel_scope,
+)
 from world.rules.possession import (
     REASON_RELEASE_REFUSED,
     PossessionWriteError,
@@ -39,9 +50,10 @@ from world.rules.possession import (
 from world.quests.room_observation import observe_room_entry
 
 MOVE = CLOCK_YAML["command_defaults"]["move"]
-#: Resolved physical durations: east-gate approach 21,601 s at 1.25 m/s, and
-#: one 10 km open-ground wilderness step 12,000 s.
-EAST_GATE_SECONDS = 21601
+#: Integrated physical durations for a full-reserve party: the east-gate
+#: approach is 13,500 s at 1.25 m/s then the light-stage 1.125 m/s to 22,501 s,
+#: and one 10 km open-ground wilderness step stays 12,000 s (no threshold).
+EAST_GATE_SECONDS = 22501
 WILDERNESS_STEP_SECONDS = 12000
 
 
@@ -267,6 +279,24 @@ class PossessedGridFollowTests(PossessedFollowTestCase):
         self.assertIs(commander_calls[0].args[0], self.room2)
         self.assertIs(commander_calls[0].kwargs["observe_lore"], False)
 
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_travel_scope_keeps_a_forced_sleeping_present_member(self):
+        from world.rules.travel_cost import source_present_members
+
+        write_fatigue_state(self.other, 0, SleepPosture.FORCED)
+        scope = travel_scope(self.npc, self.room1)
+        self.assertIn(self.npc, scope)
+        self.assertIn(self.char1, scope)
+        self.assertIn(self.other, scope)
+        # The shared preflight scope is identical, so admission can never be
+        # decided on a different set than the charge and the follow step.
+        self.assertEqual(scope, source_present_members(self.npc, self.room1))
+
+        remote = self._companion("遠方沉睡者")
+        remote.location = self.room2
+        write_fatigue_state(remote, 0, SleepPosture.FORCED)
+        self.assertNotIn(remote, travel_scope(self.npc, self.room1))
+
 
 class PossessedWildernessFollowTests(PossessedFollowTestCase):
     def setUp(self):
@@ -414,6 +444,28 @@ class PossessedWildernessFollowTests(PossessedFollowTestCase):
         self.assertIsNone(self.char1.db.possession)
         self.assertIsNone(self.npc.db.possessed_by)
 
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_a_forced_sleeping_member_blocks_the_wilderness_return(self):
+        self.gate.at_traverse(self.npc, self.east_gate)
+        write_fatigue_state(self.other, 0, SleepPosture.FORCED)
+        before = self._tick()
+        coordinates = self.npc.location.coordinates
+        visited = set(self.char1.attributes.get("map_knowledge")["visited"])
+
+        result = self._exit("west").at_traverse(self.npc, self.npc.location)
+
+        # The gate-return lineage refuses before relocation or any write: the
+        # whole party stays registered at the same wilderness cell.
+        self.assertFalse(result)
+        self.assertEqual(self.npc.location.coordinates, coordinates)
+        self.assertEqual(self.char1.location.coordinates, coordinates)
+        self.assertEqual(self.other.location.coordinates, coordinates)
+        self.assertEqual(self._script().itemcoordinates[self.npc], coordinates)
+        self.assertEqual(self._tick(), before)
+        self.assertEqual(
+            set(self.char1.attributes.get("map_knowledge")["visited"]), visited
+        )
+
 
 class PossessedSettlementTests(PossessedFollowTestCase):
     def setUp(self):
@@ -507,6 +559,38 @@ class PossessedSettlementTests(PossessedFollowTestCase):
         self.assertIsNone(self.npc.db.possessed_by)
         self.assertFalse(self.npc.attributes.has("prelogout_location"))
         self.assertNotIn("呆立入神", self.char1.get_display_name(self.other))
+
+    @covers_requirement(
+        "movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces"
+    )
+    def test_late_fault_restores_the_possessed_party_mental_state(self):
+        import world.rules.party as party_module
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        for member in (self.npc, self.other):
+            member.traits.add("hp", trait_type="gauge", base=500, min=0, rate=0)
+        for member in (self.npc, self.char1, self.other):
+            write_fatigue_state(member, 300000, SleepPosture.AWAKE)
+        real_follow = party_module.follow_companions
+
+        def follow_then_raise(*args, **kwargs):
+            real_follow(*args, **kwargs)
+            raise RuntimeError("post-follow step failed")
+
+        before = self._tick()
+        with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
+            with self.assertRaises(RuntimeError):
+                self.door.at_traverse(self.npc, self.room2)
+
+        self._assert_whole_party_in_room(self.room1)
+        self.assertEqual(self._tick(), before)
+        # The possessed puppet, the owner body it drags and the other
+        # companion all return to their exact pre-move physiology.
+        for member in (self.npc, self.char1, self.other):
+            state = read_fatigue_state(member)
+            self.assertEqual(state.reserve_units, 300000)
+            self.assertIs(state.posture, SleepPosture.AWAKE)
 
 
 class PossessedWildernessSettlementTests(PossessedFollowTestCase):

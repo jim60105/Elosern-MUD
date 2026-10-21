@@ -662,6 +662,11 @@ def build_advance_snapshot_registry(
     registry before its transaction opens and restore it together with the
     clock-tick snapshot after an outer-commit failure, so callback-owned
     surfaces are covered whichever boundary fails.
+
+    ``seconds`` is the whole planned window, which may exceed the one-day
+    single-call advance bound when an authored movement edge is that long;
+    :meth:`WorldClock.advance_bounded` builds this registry once for the full
+    window and then advances it in bounded pieces inside one transaction.
     """
     registry: dict[int, SurfaceSnapshot] = {}
 
@@ -959,6 +964,52 @@ class WorldClock:
                         },
                     )
                 )
+        except Exception:
+            _restore_clock_tick(self, tick_snapshot)
+            _restore_advance_registry(registry, scope)
+            raise
+        return events
+
+    def advance_bounded(
+        self,
+        seconds: int,
+        source: AdvanceSource,
+        entities: Iterable[Any],
+        *,
+        mental: MentalPlan | None = None,
+    ) -> list[ScheduledEvent]:
+        """Advance any duration inside the one-call bound, as one window.
+
+        A duration at or below :data:`MAX_ADVANCE_SECONDS` is exactly
+        ``advance()``. A longer committed duration — a multi-day authored
+        movement edge — is split into bounded internal advances that all stay
+        inside one transaction, while the pre-advance snapshot registry and the
+        clock-tick snapshot are built once for the **full** window. A failure
+        in any piece restores that whole window, so callers never observe a
+        partially advanced traversal, and the committed duration is never
+        clipped to a daily cap.
+        """
+
+        if seconds < 0:
+            raise ValueError("seconds must be non-negative")
+        if seconds <= MAX_ADVANCE_SECONDS:
+            return self.advance(seconds, source, entities, mental=mental)
+        scope = tuple(entities)
+        mental_scope = mental.scope if mental is not None else ()
+        registry = build_advance_snapshot_registry(
+            self, seconds, source, scope, mental_scope=mental_scope
+        )
+        tick_snapshot = _snapshot_clock_tick(self)
+        events: list[ScheduledEvent] = []
+        try:
+            with transaction.atomic():
+                remaining = seconds
+                while remaining > 0:
+                    step = min(remaining, MAX_ADVANCE_SECONDS)
+                    events.extend(
+                        self.advance(step, source, scope, mental=mental)
+                    )
+                    remaining -= step
         except Exception:
             _restore_clock_tick(self, tick_snapshot)
             _restore_advance_registry(registry, scope)
