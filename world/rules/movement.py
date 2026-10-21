@@ -3,13 +3,21 @@
 One function, ``charge_movement``, is the single place an exit traversal advances
 ``WorldClock`` for a successful, player-driven step. Distance-bearing outdoor
 traversal charges the physical duration the exit resolved at preflight
-(``world.rules.travel_cost``: authored edge geometry divided by the slowest
-eligible source-present traveller's terrain speed, rounded upward once);
+(``world.rules.travel_cost``: authored edge geometry integrated against the
+slowest eligible source-present traveller's terrain speed, recomputed at every
+member threshold and terrain boundary, rounded upward once);
 explicit non-distance connectors — the Limbo bridge, instance-room doorways, a
 plain room pair — charge their authored ``CLOCK_YAML["command_defaults"]``
 duration. Grid steps, wilderness steps and gate approaches still share one cost
 mechanism instead of bespoke inline ``get_world_clock().advance(...)`` calls
 (design.md D-1/D-5).
+
+The charge settles as one indivisible interval through
+``WorldClock.advance_bounded``: a committed edge longer than the clock's
+one-day single-call bound is advanced in bounded pieces that share one
+full-window rollback snapshot rather than being clipped. Admission (forced
+sleepers, pre-destination depletion) runs before the flight waiver and before
+any time or location write.
 
 ``wilderness_move`` is retained only as the distinct wilderness travel context
 that carries the existing flight waiver. It is never a seconds authority: a
@@ -39,8 +47,8 @@ def charge_movement(
     ``source_location`` and the traverser's current location — exactly the
     values the exit would have preflighted.
 
-    ``WorldClock.advance(cost, AdvanceSource.COMMAND, entities)`` runs only when
-    ``is_player_driven(traversing_object)`` is true — matching design doc D4
+    ``WorldClock.advance_bounded(cost, AdvanceSource.COMMAND, entities)`` runs
+    only when ``is_player_driven(traversing_object)`` is true — matching design doc D4
     ("the world advances only on player action"). Anything else is a no-op, so a
     future NPC or monster crossing an exit never drives the global clock on its
     own schedule (design.md D-8). A ``PlayerCharacter`` owning the ``flight``
@@ -51,9 +59,10 @@ def charge_movement(
     step moves with it (party-rest-move-settlement): the effective companions
     co-located in ``source_location`` before the step and, for a possessed
     traverser, the commander's body. The set comes from the same
-    ``follow_scope`` predicate ``follow_companions`` uses, evaluated against
+    ``travel_scope`` predicate ``follow_companions`` uses, evaluated against
     the pre-move ``source_location`` (and ``wilderness_source_coordinates`` for
-    a wilderness step), so charging and following can never disagree.
+    a wilderness step), so admission, charging and following can never
+    disagree; a preflighted exit reuses that record's traveller tuple.
     ``source_location`` is required so a caller cannot silently fall back to
     the post-relocation room.
     """
@@ -67,11 +76,26 @@ def charge_movement(
         MovementPreflightRefused,
         TraversalStatus,
         consume_preflight_resolution,
+        refuse_sleeping_party,
         resolve_traversal_cost,
         source_present_members,
     )
     from world.skills.restrictions import skill_effect_allowed
 
+    resolution = consume_preflight_resolution(
+        traversing_object, cost_key, source_location
+    )
+    members = (
+        tuple(resolution.members)
+        if resolution is not None
+        else source_present_members(
+            traversing_object, source_location, wilderness_source_coordinates
+        )
+    )
+    # Admission precedes every early return, so a flight waiver can never carry
+    # a forced-sleeping present member and a direct charge call cannot bypass
+    # the exit lineages' preflight refusal.
+    refuse_sleeping_party(members)
     if (
         cost_key == "wilderness_move"
         and "flight" in traversing_object.skills.owned_keys()
@@ -82,13 +106,7 @@ def charge_movement(
         # (movement-skill-waiver design). ``flash_step`` explicitly does NOT
         # waive this cost; only the flight-required-exit gate honors it.
         return
-    resolution = consume_preflight_resolution(
-        traversing_object, cost_key, source_location
-    )
     if resolution is None:
-        members = source_present_members(
-            traversing_object, source_location, wilderness_source_coordinates
-        )
         resolution = resolve_traversal_cost(
             traversing_object,
             cost_key,
@@ -118,8 +136,10 @@ def charge_movement(
     members = tuple(resolution.members)
     # The traversal is one indivisible interval: every source-present member
     # settles foot-travel physiology for its full duration, and a body that
-    # depletes collapses only after the step has committed.
-    get_world_clock().advance(
+    # depletes collapses only after the step has committed. A committed edge
+    # longer than the clock's one-call bound is advanced in bounded pieces that
+    # share one full-window snapshot, never clipped to a daily cap.
+    get_world_clock().advance_bounded(
         cost,
         AdvanceSource.COMMAND,
         list(members),

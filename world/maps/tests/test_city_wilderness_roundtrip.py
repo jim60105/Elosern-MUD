@@ -59,9 +59,10 @@ SOUTH_GATE_XYZ = (
 #: Physical durations at the current 10 km wilderness cell span, from the
 #: authored meter positions (world-map-scale §8):
 #:   east gate local (6500,3010) -> absolute (608000,1005160); approach cell
-#:   (63,100) center (635000,1005000): 27,000.47 m at 1.25 m/s = 21,601 s.
+#:   (63,100) center (635000,1005000): 27,000.47 m costs 13,500 s at 1.25 m/s
+#:   plus the remainder at the light-stage 1.125 m/s = 22,501 s.
 #:   one 10 km cardinal wilderness step over open ground (3 km/h) = 12,000 s.
-GATE_APPROACH_SECONDS = 21601
+GATE_APPROACH_SECONDS = 22501
 WILDERNESS_STEP_SECONDS = 12000
 
 

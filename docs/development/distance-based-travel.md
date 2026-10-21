@@ -5,6 +5,10 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 情況下一次移動會退回明確的「非距離連接器」固定耗時。改動移動、地圖幾何或疲勞速度
 縮放前請先讀本頁。
 
+`integrate-fatigue-aware-traversal` 在同一契約上加上分段積分：耗時不再只取出發
+當下的最慢速度，而是在每個成員疲勞門檻與地形邊界重算，並在出發前拒絕「到不了」
+的行程。
+
 ## 所有權
 
 | Concern | Owner |
@@ -36,18 +40,42 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
   `world_anchor_center + local_position - local_anchor_position` 得到城門的絕對
   公尺位置，再量到外部 approach cell 的中心。進城與出城共用同一段，不另外加整格
   荒野步或第二次市街步。
-- 取整只發生一次：`traversal_seconds()` 把整條折線的所有路段以精確分數相加後向上
-  取整。兩段各 0.4 秒的物理腿合計 1 秒，不會變成 2 秒。
+- 取整只發生一次：`plan_traversal()` 把整條折線的所有「等速段」以精確 `Fraction`
+  相加後向上取整。兩段各 0.4 秒的物理腿合計 1 秒，不會變成 2 秒；次秒級的疲勞
+  門檻也不會被逐段取整掉。提交的整數秒與 `WorldClock` 的疲勞結算完全相同。
+- 耗時是積分而非單點取樣：每一段的速度 = 地形速度 × 該成員在該段開始時的外出
+  疲勞縮放（`outgoing_foot_speed_scale`）。段與段之間只以「某位成員跨過疲勞門檻」
+  或「地形改變」切分，不是逐公尺或逐秒模擬；換速度只影響剩下的距離。
+- 多段地形以 `plan_traversal(((distance_m, terrain), ...), members)` 表示；目前
+  作者資料的單一路段仍只傳入一段，未來彎道／混合地形宣告不需要改計算核心。
 
 ## 隊伍速度
 
 - 出發時在來源房間以 `follow_scope` 取得「旅遊者 + 跟隨者」一次，該名單同時用於
   速度、充能實體與補償；遠端隊員不計入。
+- `follow_scope` 仍是唯一的來源在場判定；`party.travel_scope()` 是「旅遊者 +
+  跟隨者」的正式組合入口，`travel_cost.source_present_members()` 只是它的轉接。
+  移動結算的快照也重用預檢記錄裡的同一組成員。
 - 每位成員的速度 = 地形速度 × 該成員出發展疲勞階段的精確 `foot_speed_scale`；
   隊伍速度取最慢者。沒有隊伍人數懲罰，也不平均成員速度。被附身時，指揮者本體
   也在名單內。
 - 完全沒有精神儲備狀態的實體（尚未初始化）以基礎速度旅行；狀態損毀或禁止旅行
   （自願／強制睡眠）在預檢即拒絕，不會被當成健康速度計價。
+
+## 出發前拒絕（預先耗盡）
+
+`world/rules/travel_cost.py::refuse_pre_destination_depletion` 與
+`plan_traversal()` 共用同一條規則：
+
+- 若任一位在場成員會在**抵達前**耗盡精神儲備，預檢就以
+  `pre_destination_depletion` 拒絕；時鐘、位置、精神儲備、地圖知識、任務狀態與
+  荒野房間都不會被寫入，也不會建立未命名的中途房間或自動休息。
+- **恰好在抵達時歸零**是允許的：整趟照常提交，並由外部疲勞契約在目的地轉為強制
+  沉睡；下一次出發會因沉睡被拒絕。
+- 不是只有距離邊：明確的非距離連接器（一般房門、副本門、虛境橋）用作者宣告的
+  `command_defaults` 秒數做同一項判定。強制沉睡的拒絕更早，且在飛行豁免之前，
+  所以飛行擁有者也不能帶走沉睡成員。
+- 預檢只讀狀態、不寫入；`MovementPreflightRefused.reason` 是穩定的拒絕碼。
 
 ## 預檢與充能
 
@@ -62,6 +90,13 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
    `NON_DISTANCE`，使用 `rulebook/clock.yaml` 的 `command_defaults` 作者耗時。
    `wilderness_move` 只保留為飛行豁免的荒野情境鍵與此類連接器的作者耗時，不再是
    荒野步的秒數權威：真正的荒野步若解析不到物理邊會拋出而非猜測。
+4. 實際充能走 `WorldClock.advance_bounded(...)`：一趟超過時鐘單次上限
+   （`MAX_ADVANCE_SECONDS`＝86,400 秒）的已提交行程，會在**同一個移動交易**內
+   切成數個有界內部推進，並以「整趟視窗」建立一次前推進快照；整趟只取整一次，
+   不會被截成單日上限。任一段失敗都會還原整個視窗，而不是只還原最後一段。
+5. 移動結算的 `MovementSnapshot` 以預檢記錄的成員與 `window_seconds`（已提交秒數）
+   建立快照視窗；晚到的失敗會還原全部旅客的地點、精神儲備、睡眠姿態、地圖知識、
+   任務介面與時鐘。
 
 荒野斜向步另有轉角規則：任一正交鄰格不可通行（越界或錨點足跡格）時拒絕斜向，
 `wilderness_neighbor`、canonical resolver 與小地圖三者共用同一條規則，因此在任何
@@ -72,12 +107,15 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 ```sh
 uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
   world.rules.tests.test_movement world.rules.tests.test_movement_settlement \
-  typeclasses.tests.test_exit_movement_cost world.maps.tests.test_city_movement_cost \
-  world.maps.tests.test_wilderness_destination
+  world.rules.tests.test_clock world.rules.tests.test_party_follow_possession \
+  world.rules.tests.test_party_time_settlement
 uv run --locked python -m tools.contract_gate
-uv run --locked openspec validate charge-distance-based-travel --strict
+uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
 ```
 
 `<file>` 只需包含 `MUD_TEST_SETTINGS=1`。取整、地形速度與格距的純計算測試位於
-`world/rules/tests/test_movement.py`；作者資料的實際路段秒數由
-`world/maps/tests/test_city_movement_cost.py` 與 `test_altoria_capital.py` 釘值。
+`world/rules/tests/test_movement.py`（含分段積分、次秒門檻與預先耗盡拒絕）；
+疲勞感知的長途視窗與回滾在 `test_movement_settlement.py` 與 `test_clock.py`；
+隊伍耗時與實際城門／荒野路段秒數由 `test_party_time_settlement.py`、
+`test_party_follow_possession.py`、`world/maps/tests/test_city_movement_cost.py`
+與 `test_altoria_capital.py` 釘值。

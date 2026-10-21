@@ -110,3 +110,14 @@ A movement whose settlement failed SHALL report failure (WebClient `move_failed`
 - **WHEN** a `move_to` hook raises after relocation on the plain-exit lineage, making `move_to` return `False` without an exception and `DefaultExit.at_traverse` return `None` on both branches
 - **THEN** this is the one documented exception to truthful failure reporting, which the mixin lineage cannot detect
 - **AND** the wilderness lineages close this gap through their falsy-return trigger
+
+### Requirement: Fatigue-aware movement restores all owning surfaces
+Accepted movement SHALL atomically commit location, all intended followers, clock, mental/fractional state, forced sleep, map knowledge and owning effects. Failed settlement SHALL restore durable and cached state through existing owners without a second physiology or clock writer.
+
+#### Scenario: Late fault rollback
+- **WHEN** a fault follows follower relocation and mental/forced-sleep writes or occurs at outer commit
+- **THEN** all travellers including the possessed owner body, locations/contents, wilderness bookkeeping, mental remainder, sleep, quest/knowledge surfaces and tick equal pre-move state in durable rows and live caches.
+
+#### Scenario: Long accepted edge
+- **WHEN** an authored edge exceeds the clock’s 86400-second call bound
+- **THEN** bounded internal advances remain inside one movement transaction and snapshot the full window; the traversal rounds once and is never clipped to a daily cap.

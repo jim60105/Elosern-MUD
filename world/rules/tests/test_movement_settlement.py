@@ -93,9 +93,14 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
+        # A constructed character needs its trait set before the clock can
+        # settle physiology for it (the dead-member guard reads HP).
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
 
     def _companion(self):
         npc = create_object(NPC, key="同伴", location=self.room1)
+        npc.traits.add("hp", trait_type="gauge", base=500, min=0, rate=0)
         join_party(npc, self.char1)
         return npc
 
@@ -201,6 +206,177 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertIs(npc.location, self.room2)
         self.assertEqual(get_world_clock().tick, before)
         self.assertIsNone(npc.attributes.get("map_knowledge"))
+
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_an_exhausted_connector_traveller_is_refused_with_zero_writes(self):
+        from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        before = get_world_clock().tick
+        # The plain connector costs 30 s = 240 units of foot-travel reserve.
+        write_fatigue_state(self.char1, 200, SleepPosture.AWAKE)
+        self.assertIsNone(exit_obj.at_traverse(self.char1, self.room2))
+        self.assertIs(self.char1.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.char1)
+        self.assertEqual(
+            read_fatigue_state(self.char1).reserve_units, 200
+        )
+        # Exactly zero at arrival commits the traversal and latches the
+        # external forced sleep at the destination.
+        write_fatigue_state(self.char1, 240, SleepPosture.AWAKE)
+        exit_obj.at_traverse(self.char1, self.room2)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+        state = read_fatigue_state(self.char1)
+        self.assertEqual(state.reserve_units, 0)
+        self.assertIs(state.posture, SleepPosture.FORCED)
+
+    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    def test_a_rested_but_forced_sleeping_connector_traveller_is_refused_before_writes(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        npc = self._companion()
+        # Plenty of reserve, but the forced-sleep latch alone forbids travel;
+        # the shared preflight (not the later post-relocation charge) must
+        # refuse the plain connector.
+        write_fatigue_state(npc, 300000, SleepPosture.FORCED)
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        before = get_world_clock().tick
+        self.assertIsNone(exit_obj.at_traverse(self.char1, self.room2))
+        self.assertIs(self.char1.location, self.room1)
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        with self.assertRaises(KnowledgeError):
+            parse_knowledge(self.char1)
+
+    @covers_requirement("movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces")
+    def test_late_failure_restores_each_traveller_mental_state(self):
+        from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+
+        npc = self._companion()
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        write_fatigue_state(self.char1, 300000, SleepPosture.AWAKE)
+        write_fatigue_state(npc, 300000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        import world.rules.party as party_module
+
+        real_follow = party_module.follow_companions
+
+        def follow_then_raise(*args, **kwargs):
+            real_follow(*args, **kwargs)
+            raise RuntimeError("post-follow step failed")
+
+        with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
+            with self.assertRaises(RuntimeError):
+                exit_obj.at_traverse(self.char1, self.room2)
+        self.assertIs(self.char1.location, self.room1)
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+        for member in (self.char1, npc):
+            state = read_fatigue_state(member)
+            self.assertEqual(state.reserve_units, 300000)
+            self.assertIs(state.posture, SleepPosture.AWAKE)
+
+    @covers_requirement("movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces")
+    def test_a_long_edge_snapshots_and_advances_the_full_window(self):
+        from world.rules import travel_cost
+        from world.rules.clock import _EVENT_SOURCES, register_event_source
+        from world.rules.movement import charge_movement
+        from world.rules.movement_settlement import settle_movement
+        from world.rules.travel_cost import (
+            TraversalCost,
+            TraversalResolution,
+            TraversalStatus,
+            preflight_movement_cost,
+        )
+
+        # A wholly absent physiology (the documented not-yet-initialized
+        # baseline) is the only body a >1-day foot interval can settle
+        # without a pre-destination depletion refusal.
+        self.char1.attributes.remove("mental_reserve_units")
+        self.char1.attributes.remove("sleep_posture")
+        windows = []
+        sources = dict(_EVENT_SOURCES)
+        self.addCleanup(
+            lambda: (_EVENT_SOURCES.clear(), _EVENT_SOURCES.update(sources))
+        )
+        register_event_source(
+            "quest_deadlines",
+            lambda start, end: [],
+            lambda start, end: windows.append((start, end)) or {},
+        )
+        resolution = TraversalResolution(
+            status=TraversalStatus.RESOLVED,
+            cost=TraversalCost(
+                distance_m=200_000.0,
+                terrain="road",
+                seconds=160_000,
+                members=(self.char1,),
+            ),
+            members=(self.char1,),
+            traverser_id=self.char1.id,
+            cost_key="move",
+            source_location_id=self.room1.id,
+        )
+
+        def move_and_charge():
+            self.char1.location = self.room2
+            charge_movement(self.char1, "move", source_location=self.room1)
+            return None
+
+        before = get_world_clock().tick
+        with patch.object(
+            travel_cost, "resolve_traversal_cost", return_value=resolution
+        ), preflight_movement_cost(
+            self.char1,
+            "move",
+            source_location=self.room1,
+            destination=self.room2,
+            members=(self.char1,),
+        ) as preflight:
+            self.assertEqual(preflight.cost.seconds, 160_000)
+            settle_movement(
+                self.char1,
+                self.room1,
+                destination=self.room2,
+                traverse=move_and_charge,
+                window_seconds=preflight.cost.seconds,
+            )
+        self.assertIs(self.char1.location, self.room2)
+        # The committed duration is never clipped to a daily cap.
+        self.assertEqual(get_world_clock().tick, before + 160_000)
+        # The settlement registry was built for the whole planned window.
+        self.assertIn((before, before + 160_000), windows)
+
+        self.char1.location = self.room1
+        before = get_world_clock().tick
+
+        def move_charge_then_fail():
+            self.char1.location = self.room2
+            charge_movement(self.char1, "move", source_location=self.room1)
+            raise RuntimeError("late fault")
+
+        with patch.object(
+            travel_cost, "resolve_traversal_cost", return_value=resolution
+        ), preflight_movement_cost(
+            self.char1,
+            "move",
+            source_location=self.room1,
+            destination=self.room2,
+            members=(self.char1,),
+        ) as preflight, self.assertRaises(RuntimeError):
+            settle_movement(
+                self.char1,
+                self.room1,
+                destination=self.room2,
+                traverse=move_charge_then_fail,
+                window_seconds=preflight.cost.seconds,
+            )
+        # A fault after the chunked charge restores the whole window.
+        self.assertIs(self.char1.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
 
 
 class MovementSettlementWildernessTests(EvenniaTest):

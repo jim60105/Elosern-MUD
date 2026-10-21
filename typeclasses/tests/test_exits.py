@@ -63,11 +63,13 @@ SOUTH_GATE_XYZ = (
 EAST_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("w"))
 SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 
-#: Resolved physical durations at the current 10 km wilderness cell span:
-#: east-gate approach 21,601 s (27,000.47 m at 1.25 m/s), south-gate approach
-#: 21,843 s (27,303.71 m), and one 10 km open-ground wilderness step 12,000 s.
-EAST_GATE_SECONDS = 21601
-SOUTH_GATE_SECONDS = 21843
+#: Integrated physical durations for a full-reserve party at the current 10 km
+#: wilderness cell span: the east approach (27,000.47 m) is 13,500 s at
+#: 1.25 m/s plus the remainder at the light-stage 1.125 m/s = 22,501 s; the
+#: south approach (27,303.71 m) integrates to 22,770 s; and one 10 km
+#: open-ground wilderness step stays 12,000 s (no threshold crossed).
+EAST_GATE_SECONDS = 22501
+SOUTH_GATE_SECONDS = 22770
 WILDERNESS_STEP_SECONDS = 12000
 
 

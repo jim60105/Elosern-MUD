@@ -1143,3 +1143,62 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         self.assertEqual(
             kwargs["context"]["stage"], "advance_registry_attribute"
         )
+
+    @covers_requirement(
+        "movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces"
+    )
+    def test_bounded_advance_snapshots_the_full_window_and_advances_in_pieces(self):
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        windows = []
+        register_event_source(
+            "quest_deadlines",
+            lambda start, end: [],
+            lambda start, end: windows.append((start, end)) or {},
+        )
+        pieces = []
+        real_advance = WorldClock.advance
+
+        def tracking_advance(inner_clock, seconds, source, entities, *, mental=None):
+            pieces.append(seconds)
+            return real_advance(inner_clock, seconds, source, entities, mental=mental)
+
+        before = clock.tick
+        with patch.object(WorldClock, "advance", tracking_advance):
+            clock.advance_bounded(
+                160000, AdvanceSource.SKIP, [self.player]
+            )
+        # Two bounded pieces commit the whole multi-day duration; nothing is
+        # clipped to a daily cap.
+        self.assertEqual(pieces, [MAX_ADVANCE_SECONDS, 160000 - MAX_ADVANCE_SECONDS])
+        self.assertEqual(clock.tick, before + 160000)
+        # The pre-advance registry is built once for the full window.
+        self.assertEqual(windows[0], (before, before + 160000))
+
+    @covers_requirement(
+        "movement-settlement-atomicity::fatigue-aware-movement-restores-all-owning-surfaces"
+    )
+    def test_a_failing_later_piece_restores_the_full_window(self):
+        from world.rules.clock import get_world_clock
+
+        clock = get_world_clock()
+        self.player.traits.hp.current = 50
+        before_tick = clock.tick
+        before_hp = self.player.traits.hp.current
+        real_advance = WorldClock.advance
+
+        def failing_second_piece(inner_clock, seconds, source, entities, *, mental=None):
+            if inner_clock.tick >= MAX_ADVANCE_SECONDS:
+                raise RuntimeError("later piece failed")
+            return real_advance(inner_clock, seconds, source, entities, mental=mental)
+
+        with patch.object(WorldClock, "advance", failing_second_piece):
+            with self.assertRaises(RuntimeError):
+                clock.advance_bounded(
+                    160000, AdvanceSource.SKIP, [self.player]
+                )
+        # The full-window snapshot restores the first piece's committed
+        # surface writes along with the tick.
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(self.player.traits.hp.current, before_hp)
