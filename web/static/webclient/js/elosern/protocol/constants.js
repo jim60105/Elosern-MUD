@@ -26,6 +26,19 @@ var MAX_LOCATION_LABEL = 256;
 var MAX_CONDITION_COUNT = 32;
 var MAX_CONDITION_LABEL = 128;
 var MAX_MODIFIER_KEYS = 16;
+// Status v4 physiological subject rows (mirror of the Python fatigue read
+// model): at most the present party's bodies, one bounded restriction line per
+// row, and the closed stage vocabulary the exact stored units select.
+var STATUS_FATIGUE_MAX_SUBJECTS = 8;
+var STATUS_FATIGUE_MAX_RESTRICTION = 64;
+var STATUS_FATIGUE_STAGES = [
+  "normal",
+  "light",
+  "moderate",
+  "severe",
+  "forced_sleep",
+  "sleeping",
+];
 // Adapter data slot (ui_action_result success only). Must match
 // web.webclient.presentation.protocol.MAX_RESULT_DATA_FIELDS and
 // MAX_RESULT_DATA_BYTES and RESULT_DATA_STANDARD_RESERVE: eight fields, and
@@ -485,7 +498,7 @@ var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
 var PANEL_ALLOWLIST = {
   gallery: 3,
   art: ART_SCHEMA_VERSION,
-  status: 3,
+  status: 4,
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
   party: PARTY_SCHEMA_VERSION,
@@ -540,6 +553,9 @@ module.exports = {
   MAX_CONDITION_COUNT: MAX_CONDITION_COUNT,
   MAX_CONDITION_LABEL: MAX_CONDITION_LABEL,
   MAX_MODIFIER_KEYS: MAX_MODIFIER_KEYS,
+  STATUS_FATIGUE_MAX_SUBJECTS: STATUS_FATIGUE_MAX_SUBJECTS,
+  STATUS_FATIGUE_MAX_RESTRICTION: STATUS_FATIGUE_MAX_RESTRICTION,
+  STATUS_FATIGUE_STAGES: STATUS_FATIGUE_STAGES,
   RESULT_DATA_STANDARD_RESERVE: RESULT_DATA_STANDARD_RESERVE,
   MAX_RESULT_DATA_FIELDS: MAX_RESULT_DATA_FIELDS,
   MAX_RESULT_DATA_BYTES: MAX_RESULT_DATA_BYTES,

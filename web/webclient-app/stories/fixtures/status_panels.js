@@ -13,12 +13,12 @@
 // only, so the offline showcase and the live (C1 store) views cannot drift.
 // ---------------------------------------------------------------------------
 
-// A committed `status` v1 payload (design-draft actor at 霧骨渡口): mixed
+// A committed `status` v4 payload (design-draft actor at 霧骨渡口): mixed
 // gauge states, one buff with a remaining duration, one deterministic
 // combat-modifier condition carrying its exact applied modifiers, an active
-// disguise, and no combat session.
+// disguise, the actor's physiological subject row, and no combat session.
 export const STATUS_PANEL_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   actor: {
     name: "艾倫‧灰誓",
@@ -47,6 +47,17 @@ export const STATUS_PANEL_SAMPLE = {
       code: "fog_veil",
       label: "霧隱",
       provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational",
+    },
+  ],
+  fatigue: [
+    {
+      identity: "char-42",
+      name: "艾倫‧灰誓",
+      reserve_percent: 68,
+      stage: "normal",
+      label: "精神充沛",
+      severity: "informational",
+      restriction: null,
     },
   ],
   disguise_active: true,

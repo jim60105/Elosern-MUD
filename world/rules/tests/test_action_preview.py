@@ -18,6 +18,7 @@ from world.rules.action_preview import (
 )
 from world.rules.buffs import apply_buff
 from world.rules.combat import BattlefieldActionContext
+from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.sexual_state import AROUSAL_LEVELS
 from world.rules.targeting import RoomActionContext
@@ -266,6 +267,26 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertFalse(result.enabled)
         self.assertIs(result.reason, RejectReason.ACTION_FORBIDDEN)
+
+    def test_sleeping_actor_is_refused_with_the_sleep_reason(self):
+        from world.rules.clock import get_world_clock
+
+        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
+        context = self._context()
+        before_tick = get_world_clock().tick
+        preview = preview_skill(
+            self.player, _basic_attack_key(), context, [self.monster]
+        )
+        self.assertFalse(preview.enabled)
+        self.assertIs(preview.reason, RejectReason.ASLEEP)
+        self.assertEqual(preview.detail, self.player.key)
+        preflight = ActionResolver.preflight(
+            ActionRequest(
+                self.player, _basic_attack_key(), [self.monster], context
+            )
+        )
+        self.assertEqual(preflight.reason, RejectReason.ASLEEP)
+        self.assertEqual(get_world_clock().tick, before_tick)
 
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
     def test_preview_does_not_materialize_sexual_state(self):

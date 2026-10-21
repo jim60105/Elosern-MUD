@@ -30,6 +30,7 @@ class ItemUseReason(StrEnum):
     HP_FULL = "hp_full"
     MP_FULL = "mp_full"
     NOT_ALIVE = "not_alive"
+    ASLEEP = "asleep"
     NO_DEBUFFS = "no_debuffs"
     COMBAT_NOT_ALLOWED = "combat_not_allowed"
     UNKNOWN_EFFECT = "unknown_effect"

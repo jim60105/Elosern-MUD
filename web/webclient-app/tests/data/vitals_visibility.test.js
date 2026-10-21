@@ -62,7 +62,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
     expect(store.view.vitals.visible).toBe(false);
     const unavailable = fx.snapshot({ revision: 2, presentation_epoch: fx.EPOCH_B, mode: "combat" });
     unavailable.panels.status = {
-      schema_version: 3, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
+      schema_version: 4, available: false, reason: { code: "status_unavailable", message: "暫無資料" },
     };
     expect(store.receive(2, "ui_update", [unavailable], {}).accepted).toBe(true);
     expect(store.view.vitals.visible).toBe(false);
@@ -95,6 +95,63 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
         lowHp: false,
       }),
     ).toBe(true);
+  });
+
+  it("an adverse controlled-body fatigue row reveals the dock at full owner vitals", () => {
+    const ownerRow = {
+      identity: "1", name: "主人", reserve_percent: 80, stage: "normal",
+      label: "精神充沛", severity: "informational", restriction: null,
+    };
+    const companionRow = {
+      identity: "2", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
+      label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動",
+    };
+    expect(
+      isVitalsVisible({
+        mode: "exploration",
+        resources: fullResources,
+        conditions: [],
+        lowHp: false,
+        fatigue: [ownerRow],
+      }),
+    ).toBe(false);
+    expect(
+      isVitalsVisible({
+        mode: "exploration",
+        resources: fullResources,
+        conditions: [],
+        lowHp: false,
+        fatigue: [ownerRow, companionRow],
+      }),
+    ).toBe(true);
+  });
+
+  it("the store derives visibility from the committed fatigue rows", () => {
+    setActivePinia(createPinia());
+    const store = useElosernStore();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    const message = (revision, fatigue) => fx.snapshot({
+      revision, presentation_epoch: fx.EPOCH_A, mode: "exploration",
+      panels: { status: fx.statusPanel({ resources: fullResources, fatigue }) },
+    });
+    expect(store.receive(1, "ui_snapshot", [message(1, [{
+      identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
+      label: "精神充沛", severity: "informational", restriction: null,
+    }])], {}).accepted).toBe(true);
+    expect(store.view.vitals.visible).toBe(false);
+    expect(store.receive(1, "ui_update", [message(2, [
+      {
+        identity: "42", name: "影行者", reserve_percent: 80, stage: "normal",
+        label: "精神充沛", severity: "informational", restriction: null,
+      },
+      {
+        identity: "77", name: "同伴", reserve_percent: 2, stage: "forced_sleep",
+        label: "強制睡眠", severity: "critical", restriction: "沉睡中，無法行動",
+      },
+    ])], {}).accepted).toBe(true);
+    expect(store.view.vitals.visible).toBe(true);
   });
 
   it("mp below max shows the island", () => {
@@ -263,7 +320,7 @@ describe("isVitalsVisible (webclient-retire-redundant-hud, design D2)", () => {
       mode: "exploration",
       panels: {
         status: {
-          schema_version: 3,
+          schema_version: 4,
           available: false,
           reason: { code: "status_unavailable", message: "無法顯示" },
         },

@@ -1,18 +1,37 @@
-"""Version-3 read-only ``status`` panel presenter.
+"""Version-4 read-only ``status`` panel presenter.
 
 The presenter serializes the frozen status read model built by
 ``world.rules.status_query``. It never reads raw persistent records itself, never
 calls ``get_display_value``, and never mutates canonical state. Version 3 requires
 condition provenance and preserves the optional composed ``actor.full_title``.
+Version 4 adds the ``fatigue`` subject rows: the status source's own row, plus
+the controlled body's distinct row under possession, so each physiological
+subject is identified while the owner-keyed resources stay unchanged.
 """
 
 from typing import Any
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.rules.status_query import StatusQueryError, build_status_read_model
+from world.rules.status_query import (
+    StatusQueryError,
+    build_fatigue_subject,
+    build_status_read_model,
+)
 
-STATUS_SCHEMA_VERSION = 3
+STATUS_SCHEMA_VERSION = 4
+
+
+def _fatigue_entry(row) -> dict[str, Any]:
+    return {
+        "identity": row.identity,
+        "name": row.name,
+        "reserve_percent": row.reserve_percent,
+        "stage": row.stage,
+        "label": row.label,
+        "severity": row.severity,
+        "restriction": row.restriction,
+    }
 
 
 def status_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -56,6 +75,16 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         if condition.modifiers:
             entry["modifiers"] = condition.modifiers
         conditions.append(entry)
+    fatigue = [_fatigue_entry(row) for row in model.fatigue]
+    controlled_identity = str(actor.pk)
+    if controlled_identity != model.actor_identity:
+        # The controlled body is a distinct physiological subject: append its
+        # own row instead of relabelling the owner-keyed resources above.
+        try:
+            controlled = build_fatigue_subject(actor)
+        except StatusQueryError:
+            raise PanelUnavailableError
+        fatigue.append(_fatigue_entry(controlled))
     actor_field: dict[str, Any] = {
         "name": model.actor_name,
         # Resources remain owner-keyed under possession; identity addresses
@@ -82,6 +111,7 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         "actor": actor_field,
         "resources": resources,
         "conditions": conditions,
+        "fatigue": fatigue,
         "disguise_active": model.disguise_active,
         "combat": combat,
     }

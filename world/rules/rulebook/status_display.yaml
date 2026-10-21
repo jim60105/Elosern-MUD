@@ -398,3 +398,26 @@
 - code: mane_misdirection_accuracy
   label: 鬃風佯撲命中下降
   severity: harmful
+# 生理性疲勞投影（project-physiological-fatigue）：四個排他投影與三條戰鬥
+# 修正各自一個穩定代碼；嚴重度由這裡決定，呈現端不得自創。
+- code: fatigue_light
+  label: 輕度疲勞
+  severity: warning
+- code: fatigue_moderate
+  label: 中度疲勞
+  severity: harmful
+- code: fatigue_severe
+  label: 重度疲勞
+  severity: critical
+- code: fatigue_forced_sleep
+  label: 強制睡眠
+  severity: critical
+- code: fatigue_light_penalty
+  label: 輕度疲勞敏捷準度下降
+  severity: warning
+- code: fatigue_moderate_penalty
+  label: 中度疲勞敏捷準度下降
+  severity: harmful
+- code: fatigue_severe_penalty
+  label: 重度疲勞敏捷準度下降
+  severity: critical

@@ -82,6 +82,12 @@ import yaml
 from django.db import transaction
 
 from world.observability import log_info
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    PHYSIOLOGICAL_PROTECTION,
+    apply_buff,
+    entity_active_buffs,
+)
 from world.rules.rulebook.schema import SectionedRule, load_sectioned_rules
 from world.rules.surfaces import (
     attribute_snapshot,
@@ -90,11 +96,15 @@ from world.rules.surfaces import (
 
 RESERVE_ATTRIBUTE = "mental_reserve_units"
 POSTURE_ATTRIBUTE = "sleep_posture"
+#: The BuffHandler's own persisted cache attribute; a projection write and
+#: every restore must cover it together with the two physiology attributes.
+BUFF_CACHE_ATTRIBUTE = "buffs"
 
 #: Durable attributes the fatigue writer can touch, for enclosing rollback owners.
 FATIGUE_ATTRIBUTE_SURFACES: tuple[tuple[str, str | None], ...] = (
     (RESERVE_ATTRIBUTE, None),
     (POSTURE_ATTRIBUTE, None),
+    (BUFF_CACHE_ATTRIBUTE, None),
 )
 
 RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "fatigue.yaml"
@@ -710,6 +720,124 @@ def actions_allowed(state: FatigueState) -> bool:
     return state.posture is SleepPosture.AWAKE
 
 
+def sleep_blocks_actions(entity: Any) -> bool:
+    """Whether one body's stored posture currently forbids ordinary actions.
+
+    A no-create query for preflight and presentation: it reads the persisted
+    posture directly and never validates or materializes physiology, so a
+    body with no fatigue state (an authoring fixture or a non-physiological
+    creature) is not blocked. A malformed stored posture fails closed
+    (forbidden) rather than letting an unrecognizable body act.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return False
+    posture = attributes.get(POSTURE_ATTRIBUTE, default=None)
+    if posture is None:
+        return False
+    if isinstance(posture, SleepPosture):
+        return posture is not SleepPosture.AWAKE
+    try:
+        return SleepPosture(posture) is not SleepPosture.AWAKE
+    except (TypeError, ValueError):  # observability: ignore R2: a malformed stored posture fails closed as forbidden; this read touches no state and has no I/O to report
+        return True
+
+
+def reserve_percent(
+    state: FatigueState, policy: FatiguePolicy | None = None
+) -> int:
+    """Return the display-only rounded percentage of one exact reserve.
+
+    Eligibility always reads the stored units; this helper exists only for
+    presentation. Half-up integer rounding keeps the result independent of
+    floating point, and a reserve one unit below a threshold can round to that
+    threshold's displayed percent while its stage still comes from the exact
+    units.
+    """
+    resolved = _resolve_policy(policy)
+    state = _require_state(state, resolved)
+    return (state.reserve_units * 100 + resolved.max_units // 2) // resolved.max_units
+
+
+#: The exclusive physiological projection: one buff key per projected stage.
+#: ``NORMAL`` has no projection and ordinary sleep has none either; the
+#: persisted posture, not a buff, is what forbids their actions.
+PROJECTION_BUFF_KEYS: Mapping[FatigueStage, str] = MappingProxyType(
+    {
+        FatigueStage.LIGHT: "fatigue_light",
+        FatigueStage.MODERATE: "fatigue_moderate",
+        FatigueStage.SEVERE: "fatigue_severe",
+        FatigueStage.FORCED_SLEEP: "fatigue_forced_sleep",
+    }
+)
+
+#: Every buff key the projection owns; external removal must exclude these.
+PHYSIOLOGICAL_BUFF_KEYS: frozenset[str] = frozenset(PROJECTION_BUFF_KEYS.values())
+
+_PROJECTION_DEFINITIONS_VALIDATED = False
+
+
+def _validate_projection_definitions() -> None:
+    """Fail closed unless every projection key is a protected debuff definition."""
+    global _PROJECTION_DEFINITIONS_VALIDATED
+    if _PROJECTION_DEFINITIONS_VALIDATED:
+        return
+    for key in PROJECTION_BUFF_KEYS.values():
+        definition = BUFF_DEFINITIONS.get(key)
+        if definition is None:
+            raise FatigueRulebookError(
+                f"buffs.yaml: fatigue projection key {key!r} is not defined"
+            )
+        if definition.protection != PHYSIOLOGICAL_PROTECTION:
+            raise FatigueRulebookError(
+                f"buffs.yaml: fatigue projection key {key!r} must declare "
+                f"protection {PHYSIOLOGICAL_PROTECTION!r}"
+            )
+    _PROJECTION_DEFINITIONS_VALIDATED = True
+
+
+def projected_buff_key(
+    state: FatigueState, policy: FatiguePolicy | None = None
+) -> str | None:
+    """Return the one protected buff key the state projects, or ``None``."""
+    return PROJECTION_BUFF_KEYS.get(fatigue_stage(state, policy))
+
+
+def project_fatigue_status(
+    entity: Any,
+    state: FatigueState | None = None,
+    policy: FatiguePolicy | None = None,
+) -> str | None:
+    """Reconcile one body's exclusive protected status inside the current write.
+
+    Reads (and validates) the body's persisted state when ``state`` is
+    omitted, removes every other live projection, then mounts the desired one
+    through the public :func:`world.rules.buffs.apply_buff` entry point so the
+    grant-time guards stay binding. A body without a BuffHandler (a pure
+    attribute double) has nothing to project. Callers own the enclosing
+    transaction; :func:`settle_fatigue_intervals` calls this for every accepted
+    interval before the transaction commits.
+    """
+    resolved = _resolve_policy(policy)
+    current = read_fatigue_state(entity, resolved) if state is None else _require_state(state, resolved)
+    desired = projected_buff_key(current, resolved)
+    buffs = getattr(entity, "buffs", None)
+    if buffs is None:
+        return desired
+    _validate_projection_definitions()
+    active = entity_active_buffs(entity)
+    for key in PHYSIOLOGICAL_BUFF_KEYS:
+        if key != desired and key in active:
+            buffs.remove(key, dispel=True)
+    if desired is not None and desired not in active:
+        # Reserve/posture are canonical: a threshold crossing is not an
+        # action outcome, so the projection must not fire the authored
+        # ``negative_buff_added`` reactions (which could write unrelated
+        # pleasure state outside this settlement's rollback surfaces).
+        apply_buff(entity, desired, dispatch_reaction=False)
+    return desired
+
+
 def next_fatigue_boundary(
     state: FatigueState,
     activity: FatigueActivity,
@@ -939,6 +1067,10 @@ def settle_fatigue_intervals(
                     prediction.end.posture,
                     policy,
                 )
+                # Reconcile the projection in the same atomic unit as the
+                # reserve/posture write, so no observer sees a stage that
+                # disagrees with the persisted physiology.
+                project_fatigue_status(interval.entity, prediction.end, policy)
             for interval, prediction in planned:
                 if prediction.end == prediction.start:
                     continue

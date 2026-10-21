@@ -5,6 +5,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.character import MAX_FULL_TITLE_CODE_POINTS
 from web.webclient.presentation.registry import build_production_registry
+from web.webclient.presentation.status import STATUS_SCHEMA_VERSION
 from ._support import _T_COMPOSED_TITLE, _T_RANK, _T_TITLE, _context, _open_title_scope
 import unittest
 from dataclasses import replace
@@ -45,7 +46,7 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
         row = ConditionValue("t_warning", "合成警告", "warning", 17, {"defense": -15}, valid)
         with patch("web.webclient.presentation.status.build_status_read_model", return_value=replace(model, conditions=(row,))):
             panel = self._status()
-        self.assertEqual(panel["schema_version"], 3)
+        self.assertEqual(panel["schema_version"], STATUS_SCHEMA_VERSION)
         self.assertEqual(panel["conditions"], [{
             "code": "t_warning", "label": "合成警告", "severity": "warning",
             "remaining_seconds": 17, "modifiers": {"defense": -15},
@@ -69,7 +70,7 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
             ):
                 panel = self._status()
                 self.assertFalse(panel["available"])
-                self.assertEqual(panel["schema_version"], 3)
+                self.assertEqual(panel["schema_version"], STATUS_SCHEMA_VERSION)
 
 
     def test_an_untitled_actor_omits_the_row_on_both_panels(self):

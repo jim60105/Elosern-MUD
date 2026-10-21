@@ -48,9 +48,10 @@ describe("StatusPanel (H2 island-stack root)", () => {
     expect(conditions.exists()).toBe(true);
     const root = w.get('[data-testid="status-panel"]');
     const children = root.element.children;
-    expect(children).toHaveLength(2);
+    expect(children).toHaveLength(3);
     expect(children[0].getAttribute("data-testid")).toBe("status-panel__conditions");
     expect(children[1].getAttribute("data-testid")).toBe("vitals-track");
+    expect(children[2].getAttribute("data-testid")).toBe("status-panel__fatigue");
     // The dock carries the island chrome; the children are transparent.
     expect(vitals.classes()).not.toContain("hud");
     expect(conditions.classes()).not.toContain("hud");
@@ -146,6 +147,51 @@ describe("StatusPanel (H2 island-stack root)", () => {
     const w = mountPanel({ status: STATUS_PANEL_MINIMAL_SAMPLE });
     expect(w.find('[data-testid="status-panel__conditions"]').exists()).toBe(false);
     expect(w.find('[data-testid="status-panel__conditions-empty"]').exists()).toBe(false);
+  });
+
+  it("renders one truthfully labelled row per physiological subject", () => {
+    const w = mountPanel({
+      status: {
+        ...STATUS_PANEL_SAMPLE,
+        fatigue: [
+          {
+            identity: "char-42",
+            name: "艾倫‧灰誓",
+            reserve_percent: 80,
+            stage: "normal",
+            label: "測試充沛",
+            severity: "informational",
+            restriction: null,
+          },
+          {
+            identity: "char-77",
+            name: "同行者",
+            reserve_percent: 2,
+            stage: "forced_sleep",
+            label: "測試強制睡眠",
+            severity: "critical",
+            restriction: "測試無法行動",
+          },
+        ],
+      },
+    });
+    const rows = w.findAll('[data-testid="status-panel__fatigue"] .fatigue__row');
+    expect(rows).toHaveLength(2);
+    // Each row identifies its own body: the controlled companion's truth is
+    // never the owner's row relabelled.
+    expect(rows[0].attributes("data-identity")).toBe("char-42");
+    expect(rows[0].text()).toContain("艾倫‧灰誓：精神儲備 80%（測試充沛）");
+    expect(rows[1].attributes("data-identity")).toBe("char-77");
+    expect(rows[1].attributes("data-stage")).toBe("forced_sleep");
+    expect(rows[1].text()).toContain("同行者：精神儲備 2%（測試強制睡眠）");
+    expect(rows[1].text()).toContain("測試無法行動");
+  });
+
+  it("renders no fatigue block when the payload carries no subject rows", () => {
+    const w = mountPanel({
+      status: { ...STATUS_PANEL_SAMPLE, fatigue: [] },
+    });
+    expect(w.find('[data-testid="status-panel__fatigue"]').exists()).toBe(false);
   });
 
   it("invents no intimate/adult block (no backing field, not mocked)", () => {

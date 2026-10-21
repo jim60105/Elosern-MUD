@@ -56,6 +56,24 @@ from ._support import (
 
 
 class ItemUsePreflightTests(_ItemUseTestCase):
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
+    def test_sleeping_actor_rejects_before_planning_effects(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+
+        self.hurt(HEAL_AMOUNT + 5)
+        self.actor.db.inventory = ["t_moss_tonic"]
+        write_fatigue_state(self.actor, 0, SleepPosture.FORCED)
+        before = self.canonical_state()
+        preflight = preflight_item_use(
+            ItemUseRequest(self.actor, "t_moss_tonic"), in_combat=False
+        )
+        self.assertFalse(preflight.allowed)
+        self.assertIs(preflight.reason, ItemUseReason.ASLEEP)
+        self.assertIsNone(preflight.plan)
+        self.assert_state_unchanged(before)
+
     def test_full_hp_rejects_with_hp_full(self):
         self.actor.db.inventory = ["t_moss_tonic"]
         maximum = int(self.actor.traits.hp.max)

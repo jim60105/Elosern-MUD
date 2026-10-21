@@ -175,6 +175,7 @@ export function applyView(ctx) {
           mode: rs.mode,
           resources: statusPanel.resources,
           conditions: statusPanel.conditions,
+          fatigue: statusPanel.fatigue,
           lowHp,
         }),
       };

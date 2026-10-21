@@ -100,7 +100,7 @@ function serverTime(overrides) {
 function validStatusPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       actor: {
         name: "影行者",
@@ -115,6 +115,9 @@ function validStatusPanel(overrides) {
       conditions: [
         { code: "combat_modifier.arousal", label: "情動", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational", modifiers: { power: 2 } },
       ],
+      fatigue: [
+        { identity: "42", name: "影行者", reserve_percent: 80, stage: "normal", label: "精神充沛", severity: "informational", restriction: null },
+      ],
       disguise_active: false,
       combat: null,
     },
@@ -125,7 +128,7 @@ function validStatusPanel(overrides) {
 function unavailableStatusPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: false,
       reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
     },

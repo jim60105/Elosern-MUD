@@ -30,6 +30,7 @@ class RejectReason(StrEnum):
     TARGET_FACTION_FORBIDDEN = "target_faction_forbidden"
     NO_VALID_TARGETS_IN_AREA = "no_valid_targets_in_area"
     ACTION_FORBIDDEN = "action_forbidden"
+    ASLEEP = "asleep"
     IDENTITY_INELIGIBLE = "identity_ineligible"
     SCALED_CAST_FORBIDDEN = "scaled_cast_forbidden"
     CAST_CONDITION_UNMET = "cast_condition_unmet"

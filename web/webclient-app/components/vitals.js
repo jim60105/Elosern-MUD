@@ -36,7 +36,7 @@ const ATTENTION_SEVERITIES = new Set(["warning", "harmful", "critical"]);
 // Mode and availability gates remain view-owned. Only independently adverse
 // or unattributable conditions request attention; equipment-only rows remain
 // truthful status data and render whenever another trigger reveals the dock.
-export function isVitalsVisible({ mode, resources, conditions, lowHp } = {}) {
+export function isVitalsVisible({ mode, resources, conditions, lowHp, fatigue } = {}) {
   if (mode === "combat") {
     return true;
   }
@@ -56,6 +56,22 @@ export function isVitalsVisible({ mode, resources, conditions, lowHp } = {}) {
       ) {
         return true;
       }
+    }
+  }
+  // Physiological attention (project-physiological-fatigue): a subject's
+  // adverse fatigue stage or its action restriction must reveal the dock even
+  // when the owner-keyed gauges are full and no condition row is adverse.
+  // Under possession the controlled body is represented only by its own
+  // fatigue row, so ignoring this would hide the exact acceptance scenario.
+  if (Array.isArray(fatigue)) {
+    const adverse = fatigue.some(
+      (row) =>
+        row &&
+        (typeof row.restriction === "string" ||
+          (row.stage !== "normal" && ATTENTION_SEVERITIES.has(row.severity))),
+    );
+    if (adverse) {
+      return true;
     }
   }
   if (Array.isArray(conditions)) {

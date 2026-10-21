@@ -20,6 +20,7 @@ from world.rules.party_scope import (
     PARTY_SCOPE_MESSAGES,
     PURPOSE_ACT,
     PURPOSE_ORGANIZE,
+    REASON_MEMBER_ASLEEP,
     REASON_MEMBER_CANNOT_ACT,
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
@@ -30,6 +31,7 @@ from world.rules.party_scope import (
     resolve_commander,
     resolve_member_token,
 )
+from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.player_control import is_player_driven
 from world.rules.possession import enter_possession
 
@@ -86,6 +88,7 @@ class PartyScopeInputTests(unittest.TestCase):
                 REASON_NOT_PARTY_MEMBER: "對方不是你的隊伍成員。",
                 REASON_MEMBER_NOT_PRESENT: "對方不在這裡。",
                 REASON_MEMBER_CANNOT_ACT: "對方目前無法行動。",
+                REASON_MEMBER_ASLEEP: "對方正在沉睡，無法行動。",
             },
         )
         for reason, message in PARTY_SCOPE_MESSAGES.items():
@@ -392,6 +395,30 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             authorize_member(self.char1, companion.pk, PURPOSE_ACT),
             companion,
         )
+
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
+    def test_sleep_alone_forbids_acting_but_not_organizing(self):
+        for posture in (SleepPosture.VOLUNTARY, SleepPosture.FORCED):
+            with self.subTest(posture=posture):
+                companion = self._companion(f"沉睡者-{posture.value}")
+                write_fatigue_state(companion, 0, posture)
+                before = _attribute_rows(companion)
+                _rejected(
+                    self,
+                    lambda companion=companion: authorize_member(
+                        self.char1, companion.pk, PURPOSE_ACT
+                    ),
+                    REASON_MEMBER_ASLEEP,
+                )
+                self.assertIs(
+                    authorize_member(
+                        self.char1, companion.pk, PURPOSE_ORGANIZE
+                    ),
+                    companion,
+                )
+                self.assertEqual(_attribute_rows(companion), before)
 
     @covers_requirement(
         "party-member-authority::membership-rejections-are-stable-and-write-nothing"

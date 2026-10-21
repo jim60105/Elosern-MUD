@@ -217,6 +217,10 @@ def preflight_item_use(
         return _rejected(ItemUseReason.MALFORMED_TRAITS)
     if hp_gauge[0] <= 0:
         return _rejected(ItemUseReason.NOT_ALIVE)
+    from world.rules.fatigue import sleep_blocks_actions
+
+    if sleep_blocks_actions(request.actor):
+        return _rejected(ItemUseReason.ASLEEP)
     steps: list[ItemEffectStep] = []
     reasons: list[ItemUseReason] = []
     needs_resolution = any(

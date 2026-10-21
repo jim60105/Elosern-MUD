@@ -10,6 +10,7 @@ from typing import Any
 
 from .assembly import _assemble
 from .conditions import condition_values
+from .fatigue import build_fatigue_subject
 from .models import _GAUGE_KEYS, StatusQueryError, StatusReadModel
 from .readers import _read_attribute, _read_full_title
 
@@ -38,6 +39,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
         location_identity=None if location is None else str(location.pk),
         resources={key: assembly.gauges[key] for key in _GAUGE_KEYS},
         conditions=conditions,
+        fatigue=(build_fatigue_subject(entity),),
         disguise_active=bool(_read_attribute(entity, "disguised_stats", default=None)),
         combat_mode=None if combat is None else combat[0],
         combat_round=None if combat is None else combat[1],

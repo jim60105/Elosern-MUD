@@ -786,6 +786,18 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("熟練度", overview_row)
 
     @covers_requirement("game-command-docs::accurate-command-details")
+    def test_status_and_cast_entries_document_protected_physiology(self):
+        """Physiological fatigue is presented and never cleansed away."""
+        status_description = self.entries["狀態"]["說明"]
+        self.assertIn("精神儲備", status_description)
+        self.assertIn("疲勞階段", status_description)
+        self.assertIn("無法行動", status_description)
+        cast_description = self.entries["cast"]["說明"]
+        self.assertIn("沉睡", cast_description)
+        self.assertIn("淨化", cast_description)
+        self.assertIn("生理性疲勞", cast_description)
+
+    @covers_requirement("game-command-docs::accurate-command-details")
     def test_practice_entry_documents_the_standing_booking(self):
         entry = self.entries["修煉"]
         self.assertEqual(entry["指令"], "修煉")

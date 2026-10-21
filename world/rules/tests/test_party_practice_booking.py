@@ -25,6 +25,7 @@ from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
 from world.rules.movement import charge_movement
 from world.rules.party import join_party
 from world.rules.party_scope import (
+    REASON_MEMBER_ASLEEP,
     REASON_MEMBER_NOT_PRESENT,
     REASON_NOT_PARTY_MEMBER,
     PartyScopeError,
@@ -42,7 +43,9 @@ from world.rules.time_skip import (
     PracticeReject,
     PracticeRejectReason,
     book_member_practice,
+    preflight_practice_booking,
 )
+from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 # Kit rows: two ACTIVE skills, one per member, so each booking settles against
@@ -85,6 +88,24 @@ class StandingPracticeBookingTests(EvenniaTest):
         self.room2.save()
         self.ella = self._make_companion("艾拉")
         self.kahn = self._make_companion("卡恩", location=self.room2)
+
+    @synthetic_registries("skills")
+    @covers_requirement(
+        "party-member-authority::sleep-blocks-acting-purposes-without-removing-authenticated-authority"
+    )
+    def test_sleep_rejects_member_booking_and_the_shared_clause_preflight(self):
+        _own(self.ella, _HEAL)
+        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+        before = self.ella.db.practice_booking
+        with self.assertRaises(PartyScopeError) as caught:
+            book_member_practice(self.player, self.ella.pk, _HEAL)
+        self.assertEqual(caught.exception.reason, REASON_MEMBER_ASLEEP)
+        self.assertEqual(self.ella.db.practice_booking, before)
+        # The text `rest ... practice` clause reaches this same preflight and
+        # must reject with zero effects and no clock advance.
+        reject = preflight_practice_booking(self.ella, _HEAL)
+        self.assertIsInstance(reject, PracticeReject)
+        self.assertEqual(reject.reason, PracticeRejectReason.ASLEEP)
 
     def _make_companion(self, key, location=None):
         npc = create_object(NPC, key=key, location=self.player.location)

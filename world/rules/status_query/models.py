@@ -196,6 +196,26 @@ class ConditionValue:
 
 
 @dataclass(frozen=True)
+class FatigueSubjectView:
+    """One physiological subject row: identity, rounded reserve and restriction.
+
+    ``identity`` names the body the row describes, never the viewer's
+    possession owner by implication; ``stage`` is the exact threshold stage
+    from stored units and ``reserve_percent`` is display-only rounding.
+    ``restriction`` is the fixed action-unavailability line, or ``None`` when
+    the body may act.
+    """
+
+    identity: str
+    name: str
+    reserve_percent: int
+    stage: str
+    label: str
+    severity: str
+    restriction: str | None
+
+
+@dataclass(frozen=True)
 class StatusReadModel:
     """The complete read-only inputs a presenter may serialize."""
 
@@ -206,6 +226,7 @@ class StatusReadModel:
     location_identity: str | None
     resources: dict[str, GaugeValue]
     conditions: tuple[ConditionValue, ...]
+    fatigue: tuple[FatigueSubjectView, ...]
     disguise_active: bool
     combat_mode: str | None
     combat_round: int | None
