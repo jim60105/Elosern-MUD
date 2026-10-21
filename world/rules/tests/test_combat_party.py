@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
@@ -2137,63 +2137,6 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self._state(companion).reserve_units, 100720)
         self.assertEqual(get_world_clock().tick, tick_before + 60)
 
-    @covers_requirement(
-        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
-    )
-    def test_terminal_handoff_offer_is_post_commit_and_lists_real_survivors(self):
-        from world.rules.fatigue import SleepPosture
-
-        awake = _companion(self.player, "awake handoff ally", hp=500)
-        removed = _companion(self.player, "removed handoff ally", hp=1)
-        self._write(self.player, 50000, SleepPosture.FORCED)
-        record = self._manual_record(
-            [self.player, awake, removed],
-            initial_sleep=[self.player.pk],
-            knocked_out=[removed.pk],
-        )
-        with patch(
-            "world.rules.combat_session.settlement.log_info"
-        ) as logged:
-            with self.captureOnCommitCallbacks(execute=True):
-                self._settle(record)
-        offers = [
-            call
-            for call in logged.call_args_list
-            if call.args and call.args[0] == "terminal_sleep_handoff"
-        ]
-        self.assertEqual(len(offers), 1)
-        self.assertEqual(offers[0].kwargs["context"]["candidates"], str(awake.pk))
-        self.assertNotIn(
-            str(removed.pk), offers[0].kwargs["context"]["candidates"]
-        )
-
-    @covers_requirement(
-        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
-    )
-    def test_rolled_back_settlement_emits_no_handoff_offer(self):
-        from world.rules.fatigue import SleepPosture
-
-        awake = _companion(self.player, "unoffered handoff ally", hp=500)
-        self._write(self.player, 50000, SleepPosture.FORCED)
-        record = self._manual_record(
-            [self.player, awake], initial_sleep=[self.player.pk]
-        )
-        with patch(
-            "world.narrative.projector.select_and_record_protection_event",
-            side_effect=RuntimeError("late terminal failure"),
-        ), patch(
-            "world.rules.combat_session.settlement.log_info"
-        ) as logged:
-            with self.assertRaises(RuntimeError):
-                _settle_with_restore(
-                    self.player,
-                    record,
-                    reconstruct_battlefield(self.player, record),
-                    "victory",
-                )
-        events = [call.args[0] for call in logged.call_args_list]
-        self.assertNotIn("terminal_sleep_handoff", events)
-
 
 class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
     """Delta: an all-forced-sleep opening enters ordinary zero-round defeat."""
@@ -2299,3 +2242,106 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn(key, _BATTLEFIELDS)
         self.assertEqual(get_world_clock().tick, tick_before)
         self.assertEqual(read_fatigue_state(self.player), state_before)
+
+
+class TerminalHandoffOfferTests(BattlefieldIsolation, EvenniaTest):
+    """Delta: the terminal offer uses the verified control candidate surface."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.player = self.char1
+        self.player.race = _race_key()
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.monster = _monster("terminal handoff goblin", hp=500, atk=1)
+        self.monster.location = self.room1
+
+    def _record(self, allies, *, initial_sleep=(), knocked_out=()):
+        from world.rules.combat_session import CombatSessionRecord
+
+        return CombatSessionRecord(
+            session_id="hostile:terminal-handoff:manual",
+            mode="hostile",
+            room_id=int(self.room1.pk),
+            player_ids=tuple(int(member.pk) for member in allies),
+            enemy_ids=(int(self.monster.pk),),
+            fled_ids=(),
+            knocked_out_ids=tuple(int(pk) for pk in knocked_out),
+            rounds_elapsed=10,
+            exam_id=None,
+            initial_sleep_ids=tuple(int(pk) for pk in initial_sleep),
+        )
+
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
+    )
+    def test_offer_is_post_commit_and_uses_the_verified_candidates(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            project_fatigue_status,
+            write_fatigue_state,
+        )
+
+        awake = _companion(self.player, "awake terminal ally", hp=500)
+        removed = _companion(self.player, "removed terminal ally", hp=1)
+        write_fatigue_state(self.player, 50000, SleepPosture.FORCED)
+        project_fatigue_status(self.player)
+        record = self._record(
+            [self.player, awake, removed],
+            initial_sleep=[self.player.pk],
+            knocked_out=[removed.pk],
+        )
+        with patch(
+            "world.rules.combat_session.settlement.log_info"
+        ) as logged, patch.object(self.player, "msg") as delivered:
+            with self.captureOnCommitCallbacks(execute=True):
+                settle_session(
+                    self.player,
+                    record,
+                    reconstruct_battlefield(self.player, record),
+                    "victory",
+                )
+        offers = [
+            call
+            for call in logged.call_args_list
+            if call.args and call.args[0] == "terminal_sleep_handoff"
+        ]
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0].kwargs["context"]["candidates"], str(awake.pk))
+        self.assertNotIn(str(removed.pk), offers[0].kwargs["context"]["candidates"])
+        delivered.assert_called_once()
+        self.assertIn("交接", delivered.call_args.args[0])
+
+    @covers_requirement(
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+    )
+    def test_rolled_back_settlement_emits_no_offer(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            project_fatigue_status,
+            write_fatigue_state,
+        )
+
+        _companion(self.player, "unoffered terminal ally", hp=500)
+        write_fatigue_state(self.player, 50000, SleepPosture.FORCED)
+        project_fatigue_status(self.player)
+        record = self._record([self.player], initial_sleep=[self.player.pk])
+        with patch(
+            "world.narrative.projector.select_and_record_protection_event",
+            side_effect=RuntimeError("late terminal failure"),
+        ), patch("world.rules.combat_session.settlement.log_info") as logged:
+            with self.assertRaises(RuntimeError):
+                _settle_with_restore(
+                    self.player,
+                    record,
+                    reconstruct_battlefield(self.player, record),
+                    "victory",
+                )
+        events = [call.args[0] for call in logged.call_args_list]
+        self.assertNotIn("terminal_sleep_handoff", events)

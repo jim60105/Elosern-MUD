@@ -311,74 +311,35 @@ def settle_forced_sleep_opening(
     return _settle_with_restore(actor, record, battlefield, outcome)
 
 
-def _controlled_body(actor: Any) -> tuple[Any, Any] | None:
-    """Return ``(controlled body, commander)`` for the actor's live control."""
-    from world.rules.party_scope import PartyScopeError, resolve_commander
-    from world.rules.possession import current_possession
-
-    try:
-        commander = resolve_commander(actor)
-    except PartyScopeError:  # observability: ignore R2: a non-player-driven body has no control binding to hand over; this read writes nothing
-        return None
-    binding = current_possession(commander)
-    if binding is not None:
-        npc = ObjectDB.objects.filter(id=binding["npc_dbid"]).first()
-        if npc is not None:
-            try:
-                if resolve_commander(npc) is commander:
-                    return npc, commander
-            except PartyScopeError:  # observability: ignore R2: a stale possession mirror is not a controllable body; the owner body is used instead
-                pass
-    return commander, commander
-
-
 def _emit_terminal_sleep_handoff(actor: Any, session_id: str) -> None:
     """Offer sleep-control transfer from committed terminal state, never raises.
 
     Runs only from ``transaction.on_commit``: the sleep posture, defeat sets
-    and aftermath removal are final, so an awake, co-located, living party
-    member is a real candidate. A notification failure is reported and never
-    propagates, because the settlement has already committed.
+    and aftermath removal are final. The dependent control component owns the
+    candidate query and prompt wording, so this seam only asks it for the
+    committed offer; a notification failure is reported and never propagates,
+    because the settlement has already committed.
     """
-    from world.rules.fatigue import sleep_blocks_actions
-    from world.rules.party_scope import is_knocked_out, present_party_scope
-
     try:
         if not hasattr(actor, "db"):
             return
-        controlled_body = _controlled_body(actor)
-        if controlled_body is None:
-            return
-        controlled, commander = controlled_body
-        if getattr(controlled, "_is_deleted", False):
-            return
-        if _stored_trait_value(controlled.traits.hp) <= 0:
-            return
-        if not sleep_blocks_actions(controlled):
-            return
-        candidates = [
-            member
-            for member in present_party_scope(commander)
-            if member is not controlled
-            and not getattr(member, "_is_deleted", False)
-            and not is_knocked_out(member)
-            and getattr(member, "location", None)
-            is getattr(controlled, "location", None)
-            and not sleep_blocks_actions(member)
-        ]
+        from world.rules.time_skip import (
+            _handoff_candidates,
+            render_handoff_offer_message,
+        )
+
+        candidates = _handoff_candidates(actor)
         if not candidates:
             return
-        from world.rules.time_skip import HANDOFF_OFFERED_MESSAGE
-
-        controlled.msg(HANDOFF_OFFERED_MESSAGE)
+        actor.msg(render_handoff_offer_message(candidates))
         log_info(
             "terminal_sleep_handoff",
             context={
-                "char": str(getattr(commander, "pk", "?")),
-                "body": str(getattr(controlled, "pk", "?")),
+                "char": str(getattr(actor, "pk", "?")),
                 "session": session_id,
                 "candidates": ",".join(
-                    str(getattr(member, "pk", "?")) for member in candidates
+                    str(getattr(candidate, "dbid", "?"))
+                    for candidate in candidates
                 ),
             },
         )
