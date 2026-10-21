@@ -19,13 +19,11 @@ The wilderness SHALL comprise 2700 by 2700 one-kilometer logical cells with east
 <!-- Requirement title retained verbatim: a MODIFIED block may not rename the requirement ID.
      The body below is the current one-kilometre contract. -->
 `world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
-`WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`, a subclass
-of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
-`is_valid_coordinates` accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and
-`0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable terrain and NOT an anchor footprint cell of any
-`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`). The single shared rule
-is `is_valid_wilderness_cell`: frame, mainland polygon at the cell centre, off the closed summit
-ridge and authored waterways, and outside every live footprint.
+`WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`,
+subclassing `WildernessMapProvider`, whose `is_valid_coordinates` accepts exactly `0 <= x <=
+WILDERNESS_MAX_X` and `0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable, and outside every
+`WILDERNESS_ENTRY_REGISTRY` footprint; the single shared rule is `is_valid_wilderness_cell` (frame,
+mainland, ridge, water, footprints).
 
 #### Scenario: Coordinates inside the bound and outside every footprint are valid
 - **WHEN** a land-side passable fixture and an ocean-margin fixture lie inside the frame

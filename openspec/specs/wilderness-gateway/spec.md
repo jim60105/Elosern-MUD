@@ -11,11 +11,11 @@ provisioning wired into server startup.
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
 `world/lore/wilderness_entry.py` SHALL define the frozen `WildernessGate` and
-`WildernessEntryPoint` dataclasses and a module-level
-`WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`, and SHALL expose the derived
-pure helpers `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the single geometry
-source for all consumers. A point-shape entry's `approach_cell(gate)` IS its anchor cell, and only
-that gate's authored `return_direction` is a gateway.
+`WildernessEntryPoint` dataclasses and `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`,
+exposing `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the geometry source. A
+point-shape entry's approach cell IS its anchor; only its `return_direction` is a gateway. `grid_xy`
+stays logical; `activate-metric-settlements` owns the meter cutover, and entrance geometry comes
+from the sparse graph.
 
 #### Scenario: The registry has exactly one v2 entry after this change
 <!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
@@ -117,12 +117,12 @@ that gate's authored `return_direction` is a gateway.
   overlaps another entry's footprint
 
 ### Requirement: WildernessGateExit moves a traversing object from a grid room into the wilderness
-`typeclasses.exits.py::WildernessGateExit`, an ordinary `Exit`, SHALL fully override `at_traverse`
-to call `evennia.contrib.grid.wilderness.wilderness.enter_wilderness(traversing_object,
-coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
-name=WILDERNESS_NAME)` instead of moving to a fixed `destination`, where `<its anchor_key>` is
-read from `self.db.anchor_key` and `<its gate>` is the registered gate whose `return_direction`
-equals `self.db.gate_direction`. A point-shape entry lands the traveller on its anchor cell.
+`typeclasses.exits.py::WildernessGateExit` SHALL fully override `at_traverse` to call
+`evennia.contrib.grid.wilderness.wilderness.enter_wilderness(traversing_object,
+coordinates=WILDERNESS_ENTRY_REGISTRY[<anchor_key>].approach_cell(<gate>), name=WILDERNESS_NAME)`
+instead of moving to a fixed `destination`, where `<anchor_key>` is `self.db.anchor_key` and
+`<gate>` is the gate whose `return_direction` equals `self.db.gate_direction`; point-shape entries
+land on their anchor cell.
 
 #### Scenario: Traversing a gate exit places the object at that gate's approach cell
 - **WHEN** a character traverses a `WildernessGateExit` configured for
@@ -201,10 +201,10 @@ equals `self.db.gate_direction`. A point-shape entry lands the traveller on its 
 ### Requirement: WildernessReturnExit routes every registered approach-cell-and-direction pair back to the grid
 `typeclasses.exits.py::WildernessReturnExit`, subclassing the stock
 `evennia.contrib.grid.wilderness.wilderness.WildernessExit`, SHALL be
-`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — recognized through one shared
-registry helper, true if and only if the traverser's current coordinates equal some entry's
-`approach_cell(gate)` and the exit's direction equals that gate's `return_direction` — SHALL
-move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`.
+`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — one shared registry helper's match
+on `approach_cell(gate)` and that gate's `return_direction` — SHALL move the traverser to the
+`GridRoom` at the gate's `grid_xy`/`z_map_key`. `grid_xy` is logical until
+`activate-metric-settlements` performs the meter cutover.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
 - **WHEN** a character at `(860, 1077)` traverses the `"north"` exit
@@ -454,10 +454,11 @@ The wilderness traversal context SHALL remain distinct for the existing flight w
   read each other's constant; the amended scenario above asserts exactly that
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
-`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
-DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL
-run it before mirroring, so malformed authored data fails at startup rather than producing an
-unwalkable or contradictory world. The shipped registry SHALL pass validation.
+`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()`, a pure DB-free
+check of the whole registry, and `world/lore/sync.py`'s mirror step SHALL run it before mirroring,
+so malformed data fails at startup instead of producing an unwalkable world. It uses the provider's
+shared walkability rule — frame, mainland, passable terrain, footprint exclusion — so no authored
+footprint or approach names impassable ground. The shipped registry SHALL pass.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped

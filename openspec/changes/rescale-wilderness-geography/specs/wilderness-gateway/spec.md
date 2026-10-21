@@ -17,18 +17,22 @@ Urban routing masks SHALL rasterize authored irregular physical footprints. Capi
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
 `world/lore/wilderness_entry.py` SHALL define the frozen `WildernessGate` and
-`WildernessEntryPoint` dataclasses and a module-level
-`WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`, and SHALL expose the derived
-pure helpers `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the single geometry
-source for all consumers. A point-shape entry's `approach_cell(gate)` IS its anchor cell, and only
-that gate's authored `return_direction` is a gateway. `gate.grid_xy` remains the destination
-`GridRoom`'s logical grid coordinate in this change; `activate-metric-settlements` owns the
-meter-coordinate cutover, so this change's transformed entrance geometry is carried by the sparse
-graph's authored physical positions, not by new grid coordinates.
+`WildernessEntryPoint` dataclasses and `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`,
+exposing `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the geometry source. A
+point-shape entry's approach cell IS its anchor; only its `return_direction` is a gateway. `grid_xy`
+stays logical; `activate-metric-settlements` owns the meter cutover, and entrance geometry comes
+from the sparse graph.
 
 #### Scenario: The registry has exactly one v2 entry after this change
-- **WHEN** the declared metric settlement geometry is validated and used for routing
-- **THEN** Altoria binds plaza (3500,2850) to wilderness (860,1080), south/east gate nodes (3050,150)/(6500,3010) to facing-preserving valid approaches outside its rasterized irregular footprint; Ciaran binds plaza (220,305) to (1340,1220) with hidden path (35,270) as an explicit-direction point entrance. Geometry is frozen, exact transforms supply one approach segment, unrelated directions remain ordinary and hidden knowledge is not disclosed.
+<!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
+     scenario. The "exactly one" wording is historical; the assertion below is the current
+     two-entry state. -->
+- **WHEN** `WILDERNESS_ENTRY_REGISTRY` is inspected
+- **THEN** it contains exactly two entries; the `"capital_altoria"` entry has a 7×9 mask with 40
+  `#` cells, `origin_xy` `(857, 1076)`, and gates exactly `("n" → (3,0)), ("w" → (6,3))` on map
+  `capital_altoria`; the `"village_ciaran"` entry is a point shape at `(1340, 1220)` with one gate
+  returning to the village's entrance node; and no test asserts that any other
+  `ANCHOR_PLACEMENT_REGISTRY` key must also appear
 
 #### Scenario: Derived geometry matches the authored mask
 - **WHEN** the derived helpers are evaluated against the authored rows
@@ -122,13 +126,10 @@ graph's authored physical positions, not by new grid coordinates.
 ### Requirement: WildernessReturnExit routes every registered approach-cell-and-direction pair back to the grid
 `typeclasses.exits.py::WildernessReturnExit`, subclassing the stock
 `evennia.contrib.grid.wilderness.wilderness.WildernessExit`, SHALL be
-`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — recognized through one shared
-registry helper, true if and only if the traverser's current coordinates equal some entry's
-`approach_cell(gate)` and the exit's direction equals that gate's `return_direction` — SHALL
-move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`. In this change
-`grid_xy` is still the settled logical grid coordinate; `activate-metric-settlements` performs the
-meter-coordinate cutover of the authored settlement maps, so the gate's physical entrance position
-already comes from the sparse graph's metre table while the room lookup keeps the logical cell.
+`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — one shared registry helper's match
+on `approach_cell(gate)` and that gate's `return_direction` — SHALL move the traverser to the
+`GridRoom` at the gate's `grid_xy`/`z_map_key`. `grid_xy` is logical until
+`activate-metric-settlements` performs the meter cutover.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
 - **WHEN** a character at `(860, 1077)` traverses the `"north"` exit
@@ -185,7 +186,7 @@ already comes from the sparse graph's metre table while the room lookup keeps th
 #### Scenario: The hardcoded legacy rule is removed
 - **WHEN** gateway recognition is implemented
 - **THEN** the hardcoded legacy rule (current coordinates equal to an entry's single
-  `wilderness_xy` and exit key `"west"`) SHALL NOT exist in any form
+  `wilderness_xy` and exit key `"south"`) SHALL NOT exist in any form
 
 #### Scenario: This requirement governs routing only
 - **WHEN** the clock cost of a successful traversal is considered
@@ -194,12 +195,11 @@ already comes from the sparse graph's metre table while the room lookup keeps th
   uniformly regardless of which routing branch was taken
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
-`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
-DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL
-run it before mirroring, so malformed authored data fails at startup rather than producing an
-unwalkable or contradictory world. The shipped registry SHALL pass validation. Validation uses the
-provider's shared walkability rule (frame, mainland, passable terrain, footprint exclusion) so an
-authored footprint or approach can never name impassable ground.
+`world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()`, a pure DB-free
+check of the whole registry, and `world/lore/sync.py`'s mirror step SHALL run it before mirroring,
+so malformed data fails at startup instead of producing an unwalkable world. It uses the provider's
+shared walkability rule — frame, mainland, passable terrain, footprint exclusion — so no authored
+footprint or approach names impassable ground. The shipped registry SHALL pass.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped

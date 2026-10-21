@@ -9,13 +9,11 @@ area, using the project-owned `TerrainRoom` and `WildernessReturnExit` typeclass
 
 ### Requirement: ElosernWildernessMapProvider bounds the map to a 224x224 grid at 10 km per cell
 `world/maps/wilderness_provider.py` SHALL define `WILDERNESS_KM_PER_CELL = 1`,
-`WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`, a subclass
-of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
-`is_valid_coordinates` accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and
-`0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable terrain and NOT an anchor footprint cell
-of any `WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`). The shared rule
-is `is_valid_wilderness_cell`: frame, mainland polygon at the cell centre, off the closed summit
-ridge and authored waterways, and outside every live footprint.
+`WILDERNESS_MAX_X = 2699`, `WILDERNESS_MAX_Y = 2699`, and `ElosernWildernessMapProvider`,
+subclassing `WildernessMapProvider`, whose `is_valid_coordinates` accepts exactly `0 <= x <=
+WILDERNESS_MAX_X` and `0 <= y <= WILDERNESS_MAX_Y` that are land-side, passable, and outside every
+`WILDERNESS_ENTRY_REGISTRY` footprint; the single shared rule is `is_valid_wilderness_cell` (frame,
+mainland, ridge, water, footprints).
 
 #### Scenario: Coordinates inside the bound and outside every footprint are valid
 - **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (500, 700))` and the

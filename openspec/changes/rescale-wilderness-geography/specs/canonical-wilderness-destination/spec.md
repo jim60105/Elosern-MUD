@@ -3,13 +3,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: Wilderness destination resolution is canonical, shared, and registry-driven
-The system SHALL provide one resolver that derives the actual arrival node for a wilderness
-direction from the current coordinates, direction, and the gateway rules of
-`WILDERNESS_ENTRY_REGISTRY`, and SHALL NOT derive destinations from the pooled self-loop
-`exit_obj.destination`. It returns the gate's destination room `grid:` node at a registered
-gate's `approach_cell` and `return_direction`, `None` on a provider-invalid neighbor cell,
-and otherwise the adjacent `wild:` node. A point-shape entry answers only its authored
-`return_direction`; its other directions resolve as ordinary wilderness steps.
+One resolver SHALL derive the arrival node from the current coordinates, direction, and the
+registry's gateway rules, never from the pooled self-loop `exit_obj.destination`. It returns the
+gate's `grid:` node at a registered `approach_cell`/`return_direction`, `None` on a
+provider-invalid neighbor, else the adjacent `wild:` node. A point-shape entry answers only its
+`return_direction`. Coordinates stay logical until `activate-metric-settlements` performs the
+meter cutover.
 
 #### Scenario: Wilderness direction resolves to the true neighbor
 - **WHEN** the resolver is asked for the north direction from `wild:(500, 700)`
