@@ -675,6 +675,7 @@ class _SettlementRestore:
     exam_host: tuple[Any, Any] | None
     action_context: Any
     battlefield: Battlefield | None
+    battlefield_registrations: tuple[tuple[str, Any], ...]
     clock: Any
     clock_tick: tuple[int, tuple[bool, Any] | None] | None
 
@@ -682,7 +683,7 @@ class _SettlementRestore:
         """Reinstate every snapshotted surface, in the round path's order."""
         from world.rules.action import _restore_attribute
         from world.rules.clock import _restore_clock_tick
-        from world.rules.skip_safety import register_active_battlefield
+        from world.rules.skip_safety import _BATTLEFIELDS
 
         for key, snapshot in self.attributes:
             _restore_attribute(self.actor, key, snapshot)
@@ -702,7 +703,14 @@ class _SettlementRestore:
             restore_exam_host_surfaces(host, snapshot)
         self.actor.ndb.action_context = self.action_context
         if self.battlefield is not None:
-            register_active_battlefield(self.battlefield)
+            # Registrations are process memory, not durable state: restore the
+            # exact pre-settlement entries rather than assuming this battle
+            # was registered (a failed all-sleep opening runs before it is).
+            for key in (
+                str(entity.pk) for entity in self.battlefield.roster.values()
+            ):
+                _BATTLEFIELDS.pop(key, None)
+            _BATTLEFIELDS.update(dict(self.battlefield_registrations))
         if self.clock is not None and self.clock_tick is not None:
             # A later write of the same unit rolls the durable tick back, but
             # the idmapper-cached Script attribute is not transaction-aware.
@@ -718,6 +726,7 @@ def _snapshot_settlement_restore(
     from world.rules.action import _attribute_snapshot
     from world.rules.clock import _snapshot_clock_tick, read_world_clock
     from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+    from world.rules.skip_safety import _BATTLEFIELDS
 
     attributes: list[tuple[str, tuple[bool, Any]]] = [
         ("active_combat", _attribute_snapshot(actor, "active_combat")),
@@ -765,6 +774,13 @@ def _snapshot_settlement_restore(
 
             exam_host = (host, snapshot_exam_host_surfaces(host))
     clock = read_world_clock()
+    battlefield_registrations: tuple[tuple[str, Any], ...] = ()
+    if battlefield is not None:
+        battlefield_registrations = tuple(
+            (str(entity.pk), _BATTLEFIELDS[str(entity.pk)])
+            for entity in battlefield.roster.values()
+            if str(entity.pk) in _BATTLEFIELDS
+        )
     return _SettlementRestore(
         actor=actor,
         attributes=tuple(attributes),
@@ -774,6 +790,7 @@ def _snapshot_settlement_restore(
         exam_host=exam_host,
         action_context=actor.ndb.action_context,
         battlefield=battlefield,
+        battlefield_registrations=battlefield_registrations,
         clock=clock,
         clock_tick=_snapshot_clock_tick(clock) if clock is not None else None,
     )

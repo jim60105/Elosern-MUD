@@ -2277,3 +2277,25 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(read_session(self.player))
         self.assertEqual(get_world_clock().tick, tick_before)
         self.assertEqual(read_fatigue_state(self.player), state_before)
+
+    @covers_requirement(
+        "player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit"
+    )
+    def test_failed_opening_leaves_no_session_or_skip_registration(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.fatigue import read_fatigue_state
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        key = str(self.player.pk)
+        tick_before = get_world_clock().tick
+        state_before = read_fatigue_state(self.player)
+        with patch(
+            "world.rules.combat_session.settlement.settle_combat_result",
+            side_effect=RuntimeError("opening settlement failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                engage(self.player, self.monster)
+        self.assertIsNone(read_session(self.player))
+        self.assertNotIn(key, _BATTLEFIELDS)
+        self.assertEqual(get_world_clock().tick, tick_before)
+        self.assertEqual(read_fatigue_state(self.player), state_before)

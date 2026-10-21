@@ -593,6 +593,12 @@ def start_guild_exam(
         key: attribute_snapshot(actor, key)
         for key in ("guild_exams", "active_combat", "guild_rank")
     }
+    from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+
+    actor_fatigue_snapshots = {
+        (key, category): attribute_snapshot(actor, key, category)
+        for key, category in FATIGUE_ATTRIBUTE_SURFACES
+    }
     actor_traits_snapshot = snapshot_traits(actor)
     host_snapshot = snapshot_exam_host_surfaces(host)
     try:
@@ -674,6 +680,8 @@ def start_guild_exam(
         unregister_participants((int(actor.pk), int(host.pk)))
         for key, snapshot in actor_snapshots.items():
             restore_attribute_best_effort(actor, key, snapshot)
+        for (key, category), snapshot in actor_fatigue_snapshots.items():
+            restore_attribute_best_effort(actor, key, snapshot, category)
         restore_traits(actor, actor_traits_snapshot)
         restore_exam_host_surfaces(host, host_snapshot)
         raise
