@@ -134,6 +134,10 @@ def settle_movement(
     plain-exit target and the wilderness grid-return target); its quest-
     observation surfaces (``pin_reasons``, ``interacted``) are snapshotted
     because the wrapped relocation can write them before the charge.
+    The charge itself is the exit's pre-relocation physical-duration record
+    (``world.rules.travel_cost::preflight_movement_cost``), so the settlement
+    transaction never re-derives a cost from post-relocation room state; the
+    commit/compensation guarantees below are unchanged.
     ``wilderness_coordinates`` and ``wilderness_source_coordinates`` describe
     the wilderness move involved (entry destination, source coordinates); the
     wilderness lineages pass them, which also arms the falsy-return trigger:
