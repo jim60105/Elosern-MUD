@@ -710,6 +710,9 @@ class PossessionPresentationTests(EvenniaTest):
     @covers_requirement(
         "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
     )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
     def test_sleep_handoff_adapter_rejects_a_stale_selection_with_current_choices(self):
         """A candidate that left before confirmation changes no control or time."""
         candidate, _entry = self._sleeping_possession_with_candidate()
@@ -728,6 +731,9 @@ class PossessionPresentationTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
     )
     def test_sleep_handoff_stale_selection_is_a_protocol_valid_refusal(self):
         """The dispatcher emits the stable refusal, never an internal error."""
@@ -762,6 +768,9 @@ class PossessionPresentationTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
     )
     def test_sleep_handoff_adapter_commits_and_repoints_the_epoch(self):
         """A lawful candidate moves control once and the old epoch is refused."""
@@ -828,6 +837,9 @@ class PossessionPresentationTests(EvenniaTest):
     @covers_requirement(
         "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
     )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
     def test_sleep_handoff_admission_never_claims_completion_on_failure(self):
         """A candidate that turns stale before execution gets a refusal, not success."""
         candidate, _entry = self._sleeping_possession_with_candidate()
@@ -852,6 +864,9 @@ class PossessionPresentationTests(EvenniaTest):
 
     @covers_requirement(
         "time-skip-commands::recovery-waiting-preserves-skip-safety"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
     )
     def test_wait_adapter_recovers_a_sleeping_controlled_body(self):
         """Recovery waiting stays available without any handoff selection."""

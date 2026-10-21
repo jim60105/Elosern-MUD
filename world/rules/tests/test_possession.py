@@ -441,6 +441,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
     def test_sleep_entry_offers_the_awake_owner_as_a_return_choice(self):
         sleeper, entry = self._sleeping_possession()
         self.assertTrue(entry.handoff_offered)
@@ -462,6 +465,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
     def test_unselected_sleep_never_steals_control(self):
         sleeper, _entry = self._sleeping_possession()
         awake = self._companion("清醒者")
@@ -475,6 +481,9 @@ class SleepHandoffTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
     def test_owner_wake_never_steals_control(self):
         witness = self._companion("見證者")
@@ -493,6 +502,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
     def test_forged_account_and_foreign_session_are_refused(self):
         sleeper, _entry = self._sleeping_possession()
         forged = SimpleNamespace(pk=987654)
@@ -510,6 +522,9 @@ class SleepHandoffTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
     )
     def test_stale_or_ineligible_candidates_are_rejected_with_current_choices(self):
         sleeper, _entry = self._sleeping_possession()
@@ -539,6 +554,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
     def test_wake_and_resleep_change_the_transition_identity(self):
         sleeper, entry = self._sleeping_possession()
         first = self._transition_id(sleeper)
@@ -559,6 +577,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
     def test_return_confirmation_hands_control_back_to_the_owner(self):
         sleeper, _entry = self._sleeping_possession()
         confirm_sleep_handoff(
@@ -578,6 +599,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
         "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder",
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
     )
     def test_ordinary_combat_gate_stays_while_contextual_handoff_is_lawful(self):
         sleeper, _entry = self._sleeping_possession()
@@ -601,6 +625,9 @@ class SleepHandoffTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
     def test_sleeping_owner_can_hand_control_to_an_awake_companion(self):
         awake = self._companion("清醒同伴")
@@ -641,6 +668,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
     def test_forced_sleep_episode_identity_never_replays(self):
         sleeper, entry = self._sleeping_possession()
         continue_sleep(sleeper, entry)
@@ -661,6 +691,9 @@ class SleepHandoffTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
     def test_action_locked_candidate_is_not_lawful(self):
         sleeper, _entry = self._sleeping_possession()
@@ -683,6 +716,9 @@ class SleepHandoffTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
         "time-skip-commands::recovery-waiting-preserves-skip-safety",
+    )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
     def test_accepted_wait_offers_handoff_after_a_forced_collapse(self):
         sleeper = self._companion("力竭者")

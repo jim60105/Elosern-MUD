@@ -163,6 +163,9 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         "webclient-possession-presentation::the-possession-controls-complete-the-action-round-trip"
     )
     @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
+    @covers_requirement(
         "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum"
     )
     def test_keyboard_sleep_handoff_returns_control_and_survives_reload(self):
@@ -225,6 +228,9 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
 
     @covers_requirement(
         "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
     )
     def test_keyboard_sleep_handoff_transfers_to_an_awake_companion(self):
         page = self.logged_in_page()

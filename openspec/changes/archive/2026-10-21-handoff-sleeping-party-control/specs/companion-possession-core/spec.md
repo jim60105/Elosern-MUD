@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Entry gates are deterministic, stable-coded, and precede all generative work
-Possession SHALL resolve the same canonical effective party membership for general and temporary companions. Existing ordered stable-coded gates `not_bound`, `not_co_located`, `in_combat`, `dialogue_open`, and `already_possessing`, together with existing living-state restrictions, SHALL apply before any generative work or write. Only a validated contextual sleep-driven handoff SHALL relax in_combat and replace an existing possession through one verified transfer; all membership, co-location, living/action, dialogue and account-scope checks SHALL remain binding. Account-wide single-possession scope and fixed reason messages SHALL remain unchanged.
+General and temporary membership SHALL resolve identically. Ordered stable-coded gates `not_bound`, `not_co_located`, `in_combat`, `dialogue_open`, `already_possessing` and living-state restrictions SHALL precede any generative work or write. Only a validated sleep-driven handoff SHALL relax in_combat and replace a possession via a verified transfer; membership, co-location, living, dialogue and account-scope checks SHALL stay binding, as SHALL single-possession scope and fixed reason messages.
 
 #### Scenario: Temporary membership permits ordinary possession
 - **WHEN** a live temporary-only companion passes every existing entry gate

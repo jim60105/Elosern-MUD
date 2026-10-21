@@ -1485,6 +1485,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
     )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
     def test_verified_companion_to_companion_handoff_keeps_one_mirrored_binding(self):
         tick_before = int(get_world_clock().tick)
         candidate = self._confirm()
@@ -1507,6 +1510,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
+    )
     def test_failure_after_the_first_handback_restores_the_old_control(self):
         tick_before = int(get_world_clock().tick)
         with patch(
@@ -1520,6 +1526,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
     )
     def test_failure_after_the_target_puppet_restores_every_surface(self):
         tick_before = int(get_world_clock().tick)
@@ -1543,6 +1552,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
     )
     def test_outer_failure_after_a_successful_return_restores_the_sleeper(self):
         """A release that succeeded inside a rolled-back transaction is undone."""
@@ -1578,6 +1590,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
     )
     def test_outer_failure_after_an_owner_transfer_restores_the_owner(self):
         """An owner-origin entry that succeeded before rollback is undone."""
@@ -1618,6 +1633,9 @@ class SleepHandoffTransitionTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
+    )
+    @covers_requirement(
+        "companion-possession-transition::contextual-handoff-uses-compensated-verified-control-transfer"
     )
     def test_disconnect_releases_a_sleeping_possession_through_the_existing_hook(self):
         self.account.unpuppet_object(self.session)

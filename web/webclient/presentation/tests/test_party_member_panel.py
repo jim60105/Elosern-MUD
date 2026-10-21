@@ -527,6 +527,9 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
     @covers_requirement(
         "webclient-party-member-panel::companion-actions-are-server-authored-descriptors"
     )
+    @covers_requirement(
+        "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"
+    )
     def test_sleep_handoff_enables_lawful_candidates_and_the_return_descriptor(self):
         """A committed sleep handoff replaces the ordinary refusal for candidates."""
         self.player.account = self.account

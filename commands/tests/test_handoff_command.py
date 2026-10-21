@@ -59,6 +59,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::the-possess-command-surface-is-localized-and-documented"
     )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
     def test_handoff_lists_fatigue_and_return_or_possess_meaning(self):
         output = self._listing()
         self.assertIn("1. 回到自己的身體（精神儲備 100%）", output)
@@ -71,6 +74,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::the-possess-command-surface-is-localized-and-documented"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
     )
     def test_handoff_confirms_the_exact_listed_candidate_at_zero_time(self):
         self._listing()
@@ -88,6 +94,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::the-possess-command-surface-is-localized-and-documented"
     )
+    @covers_requirement(
+        "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
+    )
     def test_handoff_cancel_keeps_control_and_passes_no_time(self):
         self._listing()
         before = int(get_world_clock().tick)
@@ -104,6 +113,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::the-possess-command-surface-is-localized-and-documented"
     )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
+    )
     def test_handoff_without_a_fresh_listing_rejects_stale_choices(self):
         before = int(get_world_clock().tick)
         output = self.call(CmdHandoff(), "1", caller=self.sleeper)
@@ -116,6 +128,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::the-possess-command-surface-is-localized-and-documented"
+    )
+    @covers_requirement(
+        "companion-possession-core::handoff-confirmation-revalidates-the-exact-candidate"
     )
     def test_handoff_candidate_that_left_is_relisted_not_substituted(self):
         self._listing()
