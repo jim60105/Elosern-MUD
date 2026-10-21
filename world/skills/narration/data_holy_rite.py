@@ -18,50 +18,50 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "rite_heal_light",
         action=(
-            "{actor} 將掌心覆上，讓光一點點滲進傷處——",
-            "{actor} 捧起一束光，輕輕按在對方身上——",
+            "{actor} 將掌心覆上，讓光逐漸滲進傷處。",
+            "{actor} 捧起一束光，輕按在對方身上。",
         ),
     ),
     NarrationRow(
         "rite_cleanse",
         action=(
-            "{actor} 以指蘸水，在對方額前畫下潔淨的記號——",
-            "{actor} 低聲誦念，把附在身上的沉重一層層洗去——",
+            "{actor} 以指蘸水，在對方額前畫下潔淨的記號。",
+            "{actor} 低聲誦念，把附在身上的沉重逐層洗去。",
         ),
     ),
     NarrationRow(
         "rite_calm",
         action=(
-            "{actor} 放慢聲調，領著對方把呼吸平靜下來——",
-            "{actor} 按住對方的手，讓紛亂慢慢退去——",
+            "{actor} 放慢聲調，領著對方把呼吸平靜下來。",
+            "{actor} 按住對方的手，讓紛亂逐漸退去。",
         ),
     ),
     NarrationRow(
         "rite_bless_water",
         action=(
-            "{actor} 舉起聖水，讓禱詞落進水面——",
-            "{actor} 在聖水上畫下祝福，再洒向對方——",
+            "{actor} 舉起聖水，讓禱詞落進水面。",
+            "{actor} 在聖水上畫下祝福，再洒向對方。",
         ),
     ),
     NarrationRow(
         "rite_sanctify_ground",
         action=(
-            "{actor} 俯身按地，把聖意鋪向四周——",
-            "{actor} 繞行一圈，腳下所過之處皆成聖域——",
+            "{actor} 俯身按地，把聖意鋪向四周。",
+            "{actor} 繞行一圈，腳下所過之處皆成聖域。",
         ),
     ),
     NarrationRow(
         "rite_absolution",
         action=(
-            "{actor} 垂下眼，替對方說出那句赦免——",
-            "{actor} 覆上對方的手，把罪與重擔一併接過——",
+            "{actor} 垂下眼，替對方說出那句赦免。",
+            "{actor} 覆上對方的手，把罪與重擔一併接過。",
         ),
     ),
     NarrationRow(
         "rite_lamb_mark",
         action=(
-            "{actor} 在自己額上按下代贖的印記——",
-            "{actor} 抬手按額，把那道印記留給自己——",
+            "{actor} 在自己額上按下代贖的印記。",
+            "{actor} 抬手按額，把那道印記留給自己。",
         ),
         kind_lines={
             "self_buff_applied": (
@@ -73,8 +73,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "rite_martyrdom_vow",
         action=(
-            "{actor} 立於原地，把名字交了出去——",
-            "{actor} 仰望聖所深處，低聲許下再無退路的願——",
+            "{actor} 立於原地，把名字交了出去。",
+            "{actor} 仰望聖所深處，低聲許下再無退路的願。",
         ),
         kind_lines={
             "session_stamp": (
@@ -86,36 +86,36 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "rite_anointing_touch",
         action=(
-            "{actor} 蘸著聖油，沿著對方的肌膚抹開——",
-            "{actor} 讓溫熱的油在指尖化開，一寸寸敷上——",
+            "{actor} 蘸著聖油，沿著對方的肌膚抹開。",
+            "{actor} 讓溫熱的油在指尖化開，逐寸敷上。",
         ),
     ),
     NarrationRow(
         "rite_milk_blessing",
         action=(
-            "{actor} 將對方攬近，讓祝福安靜地餵養——",
-            "{actor} 以最輕的姿態，把滋養與安寧遞過去——",
+            "{actor} 將對方攬近，讓祝福安靜地落進身體。",
+            "{actor} 以最輕的力道，讓滋養與安寧落進對方身體。",
         ),
     ),
     NarrationRow(
         "rite_holy_kiss",
         action=(
-            "{actor} 俯身，以一個吻完成這場聖儀——",
-            "{actor} 捧住對方的臉，讓聖吻久一點才落下——",
+            "{actor} 俯身，以一個吻完成這場聖儀。",
+            "{actor} 捧住對方的臉，讓聖吻久一點才落下。",
         ),
     ),
     NarrationRow(
         "rite_confession_bed",
         action=(
-            "{actor} 領著對方躺下，讓告解從身體開始——",
-            "{actor} 在床邊俯身，把未說出口的話都接下——",
+            "{actor} 領著對方躺下，讓告解從身體開始。",
+            "{actor} 在床邊俯身，把未說出口的話都接下。",
         ),
     ),
     NarrationRow(
         "rite_martial_blessing",
         action=(
-            "{actor} 抬手為武備覆上一層聖意——",
-            "{actor} 將兵刃舉到光下，讓禱詞附上去——",
+            "{actor} 抬手為武備覆上一層聖意。",
+            "{actor} 將兵刃舉到光下，讓禱詞附上去。",
         ),
         kind_lines={
             "rite_blessing": (
@@ -127,12 +127,12 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "rite_shelter",
         action=(
-            "{actor} 在聖所裡張開一層庇護——",
-            "{actor} 關上門，讓庇護靜靜落在自己身上——",
+            "{actor} 在聖所裡張開一層庇護。",
+            "{actor} 關上門，讓庇護安然落在自己身上。",
         ),
         kind_lines={
             "rite_shelter": (
-                "{actor} 的傷勢在門後一點點平息。",
+                "{actor} 的傷勢在門後逐漸平息。",
                 "{actor} 的呼吸終於在門內慢了下來。",
             ),
         },

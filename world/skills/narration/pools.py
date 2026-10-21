@@ -93,13 +93,13 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
     ),
     "rite_blessing": (
         "{actor} 的兵刃泛起一層柔光。",
-        "{actor} 的武備被聖意輕輕覆過。",
+        "{actor} 的武備被聖意拂過。",
         "{actor} 感到掌心傳來一股安定的暖意。",
     ),
     "rite_shelter": (
         "{actor} 在聖所裡卸下了緊繃。",
         "{actor} 被一層看不見的庇護攏住。",
-        "{actor} 的傷勢在安靜中慢慢平息。",
+        "{actor} 的傷勢在安靜中逐漸平息。",
     ),
     "skill_granted": (
         "{target} 的動作裡多了一分不屬於自己的熟練。",
@@ -114,7 +114,7 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
     "disguise_lifted": (
         "{target} 的偽裝像霧一樣散開。",
         "{target} 露出了原本的面貌。",
-        "{target} 身上的假象褪得乾乾淨淨。",
+        "{target} 身上的假象褪盡。",
     ),
     "reveal_lifted": (
         "{target} 的偽裝被看穿了。",
@@ -123,7 +123,7 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
     ),
     "reveal_noop": (
         "{target} 的偽裝沒有露出破綻。",
-        "{target} 仍穩穩藏在表象之後。",
+        "{target} 仍安然藏在表象之後。",
         "{target} 看著毫無異樣。",
     ),
     "buff_applied": (
@@ -132,13 +132,13 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
         "{target} 的狀態悄然改變。",
     ),
     "grants_revoked": (
-        "{target} 身上的授予一條條斷開。",
+        "{target} 身上的授予逐條斷開。",
         "{target} 失去了那些借來的力量。",
         "{target} 被收回了一切恩惠。",
     ),
     "self_buff_applied": (
         "{actor} 凝神聚力，氣息沉穩下來。",
-        "{actor} 的身周亮起一圈淡淡的光。",
+        "{actor} 的身周亮起一圈淡光。",
         "{actor} 把力量收進身體深處。",
     ),
     "buffs_cleansed": (
@@ -152,17 +152,17 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
         "{target} 的鎧甲把這道手段消於無形。",
     ),
     "sexual_transition": (
-        "{target} 的呼吸微微一亂。",
+        "{target} 的呼吸微亂。",
         "{target} 的身體有了新的反應。",
-        "{target} 的狀態悄悄越過了一道界線。",
+        "{target} 的狀態悄然越過一道界線。",
     ),
     "sexual_resist": (
         "{target} 沒有立刻回應。",
         "{target} 的動作停了一拍。",
-        "{target} 靜靜看著眼前的人。",
+        "{target} 安靜看著眼前的人。",
     ),
     "pleasure_gain": (
-        "{target} 的快感一層層漫上來。",
+        "{target} 的快感逐層漫上來。",
         "{target} 的腰背不由自主地繃緊。",
         "{target} 的呼吸變得又淺又急。",
     ),
@@ -187,14 +187,14 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
         "{target} 的呼吸亂了。",
     ),
     "heal": (
-        "{target} 的傷口慢慢收攏。",
+        "{target} 的傷口逐漸收攏。",
         "{target} 感到一股暖流覆上傷處。",
         "{target} 的臉色恢復了些許。",
     ),
     "self_heal": (
-        "{actor} 的傷勢緩緩癒合。",
+        "{actor} 的傷勢逐漸癒合。",
         "{actor} 重新站穩，氣息平復。",
-        "{actor} 感到力氣一點點回來。",
+        "{actor} 感到力氣逐漸回來。",
     ),
     "target_defeated": (
         "{target} 的身影終於倒下。",
@@ -222,13 +222,13 @@ _KIND_POOLS_SOURCE: dict[str, tuple[str, ...]] = {
         "{target} 再也承受不住地弓起身子。",
     ),
     "divine_climax_extension": (
-        "{target} 的餘韻被硬生生拉長。",
+        "{target} 的餘韻被硬是延長。",
         "{target} 沒能從那陣顫抖裡落下。",
         "{target} 被留在原處，動彈不得。",
     ),
     "divine_drain": (
         "{target} 的力量被抽走了一部分。",
-        "{target} 感到自己正被慢慢掏空。",
+        "{target} 感到自己正被逐步掏空。",
         "{target} 的氣息黯淡下去。",
     ),
     "divine_saturate_sensitivity": (
@@ -297,7 +297,7 @@ _COMPACT_SOURCE: dict[str, str] = {
     "self_return_clear": "架勢重新穩住。",
     "session_stamp": "誓言已然立下。",
     "rite_blessing": "武備覆上了一層柔光。",
-    "rite_shelter": "庇護靜靜降下。",
+    "rite_shelter": "庇護悄然降下。",
     "skill_granted": "借來的力量落了下來。",
     "disguise_set": "面貌換了一副。",
     "disguise_lifted": "偽裝散了。",
@@ -315,14 +315,14 @@ _COMPACT_SOURCE: dict[str, str] = {
     "trait_delta": "身體狀態改變了。",
     "roll": "攻勢逼近。",
     "damage": "傷勢添了一筆。",
-    "heal": "傷口慢慢收攏。",
-    "self_heal": "傷勢緩緩癒合。",
+    "heal": "傷口逐漸收攏。",
+    "self_heal": "傷勢逐漸癒合。",
     "target_defeated": "身影終於倒下。",
     "target_knocked_out": "意識中斷了。",
     "disengage_attempt": "尋找脫身的空隙。",
     "skill_practice": "這一式留下了痕跡。",
     "divine_pleasure_max": "感官被推到盡頭。",
-    "divine_climax_extension": "餘韻被拉長了。",
+    "divine_climax_extension": "餘韻被延長了。",
     "divine_drain": "力量被抽走了一部分。",
     "divine_saturate_sensitivity": "感官被推到極處。",
     "divine_clamp_shame": "羞恥被剝去了。",
@@ -349,7 +349,7 @@ FALLBACK_TEMPLATES: Mapping[str, str] = MappingProxyType(
 
 
 HIT_LINES = (
-    "這一擊扎扎實實落在 {target} 身上。",
+    "這一擊著實落在 {target} 身上。",
     "{target} 沒能完全避開。",
     "攻勢破開了 {target} 的防備。",
 )
@@ -368,7 +368,7 @@ DAMAGE_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "{target} 偏了偏身，傷得不重。",
         ),
         "light": (
-            "{target} 的傷口淺而清晰。",
+            "{target} 的傷口淺，滲出一點血。",
             "{target} 皺了下眉。",
             "{target} 退了半步，傷勢不深。",
         ),
@@ -393,7 +393,7 @@ DAMAGE_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 HEAL_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "minor": (
-            "{target} 的傷口淺淺收攏。",
+            "{target} 的傷口開始收攏。",
             "{target} 感到一絲暖意。",
             "{target} 的疼痛輕了些。",
         ),
@@ -433,7 +433,7 @@ SELF_HEAL_BAND_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 VERDICT_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "resist": (
-            "{target} 輕輕別過臉，拒絕了這場靠近。",
+            "{target} 別過臉去，拒絕了這場靠近。",
             "{target} 抬手擋住，沒有退讓。",
             "{target} 的態度明白而堅決。",
         ),
@@ -445,7 +445,7 @@ VERDICT_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
         "comply": (
             "{target} 沒有拒絕，呼吸亂了拍子。",
             "{target} 的眼神動搖，最後什麼也沒說。",
-            "{target} 微微垂下眼，默許了這一刻。",
+            "{target} 垂下眼，默許了這一刻。",
         ),
     }
 )
@@ -455,12 +455,12 @@ PLEASURE_ACTOR_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
         "faint": (
             "{actor} 感到一絲細微的熱意。",
             "{actor} 的心跳快了半拍。",
-            "{actor} 的身體輕輕一顫。",
+            "{actor} 的身體一顫。",
         ),
         "clear": (
             "{actor} 的呼吸明顯亂了。",
             "{actor} 感到熱意一路蔓延。",
-            "{actor} 的手指微微收緊。",
+            "{actor} 的手指收緊了些。",
         ),
         "strong": (
             "{actor} 幾乎站不穩。",
@@ -478,7 +478,7 @@ PLEASURE_ACTOR_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 PLEASURE_TARGET_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "faint": (
-            "{target} 的身子輕輕一顫。",
+            "{target} 的身子一顫。",
             "{target} 的呼吸亂了一拍。",
             "{target} 察覺到那點細微的異樣。",
         ),
@@ -488,7 +488,7 @@ PLEASURE_TARGET_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "{target} 忍不住縮了一下。",
         ),
         "strong": (
-            "{target} 的腰背繃得緊緊的。",
+            "{target} 的腰背緊繃。",
             "{target} 幾乎要站不住。",
             "{target} 的思緒被攪成一團。",
         ),
@@ -502,7 +502,7 @@ PLEASURE_TARGET_LINES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 
 SEXUAL_COUNTER_ACTOR_LINES = (
     "{actor} 明白自己剛才做了什麼。",
-    "{actor} 把這一刻收進記憶裡。",
+    "{actor} 把這一刻記在心裡。",
     "{actor} 的身上留下了主動的痕跡。",
 )
 
@@ -520,7 +520,7 @@ SEXUAL_COUNTER_LINES: Mapping[str, RoleClause] = MappingProxyType(
         "duo_act_count": RoleClause(
             performer=(
                 "{actor} 記得自己的身體剛才做了什麼。",
-                "{actor} 把這一刻收進了自己的記憶。",
+                "{actor} 記住了這一刻。",
             ),
             participant=(
                 "{target} 與對方的身體一起記住了這一刻。",
@@ -540,7 +540,7 @@ SEXUAL_COUNTER_LINES: Mapping[str, RoleClause] = MappingProxyType(
         "hostile_act_count": RoleClause(
             performer=(
                 "{actor} 知道自己把刀鋒換成了別的手段。",
-                "{actor} 把這一手收進記憶裡。",
+                "{actor} 把這一手記在心裡。",
             ),
             participant=(
                 "{target} 與對手之間多了一筆帳。",
@@ -748,7 +748,7 @@ CONTINUE_MESSAGE = "刀光未歇，下一輪交手已然開始。"
 
 TERMINAL_OUTCOME_MESSAGES: Mapping[str, str] = MappingProxyType(
     {
-        "victory": "最後一擊落下，廝殺聲終於平息——你贏了。",
+        "victory": "最後一擊落下，廝殺聲終於平息，你贏了。",
         "defeat": "你被擊敗了，意識沉入黑暗，許久之後才在原地醒轉。",
         "fled": "你抽身退去，把廝殺聲留在身後。",
         "exam_passed": "考核官的評語落下，你正式跨過了這道門檻。",

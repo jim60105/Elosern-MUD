@@ -14,8 +14,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "concentration",
         action=(
-            "{actor} 收束呼吸，把心神歸到一點——",
-            "{actor} 讓身體記起訓練過千百次的節奏——",
+            "{actor} 收束呼吸，把心神歸到一點。",
+            "{actor} 讓身體記起訓練過千百次的節奏。",
         ),
     ),
 )

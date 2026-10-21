@@ -16,8 +16,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_touch",
         action=(
-            "{actor} 朝那具非人的身軀伸出手——",
-            "{actor} 放慢腳步，把手掌朝那片陌生靠近——",
+            "{actor} 朝那具非人的身軀伸出手。",
+            "{actor} 放慢腳步，把手掌朝那片陌生靠近。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 的掌心還留著那不屬於人的溫度。",),
@@ -29,8 +29,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_caress",
         action=(
-            "{actor} 順著那副陌生軀體的輪廓探去——",
-            "{actor} 的手朝那副從未見過的形狀探去——",
+            "{actor} 順著那副陌生軀體的輪廓探去。",
+            "{actor} 的手朝那副從未見過的形狀探去。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 的指尖被陌生的觸感燙著。",),
@@ -42,8 +42,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_entangle",
         action=(
-            "{actor} 朝纏繞過來的肢體迎上去——",
-            "{actor} 讓自己的身體朝那些肢體靠近——",
+            "{actor} 朝纏繞過來的肢體迎上去。",
+            "{actor} 讓自己的身體朝那些肢體靠近。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 被擠壓得幾乎喘不過氣。",),
@@ -55,8 +55,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_receive",
         action=(
-            "{actor} 敞開身體，朝那副身軀迎去——",
-            "{actor} 不再退開，讓對方朝自己靠近——",
+            "{actor} 敞開身體，朝那副身軀迎去。",
+            "{actor} 不再退開，讓對方朝自己靠近。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 的體內被陌生的形狀撐開。",),
@@ -68,8 +68,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_mating",
         action=(
-            "{actor} 朝那副非人的身體貼近，往深處迎去——",
-            "{actor} 伸手朝那具身軀探去——",
+            "{actor} 朝那副非人的身體貼近，往深處迎去。",
+            "{actor} 伸手朝那具身軀探去。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 被陌生的熱度整個裹住。",),
@@ -81,8 +81,8 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_domination",
         action=(
-            "{actor} 翻身逼近那具身軀，用大腿朝它扣去——",
-            "{actor} 抬高身子，朝那具軀體的上方移去——",
+            "{actor} 翻身逼近那具身軀，用大腿朝它扣去。",
+            "{actor} 抬高身子，朝那具軀體的上方移去。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 的腿在夾緊之中發燙。",),
@@ -94,14 +94,14 @@ ROWS: tuple[NarrationRow, ...] = (
     NarrationRow(
         "interspecies_resonance",
         action=(
-            "{actor} 張開手臂，朝那具身軀迎去——",
-            "{actor} 朝那具身軀靠攏，等著兩邊的律動對上——",
+            "{actor} 張開手臂，朝那具身軀迎去。",
+            "{actor} 朝那具身軀靠攏，等著兩邊的律動對上。",
         ),
         performer_lines={
             "pleasure_gain": ("{actor} 的胸口被陌生的律動帶著走。",),
         },
         participant_lines={
-            "pleasure_gain": ("{target} 的律動慢慢跟上對方的心跳。",),
+            "pleasure_gain": ("{target} 的律動逐漸跟上對方的心跳。",),
         },
     ),
 )
