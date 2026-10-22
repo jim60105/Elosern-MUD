@@ -1,0 +1,41 @@
+# Design
+
+## Context
+
+`MapLattice.vue` records a pan frame in a pre-flush current-node watcher and computes `panOffset` in a post-flush watcher; only lines/nodes join the existing pan groups and the old dot field remains stationary. `lib/map_pan.js` has pure frame conversion/offset functions tested by `tests/map_pan.test.js`. Approved design §6.5 says equal mode/level retains FLIP and changed mode/level crossfades only at effective full motion.
+
+## Goals / Non-Goals
+
+Finish scale-aware island motion and the complete metric acceptance journey. Reuse the existing motion-level resolution and shared motion tokens. No new player setting, broad animation framework, overlay transition redesign or change to instance/interior pan.
+
+## Decisions
+
+Record previous projection mode/level alongside the existing pan frame. For the coordinate-bearing island, unchanged mode/level uses the existing pan path and includes world-anchored dots in the drawing transform. A changed mode OR level skips equal-scale `panOffset`: effective full uses a short opacity crossfade of old/new projected drawing snapshots; reduced/off switches immediately. Reuse token-controlled durations and existing leaving-element inertness so leaving snapshots cannot submit moves or hold focus. Do not animate numeric scale or independently tween node coordinates. Keep level/mode comparison even if current ID does not change but a replacement payload changes exit distances. Do not disturb the existing radial-graph pan path.
+
+Make transition cleanup follow current component lifecycle and existing transition hooks. An interrupted move/replacement must end at the latest committed projection; old leaving layers are pointer-inert/aria-hidden and cannot duplicate named actionable controls. At off/reduced changed scale, no stale outgoing projection may remain through a double animation frame. Dot world anchors after settling must match the projection's own offsets.
+
+Add controlled metric movement stories under `World/LocalMap` for same-scale movement, a ladder boundary and a uniform/compressed switch, covering effective full/reduced/off. Use their actual committed models; no fake renderer. Play functions continue the metric exit-inside/non-overlap assertions after settling. Preserve the original five metric fixture families and unit-coordinate overlay stories.
+
+## Risks / Trade-offs
+
+The existing pre/post watcher logic assumes the previous current node remains drawn. Handle the cross-layer journey through the existing no-shared-frame behavior while applying the approved mode/level decision. Do not synthesize world distance across a gateway. If an inherited general scene-transition contract needs an island-only clarification, preserve unchanged graph/overlay assertions and use matching existing traceability IDs rather than adding unrelated requirements.
+
+## Focused evidence
+
+Extend `web/webclient-app/tests/map_pan.test.js` and focused MapLattice/scene transition tests with mode/level decisions, same-scale dot movement and immediate reduced/off scale replacement. Run each changed Vitest file separately and reuse `SceneTransitionsEvidenceTest` only for assertions its executed files substantiate. Add a focused managed-browser transition method in `web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest` and register it in browser-shards, running only that method. Do not rerun the complete scene transitions/browser suite.
+
+Completion requires agent-browser capture of all five metric `World/LocalMap` fixture stories plus the scale-change stories, inspecting images at the reference desktop size and the existing chrome cap. Then walk south gate → wilderness → back in the real client, using current snapshots and real move controls, recording before/after node IDs, visible exit set, gate labels, scale mode/level and screenshot paths. Verify return action matches the existing gateway descriptor and that dots move on a same-scale street step. Check one unchanged full-map lattice and instance/interior control. Any missing exit, unusable return, clipped required label or reduced/off animated scale change blocks task completion.
+
+## Verification workflow (required during implementation)
+
+Use `World/LocalMap` as the production component showcase and retain `Overlays/MapOverlay` plus the instance/interior stories as unchanged-surface controls. No `Design/...` prototype is needed for this approved algorithmic change; if an existing relevant Design story is used for token/chrome comparison, it cannot replace a production-component story or the real client.
+
+Read the agent-browser skill, start the repository's existing Storybook command (`pnpm run serve-storybook`), navigate to the affected story, take an interactive snapshot, and capture a screenshot with agent-browser. Inspect the actual image for missing exits, clipping, label readability and shape/text mode distinction. Refresh element references after each story or payload change. Record story IDs, viewport, screenshot locations and observed results in the implementation handoff. Automation play assertions do not replace this visual step. The renderer and later changes must also inspect the real client because `.elosern-root` rules in `styles/app-shell.css` can override component styles absent from Storybook.
+
+Run only the smallest focused Python label, Node file, Vitest file or managed-browser method/class that covers the changed assertions, one short batch per command. Python always uses `uv run --locked`; Evennia uses `uv run --locked --env-file=<test-env-file> evennia test --settings test_settings.py --keepdb <label>` with `MUD_TEST_SETTINGS=1` inside that env file. Use the single-token env-file spelling. Run a browser method with `uv run --locked python -m web.tests.browser.unittest_driver <module.Class.test_method>` and capture its output once. No local full suites, shard commands, complete showcase matrix or `spec_traceability verify --evidence`; keep each local command below ten minutes and browser files below five CI minutes.
+
+For every requirement, map the concrete scenario to matching assertions. Obtain literal IDs with `uv run --locked python -m tools.spec_traceability list`; for newly added requirements run that tool on an equivalent spec tree with predecessor and current deltas synchronized, using its documented root option, without prematurely modifying the live main specs. Never hand-construct IDs. Decorate discoverable Python `test_*` methods with `covers_requirement` imported from `tools.spec_traceability`. JS-only behavior needs a focused Python executed-evidence wrapper that actually runs the relevant file and asserts success, reusing existing evidence patterns; a source-presence assertion cannot substitute for execution. Keep existing IDs when titles are unchanged and review their matching assertions after each modified contract. Run `tools.spec_traceability check` while editing and against the synchronized main contract at archive time; a pre-sync pass alone is insufficient.
+
+Add/rename/move any non-browser Python test module only with an exact single-owner update in `.github/evennia-shards.json`. Add every new browser test class or method to `.github/browser-shards.json` in the same feature commit, without overlapping class/method ownership. Reusing an already registered module does not need a fabricated manifest change; record that ownership is unchanged. Run the focused shard-ownership contract if ownership changes, and finish with `uv run --locked python -m tools.contract_gate` and `openspec validate <change> --strict`. Before archive also run the focused `tests.test_evennia_test_optimization_contract` and `tests.test_webclient_frozen_contract` labels as required by AGENTS.md.
+
+No new operational logging is needed for pure projection/render work. Preserve existing boundary observability. Any changed exception/logging path must use named imports from `world.observability`, stable English event IDs and business identifiers in context; patch the caller binding in tests and run `uv run --locked python -m tools.observability_lint check` with the focused tests. Do not add logging imports, silent swallowing, a freeze-list entry or a new telemetry subsystem.
