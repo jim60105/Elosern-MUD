@@ -7,7 +7,7 @@ Terrain, nominal claims and effective control SHALL remain distinct. The deep fo
 
 #### Scenario: Anchor relationships
 - **WHEN** the amended geography is evaluated
-- **THEN** 咆哮王城 at (780,1910) is about 10 km south of the forest edge, 幽月谷村 at (1410,2150) and 永夜迷宮 at (900,2350) lie in deep forest, and all nine anchors and six harbour sites remain on land and reachable
+- **THEN** 咆哮王城 at (780,1910) is about 10 km south of the forest edge, 幽月谷村 at (1410,2150) and 永夜迷宮 at (900,2350) lie in deep forest, and all nine anchors and six harbour sites remain on land and reachable; Altoria remains southwest in hills/river valleys, Valhalla northwest, Grandia eastern productive plains, Ciaran underground on the western flank and Fionnen on the eastern flank
 
 #### Scenario: Nominal claims include previously neutral terrain
 - **WHEN** land on either side of the ridge and border river is classified, including mountain and deep-forest cells
