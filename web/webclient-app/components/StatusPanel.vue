@@ -164,7 +164,9 @@ const fatigueRows = computed(() =>
   flex-wrap: wrap;
   gap: calc(2px * var(--ui-scale)) calc(10px * var(--ui-scale));
   min-width: 0;
-  font-size: calc(11px * var(--ui-scale));
+  /* `--text-xs` is the client's 16px legibility floor: the reserve line is
+     chrome, never the smaller drawn-map type. */
+  font-size: var(--text-xs);
   line-height: 1.35;
   color: var(--paper-100);
   opacity: 0.82;
