@@ -88,6 +88,7 @@ from world.lore.guild import GuildRank
 from world.tests.synthetic_data import make_title
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._knowledge_probes import basic_attack_key, live_fixed_title_registry, live_guild_rank_registry, live_registry
+from world.quests.tests._fixtures import QuestRegistryIsolation
 
 from ._support import (
     T_E_DISPLAY,
@@ -262,3 +263,52 @@ class TitlePlannerTests(EvenniaTest):
         )
         _EVENT_EFFECT_PLANNERS.pop("title", None)
         self.assertNotIn("title", _EVENT_EFFECT_PLANNERS)
+
+
+class TitlePlannerQuestCompletionDiscoveryTests(QuestRegistryIsolation, EvenniaTest):
+    """A finished quest is never rediscovered by an unrelated later action."""
+
+    def setUp(self):
+        _open_title_scope(self)
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="title-quest-discovery")
+        from world.quests.definitions import QuestStage
+        from world.quests.runtime import fulfill_record, to_storage
+        from world.quests.tests._fixtures import accept, defeat, quest, register
+
+        definition = register(
+            quest("t_planner_quest_row", stages=(QuestStage(0, defeat()),))
+        )
+        record = accept(self.actor, definition)
+        # Store the completed record directly: this test targets discovery,
+        # not the writer that settles a completion.
+        self.actor.db.quest_log = [
+            to_storage(fulfill_record(record, definition))
+        ]
+        self.quest_key = definition.key
+        self.row = FixedTitleDef(
+            "t_quest_discovery",
+            "任務成名",
+            TitleCategory.EXPLORE,
+            "你讓一樁委託有了結局。",
+            "完成指定的具名委託即可獲得。",
+            TitlePredicate(
+                family=TitlePredicateFamily.QUEST_COMPLETED,
+                quest_key=self.quest_key,
+            ),
+        )
+
+    @covers_requirement(
+        "title-system::fixed-title-grants-ride-the-triggering-action-s-atomic-transaction"
+    )
+    def test_an_unrelated_action_never_discovers_or_grants_the_completion_title(self):
+        with _patched_fixed_registry({"t_quest_discovery": self.row}):
+            # The pure evaluator stays authoritative for rules consumers.
+            self.assertTrue(
+                predicate_satisfied(self.actor, _event_log(), self.row.predicate)
+            )
+            self.assertEqual(title_event_effect_planner(_Request(self.actor), _event_log()), [])
+        self.assertEqual(
+            read_title_state(self.actor), ([], {"fixed": None, "epithet": None})
+        )
+        self.assertNotIn("t_quest_discovery", banked_fixed_keys(self.actor))
