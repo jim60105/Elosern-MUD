@@ -271,8 +271,11 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
     def test_sleeping_actor_is_refused_with_the_sleep_reason(self):
         from world.rules.clock import get_world_clock
 
-        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         context = self._context()
+        # The forced posture is written after the session opens: an opening
+        # settlement for an all-asleep side resolves the encounter at once, so
+        # the preview must be read against the session it was opened in.
+        write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         before_tick = get_world_clock().tick
         preview = preview_skill(
             self.player, _basic_attack_key(), context, [self.monster]

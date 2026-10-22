@@ -1055,6 +1055,29 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    def test_rule_fatigue_light_penalty(self):
+        # The light stage fires its own penalty row and nothing else: an
+        # unstaged body carries no modifier at all.
+        entity = self._entity()
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+        rule = RULES["fatigue_light_penalty"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
+    def test_rule_fatigue_moderate_penalty(self):
+        entity = self._entity()
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+        rule = RULES["fatigue_moderate_penalty"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
+    def test_rule_fatigue_severe_penalty(self):
+        entity = self._entity()
+        self.assertEqual(evaluate_combat_modifiers(entity), {})
+        rule = RULES["fatigue_severe_penalty"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()

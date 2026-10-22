@@ -227,9 +227,9 @@ class RulesConsoleTests(ConsoleOwnerTest):
         before = read_world_clock().tick
         original = clock._run_stages
         seen = []
-        def stages(driver,seconds,source,entities):
+        def stages(driver,seconds,source,entities,**kwargs):
             seen.append((source,{entity.pk for entity in entities}))
-            return original(driver,seconds,source,entities)
+            return original(driver,seconds,source,entities,**kwargs)
         with mock.patch.object(clock,'_run_stages',side_effect=stages):
             gm.advance_clock(0)
             gm.advance_clock(2)
@@ -242,7 +242,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         for seconds in (-1,True,1.5,'3',MAX_ADVANCE_SECONDS+1):
             self.assert_refusal('invalid_argument',lambda:gm.advance_clock(seconds))
         attrs = snapshot_traits(self.player)
-        def fail(driver,seconds,source,entities):
+        def fail(driver,seconds,source,entities,**kwargs):
             self.player.traits.hp.current=0
             raise RuntimeError('later stage')
         with mock.patch.object(clock,'_run_stages',side_effect=fail):
