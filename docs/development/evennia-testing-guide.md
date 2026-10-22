@@ -789,6 +789,14 @@ Django 的 `TestCase` 會使用 transaction rollback 回復 database。`Transact
 
 如果測試本身就是驗證 transaction semantics，才應使用 `TransactionTestCase`。
 
+若測試的目的是證明「commit 後的持久狀態可由全新實例讀出」，除了改用
+`TransactionTestCase`，還必須在讀取前同時強制清除 `ObjectDB` 與 `Attribute`
+兩個 idmapper cache，再透過 typeclass manager 重新載入物件；只呼叫
+`attributes.reset_cache()` 或沿用寫入端的 handler 都不足以證明資料來自儲存。
+既有先例是 `EquipmentGrowthCommittedReloadTests`、`DurableRoundAdmissionTests`
+與 `TitleNominationCommittedReloadTests`。這類探針應保持窄小，僅覆蓋
+transaction／reload 語意，不作為一般整合測試的預設樣板。
+
 ### 不要依賴固定 primary key
 
 避免：
