@@ -140,6 +140,9 @@ class CompletionTitleSettlementTests(
     @covers_requirement(
         "title-system::award-evidence-finalizes-atomically-and-survives-replay"
     )
+    @covers_requirement(
+        "title-system::quest-completion-awards-use-completion-occurrence-attribution"
+    )
     def test_completion_finalizes_every_grant_before_the_immutable_fact(self):
         # Warm both caches first: the settlement must write through the same
         # attributes the post-commit read sees.
@@ -179,6 +182,9 @@ class CompletionTitleSettlementTests(
 
     @covers_requirement(
         "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
+    )
+    @covers_requirement(
+        "title-system::quest-completion-awards-use-completion-occurrence-attribution"
     )
     def test_a_new_occurrence_meeting_owned_titles_grants_nothing(self):
         self._complete(self.record)
@@ -286,6 +292,9 @@ class CompletionTitleSuppressionScopeTests(
 
     @covers_requirement(
         "title-system::immediate-source-suppression-uses-automatic-award-results"
+    )
+    @covers_requirement(
+        "title-system::quest-completion-awards-use-completion-occurrence-attribution"
     )
     def test_another_recipient_s_award_does_not_suppress_the_player(self):
         from server import title_nomination_service as service
@@ -871,6 +880,9 @@ class CompletionTitleNominationTests(
     )
     @covers_requirement(
         "title-system::immediate-source-suppression-uses-automatic-award-results"
+    )
+    @covers_requirement(
+        "title-system::quest-completion-awards-use-completion-occurrence-attribution"
     )
     def test_the_committed_envelope_suppresses_its_own_trigger(self):
         source_id = self._complete()

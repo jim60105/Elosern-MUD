@@ -88,7 +88,7 @@ Define deterministic title storage, the fixed-title lore registry, transactional
 - **THEN** they validate against the codex `category` vocabulary extended with the 聖職 (`clergy`) member, exactly as the guild rows validate against the guild-rank face
 
 ### Requirement: Fixed-title grants ride the triggering action's atomic transaction
-A registered event-effect planner SHALL evaluate pending predicates against the step-7 EventLog (non-EventLog faces read through the existing shared read helpers) and stage fixed-title grants as `PendingEffect` values committed inside the triggering action's own transaction; collection membership short-circuits re-grants, so a staged-then-rolled-back grant re-applies naturally when its events next appear and nothing can be written twice.
+An event-effect planner SHALL evaluate pending predicates against the step-7 EventLog (non-EventLog faces read via shared helpers) and stage fixed-title grants as `PendingEffect` values in the action's transaction; membership short-circuits re-grants, so a rolled-back grant re-applies when its events recur and nothing is written twice. Quest-completed predicates SHALL be excluded from action-time discovery and settle in the completing quest owner through the unified automatic award entry point.
 
 #### Scenario: A predicate-satisfying kill grants inside the same commit
 - **WHEN** an action commits an EventLog satisfying a `first_kill_tier` predicate
@@ -101,6 +101,10 @@ A registered event-effect planner SHALL evaluate pending predicates against the 
 #### Scenario: A live grant pushes one notification
 - **WHEN** a fixed-title grant commits successfully on a live session
 - **THEN** one OOB notification (「獲得稱號：屠龍者」) is pushed
+
+#### Scenario: Quest completion awards do not wait for a later action
+- **WHEN** a newly completed quest satisfies a synthetic registered quest-completed title predicate
+- **THEN** the completion settlement grants and attributes that title before its fact commits; an unrelated later skill action does not rediscover the completion under its own source
 
 ### Requirement: Guild registration and rank promotion grant paired titles atomically
 Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing `world/rules/guild.py::register_adventurer` transaction SHALL grant the F-rank title (「F級冒險者」) in one commit, with no planner or LLM involvement. Exam promotions SHALL grant the new rank's title inside `settle_exam_outcome`'s promotion transaction; a rolled-back promotion removes it.
@@ -469,7 +473,7 @@ All automatic built-in-title awards SHALL use one deterministic award contract r
 - **THEN** no automatic built-in-title award result is emitted
 
 ### Requirement: Award evidence finalizes atomically and survives replay
-Title writes, automatic award results and source evidence SHALL share the source settlement transaction. Award results SHALL be finalized before immutable event persistence. Replaying a committed occurrence SHALL retain its original grant results and SHALL NOT replace them with an empty replay result.
+Title writes, automatic award results and source evidence SHALL share the source settlement transaction, including when a nested completion owner writes inside an outer purchase, delivery, action or reward transaction. Award results SHALL be finalized before immutable event persistence. Replaying a committed occurrence SHALL retain its original grant results and SHALL NOT replace them with an empty replay result.
 
 #### Scenario: Rollback after writes
 - **WHEN** a fault follows gameplay, title, award and narrative writes before outer commit
@@ -478,6 +482,18 @@ Title writes, automatic award results and source evidence SHALL share the source
 #### Scenario: Replay keeps suppression evidence
 - **WHEN** the same committed source settles again after its title is already owned
 - **THEN** one source remains and its original nonempty award results are returned unchanged
+
+#### Scenario: Completion grants finalize before the event
+- **WHEN** one committed quest completion newly grants several synthetic built-in titles
+- **THEN** all results use that completion source, are present when the immutable fact is first committed, and suppress its immediate player notification through the generic award contract
+
+#### Scenario: Outer completion owner fails after the inner writer
+- **WHEN** purchase, delivery, action or automatic-chain settlement fails after completion title and evidence writes but before outer commit
+- **THEN** gameplay, title collection and equipped state, award evidence, events and pending projection work restore in durable storage and warmed caches
+
+#### Scenario: Replay preserves original completion awards
+- **WHEN** a committed completion with nonempty awards is replayed after those titles are already owned
+- **THEN** its original immutable results are returned without new grants, additional evidence or loss of source suppression
 
 ### Requirement: Recent deeds use a frozen inclusive two-day world window
 An admitted request SHALL freeze world tick T and select committed deeds from max(0, T minus two canonical world days) through T inclusive. Future records SHALL be excluded. Selection SHALL NOT consume deeds or resize the window with fatigue balance. Time filtering SHALL precede aggregation.
@@ -692,3 +708,18 @@ Authorized adult effects, transitions, counter changes and resistance outcomes S
 #### Scenario: Attached milestone is not a separate action boundary
 - **WHEN** consecutive matching action occurrences have a milestone attached to the first action and no independent intervening occurrence
 - **THEN** compression retains both actions and the milestone with count two and all supporting sources
+
+### Requirement: Quest completion awards use completion occurrence attribution
+Quest-completed built-in-title grants SHALL use the completion occurrence source and the unified automatic award contract within that settlement. Existing ownership SHALL produce no new grant for a new occurrence. Recipient-specific immediate suppression SHALL require no event-type exception. The starter epithet SHALL remain attributed to its separate reward claim.
+
+#### Scenario: Synthetic future completion title uses the unchanged service
+- **WHEN** a synthetic new quest-completed title is registered and real quest completion sends its normal notification
+- **THEN** the nominated recipient is suppressed without service changes and the deed remains usable at later wake or logout
+
+#### Scenario: Other recipients and old ownership do not suppress
+- **WHEN** only another recipient gains a title or a new completion merely encounters a title the player already owns
+- **THEN** that completion is not suppressed by the player's award-result rule
+
+#### Scenario: First reward claim retains its own source
+- **WHEN** a completed quest is later claimed for its first guild reward
+- **THEN** the authored starter epithet is awarded under the reward claim rather than retroactively patched into the completion fact

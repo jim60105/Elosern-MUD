@@ -147,6 +147,9 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
         )
         _register_board_offer("introductory_hunt")
 
+    @covers_requirement(
+        "title-system::quest-completion-awards-use-completion-occurrence-attribution"
+    )
     def test_register_list_accept_turnin_flow(self):
         self.call(CmdGuildRegister(), "", "你已註冊為冒險者")
         self.call(CmdGuildList(), "", "任務板")
