@@ -261,6 +261,9 @@ class PurchaseCompletionBoundaryTests(
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
     )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
+    )
     def test_purchase_plan_notifies_nothing_before_the_transaction_opens(self):
         # ``buy`` computes exactly this replacement before it opens its atomic
         # block; predicting the completion must stay side-effect free.
@@ -275,6 +278,9 @@ class PurchaseCompletionBoundaryTests(
 
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
     )
     def test_first_purchase_completion_is_admitted_only_after_commit(self):
         with self._open_clock():
@@ -299,6 +305,9 @@ class PurchaseCompletionBoundaryTests(
 
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
     )
     def test_late_purchase_failure_discards_evidence_and_notification(self):
         # The injected fault lands AFTER ``apply_quest_log_delta`` recorded the
@@ -565,6 +574,9 @@ class CompletionReplayTests(
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
     )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
+    )
     def test_unchanged_terminal_replacement_is_inert(self):
         completed = self._complete_once()
         self.assertEqual(len(self.receipts), 1)
@@ -577,6 +589,9 @@ class CompletionReplayTests(
 
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
     )
     def test_replayed_completion_notification_is_inert(self):
         # The durable fact already exists for this source identity: the writer
@@ -696,6 +711,9 @@ class CompletionOuterOwnerTests(
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
     )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
+    )
     def test_inner_completion_waits_for_the_outer_commit(self):
         plan = plan_inventory_delta(self.player, additions=(_T_BOUGHT,))
         self.assertIsNotNone(plan.acquire)
@@ -715,6 +733,9 @@ class CompletionOuterOwnerTests(
 
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
     )
     def test_outer_rollback_discards_the_pending_completion(self):
         plan = plan_inventory_delta(self.player, additions=(_T_BOUGHT,))
@@ -763,6 +784,9 @@ class CompletionNominationEnvelopeTests(
 
     @covers_requirement(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    @covers_requirement(
+        "title-system::quest-nomination-observes-the-committed-completion-owner"
     )
     def test_committed_envelope_drives_the_nomination_service(self):
         with patch.object(self.service, "schedule_epithet_nomination") as schedule:

@@ -34,7 +34,7 @@ Pending derived work SHALL survive interruption and be rediscoverable without a 
 - **THEN** their durable source identities remain distinct
 
 ### Requirement: Completed quest and passed examination facts are durable
-Committed quest completion and passed guild examinations SHALL produce source-keyed deterministic facts with actual outcomes. Quest facts SHALL identify the quest and completed objective. Examination facts SHALL identify the examination and attained rank. Acceptance and partial progress SHALL NOT establish completion.
+Committed quest completion and passed guild examinations SHALL produce source-keyed deterministic facts with actual outcomes. Quest facts SHALL identify the quest and completed objective, including its destination and relevant bound identities with readable roles and required relation. Examination facts SHALL identify the examination and attained rank. Acceptance and partial progress SHALL NOT establish completion. Completion evidence SHALL be finalized before terminal bindings are cleared.
 
 #### Scenario: Only actual completion
 - **WHEN** a quest is accepted, partially progressed and then completed
@@ -47,6 +47,18 @@ Committed quest completion and passed guild examinations SHALL produce source-ke
 #### Scenario: Producer failure aborts settlement
 - **WHEN** a required fact write fails inside quest or exam settlement
 - **THEN** the source gameplay and associated titles roll back with no committed fact
+
+#### Scenario: Completed objective survives terminal binding cleanup
+- **WHEN** a reach, delivery or escort objective completes and its runtime bindings are cleared
+- **THEN** the immutable completion fact retains its actual destination and relevant bound target or participant identities, readable roles and required relation from the satisfied objective
+
+#### Scenario: Automatic completion chains preserve each result
+- **WHEN** one real inventory or reward settlement completes multiple quest stages or quests in an automatic chain
+- **THEN** only actual completed quests produce facts and each completion retains its own pre-cleanup objective/result snapshot
+
+#### Scenario: Discarded completion plan has no effects
+- **WHEN** an inventory, delivery, arrival or action plan predicts completion but is discarded or rejected before its owner writes
+- **THEN** no completion fact, completion notification or nomination request is produced
 
 ### Requirement: Completed combat evidence preserves the actual encounter outcome
 Completed combat facts SHALL summarize actual victory, defeat or escape with durable participants, opponents and encounter mode. Nonlethal examination outcomes SHALL NOT become lethal victories. Replayed terminal settlement SHALL NOT duplicate occurrences. Existing protection consumers SHALL remain unchanged.
