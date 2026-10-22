@@ -915,9 +915,9 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
     def test_overwhelm_round_records_its_own_internal_round_identity(self):
         harness = self._harness()
         # A genuinely decided encounter: the monster's team overwhelmingly
-        # out-powers the party, which is exactly when compression is authorized
-        # to run, while the party can absorb the monster's offense long enough
-        # that the encounter really spans its three internal rounds.
+        # out-powers the party (100.9x against the threshold of 100, and the
+        # classifier's own estimate is 4.2 rounds inside its five-round budget),
+        # which is exactly when compression is authorized to run.
         player, monster, battlefield = self._field(
             harness, player_hp=400, monster_hp=6000
         )
@@ -940,12 +940,26 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
                 trace=traces,
             )
 
-        resolve_overwhelm(
-            battlefield,
-            provider,
-            max_rounds=3,
-            decision_scope_base=ExecutionScopeBase(session_id="smoke:ovw", round_index=1),
-        )
+        # The round identities are the subject; who wins is not. Combat dice
+        # are the process-wide stream, so its position is not this test's to
+        # know: the party's 400 hp is two lucky blows away from a wipe, and a
+        # wipe ends the encounter before the third identity is recorded (that
+        # is how it failed once the stream shifted). Every roll coming up 1
+        # cannot clear the to-hit threshold in either direction, so the
+        # encounter spans all three bounded rounds every time.
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+        ):
+            resolve_overwhelm(
+                battlefield,
+                provider,
+                max_rounds=3,
+                decision_scope_base=ExecutionScopeBase(
+                    session_id="smoke:ovw", round_index=1
+                ),
+            )
         self.assertTrue(seen and traces)
         for scope in seen:
             self.assertEqual(scope.session_id, "smoke:ovw")
