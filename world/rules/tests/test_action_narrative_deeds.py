@@ -1117,6 +1117,61 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
     )
+    def test_actor_named_key_never_joins_a_committed_log_recipient(self):
+        """Scenario: Untouched recipient is excluded.
+
+        WHEN the acting entity and one submitted target share a display key
+        THEN an entry naming that key (the actor's own self-effect) is not
+        evidence that the untouched target took part.
+        """
+        import world.narrative.action_adapters as adapter_module
+        from world.rules.event_log import EventEntry, EventLog
+
+        self.actor.key = "EffectTarget"
+        log = EventLog(
+            actor=str(self.actor.pk),
+            skill_key=_T_SELF_BUFF_SKILL.key,
+            targets=(self.target.key,),
+            entries=(
+                EventEntry(
+                    kind="self_buff_applied",
+                    actor=str(self.actor.pk),
+                    target=self.actor.key,
+                    data={"buff_key": _T_DEED_WARD.key},
+                    text_template="{done}",
+                ),
+            ),
+            time_cost_seconds=0,
+        )
+        request = ActionRequest(
+            self.actor,
+            _T_SELF_BUFF_SKILL.key,
+            [self.target],
+            self.context,
+            source_id="occurrence:entry_actor_key:1",
+        )
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {_T_SELF_BUFF_SKILL.key: _T_SELF_BUFF_SKILL},
+        ):
+            adapter_module.record_action_settlement_evidence(
+                request, log, (), {}, tick=7
+            )
+
+        event = NarrativeEvent.objects.filter(
+            source_id="occurrence:entry_actor_key:1"
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.content["recipients"], [])
+        self.assertEqual(event.participants, [str(self.actor.pk)])
+        self.assertEqual(
+            [row["target_id"] for row in event.content["effects"]],
+            [str(self.actor.pk)],
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
     def test_repeated_gains_are_stated_once_as_the_committed_change(self):
         """Scenario: Actual bounded effect remains actual.
 

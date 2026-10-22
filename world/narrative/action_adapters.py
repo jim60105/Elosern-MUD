@@ -837,6 +837,9 @@ def record_action_settlement_evidence(
         submitted_keys = [
             str(getattr(target, "key", "") or "") for target in submitted_targets
         ]
+        # The actor is a candidate too: an entry naming the actor's own key must
+        # never read as evidence that a same-named submitted target took part.
+        all_keys = [str(getattr(actor, "key", "") or ""), *submitted_keys]
         entry_targets = {
             str(getattr(entry, "target", "") or "") for entry in event_log.entries
         }
@@ -845,7 +848,7 @@ def record_action_settlement_evidence(
             t_pk = _durable_pk(target)
             if (
                 not t_key
-                or submitted_keys.count(t_key) != 1
+                or all_keys.count(t_key) != 1
                 or t_key not in entry_targets
                 or t_pk in seen_target_pks
                 or t_pk == actor_pk
