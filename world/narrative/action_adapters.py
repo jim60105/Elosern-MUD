@@ -52,16 +52,20 @@ Payload contracts:
    - buffs_cleansed: count
 
    A `damage` result exists only for a hit: the canonical parser emits a roll
-   entry alone for a miss, so a mistarget or a miss is never evidence of a
-   committed effect. A `pleasure_gain` amount is the recipient's committed
-   gauge change observed against the pre-settlement snapshot — the bounded
-   gauge is the one staged amount production applies through a cap — never the
-   requested magnitude.
+   entry alone for a miss, so a miss is never evidence of a committed effect.
+   The bounded families (`pleasure_gain`, `gauge_transfer`, `buffs_cleansed`)
+   are applied through a cap or a reselection, so their staged magnitude is
+   only a request: the record states the recipient's committed movement between
+   the pre-settlement snapshot and its state after the action applied — one
+   value per recipient for the whole action, never the requested magnitude and
+   never a repeat of the same movement per staged component.
 """
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+from django.db import transaction
 
 from world.observability import log_info
 from world.rules.event_log import EventLog
@@ -89,21 +93,39 @@ _SETTLED_EFFECT_RESULTS: dict[str, tuple[tuple[str, type], ...]] = {
 #: entry naming any target is still the actor's own result.
 _SELF_BOUND_EFFECT_KINDS = frozenset({"self_heal", "self_buff_applied"})
 
-#: Bounded gauge gain kinds whose staged amount is the requested magnitude, and
-#: the pre-settlement snapshot field carrying the value they started from.
-_BOUNDED_GAUGE_SNAPSHOT_FIELD = {"pleasure_gain": "pleasure_value"}
+#: Bounded result families whose staged magnitude is a request: their committed
+#: value is observed from the recipient's own state after every effect applied.
+_BOUNDED_RESULT_KINDS = frozenset(
+    {"pleasure_gain", "gauge_transfer", "buffs_cleansed"}
+)
+
+
+@dataclass(frozen=True)
+class SettlementGauges:
+    """One entity's pre-settlement bounded gauges and active buff keys."""
+
+    hp: int | None
+    mp: int | None
+    sp: int | None
+    pleasure: int | None
+    buff_keys: frozenset[str] | None
 
 
 @dataclass(frozen=True)
 class MilestoneSnapshot:
-    """Snapshot of milestone-relevant sexual state taken before settlement."""
+    """Pre-settlement state the settlement evidence reads back afterwards.
+
+    The sexual fields are the milestone comparison basis; ``gauges`` carries the
+    bounded values whose committed change the same record must state instead of
+    the staged magnitude.
+    """
 
     experience_types: frozenset[str]
     unlocked_act_keys: frozenset[str]
     virgin: bool
     climax_count: int
     climax_phase: str
-    pleasure_value: int | None
+    gauges: SettlementGauges | None
 
 
 def _durable_pk(entity: Any) -> str:
@@ -121,7 +143,7 @@ def _durable_pk(entity: Any) -> str:
 
 
 def capture_milestone_snapshot(entity: Any) -> MilestoneSnapshot | None:
-    """Capture milestone-relevant sexual state for an entity before mutation."""
+    """Capture milestone-relevant sexual state and bounded gauges before mutation."""
     sexual = getattr(entity, "sexual", None)
     if sexual is None:
         return None
@@ -135,7 +157,13 @@ def capture_milestone_snapshot(entity: Any) -> MilestoneSnapshot | None:
             virgin=bool(sexual.virgin),
             climax_count=int(sexual.climax_count),
             climax_phase=str(current_phase),
-            pleasure_value=_stored_pleasure_value(entity),
+            gauges=SettlementGauges(
+                hp=_stored_gauge_value(entity, "hp"),
+                mp=_stored_gauge_value(entity, "mp"),
+                sp=_stored_gauge_value(entity, "sp"),
+                pleasure=_stored_pleasure_value(entity),
+                buff_keys=_active_buff_keys(entity),
+            ),
         )
     except (AttributeError, TypeError, ValueError):  # observability: ignore R2: a non-character or uninitialized entity without full sexual fields has no milestone surface to capture; the entry's own writes are the report
         # A non-character or uninitialized entity without full sexual fields
@@ -157,9 +185,26 @@ def _stored_pleasure_value(entity: Any) -> int | None:
         return None
 
 
-#: Post-settlement readers for the bounded gauge gains above, read through the
-#: same surface their snapshot captured.
-_BOUNDED_GAUGE_READERS = {"pleasure_gain": _stored_pleasure_value}
+def _stored_gauge_value(entity: Any, key: str) -> int | None:
+    """Read one entity's stored resource gauge without advancing it."""
+    from world.rules.action.gates import stored_gauge_pair
+
+    try:
+        current, _maximum = stored_gauge_pair(entity, key)
+    except (AttributeError, KeyError, TypeError, ValueError):  # observability: ignore R2: an entity without that gauge has no committed change to state; the record keeps the staged magnitude
+        return None
+    return int(current)
+
+
+def _active_buff_keys(entity: Any) -> frozenset[str] | None:
+    """Read one entity's active buff keys, or ``None`` when unreadable."""
+    handler = getattr(entity, "buffs", None)
+    if handler is None:
+        return None
+    try:
+        return frozenset(str(key) for key in handler.all)
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: an unreadable buff mount only disables the observed removal count; the record keeps the staged count
+        return None
 
 
 def detect_new_milestones(entity: Any, before: MilestoneSnapshot | None) -> list[dict[str, Any]]:
@@ -494,34 +539,161 @@ def _settled_effect_record(
     }
 
 
-def _committed_gauge_gain(
+def _observe_bounded_result(
+    observations: dict[tuple[str, str, str], dict[str, Any]],
     entity: Any,
     kind: str,
-    requested: int,
-    milestone_snapshots: Mapping[int, MilestoneSnapshot],
-) -> int:
-    """Return the recipient's committed bounded-gauge change for one gain.
+    target_id: str,
+    target_name: str,
+    staged: Mapping[str, Any],
+) -> None:
+    """Collect one bounded result family for committed observation.
 
-    The staged pleasure amount is the requested magnitude; the committed change
-    is what the recipient's gauge actually holds after the action applied. It is
-    observed once per recipient for the whole action (several staged gains sum
-    into one committed change) and stated as the recipient's actual result. A
-    recipient without a readable pre-settlement snapshot falls back to the
-    requested amount, which is the only committed value left to state.
+    Several staged components can describe the same bounded result (repeated
+    gains, a second cleanse). They are one committed outcome for that
+    recipient, so only the first staged record is kept and the recipient's own
+    state decides the committed value once every effect has applied.
     """
-    reader = _BOUNDED_GAUGE_READERS.get(kind)
-    if reader is None:
-        return requested
-    snapshot = milestone_snapshots.get(id(entity))
-    before = (
-        getattr(snapshot, _BOUNDED_GAUGE_SNAPSHOT_FIELD[kind], None)
-        if snapshot is not None
-        else None
+    family = str(staged.get("gauge", "")) if kind == "gauge_transfer" else ""
+    key = (target_id, kind, family)
+    if key not in observations:
+        observations[key] = {
+            "kind": kind,
+            "entity": entity,
+            "target_id": target_id,
+            "target_name": target_name,
+            "staged": dict(staged),
+        }
+
+
+def _committed_bounded_result(
+    kind: str,
+    entity: Any,
+    staged: Mapping[str, Any],
+    milestone_snapshots: Mapping[int, MilestoneSnapshot],
+) -> dict[str, Any]:
+    """State one bounded result as the committed value, not the staged request.
+
+    A bounded gauge or removal count is applied through a cap or a reselection,
+    so the staged magnitude is only a request. The committed value is the
+    recipient's own movement between the pre-settlement snapshot and its state
+    after the action applied — observed once for the whole action, never per
+    staged component. Without a readable snapshot the staged value is the only
+    committed value left to state.
+    """
+    snapshot = milestone_snapshots.get(id(entity)) if entity is not None else None
+    gauges = snapshot.gauges if snapshot is not None else None
+    if gauges is None:
+        return dict(staged)
+    if kind == "pleasure_gain":
+        after_pleasure = _stored_pleasure_value(entity)
+        if gauges.pleasure is None or after_pleasure is None:
+            return dict(staged)
+        return {"amount": max(0, after_pleasure - gauges.pleasure)}
+    if kind == "gauge_transfer":
+        gauge = str(staged.get("gauge", "mp"))
+        before = getattr(gauges, gauge, None)
+        after = _stored_gauge_value(entity, gauge)
+        if before is None or after is None:
+            return dict(staged)
+        movement = after - before
+        committed = (
+            max(0, movement)
+            if staged.get("direction") == "restore"
+            else max(0, -movement)
+        )
+        return {
+            "gauge": gauge,
+            "direction": str(staged.get("direction", "drain")),
+            "amount": committed,
+        }
+    if kind == "buffs_cleansed":
+        after_keys = _active_buff_keys(entity)
+        if gauges.buff_keys is None or after_keys is None:
+            return dict(staged)
+        return {"count": len(gauges.buff_keys - after_keys)}
+    return dict(staged)
+
+
+def _report_normalized_result(
+    *,
+    source_id: str,
+    event_type: str,
+    kind: str,
+    target_id: str,
+    staged: Mapping[str, Any],
+    committed: Mapping[str, Any],
+) -> None:
+    """Report one repaired committed result after the enclosing commit.
+
+    A bounded result whose committed value differs from the staged request is
+    reported with identifiers and numbers only, never the staged payload. The
+    event rides the outer durable commit, so a rolled-back settlement leaves no
+    repair line behind.
+    """
+    context: dict[str, Any] = {
+        "source_id": source_id,
+        "event_type": event_type,
+        "kind": kind,
+        "target_id": target_id,
+    }
+    for field, value in committed.items():
+        context[field] = value
+    for field in ("amount", "count"):
+        if field in staged:
+            context[f"staged_{field}"] = staged[field]
+    transaction.on_commit(
+        lambda: log_info("action_deed_evidence_normalized", context=context)
     )
-    after = reader(entity)
-    if before is None or after is None:
-        return requested
-    return max(0, after - before)
+
+
+def _pending_resistance_values(
+    values: Sequence[str],
+    *,
+    source: str,
+) -> tuple[bool, bool, int | None]:
+    """Read one staged resistance verdict's required fields.
+
+    ``"none"`` is the canonical absent-roll sentinel staged by
+    ``action.gates._resist_pending_effect`` and parsed by ``action.event_log``:
+    an auto-complied verdict never rolls, so an absent roll is a normal result
+    rather than a parse failure. Anything else that is not a two-flag verdict
+    fails its source transaction.
+    """
+    if len(values) != 3:
+        raise ValueError(f"malformed resistance evidence in {source}")
+    try:
+        resisted_flag = int(values[0])
+        auto_comply_flag = int(values[1])
+        roll = None if values[2] == "none" else int(values[2])
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"malformed resistance evidence in {source}") from error
+    if resisted_flag not in (0, 1) or auto_comply_flag not in (0, 1):
+        raise ValueError(f"malformed resistance evidence in {source}")
+    return bool(resisted_flag), bool(auto_comply_flag), roll
+
+
+def _entry_resistance_values(
+    data: Mapping[str, Any],
+    *,
+    source: str,
+) -> tuple[bool, bool, int | None]:
+    """Read one committed resistance verdict's required fields.
+
+    A verdict with no outcome at all must never be read as an affirmative
+    non-resistance result, so the committed form demands exactly the three
+    fields the canonical parser writes.
+    """
+    if not {"resisted", "auto_comply", "roll"} <= set(data):
+        raise ValueError(f"malformed resistance evidence in {source}")
+    resisted = data["resisted"]
+    auto_comply = data["auto_comply"]
+    roll = data["roll"]
+    if not isinstance(resisted, bool) or not isinstance(auto_comply, bool):
+        raise ValueError(f"malformed resistance evidence in {source}")
+    if roll is not None and (isinstance(roll, bool) or not isinstance(roll, int)):
+        raise ValueError(f"malformed resistance evidence in {source}")
+    return resisted, auto_comply, roll
 
 
 def _unique_key_index(entities: Sequence[Any]) -> dict[str, str]:
@@ -649,21 +821,43 @@ def record_action_settlement_evidence(
                 "role": "recipient",
             })
 
-    # If delivered_targets was empty but targets were in event_log (e.g. synthetic test call)
-    if not actual_recipient_records and isinstance(getattr(request, "targets", None), list):
-        for t in request.targets:
-            t_pk = _durable_pk(t)
-            t_key = str(getattr(t, "key", ""))
-            # check if mentioned in event_log
-            if any(str(getattr(e, "target", "")) in {t_key, t_pk} for e in event_log.entries):
-                if t_pk not in seen_target_pks and t_pk != actor_pk:
-                    seen_target_pks.add(t_pk)
-                    actual_target_entities.append(t)
-                    actual_recipient_records.append({
-                        "id": t_pk,
-                        "name": t_key,
-                        "role": "recipient",
-                    })
+    # A caller that supplies no staged effects and no delivery identities (the
+    # synthetic, committed-log-only form) can still name a recipient through the
+    # committed entries. Display keys are not identifiers, so attribution
+    # follows only a submitted target whose own key is unique among the
+    # candidates: a shared name must never imply participation. Production
+    # always passes its staged effects, so it never enters this path.
+    submitted_targets = getattr(request, "targets", None)
+    if (
+        not pending_effects
+        and not actual_recipient_records
+        and isinstance(submitted_targets, list)
+        and submitted_targets
+    ):
+        submitted_keys = [
+            str(getattr(target, "key", "") or "") for target in submitted_targets
+        ]
+        entry_targets = {
+            str(getattr(entry, "target", "") or "") for entry in event_log.entries
+        }
+        for target in submitted_targets:
+            t_key = str(getattr(target, "key", "") or "")
+            t_pk = _durable_pk(target)
+            if (
+                not t_key
+                or submitted_keys.count(t_key) != 1
+                or t_key not in entry_targets
+                or t_pk in seen_target_pks
+                or t_pk == actor_pk
+            ):
+                continue
+            seen_target_pks.add(t_pk)
+            actual_target_entities.append(target)
+            actual_recipient_records.append({
+                "id": t_pk,
+                "name": t_key,
+                "role": "recipient",
+            })
 
     # Participants list: actual actor and actual recipients only
     participants = [actor_pk] + [r["id"] for r in actual_recipient_records if r["id"] != actor_pk]
@@ -679,16 +873,16 @@ def record_action_settlement_evidence(
     # Read settled results through the one admitted-result normalizer. Both
     # accepted input forms — the staged pending effects production passes and
     # the committed event log — converge here, so a kind one form recognizes is
-    # never dropped by the other.
+    # never dropped by the other and neither form states a different result.
     effects_data: list[dict[str, Any]] = []
     resist_entries: list[dict[str, Any]] = []
     transition_entries: list[dict[str, Any]] = []
     counter_entries: list[dict[str, Any]] = []
 
-    # Recipients of a bounded gauge gain, in first-appearance order. The staged
-    # amount is the requested magnitude, so each recipient's committed change
-    # is observed once for the whole action after every effect has applied.
-    gauge_gains: dict[int, dict[str, Any]] = {}
+    # Bounded result families, collected per recipient: their staged magnitude
+    # is a request, so the committed value is observed once for the whole action
+    # after every effect has applied.
+    observations: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     if pending_effects:
         for eff in pending_effects:
@@ -701,49 +895,39 @@ def record_action_settlement_evidence(
             values = parts[2:]
             source = f"{kind}:{eff_pk}"
             if kind == "sexual_resist":
-                if len(values) != 3:
-                    raise ValueError(f"malformed resistance evidence in {source}")
-                # "none" is the canonical absent-roll sentinel staged by
-                # ``action.gates._resist_pending_effect`` and parsed by
-                # ``action.event_log``; auto-complied verdicts never roll, so
-                # an absent roll is a normal result, never a parse failure.
+                resisted, auto_comply, roll = _pending_resistance_values(
+                    values, source=source
+                )
                 resist_entries.append(_resistance_record(
-                    actor_pk,
-                    eff_pk,
-                    eff_name,
-                    resisted=bool(int(values[0])),
-                    auto_comply=bool(int(values[1])),
-                    roll=None if values[2] == "none" else int(values[2]),
+                    actor_pk, eff_pk, eff_name,
+                    resisted=resisted, auto_comply=auto_comply, roll=roll,
                 ))
             elif kind == "sexual_transition":
                 if len(values) != 1:
                     raise ValueError(f"malformed transition evidence in {source}")
-                transition_entries.append(
-                    _transition_record(eff_pk, eff_name, values[0])
-                )
+                transition_entries.append(_transition_record(
+                    eff_pk,
+                    eff_name,
+                    _required_text(values[0], "transition result", source=source),
+                ))
             elif kind == "sexual_counter":
                 if len(values) != 1:
                     raise ValueError(f"malformed counter evidence in {source}")
-                counter_entries.append(_counter_record(eff_pk, eff_name, values[0]))
+                counter_entries.append(_counter_record(
+                    eff_pk,
+                    eff_name,
+                    _required_text(values[0], "counter result", source=source),
+                ))
             elif kind in _SETTLED_EFFECT_RESULTS:
                 result = _settled_result_from_values(kind, values, source=source)
                 if result is None:
                     # A damage miss commits no effect, exactly as the canonical
                     # parser emits no damage entry for it.
                     continue
-                if kind in _BOUNDED_GAUGE_SNAPSHOT_FIELD:
-                    identity = id(eff_entity)
-                    gain = gauge_gains.get(identity)
-                    if gain is None:
-                        gauge_gains[identity] = {
-                            "kind": kind,
-                            "entity": eff_entity,
-                            "target_id": eff_pk,
-                            "target_name": eff_name,
-                            "requested": int(result["amount"]),
-                        }
-                    else:
-                        gain["requested"] += int(result["amount"])
+                if kind in _BOUNDED_RESULT_KINDS:
+                    _observe_bounded_result(
+                        observations, eff_entity, kind, eff_pk, eff_name, result
+                    )
                     continue
                 effects_data.append(
                     _settled_effect_record(kind, actor_pk, eff_pk, eff_name, result)
@@ -754,6 +938,7 @@ def record_action_settlement_evidence(
         if isinstance(getattr(request, "targets", None), list):
             candidates.extend(request.targets)
         key_index = _unique_key_index(candidates)
+        entities_by_pk = {_durable_pk(entity): entity for entity in candidates}
         for entry in event_log.entries:
             kind = str(getattr(entry, "kind", "") or "")
             data = (
@@ -766,13 +951,12 @@ def record_action_settlement_evidence(
                 target_id, target_name = _entry_target(
                     entry, kind, key_index, actor_pk, actor_key, source=source
                 )
+                resisted, auto_comply, roll = _entry_resistance_values(
+                    data, source=source
+                )
                 resist_entries.append(_resistance_record(
-                    actor_pk,
-                    target_id,
-                    target_name,
-                    resisted=bool(data.get("resisted")),
-                    auto_comply=bool(data.get("auto_comply")),
-                    roll=data.get("roll"),
+                    actor_pk, target_id, target_name,
+                    resisted=resisted, auto_comply=auto_comply, roll=roll,
                 ))
             elif kind == "sexual_transition":
                 target_id, target_name = _entry_target(
@@ -796,40 +980,44 @@ def record_action_settlement_evidence(
                 target_id, target_name = _entry_target(
                     entry, kind, key_index, actor_pk, actor_key, source=source
                 )
+                result = _settled_result_from_entry(kind, data, source=source)
+                if kind in _BOUNDED_RESULT_KINDS:
+                    _observe_bounded_result(
+                        observations,
+                        entities_by_pk.get(target_id),
+                        kind,
+                        target_id,
+                        target_name,
+                        result,
+                    )
+                    continue
                 effects_data.append(_settled_effect_record(
-                    kind,
-                    actor_pk,
-                    target_id,
-                    target_name,
-                    _settled_result_from_entry(kind, data, source=source),
+                    kind, actor_pk, target_id, target_name, result
                 ))
 
-    for gain in gauge_gains.values():
-        kind = str(gain["kind"])
-        committed = _committed_gauge_gain(
-            gain["entity"], kind, int(gain["requested"]), milestone_snapshots
+    for observation in observations.values():
+        kind = str(observation["kind"])
+        committed = _committed_bounded_result(
+            kind,
+            observation["entity"],
+            observation["staged"],
+            milestone_snapshots,
         )
         effects_data.append(_settled_effect_record(
             kind,
             actor_pk,
-            str(gain["target_id"]),
-            str(gain["target_name"]),
-            {"amount": committed},
+            str(observation["target_id"]),
+            str(observation["target_name"]),
+            committed,
         ))
-        if committed != int(gain["requested"]):
-            # A bounded gauge change is the one committed result that can differ
-            # from the staged amount; the repair is reported with identifiers
-            # and numbers only, never the staged payload.
-            log_info(
-                "action_deed_evidence_normalized",
-                context={
-                    "source_id": source_id,
-                    "event_type": event_type,
-                    "kind": kind,
-                    "target_id": str(gain["target_id"]),
-                    "requested": int(gain["requested"]),
-                    "committed": committed,
-                },
+        if committed != observation["staged"]:
+            _report_normalized_result(
+                source_id=source_id,
+                event_type=event_type,
+                kind=kind,
+                target_id=str(observation["target_id"]),
+                staged=observation["staged"],
+                committed=committed,
             )
 
     # Detect and record milestones for all involved participants
