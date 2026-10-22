@@ -30,6 +30,7 @@ from world.rules.titles.awards import (
     award_guild_rank_title,
     read_title_state,
 )
+from world.narrative.action_adapters import build_action_source_id
 # ---------------------------------------------------------------------------
 # Predicate evaluation and the event-effect planner.
 # ---------------------------------------------------------------------------
@@ -213,17 +214,8 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
         notify = f"獲得稱號：{display}"
         
         # Build stable occurrence identity for the action effect
-        actor_pk = getattr(actor, "pk", getattr(actor, "id", str(actor)))
-        req_context = getattr(request, "context", None)
-        skill_key = getattr(request, "skill_key", "skill")
-        session_id = getattr(getattr(req_context, "battlefield", None), "session_id", None)
-        action_id = getattr(request, "action_id", None) or getattr(req_context, "action_id", None)
-        if action_id:
-            source_id = f"action:{action_id}:{actor_pk}"
-        elif session_id:
-            source_id = f"action:{session_id}:{actor_pk}:{skill_key}"
-        else:
-            source_id = f"action:cast:{actor_pk}:{skill_key}:{tick}"
+        narration_scope = getattr(request, "narration_scope", "")
+        source_id = build_action_source_id(request, tick=tick, narration_scope=narration_scope)
 
         awards_box: list[AutomaticTitleAward] = []
 
@@ -246,6 +238,7 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
                 _apply,
                 notify=notify,
                 hit_evidence=(),
+                title_awards=awards_box,
             )
         )
     return pending

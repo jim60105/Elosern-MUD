@@ -193,6 +193,39 @@ class ActionResolver:
             event_log = replace(event_log, time_cost_seconds=time_cost)
         except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
             return ActionResult.rejected(rejection.reason, rejection.detail)
+        from world.narrative.action_adapters import (
+            capture_milestone_snapshot,
+            record_action_settlement_evidence,
+        )
+        # Capture milestone snapshots for actor and involved targets before commit
+        milestone_snapshots = {}
+        candidate_entities = [request.actor] + list(delivered_recipients) + [e.entity for e in resist_pending]
+        if isinstance(getattr(request, "targets", None), list):
+            candidate_entities.extend(request.targets)
+        for entity in candidate_entities:
+            if id(entity) not in milestone_snapshots:
+                ms = capture_milestone_snapshot(entity)
+                if ms is not None:
+                    milestone_snapshots[id(entity)] = ms
+
+        committed_awards_box = []
+        def _post_commit_evidence():
+            for eff in pending:
+                box = getattr(eff, "title_awards", None)
+                if box:
+                    for award in box:
+                        if award not in committed_awards_box:
+                            committed_awards_box.append(award)
+            resisted_recipients = [e.entity for e in resist_pending if e.entity not in delivered_recipients]
+            record_action_settlement_evidence(
+                request,
+                event_log,
+                committed_awards_box,
+                milestone_snapshots,
+                narration_scope=narration_scope,
+                delivered_targets=delivered_recipients,
+                resisted_targets=resisted_recipients,
+            )
         try:
             _commit(
                 pending,
@@ -200,6 +233,7 @@ class ActionResolver:
                 # user-controlled display key (stable join, no PII retention).
                 char=str(request.actor.pk),
                 action=request.skill_key,
+                post_commit_hook=_post_commit_evidence,
             )
         except CommitFailed as failure:  # observability: ignore R2: the commit failure is returned as ActionResult.rejected after the rollback/restore path logged every failed surface restore
             # The staged practice awards rolled back with everything else; the
@@ -222,6 +256,6 @@ class ActionResolver:
             time_cost,
             notifications,
             tuple(unlock_notices),
-            (),
+            tuple(committed_awards_box),
         )
 

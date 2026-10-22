@@ -191,6 +191,10 @@ def _end_of_round_upkeep(
     test seam or an out-of-combat caller) is treated as no ticks so existing
     ``world.rules.combat.tick_buffs`` patches stay green.
     """
+    from world.narrative.action_adapters import (
+        capture_milestone_snapshot,
+        record_non_resolver_adult_milestones,
+    )
     seconds = int(COMBAT_YAML["round"]["seconds"])
     records_by_key: dict[str, tuple[TickRecord, ...]] = {}
     for key, entity in battlefield.roster.items():
@@ -198,12 +202,25 @@ def _end_of_round_upkeep(
             continue
         records = tick_buffs(entity, seconds)
         records_by_key[key] = records if isinstance(records, tuple) else ()
+        before_ms = capture_milestone_snapshot(entity)
         decay_tick(entity, seconds)
         action = climax_settlement_action(entity)
         if action == "extend":
             apply_event(entity, "climax_extended")
         elif action == "end":
             apply_event(entity, "climax_ends")
+        session_id = getattr(battlefield, "session_id", "combat")
+        round_num = getattr(battlefield, "round_number", 1)
+        e_pk = getattr(entity, "pk", key)
+        upkeep_source_id = f"combat:{session_id}:round:{round_num}:upkeep:climax:{e_pk}"
+        from world.rules.clock import get_world_clock
+        record_non_resolver_adult_milestones(
+            entity,
+            before_ms,
+            source_id=upkeep_source_id,
+            tick=get_world_clock().tick,
+            location=str(getattr(entity, "location", "") or ""),
+        )
     return records_by_key
 
 

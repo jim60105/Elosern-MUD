@@ -90,6 +90,7 @@ class ActionRequest:
     targets: list[Any] | Literal["all-enemies", "all-allies", "all"]
     context: ActionContext
     scale: float = 1.0
+    source_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ class PendingEffect:
     # stages nothing.
     notify: str | None = None
     hit_evidence: tuple[DamageHitEvidence, ...] = ()
+    title_awards: list[AutomaticTitleAward] | tuple[AutomaticTitleAward, ...] | None = None
 
 
 class UnsnapshottedSurfaceError(Exception):

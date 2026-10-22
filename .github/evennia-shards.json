@@ -264,6 +264,7 @@
         "world.rules.tests.test_unlock_notices",
         "world.rules.tests.test_upkeep_settlement",
         "world.rules.tests.test_water_mana_tide",
+        "world.rules.tests.test_action_narrative_deeds",
         "world.rules.tests.test_divine_digestion_cadence"
       ]
     },
