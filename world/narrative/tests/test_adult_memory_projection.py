@@ -1,12 +1,11 @@
 """Adult memories authorize fields per participant.
 
 The two ADDED requirements of ``authorize-adult-deed-memory-projections``
-("Visibility does not grant adult content knowledge" and "Adult memories
-authorize fields per participant") have no canonical id until the delta syncs
-at archive. These tests therefore annotate the closest current canonical
-requirements: ``narrative-memory``'s owner-scoped cognition and restart-safe
-projection, ``narrative-events``' adult-evidence boundary, and the title
-capability's personally authorized deed eligibility.
+("Visibility does not grant adult content knowledge" in ``narrative-events``
+and "Adult memories authorize fields per participant" in ``narrative-memory``)
+are annotated with their canonical ids after the archive sync; the surrounding
+requirements of ``narrative-memory``, ``narrative-events`` and the title
+capability keep their annotations because these tests also establish them.
 """
 
 import json
@@ -186,6 +185,8 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-events::visibility-does-not-grant-adult-content-knowledge",
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
         "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
     )
@@ -252,6 +253,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         self.assertNotIn(self.bystander_pk, event.participants)
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving"
     )
     def test_own_experience_retains_authorized_fields_and_provenance(self):
@@ -289,6 +291,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         self.assertEqual([view.source_id for view in views], ["adult:own:1"])
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe"
     )
     def test_replay_and_restart_reuse_the_source_once_per_authorized_owner(self):
@@ -371,6 +374,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
         "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
     )
@@ -410,6 +414,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         self.assertEqual(warn[0][1]["source_id"], "adult:malformed:1")
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe"
     )
     def test_missing_field_access_and_unauthorized_owner_fail_closed(self):
@@ -447,6 +452,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
         "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
     )
@@ -472,6 +478,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe"
     )
     def test_malformed_second_owner_preparation_creates_no_partial_memory(self):
@@ -544,6 +551,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         self.assertEqual(records[0].content["skill_key"], "t_probe")
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "title-system::recent-deed-eligibility-is-closed-and-personally-authorized",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
     )
@@ -598,6 +606,7 @@ class SharedAdultProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-events::visibility-does-not-grant-adult-content-knowledge",
         "title-system::recent-deed-eligibility-is-closed-and-personally-authorized",
         "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
     )
@@ -643,6 +652,7 @@ class SharedAdultProjectionTests(EvenniaTestCase):
         )
 
     @covers_requirement(
+        "narrative-memory::adult-memories-authorize-fields-per-participant",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving"
     )
     def test_private_fields_of_another_participant_never_change_owner_content(self):
