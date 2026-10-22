@@ -93,6 +93,18 @@ NPC 收件人轉為 `delivered`；玩家收件人轉為 `available`，沒有領�
 
 這個邊界僅屬於增量的覆蓋 ID，由後續的規格同步擁有者在增量規格進入 `openspec/specs/` 之後取得並標註；本次變更針對既有正典主 ID 標註其實質測試。
 
+## 成人行為的逐收件人知識邊界（E）
+
+`world.narrative.adult_projection` 是唯一決定「某位收件人能知道哪些欄位」的純函式邊界。`world.narrative.recent_deeds`（提名事蹟）與 `world.narrative.memory`（認知投射）都呼叫同一個 `project_adult_action_for_recipient`，因此這兩個消費者不會對同一筆成人行為給出不同的知識範圍；投影模組不從 `world.ai` 匯入任何東西、不寫入任何遊戲狀態，也不建立事件、記憶或進度列。
+
+事件可見性只決定這筆發生「可否被消費」，不授權任何內容欄位。第三位在場的活體實體會讓 `adult_action` 記錄為 `visibility = "public"`，但可見性本身不會把另一位參與者的欄位變成可得知；欄位授權仍逐收件人由 `field_access` 決定，公開的成人事件不會繞過欄位檢查。只有行為人與實際收件人會取得投影；單純在場者不在 `participants` 之中，既不取得參與角色，也不取得記憶。
+
+投影輸出是分離的允許清單：動作、角色與結果。抵抗結果只保留 `resisted` 布林值與對象身分，擲骰與自動順從理由永不複製；狀態轉移與計數變更只保留收件人自己的列；里程碑只保留當事人自己的摘要。`build_adult_memory_content` 再由同一份投影推導記憶內容，其中的 `summary` 只陳述已授權的動作與角色，不主張同意、意願、關係或公開知名度。記憶層級為 `working`、範圍為 `witnessed`，每位授權擁有者各自一筆，並保留來源識別與投影版本。
+
+私人事作維持既有行為：`visibility == "private"` 的來源不投射認知，進度列仍結算為 `completed`，提名則透過玩家自己的授權路徑讀取私人經驗。失敗關閉也是契約的一部分：`field_access` 缺失或形狀不合法、行為人或 `act_key` 不合法、未支援的效果列或結果欄位，都會在寫入任何記憶之前拋出 `AdultProjectionError`；該筆來源以 `adult_memory_projection_rejected` 警告結算（只帶 `source_id`、`event_type`、`projector_version`），絕不退回通用原始內容分支。重播冪等：`(source_id, projector_version)` 進度列只結算一次，重試或重啟回傳原紀錄，不新增記憶，也不會放寬任何欄位。
+
+這個邊界僅屬於增量的覆蓋 ID，由後續的規格同步擁有者在增量規格進入 `openspec/specs/` 之後取得並標註；本次變更針對既有正典主 ID 標註其實質測試（`world.narrative.tests.test_adult_memory_projection`）。
+
 ## 持久化的六次交流夢境會話（W3）
 
 `world.narrative.dream_session` 負責一場協作夢境對話的持久記帳：六次交流的預算、唯一的待完成輪次，以及確定性的確認、草稿與醒來選項。它只儲存識別碼、計數與參考：一筆 `DreamSession` 列（會話與擁有者識別、`completed_exchanges`、`revision`、`state`、`outcome`、`pending_submission_id`、有上限的 `saved_input`、`draft_id`、`request_key`），加上只增不改的 `DreamExchange` 列（已送達回應的識別、交流編號、提交識別與 `response_ref`）。它絕不儲存生成的散文、絕不開啟傳輸，也不從 `world.ai` 匯入任何東西，因此所有操作在所有生成服務離線時都能運作。開啟夢境、呈現場景、伺服器計算的興奮軌跡與睡眠結算屬於其他能力的範圍；這個邊界只做計算與記錄。
