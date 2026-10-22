@@ -104,6 +104,12 @@ class ActionResolver:
         """Resolve one action; ``narration_scope`` seeds its prose only."""
         try:
             skill = _step1_ownership(request)
+            if not getattr(request, "source_id", None):
+                from world.narrative.action_adapters import build_action_source_id
+                request = replace(
+                    request,
+                    source_id=build_action_source_id(request, narration_scope=narration_scope),
+                )
             _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
@@ -193,6 +199,47 @@ class ActionResolver:
             event_log = replace(event_log, time_cost_seconds=time_cost)
         except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
             return ActionResult.rejected(rejection.reason, rejection.detail)
+        milestone_snapshots = {}
+        from world.narrative.action_adapters import (
+            capture_milestone_snapshot,
+            record_action_settlement_evidence,
+        )
+        # Capture milestone snapshots for actor and involved targets before commit inside try boundary
+        try:
+            candidate_entities = [request.actor] + list(delivered_recipients) + [e.entity for e in resist_pending]
+            if isinstance(getattr(request, "targets", None), list):
+                candidate_entities.extend(request.targets)
+            for entity in candidate_entities:
+                if id(entity) not in milestone_snapshots:
+                    ms = capture_milestone_snapshot(entity)
+                    if ms is not None:
+                        milestone_snapshots[id(entity)] = ms
+        except Exception as snap_err:
+            release_practice_claims(practice_claims)
+            return ActionResult.rejected(
+                RejectReason.EFFECT_RESOLUTION_FAILED,
+                f"milestone snapshot failed: {snap_err}",
+            )
+
+        committed_awards_box = []
+        def _post_commit_evidence():
+            for eff in pending:
+                box = getattr(eff, "title_awards", None)
+                if box:
+                    for award in box:
+                        if award not in committed_awards_box:
+                            committed_awards_box.append(award)
+            resisted_recipients = [e.entity for e in resist_pending if e.entity not in delivered_recipients]
+            record_action_settlement_evidence(
+                request,
+                event_log,
+                committed_awards_box,
+                milestone_snapshots,
+                narration_scope=narration_scope,
+                delivered_targets=delivered_recipients,
+                resisted_targets=resisted_recipients,
+                pending_effects=pending,
+            )
         try:
             _commit(
                 pending,
@@ -200,6 +247,7 @@ class ActionResolver:
                 # user-controlled display key (stable join, no PII retention).
                 char=str(request.actor.pk),
                 action=request.skill_key,
+                post_commit_hook=_post_commit_evidence,
             )
         except CommitFailed as failure:  # observability: ignore R2: the commit failure is returned as ActionResult.rejected after the rollback/restore path logged every failed surface restore
             # The staged practice awards rolled back with everything else; the
@@ -222,6 +270,6 @@ class ActionResolver:
             time_cost,
             notifications,
             tuple(unlock_notices),
-            (),
+            tuple(committed_awards_box),
         )
 

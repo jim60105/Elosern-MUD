@@ -7,7 +7,7 @@ one atomic transaction, and restores the snapshots best-effort on failure.
 
 import time
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
 from django.db import transaction
 
@@ -284,7 +284,13 @@ def _restore_touched_best_effort(
         )
 
 
-def _commit(pending: list[PendingEffect], *, char: str, action: str) -> None:
+def _commit(
+    pending: list[PendingEffect],
+    *,
+    char: str,
+    action: str,
+    post_commit_hook: Callable[[], None] | None = None,
+) -> None:
     for effect in pending:
         unsupported = effect.surfaces - SNAPSHOTTED_SURFACES
         if unsupported:
@@ -312,6 +318,8 @@ def _commit(pending: list[PendingEffect], *, char: str, action: str) -> None:
         with transaction.atomic():
             for effect in pending:
                 effect.apply()
+            if post_commit_hook is not None:
+                post_commit_hook()
             # Boundary event fires only on the OUTERMOST durable commit: the
             # resolver's atomic block is routinely a savepoint inside a
             # combat/item transaction, and a rolled-back outer unit must not

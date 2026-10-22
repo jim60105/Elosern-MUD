@@ -257,12 +257,22 @@ def _has_settlement_work(entity: Any) -> bool:
     return False
 
 
-def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> None:
+def _settle_buffs_and_decay(
+    entities: tuple[Any, ...],
+    elapsed_seconds: int,
+    start_tick: int = 0,
+) -> None:
+    from world.narrative.action_adapters import (
+        capture_milestone_snapshot,
+        record_non_resolver_adult_milestones,
+    )
     quanta, remainder = divmod(elapsed_seconds, SETTLEMENT_QUANTUM_SECONDS)
-    for _ in range(min(quanta, CLOCK_YAML["max_settlement_quanta"])):
+    for quantum_idx in range(min(quanta, CLOCK_YAML["max_settlement_quanta"])):
         if not any(_has_settlement_work(entity) for entity in entities):
             break
+        q_tick = start_tick + (quantum_idx + 1) * SETTLEMENT_QUANTUM_SECONDS
         for entity in entities:
+            before_ms = capture_milestone_snapshot(entity)
             tick_buffs(entity, SETTLEMENT_QUANTUM_SECONDS)
             decay_tick(entity, SETTLEMENT_QUANTUM_SECONDS)
             action = climax_settlement_action(entity)
@@ -270,8 +280,18 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
                 apply_event(entity, "climax_extended")
             elif action == "end":
                 apply_event(entity, "climax_ends")
+            e_id = getattr(entity, "pk", id(entity))
+            record_non_resolver_adult_milestones(
+                entity,
+                before_ms,
+                source_id=f"clock:climax:{q_tick}:{e_id}",
+                tick=q_tick,
+                location=str(getattr(entity, "location", "") or ""),
+            )
     if remainder and any(_has_settlement_work(entity) for entity in entities):
+        rem_tick = start_tick + elapsed_seconds
         for entity in entities:
+            before_ms = capture_milestone_snapshot(entity)
             tick_buffs(entity, remainder)
             decay_tick(entity, remainder)
             action = climax_settlement_action(entity)
@@ -279,6 +299,14 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
                 apply_event(entity, "climax_extended")
             elif action == "end":
                 apply_event(entity, "climax_ends")
+            e_id = getattr(entity, "pk", id(entity))
+            record_non_resolver_adult_milestones(
+                entity,
+                before_ms,
+                source_id=f"clock:climax:{rem_tick}:{e_id}",
+                tick=rem_tick,
+                location=str(getattr(entity, "location", "") or ""),
+            )
 
 
 def _practice_settlement(
@@ -562,7 +590,7 @@ def _run_stages(
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
         _settle_mental(seconds, mental)
-        _settle_buffs_and_decay(entities, seconds)
+        _settle_buffs_and_decay(entities, seconds, start_tick=clock.tick)
         events.extend(
             _practice_settlement(
                 entities, seconds, source, clock.tick + seconds, practice_eligible
