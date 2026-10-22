@@ -27,7 +27,7 @@ its archetype's legacy mode; nothing supplies intelligence or a mode by tier,
 species, rank, stat or archetype.
 
 Tuning fingerprint of the activated configuration (algorithm version 5):
-`23e711e9bb93a0c9c0e0b66a72f5c17bb4c9bb78c6693b540b34ad54b7da37ba`.
+`e2677d39e27adff0bc12f19478fe552a83d65695e0bcb8f6b5aa6273986c9866`.
 
 ## Evidence linkage
 
@@ -144,7 +144,7 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
    tuning and the observation memory).
 
 Rollback fingerprint of the edited configuration:
-`878a9106ed51750c5079ea02e910b92c5037d4b08b8033a767d063945125bcd8`. Recorded
+`5a6478365964257d5b03c6ee909bdd04cd41f3b965bc0eb842a1ce5485ad67d8`. Recorded
 acceptance claims made under `23e711e9...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce.
 

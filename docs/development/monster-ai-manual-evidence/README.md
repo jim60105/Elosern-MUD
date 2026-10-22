@@ -135,7 +135,7 @@ Configuration fingerprint (all campaign and performance reports):
 (algorithm version 5): the campaigns build their own synthetic variant pairs and
 copy only the archetypes from the shipped rulebook, so the shipped variant maps
 never enter this fingerprint. Selector-check fingerprint:
-`23e711e9bb93a0c9c0e0b66a72f5c17bb4c9bb78c6693b540b34ad54b7da37ba` -- that
+`e2677d39e27adff0bc12f19478fe552a83d65695e0bcb8f6b5aa6273986c9866` -- that
 operation records the process's startup fingerprint, which this value now is;
 the pre-activation value `a29fd4fa...` describes a tuning production no longer
 loads and is superseded, not evidence for the changed tuning. See
