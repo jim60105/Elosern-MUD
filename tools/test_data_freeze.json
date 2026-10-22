@@ -193,10 +193,6 @@
       "reason": "wilderness region data contract"
     },
     {
-      "path": "world/maps/tests/test_wilderness_provider.py",
-      "reason": "authored continental terrain, waterway and anchor-region data contract"
-    },
-    {
       "path": "world/maps/tests/test_altoria_capital.py",
       "reason": "capital xymap data contract"
     },
@@ -215,6 +211,10 @@
     {
       "path": "world/maps/tests/test_village_ciaran.py",
       "reason": "village ciaran map data contract"
+    },
+    {
+      "path": "world/maps/tests/test_wilderness_geography_contract.py",
+      "reason": "authored continental terrain, waterway and anchor-region data contract"
     },
     {
       "path": "world/quests/tests/test_compile_blueprint.py",

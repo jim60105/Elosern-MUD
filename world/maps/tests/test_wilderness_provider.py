@@ -1,7 +1,9 @@
-"""Data-contract test: authored continental terrain, waterway and anchor-region data contract
+"""Behaviour suite for the deterministic terrain model and bounded map provider.
 
-Mechanics (purity, bound validity, pooled-room preparation and gate locks) live
-here beside the authored geography rows they must agree with
+Purity, bound validity, pooled-room preparation and gate locks live here and
+resolve game data through the live registries or the synthetic kit; the
+authored geography rows themselves are pinned by
+``world/maps/tests/test_wilderness_geography_contract.py``
 (map-wilderness, wilderness-anchor-footprint, rescale-wilderness-geography)."""
 
 from tools.spec_traceability import covers_requirement
@@ -24,18 +26,13 @@ from world.maps.room_art import (
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
     REGION_SEARCH_BOXES,
-    RIDGE_PASSES,
     WILDERNESS_NAME,
-    _rasterize_routes,
     WATERWAY_FORDS,
     WILDERNESS_KM_PER_CELL,
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
     ElosernWildernessMapProvider,
     _ridge_center_x,
-    is_closed_ridge_cell,
-    is_inland_water_cell,
-    is_land_cell,
     is_valid_wilderness_cell,
     region_for_coordinates,
     terrain_description,
@@ -123,94 +120,24 @@ class TerrainModelTests(unittest.TestCase):
         self.assertEqual(reached, set(live_region_registry()))
 
     @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
-    def test_central_mountain_region_bends_with_the_authored_corridor(self):
-        # The corridor follows the bending summit centre; it is neither a fixed
-        # rectangular band nor a continuous summit wall (the pass windows below
-        # are open ground).
+    def test_central_mountain_region_follows_the_bending_corridor(self):
+        # The corridor follows the bending summit centre and stays ONE region
+        # along its whole length; its both flanks resolve elsewhere. Which
+        # region key that is, is authored data (geography contract module).
+        corridor = set()
         for y in (150, 700, 1200, 2100):
             centre = _ridge_center_x(y)
-            self.assertEqual(region_for_coordinates(centre, y), "central_mountains")
+            region = region_for_coordinates(centre, y)
+            corridor.add(region)
             self.assertNotEqual(
-                region_for_coordinates(centre - 300, y), "central_mountains"
+                region_for_coordinates(centre - 300, y), region
             )
             self.assertNotEqual(
-                region_for_coordinates(centre + 300, y), "central_mountains"
+                region_for_coordinates(centre + 300, y), region
             )
+        self.assertEqual(len(corridor), 1, corridor)
+        self.assertIn(next(iter(corridor)), live_region_registry())
         self.assertNotEqual(_ridge_center_x(100), _ridge_center_x(1200))
-
-    @covers_requirement("wilderness-terrain::region-for-coordinates-is-a-pure-deterministic-function-covering-the-whole-bounded-map")
-    def test_settlement_derived_anchor_cells_resolve_to_altoria_territory(self):
-        entry = live_anchor_entry()
-        cells = {entry.anchor_cell} | {
-            entry.approach_cell(gate) for gate in entry.gates
-        }
-        self.assertEqual(cells, {CAPITAL_ANCHOR, SOUTH_APPROACH, EAST_APPROACH})
-        # Delta scenario: Altoria's anchor and both gate approaches are the
-        # western hills and valleys (the signed anchor relationships).
-        for cell in cells:
-            self.assertEqual(region_for_coordinates(*cell), "western_hills_valleys")
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_anchor_centres_resolve_their_authored_terrain(self):
-        # Region keys are the terrain layer; nominal claims stay in
-        # ``world.lore.nations``. The authored anchor relationships pin which
-        # terrain each canonical anchor cell belongs to.
-        from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
-
-        expected = {
-            "capital_altoria": "western_hills_valleys",
-            "capital_valhalla": "northwest_highland_forest",
-            "capital_grandia": "eastern_plains",
-            "village_ciaran": "central_mountains",
-            "village_fionnen": "central_mountains",
-            "village_eolas": "central_mountains",
-        }
-        for anchor_key, region_key in expected.items():
-            cell = ANCHOR_GEOGRAPHY_REGISTRY[anchor_key].cell
-            self.assertEqual(region_for_coordinates(*cell), region_key, anchor_key)
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_principal_pass_is_open_mountain_trail_and_ridge_blocks_elsewhere(self):
-        from world.rules.travel_cost import WILDERNESS_TERRAIN, terrain_speed_m_per_hour
-
-        # The principal pass near (1410, 980) is open ground in the mountain
-        # region, costed as mountain trail: an explicit slower crossing, never
-        # an all-road shortcut.
-        self.assertIn(980, range(*RIDGE_PASSES[1]))
-        self.assertFalse(is_closed_ridge_cell((1410, 980)))
-        self.assertEqual(region_for_coordinates(1410, 980), "central_mountains")
-        mountain = terrain_speed_m_per_hour(WILDERNESS_TERRAIN["central_mountains"])
-        self.assertLess(mountain, terrain_speed_m_per_hour("road"))
-        # Away from an authored pass the summit ridge is a closed cliff wall.
-        self.assertTrue(is_closed_ridge_cell((_ridge_center_x(1200), 1200)))
-
-    @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
-    def test_rivers_are_authored_water_with_declared_fords(self):
-        from world.maps.wilderness_provider import WATERWAY_ROUTES
-
-        # Every ford lies on its own river, and every river starts and ends on
-        # the coastal region it drains into (capital river -> southwest coast;
-        # imperial rivers -> southeast coast).
-        raster = _rasterize_routes(WATERWAY_ROUTES)
-        for name, fords in WATERWAY_FORDS.items():
-            for ford in fords:
-                # The ford is on its authored river before the exemption is
-                # subtracted, so a typo cannot silently remove a crossing.
-                self.assertIn(ford, raster, name)
-                self.assertFalse(is_inland_water_cell(ford), name)
-                self.assertTrue(is_land_cell(ford), name)
-        capital = WATERWAY_ROUTES["capital_river"]
-        self.assertEqual(region_for_coordinates(*capital[-1]), "southwest_coast")
-        for name in ("imperial_river", "imperial_east_branch"):
-            self.assertEqual(
-                region_for_coordinates(*WATERWAY_ROUTES[name][-1]), "southeast_coast"
-            )
-        # A river cell is impassable water; its declared ford is ordinary land.
-        river_cell = (900, 1042)
-        self.assertTrue(is_inland_water_cell(river_cell))
-        self.assertFalse(is_valid_wilderness_cell(river_cell))
-        self.assertFalse(is_inland_water_cell(WATERWAY_FORDS["capital_river"][0]))
-        self.assertTrue(is_valid_wilderness_cell(WATERWAY_FORDS["capital_river"][0]))
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
     def test_region_search_windows_cover_their_region(self):
@@ -325,25 +252,11 @@ class MapProviderTests(EvenniaTest):
         )
         self.assertTrue(self.provider.is_valid_coordinates(None, (1410, 980)))
         self.assertFalse(self.provider.is_valid_coordinates(None, (900, 1042)))
+        # The authored fords are read from the table, never named here: the
+        # waterway keys belong to the geography contract module.
+        authored_ford = next(iter(WATERWAY_FORDS.values()))[0]
         self.assertTrue(
-            self.provider.is_valid_coordinates(
-                None, WATERWAY_FORDS["capital_river"][0]
-            )
-        )
-
-    @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
-    def test_anchor_and_port_centres_are_land_side(self):
-        from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
-        from world.lore.wilderness_regions import HARBOR_SITE_REGISTRY
-
-        for anchor in ANCHOR_GEOGRAPHY_REGISTRY.values():
-            self.assertTrue(is_land_cell(anchor.cell), anchor.anchor_key)
-        for harbor in HARBOR_SITE_REGISTRY.values():
-            self.assertTrue(is_land_cell(harbor.cell), harbor.key)
-        # Declaration reveals nothing: no settlement map is invented for the
-        # seven unbuilt anchors.
-        self.assertLessEqual(
-            set(live_entry_registry()), set(ANCHOR_GEOGRAPHY_REGISTRY)
+            self.provider.is_valid_coordinates(None, authored_ford)
         )
 
     @covers_requirement("wilderness-map-provider::the-continent-remains-virtual-with-bounded-local-lookup")
