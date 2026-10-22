@@ -31,6 +31,12 @@ _IMPORT_BEFORE_INSTALL = (
     # presentation registry buildable under the install (the kit's own
     # condition rows are grafted in afterwards).
     "world.rules.status_display",
+    # The distance-travel rulebook validates, at import, that every live
+    # wilderness region declares a terrain row (movement.yaml) and is only
+    # reached lazily from the first movement settlement. Importing it while
+    # the shipped regions are still installed keeps that validation honest;
+    # the terrain graft then widens the same table with the kit's own rows.
+    "world.rules.travel_cost",
     "world.quests.bootstrap",
     # The monster-population model binds the shipped capital entry and its
     # immutable shipped-key region tables at import; importing it here keeps

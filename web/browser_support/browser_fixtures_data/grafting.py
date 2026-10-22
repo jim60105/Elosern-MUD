@@ -160,11 +160,17 @@ def graft_synth_wilderness_terrain() -> None:
     shipped partition/tier key (idempotent ``setdefault``) derived from the
     kit's own templates, so the arithmetic resolves against synthetic content
     without the model ever learning shipped drift.
+
+    The travel rulebook's region→terrain table is widened too: it validates at
+    import that every live region declares a terrain row (the module is
+    imported before the install, against shipped data), and the kit's own
+    regions have no shipped row of their own.
     """
     from dataclasses import replace
 
     import world.lore.wilderness_regions as _regions
     import world.lore.monsters as _monsters
+    from world.rules import travel_cost
     from world.tests.synthetic_data import SYNTH_REGIONS
     from world.maps.wilderness_provider import (
         WILDERNESS_MAX_X,
@@ -180,6 +186,14 @@ def graft_synth_wilderness_terrain() -> None:
     template = next(iter(SYNTH_REGIONS.values()))
     for key in sorted(partition_keys):
         _regions.WILDERNESS_REGION_REGISTRY.setdefault(key, replace(template, key=key))
+
+    # Every live region needs a terrain row: the grafted partition keys keep
+    # their shipped rows, and the kit's regions borrow the rulebook's own
+    # first terrain (the kit's coordinates are not part of the authored
+    # continental partition).
+    kit_terrain = next(iter(travel_cost.WILDERNESS_TERRAIN.values()))
+    for key in (*sorted(partition_keys), *SYNTH_REGIONS):
+        travel_cost.WILDERNESS_TERRAIN.setdefault(key, kit_terrain)
 
     # Threat tiers: the population model hardcodes the shipped tier keys
     # (hunting band "low", region tables low/mid/high). Graft one kit-authored
