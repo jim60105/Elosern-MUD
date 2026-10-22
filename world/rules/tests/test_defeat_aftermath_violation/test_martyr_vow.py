@@ -24,7 +24,11 @@ from world.rules import combat_session as combat_session_module
 import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.buffs import apply_buff, entity_active_buffs
-from world.rules.combat import BattlefieldActionContext
+from world.rules.combat import (
+    BattlefieldActionContext,
+    CombatProvenance,
+    combat_provenance,
+)
 from world.rules.combat_session import (
     engage,
     forfeit,
@@ -366,7 +370,18 @@ class MartyrCastRailTests(MartyrVowBase):
     def test_vow_cast_stamps_the_active_session(self):
         skill = self._synth_vow_skill("session_stamp:martyr_key")
         engage(self.player, self.monster)
-        result = ActionResolver.resolve(self._combat_request(skill))
+        # A resolved combat action is a slot occurrence: the session's own
+        # engagement identity is installed exactly as the round engine does.
+        engaged = read_session(self.player)
+        with combat_provenance(
+            CombatProvenance(
+                engagement_id=engaged.engagement_id,
+                round_ordinal=1,
+                slot_ordinal=0,
+                session_id=engaged.session_id,
+            )
+        ):
+            result = ActionResolver.resolve(self._combat_request(skill))
         self.assertEqual(result.outcome, "success")
         record = read_session(self.player)
         self.assertEqual(record.martyr_key, (record.session_id,))
@@ -409,7 +424,16 @@ class MartyrCastRailTests(MartyrVowBase):
     def test_session_stamp_unknown_field_is_rejected(self):
         skill = self._synth_vow_skill("session_stamp:not_a_field")
         engage(self.player, self.monster)
-        result = ActionResolver.resolve(self._combat_request(skill))
+        engaged = read_session(self.player)
+        with combat_provenance(
+            CombatProvenance(
+                engagement_id=engaged.engagement_id,
+                round_ordinal=1,
+                slot_ordinal=0,
+                session_id=engaged.session_id,
+            )
+        ):
+            result = ActionResolver.resolve(self._combat_request(skill))
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason.value, "effect_resolution_failed")
 

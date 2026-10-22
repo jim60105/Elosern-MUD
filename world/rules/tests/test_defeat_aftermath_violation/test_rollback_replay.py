@@ -32,6 +32,11 @@ from world.rules.clock import WorldClock
 from world.rules.event_log import render_plain_text
 from world.rules.party import join_party
 from world.rules.state_derived_roll import derived_roll
+from world.narrative.action_adapters import (
+    capture_milestone_snapshot,
+    record_defeat_attempt_evidence,
+)
+from world.narrative.models import NarrativeEvent, ProjectionProgress
 from tools.spec_traceability import covers_requirement
 from .._combat_session_helpers import BattlefieldIsolation, _player
 
@@ -186,3 +191,104 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
             )
             self.assertEqual(victim.sexual.hostile_act_count, targeted)
         self.assertEqual(self.monster.sexual.hostile_act_count, 2)
+
+    @covers_requirement(
+        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_failure_after_evidence_recording_rolls_back_the_whole_unit(self):
+        """Scenario: Owner rollback removes evidence with the gameplay."""
+        self._equalize_scores()
+        self._arouse(13)
+        engage(self.player, self.monster)
+        # The ordinary round commits its own action evidence first; only the
+        # aftermath unit is under test here.
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch(
+            "world.rules.combat.damage.roll_d100", return_value=1
+        ), patch("world.rules.combat.rounds.roll_d100", return_value=1):
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        counts_before = (
+            NarrativeEvent.objects.count(),
+            ProjectionProgress.objects.count(),
+        )
+        real_record = defeat_aftermath_violation_module._record_attempt_evidence
+
+        def failing(**kwargs):
+            real_record(**kwargs)
+            raise RuntimeError("injected evidence failure")
+
+        with patch.object(
+            defeat_aftermath_violation_module,
+            "_record_attempt_evidence",
+            side_effect=failing,
+        ), self.assertRaises(RuntimeError):
+            forfeit(self.player)
+
+        self.assertEqual(
+            (
+                NarrativeEvent.objects.count(),
+                ProjectionProgress.objects.count(),
+            ),
+            counts_before,
+        )
+        self.assertEqual(self.player.sexual.pleasure.value, 0)
+        self.assertEqual(self.player.sexual.hostile_act_count, 0)
+        self.assertEqual(self.monster.sexual.pleasure.value, 13)
+        self.assertEqual(self.monster.sexual.hostile_act_count, 0)
+        self.assertEqual(self.clock.tick, 6)
+        self.assertIsNotNone(self.player.db.active_combat)
+
+    @covers_requirement(
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_replayed_committed_attempt_evidence_reuses_the_original_crossing(self):
+        """Scenario: Replayed owner settlement does not create another crossing."""
+        self._equalize_scores()
+        self._arouse(13)
+        self.player.sexual.climax_phase.value = "接近"
+        self.player.sexual.pleasure.base = 40
+        before = capture_milestone_snapshot(self.player)
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        with self._patch_rolls([1, 1]):
+            self._settle()
+        first_source = (
+            f"defeat:{record.engagement_id}:{self.monster.pk}"
+            f":attempt:0:victim:{self.player.pk}"
+        )
+        original = [(e.pk, e.source_id) for e in NarrativeEvent.objects.filter(
+            event_type="adult_milestone", content__action_source_id=first_source
+        )]
+        self.assertTrue(original)
+        action = NarrativeEvent.objects.get(source_id=first_source)
+        pleasure_after = self.player.sexual.pleasure.value
+
+        for _ in range(2):
+            record_defeat_attempt_evidence(
+                attempt_source_id=first_source,
+                aggressor=self.monster,
+                victim=self.player,
+                resisted=False,
+                auto_comply=False,
+                roll=None,
+                credited_counters=("hostile_act_count",),
+                before=before,
+                tick=action.tick,
+                encounter_id=record.engagement_id,
+                session_id=record.session_id,
+            )
+
+        self.assertEqual(
+            [(e.pk, e.source_id) for e in NarrativeEvent.objects.filter(
+                event_type="adult_milestone", content__action_source_id=first_source
+            )],
+            original,
+        )
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_action", content__act_key="defeat_violation"
+            ).count(),
+            2,
+        )
+        self.assertEqual(self.player.sexual.pleasure.value, pleasure_after)

@@ -62,6 +62,22 @@ Payload contracts:
    the pre-settlement snapshot and its state after the action applied — one
    value per recipient for the whole action, never the requested magnitude and
    never a repeat of the same movement per staged component.
+
+5. Non-resolver adult occurrence (event_type="adult_action", defeat aftermath):
+   - action_source_id (str): The attempt identity —
+     `defeat:{engagement}:{aggressor}:attempt:{ordinal}:victim:{victim}`.
+   - act_key/act_name (str): The defeat owner's own act, never a borrowed
+     skill-registry key.
+   - encounter_context (dict): The unique engagement occurrence, carrying the
+     reusable session token as diagnostic metadata only.
+   - actor/recipients: The actual aggressor and the selected victim.
+   - outcomes: The actual resistance verdict, the counter credits that really
+     happened, and a transition only when the attempt itself crossed the
+     victim into 進行中.
+   - milestones: Only the victim's own newly crossed transitions.
+   `visibility` is "private", so the existing memory consumer deliberately
+   projects no cognition record for it while its progress row still settles;
+   the authorized recent-deed projection still reads it.
 """
 
 from collections.abc import Mapping, Sequence
@@ -102,6 +118,17 @@ _BOUNDED_RESULT_KINDS = frozenset(
     {"pleasure_gain", "gauge_transfer", "buffs_cleansed"}
 )
 
+#: The defeat aftermath's own adult act key. The violation sequence is not a
+#: catalogue skill, so the record states the owner's stable act instead of
+#: borrowing an unrelated skill key.
+DEFEAT_VIOLATION_ACT_KEY = "defeat_violation"
+
+#: Display label of the defeat aftermath's own adult act.
+DEFEAT_VIOLATION_ACT_NAME = "戰敗侵犯"
+
+#: The climax phase level an onset transition is measured against.
+_ACTIVE_CLIMAX_PHASE = "進行中"
+
 
 @dataclass(frozen=True)
 class SettlementGauges:
@@ -129,6 +156,20 @@ class MilestoneSnapshot:
     climax_count: int
     climax_phase: str
     gauges: SettlementGauges | None
+
+
+@dataclass(frozen=True)
+class RecordedAdultMilestones:
+    """The events and summaries one non-resolver milestone write committed.
+
+    ``events`` are the committed ``adult_milestone`` rows; ``summaries`` state
+    the same occurrences in the payload shape an ``adult_action`` record
+    embeds. A non-resolver owner therefore keys every milestone row to its own
+    occurrence and can still state its milestones inside its action record.
+    """
+
+    events: tuple[Any, ...] = ()
+    summaries: tuple[dict[str, Any], ...] = ()
 
 
 def _durable_pk(entity: Any) -> str:
@@ -391,7 +432,7 @@ def record_non_resolver_adult_milestones(
     tick: int,
     location: str = "",
     encounter_provenance: Any | None = None,
-) -> list[Any]:
+) -> RecordedAdultMilestones:
     """Record newly crossed adult milestones for non-resolver transition owners.
 
     ``encounter_provenance`` is the combat occurrence the boundary resolves
@@ -399,10 +440,14 @@ def record_non_resolver_adult_milestones(
     context the action evidence does, so selection can join an upkeep
     milestone to its own encounter outcome instead of treating it as a
     standalone fact or merging it with another engagement.
+
+    The returned summaries use the ``adult_action.milestones`` payload shape,
+    so an owner that records an action occurrence alongside its milestones can
+    embed the same occurrences without re-detecting them.
     """
     milestones = detect_new_milestones(entity, before)
     if not milestones:
-        return []
+        return RecordedAdultMilestones()
 
     entity_pk = _durable_pk(entity)
     encounter_context = (
@@ -412,6 +457,7 @@ def record_non_resolver_adult_milestones(
     )
     from world.narrative.events import record_narrative_event
     recorded = []
+    summaries = []
     for m in milestones:
         ms_source_id = f"{source_id}:milestone:{entity_pk}:{m['kind']}:{m['identifier']}"
         ms_content = {
@@ -441,7 +487,13 @@ def record_non_resolver_adult_milestones(
             salience=1,
         )
         recorded.append(event)
-    return recorded
+        summaries.append({
+            "source_id": ms_source_id,
+            "milestone_kind": m["kind"],
+            "identifier": m["identifier"],
+            "entity_id": entity_pk,
+        })
+    return RecordedAdultMilestones(events=tuple(recorded), summaries=tuple(summaries))
 
 
 def _check_external_observers(actor: Any, target_entities: Sequence[Any], room: Any) -> bool:
@@ -845,6 +897,168 @@ def _transition_record(target_id: str, target_name: str, event: str) -> dict[str
 def _counter_record(target_id: str, target_name: str, counter: str) -> dict[str, Any]:
     """Build one committed counter-change record."""
     return {"target_id": target_id, "target_name": target_name, "counter": counter}
+
+
+def record_defeat_attempt_evidence(
+    *,
+    attempt_source_id: str,
+    aggressor: Any,
+    victim: Any,
+    resisted: bool,
+    auto_comply: bool,
+    roll: int | None,
+    credited_counters: Sequence[str],
+    before: MilestoneSnapshot | None,
+    tick: int,
+    encounter_id: str,
+    location: str = "",
+    session_id: str = "",
+) -> tuple[Any, list[Any]]:
+    """Record one defeat aftermath attempt's adult occurrence and victim milestones.
+
+    The attempt identity is the unique engagement, the aggressor, the attempt
+    ordinal and the selected victim, so two attempts of one aftermath and two
+    afternoons of one engagement can never share an occurrence. The record
+    states what actually happened: the resistance verdict as it was decided,
+    the counter credits the attempt really made, and an onset transition only
+    when the victim's own phase crossed into 進行中 between ``before`` and the
+    applied deltas — on a landed *and* on a resisted attempt. Unselected pool
+    members and untouched allies never reach this record.
+    """
+    clean_encounter = str(encounter_id or "").strip()
+    if not clean_encounter:
+        raise ValueError(
+            "defeat adult evidence has no engagement identity: an attempt is "
+            "never identifiable by a session token or a world tick"
+        )
+
+    # A committed attempt's evidence is immutable: re-delivering it reuses the
+    # original action and its original milestone rows instead of re-detecting
+    # the victim's later state under the old attempt identity.
+    from world.narrative.models import NarrativeEvent
+
+    existing = NarrativeEvent.objects.filter(source_id=attempt_source_id).first()
+    if existing is not None:
+        originals = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__action_source_id=attempt_source_id,
+            )
+        )
+        return existing, originals
+
+    aggressor_pk = _durable_pk(aggressor)
+    victim_pk = _durable_pk(victim)
+    victim_name = str(getattr(victim, "key", ""))
+    recorded = record_non_resolver_adult_milestones(
+        victim,
+        before,
+        source_id=attempt_source_id,
+        tick=tick,
+        location=location,
+    )
+
+    crossed_onset = False
+    if before is not None:
+        current_phase = getattr(victim.sexual.climax_phase, "level", None)
+        if current_phase is None:
+            current_phase = str(victim.sexual.climax_phase)
+        crossed_onset = (
+            before.climax_phase != _ACTIVE_CLIMAX_PHASE
+            and str(current_phase) == _ACTIVE_CLIMAX_PHASE
+        )
+
+    transitions = (
+        [_transition_record(victim_pk, victim_name, "climax_onset")]
+        if crossed_onset
+        else []
+    )
+    counters = [
+        record
+        for counter in credited_counters
+        for record in (
+            _counter_record(victim_pk, victim_name, counter),
+            _counter_record(aggressor_pk, str(getattr(aggressor, "key", "")), counter),
+        )
+    ]
+    encounter_context: dict[str, Any] = {"encounter_id": clean_encounter}
+    if session_id:
+        # Diagnostic transport metadata only; the encounter is the occurrence.
+        encounter_context["session_id"] = str(session_id)
+
+    content: dict[str, Any] = {
+        "action_source_id": attempt_source_id,
+        "act_key": DEFEAT_VIOLATION_ACT_KEY,
+        "act_name": DEFEAT_VIOLATION_ACT_NAME,
+        "category": "sexual_act",
+        "encounter_context": encounter_context,
+        "actor": {
+            "id": aggressor_pk,
+            "name": str(getattr(aggressor, "key", "")),
+            "role": "actor",
+        },
+        "recipients": [
+            {"id": victim_pk, "name": victim_name, "role": "recipient"}
+        ],
+        "outcomes": {
+            "transitions": transitions,
+            "counters": counters,
+            "resistance": [
+                _resistance_record(
+                    aggressor_pk,
+                    victim_pk,
+                    victim_name,
+                    resisted=resisted,
+                    auto_comply=auto_comply,
+                    roll=roll,
+                )
+            ],
+            "effects": [],
+        },
+        # ``_rows`` reads a plain list; the summaries stay detached copies.
+        "milestones": [dict(summary) for summary in recorded.summaries],
+        "visibility": "private",
+        "privacy": {
+            "private_experience": True,
+            "consent_inferred": False,
+            "willingness_inferred": False,
+            "relationship_inferred": False,
+            "public_notoriety": False,
+        },
+        "field_access": {
+            aggressor_pk: [
+                "actor",
+                "act_key",
+                "recipients",
+                "resistance_verdict",
+                "physical_effects",
+                "own_state_transitions",
+                "own_counter_changes",
+                "actor_milestones",
+            ],
+            victim_pk: [
+                "target_own_outcome",
+                "resistance_verdict",
+                "effects_on_target",
+                "target_state_transitions",
+                "target_counter_changes",
+                "target_milestones",
+            ],
+        },
+    }
+
+    from world.narrative.events import record_narrative_event
+    action_event, _, _ = record_narrative_event(
+        source_id=attempt_source_id,
+        event_type="adult_action",
+        content=content,
+        participants=[aggressor_pk, victim_pk],
+        location=str(location or ""),
+        tick=int(tick),
+        visibility="private",
+        salience=1,
+    )
+    return action_event, list(recorded.events)
 
 
 def _required_text(value: Any, what: str, *, source: str) -> str:

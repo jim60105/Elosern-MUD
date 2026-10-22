@@ -48,7 +48,7 @@ End-of-round upkeep milestone (the recorder appends
 `:milestone:<entity_pk>:<milestone_kind>:<identifier>`):
 
 ```text
-combat:<engagement_id>:round:<round_ordinal>:upkeep:climax:<entity_pk>
+combat:<engagement_id>:round:<round_ordinal>:upkeep:<entity_pk>
 ```
 
 Terminal encounter:

@@ -1,12 +1,14 @@
-"""Slice of ``test_item_use``: NegativeGaugeDrainTests, RemovalSelectorSettlementTests, SettlementScopeSeamTests."""
+"""Slice of ``test_item_use``: drain, removal, scope and accepted-operation evidence tests."""
 from tools.spec_traceability import covers_requirement
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any
 from dataclasses import replace
 from unittest.mock import patch
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from typeclasses.characters import PlayerCharacter
 from world.lore.items import (
     ItemDefinition,
     EquipmentSlot,
@@ -16,7 +18,19 @@ from world.lore.items import (
     ItemRarity,
     ItemUseMechanics,
 )
-from world.rules.clock import EventSourceRegistration, WorldClock, _EVENT_SOURCES
+from world.narrative.action_adapters import (
+    capture_milestone_snapshot,
+    record_non_resolver_adult_milestones,
+)
+from world.narrative.models import NarrativeEvent, ProjectionProgress
+from world.rules.clock import (
+    AdvanceSource,
+    EventSourceRegistration,
+    WorldClock,
+    _EVENT_SOURCES,
+    get_world_clock,
+)
+from world.rules.combat import CombatProvenance, combat_provenance
 from world.rules.equipment import materialize_registry_object, registry_key_for_object
 from world.rules.equipment import (
     EquipmentToggleReason,
@@ -27,6 +41,7 @@ from world.rules.item_effects import (
     GaugeAdjustEffect,
     ItemEffectProfile,
     ItemStat,
+    ItemTargetScope,
     StatusApplyEffect,
     StatusRemoveEffect,
 )
@@ -40,6 +55,7 @@ from world.rules.tests._combat_session_helpers import (
 from world.rules.items import (
     ItemUseReason,
     ItemUseRequest,
+    accepted_item_operation_id,
     preflight_item_use,
     resolve_item_use,
     use_item,
@@ -52,9 +68,11 @@ from ._support import (
     _ALL_VIAL_KEY,
     _APPLY_KEY,
     _FOCUS_DROP_KEY,
+    _TONIC_KEY,
     _MultiEffectTestCase,
     _PLEASURE_DOWN_KEY,
     _SP_DOWN_KEY,
+    _fixture_item,
 )
 
 
@@ -268,3 +286,262 @@ class SettlementScopeSeamTests(_MultiEffectTestCase):
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, ItemUseReason.UNKNOWN_EFFECT)
         self.assertEqual(list_items(self.actor), [_APPLY_KEY])
+
+
+_GROUP_BLISS_KEY = "t_group_bliss"
+
+_GROUP_BLISS_PROFILE = ItemEffectProfile(
+    effects=(
+        GaugeAdjustEffect(
+            stat=ItemStat.PLEASURE,
+            amount=20,
+            scope=ItemTargetScope.ALL_ALLIES,
+        ),
+    )
+)
+
+
+class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
+    """An accepted item use owns its own transition-time adult evidence.
+
+    Spec: ``narrative-events`` — non-resolver adult milestones are recorded at
+    transition time under an authoritative operation identity, and owner
+    rollback removes evidence with the gameplay.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.register_fixture(
+            _fixture_item(_GROUP_BLISS_KEY, consumable=True), _GROUP_BLISS_PROFILE
+        )
+        self.room = self.actor.location
+        self.ally = self.char2
+        self.ally.location = self.room
+        self.ally.race = "human"
+        self.ally.apply_race_baseline()
+        self.second_ally = create_object(
+            PlayerCharacter, key="item ally two", location=self.room
+        )
+        self.second_ally.race = "human"
+        self.second_ally.apply_race_baseline()
+        self.control = create_object(
+            PlayerCharacter, key="item control", location=self.room
+        )
+        self.control.race = "human"
+        self.control.apply_race_baseline()
+        for entity in (self.ally, self.second_ally):
+            entity.sexual.climax_phase.value = "接近"
+            entity.sexual.pleasure.base = 40
+        self.control.sexual.pleasure.base = 100
+
+    def _operation_milestones(self, source_id: str) -> list[NarrativeEvent]:
+        return list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__action_source_id=source_id,
+            )
+        )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_one_accepted_use_owns_each_affected_recipients_crossing(self):
+        """Scenario: Accepted item use crossing uses the accepted operation."""
+        before_ally = capture_milestone_snapshot(self.ally)
+        self.actor.db.inventory = [_GROUP_BLISS_KEY]
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, _GROUP_BLISS_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.ally.sexual.climax_phase.level, "進行中")
+        self.assertEqual(self.second_ally.sexual.climax_phase.level, "進行中")
+
+        milestones = list(NarrativeEvent.objects.filter(event_type="adult_milestone"))
+        self.assertEqual(
+            {event.content["entity_id"] for event in milestones},
+            {str(self.ally.pk), str(self.second_ally.pk)},
+        )
+        (operation_id,) = {event.content["action_source_id"] for event in milestones}
+        self.assertTrue(operation_id.startswith("item:accept:"))
+        self.assertEqual(len(self._operation_milestones(operation_id)), 2)
+
+        # The unaffected control was ineligible at the top of its gauge: it
+        # gained no evidence and kept its state.
+        self.assertEqual(int(self.control.sexual.pleasure.base), 100)
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__entity_id=str(self.control.pk),
+            ).count(),
+            0,
+        )
+
+        # Re-delivering the committed evidence reuses the original records.
+        before_ids = [
+            (event.pk, event.source_id)
+            for event in self._operation_milestones(operation_id)
+        ]
+        record_non_resolver_adult_milestones(
+            self.ally,
+            before_ally,
+            source_id=operation_id,
+            tick=int(get_world_clock().tick),
+        )
+        self.assertEqual(
+            [
+                (event.pk, event.source_id)
+                for event in self._operation_milestones(operation_id)
+            ],
+            before_ids,
+        )
+
+        # A later clock read never re-dates this operation's crossing, under
+        # this or any other source.
+        onsets_before = NarrativeEvent.objects.filter(
+            event_type="adult_milestone", content__identifier="climax_onset"
+        ).count()
+        WorldClock(tick=0).advance(6, AdvanceSource.COMMAND, (self.ally,))
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone", content__identifier="climax_onset"
+            ).count(),
+            onsets_before,
+        )
+        self.assertEqual(len(self._operation_milestones(operation_id)), 2)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_non_adult_use_and_preexisting_state_record_no_milestone(self):
+        """A non-adult item use and an already-active phase create nothing."""
+        self.hurt(20)
+        self.actor.sexual.climax_phase.value = "進行中"
+        self.actor.db.inventory = [_TONIC_KEY]
+        result = resolve_item_use(
+            ItemUseRequest(self.actor, _TONIC_KEY), in_combat=False
+        )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(
+            NarrativeEvent.objects.filter(event_type="adult_milestone").count(), 0
+        )
+
+    @covers_requirement(
+        "narrative-events::durable-source-identity-makes-projection-recoverable"
+    )
+    def test_accepted_operation_identity_is_never_the_item_key_or_tick(self):
+        first = accepted_item_operation_id(str(self.actor.pk), _GROUP_BLISS_KEY)
+        second = accepted_item_operation_id(str(self.actor.pk), _GROUP_BLISS_KEY)
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.startswith("item:accept:"))
+        for slot in (0, 1):
+            with combat_provenance(
+                CombatProvenance(
+                    engagement_id="hostile:items:1",
+                    round_ordinal=1,
+                    slot_ordinal=slot,
+                )
+            ):
+                value = accepted_item_operation_id(
+                    str(self.actor.pk), _GROUP_BLISS_KEY
+                )
+            self.assertEqual(
+                value,
+                f"item:combat:hostile:items:1:r1:s{slot}:"
+                f"{self.actor.pk}:{_GROUP_BLISS_KEY}",
+            )
+        with self.assertRaises(ValueError):
+            accepted_item_operation_id(
+                str(self.actor.pk),
+                _GROUP_BLISS_KEY,
+                context=SimpleNamespace(battlefield=object()),
+            )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_two_slots_of_one_engagement_keep_distinct_operation_sources(self):
+        """Scenario: two accepted operations in different slots stay distinct."""
+        from world.rules.items import ItemUseRequest
+        from world.rules.targeting import RoomActionContext
+
+        key = "t_slot_bliss"
+        self.register_fixture(
+            _fixture_item(key, consumable=True),
+            ItemEffectProfile(
+                effects=(GaugeAdjustEffect(stat=ItemStat.PLEASURE, amount=20),)
+            ),
+        )
+        for entity, slot in ((self.actor, 0), (self.ally, 1)):
+            entity.sexual.climax_phase.value = "接近"
+            entity.sexual.pleasure.base = 40
+            entity.db.inventory = [key]
+            with combat_provenance(
+                CombatProvenance(
+                    engagement_id="hostile:slots:1",
+                    round_ordinal=1,
+                    slot_ordinal=slot,
+                )
+            ):
+                result = resolve_item_use(
+                    ItemUseRequest(entity, key),
+                    in_combat=True,
+                    context=RoomActionContext(self.room),
+                )
+            self.assertEqual(result.outcome, "success")
+
+        milestones = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__identifier="climax_onset",
+            )
+        )
+        self.assertEqual(
+            {m.content["action_source_id"] for m in milestones},
+            {
+                f"item:combat:hostile:slots:1:r1:s0:{self.actor.pk}:{key}",
+                f"item:combat:hostile:slots:1:r1:s1:{self.ally.pk}:{key}",
+            },
+        )
+        for milestone in milestones:
+            self.assertEqual(
+                milestone.content["encounter_context"]["encounter_id"],
+                "hostile:slots:1",
+            )
+            self.assertEqual(
+                NarrativeEvent.objects.filter(
+                    event_type="adult_milestone",
+                    content__action_source_id=milestone.content["action_source_id"],
+                ).count(),
+                1,
+            )
+
+    @covers_requirement(
+        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
+    )
+    def test_evidence_write_failure_rolls_back_consumption_and_milestones(self):
+        """Scenario: Owner rollback removes evidence with the gameplay."""
+        from world.narrative.events import record_narrative_event
+        from world.rules.clock import get_world_clock
+
+        self.actor.db.inventory = [_GROUP_BLISS_KEY]
+        tick_before = int(get_world_clock().tick)
+
+        def failing(**kwargs: Any) -> Any:
+            record_narrative_event(**kwargs)
+            raise RuntimeError("injected evidence failure")
+
+        with patch("world.narrative.events.record_narrative_event", side_effect=failing):
+            with self.assertRaises(RuntimeError):
+                use_item(self.actor, _GROUP_BLISS_KEY)
+
+        self.assertEqual(self.actor.db.inventory, [_GROUP_BLISS_KEY])
+        self.assertEqual(self.ally.sexual.climax_phase.level, "接近")
+        self.assertEqual(int(self.ally.sexual.pleasure.base), 40)
+        self.assertEqual(int(get_world_clock().tick), tick_before)
+        self.assertEqual(NarrativeEvent.objects.count(), 0)
+        self.assertEqual(ProjectionProgress.objects.count(), 0)
+
