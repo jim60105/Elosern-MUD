@@ -1,0 +1,630 @@
+"""Behavior tests for recent-deed eligibility, authorized window, aggregation, and bounded JSON rendering.
+
+OpenSpec change: select-authorized-recent-deeds
+Specs: openspec/specs/title-system/spec.md
+"""
+
+from copy import deepcopy
+import json
+import unittest
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTestCase
+
+from tools.spec_traceability import covers_requirement
+from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
+from world.narrative.events import record_narrative_event
+from world.narrative.models import NarrativeEvent
+from world.narrative.recent_deeds import (
+    RECENT_DEEDS_JSON_CODE_POINTS_LIMIT,
+    canonical_two_day_seconds,
+    compute_recent_deeds_window,
+    select_authorized_recent_deeds,
+)
+
+
+class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
+    """Behavior tests for authorized recent deed selection, grouping, and bounded rendering."""
+
+    def setUp(self):
+        super().setUp()
+        self.char = create_object(PlayerCharacter, key="t_sel_player")
+        self.other_char = create_object(PlayerCharacter, key="t_sel_other")
+        self.room = create_object(Room, key="t_sel_room")
+        self.char.location = self.room
+        self.other_char.location = self.room
+        self.player_pk = str(self.char.pk)
+        self.other_pk = str(self.other_char.pk)
+
+    @covers_requirement("title-system::recent-deeds-use-a-frozen-inclusive-two-day-world-window")
+    def test_inclusive_bounds_and_future_exclusion(self):
+        """Scenario: Inclusive bounds.
+
+        Records exist at lower bound, one tick earlier, T, and T + 1.
+        Only lower bound and T qualify; future records and records before lower bound excluded.
+        """
+        t = 200000
+        duration = canonical_two_day_seconds()
+        lower = t - duration
+
+        # 1. Before lower bound: lower - 1
+        record_narrative_event(
+            source_id="quest:before_lower",
+            event_type="quest_completion",
+            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=lower - 1,
+        )
+        # 2. Exactly at lower bound
+        record_narrative_event(
+            source_id="quest:at_lower",
+            event_type="quest_completion",
+            content={"quest_id": "q2", "definition_key": "dk2", "completed_objective": "obj2", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=lower,
+        )
+        # 3. Inside window
+        record_narrative_event(
+            source_id="quest:inside",
+            event_type="quest_completion",
+            content={"quest_id": "q3", "definition_key": "dk3", "completed_objective": "obj3", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t - 100,
+        )
+        # 4. Exactly at T
+        record_narrative_event(
+            source_id="quest:at_t",
+            event_type="quest_completion",
+            content={"quest_id": "q4", "definition_key": "dk4", "completed_objective": "obj4", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        # 5. Future record: T + 1
+        record_narrative_event(
+            source_id="quest:future",
+            event_type="quest_completion",
+            content={"quest_id": "q5", "definition_key": "dk5", "completed_objective": "obj5", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t + 1,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        retained_sources = result.source_ids
+
+        self.assertIn("quest:at_lower", retained_sources)
+        self.assertIn("quest:inside", retained_sources)
+        self.assertIn("quest:at_t", retained_sources)
+        self.assertNotIn("quest:before_lower", retained_sources)
+        self.assertNotIn("quest:future", retained_sources)
+
+    @covers_requirement("title-system::recent-deeds-use-a-frozen-inclusive-two-day-world-window")
+    def test_canonical_duration_and_zero_clamp(self):
+        """Scenario: Canonical duration and zero clamp.
+
+        When T is less than two configured world days, lower bound is 0 and duration is 172800.
+        """
+        duration = canonical_two_day_seconds()
+        self.assertEqual(duration, 172800)
+
+        t_small = 50000
+        lower, upper = compute_recent_deeds_window(t_small)
+        self.assertEqual(lower, 0)
+        self.assertEqual(upper, t_small)
+
+        # Record at tick 0 should be included when T = 50000
+        record_narrative_event(
+            source_id="quest:zero_tick",
+            event_type="quest_completion",
+            content={"quest_id": "q_zero", "definition_key": "dk_zero", "completed_objective": "obj", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=0,
+        )
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t_small)
+        self.assertIn("quest:zero_tick", result.source_ids)
+
+    @covers_requirement("title-system::recent-deeds-use-a-frozen-inclusive-two-day-world-window")
+    def test_expired_repetitions_do_not_count_and_selection_does_not_consume(self):
+        """Scenario: Expired repetitions do not count.
+
+        Matching repeated actions straddling window boundary only count retained occurrences.
+        Later requests can reuse deeds without consumption.
+        """
+        t = 200000
+        lower, _ = compute_recent_deeds_window(t)
+
+        # Action repeated 3 times before window
+        for i in range(1, 4):
+            record_narrative_event(
+                source_id=f"action:straddle:before:{i}",
+                event_type="skill_use",
+                content={
+                    "skill_key": "fireball",
+                    "actor": {"id": self.player_pk, "name": "Caster"},
+                    "recipients": [{"id": self.other_pk, "name": "Target"}],
+                    "effects": [{"damage": 10}],
+                },
+                participants=[self.player_pk, self.other_pk],
+                tick=lower - 100 + i,
+            )
+
+        # Action repeated 2 times inside window
+        for i in range(1, 3):
+            record_narrative_event(
+                source_id=f"action:straddle:inside:{i}",
+                event_type="skill_use",
+                content={
+                    "skill_key": "fireball",
+                    "actor": {"id": self.player_pk, "name": "Caster"},
+                    "recipients": [{"id": self.other_pk, "name": "Target"}],
+                    "effects": [{"damage": 10}],
+                },
+                participants=[self.player_pk, self.other_pk],
+                tick=lower + 10 + i,
+            )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertEqual(len(result.groups), 1)
+        group = result.groups[0]
+        # Only the 2 occurrences inside the window count
+        self.assertEqual(group.count, 2)
+        self.assertEqual(len(group.source_ids), 2)
+        self.assertIn("action:straddle:inside:1", group.source_ids)
+        self.assertIn("action:straddle:inside:2", group.source_ids)
+
+        # Second request reuses the same events (unconsumed)
+        result2 = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+        self.assertEqual(len(result2.groups), 1)
+        self.assertEqual(result2.groups[0].count, 2)
+
+    @covers_requirement("title-system::recent-deed-eligibility-is-closed-and-personally-authorized")
+    def test_closed_evidence_set(self):
+        """Scenario: Closed evidence set.
+
+        Only authorized supported deterministic deeds enter the stream;
+        narrator prose, model statements, movement, waiting, commerce, conversation, and protection are excluded.
+        """
+        t = 100000
+
+        # Admitted types
+        record_narrative_event(
+            source_id="quest:admitted",
+            event_type="quest_completion",
+            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="exam:admitted",
+            event_type="guild_exam_settlement",
+            content={"exam_id": "e1", "attained_rank": "D", "target_rank": "D", "passed": True},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="combat:admitted",
+            event_type="combat_encounter",
+            content={"session_id": "s1", "outcome": "victory", "mode": "hostile", "participant_ids": [self.player_pk]},
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        # Excluded types
+        record_narrative_event(
+            source_id="prot:excluded",
+            event_type="encounter_protection",
+            content={"encounter_outcome": "victory"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="claim:excluded",
+            event_type="claim_receipt",
+            content={"statement": "model statement"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="beat:excluded",
+            event_type="narrative_beat",
+            content={"summary": "narrator beat"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="move:excluded",
+            event_type="wilderness_move",
+            content={"destination": "forest"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id="mail:excluded",
+            event_type="correspondence_read",
+            content={"letter_source_id": "let1"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        # Failed exam is excluded
+        record_narrative_event(
+            source_id="exam:failed_excluded",
+            event_type="guild_exam_settlement",
+            content={"exam_id": "e_fail", "attained_rank": "E", "passed": False},
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertIn("quest:admitted", result.source_ids)
+        self.assertIn("exam:admitted", result.source_ids)
+        self.assertIn("combat:admitted", result.source_ids)
+
+        self.assertNotIn("prot:excluded", result.source_ids)
+        self.assertNotIn("claim:excluded", result.source_ids)
+        self.assertNotIn("beat:excluded", result.source_ids)
+        self.assertNotIn("move:excluded", result.source_ids)
+        self.assertNotIn("mail:excluded", result.source_ids)
+        self.assertNotIn("exam:failed_excluded", result.source_ids)
+
+    @covers_requirement("title-system::recent-deed-eligibility-is-closed-and-personally-authorized")
+    def test_field_privacy_precedes_counts_and_invariance(self):
+        """Scenario: Field privacy precedes counts.
+
+        When a participant record contains another character's private or unknown state,
+        those fields influence neither rendered facts nor aggregate counts and summaries.
+        Mutations to another character's private fields produce zero change in returned output.
+        """
+        t = 50000
+
+        def make_adult_content(other_private_roll: int, other_auto_comply: bool, other_milestone: str):
+            data = {
+                "action_source_id": "adult:priv_test",
+                "act_key": "caress",
+                "act_name": "溫柔愛撫",
+                "actor": {"id": self.player_pk, "name": "ActorPlayer"},
+                "recipients": [{"id": self.other_pk, "name": "OtherTarget"}],
+                "outcomes": {
+                    "resistance": [
+                        {
+                            "actor_id": self.player_pk,
+                            "target_id": self.other_pk,
+                            "target_name": "OtherTarget",
+                            "resisted": False,
+                            "roll": other_private_roll,           # PRIVATE to other
+                            "auto_comply": other_auto_comply,     # PRIVATE to other
+                        }
+                    ],
+                    "effects": [{"target_id": self.other_pk, "effect": "pleasure"}],
+                },
+                "milestones": [
+                    {
+                        "source_id": "ms:player:1",
+                        "milestone_kind": "experience_type",
+                        "identifier": "caress_exp",
+                        "entity_id": self.player_pk,
+                    },
+                    {
+                        "source_id": "ms:other:1",
+                        "milestone_kind": "state_transition",
+                        "identifier": other_milestone,            # PRIVATE to other
+                        "entity_id": self.other_pk,
+                    },
+                ],
+                "field_access": {
+                    self.player_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
+                    self.other_pk: ["target_own_outcome", "resistance_verdict", "effects_on_target", "target_milestones"],
+                },
+            }
+            return data
+
+        # Baseline event
+        event1, _, _ = record_narrative_event(
+            source_id="adult:priv_test",
+            event_type="adult_action",
+            content=make_adult_content(15, False, "virginity_loss"),
+            participants=[self.player_pk, self.other_pk],
+            tick=t,
+        )
+
+        res1 = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        rendered1 = res1.rendered_json
+
+        # Assert private fields are NOT present in rendered facts
+        self.assertNotIn("roll", rendered1)
+        self.assertNotIn("auto_comply", rendered1)
+        self.assertNotIn("virginity_loss", rendered1)
+        self.assertIn("ActorPlayer", rendered1)
+        self.assertIn("caress_exp", rendered1)
+
+        # Invariance test: mutate the other character's private fields (roll, auto_comply, private milestone)
+        event1.content = make_adult_content(99, True, "climax_onset")
+        event1.save()
+
+        res2 = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        rendered2 = res2.rendered_json
+
+        # The returned JSON, group counts, and source_ids MUST BE 100% IDENTICAL
+        self.assertEqual(rendered1, rendered2)
+        self.assertEqual(res1.source_ids, res2.source_ids)
+        self.assertEqual(res1.groups[0].count, res2.groups[0].count)
+
+    @covers_requirement("title-system::recent-deed-eligibility-is-closed-and-personally-authorized")
+    def test_malformed_record_fails_closed(self):
+        """Scenario: Malformed record fails closed.
+
+        When one eligible source is malformed beside a usable record,
+        only the malformed source is omitted with a diagnostic; no substitute facts are manufactured.
+        """
+        t = 50000
+
+        # Usable valid record
+        record_narrative_event(
+            source_id="quest:usable",
+            event_type="quest_completion",
+            content={"quest_id": "q_ok", "definition_key": "dk_ok", "completed_objective": "obj_ok", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        # Malformed record (missing definition_key and outcome)
+        record_narrative_event(
+            source_id="quest:corrupt",
+            event_type="quest_completion",
+            content={"quest_id": "q_bad"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertIn("quest:usable", result.source_ids)
+        self.assertNotIn("quest:corrupt", result.source_ids)
+
+        # Malformed passed field (string "true" instead of bool True)
+        record_narrative_event(
+            source_id="exam:string_passed",
+            event_type="guild_exam_settlement",
+            content={"exam_id": "e_str", "target_rank": "D", "attained_rank": "D", "passed": "true"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+        res_exam = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertNotIn("exam:string_passed", res_exam.source_ids)
+
+        # Malformed adult action (missing act_key and empty actor id)
+        record_narrative_event(
+            source_id="adult:no_actor",
+            event_type="adult_action",
+            content={
+                "action_source_id": "adult:no_actor",
+                "actor": {"id": ""},
+                "recipients": [],
+                "field_access": {self.player_pk: ["actor"]},
+            },
+            participants=[self.player_pk],
+            tick=t,
+        )
+        res_adult = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertNotIn("adult:no_actor", res_adult.source_ids)
+
+    @covers_requirement("title-system::recent-deed-groups-retain-outcomes-and-stable-provenance")
+    def test_context_boundaries_stop_repetition_and_encounters_never_merge(self):
+        """Scenario: Context boundaries stop repetition.
+
+        Consecutive actions change roles, participants, action type or encounter -> new repetition group.
+        Different encounters never merge.
+        Interruption A, B, A creates distinct runs.
+        """
+        t = 50000
+
+        # Run 1: fireball on other_pk (2 times)
+        for i in (1, 2):
+            record_narrative_event(
+                source_id=f"act:run1:{i}",
+                event_type="skill_use",
+                content={
+                    "skill_key": "fireball",
+                    "actor": {"id": self.player_pk},
+                    "recipients": [{"id": self.other_pk}],
+                    "effects": [{"dmg": 10}],
+                },
+                participants=[self.player_pk, self.other_pk],
+                tick=t + i,
+            )
+
+        # Run 2: ice_bolt on other_pk (different action type)
+        record_narrative_event(
+            source_id="act:run2:1",
+            event_type="skill_use",
+            content={
+                "skill_key": "ice_bolt",
+                "actor": {"id": self.player_pk},
+                "recipients": [{"id": self.other_pk}],
+                "effects": [{"dmg": 5}],
+            },
+            participants=[self.player_pk, self.other_pk],
+            tick=t + 10,
+        )
+
+        # Run 3: fireball on other_pk again (A, B, A interruption)
+        record_narrative_event(
+            source_id="act:run3:1",
+            event_type="skill_use",
+            content={
+                "skill_key": "fireball",
+                "actor": {"id": self.player_pk},
+                "recipients": [{"id": self.other_pk}],
+                "effects": [{"dmg": 10}],
+            },
+            participants=[self.player_pk, self.other_pk],
+            tick=t + 20,
+        )
+
+        # Separate encounters: Encounter 1 and Encounter 2
+        record_narrative_event(
+            source_id="enc:enc1",
+            event_type="combat_encounter",
+            content={"session_id": "sess_1", "outcome": "victory"},
+            participants=[self.player_pk],
+            tick=t + 30,
+        )
+        record_narrative_event(
+            source_id="enc:enc2",
+            event_type="combat_encounter",
+            content={"session_id": "sess_2", "outcome": "escape"},
+            participants=[self.player_pk],
+            tick=t + 40,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 50)
+        # Should have: Run 1 (fireball, count=2), Run 2 (ice_bolt, count=1), Run 3 (fireball, count=1), enc1, enc2
+        # Exactly 5 distinct groups! Run 1 and Run 3 must NOT merge!
+        self.assertEqual(len(result.groups), 5)
+
+        fireball_groups = [g for g in result.groups if g.facts.get("skill_key") == "fireball"]
+        self.assertEqual(len(fireball_groups), 2)
+        counts = sorted(g.count for g in fireball_groups)
+        self.assertEqual(counts, [1, 2])
+
+        enc_groups = [g for g in result.groups if g.group_type == "combat_encounter"]
+        self.assertEqual(len(enc_groups), 2)
+        enc_sessions = {g.facts["session_id"] for g in enc_groups}
+        self.assertEqual(enc_sessions, {"sess_1", "sess_2"})
+
+    @covers_requirement("title-system::recent-deed-groups-retain-outcomes-and-stable-provenance")
+    def test_action_milestones_do_not_double_count_and_no_invented_aggregate_identity(self):
+        """Scenario: Action milestones do not double count & No invented aggregate identity.
+
+        One action with effects and milestone retains both with required source IDs and counts once.
+        Group lists immutable source IDs and claims no new persisted aggregate ID.
+        """
+        t = 50000
+        action_source = "adult:action:comb_test"
+        ms_source = "adult:milestone:comb_test"
+
+        record_narrative_event(
+            source_id=action_source,
+            event_type="adult_action",
+            content={
+                "action_source_id": action_source,
+                "act_key": "embrace",
+                "act_name": "相擁",
+                "actor": {"id": self.player_pk},
+                "recipients": [{"id": self.other_pk}],
+                "outcomes": {"effects": [{"warmth": 1}]},
+                "milestones": [],
+                "field_access": {
+                    self.player_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
+                },
+            },
+            participants=[self.player_pk, self.other_pk],
+            tick=t,
+        )
+        record_narrative_event(
+            source_id=ms_source,
+            event_type="adult_milestone",
+            content={
+                "action_source_id": action_source,
+                "milestone_kind": "state_transition",
+                "identifier": "emotional_bond",
+                "entity_id": self.player_pk,
+                "details": {"type": "warmth_deepened"},
+            },
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertEqual(len(result.groups), 1)
+        group = result.groups[0]
+        # Counts that action occurrence ONCE
+        self.assertEqual(group.count, 1)
+        # Lists both immutable source IDs
+        self.assertEqual(sorted(group.source_ids), sorted([action_source, ms_source]))
+        # Facts contain both effects and milestone
+        self.assertIn("warmth", str(group.facts))
+        self.assertIn("emotional_bond", str(group.facts))
+        # No invented aggregate event ID in the group dict
+        self.assertNotIn("aggregate_id", group.facts)
+        self.assertNotIn("event_id", group.to_dict())
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_deterministic_tie_and_eight_group_cap(self):
+        """Scenario: Deterministic tie and cap.
+
+        More than 8 groups share latest ticks -> newest 8 follow stable source tie order.
+        """
+        t = 100000
+
+        # Create 12 quest completion groups sharing tick t
+        for i in range(1, 13):
+            # source_ids "quest:batch:01" to "quest:batch:12"
+            sid = f"quest:batch:{i:02d}"
+            record_narrative_event(
+                source_id=sid,
+                event_type="quest_completion",
+                content={"quest_id": f"q_{i}", "definition_key": f"dk_{i}", "completed_objective": f"obj_{i}", "outcome": "completed"},
+                participants=[self.player_pk],
+                tick=t,
+            )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertEqual(len(result.groups), 8)
+        # Sorting is (-tick, primary_source_id ASC)
+        expected_sources = [f"quest:batch:{i:02d}" for i in range(1, 9)]
+        actual_sources = [g.primary_source_id for g in result.groups]
+        self.assertEqual(actual_sources, expected_sources)
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_unicode_budget_and_oversized_group_omission(self):
+        """Scenario: Unicode and oversized groups.
+
+        Groups exceeding 8000 Unicode code points drop older complete groups.
+        Oversized singleton groups are omitted.
+        """
+        t = 50000
+
+        # Group 1 (newest): Oversized singleton exceeding 8000 chars alone!
+        huge_text = "繁體中文測試事實超長字串" * 700  # 8400 chars > 8000 code points
+        record_narrative_event(
+            source_id="quest:huge_newest",
+            event_type="quest_completion",
+            content={"quest_id": "q_huge", "definition_key": "dk_huge", "completed_objective": huge_text, "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t + 10,
+        )
+
+        # Group 2 (older): Normal small group
+        record_narrative_event(
+            source_id="quest:normal_older",
+            event_type="quest_completion",
+            content={"quest_id": "q_small", "definition_key": "dk_small", "completed_objective": "small obj", "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 20)
+        # Oversized newest singleton must be omitted; normal older group must be retained!
+        self.assertNotIn("quest:huge_newest", result.source_ids)
+        self.assertIn("quest:normal_older", result.source_ids)
+        self.assertLessEqual(len(result.rendered_json), RECENT_DEEDS_JSON_CODE_POINTS_LIMIT)
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_no_renderable_evidence_empty_rendering(self):
+        """Scenario: No renderable evidence.
+
+        When every eligible group is too large or no eligible groups exist,
+        feed is empty (meaning empty material: {"recent_deeds": []}).
+        """
+        t = 50000
+        huge_text = "超大型文字資料" * 1500
+        record_narrative_event(
+            source_id="quest:only_huge",
+            event_type="quest_completion",
+            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": huge_text, "outcome": "completed"},
+            participants=[self.player_pk],
+            tick=t,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertEqual(len(result.groups), 0)
+        self.assertEqual(len(result.source_ids), 0)
+        self.assertEqual(result.rendered_json, '{"recent_deeds":[]}')
