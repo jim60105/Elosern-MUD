@@ -1,0 +1,856 @@
+"""Authorized recent-deed selection and bounded rendering for epithet nomination.
+
+OpenSpec change: select-authorized-recent-deeds
+Design: docs/superpowers/specs/2026-10-22-epithet-recent-deeds-design.md §5, §5.1, §6, §9, §10
+Specs: openspec/specs/title-system/spec.md
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import json
+from typing import Any, Iterable, Sequence
+
+from django.db.models import QuerySet
+
+from world.narrative.models import NarrativeEvent
+from world.observability import log_warn, log_error
+from world.rules.clock import CLOCK_YAML, read_world_clock
+
+#: Maximum Unicode code points allowed for rendered recent deeds JSON envelope
+RECENT_DEEDS_JSON_CODE_POINTS_LIMIT = 8000
+
+#: Maximum number of factual groups retained in the nomination feed
+RECENT_DEEDS_MAX_GROUPS = 8
+
+#: Closed deterministic narrative event types admitted for recent-deed nomination
+ADMITTED_EVENT_TYPES = frozenset({
+    "quest_completion",
+    "guild_exam_settlement",
+    "combat_encounter",
+    "skill_use",
+    "adult_action",
+    "adult_milestone",
+})
+
+#: Excluded event types (explicit non-evidence)
+EXCLUDED_EVENT_TYPES = frozenset({
+    "encounter_protection",
+    "claim_receipt",
+    "narrative_beat",
+    "correspondence_delivery",
+    "correspondence_read",
+    "wilderness_move",
+})
+
+
+def canonical_two_day_seconds() -> int:
+    """Derive canonical two-day world window duration in seconds from clock config."""
+    seconds_per_hour = int(CLOCK_YAML.get("seconds_per_hour", 3600))
+    hours_per_day = int(CLOCK_YAML.get("hours_per_day", 24))
+    day_seconds = seconds_per_hour * hours_per_day
+    return 2 * day_seconds
+
+
+def compute_recent_deeds_window(frozen_tick: int) -> tuple[int, int]:
+    """Compute the inclusive world tick window [lower_bound, upper_bound].
+
+    Upper bound is T (frozen_tick).
+    Lower bound is max(0, T - 2 canonical world days).
+    """
+    t = int(frozen_tick)
+    duration = canonical_two_day_seconds()
+    lower_bound = max(0, t - duration)
+    return lower_bound, t
+
+
+def _durable_pk(entity: Any) -> str:
+    """Return stable string identifier for an entity."""
+    pk = getattr(entity, "pk", None)
+    if pk is not None:
+        return str(pk)
+    entity_id = getattr(entity, "id", None)
+    if entity_id is not None:
+        return str(entity_id)
+    key = getattr(entity, "key", None)
+    if key is not None and str(key).strip():
+        return str(key).strip()
+    return str(entity).strip()
+
+
+@dataclass(frozen=True)
+class AuthorizedDeedRecord:
+    """A single authorized, validated, projected narrative deed record."""
+
+    source_id: str
+    event_type: str
+    tick: int
+    data: dict[str, Any]
+    award_results: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass
+class DeedFactGroup:
+    """A bounded factual group of one or more related recent occurrences."""
+
+    group_type: str
+    latest_tick: int
+    source_ids: list[str]
+    count: int
+    facts: dict[str, Any]
+
+    @property
+    def primary_source_id(self) -> str:
+        return self.source_ids[0] if self.source_ids else ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "group_type": self.group_type,
+            "latest_tick": self.latest_tick,
+            "source_ids": list(self.source_ids),
+            "count": self.count,
+            "facts": self.facts,
+        }
+
+
+@dataclass(frozen=True)
+class RecentDeedsSelectionResult:
+    """Immutable result of recent-deed selection and bounded JSON rendering."""
+
+    player_id: str
+    frozen_tick: int
+    groups: tuple[DeedFactGroup, ...]
+    source_ids: tuple[str, ...]
+    rendered_json: str
+
+
+def _project_adult_action_for_player(
+    event: NarrativeEvent,
+    player_pk: str,
+) -> dict[str, Any] | None:
+    """Project adult_action content strictly according to player's authorized field access.
+
+    Ensures other participants' private internal states never leak into rendered facts
+    or counts, even if other participants' states are malformed or mutated.
+    """
+    content = event.content if isinstance(event.content, dict) else {}
+    field_access = content.get("field_access")
+    if not isinstance(field_access, dict):
+        return None
+
+    perms = field_access.get(player_pk)
+    if not isinstance(perms, (list, tuple, set)):
+        return None
+    allowed_tokens = set(perms)
+
+    actor_info = content.get("actor")
+    if not isinstance(actor_info, dict) or not str(actor_info.get("id", "")).strip():
+        raise ValueError(f"malformed adult_action actor in {event.source_id}")
+    actor_id = str(actor_info.get("id", ""))
+    is_actor = actor_id == player_pk
+
+    act_key = content.get("act_key")
+    if not (isinstance(act_key, str) and act_key.strip()):
+        raise ValueError(f"malformed adult_action act_key in {event.source_id}")
+
+    projected: dict[str, Any] = {
+        "action_source_id": content.get("action_source_id", event.source_id),
+        "act_key": content.get("act_key", ""),
+        "act_name": content.get("act_name", ""),
+        "category": "sexual_act",
+        "encounter_context": content.get("encounter_context"),
+    }
+
+    # Actor identity
+    if "actor" in allowed_tokens:
+        projected["actor"] = {
+            "id": actor_id,
+            "name": str(actor_info.get("name", "")),
+            "role": "actor",
+        }
+    elif is_actor and "target_own_outcome" in allowed_tokens:
+        projected["actor"] = {"id": actor_id, "role": "actor"}
+    elif not is_actor:
+        projected["actor"] = {"id": actor_id, "role": "actor"}
+
+    # Recipients
+    recipients = content.get("recipients", [])
+    if isinstance(recipients, list) and "recipients" in allowed_tokens:
+        projected["recipients"] = [
+            {"id": str(r.get("id", "")), "name": str(r.get("name", "")), "role": "recipient"}
+            for r in recipients
+            if isinstance(r, dict)
+        ]
+    elif not is_actor and "target_own_outcome" in allowed_tokens:
+        # Recipient seeing themselves
+        matching_recip = [
+            {"id": str(r.get("id", "")), "name": str(r.get("name", "")), "role": "recipient"}
+            for r in recipients
+            if isinstance(r, dict) and str(r.get("id", "")) == player_pk
+        ]
+        projected["recipients"] = matching_recip
+    else:
+        projected["recipients"] = []
+
+    # Outcomes projection
+    outcomes = content.get("outcomes", {})
+    if not isinstance(outcomes, dict):
+        outcomes = {}
+
+    projected_outcomes: dict[str, Any] = {}
+
+    # Physical / target effects
+    raw_effects = outcomes.get("effects", [])
+    if isinstance(raw_effects, list):
+        if "physical_effects" in allowed_tokens:
+            projected_outcomes["effects"] = [dict(eff) for eff in raw_effects if isinstance(eff, dict)]
+        elif "effects_on_target" in allowed_tokens:
+            projected_outcomes["effects"] = [
+                dict(eff)
+                for eff in raw_effects
+                if isinstance(eff, dict) and str(eff.get("target_id", "")) == player_pk
+            ]
+
+    # Resistance verdicts (only actual resisted boolean and identity, NEVER dice rolls or auto_comply)
+    raw_resist = outcomes.get("resistance", [])
+    if isinstance(raw_resist, list) and "resistance_verdict" in allowed_tokens:
+        verdicts = []
+        for r in raw_resist:
+            if not isinstance(r, dict):
+                continue
+            r_target = str(r.get("target_id", ""))
+            if is_actor or r_target == player_pk:
+                resisted_val = bool(r.get("resisted", False))
+                verdicts.append({
+                    "target_id": r_target,
+                    "target_name": str(r.get("target_name", "")),
+                    "resisted": resisted_val,
+                })
+        projected_outcomes["resistance"] = verdicts
+
+    # Embedded milestones: ONLY the player's own milestones
+    embedded_ms = content.get("milestones", [])
+    player_ms = []
+    has_ms_perm = "actor_milestones" in allowed_tokens or "target_milestones" in allowed_tokens
+    if isinstance(embedded_ms, list) and has_ms_perm:
+        for ms in embedded_ms:
+            if isinstance(ms, dict) and str(ms.get("entity_id", "")) == player_pk:
+                player_ms.append({
+                    "source_id": str(ms.get("source_id", "")),
+                    "milestone_kind": str(ms.get("milestone_kind", "")),
+                    "identifier": str(ms.get("identifier", "")),
+                    "entity_id": player_pk,
+                })
+    projected["milestones"] = player_ms
+    projected["outcomes"] = projected_outcomes
+
+    # Privacy declaration
+    projected["privacy"] = {
+        "consent_inferred": False,
+        "willingness_inferred": False,
+        "relationship_inferred": False,
+        "public_notoriety": False,
+    }
+
+    return projected
+
+
+def _validate_and_project_record(
+    event: NarrativeEvent,
+    player_pk: str,
+) -> AuthorizedDeedRecord | None:
+    """Validate and project a single narrative event for player_pk.
+
+    Returns AuthorizedDeedRecord if authorized and valid, or None if omitted/inaccessible.
+    Raises ValueError on malformed eligible record.
+    """
+    event_type = str(event.event_type)
+    if event_type not in ADMITTED_EVENT_TYPES:
+        return None
+
+    # Exclude model-authored statements, routine activities, protection
+    if event_type in EXCLUDED_EVENT_TYPES:
+        return None
+
+    participants = [str(p) for p in (event.participants or ())]
+    if player_pk not in participants:
+        return None
+
+    content = event.content if isinstance(event.content, dict) else {}
+
+    raw_awards = content.get("award_results", [])
+    award_results: list[dict[str, Any]] = []
+    if isinstance(raw_awards, list):
+        award_results = [dict(a) for a in raw_awards if isinstance(a, dict)]
+
+    if event_type == "quest_completion":
+        quest_id = content.get("quest_id")
+        definition_key = content.get("definition_key")
+        completed_objective = content.get("completed_objective")
+        outcome = content.get("outcome")
+        if not (quest_id and definition_key and completed_objective is not None and outcome):
+            raise ValueError(f"malformed quest_completion record {event.source_id}")
+        data = {
+            "quest_id": str(quest_id),
+            "definition_key": str(definition_key),
+            "completed_objective": dict(completed_objective) if isinstance(completed_objective, dict) else str(completed_objective),
+            "outcome": str(outcome),
+        }
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=data,
+            award_results=tuple(award_results),
+        )
+
+    elif event_type == "guild_exam_settlement":
+        passed = content.get("passed")
+        if not passed:
+            # Only passed exams are admitted evidence
+            return None
+        if not isinstance(passed, bool):
+            raise ValueError(f"malformed guild_exam_settlement passed value {passed!r} in {event.source_id}")
+        exam_id = content.get("exam_id")
+        attained_rank = content.get("attained_rank")
+        if not (exam_id and attained_rank):
+            raise ValueError(f"malformed guild_exam_settlement record {event.source_id}")
+        data = {
+            "exam_id": str(exam_id),
+            "target_rank": str(content.get("target_rank", "")),
+            "attained_rank": str(attained_rank),
+            "passed": True,
+        }
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=data,
+            award_results=tuple(award_results),
+        )
+
+    elif event_type == "combat_encounter":
+        session_id = content.get("session_id")
+        outcome = content.get("outcome")
+        if not (session_id and outcome):
+            raise ValueError(f"malformed combat_encounter record {event.source_id}")
+        data = {
+            "session_id": str(session_id),
+            "outcome": str(outcome),
+            "gameplay_outcome": str(content.get("gameplay_outcome", outcome)),
+            "mode": str(content.get("mode", "hostile")),
+            "participant_ids": [str(pid) for pid in content.get("participant_ids", [])],
+            "opponent_ids": [str(oid) for oid in content.get("opponent_ids", [])],
+            "rounds_elapsed": int(content.get("rounds_elapsed", 0)),
+            "display_snapshots": dict(content.get("display_snapshots", {})),
+        }
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=data,
+            award_results=tuple(award_results),
+        )
+
+    elif event_type == "skill_use":
+        skill_key = content.get("skill_key")
+        actor = content.get("actor")
+        if not (skill_key and isinstance(actor, dict)):
+            raise ValueError(f"malformed skill_use record {event.source_id}")
+        actor_id = str(actor.get("id", ""))
+        recipients = content.get("recipients", [])
+        recip_records = [
+            {"id": str(r.get("id", "")), "name": str(r.get("name", "")), "role": "recipient"}
+            for r in recipients
+            if isinstance(r, dict)
+        ]
+        # In combat or outside, personal involvement means player is actor or recipient
+        if actor_id != player_pk and not any(r["id"] == player_pk for r in recip_records):
+            return None
+
+        data = {
+            "action_source_id": str(content.get("action_source_id", event.source_id)),
+            "skill_key": str(skill_key),
+            "skill_name": str(content.get("skill_name", skill_key)),
+            "category": str(content.get("category", "skill")),
+            "encounter_context": content.get("encounter_context"),
+            "actor": {"id": actor_id, "name": str(actor.get("name", "")), "role": "actor"},
+            "recipients": recip_records,
+            "effects": [dict(e) for e in content.get("effects", []) if isinstance(e, dict)],
+            "claim_limits": {
+                "rescue_claimed": False,
+                "protection_claimed": False,
+                "exceptional_difficulty": False,
+            },
+        }
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=data,
+            award_results=tuple(award_results),
+        )
+
+    elif event_type == "adult_action":
+        projected = _project_adult_action_for_player(event, player_pk)
+        if projected is None:
+            # Not authorized or malformed permission block
+            return None
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=projected,
+            award_results=tuple(award_results),
+        )
+
+    elif event_type == "adult_milestone":
+        # Adult milestone records are private to their entity
+        entity_id = str(content.get("entity_id", ""))
+        if entity_id != player_pk:
+            return None
+        milestone_kind = content.get("milestone_kind")
+        identifier = content.get("identifier")
+        if not (milestone_kind and identifier):
+            raise ValueError(f"malformed adult_milestone record {event.source_id}")
+        data = {
+            "action_source_id": str(content.get("action_source_id", "")),
+            "milestone_kind": str(milestone_kind),
+            "identifier": str(identifier),
+            "entity_id": player_pk,
+            "entity_name": str(content.get("entity_name", "")),
+            "details": dict(content.get("details", {})) if isinstance(content.get("details"), dict) else {},
+            "privacy": {
+                "private_experience": True,
+                "public_notoriety": False,
+            },
+        }
+        return AuthorizedDeedRecord(
+            source_id=event.source_id,
+            event_type=event_type,
+            tick=int(event.tick),
+            data=data,
+            award_results=tuple(award_results),
+        )
+
+    return None
+
+
+def _load_authorized_records(
+    player_pk: str,
+    lower_bound: int,
+    upper_bound: int,
+) -> list[AuthorizedDeedRecord]:
+    """Query durable storage and project authorized records within the frozen window.
+
+    Malformed eligible records fail closed for that record only with a diagnostic warning.
+    """
+    qs: QuerySet[NarrativeEvent] = NarrativeEvent.objects.filter(
+        tick__gte=lower_bound,
+        tick__lte=upper_bound,
+        event_type__in=list(ADMITTED_EVENT_TYPES),
+    ).order_by("tick", "source_id")
+
+    authorized_records: list[AuthorizedDeedRecord] = []
+    seen_sources: set[str] = set()
+
+    for event in qs:
+        if event.source_id in seen_sources:
+            continue
+        try:
+            record = _validate_and_project_record(event, player_pk)
+            if record is not None:
+                seen_sources.add(record.source_id)
+                authorized_records.append(record)
+        except Exception as error:
+            # Privacy-safe diagnostic warning: IDs and event_type only, never raw payload
+            log_warn(
+                "recent_deed_record_malformed",
+                context={"source_id": str(event.source_id), "event_type": str(event.event_type)},
+            )
+            continue
+
+    return authorized_records
+
+
+def _get_action_compression_key(record: AuthorizedDeedRecord) -> tuple[str, str, str, str, str] | None:
+    """Return stable grouping tuple for consecutive action compression:
+
+    (action_type, actor_id, sorted_recipients_str, encounter_session_id, player_role)
+    """
+    if record.event_type not in ("skill_use", "adult_action"):
+        return None
+
+    data = record.data
+    action_type = str(data.get("skill_key") or data.get("act_key") or "")
+    actor_id = str(data.get("actor", {}).get("id", ""))
+    recips = data.get("recipients", [])
+    recip_ids = sorted(str(r.get("id", "")) for r in recips if isinstance(r, dict))
+    recip_key = ",".join(recip_ids)
+
+    enc_ctx = data.get("encounter_context")
+    enc_session = str(enc_ctx.get("session_id", "")) if isinstance(enc_ctx, dict) else ""
+
+    player_role = "actor" if actor_id == data.get("player_id") else "recipient"
+
+    return (action_type, actor_id, recip_key, enc_session, player_role)
+
+
+def _build_compressed_action_fact(
+    records: list[AuthorizedDeedRecord],
+    milestones: list[AuthorizedDeedRecord],
+) -> dict[str, Any]:
+    """Build factual content for a run of consecutive compressed actions."""
+    first = records[0]
+    base_data = dict(first.data)
+    is_adult = first.event_type == "adult_action"
+
+    # Collect distinct results
+    distinct_effects: list[dict[str, Any]] = []
+    seen_effects: set[str] = set()
+
+    for r in records:
+        effs = r.data.get("effects") or r.data.get("outcomes", {}).get("effects", [])
+        if isinstance(effs, list):
+            for e in effs:
+                if isinstance(e, dict):
+                    e_json = json.dumps(e, sort_keys=True)
+                    if e_json not in seen_effects:
+                        seen_effects.add(e_json)
+                        distinct_effects.append(e)
+
+    # Collect distinct resistance verdicts
+    distinct_resist: list[dict[str, Any]] = []
+    seen_resist: set[str] = set()
+    for r in records:
+        res_list = r.data.get("outcomes", {}).get("resistance", [])
+        if isinstance(res_list, list):
+            for res in res_list:
+                if isinstance(res, dict):
+                    res_json = json.dumps(res, sort_keys=True)
+                    if res_json not in seen_resist:
+                        seen_resist.add(res_json)
+                        distinct_resist.append(res)
+
+    # Collect distinct milestones
+    combined_milestones: list[dict[str, Any]] = []
+    seen_ms: set[str] = set()
+    for r in records:
+        for ms in r.data.get("milestones", []):
+            if isinstance(ms, dict):
+                ms_id = str(ms.get("source_id") or f"{ms.get('milestone_kind')}:{ms.get('identifier')}")
+                if ms_id not in seen_ms:
+                    seen_ms.add(ms_id)
+                    combined_milestones.append(ms)
+
+    for ms_rec in milestones:
+        ms_id = ms_rec.source_id
+        if ms_id not in seen_ms:
+            seen_ms.add(ms_id)
+            combined_milestones.append({
+                "source_id": ms_id,
+                "milestone_kind": ms_rec.data.get("milestone_kind"),
+                "identifier": ms_rec.data.get("identifier"),
+                "details": ms_rec.data.get("details"),
+            })
+
+    if is_adult:
+        outcomes = dict(base_data.get("outcomes", {}))
+        outcomes["effects"] = distinct_effects
+        outcomes["resistance"] = distinct_resist
+        base_data["outcomes"] = outcomes
+        base_data["milestones"] = combined_milestones
+    else:
+        base_data["effects"] = distinct_effects
+        base_data["milestones"] = combined_milestones
+
+    return base_data
+
+
+def _group_and_aggregate_deeds(
+    authorized_records: list[AuthorizedDeedRecord],
+    player_pk: str,
+) -> list[DeedFactGroup]:
+    """Perform order-independent linking, consecutive action compression, and encounter grouping.
+
+    Invariants:
+    - Encounters group their terminal outcome with member combat actions.
+    - An action and its milestones combine, counting that occurrence once.
+    - Standalone milestones retain distinct factual representation.
+    - Repetition compression applies to consecutive eligible actions matching
+      action type, participants, roles, and encounter context.
+    - Different encounters never merge.
+    - Every group retains immutable source IDs without inventing aggregate IDs.
+    """
+    if not authorized_records:
+        return []
+
+    # Chronological sort for stream processing
+    sorted_stream = sorted(authorized_records, key=lambda r: (r.tick, r.source_id))
+
+    # 1. Index standalone milestones and combat encounter outcomes
+    encounter_records: dict[str, AuthorizedDeedRecord] = {}
+    action_records_by_source: dict[str, AuthorizedDeedRecord] = {}
+    milestones_by_action_source: dict[str, list[AuthorizedDeedRecord]] = {}
+    standalone_milestones: list[AuthorizedDeedRecord] = []
+
+    for r in sorted_stream:
+        if r.event_type == "combat_encounter":
+            session_id = str(r.data.get("session_id", ""))
+            if session_id:
+                encounter_records[session_id] = r
+        elif r.event_type in ("skill_use", "adult_action"):
+            action_source_id = str(r.data.get("action_source_id") or r.source_id)
+            action_records_by_source[action_source_id] = r
+        elif r.event_type == "adult_milestone":
+            action_src = str(r.data.get("action_source_id", ""))
+            if action_src:
+                milestones_by_action_source.setdefault(action_src, []).append(r)
+            else:
+                standalone_milestones.append(r)
+
+    # Recheck milestones whose action_source_id didn't match any admitted action in window
+    for action_src, ms_list in list(milestones_by_action_source.items()):
+        if action_src not in action_records_by_source:
+            standalone_milestones.extend(ms_list)
+            del milestones_by_action_source[action_src]
+
+    # 2. Identify consecutive action runs across the chronological action stream
+    # A run breaks if action type, actor, recipients, encounter, or role changes.
+    action_runs: list[list[AuthorizedDeedRecord]] = []
+    current_run: list[AuthorizedDeedRecord] = []
+    current_key: tuple[str, str, str, str, str] | None = None
+
+    for r in sorted_stream:
+        if r.event_type not in ("skill_use", "adult_action"):
+            # Non-action record breaks consecutive action run!
+            if current_run:
+                action_runs.append(current_run)
+                current_run = []
+                current_key = None
+            continue
+
+        r_key = _get_action_compression_key(r)
+        if current_run and r_key == current_key:
+            current_run.append(r)
+        else:
+            if current_run:
+                action_runs.append(current_run)
+            current_run = [r]
+            current_key = r_key
+
+    if current_run:
+        action_runs.append(current_run)
+
+    # 3. Associate action runs to combat encounters or standalone groups
+    # Encounter session_id -> list of action runs
+    encounter_action_runs: dict[str, list[list[AuthorizedDeedRecord]]] = {}
+    standalone_action_runs: list[list[AuthorizedDeedRecord]] = []
+
+    for run in action_runs:
+        enc_ctx = run[0].data.get("encounter_context")
+        session_id = str(enc_ctx.get("session_id", "")) if isinstance(enc_ctx, dict) else ""
+        if session_id and session_id in encounter_records:
+            encounter_action_runs.setdefault(session_id, []).append(run)
+        else:
+            standalone_action_runs.append(run)
+
+    groups: list[DeedFactGroup] = []
+
+    # 4. Form groups for Quest Completions
+    for r in sorted_stream:
+        if r.event_type == "quest_completion":
+            groups.append(DeedFactGroup(
+                group_type="quest_completion",
+                latest_tick=r.tick,
+                source_ids=[r.source_id],
+                count=1,
+                facts=dict(r.data),
+            ))
+
+    # 5. Form groups for Passed Guild Exams
+    for r in sorted_stream:
+        if r.event_type == "guild_exam_settlement":
+            groups.append(DeedFactGroup(
+                group_type="guild_exam_settlement",
+                latest_tick=r.tick,
+                source_ids=[r.source_id],
+                count=1,
+                facts=dict(r.data),
+            ))
+
+    # 6. Form groups for Combat Encounters (group encounter outcome + its action runs)
+    for session_id, enc_record in encounter_records.items():
+        all_enc_sources = [enc_record.source_id]
+        runs = encounter_action_runs.get(session_id, [])
+        all_ticks = [enc_record.tick]
+        enc_facts = dict(enc_record.data)
+
+        action_summaries = []
+        for run in runs:
+            run_sources = [r.source_id for r in run]
+            all_enc_sources.extend(run_sources)
+            all_ticks.extend(r.tick for r in run)
+
+            # Milestones for actions in this run
+            run_ms: list[AuthorizedDeedRecord] = []
+            for r in run:
+                action_src = str(r.data.get("action_source_id") or r.source_id)
+                matched_ms = milestones_by_action_source.get(action_src, [])
+                for ms in matched_ms:
+                    if ms.source_id not in all_enc_sources:
+                        all_enc_sources.append(ms.source_id)
+                        all_ticks.append(ms.tick)
+                        run_ms.append(ms)
+
+            run_fact = _build_compressed_action_fact(run, run_ms)
+            action_summaries.append({
+                "action_type": run_fact.get("skill_key") or run_fact.get("act_key"),
+                "count": len(run),
+                "latest_tick": max(r.tick for r in run),
+                "facts": run_fact,
+            })
+
+        if action_summaries:
+            enc_facts["actions"] = action_summaries
+
+        groups.append(DeedFactGroup(
+            group_type="combat_encounter",
+            latest_tick=max(all_ticks),
+            source_ids=sorted(set(all_enc_sources)),
+            count=1,
+            facts=enc_facts,
+        ))
+
+    # 7. Form groups for Standalone Action Runs (outside combat or in unmatched encounters)
+    for run in standalone_action_runs:
+        run_sources: list[str] = [r.source_id for r in run]
+        run_ticks: list[int] = [r.tick for r in run]
+        run_ms: list[AuthorizedDeedRecord] = []
+
+        for r in run:
+            action_src = str(r.data.get("action_source_id") or r.source_id)
+            matched_ms = milestones_by_action_source.get(action_src, [])
+            for ms in matched_ms:
+                if ms.source_id not in run_sources:
+                    run_sources.append(ms.source_id)
+                    run_ticks.append(ms.tick)
+                    run_ms.append(ms)
+
+        fact = _build_compressed_action_fact(run, run_ms)
+        group_type = run[0].event_type
+
+        groups.append(DeedFactGroup(
+            group_type=group_type,
+            latest_tick=max(run_ticks),
+            source_ids=sorted(set(run_sources)),
+            count=len(run),
+            facts=fact,
+        ))
+
+    # 8. Form groups for Standalone Adult Milestones
+    for ms in standalone_milestones:
+        groups.append(DeedFactGroup(
+            group_type="adult_milestone",
+            latest_tick=ms.tick,
+            source_ids=[ms.source_id],
+            count=1,
+            facts=dict(ms.data),
+        ))
+
+    return groups
+
+
+def _render_envelope(groups: Sequence[DeedFactGroup]) -> str:
+    """Serialize groups into the canonical JSON envelope string."""
+    payload = {
+        "recent_deeds": [g.to_dict() for g in groups],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _budget_and_render_groups(
+    groups: list[DeedFactGroup],
+) -> tuple[tuple[DeedFactGroup, ...], tuple[str, ...], str]:
+    """Apply ordering, eight-group limit, oversized singleton omission, and 8000 code-point budget.
+
+    Ordering rule:
+    - `latest_tick` descending.
+    - Tie-break: `primary_source_id` ascending.
+
+    Budgeting rule:
+    - Omit any individual group that cannot fit alone in 8000 code points.
+    - Select at most 8 newest groups.
+    - If combined envelope > 8000 code points, iteratively pop the oldest group.
+    - If all groups omitted, return empty envelope `{"recent_deeds":[]}`.
+    - Returned `groups`, `source_ids`, and `rendered_json` are completely synchronized.
+    """
+    if not groups:
+        empty_json = _render_envelope([])
+        return (), (), empty_json
+
+    # Filter out oversized singletons immediately
+    viable_groups: list[DeedFactGroup] = []
+    for g in groups:
+        single_json = _render_envelope([g])
+        if len(single_json) <= RECENT_DEEDS_JSON_CODE_POINTS_LIMIT:
+            viable_groups.append(g)
+
+    if not viable_groups:
+        empty_json = _render_envelope([])
+        return (), (), empty_json
+
+    # Sort newest first, tie-break by primary_source_id ascending
+    viable_groups.sort(key=lambda g: (-g.latest_tick, g.primary_source_id))
+
+    # Take at most RECENT_DEEDS_MAX_GROUPS (8)
+    selected = viable_groups[:RECENT_DEEDS_MAX_GROUPS]
+
+    # Iteratively drop the oldest group if over the 8000 code points limit
+    rendered = _render_envelope(selected)
+    while len(rendered) > RECENT_DEEDS_JSON_CODE_POINTS_LIMIT and selected:
+        selected.pop()  # Drop oldest (last in descending list)
+        rendered = _render_envelope(selected)
+
+    final_groups = tuple(selected)
+    # Collect all retained source_ids
+    all_sources: list[str] = []
+    for g in final_groups:
+        all_sources.extend(g.source_ids)
+    final_sources = tuple(sorted(set(all_sources)))
+
+    return final_groups, final_sources, rendered
+
+
+def select_authorized_recent_deeds(
+    entity: Any,
+    *,
+    frozen_tick: int | None = None,
+) -> RecentDeedsSelectionResult:
+    """Select, authorize, aggregate and render recent deeds for a player character.
+
+    Selection never consumes deeds, permitting subsequent requests to reuse them.
+    Admitted request freezes world tick T.
+    """
+    player_pk = _durable_pk(entity)
+    if frozen_tick is None:
+        clock = read_world_clock()
+        if clock is None:
+            raise RuntimeError("world clock is unavailable")
+        frozen_tick = int(clock.tick)
+    else:
+        frozen_tick = int(frozen_tick)
+
+    lower_bound, upper_bound = compute_recent_deeds_window(frozen_tick)
+
+    authorized_records = _load_authorized_records(player_pk, lower_bound, upper_bound)
+    groups = _group_and_aggregate_deeds(authorized_records, player_pk)
+    final_groups, final_sources, rendered_json = _budget_and_render_groups(groups)
+
+    return RecentDeedsSelectionResult(
+        player_id=player_pk,
+        frozen_tick=frozen_tick,
+        groups=final_groups,
+        source_ids=final_sources,
+        rendered_json=rendered_json,
+    )

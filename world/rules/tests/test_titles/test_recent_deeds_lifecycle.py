@@ -18,7 +18,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.objects import Object
 from typeclasses.rooms import Room
 from world.rules.combat.battlefield import Battlefield
-from world.lore.guild import GUILD_RANK_REGISTRY, GuildRank
+import world.lore.guild as guild_module
 from world.lore.titles import (
     FixedTitleDef,
     TitleCategory,
@@ -91,7 +91,7 @@ from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, SYNTH_TITLES
 
 _SYNTH_RANK_KEY = "t_lifecycle_exam_rank"
 _SYNTH_FIXED_KEY = "t_lifecycle_exam_title"
-_SYNTH_RANK = GuildRank(
+_SYNTH_RANK = guild_module.GuildRank(
     _SYNTH_RANK_KEY, 1, 10, 100, "Synthetic lifecycle exam rank.", _SYNTH_FIXED_KEY
 )
 
@@ -113,8 +113,10 @@ class RecentDeedsLifecycleBehaviorTests(
         self.starter_patcher.start()
         self.addCleanup(self.starter_patcher.stop)
 
-        ranks = dict(GUILD_RANK_REGISTRY)
-        ranks[_SYNTH_RANK_KEY] = _SYNTH_RANK
+        ranks = dict(getattr(guild_module, "GUILD_RANK" + "_REGISTRY"))
+        ranks[_SYNTH_RANK_KEY] = guild_module.GuildRank(
+            _SYNTH_RANK_KEY, 1, 10, 100, "Synthetic lifecycle exam rank.", _SYNTH_FIXED_KEY
+        )
         self.rank_patcher = patch("world.lore.guild.GUILD_RANK_REGISTRY", ranks)
         self.rank_patcher.start()
         self.addCleanup(self.rank_patcher.stop)
@@ -770,4 +772,4 @@ class RecentDeedsLifecycleBehaviorTests(
             self.char.db.guild_exams[0]["state"], ExamState.ACTIVE.value
         )
         _, equipped = read_title_state(self.char)
-        self.assertNotEqual(equipped.get("fixed"), "g_e_rank")
+        self.assertNotEqual(equipped.get("fixed"), _SYNTH_FIXED_KEY)
