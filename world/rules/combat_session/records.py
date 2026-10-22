@@ -43,6 +43,7 @@ _OPTIONAL_RECORD_FIELDS = frozenset(
         "opening_first_actor",
         "initial_sleep_ids",
         "sleep_transitions",
+        "engagement_id",
     }
 )
 
@@ -67,6 +68,7 @@ class CombatSessionRecord:
     settled_tick: int | None = None
     martyr_key: tuple[str, ...] | None = None
     opening_first_actor: str | None = None
+    engagement_id: str | None = None
     # Sleep is a live posture, never a stored knockout: ``initial_sleep_ids``
     # records the posture the roster carried at engagement and
     # ``sleep_transitions`` the explicit posture changes observed at completed
@@ -341,6 +343,14 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         data.get("initial_sleep_ids", []), "initial_sleep_ids"
     )
     sleep_transitions = _parse_sleep_transitions(data.get("sleep_transitions"))
+    engagement_id = data.get("engagement_id")
+    if engagement_id is not None and (
+        not isinstance(engagement_id, str) or not engagement_id
+    ):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "engagement_id must be a non-empty string or None",
+        )
     record = CombatSessionRecord(
         session_id=session_id,
         mode=mode,
@@ -358,6 +368,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         settled_tick=settled_tick,
         martyr_key=martyr_key,
         opening_first_actor=opening_first_actor,
+        engagement_id=engagement_id,
         initial_sleep_ids=initial_sleep_ids,
         sleep_transitions=sleep_transitions,
     )
@@ -424,7 +435,7 @@ def _validate_participant_shape(record: CombatSessionRecord) -> None:
 
 def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
     """Serialize one record into a JSON-safe storage dict with no live refs."""
-    return {
+    result: dict[str, Any] = {
         "session_id": record.session_id,
         "mode": record.mode,
         "room_id": record.room_id,
@@ -456,6 +467,9 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
             for transition in record.sleep_transitions
         ],
     }
+    if record.engagement_id is not None:
+        result["engagement_id"] = record.engagement_id
+    return result
 
 
 def participant_sleep_state(battlefield: Any) -> dict[int, bool]:

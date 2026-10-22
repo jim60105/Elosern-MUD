@@ -407,7 +407,59 @@ def settle_session(
     persistent exam host is restored inside the same transaction and is
     never deleted.
     """
+    from evennia.objects.models import ObjectDB
     from django.db import transaction
+    from world.narrative.events import (
+        build_encounter_source_id,
+        get_committed_award_results,
+        record_narrative_event,
+    )
+    from world.narrative.models import NarrativeEvent
+
+    encounter_source_id = build_encounter_source_id(
+        record.engagement_id or record.session_id,
+        kind="terminal",
+        ordinal=1,
+    )
+    existing_event = NarrativeEvent.objects.filter(source_id=encounter_source_id).first()
+    if record.settled_tick is not None or existing_event is not None:
+        committed_awards = get_committed_award_results(encounter_source_id)
+        effective_outcome = (
+            existing_event.content.get("gameplay_outcome", existing_event.content.get("outcome", outcome))
+            if existing_event
+            else outcome
+        )
+        res = {
+            "outcome": effective_outcome,
+            "rounds_elapsed": record.rounds_elapsed,
+            "logs": tuple(logs),
+            "events": (),
+        }
+        if committed_awards is not None:
+            res["title_awards"] = [a.to_dict() for a in committed_awards]
+        return res
+
+    participant_ids = [str(pid) for pid in record.player_ids]
+    opponent_ids = [str(eid) for eid in record.enemy_ids]
+    display_snapshots: dict[str, str] = {}
+    for entity_id in (*record.player_ids, *record.enemy_ids):
+        id_str = str(entity_id)
+        name = None
+        if battlefield is not None:
+            for entity in battlefield.roster.values():
+                if getattr(entity, "pk", None) == entity_id or str(getattr(entity, "key", None)) == id_str:
+                    name = str(getattr(entity, "name", entity.key))
+                    break
+        if name is None:
+            obj = ObjectDB.objects.filter(id=entity_id).first()
+            if obj is not None:
+                name = str(getattr(obj, "name", obj.key))
+        display_snapshots[id_str] = name if name is not None else id_str
+
+    if outcome in ("fled", "escaped"):
+        normalized_outcome = "escape"
+    else:
+        normalized_outcome = outcome
 
     exam_result = None
     started = time.monotonic()
@@ -516,6 +568,34 @@ def settle_session(
                 opening=opening,
                 rounds_elapsed=record.rounds_elapsed,
                 settled_tick=int(settled_record.settled_tick or 0),
+            )
+            # Record durable narrative event for completed combat encounter
+            committed_awards = get_committed_award_results(encounter_source_id)
+            title_awards_list = []
+            if exam_result and "title_awards" in exam_result:
+                title_awards_list.extend(exam_result["title_awards"])
+            elif committed_awards:
+                title_awards_list.extend(committed_awards)
+
+            record_narrative_event(
+                source_id=encounter_source_id,
+                event_type="combat_encounter",
+                content={
+                    "outcome": normalized_outcome,
+                    "gameplay_outcome": outcome,
+                    "mode": record.mode,
+                    "participant_ids": participant_ids,
+                    "opponent_ids": opponent_ids,
+                    "display_snapshots": display_snapshots,
+                    "rounds_elapsed": int(record.rounds_elapsed),
+                    "session_id": record.session_id,
+                },
+                participants=[str(actor.pk), *participant_ids, *opponent_ids],
+                location=str(record.room_id or ""),
+                tick=int(settled_record.settled_tick or get_world_clock().tick),
+                visibility="public",
+                salience=1,
+                award_results=title_awards_list,
             )
             if outcome == "victory" and settled_record.martyr_key is not None:
                 settled_record = replace(
@@ -723,6 +803,8 @@ def _snapshot_settlement_restore(
     if record.mode == "guild_exam":
         attributes.append(("guild_rank", _attribute_snapshot(actor, "guild_rank")))
         attributes.append(("guild_exams", _attribute_snapshot(actor, "guild_exams")))
+        attributes.append(("title_collection", _attribute_snapshot(actor, "title_collection")))
+        attributes.append(("title_equipped", _attribute_snapshot(actor, "title_equipped")))
         # The settlement transaction restores the exam sides' gauges; when it
         # rolls back, restore the in-process trait surfaces too (the idmapper
         # cache is not transaction-aware), for the actor and the opponent.

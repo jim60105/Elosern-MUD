@@ -613,8 +613,12 @@ def start_guild_exam(
             # Simulated battle: both sides enter at full applicable pools.
             restore_gauges_to_full(actor)
             restore_gauges_to_full(host)
+            counter = int(getattr(actor.db, "combat_encounter_seq", 0) or 0) + 1
+            actor.db.combat_encounter_seq = counter
+            session_id = f"guild_exam:{actor.pk}:{exam_id}"
             session = CombatSessionRecord(
-                session_id=f"guild_exam:{actor.pk}:{exam_id}",
+                session_id=session_id,
+                engagement_id=f"{session_id}:{counter}",
                 mode="guild_exam",
                 room_id=int(actor.location.pk),
                 player_ids=(int(actor.pk),),
@@ -755,22 +759,23 @@ def settle_exam_outcome(
                 if note:
                     title_notifications = (note,)
 
-            # Finalize award results inside the same transaction
-            from world.narrative.events import record_narrative_event
-            record_narrative_event(
-                source_id=source_id,
-                event_type="guild_exam_settlement",
-                content={
-                    "exam_id": exam_id,
-                    "passed": passed,
-                    "target_rank": record.target_rank,
-                },
-                participants=[str(actor.pk)],
-                tick=get_world_clock().tick,
-                visibility="public",
-                salience=1,
-                award_results=title_awards,
-            )
+                # Finalize award results inside the same transaction
+                from world.narrative.events import record_narrative_event
+                record_narrative_event(
+                    source_id=source_id,
+                    event_type="guild_exam_settlement",
+                    content={
+                        "exam_id": exam_id,
+                        "passed": True,
+                        "target_rank": record.target_rank,
+                        "attained_rank": actor.guild_rank,
+                    },
+                    participants=[str(actor.pk)],
+                    tick=get_world_clock().tick,
+                    visibility="public",
+                    salience=1,
+                    award_results=title_awards,
+                )
     except Exception:
         from world.rules.surfaces import restore_attribute_best_effort
 

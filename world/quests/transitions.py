@@ -227,6 +227,77 @@ def _apply_pin_operations(
             room.db.pin_reasons = reasons
 
 
+def _serialize_objective(objective: Any) -> dict[str, Any]:
+    """Serialize a QuestObjective into a JSON-safe fact payload."""
+    if objective is None:
+        return {}
+    payload: dict[str, Any] = {
+        "kind": (
+            objective.kind.value
+            if hasattr(objective.kind, "value")
+            else str(objective.kind)
+        ),
+        "quantity": int(getattr(objective, "quantity", 1)),
+    }
+    for field in (
+        "monster_tier",
+        "item_key",
+        "region_key",
+        "species_key",
+        "site_key",
+    ):
+        val = getattr(objective, field, None)
+        if val is not None:
+            payload[field] = val
+    if getattr(objective, "countable_variant_keys", None):
+        payload["countable_variant_keys"] = list(objective.countable_variant_keys)
+    if getattr(objective, "completion", None) is not None:
+        payload["completion"] = (
+            objective.completion.value
+            if hasattr(objective.completion, "value")
+            else str(objective.completion)
+        )
+    return payload
+
+
+def _settle_quest_completion_events(
+    actor: Any, completed_records: Iterable[Any]
+) -> None:
+    """Record durable narrative events for newly completed quests in the current transaction."""
+    completed = list(completed_records)
+    if not completed:
+        return
+    from world.quests.runtime import definition_for
+    from world.rules.clock import get_world_clock
+    from world.narrative.events import get_committed_award_results, record_narrative_event
+
+    current_tick = get_world_clock().tick
+    location_str = str(getattr(getattr(actor, "location", None), "pk", "") or "")
+    for record in completed:
+        definition = definition_for(record)
+        stage_idx = min(record.stage_index, len(definition.stages) - 1)
+        objective = definition.stages[stage_idx].objective
+        source_id = f"quest:{record.quest_id}:completion:{actor.pk}"
+        committed_awards = get_committed_award_results(source_id)
+
+        record_narrative_event(
+            source_id=source_id,
+            event_type="quest_completion",
+            content={
+                "quest_id": str(record.quest_id),
+                "definition_key": str(record.definition_key),
+                "completed_objective": _serialize_objective(objective),
+                "outcome": "completed",
+            },
+            participants=[str(actor.pk)],
+            location=location_str,
+            tick=current_tick,
+            visibility="public",
+            salience=1,
+            award_results=committed_awards or (),
+        )
+
+
 def apply_quest_log_replacement(
     actor: Any,
     new_records: list[Any],
@@ -270,11 +341,24 @@ def _replace_quest_log(
     """
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
     from world.quests.runtime import to_storage
-    from world.quests.settlement import commit_auto_settlement, plan_auto_settlement_chain
+    from world.quests.settlement import (
+        commit_auto_settlement,
+        just_completed_records,
+        plan_auto_settlement_chain,
+    )
 
     pin_operations = tuple(pin_operations)
     old_entries = list(actor.db.quest_log or [])
     plan = plan_auto_settlement_chain(actor, old_entries, new_records)
+    completing = just_completed_records(old_entries, new_records)
+    chain_completing = (
+        just_completed_records(
+            [to_storage(r) for r in new_records], list(plan.chain_records)
+        )
+        if plan.chain_records is not None
+        else []
+    )
+    all_completing = [*completing, *chain_completing]
     actor_snapshot = snapshot_quest_log(actor)
     room_snapshots = {
         id(room): snapshot_pin_reasons(room) for room, _, _ in pin_operations
@@ -296,6 +380,7 @@ def _replace_quest_log(
                     to_storage(record) for record in plan.chain_records
                 ]
                 _apply_pin_operations(plan.chain_pins)
+            _settle_quest_completion_events(actor, all_completing)
     except Exception:
         restore_quest_log(actor, actor_snapshot)
         for room, _, _ in pin_operations:
@@ -335,11 +420,24 @@ def apply_quest_log_delta(
     trigger release stage pins on rooms the caller cannot know; those rooms
     are snapshotted and restored here.
     """
-    from world.quests.settlement import commit_auto_settlement, plan_auto_settlement_chain
+    from world.quests.settlement import (
+        commit_auto_settlement,
+        just_completed_records,
+        plan_auto_settlement_chain,
+    )
     from world.quests.runtime import to_storage
 
     old_entries = list(actor.db.quest_log or [])
     plan = plan_auto_settlement_chain(actor, old_entries, new_records)
+    completing = just_completed_records(old_entries, new_records)
+    chain_completing = (
+        just_completed_records(
+            [to_storage(r) for r in new_records], list(plan.chain_records)
+        )
+        if plan.chain_records is not None
+        else []
+    )
+    all_completing = [*completing, *chain_completing]
     settlement_pin_snapshots = [
         (room, snapshot_pin_reasons(room)) for room, _, _ in plan.chain_pins
     ]
@@ -352,6 +450,7 @@ def apply_quest_log_delta(
                 to_storage(record) for record in plan.chain_records
             ]
             _apply_pin_operations(plan.chain_pins)
+        _settle_quest_completion_events(actor, all_completing)
     except Exception:
         for room, snapshot in settlement_pin_snapshots:
             restore_pin_reasons(room, snapshot)
@@ -382,6 +481,7 @@ def pending_effects_for_transition(
     once.
     """
     from world.quests.settlement import (
+        just_completed_records,
         plan_auto_settlement_chain,
         settlement_pending_effect,
     )
@@ -399,7 +499,9 @@ def pending_effects_for_transition(
     def _apply_quest_log(actor: Any, records: list[Any]) -> None:
         """Write the log and schedule its diff at APPLY time (inside commit)."""
         old_entries = list(actor.db.quest_log or [])
+        completing = just_completed_records(old_entries, records)
         actor.db.quest_log = [to_storage(record) for record in records]
+        _settle_quest_completion_events(actor, completing)
         _schedule_transition_events(actor, old_entries, records)
 
     effects: list[Any] = [

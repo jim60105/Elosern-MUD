@@ -223,8 +223,12 @@ def engage_group(
             if sleep_blocks_actions(entity)
         )
     )
+    counter = int(getattr(actor.db, "combat_encounter_seq", 0) or 0) + 1
+    actor.db.combat_encounter_seq = counter
+    session_id = session_id_for(actor, "hostile")
     record = CombatSessionRecord(
-        session_id=session_id_for(actor, "hostile"),
+        session_id=session_id,
+        engagement_id=f"{session_id}:{counter}",
         mode="hostile",
         room_id=int(actor.location.pk),
         player_ids=(int(actor.pk), *companions),
