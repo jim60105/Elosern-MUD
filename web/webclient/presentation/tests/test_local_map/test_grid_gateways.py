@@ -19,6 +19,7 @@ from ._support import (
     _inserted_multiple,
     _live,
     _payload_cell_divisor,
+    _t_anchor_display,
     _t_grid_id,
     _t_region_display_for,
 )
@@ -57,6 +58,52 @@ class LocalMapGridGatewayTests(EvenniaTest):
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
+        # The remembered gate room still hosts its registered gateway.
+        self.assertEqual(node["gateway"], {"leads_to": _t_region_display_for(*EAST_APPROACH)})
+        # The current south gate room names its own far side.
+        current = next(node for node in payload["nodes"] if node["current"])
+        self.assertEqual(current["gateway"], {"leads_to": _t_region_display_for(*SOUTH_APPROACH)})
+
+    @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
+    def test_an_in_view_gate_room_names_its_far_side_and_ordinary_rooms_carry_null(self):
+        # Stand on an ordinary street one step from the south gate: the gate
+        # room drawn in view carries its far-side region, every other grid
+        # room (not a registered gate room) carries null.
+        self.char1.location = self.south_gate
+        record_arrival(self.char1)
+        at_gate = self._registry().render("local_map", _context(self.char1))
+        gate_ids = {
+            _t_grid_id(*SOUTH_GATE_XYZ[:2]): _t_region_display_for(*SOUTH_APPROACH),
+            _t_grid_id(*EAST_GATE_XYZ[:2]): _t_region_display_for(*EAST_APPROACH),
+        }
+        neighbour = next(
+            node
+            for node in at_gate["nodes"]
+            if node["action"] is not None
+            and node["id"].startswith("grid:")
+            and node["id"] not in gate_ids
+        )
+        self.char1.location = GridRoom.objects.filter_xyz(
+            xyz=(neighbour["x"], neighbour["y"], _T_MAP_KEY)
+        ).first()
+        record_arrival(self.char1)
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["layer"], "grid")
+        south = next(node for node in payload["nodes"] if node["id"] == _t_grid_id(*SOUTH_GATE_XYZ[:2]))
+        self.assertEqual(south["visibility"], "visible_visited")
+        self.assertEqual(south["gateway"], {"leads_to": gate_ids[south["id"]]})
+        ordinary = [
+            node
+            for node in payload["nodes"]
+            if node["id"].startswith("grid:") and node["id"] not in gate_ids
+        ]
+        self.assertTrue(ordinary)
+        for node in ordinary:
+            with self.subTest(node=node["id"]):
+                self.assertIsNone(node["gateway"])
+        for node in payload["nodes"]:
+            if node["id"] in gate_ids:
+                self.assertEqual(node["gateway"], {"leads_to": gate_ids[node["id"]]})
 
     @patch("web.webclient.presentation.local_map.grid._grid_nodes_in_range", return_value=[])
     def test_an_in_map_landmark_is_not_a_way_out_of_the_map(self, _mock_range):
@@ -251,6 +298,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
+    @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_entry_cell_gateway_node_is_the_gate_room_itself(self):
         self._at_entry_cell()
         payload = self._registry().render("local_map", _context(self.char1))
@@ -271,6 +319,13 @@ class LocalMapGatewayPairTests(EvenniaTest):
         ][0]
         self.assertEqual(node["action"]["exit_ref"], str(int(west_exit.id)))
         self.assertEqual(node["action"]["destination"], self.GATE_ID)
+        # The wilderness-adjacent grid gate names the settlement it leads
+        # into; the current approach cell and every wild node carry null.
+        self.assertEqual(node["gateway"], {"leads_to": _t_anchor_display(entry.anchor_key)})
+        for other in payload["nodes"]:
+            if other["id"] != self.GATE_ID:
+                with self.subTest(node=other["id"]):
+                    self.assertIsNone(other["gateway"])
         # The replaced geometric wild cell never appears.
         self.assertNotIn(
             f"wild:elosern:{x - 1}:{y}",
@@ -287,6 +342,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
+    @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_gate_room_panel_shows_the_wild_entry_node(self):
         from world.maps.wilderness_provider import region_for_coordinates
 
@@ -323,6 +379,12 @@ class LocalMapGatewayPairTests(EvenniaTest):
         )
         self.assertEqual(edge["label"], "e")
         self.assertTrue(edge["traversable"])
+        # The current gate room names the wilderness region its gate opens
+        # onto; the cross-layer wild target carries null (a city-side exit
+        # stub reads the current gate's metadata).
+        current = next(n for n in payload["nodes"] if n["current"])
+        self.assertEqual(current["gateway"], {"leads_to": _t_region_display_for(*EAST_APPROACH)})
+        self.assertIsNone(node["gateway"])
 
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"

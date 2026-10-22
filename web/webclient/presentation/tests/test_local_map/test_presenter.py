@@ -85,6 +85,9 @@ class LocalMapPresenterTests(EvenniaTestCase):
             all(node["id"].startswith("room:") for node in payload["nodes"]),
             "no grid/wild identity may be invented for an instance",
         )
+        # Coordinate-free nodes (current and origin/return) carry null gateway.
+        self.assertGreaterEqual(len(payload["nodes"]), 2)
+        self.assertEqual([node["gateway"] for node in payload["nodes"]], [None] * len(payload["nodes"]))
 
     def test_instance_with_missing_origin_renders_current_node_only(self):
         from typeclasses.rooms import InstanceRoom
@@ -107,6 +110,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
         self.assertTrue(payload["available"])
         self.assertEqual(payload["layer"], "interior")
         self.assertEqual(payload["current_node"], f"room:{interior.id}")
+        self.assertEqual([node["gateway"] for node in payload["nodes"]], [None] * len(payload["nodes"]))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_interior_payload_still_remembers_a_previously_entered_room(self):

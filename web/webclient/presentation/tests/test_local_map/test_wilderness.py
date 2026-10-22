@@ -76,6 +76,16 @@ class LocalMapWildernessTests(EvenniaTestCase):
 
             self.assertLessEqual(int(decoded[2]), WILDERNESS_MAX_X)
             self.assertLessEqual(int(decoded[3]), WILDERNESS_MAX_Y)
+        # Gateway metadata: the resolved grid gate node names the settlement
+        # it leads into; the current approach cell and every ordinary wild
+        # terrain cell carry null.
+        grid_nodes = [node for node in payload["nodes"] if node["id"].startswith("grid:")]
+        self.assertEqual(len(grid_nodes), 1)
+        self.assertEqual(grid_nodes[0]["gateway"], {"leads_to": _t_anchor_display(_T_MAP_KEY)})
+        for node in payload["nodes"]:
+            if node["id"].startswith("wild:"):
+                with self.subTest(node=node["id"]):
+                    self.assertIsNone(node["gateway"])
 
     @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
     def test_wilderness_legend_appends_scale_note_after_the_states(self):
@@ -251,6 +261,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
+        # A remembered approach cell is a wild cell, not a grid gate room.
+        self.assertIsNone(node["gateway"])
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_a_gateway_the_player_has_never_reached_is_absent(self):
@@ -331,6 +343,9 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         )
         self.assertEqual(neighbor["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertEqual(neighbor["visibility"], "visible_unvisited")
+        # Naming the approach cell for its far side adds no gateway metadata:
+        # only the resolved grid gate node carries it.
+        self.assertIsNone(neighbor["gateway"])
         edge = next(
             edge
             for edge in payload["edges"]
