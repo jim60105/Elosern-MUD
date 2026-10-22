@@ -1143,7 +1143,10 @@ class SettledLocationContextTests(EvenniaTestCase):
             tick=tick,
         )
 
-    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    @covers_requirement(
+        "title-system::recent-deed-rendering-has-complete-bounded-groups",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
+    )
     def test_compressed_run_keeps_each_occurrence_time_and_place(self):
         """Scenario: Different locations are rendered without misattribution.
 
@@ -1261,7 +1264,10 @@ class SettledLocationContextTests(EvenniaTestCase):
         )
         self.assertEqual(sorted(group.source_ids), ["act:loc:enc", "enc:loc:1"])
 
-    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    @covers_requirement(
+        "title-system::recent-deed-rendering-has-complete-bounded-groups",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
+    )
     def test_unknown_location_renders_explicitly_unknown(self):
         """A fact whose producer stated no location stays explicitly unknown."""
         record_narrative_event(

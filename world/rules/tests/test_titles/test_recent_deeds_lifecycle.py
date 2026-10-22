@@ -778,15 +778,11 @@ class RecentDeedsLifecycleBehaviorTests(
         self.assertNotEqual(equipped.get("fixed"), _SYNTH_FIXED_KEY)
 
     @covers_requirement(
-        "narrative-events::completed-quest-and-passed-examination-facts-are-durable"
+        "narrative-events::completed-quest-and-passed-examination-facts-are-durable",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
     )
     def test_quest_and_exam_facts_retain_their_settled_locations(self):
-        """Quest completion and exam promotion snapshot their own settlement room.
-
-        Closest canonical requirement: the location-snapshot delta has no
-        canonical ID before archive sync; this requirement owns the settlement
-        fact fields the snapshot extends.
-        """
+        """Quest completion and exam promotion snapshot their own settlement room."""
         quest_room = create_object(Room, key="t_lifecycle_quest_room")
         exam_room = create_object(Room, key="t_lifecycle_exam_room")
         original_room = self.char.location
@@ -871,7 +867,8 @@ class RecentDeedsLifecycleBehaviorTests(
         self.char.location = original_room
 
     @covers_requirement(
-        "narrative-events::completed-combat-evidence-preserves-the-actual-encounter-outcome"
+        "narrative-events::completed-combat-evidence-preserves-the-actual-encounter-outcome",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
     )
     def test_terminal_combat_snapshots_the_session_room(self):
         """The terminal encounter keeps its durable session room and readable label."""

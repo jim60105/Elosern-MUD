@@ -244,15 +244,11 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertNotIn(str(self.bystander.pk), event.participants)
 
     @covers_requirement(
-        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
     )
     def test_settled_actions_and_their_milestones_keep_their_room(self):
-        """A settled action states the room it happened in; its milestones too.
-
-        Closest canonical requirement: the location-snapshot delta has no
-        canonical ID before archive sync; this requirement owns the action
-        fact fields the snapshot extends.
-        """
+        """A settled action states the room it happened in; its milestones too."""
         self._grant_skills(self.actor, _T_PENETRATION_SKILL.key)
         self.target.sexual.virgin = True
         request = ActionRequest(
