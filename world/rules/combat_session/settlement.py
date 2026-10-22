@@ -930,6 +930,123 @@ def forfeit(actor: Any) -> dict[str, Any]:
     return _settle_with_restore(actor, record, battlefield, outcome)
 
 
+def _raw_participant_ids(raw: Any) -> tuple[int, ...]:
+    """Read the raw payload's participant dbrefs without trusting its shape."""
+    ids: list[int] = []
+    for field in ("player_ids", "enemy_ids"):
+        values = raw.get(field)
+        if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
+            continue
+        for value in values:
+            if isinstance(value, int) and not isinstance(value, bool):
+                ids.append(value)
+    return tuple(ids)
+
+
+def _retire_unidentified_exam(actor: Any) -> None:
+    """Retire an examination whose persisted session lost its identity.
+
+    A persisted guild-examination session without its engagement identity can
+    no longer act or settle through the ordinary combat writer, because every
+    occurrence that writer commits is keyed by that identity. The candidate's
+    examination record and the persistent host's own surfaces are independent
+    authoritative state, so the examination is marked FAILED and the host is
+    restored and released here. No combat occurrence is fabricated and no
+    replacement identity is invented: the raw payload is read only to learn
+    which examination to retire, never to drive a settlement.
+
+    Best effort by contract: this runs inside the recovery boundary whose whole
+    purpose is to leave no blocked player, so a failure is reported and never
+    propagates over the session clear that follows.
+    """
+    from evennia.objects.models import ObjectDB
+    from django.db import transaction
+
+    raw = getattr(getattr(actor, "db", None), "active_combat", None)
+    # A persisted Evennia attribute reads back as a mapping proxy, not a dict.
+    if not isinstance(raw, Mapping) or raw.get("mode") != "guild_exam":
+        return
+    exam_id = raw.get("exam_id")
+    if not isinstance(exam_id, str) or not exam_id:
+        return
+    from world.rules.guild_exams import (
+        GuildExamError,
+        _read_exams,
+        restore_exam_host,
+        settle_exam_outcome,
+    )
+    from world.rules.traits import restore_gauges_to_full
+    from types import SimpleNamespace
+
+    enemy_ids = raw.get("enemy_ids")
+    # A persisted list also reads back as a sequence proxy.
+    iterable_ids = isinstance(enemy_ids, (str, bytes)) is False and hasattr(
+        enemy_ids, "__iter__"
+    )
+    host_id = next(iter(enemy_ids), None) if iterable_ids else None
+    # The examination terminal state and the host's release are two units:
+    # a host surface that cannot be restored must never roll the candidate's
+    # FAIL back into an ACTIVE examination nobody can settle again.
+    try:
+        with transaction.atomic():
+            active = next(
+                (
+                    record
+                    for record in _read_exams(actor)
+                    if record.exam_id == exam_id
+                ),
+                None,
+            )
+            if active is not None:
+                settle_exam_outcome(
+                    actor,
+                    SimpleNamespace(mode="guild_exam", exam_id=exam_id),
+                    None,
+                    "exam_failed",
+                )
+    except GuildExamError as error:
+        # An unreadable examination history cannot be marked, but the
+        # persistent host must still be released below.
+        log_warn(
+            "guild_exam_unidentified_retirement_unavailable",
+            exc=error,
+            context={"char": str(actor.pk), "exam": exam_id},
+        )
+    except Exception as error:  # observability: ignore R2: recovery must clear the blocked session; the failed retirement is reported here
+        log_warn(
+            "guild_exam_unidentified_retirement_failed",
+            exc=error,
+            context={"char": str(actor.pk), "exam": exam_id},
+        )
+    host = (
+        ObjectDB.objects.filter(id=host_id).first()
+        if isinstance(host_id, int) and not isinstance(host_id, bool)
+        else None
+    )
+    if host is None:
+        return
+    try:
+        with transaction.atomic():
+            restore_exam_host(host, exam_id)
+            restore_gauges_to_full(actor)
+            # The session clear cannot release a roster it cannot reconstruct,
+            # so this examination's own registrations are dropped here: a
+            # stale skip-safety entry would keep the host marked as engaged.
+            from world.rules.skip_safety import (
+                unregister_active_battlefield,
+                unregister_participants,
+            )
+
+            unregister_active_battlefield(host)
+            unregister_participants(_raw_participant_ids(raw))
+    except Exception as error:  # observability: ignore R2: recovery must clear the blocked session; the failed release is reported here
+        log_warn(
+            "guild_exam_unidentified_host_release_failed",
+            exc=error,
+            context={"char": str(actor.pk), "exam": exam_id, "host": host.pk},
+        )
+
+
 @serialized_combat_write
 def restore_active_session(actor: Any) -> None:
     """Reconstruct a valid persisted session or terminate it diagnostically.
@@ -958,6 +1075,11 @@ def restore_active_session(actor: Any) -> None:
             exc=error,
             context={"char": str(actor.key)},
         )
+        # An unparseable examination still owns its candidate record and its
+        # persistent host, both of which are independent authoritative state:
+        # retire them here so a session that lost its occurrence identity can
+        # never strand the candidate or keep the host examination-owned.
+        _retire_unidentified_exam(actor)
         clear_session(actor, None, None)
         return
     if record is None:

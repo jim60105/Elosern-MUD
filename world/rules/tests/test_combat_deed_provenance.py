@@ -361,13 +361,19 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
         # The upkeep boundary's own committed notification replays the same
-        # way: one immutable milestone source, one pending-then-completed
-        # progress row, no second occurrence.
+        # way: the recorder allocates one immutable milestone source per
+        # transition under (engagement, round, entity, transition), and
+        # re-delivering each committed notification reuses that source and its
+        # completed progress row without a second occurrence.
         snapshot = capture_milestone_snapshot(self.player)
         self.player.sexual.virgin = False
         self.player.sexual.record_climax_count()
         self.player.sexual.climax_phase.value = "進行中"
-        upkeep_round = provenance.at_slot(None)
+        upkeep_round = CombatProvenance(
+            engagement_id=record.engagement_id,
+            round_ordinal=2,
+            session_id=record.session_id,
+        )
         with combat_provenance(upkeep_round):
             record_non_resolver_adult_milestones(
                 self.player,

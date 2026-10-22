@@ -369,6 +369,39 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
             ),
         )
 
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_an_examination_that_lost_its_engagement_identity_is_retired(self):
+        """Recovery retires the exam and releases its host, never stranding either."""
+        from world.rules.combat_session import restore_active_session
+
+        self._give_merit(50)
+        normal_before = self._host_normal()
+        record = start_guild_exam(self.player, self.host, "E")
+        stored = dict(self.player.db.active_combat)
+        self.assertTrue(stored.pop("engagement_id"))
+        self.player.db.active_combat = stored
+
+        restore_active_session(self.player)
+
+        self.assertIsNone(self.player.db.active_combat)
+        exams = {entry.exam_id: entry for entry in _read_exams(self.player)}
+        self.assertIs(exams[record.exam_id].state, ExamState.FAILED)
+        # The persistent host is free again: normal outfit, no restriction,
+        # no schedule hold, and a fresh examination is admitted.
+        normal_after = self._host_normal()
+        for field in ("equipment", "inventory", "buffs", "skills", "proficiency"):
+            self.assertEqual(normal_after[field], normal_before[field], field)
+        self.assertIsNone(normal_after["restriction"])
+        self.assertIsNone(normal_after["normal_state"])
+        hold = read_exam_schedule_hold(self.host)
+        self.assertTrue(hold.known)
+        self.assertTrue(hold.hold is None or hold.hold.released)
+        self.assertEqual(self.host.traits.hp.max, 200)
+        retried = start_guild_exam(self.player, self.host, "E")
+        self.assertIs(retried.state, ExamState.ACTIVE)
+
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_requested_by_metadata_grants_no_extra_authority(self):
         for requester in ("command", "npc_intent"):
