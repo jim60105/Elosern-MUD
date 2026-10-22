@@ -294,7 +294,15 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                             "auto_comply": other_auto_comply,     # PRIVATE to other
                         }
                     ],
-                    "effects": [{"target_id": self.other_pk, "effect": "pleasure"}],
+                    "effects": [
+                        {
+                            "kind": "pleasure_gain",
+                            "actor_id": self.player_pk,
+                            "target_id": self.other_pk,
+                            "target_name": "OtherTarget",
+                            "result": {"amount": 11},
+                        }
+                    ],
                 },
                 "milestones": [
                     {
@@ -628,3 +636,392 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         self.assertEqual(len(result.groups), 0)
         self.assertEqual(len(result.source_ids), 0)
         self.assertEqual(result.rendered_json, '{"recent_deeds":[]}')
+
+
+def _adult_action_content(
+    *,
+    source_id: str,
+    player_pk: str,
+    actor_name: str,
+    other_pk: str,
+    other_name: str,
+    transitions: list[dict] | None = None,
+    counters: list[dict] | None = None,
+    effects: list[dict] | None = None,
+    resistance: list[dict] | None = None,
+    milestones: list[dict] | None = None,
+    act_key: str = "caress",
+) -> dict:
+    """One adult_action payload in the shape the settlement adapter produces."""
+    return {
+        "action_source_id": source_id,
+        "act_key": act_key,
+        "act_name": "溫柔愛撫",
+        "actor": {"id": player_pk, "name": actor_name, "role": "actor"},
+        "recipients": [{"id": other_pk, "name": other_name, "role": "recipient"}],
+        "outcomes": {
+            "transitions": transitions or [],
+            "counters": counters or [],
+            "resistance": resistance or [],
+            "effects": effects or [],
+        },
+        "milestones": milestones or [],
+        "field_access": {
+            player_pk: [
+                "actor",
+                "act_key",
+                "recipients",
+                "resistance_verdict",
+                "physical_effects",
+                "own_state_transitions",
+                "own_counter_changes",
+                "actor_milestones",
+            ],
+            other_pk: [
+                "target_own_outcome",
+                "resistance_verdict",
+                "effects_on_target",
+                "target_state_transitions",
+                "target_counter_changes",
+                "target_milestones",
+            ],
+        },
+    }
+
+
+class AdultResultFamilyAggregationTests(EvenniaTestCase):
+    """Authorized adult result families survive projection, grouping and rendering."""
+
+    def setUp(self):
+        super().setUp()
+        self.char = create_object(PlayerCharacter, key="t_fam_player")
+        self.other_char = create_object(PlayerCharacter, key="t_fam_other")
+        self.control = create_object(PlayerCharacter, key="t_fam_control")
+        self.player_pk = str(self.char.pk)
+        self.other_pk = str(self.other_char.pk)
+
+    def _content(self, source_id: str, **overrides) -> dict:
+        return _adult_action_content(
+            source_id=source_id,
+            player_pk=self.player_pk,
+            actor_name=self.char.key,
+            other_pk=self.other_pk,
+            other_name=self.other_char.key,
+            **overrides,
+        )
+
+    def _record(self, source_id: str, tick: int, **overrides) -> NarrativeEvent:
+        event, _, _ = record_narrative_event(
+            source_id=source_id,
+            event_type="adult_action",
+            content=self._content(source_id, **overrides),
+            participants=[self.player_pk, self.other_pk],
+            tick=tick,
+        )
+        return event
+
+    def _milestone(self, source_id: str, parent: str, tick: int, identifier: str) -> None:
+        record_narrative_event(
+            source_id=source_id,
+            event_type="adult_milestone",
+            content={
+                "action_source_id": parent,
+                "milestone_kind": "state_transition",
+                "identifier": identifier,
+                "entity_id": self.player_pk,
+                "details": {"transition": identifier},
+            },
+            participants=[self.player_pk],
+            tick=tick,
+            visibility="private",
+        )
+
+    @covers_requirement(
+        "title-system::recent-deed-eligibility-is-closed-and-personally-authorized"
+    )
+    def test_own_state_families_respect_per_participant_knowability(self):
+        """Scenario: Other participant state stays absent.
+
+        WHEN the actor and the recipient view one adult action
+        THEN each sees only their own authorized transition, counter and effect
+        families, and a present non-participant sees nothing at all.
+        """
+        t = 50000
+        content = self._content(
+            "adult:families:1",
+            transitions=[
+                {"target_id": self.player_pk, "target_name": self.char.key, "event": "own_transition"},
+                {"target_id": self.other_pk, "target_name": self.other_char.key, "event": "other_transition"},
+            ],
+            counters=[
+                {"target_id": self.player_pk, "target_name": self.char.key, "counter": "own_counter"},
+                {"target_id": self.other_pk, "target_name": self.other_char.key, "counter": "other_counter_a"},
+            ],
+            effects=[
+                {
+                    "kind": "pleasure_gain",
+                    "actor_id": self.player_pk,
+                    "target_id": self.player_pk,
+                    "target_name": self.char.key,
+                    "result": {"amount": 6},
+                },
+                {
+                    "kind": "pleasure_gain",
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "result": {"amount": 11},
+                },
+            ],
+            resistance=[
+                {
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "resisted": False,
+                    "auto_comply": False,
+                    "roll": 42,
+                }
+            ],
+        )
+        event, _, _ = record_narrative_event(
+            source_id="adult:families:1",
+            event_type="adult_action",
+            content=content,
+            participants=[self.player_pk, self.other_pk],
+            tick=t,
+        )
+
+        actor_facts = json.loads(
+            select_authorized_recent_deeds(self.char, frozen_tick=t).rendered_json
+        )["recent_deeds"][0]["facts"]
+        actor_outcomes = actor_facts["outcomes"]
+        self.assertEqual(
+            [row["event"] for row in actor_outcomes["transitions"]],
+            ["own_transition"],
+        )
+        self.assertEqual(
+            [row["counter"] for row in actor_outcomes["counters"]],
+            ["own_counter"],
+        )
+        # The actor's existing physical-effect permission covers every committed
+        # effect of the occurrence, while the recipient sees only their own.
+        self.assertEqual(
+            {row["target_id"] for row in actor_outcomes["effects"]},
+            {self.player_pk, self.other_pk},
+        )
+        self.assertEqual(
+            actor_outcomes["resistance"],
+            [
+                {
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "resisted": False,
+                }
+            ],
+        )
+
+        recipient_facts = json.loads(
+            select_authorized_recent_deeds(self.other_char, frozen_tick=t).rendered_json
+        )["recent_deeds"][0]["facts"]
+        recipient_outcomes = recipient_facts["outcomes"]
+        self.assertEqual(
+            [row["event"] for row in recipient_outcomes["transitions"]],
+            ["other_transition"],
+        )
+        self.assertEqual(
+            [row["counter"] for row in recipient_outcomes["counters"]],
+            ["other_counter_a"],
+        )
+        self.assertEqual(
+            {row["target_id"] for row in recipient_outcomes["effects"]},
+            {self.other_pk},
+        )
+        self.assertNotIn("own_counter", json.dumps(recipient_facts))
+
+        # A present non-participant is not attributed any role or fact.
+        control_result = select_authorized_recent_deeds(self.control, frozen_tick=t)
+        self.assertEqual(control_result.groups, ())
+        self.assertEqual(control_result.rendered_json, '{"recent_deeds":[]}')
+
+        # Another participant's private counter value changes nothing rendered.
+        content["outcomes"]["counters"][1]["counter"] = "other_counter_b"
+        event.content = content
+        event.save()
+        rerendered = select_authorized_recent_deeds(self.char, frozen_tick=t)
+        self.assertEqual(
+            json.loads(rerendered.rendered_json)["recent_deeds"][0]["facts"],
+            actor_facts,
+        )
+
+    @covers_requirement(
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+    )
+    def test_grouped_run_retains_every_family_from_later_occurrences(self):
+        """Scenario: Own adult outcomes reach the rendered feed.
+
+        WHEN two consecutive matching adult occurrences settle different
+        transitions, counters, effects and resistance verdicts
+        THEN the rendered group retains every family, its actual roles and all
+        supporting source IDs.
+        """
+        t = 50000
+        self._record(
+            "adult:run:1",
+            t,
+            transitions=[{"target_id": self.player_pk, "target_name": self.char.key, "event": "first_only"}],
+            counters=[{"target_id": self.player_pk, "target_name": self.char.key, "counter": "first_counter"}],
+            effects=[
+                {
+                    "kind": "pleasure_gain",
+                    "actor_id": self.player_pk,
+                    "target_id": self.player_pk,
+                    "target_name": self.char.key,
+                    "result": {"amount": 6},
+                }
+            ],
+            resistance=[
+                {
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "resisted": False,
+                    "auto_comply": False,
+                    "roll": 42,
+                }
+            ],
+        )
+        self._record(
+            "adult:run:2",
+            t + 1,
+            transitions=[{"target_id": self.player_pk, "target_name": self.char.key, "event": "second_only"}],
+            counters=[{"target_id": self.player_pk, "target_name": self.char.key, "counter": "second_counter"}],
+            effects=[
+                {
+                    "kind": "buff_applied",
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "result": {"buff_key": "t_family_buff"},
+                }
+            ],
+            resistance=[
+                {
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other_char.key,
+                    "resisted": True,
+                    "auto_comply": False,
+                    "roll": 90,
+                }
+            ],
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+        self.assertEqual(len(result.groups), 1)
+        group = json.loads(result.rendered_json)["recent_deeds"][0]
+        self.assertEqual(group["group_type"], "adult_action")
+        self.assertEqual(group["count"], 2)
+        self.assertEqual(group["source_ids"], ["adult:run:1", "adult:run:2"])
+        outcomes = group["facts"]["outcomes"]
+        self.assertEqual(
+            [row["event"] for row in outcomes["transitions"]],
+            ["first_only", "second_only"],
+        )
+        self.assertEqual(
+            [row["counter"] for row in outcomes["counters"]],
+            ["first_counter", "second_counter"],
+        )
+        self.assertEqual(
+            [row["result"] for row in outcomes["effects"]],
+            [{"amount": 6}, {"buff_key": "t_family_buff"}],
+        )
+        self.assertEqual(
+            [(row["resisted"], row["target_id"]) for row in outcomes["resistance"]],
+            [(False, self.other_pk), (True, self.other_pk)],
+        )
+        self.assertNotIn('"roll":', group["facts"].__repr__())
+
+    @covers_requirement(
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+    )
+    def test_attached_milestone_is_not_a_separate_occurrence_boundary(self):
+        """Scenario: Attached milestone is not a separate action boundary.
+
+        WHEN consecutive matching occurrences carry a milestone attached to the
+        first action and no independent intervening occurrence
+        THEN compression retains both actions and the milestone with count two
+        and every supporting source.
+        """
+        t = 50000
+        self._record("adult:joined:1", t)
+        self._record("adult:joined:2", t + 1)
+        self._milestone("adult:joined:1:milestone", "adult:joined:1", t, "joined_transition")
+        # A milestone whose parent action is not admitted in the window stays an
+        # independent occurrence.
+        self._milestone("adult:outside:milestone", "adult:outside", t + 5, "outside_transition")
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+        self.assertEqual(
+            sorted(group.group_type for group in result.groups),
+            ["adult_action", "adult_milestone"],
+        )
+        joined = next(
+            group for group in result.groups if group.group_type == "adult_action"
+        )
+        self.assertEqual(joined.count, 2)
+        self.assertEqual(
+            joined.source_ids,
+            ["adult:joined:1", "adult:joined:1:milestone", "adult:joined:2"],
+        )
+        self.assertEqual(
+            [row["identifier"] for row in joined.facts["milestones"]],
+            ["joined_transition"],
+        )
+        standalone = next(
+            group for group in result.groups if group.group_type == "adult_milestone"
+        )
+        self.assertEqual(standalone.count, 1)
+        self.assertEqual(standalone.source_ids, ["adult:outside:milestone"])
+
+    @covers_requirement(
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+    )
+    def test_independent_milestone_still_stops_a_repetition_run(self):
+        """Scenario: Context boundaries stop repetition.
+
+        WHEN an independent occurrence sits between two otherwise matching
+        actions
+        THEN it starts a new repetition group instead of being absorbed.
+        """
+        t = 60000
+        self._record("adult:split:1", t)
+        record_narrative_event(
+            source_id="adult:split:independent",
+            event_type="adult_milestone",
+            content={
+                "action_source_id": "",
+                "milestone_kind": "state_transition",
+                "identifier": "independent_transition",
+                "entity_id": self.player_pk,
+                "details": {"transition": "independent_transition"},
+            },
+            participants=[self.player_pk],
+            tick=t + 1,
+            visibility="private",
+        )
+        self._record("adult:split:2", t + 2)
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+        action_groups = [
+            group for group in result.groups if group.group_type == "adult_action"
+        ]
+        self.assertEqual([group.count for group in action_groups], [1, 1])
+        self.assertEqual(
+            sorted(source for group in action_groups for source in group.source_ids),
+            ["adult:split:1", "adult:split:2"],
+        )
+        self.assertIn(
+            "adult:split:independent",
+            [source for group in result.groups for source in group.source_ids],
+        )
