@@ -17,7 +17,7 @@ The old local_map is bounded to a small neighbourhood and cannot support whole-s
 - `webclient-area-map`: On-demand area panel, truthful fog of war and adjacent movement.
 
 ### Modified Capabilities
-- None.
+- `webclient-action-dispatch`: add map.view to the exact allowlisted production action roster.
 
 ## Impact
 
@@ -29,6 +29,7 @@ Estimated implementation effort: 8 hours, including focused tests and documentat
 
 ## Batch:
 
+depends-on: define-map-panel-protocol
 depends-on: add-local-map-gateway-metadata
 depends-on: compute-map-district-partition
 depends-on: resolve-map-quest-destinations
