@@ -28,38 +28,38 @@
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-ambush_predator.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-apex_predator.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-brute.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-instinctive.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-pack_hunter.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/archetype-tactical_caster.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
       "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
     },
     {
       "path": "docs/development/monster-ai-manual-evidence/performance.json",
-      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
-      "claim": "complete-policy performance on the reference envelope, warm utility p95 15.78 ms against the 50 ms budget"
+      "fingerprint": "497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f",
+      "claim": "complete-policy performance on the reference envelope, warm utility p95 16.84 ms against the 50 ms budget"
     }
   ],
   "operations": [

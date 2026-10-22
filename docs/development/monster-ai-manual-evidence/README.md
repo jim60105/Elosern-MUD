@@ -131,10 +131,13 @@ snapshot (`raw[].decision_records`). `examined` is the candidate set's own
 counter: accepted candidates plus rejections plus mandatory-filter exclusions.
 
 Configuration fingerprint (all campaign and performance reports):
-`e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232`
+`497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f`
 (algorithm version 5): the campaigns build their own synthetic variant pairs and
 copy only the archetypes from the shipped rulebook, so the shipped variant maps
-never enter this fingerprint. Selector-check fingerprint:
+never enter this fingerprint — but the shared combat-rulebook leaves every
+estimate averages over (the buff definitions and the modifier rules) do, so a
+rulebook change moves this value exactly as it moves the production tuning.
+Selector-check fingerprint:
 `e2677d39e27adff0bc12f19478fe552a83d65695e0bcb8f6b5aa6273986c9866` -- that
 operation records the process's startup fingerprint, which this value now is;
 the pre-activation value `a29fd4fa...` describes a tuning production no longer
@@ -210,8 +213,8 @@ budget 256; one cold call, five warm-ups and fifty measured decisions per mode.
 
 | mode | cold ms | p50 ms | p95 ms | queries | examined | accepted | omitted | dice isolated |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| legacy | 4.10 | 0.60 | 0.77 | 10 | 0 | 0 | 0 | False |
-| utility | 45.53 | 15.50 | 15.78 | 97 | 108 | 108 | 0 | True |
+| legacy | 3.96 | 0.59 | 0.77 | 10 | 0 | 0 | 0 | False |
+| utility | 46.00 | 16.36 | 16.84 | 97 | 108 | 108 | 0 | True |
 
 Warm utility p95 budget 50 ms: met. The utility policy draws from its own
 generator and never advances the combat dice stream; the legacy body is the
@@ -224,9 +227,9 @@ so each one re-reads the same participants and skills:
 
 | examined-proposal budget | queries | examined | accepted | omitted |
 | ---: | ---: | ---: | ---: | ---: |
-| 16 | 168 | 16 | 16 | 105 |
-| 64 | 168 | 64 | 64 | 57 |
-| 256 | 168 | 108 | 108 | 0 |
+| 16 | 200 | 16 | 16 | 105 |
+| 64 | 200 | 64 | 64 | 57 |
+| 256 | 200 | 108 | 108 | 0 |
 
 Query work stays at 168 queries while the examined proposals rise from 16 to
 108 and the budget omissions fall from 105 to 0: the ORM work scales with the

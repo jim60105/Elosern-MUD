@@ -36,9 +36,9 @@ Every acceptance clause of the change, and where it is established:
 | acceptance clause | evidence |
 | --- | --- |
 | Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate` passes observability, test-data, shard manifests and the ownership contracts; its traceability gate reports the change's own four new capability IDs as `unknown-requirement-id`, which is the documented pre-sync state of an active change (its requirements enter the index only when the archive workflow syncs the delta; see `scripts/openspec-gates.sh`). Verified green against the equivalent delta-applied tree: 2189 requirements, 0 uncovered, 0 errors. The post-sync check is the authoritative one and belongs to the archive workflow. |
-| The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232` |
-| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `23e711e9...` |
-| Complete-policy performance | `performance.json`: warm utility p95 15.78 ms and p50 15.50 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
+| The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f` |
+| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `e2677d39...` |
+| Complete-policy performance | `performance.json`: warm utility p95 16.84 ms and p50 16.36 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
 | A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves legacy |
 | A real affected encounter | `RealEncounterTests`: one real `Monster` row of an activated variant decides inside a real round scope **through the production session adapter** (`_enemy_policy`), its selected candidate is the request that settlement receives, the round writes a damage entry and the defender's committed hit points fall, and the monster's own statistics, resources, kit and proficiency are unchanged |
 | Rollback without migration or restore | `legacy_rollback` below, with `RollbackTests` |
@@ -145,7 +145,7 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
 
 Rollback fingerprint of the edited configuration:
 `5a6478365964257d5b03c6ee909bdd04cd41f3b965bc0eb842a1ce5485ad67d8`. Recorded
-acceptance claims made under `23e711e9...` do not describe it, which is exactly
+acceptance claims made under `e2677d39...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce.
 
 ## Expansion and retuning
