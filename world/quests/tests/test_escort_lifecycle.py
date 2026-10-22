@@ -484,7 +484,7 @@ class EscortEntitlementTests(EscortTestBase):
     def test_automatic_planning_skips_a_completed_non_winner(self):
         from world.quests import outcome_store
         from world.quests.escort_events import reward_entitled
-        from world.quests.runtime import apply_quest_log_replacement, fulfill_record_for
+        from world.quests.runtime import apply_quest_log_replacement, fulfill_record
         from world.quests.settlement import plan_auto_settlement
 
         record = accept_quest(self.owner, self.definition.key, self.issuer_key)
@@ -492,7 +492,7 @@ class EscortEntitlementTests(EscortTestBase):
             owner_id=self.owner.pk, package_id=self.package.package_id,
             group_id="reunion", resolution_source="s", winner_quest_id="other:9",
         )
-        completed = fulfill_record_for(self.owner, record, self.definition)
+        completed = fulfill_record(record, self.definition)
         apply_quest_log_replacement(self.owner, [completed])
         self.assertFalse(reward_entitled(self.owner, completed))
         self.assertEqual(plan_auto_settlement(self.owner, [completed]).entries, ())
@@ -538,7 +538,7 @@ class EscortCounterClaimTests(EscortTestBase):
     @covers_requirement("quest-reward-settlement::counter-claims-require-the-exclusive-group-s-selected-winner")
     def test_a_completed_non_winner_is_refused_by_the_counter_claim(self):
         from world.quests import outcome_store
-        from world.quests.runtime import apply_quest_log_replacement, fulfill_record_for
+        from world.quests.runtime import apply_quest_log_replacement, fulfill_record
         from world.rules.guild import RewardClaimError, turn_in_quest
 
         record = accept_quest(self.owner, self.definition.key, self.issuer_key)
@@ -546,7 +546,7 @@ class EscortCounterClaimTests(EscortTestBase):
             owner_id=self.owner.pk, package_id=self.package.package_id,
             group_id="reunion", resolution_source="s", winner_quest_id="other:9",
         )
-        completed = fulfill_record_for(self.owner, record, self.definition)
+        completed = fulfill_record(record, self.definition)
         apply_quest_log_replacement(self.owner, [completed])
         self.assertEqual(read_records(self.owner)[0].state.value, "completed")
         with self.assertRaises(RewardClaimError):

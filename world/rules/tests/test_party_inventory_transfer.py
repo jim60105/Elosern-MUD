@@ -635,7 +635,8 @@ class TransferObservabilityTests(PartyTransferTestCase):
 class TransferPlanObserverTests(QuestRegistryIsolation, PartyTransferTestCase):
     """Plans are built inside the transfer savepoint.
 
-    A plan's ACQUIRE replacement dispatches quest-completion observers, whose
+    A plan's ACQUIRE replacement is pure; the quest-transition writer dispatches
+    the completion observers from the transfer's own transaction, and their
     contract is to defer through ``transaction.on_commit``. A rolled-back
     transfer must discard that deferred work.
     """
@@ -651,8 +652,8 @@ class TransferPlanObserverTests(QuestRegistryIsolation, PartyTransferTestCase):
         self.record = accept(self.aila, definition)
         self.effects = []
 
-    def _observer(self, entity, record, definition):
-        transaction.on_commit(lambda: self.effects.append(record.quest_id))
+    def _observer(self, receipt):
+        transaction.on_commit(lambda: self.effects.append(receipt.quest_id))
 
     def test_a_committed_transfer_publishes_the_plan_completion(self):
         self.hold(self.commander, _POTION.key)

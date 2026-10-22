@@ -237,6 +237,31 @@ LLM 必須輸出 JSON 格式：
                     └── 降級 (None 或空) ──> 不產生選票，流程靜默結束
 ```
 
+### 任務完成的擁有者通知契約
+
+「任務完成」這個觸發點不屬於規劃層。純規劃器（`world/quests/acquire.py`、
+`deliver.py`、`planner.py`、`room_observation.py`、`escort_events.py`）只呼叫
+`world.quests.runtime.fulfill_record()` 計算過場後的紀錄，不派送任何觀察者；因此一個
+算出完成、卻被丟棄或拒絕的庫存、交付、抵達或行動計畫，不會留下事實、通知或提名請求。
+
+通知由任務紀錄的寫入擁有者（`world/quests/transitions.py` 的
+`apply_quest_log_replacement`、`apply_quest_log_delta`、
+`pending_effects_for_transition`）負責，順序固定為：
+
+1. 於外層交易內，以**寫入前的權威綁定**（`old_entries` 中該任務的紀錄）與實際滿足的
+   最終階段 objective 定稿不可變的 `quest_completion` 事實；因此抵達目的地、交付對象、
+   護衛受保護／會面角色與必要關係在終局綁定被清除前就已被快照。
+2. 僅當該事實是**本次新建**時，才在該交易上註冊 `transaction.on_commit`；回滾會丟棄所有
+   待送通知，重複寫入不變的終局紀錄或重播同一事實都不會再排入一次嘗試。
+3. 提交後派送 `world.quests.runtime.QuestCompletionReceipt`，其欄位為 `source_id`（權威
+   來源識別，服務端不再自行拼組）、`actor`／`actor_id`、`quest_id`、`definition_key`、
+   `issuer_key`、定稿的 `objective` 載荷與已提交的 `awards` 信封。
+
+觀察者簽章因此只有一個參數：`observer(receipt)`。`server/title_nomination_service.py`
+的 `_on_quest_completion(receipt)` 直接轉送 `receipt.source_id` 與 `receipt.awards`，
+並以同一個 `source_id` 作為 occurrence 身分，所以重播該通知在行程內至多只會有一次嘗試。
+觀察者的例外仍被隔離並記錄，壞掉的觀察者永遠不會改變任務結算。
+
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/title_nomination.yaml` $\rightarrow$ `title_nomination.system` 與 `title_nomination.user`。
 * **預留位置**：`{player_name}`、`{full_title}`、`{recent_events}`（近期事件紀錄）、`{declined}`（歷史拒絕清單）、`{removed}`（主動卸除清單）。

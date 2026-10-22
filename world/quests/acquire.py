@@ -15,7 +15,7 @@ from .definitions import ObjectiveKind
 from .runtime import (
     QuestState,
     definition_for,
-    fulfill_record_for,
+    fulfill_record,
     read_records,
 )
 from .transitions import release_stage_binding
@@ -65,9 +65,10 @@ def _compute_acquire_replacement_for(
     Identical computation, but the candidate records are passed in instead of
     read from storage, so a caller holding a virtual (not-yet-written) record
     list — the automatic-settlement chain planner — computes the same
-    replacement without a stale store read. ``entity`` still names the actor:
-    the completion-observer dispatch and the pin-release lookups stay
-    entity-aware.
+    replacement without a stale store read. ``entity`` still names the actor
+    for the pin-release lookups. Planning never notifies: the quest-transition
+    writer finalizes the completion fact and dispatches the owner notification
+    once the caller's transaction commits.
     """
     if isinstance(additions, Counter):
         counts = additions
@@ -89,9 +90,7 @@ def _compute_acquire_replacement_for(
             continue
         new_progress = record.stage_progress + gained
         if new_progress >= objective.quantity:
-            replacements[record.quest_id] = fulfill_record_for(
-                entity, record, definition
-            )
+            replacements[record.quest_id] = fulfill_record(record, definition)
             pin_operations.extend(release_stage_binding(entity, record))
         else:
             replacements[record.quest_id] = replace(

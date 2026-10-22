@@ -15,7 +15,7 @@ from .runtime import (
     QuestRecord,
     QuestState,
     definition_for,
-    fulfill_record_for,
+    fulfill_record,
     read_records,
 )
 from .transitions import apply_quest_log_replacement, release_stage_binding
@@ -159,14 +159,15 @@ def _advance_arrival(
     non-1 quantity (should one slip through) accumulates instead of
     over-filling. Reaching the quantity fulfills the stage exactly as before
     (advancing to the next stage or completing the quest), so the shipped
-    quantity-1 behavior is unchanged. A completion is dispatched to the
-    quest-completion observers (change G nomination seam).
+    quantity-1 behavior is unchanged. Fulfilment is pure here: the enclosing
+    quest-transition writer finalizes the completion fact from this record's
+    still-live bindings and dispatches the owner notification after commit.
     """
     objective = definition.stages[record.stage_index].objective
     next_progress = record.stage_progress + 1
     if next_progress < objective.quantity:
         return replace(record, stage_progress=next_progress)
-    return fulfill_record_for(player, record, definition)
+    return fulfill_record(record, definition)
 
 
 def observe_room_entry(room: Any, obj: Any, *, observe_lore: bool = True) -> None:
