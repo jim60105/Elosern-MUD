@@ -196,6 +196,12 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         THEN each participant's memory holds only knowable acts, roles and
         results, the third entity gains no memory, and no private milestone,
         roll, compliance reasoning or unknown counter is stored anywhere.
+
+        Production settlement marks such an occurrence public while keeping the
+        bystander out of ``participants`` and the milestones private; that
+        composition is pinned by the producer test
+        ``test_room_occupancy_does_not_promote_private_milestones_to_public``
+        in ``world.rules.tests.test_action_narrative_deeds``.
         """
         content = self._content("adult:public:1")
         event, _ = self._record("adult:public:1", content)
@@ -438,6 +444,31 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         self.assertEqual([r.owner_id for r in records], [self.player_pk])
         self.assertEqual(
             MemoryRecord.objects.filter(owner_id=self.other_pk).count(), 0
+        )
+
+    @covers_requirement(
+        "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
+        "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
+    )
+    def test_malformed_metadata_fails_closed_without_memory(self):
+        """Scenario: Malformed adult payload does not bypass authorization.
+
+        WHEN an authorized occurrence carries a container where scalar act or
+        identity metadata belongs THEN projection fails closed: a nested
+        private value can neither reach a memory nor be stringified into the
+        readable summary.
+        """
+        content = self._content("adult:metadata:1")
+        content["act_name"] = {"roll": 42, "auto_comply": True}
+        event, progress = self._record("adult:metadata:1", content)
+
+        with patch("world.narrative.memory.log_warn"):
+            project_narrative_event_to_memories(event, projector_version=1)
+
+        progress.refresh_from_db()
+        self.assertEqual(progress.status, "completed")
+        self.assertEqual(
+            MemoryRecord.objects.filter(source_id="adult:metadata:1").count(), 0
         )
 
     @covers_requirement(
@@ -713,6 +744,55 @@ class SharedAdultProjectionTests(EvenniaTestCase):
                 field_access_grants,
                 recipient_pk=self.actor_pk,
                 source_id="adult:bad_context:1",
+            )
+
+    @covers_requirement(
+        "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing"
+    )
+    def test_container_metadata_is_rejected_not_stringified(self):
+        """Containers never stand in for scalar act or identity metadata.
+
+        WHEN act metadata, an identity name or an effect target name is a
+        container THEN the projector raises instead of embedding the nested
+        value in the envelope or its summary.
+        """
+        metadata_fields = ("act_key", "act_name", "action_source_id")
+        for field in metadata_fields:
+            with self.subTest(field=field):
+                malformed = self._content(f"adult:meta:{field}")
+                malformed[field] = {"roll": 42, "auto_comply": True}
+                with self.assertRaises(AdultProjectionError):
+                    project_adult_action_for_recipient(
+                        malformed,
+                        recipient_pk=self.actor_pk,
+                        source_id=f"adult:meta:{field}",
+                    )
+
+        malformed_actor = self._content("adult:meta:actor")
+        malformed_actor["actor"]["name"] = {"roll": 42}
+        with self.assertRaises(AdultProjectionError):
+            project_adult_action_for_recipient(
+                malformed_actor,
+                recipient_pk=self.actor_pk,
+                source_id="adult:meta:actor",
+            )
+
+        malformed_recipient = self._content("adult:meta:recipient")
+        malformed_recipient["recipients"][0]["name"] = {"roll": 42}
+        with self.assertRaises(AdultProjectionError):
+            project_adult_action_for_recipient(
+                malformed_recipient,
+                recipient_pk=self.actor_pk,
+                source_id="adult:meta:recipient",
+            )
+
+        malformed_target = self._content("adult:meta:target")
+        malformed_target["outcomes"]["effects"][0]["target_name"] = {"roll": 42}
+        with self.assertRaises(AdultProjectionError):
+            project_adult_action_for_recipient(
+                malformed_target,
+                recipient_pk=self.actor_pk,
+                source_id="adult:meta:target",
             )
 
     @covers_requirement(

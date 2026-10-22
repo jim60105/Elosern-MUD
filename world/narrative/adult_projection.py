@@ -84,6 +84,23 @@ def _text(
     return value
 
 
+def _optional_text(
+    row: Mapping[str, Any],
+    field: str,
+    *,
+    source_id: str,
+) -> str:
+    """Return one optional text field: absent means empty, never coerced.
+
+    A present container or number is unsupported metadata, not display text,
+    so it fails closed instead of being stringified into an envelope.
+    """
+    value = row.get(field, "")
+    if not isinstance(value, str):
+        raise _malformed(source_id, f"{field} value")
+    return value
+
+
 def _rows(container: Any, *, source_id: str, field: str) -> list[Mapping[str, Any]]:
     """Return the mapping rows of one list container, or raise when malformed."""
     if container is None:
@@ -151,7 +168,7 @@ def _project_effect(
         "kind": kind,
         "actor_id": _text(row, "actor_id", source_id=source_id),
         "target_id": target_id,
-        "target_name": str(row.get("target_name", "")),
+        "target_name": _optional_text(row, "target_name", source_id=source_id),
         "result": {
             field: _detached_scalar(
                 raw_result[field], source_id=source_id, field=f"effect result {field}"
@@ -205,7 +222,9 @@ def _project_outcomes(
         projected["transitions"] = [
             {
                 "target_id": _text(row, "target_id", source_id=source_id),
-                "target_name": str(row.get("target_name", "")),
+                "target_name": _optional_text(
+                    row, "target_name", source_id=source_id
+                ),
                 "event": _text(row, "event", source_id=source_id),
             }
             for row in _rows(
@@ -223,7 +242,9 @@ def _project_outcomes(
         projected["counters"] = [
             {
                 "target_id": _text(row, "target_id", source_id=source_id),
-                "target_name": str(row.get("target_name", "")),
+                "target_name": _optional_text(
+                    row, "target_name", source_id=source_id
+                ),
                 "counter": _text(row, "counter", source_id=source_id),
             }
             for row in _rows(
@@ -249,7 +270,9 @@ def _project_outcomes(
             verdicts.append(
                 {
                     "target_id": target_id,
-                    "target_name": str(row.get("target_name", "")),
+                    "target_name": _optional_text(
+                        row, "target_name", source_id=source_id
+                    ),
                     "resisted": resisted,
                 }
             )
@@ -325,10 +348,17 @@ def project_adult_action_for_recipient(
     if not act_key.strip():
         raise _malformed(source_id, "act_key")
 
+    action_source_id = content.get("action_source_id", source_id)
+    if not isinstance(action_source_id, str):
+        raise _malformed(source_id, "action_source_id")
+    act_name = content.get("act_name", "")
+    if not isinstance(act_name, str):
+        raise _malformed(source_id, "act_name")
+
     projected: dict[str, Any] = {
-        "action_source_id": content.get("action_source_id", source_id),
+        "action_source_id": action_source_id,
         "act_key": act_key,
-        "act_name": content.get("act_name", ""),
+        "act_name": act_name,
         "category": "sexual_act",
         "encounter_context": _project_encounter_context(content, source_id=source_id),
     }
@@ -337,7 +367,7 @@ def project_adult_action_for_recipient(
     if "actor" in allowed_tokens:
         projected["actor"] = {
             "id": actor_id,
-            "name": str(actor.get("name", "")),
+            "name": _optional_text(actor, "name", source_id=source_id),
             "role": "actor",
         }
     elif is_actor and "target_own_outcome" in allowed_tokens:
@@ -349,8 +379,8 @@ def project_adult_action_for_recipient(
     if "recipients" in allowed_tokens:
         projected["recipients"] = [
             {
-                "id": str(row.get("id", "")),
-                "name": str(row.get("name", "")),
+                "id": _optional_text(row, "id", source_id=source_id),
+                "name": _optional_text(row, "name", source_id=source_id),
                 "role": "recipient",
             }
             for row in _rows(
@@ -361,8 +391,8 @@ def project_adult_action_for_recipient(
         # A recipient sees only their own participation, never the full roster.
         projected["recipients"] = [
             {
-                "id": str(row.get("id", "")),
-                "name": str(row.get("name", "")),
+                "id": _optional_text(row, "id", source_id=source_id),
+                "name": _optional_text(row, "name", source_id=source_id),
                 "role": "recipient",
             }
             for row in _rows(
