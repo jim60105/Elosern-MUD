@@ -1245,6 +1245,7 @@ class TitleNominationRealSettlementTests(
         # The fake replaces only the external transport, so the transport's
         # own exchange record is absent by construction; the guardrail outcome
         # is the record that carries the accepted final text.
+        self.assertEqual(len(records), 1)
         self.assertEqual({record["kind"] for record in records}, {"outcome"})
         outcome = records[0]
         self.assertEqual(outcome["result"], "ok")
@@ -1264,11 +1265,27 @@ class TitleNominationRealSettlementTests(
         inventory_before = list(self.player.db.inventory or [])
         wallet_before = self.player.db.wallet
 
+        def assert_no_attempt(entity, client, expected_calls=None):
+            self.assertFalse(
+                entity.attributes.has(title_rules.PENDING_BALLOT_KEY)
+            )
+            self.assertFalse(
+                title_rules.nomination_suppressed(entity, now_tick=0)
+            )
+            if expected_calls is None:
+                # A shape violation consumes the profile's retry budget.
+                self.assertGreaterEqual(len(client.calls), 1)
+            else:
+                self.assertEqual(len(client.calls), expected_calls)
+            self.assertNotIn(
+                str(entity.pk), service._IN_FLIGHT_PLAYERS
+            )
+
         # Empty material: a character with no committed deed and no transport.
         empty = create_object(PlayerCharacter, key="h-real-empty")
         empty_client = _RequestCitingTransport()
         self.assertIsNone(self._schedule(empty_client, entity=empty))
-        self.assertEqual(empty_client.calls, [])
+        assert_no_attempt(empty, empty_client, 0)
 
         # A disabled profile never reaches the transport.
         disabled_client = _RequestCitingTransport()
@@ -1280,13 +1297,13 @@ class TitleNominationRealSettlementTests(
             )
             if disabled is not None:
                 self.assertFalse(await_result(disabled))
-        self.assertEqual(disabled_client.calls, [])
+        assert_no_attempt(self.player, disabled_client, 0)
 
         # Transport failure voids the round.
         failing = FakeLLMClient()
         failing.add_timeout(lambda descriptor: True)
         self.assertIsNotNone(self._schedule(failing))
-        self.assertEqual(len(failing.calls), 1)
+        assert_no_attempt(self.player, failing, 1)
 
         # Malformed output (four candidates) voids the round by shape.
         malformed = FakeLLMClient()
@@ -1304,15 +1321,7 @@ class TitleNominationRealSettlementTests(
             ),
         )
         self.assertIsNotNone(self._schedule(malformed))
-
-        for client in (empty_client, disabled_client, failing, malformed):
-            self.assertFalse(
-                self.player.attributes.has(title_rules.PENDING_BALLOT_KEY)
-            )
-            self.assertFalse(
-                title_rules.nomination_suppressed(self.player, now_tick=0)
-            )
-        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+        assert_no_attempt(self.player, malformed)
         # Gameplay itself is untouched: wallet and inventory are unchanged and
         # a real action still settles.
         self.assertEqual(list(self.player.db.inventory or []), inventory_before)
@@ -1419,24 +1428,32 @@ class TitleNominationRollbackTests(
         # The nested writer really granted the titles before the failure.
         self.assertTrue(granted_inside)
         self.assertIn(_H_DEED, granted_inside[0])
-        # Drop the in-memory attribute cache so the assertions read the
-        # persisted row rather than the writer's restored handler state.
+
+        def assert_restored():
+            self.assertEqual(
+                read_records(self.player)[0].state, QuestState.IN_PROGRESS
+            )
+            self.assertEqual(list(self.player.db.inventory or []), [])
+            self.assertEqual(self.player.db.wallet, 1000)
+            self.assertEqual(
+                title_rules.read_title_state(self.player),
+                ([], {"fixed": None, "epithet": None}),
+            )
+            self.assertFalse(
+                self.player.attributes.has(
+                    title_rules.TITLE_COLLECTION_KEY
+                )
+            )
+            self.assertFalse(
+                self.player.attributes.has(title_rules.TITLE_EQUIPPED_KEY)
+            )
+
+        # First the warmed instance: the owning writer must have restored every
+        # surface it had already mutated. Then, with the attribute cache
+        # evicted, the same facts must hold in persisted storage.
+        assert_restored()
         self.player.attributes.reset_cache()
-        self.assertEqual(
-            read_records(self.player)[0].state, QuestState.IN_PROGRESS
-        )
-        self.assertEqual(list(self.player.db.inventory or []), [])
-        self.assertEqual(self.player.db.wallet, 1000)
-        self.assertEqual(
-            title_rules.read_title_state(self.player),
-            ([], {"fixed": None, "epithet": None}),
-        )
-        self.assertFalse(
-            self.player.attributes.has(title_rules.TITLE_COLLECTION_KEY)
-        )
-        self.assertFalse(
-            self.player.attributes.has(title_rules.TITLE_EQUIPPED_KEY)
-        )
+        assert_restored()
         self.assertIsNone(get_committed_award_results(self.source_id))
         self.assertFalse(
             NarrativeEvent.objects.filter(
@@ -1450,8 +1467,7 @@ class TitleNominationRollbackTests(
         )
 
     @covers_requirement(
-        "title-system::award-evidence-finalizes-atomically-and-survives-replay",
-        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance",
+        "title-system::award-evidence-finalizes-atomically-and-survives-replay"
     )
     def test_action_failure_after_evidence_writes_restores_gameplay_and_evidence(self):
         from world.narrative import action_adapters as adapter_module
@@ -1504,18 +1520,29 @@ class TitleNominationRollbackTests(
         self.assertIsNone(
             get_committed_award_results(observed["event"].source_id)
         )
-        self.assertEqual(title_rules.banked_fixed_keys(self.player), ())
-        self.assertEqual(
-            title_rules.read_title_state(self.player),
-            ([], {"fixed": None, "epithet": None}),
-        )
-        self.assertTrue(self.target.sexual.virgin)
-        self.assertEqual(
-            self.player.sexual.pleasure.value, player_pleasure
-        )
-        self.assertEqual(
-            self.target.sexual.pleasure.value, target_pleasure
-        )
+
+        def assert_restored():
+            self.assertEqual(title_rules.banked_fixed_keys(self.player), ())
+            self.assertEqual(
+                title_rules.read_title_state(self.player),
+                ([], {"fixed": None, "epithet": None}),
+            )
+            self.assertTrue(self.target.sexual.virgin)
+            self.assertEqual(
+                self.player.sexual.pleasure.value, player_pleasure
+            )
+            self.assertEqual(
+                self.target.sexual.pleasure.value, target_pleasure
+            )
+
+        # Warmed instances first, then the same facts read after evicting the
+        # attribute caches and rebuilding both sexual handlers from storage.
+        assert_restored()
+        self.player.attributes.reset_cache()
+        self.target.attributes.reset_cache()
+        self.player.__dict__.pop("sexual", None)
+        self.target.__dict__.pop("sexual", None)
+        assert_restored()
 
 
 class TitleNominationNotificationReplayTests(
