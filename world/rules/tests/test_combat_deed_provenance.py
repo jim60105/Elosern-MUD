@@ -21,6 +21,7 @@ from typeclasses.rooms import Room
 from world.narrative.action_adapters import (
     build_action_source_id,
     capture_milestone_snapshot,
+    record_action_settlement_evidence,
     record_non_resolver_adult_milestones,
 )
 from world.narrative.events import (
@@ -30,6 +31,7 @@ from world.narrative.events import (
 from world.narrative.models import NarrativeEvent, ProjectionProgress
 from world.narrative.recent_deeds import select_authorized_recent_deeds
 from world.rules.action import ActionRequest
+from world.rules.buffs import apply_buff
 from world.rules.clock import get_world_clock
 from world.rules.combat import (
     Battlefield,
@@ -38,7 +40,9 @@ from world.rules.combat import (
     ExecutionScopeBase,
     combat_provenance,
 )
-from world.rules.combat.rounds import _end_of_round_upkeep
+from world.rules.combat.rounds import _end_of_round_upkeep, run_round
+from world.rules.event_log import EventLog
+from world.rules.titles.awards import AutomaticTitleAward
 from world.rules.combat_initiation import initiate_field_combat
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
@@ -53,6 +57,7 @@ from world.rules.overwhelm import resolve_overwhelm
 from ._combat_session_helpers import (
     _monster,
     _player,
+    engagement_base,
     fail_on_round_persist,
     open_synthetic_scope,
     synth_innate_overlay,
@@ -231,6 +236,186 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
                 f"{self.player.pk}:{BASIC_ATTACK_KEY}",
             ],
         )
+
+    @covers_requirement(
+        "narrative-events::durable-source-identity-makes-projection-recoverable"
+    )
+    def test_two_real_slots_of_one_actor_commit_distinct_occurrences(self):
+        """Scenario: same skill in distinct combat slots remains distinct."""
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        battlefield = reconstruct_battlefield(self.player, record)
+        # The extra-action grant provisions a second real slot for this actor.
+        apply_buff(self.player, "lightning_extra_action")
+        tick = get_world_clock().tick
+
+        def provider(entity, field):
+            if entity is self.player:
+                return ActionRequest(
+                    self.player,
+                    BASIC_ATTACK_KEY,
+                    [self.monster],
+                    BattlefieldActionContext(field),
+                )
+            return None
+
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=50):
+            run_round(
+                battlefield,
+                provider,
+                decision_scope_base=engagement_base(
+                    engagement_id=f"{record.engagement_id}:slots",
+                    round_index=1,
+                ),
+            )
+        self.assertEqual(get_world_clock().tick, tick)
+
+        actions = self._player_actions(f"{record.engagement_id}:slots")
+        self.assertEqual(
+            [event.source_id for event in actions],
+            [
+                f"action:combat:{record.engagement_id}:slots:r1:s0:"
+                f"{self.player.pk}:{BASIC_ATTACK_KEY}",
+                f"action:combat:{record.engagement_id}:slots:r1:s1:"
+                f"{self.player.pk}:{BASIC_ATTACK_KEY}",
+            ],
+        )
+        self.assertEqual(
+            {event.content["encounter_context"]["slot_ordinal"] for event in actions},
+            {0, 1},
+        )
+        self.assertEqual({event.tick for event in actions}, {tick})
+        self.assertEqual(len({event.source_id for event in actions}), 2)
+
+    @covers_requirement(
+        "narrative-events::durable-source-identity-makes-projection-recoverable"
+    )
+    def test_replaying_a_committed_action_and_upkeep_reuses_source_and_awards(self):
+        """Scenario: combat evidence replay reuses occurrence identity."""
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        battlefield = reconstruct_battlefield(self.player, record)
+        provenance = CombatProvenance(
+            engagement_id=record.engagement_id,
+            round_ordinal=1,
+            slot_ordinal=0,
+            session_id=record.session_id,
+        )
+        occurrence = (
+            f"action:combat:{record.engagement_id}:r1:s0:"
+            f"{self.player.pk}:{BASIC_ATTACK_KEY}"
+        )
+        award = AutomaticTitleAward(
+            source_id=occurrence,
+            recipient_id=str(self.player.pk),
+            kind="fixed",
+            title_id="t_provenance_award",
+            granted_tick=5,
+            display_name="合成事蹟稱號",
+        )
+        request = ActionRequest(
+            self.player,
+            BASIC_ATTACK_KEY,
+            [self.monster],
+            BattlefieldActionContext(battlefield),
+            source_id=occurrence,
+        )
+        event_log = EventLog(str(self.player.key), BASIC_ATTACK_KEY, (), (), 0)
+
+        with combat_provenance(provenance):
+            first, _ = record_action_settlement_evidence(
+                request,
+                event_log,
+                (award,),
+                {},
+                delivered_targets=[self.monster],
+            )
+            ProjectionProgress.objects.filter(source_id=occurrence).update(
+                status="completed"
+            )
+            committed_content = dict(first.content)
+            counts = (
+                NarrativeEvent.objects.count(),
+                ProjectionProgress.objects.count(),
+            )
+            # The same committed settlement notification is re-delivered with
+            # no awards at all: the replay must not erase them.
+            replayed, _ = record_action_settlement_evidence(
+                request,
+                event_log,
+                (),
+                {},
+                delivered_targets=[self.monster],
+            )
+        self.assertEqual(replayed.pk, first.pk)
+        self.assertEqual(replayed.content, committed_content)
+        self.assertEqual(
+            replayed.content["award_results"][0]["title_id"], "t_provenance_award"
+        )
+        self.assertEqual(
+            (NarrativeEvent.objects.count(), ProjectionProgress.objects.count()),
+            counts,
+        )
+        self.assertEqual(
+            ProjectionProgress.objects.get(source_id=occurrence).status, "completed"
+        )
+
+        # The upkeep boundary's own committed notification replays the same
+        # way: one immutable milestone source, one pending-then-completed
+        # progress row, no second occurrence.
+        snapshot = capture_milestone_snapshot(self.player)
+        self.player.sexual.virgin = False
+        self.player.sexual.record_climax_count()
+        self.player.sexual.climax_phase.value = "進行中"
+        upkeep_round = provenance.at_slot(None)
+        with combat_provenance(upkeep_round):
+            record_non_resolver_adult_milestones(
+                self.player,
+                snapshot,
+                source_id=(
+                    f"combat:{record.engagement_id}:round:2:upkeep:climax:"
+                    f"{self.player.pk}"
+                ),
+                tick=get_world_clock().tick,
+                encounter_provenance=upkeep_round,
+            )
+        milestones = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__encounter_context__encounter_id=record.engagement_id,
+            )
+        )
+        self.assertGreaterEqual(len(milestones), 2)
+        milestone_sources = [event.source_id for event in milestones]
+        upkeep_counts = (
+            NarrativeEvent.objects.count(),
+            ProjectionProgress.objects.count(),
+        )
+        upkeep_contents = [dict(event.content) for event in milestones]
+        for event, content in zip(milestones, upkeep_contents):
+            ProjectionProgress.objects.filter(source_id=event.source_id).update(
+                status="completed"
+            )
+            replayed_event, _, created = record_narrative_event(
+                source_id=event.source_id,
+                event_type=event.event_type,
+                content=content,
+                participants=event.participants,
+                location=event.location,
+                tick=event.tick,
+                visibility=event.visibility,
+            )
+            self.assertFalse(created)
+            self.assertEqual(replayed_event.pk, event.pk)
+            self.assertEqual(replayed_event.content, content)
+        self.assertEqual(
+            (NarrativeEvent.objects.count(), ProjectionProgress.objects.count()),
+            upkeep_counts,
+        )
+        for source in milestone_sources:
+            self.assertEqual(
+                ProjectionProgress.objects.get(source_id=source).status, "completed"
+            )
 
     @covers_requirement(
         "narrative-events::durable-source-identity-makes-projection-recoverable"
