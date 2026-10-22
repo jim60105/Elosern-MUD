@@ -22,11 +22,17 @@ Extend metric gate stories to show both city gate and wilderness return, plus a 
 
 Eight candidates and truncation cannot guarantee full long names at 16 px on a 240-unit island; the full accessible name and leader-line fallback are mandatory. Do not add an impossible universal no-label-overlap guarantee for arbitrary legal 64-node payloads. Fixture marker non-overlap remains required. Cross-layer gateway buttons must not be captured by island expand convenience handling or the action submission lock twice.
 
+For the unspecified current-label failure case, retain the existing current-label placement with its existing truncation after all eight candidates fail; never omit the current label. This is a bounded presentation assumption within the approved priority policy, without moving markers or adding a layout solver. Include a crowded-current assertion in the focused label tests. Full accessible names apply to drawn nodes; omitted context and original cross-layer room names remain reachable through the unchanged full map, while the stub keeps the exact approved travel name.
+
 ## Focused evidence
 
 Run affected `web/webclient-app/tests/world/local_map.test.js`, the new focused label-helper file if one is needed, and `web/webclient-app/tests/app_client_map_move.test.js` separately. Extend selected methods in `web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest` for Tab/Enter/Space, no duplicate move and no map-open; use `test_browser_local_map_rendering.LocalMapBrowserTest` for gate glyph/labels with no cross-layer node group. Register every new method in browser-shards. Use agent-browser screenshots and keyboard interaction on `World/LocalMap` metric city/wilderness/locked/crowded stories and then the real-client gateway. Inspect images for leader lines, clipped second lines and visible focus.
 
 ## Verification workflow (required during implementation)
+
+### Traceability gate ordering
+
+Existing-title IDs can use the normal live-tree gates. When implementation adds IDs absent from unsynchronized main specs, use a complete disposable directory snapshot of the current implementation, manifests and tooling with predecessor/current deltas applied to its equivalent main-spec tree. This is an ordinary copy, not a branch or registered git worktree. Obtain IDs with `uv run --locked python -m tools.spec_traceability --repo-root <equivalent-root> list`, then run `check` with the same root. Run the complete gate using the copied script, `uv run --locked python <equivalent-root>/tools/contract_gate.py`, so its file-derived root and subprocess working directories select that snapshot. Retain the implementation annotations unchanged. After the authorized archive step synchronizes the real main specs, repeat ordinary live-tree `tools.spec_traceability check` and `tools.contract_gate`. All task references to those gates follow this phase-aware sequence; listing IDs in the snapshot alone is insufficient, and an unsynchronized live-tree unknown-ID failure must never be suppressed.
 
 Use `World/LocalMap` as the production component showcase and retain `Overlays/MapOverlay` plus the instance/interior stories as unchanged-surface controls. No `Design/...` prototype is needed for this approved algorithmic change; if an existing relevant Design story is used for token/chrome comparison, it cannot replace a production-component story or the real client.
 

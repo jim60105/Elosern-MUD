@@ -211,7 +211,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: No node's name depends on the readout
 - **WHEN** the readout's label content is removed
-- **THEN** no node's name becomes unreachable: each in-view node's full label SHALL remain available as its on-canvas accessible name, and a remembered node's name SHALL remain readable — as the visible text of its edge marker on the lattice variant and of its entry in the full-map surface's remembered list on the graph variant — with its untruncated form always available to assistive technology on the island
+- **THEN** every drawn node representation retains its full label as its accessible name; context omitted from the island remains reachable on the unchanged full-map surface, and an actionable cross-layer gateway stub is named `往 <leads_to> 移動`. Remembered names retain their visible edge-marker or full-map graph-list presentation and untruncated island text alternatives.
 
 #### Scenario: The readout treatment is token-driven, not copied
 - **WHEN** the island renders its readout
@@ -406,7 +406,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: A node's name stays reachable without the readout
 - **WHEN** an in-view node's label is truncated on the island's canvas and a remembered node is presented alongside it
-- **THEN** the in-view node's full label is still available as its on-canvas accessible name and the remembered node's name is still readable — as its marker's visible text on the lattice variant, as its full-map list entry's visible text on the graph variant, and untruncated through the island's text alternative on both — so removing the readout's label content makes no node's name unreachable
+- **THEN** the drawn node retains its full accessible name independently of truncation; an omitted context node or cross-layer target keeps its original full name reachable on the unchanged full-map surface, while an actionable gateway stub is named `往 <leads_to> 移動`. Remembered nodes retain their visible marker or full-map graph-list names and untruncated island alternatives.
 
 #### Scenario: A screen-reader user can still reach every remembered place
 - **WHEN** a screen-reader user reads the minimap island on a wilderness payload carrying several remembered gateways, none of which is focusable and each of which is drawn inside the map graphic
