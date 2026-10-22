@@ -363,12 +363,16 @@ def _validate_and_project_record(
         )
 
     elif event_type == "combat_encounter":
+        encounter_id = content.get("encounter_id")
         session_id = content.get("session_id")
         outcome = content.get("outcome")
-        if not (session_id and outcome):
+        if not (encounter_id and outcome):
             raise ValueError(f"malformed combat_encounter record {event.source_id}")
         data = {
-            "session_id": str(session_id),
+            "encounter_id": str(encounter_id),
+            # The transport token is reusable and diagnostic only: two
+            # engagements can share it, so it never keys this record.
+            "session_id": str(session_id or ""),
             "outcome": str(outcome),
             "gameplay_outcome": str(content.get("gameplay_outcome", outcome)),
             "mode": str(content.get("mode", "hostile")),
@@ -453,6 +457,7 @@ def _validate_and_project_record(
             "entity_id": player_pk,
             "entity_name": str(content.get("entity_name", "")),
             "details": dict(content.get("details", {})) if isinstance(content.get("details"), dict) else {},
+            "encounter_context": content.get("encounter_context"),
             "privacy": {
                 "private_experience": True,
                 "public_notoriety": False,
@@ -506,10 +511,22 @@ def _load_authorized_records(
     return authorized_records
 
 
+def _milestone_encounter_id(record: AuthorizedDeedRecord) -> str:
+    """Return the encounter occurrence one milestone was committed under, or ``""``."""
+    encounter_context = record.data.get("encounter_context")
+    if not isinstance(encounter_context, dict):
+        return ""
+    return str(encounter_context.get("encounter_id", "") or "")
+
+
 def _get_action_compression_key(record: AuthorizedDeedRecord) -> tuple[str, str, str, str, str] | None:
     """Return stable grouping tuple for consecutive action compression:
 
-    (action_type, actor_id, sorted_recipients_str, encounter_session_id, player_role)
+    (action_type, actor_id, sorted_recipients_str, encounter_id, player_role)
+
+    The encounter component is the unique engagement occurrence, never the
+    reusable transport session token: two engagements sharing one token can
+    never compress into the same run.
     """
     if record.event_type not in ("skill_use", "adult_action"):
         return None
@@ -522,11 +539,11 @@ def _get_action_compression_key(record: AuthorizedDeedRecord) -> tuple[str, str,
     recip_key = ",".join(recip_ids)
 
     enc_ctx = data.get("encounter_context")
-    enc_session = str(enc_ctx.get("session_id", "")) if isinstance(enc_ctx, dict) else ""
+    enc_encounter = str(enc_ctx.get("encounter_id", "")) if isinstance(enc_ctx, dict) else ""
 
     player_role = "actor" if actor_id == data.get("player_id") else "recipient"
 
-    return (action_type, actor_id, recip_key, enc_session, player_role)
+    return (action_type, actor_id, recip_key, enc_encounter, player_role)
 
 
 def _build_compressed_action_fact(
@@ -618,10 +635,14 @@ def _group_and_aggregate_deeds(
 
     Invariants:
     - Encounters group their terminal outcome with member combat actions.
+    - A milestone records the encounter it was committed under, so an upkeep
+      milestone with no admitted action of its own still joins that encounter.
     - An action and its milestones combine, counting that occurrence once.
     - Standalone milestones retain distinct factual representation.
     - Repetition compression applies to consecutive eligible actions matching
       action type, participants, roles, and encounter context.
+    - Encounter identity is the unique engagement occurrence; the reusable
+      transport session token neither joins nor merges anything.
     - Different encounters never merge.
     - Every group retains immutable source IDs without inventing aggregate IDs.
     """
@@ -635,28 +656,35 @@ def _group_and_aggregate_deeds(
     encounter_records: dict[str, AuthorizedDeedRecord] = {}
     action_records_by_source: dict[str, AuthorizedDeedRecord] = {}
     milestones_by_action_source: dict[str, list[AuthorizedDeedRecord]] = {}
+    milestones_by_encounter: dict[str, list[AuthorizedDeedRecord]] = {}
     standalone_milestones: list[AuthorizedDeedRecord] = []
 
     for r in sorted_stream:
         if r.event_type == "combat_encounter":
-            session_id = str(r.data.get("session_id", ""))
-            if session_id:
-                encounter_records[session_id] = r
+            encounter_id = str(r.data.get("encounter_id", ""))
+            if encounter_id:
+                encounter_records[encounter_id] = r
         elif r.event_type in ("skill_use", "adult_action"):
             action_source_id = str(r.data.get("action_source_id") or r.source_id)
             action_records_by_source[action_source_id] = r
-        elif r.event_type == "adult_milestone":
-            action_src = str(r.data.get("action_source_id", ""))
-            if action_src:
-                milestones_by_action_source.setdefault(action_src, []).append(r)
-            else:
-                standalone_milestones.append(r)
 
-    # Recheck milestones whose action_source_id didn't match any admitted action in window
-    for action_src, ms_list in list(milestones_by_action_source.items()):
-        if action_src not in action_records_by_source:
-            standalone_milestones.extend(ms_list)
-            del milestones_by_action_source[action_src]
+    # 1a. Attach every milestone to the occurrence it belongs to. A milestone
+    # whose action was admitted belongs to that action; an upkeep milestone
+    # names its own encounter (the boundary commits the milestone, never an
+    # action) and joins that encounter's outcome directly; anything else is an
+    # independent fact that keeps acting as an ordinary boundary.
+    for r in sorted_stream:
+        if r.event_type != "adult_milestone":
+            continue
+        action_src = str(r.data.get("action_source_id", ""))
+        if action_src and action_src in action_records_by_source:
+            milestones_by_action_source.setdefault(action_src, []).append(r)
+            continue
+        encounter_id = _milestone_encounter_id(r)
+        if encounter_id and encounter_id in encounter_records:
+            milestones_by_encounter.setdefault(encounter_id, []).append(r)
+            continue
+        standalone_milestones.append(r)
 
     # Milestones joined to an admitted action belong to that occurrence, so they
     # are not independent occurrences: they neither break a repetition run nor
@@ -667,6 +695,11 @@ def _group_and_aggregate_deeds(
         for ms_list in milestones_by_action_source.values()
         for ms in ms_list
     }
+    joined_milestone_sources.update(
+        ms.source_id
+        for ms_list in milestones_by_encounter.values()
+        for ms in ms_list
+    )
 
     # 2. Identify consecutive action runs across the chronological action stream
     # A run breaks if action type, actor, recipients, encounter, or role changes.
@@ -703,15 +736,15 @@ def _group_and_aggregate_deeds(
         action_runs.append(current_run)
 
     # 3. Associate action runs to combat encounters or standalone groups
-    # Encounter session_id -> list of action runs
+    # Encounter occurrence id -> list of action runs
     encounter_action_runs: dict[str, list[list[AuthorizedDeedRecord]]] = {}
     standalone_action_runs: list[list[AuthorizedDeedRecord]] = []
 
     for run in action_runs:
         enc_ctx = run[0].data.get("encounter_context")
-        session_id = str(enc_ctx.get("session_id", "")) if isinstance(enc_ctx, dict) else ""
-        if session_id and session_id in encounter_records:
-            encounter_action_runs.setdefault(session_id, []).append(run)
+        encounter_id = str(enc_ctx.get("encounter_id", "")) if isinstance(enc_ctx, dict) else ""
+        if encounter_id and encounter_id in encounter_records:
+            encounter_action_runs.setdefault(encounter_id, []).append(run)
         else:
             standalone_action_runs.append(run)
 
@@ -740,9 +773,9 @@ def _group_and_aggregate_deeds(
             ))
 
     # 6. Form groups for Combat Encounters (group encounter outcome + its action runs)
-    for session_id, enc_record in encounter_records.items():
+    for encounter_id, enc_record in encounter_records.items():
         all_enc_sources = [enc_record.source_id]
-        runs = encounter_action_runs.get(session_id, [])
+        runs = encounter_action_runs.get(encounter_id, [])
         all_ticks = [enc_record.tick]
         enc_facts = dict(enc_record.data)
 
@@ -773,6 +806,25 @@ def _group_and_aggregate_deeds(
 
         if action_summaries:
             enc_facts["actions"] = action_summaries
+
+        # Milestones this encounter owns directly (an upkeep boundary's
+        # transitions) retain their own sources and facts in the same group.
+        encounter_milestones = [
+            {
+                "source_id": ms.source_id,
+                "milestone_kind": ms.data.get("milestone_kind"),
+                "identifier": ms.data.get("identifier"),
+                "details": ms.data.get("details"),
+            }
+            for ms in milestones_by_encounter.get(encounter_id, ())
+            if ms.source_id not in all_enc_sources
+        ]
+        for ms in milestones_by_encounter.get(encounter_id, ()):
+            if ms.source_id not in all_enc_sources:
+                all_enc_sources.append(ms.source_id)
+                all_ticks.append(ms.tick)
+        if encounter_milestones:
+            enc_facts["milestones"] = encounter_milestones
 
         groups.append(DeedFactGroup(
             group_type="combat_encounter",

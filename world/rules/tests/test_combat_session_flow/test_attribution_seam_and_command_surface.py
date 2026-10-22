@@ -22,6 +22,7 @@ from world.rules.combat_session import (
     SessionReason,
     engage,
     engage_group,
+    execution_scope_base,
     is_in_active_session,
     read_session,
     reconstruct_battlefield,
@@ -95,6 +96,9 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
                 commanded_action_kind="skill",
                 commanded_action_key=_T_CAST,
                 first_actor=str(self.player.key),
+                # The compressed rounds resolve under this engagement's own
+                # authoritative occurrence identity.
+                decision_scope_base=execution_scope_base(record),
             )
         logs = resolved.event_logs
         self.assertTrue(resolved.battle_over)

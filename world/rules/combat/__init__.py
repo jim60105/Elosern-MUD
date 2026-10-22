@@ -36,10 +36,14 @@ from world.rules.combat.battlefield import (  # noqa: F401
     roll_initiative,
 )
 from world.rules.combat.decision_scope import (  # noqa: F401
+    CombatProvenance,
     ExecutionScope,
     ExecutionScopeBase,
+    combat_provenance,
+    current_combat_provenance,
     current_decision_scope,
     decision_scope,
+    round_provenance,
     stable_actor_id,
 )
 from world.rules.combat.damage import (  # noqa: F401

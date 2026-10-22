@@ -22,14 +22,22 @@ from world.rules.action import (
     _commit,
 )
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import Battlefield, _end_of_round_upkeep
+from world.rules.combat import (
+    Battlefield,
+    _end_of_round_upkeep,
+    combat_provenance,
+)
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import make_skill
 
-from ._combat_session_helpers import open_synthetic_scope
+from ._combat_session_helpers import (
+    engagement_base,
+    engagement_provenance,
+    open_synthetic_scope,
+)
 
 # Synthetic cast rows: the two-event sexual caster (mid-round settlement)
 # and the kit damage spell (combat-session rollback carrier).
@@ -162,7 +170,8 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         entity = self._climaxing_player()
         before_sp = entity.traits.sp.value
         with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
-            _end_of_round_upkeep(self._field(entity))
+            with combat_provenance(engagement_provenance()):
+                _end_of_round_upkeep(self._field(entity))
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
         self.assertEqual(entity.sexual.pleasure.value, 15)
         self.assertEqual(entity.sexual.climax_count, 1)
@@ -176,7 +185,8 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         entity.sexual.stage_climax_extension(1)
         before_sp = entity.traits.sp.value
         with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
-            _end_of_round_upkeep(self._field(entity))
+            with combat_provenance(engagement_provenance()):
+                _end_of_round_upkeep(self._field(entity))
         self.assertEqual(entity.sexual.climax_phase.level, "進行中")
         self.assertEqual(entity.sexual.pending_climax_extension, 0)
         self.assertEqual(entity.sexual.climax_count, 0)
@@ -211,6 +221,7 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
                     [],
                     BattlefieldActionContext(battlefield),
                 ),
+                decision_scope_base=engagement_base(),
             )
         # The cast drove the phase to 進行中 mid-round; the same round's
         # upkeep then resolved it with no external climax_ends call.
@@ -264,7 +275,8 @@ class ClimaxDeadEndRegressionTests(EvenniaTestCase):
             {entity.key: entity},
         )
         with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
-            _end_of_round_upkeep(field)
+            with combat_provenance(engagement_provenance()):
+                _end_of_round_upkeep(field)
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
         decay_tick(entity, 300)
         self.assertEqual(entity.sexual.climax_phase.level, "未達")

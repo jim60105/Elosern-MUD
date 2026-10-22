@@ -78,6 +78,7 @@ from ._combat_session_helpers import (
     _behaviour_archetype_key,
     _monster_tier_key,
     _race_key,
+    engagement_base,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -238,7 +239,9 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             return provider(entity, field)
 
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            run_round(battlefield, counting)
+            run_round(
+                battlefield, counting, decision_scope_base=engagement_base()
+            )
         for key in (self.player.key, first.key, second.key, monster_a.key, monster_b.key):
             self.assertEqual(calls.get(str(key), 0), 1, key)
 
@@ -282,7 +285,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             {int(self.player.pk): request}, battlefield, record
         )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            logs = run_round(battlefield, provider)
+            logs = run_round(battlefield, provider, decision_scope_base=engagement_base())
         targets = [entry.target for entry in _damage_entries(logs)]
         self.assertIn(str(companion.key), targets)
 
@@ -321,7 +324,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             record,
         )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            logs = run_round(battlefield, provider)
+            logs = run_round(battlefield, provider, decision_scope_base=engagement_base())
         companion_damage = [
             entry
             for entry in _damage_entries(logs)
@@ -368,7 +371,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
             {int(self.player.pk): request}, battlefield, record
         )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            logs = run_round(battlefield, provider)
+            logs = run_round(battlefield, provider, decision_scope_base=engagement_base())
         from dataclasses import replace
         from world.rules.combat_session import _persist
         from world.rules.combat_session.rounds import _knocked_out_ids
@@ -1885,6 +1888,7 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
 
         return CombatSessionRecord(
             session_id="hostile:terminal-fatigue:manual",
+            engagement_id="hostile:terminal-fatigue:manual:1",
             mode="hostile",
             room_id=int(self.room.pk),
             player_ids=tuple(int(member.pk) for member in allies),
@@ -2278,6 +2282,7 @@ class TerminalHandoffOfferTests(BattlefieldIsolation, EvenniaTest):
 
         return CombatSessionRecord(
             session_id="hostile:terminal-handoff:manual",
+            engagement_id="hostile:terminal-handoff:manual:1",
             mode="hostile",
             room_id=int(self.room1.pk),
             player_ids=tuple(int(member.pk) for member in allies),

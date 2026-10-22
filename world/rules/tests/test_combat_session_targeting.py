@@ -26,6 +26,7 @@ from ._combat_session_helpers import (
     BattlefieldIsolation,
     _monster,
     _player,
+    engagement_base,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -343,7 +344,7 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         )
         hp_before = self.companion.traits.hp.current
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            logs = run_round(field, provider)
+            logs = run_round(field, provider, decision_scope_base=engagement_base())
         targets = [
             entry.target
             for log in logs

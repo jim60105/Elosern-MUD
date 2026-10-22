@@ -13,7 +13,13 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.rules.combat_session import BASIC_ATTACK_KEY
 from world.rules.action import ActionResolver
-from world.rules.combat import Battlefield, _max_hp, _stored_hp, run_round
+from world.rules.combat import (
+    Battlefield,
+    _max_hp,
+    _stored_hp,
+    combat_provenance,
+    run_round,
+)
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import EventLog
 from world.rules.monster_behaviour import (
@@ -28,7 +34,12 @@ from world.rules.overwhelm import (
     team_effective_power,
 )
 
-from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import (
+    engagement_base,
+    engagement_provenance,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import (
     FakeMonster,
@@ -104,7 +115,11 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
-            logs = run_round(self.field, monster_behaviour_policy)
+            logs = run_round(
+                self.field,
+                monster_behaviour_policy,
+                decision_scope_base=engagement_base(),
+            )
         self.assertEqual(logs, [log])
 
     def test_overwhelm_accepts_policy_without_special_case(self):
@@ -157,7 +172,9 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
-            logs = run_round(self.field, policy)
+            logs = run_round(
+                self.field, policy, decision_scope_base=engagement_base()
+            )
         policy.assert_not_called()
         self.assertEqual(logs[0].entries[0].kind, "action_skipped")
 
@@ -204,7 +221,8 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
             "world.rules.combat.rounds.evaluate_combat_modifiers",
             return_value={},
         ):
-            result = ActionResolver.resolve(request)
+            with combat_provenance(engagement_provenance().at_slot(0)):
+                result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
 
 
@@ -244,7 +262,8 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         request = monster_behaviour_policy(self.monster, self.field)
         self.assertEqual(request.skill_key, FLEE_SKILL_KEY)
         with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            with combat_provenance(engagement_provenance().at_slot(0)):
+                result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertIn(self.monster.key, self.field.fled)
         self.assertEqual(result.event_log.entries[0].kind, "disengage_attempt")
@@ -260,7 +279,11 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
-            logs = run_round(self.field, monster_behaviour_policy)
+            logs = run_round(
+                self.field,
+                monster_behaviour_policy,
+                decision_scope_base=engagement_base(),
+            )
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
         self.assertTrue(logs[0].entries[0].data["success"])
         self.assertIn(self.monster.key, self.field.fled)
@@ -281,7 +304,11 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
-            logs = run_round(self.field, monster_behaviour_policy)
+            logs = run_round(
+                self.field,
+                monster_behaviour_policy,
+                decision_scope_base=engagement_base(),
+            )
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
         self.assertFalse(logs[0].entries[0].data["success"])
         self.assertNotIn(self.monster.key, self.field.fled)
@@ -320,7 +347,8 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                 self.field,
                 monster_behaviour_policy,
                 max_rounds=1,
-        )
+                decision_scope_base=engagement_base(),
+            )
         self.assertTrue(result.battle_over)
         self.assertIn(self.monster.key, self.field.fled)
         self.assertEqual(result.verdict_after, "party")
@@ -383,7 +411,10 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                         "world.rules.disengage.roll_d100",
                         return_value=100,
                     ):
-                        result = ActionResolver.resolve(request)
+                        with combat_provenance(
+                            engagement_provenance().at_slot(0)
+                        ):
+                            result = ActionResolver.resolve(request)
                     self.assertEqual(result.outcome, "success")
                     self.assertTrue(result.event_log.entries[0].data["success"])
                     self.assertIn(monster.key, battlefield.fled)
@@ -395,6 +426,9 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                         ),
                         patch("world.rules.combat.damage.roll_d100", return_value=100),
                     ):
-                        result = ActionResolver.resolve(request)
+                        with combat_provenance(
+                            engagement_provenance().at_slot(0)
+                        ):
+                            result = ActionResolver.resolve(request)
                     self.assertEqual(result.outcome, "success")
                     self.assertNotIn(monster.key, battlefield.fled)

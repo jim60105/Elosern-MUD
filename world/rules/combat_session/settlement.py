@@ -415,8 +415,20 @@ def settle_session(
         record_narrative_event,
     )
 
+    # The terminal fact is keyed by the encounter's own engagement identity.
+    # The transport session id is reusable (one token per player, mode and
+    # tick), so it can never identify this engagement's outcome: a record
+    # without an engagement identity is malformed and settles nothing.
+    if not record.engagement_id:
+        from world.rules.combat_session.errors import CombatSessionError, SessionReason
+
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "the combat session carries no engagement identity",
+        )
+    engagement_id = record.engagement_id
     encounter_source_id = build_encounter_source_id(
-        record.engagement_id or record.session_id,
+        engagement_id,
         kind="terminal",
         ordinal=1,
     )
@@ -592,6 +604,7 @@ def settle_session(
                 source_id=encounter_source_id,
                 event_type="combat_encounter",
                 content={
+                    "encounter_id": engagement_id,
                     "outcome": normalized_outcome,
                     "gameplay_outcome": outcome,
                     "mode": record.mode,

@@ -25,9 +25,12 @@ from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import (
+    engage,
     forfeit,
     read_session,
+    reconstruct_battlefield,
     restore_active_session,
+    settle_session,
     submit_player_action,
 )
 from world.rules.exam_schedule_holds import HOLD_ATTRIBUTE, read_exam_schedule_hold
@@ -51,6 +54,7 @@ from world.rules.npc_persona import (
 )
 from world.rules.surfaces import read_counter_trait, write_counter_trait
 from world.rules.tests._combat_session_helpers import (
+    _monster,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -318,6 +322,52 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
         self._give_merit(50)
         self.host.db.schedule_state = "busy"
         self._assert_rejected_without_writes(ExamReason.EXAMINER_BUSY)
+
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_examination_and_hostile_engagement_at_one_tick_keep_distinct_identities(self):
+        """A simulated examination never reuses a hostile engagement's identity."""
+        from world.narrative.events import build_encounter_source_id
+        from world.narrative.models import NarrativeEvent
+
+        self._give_merit(50)
+        tick = self.clock.tick
+        monster = _monster("identity goblin", hp=50, atk=1)
+        monster.location = self.hall
+        engage(self.player, monster)
+        hostile = read_session(self.player)
+        self.assertTrue(hostile.engagement_id)
+        settle_session(
+            self.player,
+            hostile,
+            reconstruct_battlefield(self.player, hostile),
+            "escape",
+        )
+        self.assertEqual(self.clock.tick, tick)
+        hostile_terminal = NarrativeEvent.objects.get(
+            source_id=build_encounter_source_id(
+                hostile.engagement_id, kind="terminal", ordinal=1
+            )
+        )
+        self.assertEqual(hostile_terminal.content["encounter_id"], hostile.engagement_id)
+
+        record = start_guild_exam(self.player, self.host, "E")
+        exam = read_session(self.player)
+        self.assertEqual(exam.mode, "guild_exam")
+        self.assertTrue(exam.engagement_id)
+        self.assertEqual(
+            exam.session_id, f"guild_exam:{self.player.pk}:{record.exam_id}"
+        )
+        # Same tick and the same candidate, yet the two encounters keep
+        # distinct occurrence identities and their own terminal sources.
+        self.assertNotEqual(exam.engagement_id, hostile.engagement_id)
+        self.assertNotEqual(
+            build_encounter_source_id(exam.engagement_id, kind="terminal", ordinal=1),
+            build_encounter_source_id(
+                hostile.engagement_id, kind="terminal", ordinal=1
+            ),
+        )
 
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_requested_by_metadata_grants_no_extra_authority(self):

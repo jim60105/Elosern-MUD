@@ -17,7 +17,12 @@ from world.rules.action import (
     RejectReason,
     _commit,
 )
-from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
+from world.rules.combat import (
+    Battlefield,
+    BattlefieldActionContext,
+    combat_provenance,
+    run_round,
+)
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.overwhelm import (
     hit_rate_verdict,
@@ -30,6 +35,8 @@ from world.rules.tests.combat_fixtures import grant_lineage
 from ._combat_session_helpers import (
     _race_key,
     _live_registry,
+    engagement_base,
+    engagement_provenance,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -99,21 +106,25 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
         )
         self.actor.traits.hp.current = 0
-        self.assertIs(
-            ActionResolver.resolve(self.request()).reason,
-            RejectReason.TARGET_DEAD,
-        )
+        with combat_provenance(engagement_provenance().at_slot(0)):
+            self.assertIs(
+                ActionResolver.resolve(self.request()).reason,
+                RejectReason.TARGET_DEAD,
+            )
         self.actor.traits.hp.current = self.actor.traits.hp.max
         self.field.fled.add("actor")
-        self.assertIs(
-            ActionResolver.resolve(self.request()).reason,
-            RejectReason.TARGET_OUT_OF_RANGE,
-        )
+        with combat_provenance(engagement_provenance().at_slot(0)):
+            self.assertIs(
+                ActionResolver.resolve(self.request()).reason,
+                RejectReason.TARGET_OUT_OF_RANGE,
+            )
 
     def test_success_ignores_resources_and_emits_timed_event(self):
         self.actor.traits.mp.current = 0
         self.actor.traits.sp.current = 0
-        with patch("world.rules.disengage.roll_d100", return_value=100):
+        with patch(
+            "world.rules.disengage.roll_d100", return_value=100
+        ), combat_provenance(engagement_provenance().at_slot(0)):
             result = ActionResolver.resolve(self.request())
         self.assertEqual(result.outcome, "success")
         self.assertEqual(result.time_cost_seconds, DEFAULT_CAST_SECONDS)
@@ -131,7 +142,9 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             }
             for entity in (self.actor, self.pursuer)
         }
-        with patch("world.rules.disengage.roll_d100", return_value=1):
+        with patch(
+            "world.rules.disengage.roll_d100", return_value=1
+        ), combat_provenance(engagement_provenance().at_slot(0)):
             failed = ActionResolver.resolve(self.request())
         self.assertEqual(failed.outcome, "success")
         self.assertFalse(failed.event_log.entries[0].data["success"])
@@ -214,7 +227,9 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
-            logs = run_round(self.field, provider)
+            logs = run_round(
+                self.field, provider, decision_scope_base=engagement_base()
+            )
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
         self.assertFalse(logs[0].entries[0].data["success"])
         self.assertIn("damage", [entry.kind for entry in logs[1].entries])
@@ -248,7 +263,9 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
                 ),
             ),
         ):
-            result = resolve_overwhelm(self.field, provider)
+            result = resolve_overwhelm(
+                self.field, provider, decision_scope_base=engagement_base()
+            )
         self.assertEqual(result.rounds_elapsed, 1)
         self.assertTrue(result.battle_over)
         self.assertIn("actor", self.field.fled)

@@ -688,7 +688,9 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
             run_round(
                 field,
                 provider,
-                decision_scope_base=ExecutionScopeBase("hostile:1:0", 1),
+                decision_scope_base=ExecutionScopeBase(
+                    "hostile:1:0", 1, engagement_id="hostile:1:0:1"
+                ),
             )
         committed = session_observations("hostile:1:0")
         self.assertEqual([record.action_key for record in committed], [MEM_STRIKE.key])
