@@ -173,6 +173,71 @@ _CLEAR_PAIR = """() => {
   };
 }"""
 
+# One reduced-motion commit, captured whole.
+#
+# The two in-flight pairs of that commit are short and are NOT open at the
+# same time: the heading's leave is half the reveal token, while the scene's
+# crossfade only begins when the new bitmap has been selected, and it is over
+# one `--motion-scene` after that. Reading them one after the other therefore
+# races both windows — a second round trip can land after either has closed,
+# and a poll then waits forever for a pair that will never come back.
+#
+# So the capture is armed BEFORE the commit and retains each pair in the
+# first microtask that shows it (a MutationObserver callback runs before any
+# frame or timer can close a window), then reports what it saw. A window that
+# genuinely never opened comes back as `null` beside the counts it ended with,
+# which is a diagnosis instead of a timeout.
+_REDUCED_COMMIT = """async ([env]) => {
+  const scenePair = () => {
+    const imgs = [...document.querySelectorAll('[data-testid="scene-backdrop-image"]')];
+    if (imgs.length !== 2) return null;
+    return imgs.map((img) => ({
+      src: img.getAttribute('src'),
+      inert: img.inert,
+      duration: getComputedStyle(img).transitionDuration,
+    }));
+  };
+  const headingPair = () => {
+    const hs = [...document.querySelectorAll('[data-testid="place-card__location"]')];
+    if (hs.length !== 2) return null;
+    return hs.map((h) => getComputedStyle(h).transform);
+  };
+  let scene = null;
+  let headings = null;
+  let settle;
+  const both = new Promise((resolve) => { settle = resolve; });
+  const capture = () => {
+    scene = scene ?? scenePair();
+    headings = headings ?? headingPair();
+    if (scene && headings) settle();
+  };
+  const observer = new MutationObserver(capture);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+  const s = window.__elosernBridge.store.view;
+  env.presentation_epoch = s.epoch;
+  env.revision = s.revision + 1;
+  const result = window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {});
+  capture();
+  if (!result || result.accepted !== true) {
+    observer.disconnect();
+    return { rejected: result };
+  }
+  await Promise.race([both, new Promise((resolve) => setTimeout(resolve, 15000))]);
+  observer.disconnect();
+  capture();
+  const pan = document.querySelector('.local-map .map-lattice__pan');
+  return {
+    scene,
+    headings,
+    pan: pan ? getComputedStyle(pan).transform : null,
+    counts: {
+      scenes: document.querySelectorAll('[data-testid="scene-backdrop-image"]').length,
+      headings: document.querySelectorAll('[data-testid="place-card__location"]').length,
+    },
+  };
+}"""
+
 
 def _identity(transform: str) -> bool:
     return transform in ("none", "matrix(1, 0, 0, 1, 0, 0)")
@@ -391,24 +456,34 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
     )
     def test_reduced_motion_fades_only(self):
         """At `reduced` the scene fades within 150ms and nothing travels: the
-        heading enters without a slide and the minimap does not pan."""
+        heading enters without a slide and the minimap does not pan.
+
+        The commit and the reading are one call: the heading's leave and the
+        scene's later, separate crossfade are both transient, so each pair is
+        retained the moment it appears rather than polled for afterwards."""
         page = self._page("reduced")
         self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), "reduced")
         inject_update(page, {"art": _art("a"), "local_map": _interior("grid:capital_altoria:2:0")})
         self._settled_scene(page, "a")
         self._settled(page, '[data-testid="place-card__location"]')
 
-        inject_update(page, {"art": _art("b"), "local_map": _interior("grid:capital_altoria:2:1")})
-        pair = page.wait_for_function(_HEADING_PAIR, timeout=15000).json_value()
-        for heading in pair:
-            self.assertTrue(_identity(heading["transform"]), heading)
-        self.assertTrue(
-            _identity(page.evaluate(
-                "getComputedStyle(document.querySelector('.local-map .map-lattice__pan')).transform"
-            ))
+        seen = page.evaluate(
+            _REDUCED_COMMIT,
+            [
+                snapshot_envelope(
+                    "",
+                    0,
+                    {"art": _art("b"), "local_map": _interior("grid:capital_altoria:2:1")},
+                )
+            ],
         )
-        scene = page.wait_for_function(_SCENE_PAIR, timeout=15000).json_value()
-        leaving = next(layer for layer in scene if layer["inert"])
+        self.assertNotIn("rejected", seen, seen)
+        self.assertIsNotNone(seen["headings"], seen)
+        for transform in seen["headings"]:
+            self.assertTrue(_identity(transform), seen)
+        self.assertTrue(_identity(seen["pan"]), seen)
+        self.assertIsNotNone(seen["scene"], seen)
+        leaving = next(layer for layer in seen["scene"] if layer["inert"])
         self.assertEqual(leaving["duration"], "0.15s")
         self._settled_scene(page, "b")
         page.close()
