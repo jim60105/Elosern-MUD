@@ -1,7 +1,7 @@
 # Recent Deeds for Epithet Nomination
 
 Date: 2026-10-22
-Status: Approved in conversation; written-spec review pending
+Status: Approved, including written-spec review and the extensible award-result amendment
 
 ## 1. Goal and scope
 
