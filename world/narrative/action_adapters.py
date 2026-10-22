@@ -197,13 +197,19 @@ def _stored_gauge_value(entity: Any, key: str) -> int | None:
 
 
 def _active_buff_keys(entity: Any) -> frozenset[str] | None:
-    """Read one entity's active buff keys, or ``None`` when unreadable."""
-    handler = getattr(entity, "buffs", None)
-    if handler is None:
-        return None
+    """Read one entity's live buff keys from storage, never through a handler.
+
+    Mounting the buff handler creates its persistent attribute and instantiates
+    every cached buff, which is a write inside a pre-settlement read. The
+    storage-level reader in ``world.rules.buffs.surface`` answers the same
+    question without touching handler state, so snapshotting a buff-free entity
+    cannot create state that a rollback would then have to undo.
+    """
+    from world.rules.buffs.surface import active_buff_keys_from_storage
+
     try:
-        return frozenset(str(key) for key in handler.all)
-    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: an unreadable buff mount only disables the observed removal count; the record keeps the staged count
+        return frozenset(active_buff_keys_from_storage(entity))
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: an unreadable buff cache only disables the observed removal count; the record keeps the staged count
         return None
 
 
@@ -927,7 +933,32 @@ def record_action_settlement_evidence(
                     # A damage miss commits no effect, exactly as the canonical
                     # parser emits no damage entry for it.
                     continue
+                applied = getattr(eff, "applied", None)
+                if isinstance(applied, Mapping) and applied:
+                    # The effect's own apply reported what it committed, so no
+                    # aggregation or whole-action inference is needed.
+                    merged = dict(result)
+                    for field, _ in _SETTLED_EFFECT_RESULTS[kind]:
+                        if field in applied:
+                            merged[field] = applied[field]
+                    committed = _settled_effect_record(
+                        kind, actor_pk, eff_pk, eff_name, merged
+                    )
+                    effects_data.append(committed)
+                    if committed["result"] != result:
+                        _report_normalized_result(
+                            source_id=source_id,
+                            event_type=event_type,
+                            kind=kind,
+                            target_id=eff_pk,
+                            staged=result,
+                            committed=committed["result"],
+                        )
+                    continue
                 if kind in _BOUNDED_RESULT_KINDS:
+                    # A staged effect without its own applied result (a
+                    # synthetic caller) falls back to the recipient's observed
+                    # movement for the whole action.
                     _observe_bounded_result(
                         observations, eff_entity, kind, eff_pk, eff_name, result
                     )

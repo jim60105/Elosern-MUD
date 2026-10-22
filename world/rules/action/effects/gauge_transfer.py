@@ -52,7 +52,11 @@ def _handle_gauge_transfer(
         actual_drained_box = [0]
 
         for target in targets:
-            def apply_target_drain(target=target) -> None:
+            applied: dict[str, Any] = {}
+
+            def apply_target_drain(
+                target: Any = target, applied: dict[str, Any] = applied
+            ) -> None:
                 traits = getattr(target, "traits", None)
                 if traits is None or not hasattr(traits, eff.gauge):
                     return
@@ -105,6 +109,7 @@ def _handle_gauge_transfer(
                         )
 
                 actual_drained_box[0] += actual
+                applied["amount"] = actual
 
             traits = getattr(target, "traits", None)
             current, _ = stored_gauge_pair(target, eff.gauge) if traits is not None and hasattr(traits, eff.gauge) else (0, 0)
@@ -123,6 +128,7 @@ def _handle_gauge_transfer(
                     f"gauge_transfer|{_entity_key(target)}|{eff.gauge}|drain|{preview_req}",
                     frozenset({"traits"}),
                     apply_target_drain,
+                    applied=applied,
                 )
             )
 
@@ -173,7 +179,11 @@ def _handle_gauge_transfer(
                 bonus += count * per_stack
 
         for target in targets:
-            def apply_target_restore(target=target) -> None:
+            applied_restore: dict[str, Any] = {}
+
+            def apply_target_restore(
+                target: Any = target, applied: dict[str, Any] = applied_restore
+            ) -> None:
                 traits = getattr(target, "traits", None)
                 if traits is None or not hasattr(traits, "mp"):
                     return
@@ -189,7 +199,12 @@ def _handle_gauge_transfer(
                 total_restore = max(0, base + bonus)
                 if total_restore > 0:
                     from world.rules.mp_flow import apply_mp_change
+                    before, _maximum = stored_gauge_pair(target, "mp")
                     apply_mp_change(target, total_restore, source_skill=skill_key, source_tier=skill_tier)
+                    after, _maximum = stored_gauge_pair(target, "mp")
+                    applied["amount"] = max(0, int(after - before))
+                else:
+                    applied["amount"] = 0
 
             traits = getattr(target, "traits", None)
             current, maximum = stored_gauge_pair(target, "mp") if traits is not None and hasattr(traits, "mp") else (0, 0)
@@ -208,6 +223,7 @@ def _handle_gauge_transfer(
                     f"gauge_transfer|{_entity_key(target)}|mp|restore|{preview_base + bonus}",
                     frozenset({"traits"}),
                     apply_target_restore,
+                    applied=applied_restore,
                 )
             )
 

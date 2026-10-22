@@ -4,6 +4,18 @@
 
 See proposal.md for the reviewed defects. The rules resolver passes pending effects to `record_action_settlement_evidence` inside `_commit`'s open transaction. The adult resistance producer uses the literal `none` sentinel. Actual emitted kinds include `pleasure_gain`, `buff_applied`, `self_buff_applied` and `buffs_cleansed`; the current adapter's alternate EventLog branch recognizes a different vocabulary. `recent_deeds` currently projects only effects and resistance.
 
+## Ownership
+
+Owned by this change: `world/narrative/action_adapters.py`,
+`world/narrative/recent_deeds.py`, the focused action/title test modules, and —
+extended during apply so the committed-result requirement can be met without
+inference — `world/rules/action/contracts.py` (the staged effect carries the
+result its own `apply` observed), `world/rules/action/effects/sexual.py`,
+`world/rules/action/effects/gauge_transfer.py`,
+`world/rules/combat/healing.py` (each apply reports what it committed) and
+`world/rules/buffs/surface.py` (read-only storage accessor the pre-settlement
+snapshot uses). No other file is touched.
+
 ## Goals / Non-Goals
 
 **Goals:** Repair the existing settlement-to-projection contract without changing whether an action resists, what it costs, or what effects it applies. Retain authorized player outcomes through compression.

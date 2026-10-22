@@ -665,6 +665,15 @@ _T_DOUBLE_CLEANSE_SKILL = make_skill(
     effect_policies=(EffectPolicy(1.0), EffectPolicy(1.0)),
 )
 
+# Two heals in one occurrence: only the remaining HP gap can be restored.
+_T_DOUBLE_HEAL_SKILL = make_skill(
+    key="t_synth_double_heal_deed",
+    element="light",
+    target_spec=TargetSpec.SINGLE,
+    effects=["heal:single", "heal:single"],
+    effect_policies=(EffectPolicy(1.0), EffectPolicy(1.0)),
+)
+
 # A restore whose requested amount exceeds a nearly full gauge.
 _T_RESTORE_SKILL = make_skill(
     key="t_synth_restore_deed",
@@ -920,12 +929,11 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
         THEN the deed states the committed restoration, not the requested one.
         """
         self.target.traits.mp.current = 95
+        result = self._cast(_T_RESTORE_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
         staged = [
             entry.data["amount"]
-            for entry in self._cast(
-                _T_RESTORE_SKILL,
-                [self.target],
-            ).event_log.entries
+            for entry in result.event_log.entries
             if entry.kind == "gauge_transfer" and entry.target == self.target.key
         ]
         self.assertEqual(len(staged), 1)
@@ -939,6 +947,60 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
         self.assertEqual(
             rows[0]["result"], {"gauge": "mp", "direction": "restore", "amount": 5}
         )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_each_heal_states_the_hp_it_actually_restored(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN one occurrence stages two heals for a recipient with room for only
+        the first
+        THEN each staged component states the HP its own application restored.
+        """
+        maximum = int(self.target.traits.hp.max)
+        self.target.traits.hp.current = maximum - 2
+
+        result = self._cast(_T_DOUBLE_HEAL_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+        self.assertEqual(int(self.target.traits.hp.value), maximum)
+
+        # Both components stage the same clamped restoration against the same
+        # pre-settlement gap, so only the first can commit HP. Each record
+        # states what its own application restored, never the staged request.
+        staged = {
+            entry.data["amount"]
+            for entry in result.event_log.entries
+            if entry.kind == "heal" and entry.target == self.target.key
+        }
+        self.assertEqual(staged, {2})
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "heal"]
+        self.assertEqual(len(rows), 2)
+        amounts = [row["result"]["amount"] for row in rows]
+        self.assertEqual(amounts, [2, 0])
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_snapshot_read_creates_no_buff_storage(self):
+        """Scenario: Action rollback and replay (read-only snapshot).
+
+        WHEN a pre-settlement snapshot is taken for a buff-free entity
+        THEN the snapshot creates no buff storage to roll back.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        fresh = create_object(PlayerCharacter, key="EffectFresh", location=self.room)
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        self.assertFalse(fresh.attributes.has("buffs"))
+
+        snapshot = adapter_module.capture_milestone_snapshot(fresh)
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.gauges.buff_keys, frozenset())
+        self.assertFalse(fresh.attributes.has("buffs"))
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
@@ -1217,8 +1279,11 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
             if row["kind"] == "pleasure_gain"
             and row["target_id"] == str(self.target.pk)
         ]
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["result"]["amount"], committed)
+        # Each staged component states what its own application committed; the
+        # shared gauge can only absorb the total, so the amounts sum to the
+        # observed committed change and never repeat it.
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(sum(row["result"]["amount"] for row in rows), committed)
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"

@@ -4,7 +4,7 @@
 
 - [x] 1.1 Replace the optional resistance-roll parsing in `world/narrative/action_adapters.py` with the authoritative absent-roll convention, then verify a real auto-comply adult action resolves through the rules resolver without raising and its evidence retains the actual verdict.
 - [x] 1.2 Normalize the effect kinds actually emitted by production handlers (`pleasure_gain`, `buff_applied`, `self_buff_applied`, `buffs_cleansed`) and remove the divergent alternate vocabulary path, verifying one committed test per family retains actor, recipient and result.
-- [x] 1.3 Record the actual settled effect amount rather than the requested amount, verifying a clamped gain leaves an untouched recipient unchanged and states the committed result.
+- [x] 1.3 Have each effect's own apply report the result it committed (pleasure gain, resource transfer, heal, cleanse) and record that per-effect result rather than the requested amount or a whole-action delta, verifying a clamped gain, a restore into a nearly full gauge, a repeated gain, repeated heals and a repeated cleanse each state their own committed amount and leave an untouched recipient unchanged.
 - [x] 1.4 Add a focused producer-to-renderer regression that settles a legal auto-comply adult action and verifies its evidence is stored and readable, replacing any seed-only payload assertion.
 - [x] 1.5 Document the accepted settled-result vocabulary beside the existing narrative evidence contract and verify the document matches the adapter's accepted kinds.
 

@@ -75,22 +75,24 @@ def _restored_amount(entity: Any, amount: int) -> int:
     )
 
 
-def _apply_heal(entity: Any, amount: int) -> None:
+def _apply_heal(entity: Any, amount: int) -> int:
     """Restore HP clamped to the entity's maximum; never revives or decreases.
 
     The commit-time alive guard keeps the no-revival invariant even when an
     earlier effect in the same action reduced the entity below 1 HP after
-    staging: such an entity stays knocked out.
+    staging: such an entity stays knocked out. Returns the HP actually
+    restored, so the effect can state its own committed result.
     """
     trait = entity.traits.hp
     current = _stored_trait_value(trait)
     if current <= 0:
-        return
+        return 0
     clamped = min(_max_hp(entity), current + amount)
     if hasattr(trait, "current"):
         trait.current = clamped
     else:
         trait.value = clamped
+    return max(0, int(clamped - current))
 
 
 def _handle_heal(
@@ -115,14 +117,22 @@ def _handle_heal(
     for target in targets:
         key = str(target.key)
         restored = _restored_amount(target, amount)
+        applied: dict[str, Any] = {}
+
+        def apply_heal(
+            target: Any = target,
+            restored: int = restored,
+            applied: dict[str, Any] = applied,
+        ) -> None:
+            applied["amount"] = _apply_heal(target, restored)
+
         pending.append(
             PendingEffect(
                 entity=target,
                 description=f"heal|{key}|{restored}",
                 surfaces=frozenset(),
-                apply=lambda target=target, restored=restored: _apply_heal(
-                    target, restored
-                ),
+                apply=apply_heal,
+                applied=applied,
             )
         )
     return pending
@@ -154,12 +164,18 @@ def _handle_self_heal(
     else:
         raise ValueError(f"unsupported self_heal basis: {parsed.basis!r}")
     restored = _restored_amount(actor, amount)
+    applied: dict[str, Any] = {}
+
+    def apply_self_heal() -> None:
+        applied["amount"] = _apply_heal(actor, restored)
+
     return [
         PendingEffect(
             entity=actor,
             description=f"self_heal|{str(actor.key)}|{restored}",
             surfaces=frozenset(),
-            apply=lambda: _apply_heal(actor, restored),
+            apply=apply_self_heal,
+            applied=applied,
         )
     ]
 
