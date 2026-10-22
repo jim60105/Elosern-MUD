@@ -255,14 +255,24 @@ def _handle_pleasure_effect(
             count,
             pleasure_percent=equipment_pleasure_gain(participant),
         )
+        applied: dict[str, Any] = {}
+
+        def apply_participant_gain(
+            participant: Any = participant,
+            gain: int = gain,
+            applied: dict[str, Any] = applied,
+        ) -> None:
+            before = participant.sexual.pleasure.value
+            apply_pleasure_gain(participant, gain)
+            applied["amount"] = max(0, participant.sexual.pleasure.value - before)
+
         pending.append(
             PendingEffect(
                 participant,
                 f"pleasure_gain|{_entity_key(participant)}|{gain}",
                 frozenset(),
-                lambda participant=participant, gain=gain: apply_pleasure_gain(
-                    participant, gain
-                ),
+                apply_participant_gain,
+                applied=applied,
             )
         )
     return pending
@@ -387,12 +397,24 @@ def _handle_stimulus(
         pleasure_pct = equipment_pleasure_gain(recipient)
         total_gain = max(0, round((base_delta + bonus) * (1 + pleasure_pct / 100)))
 
+        applied: dict[str, Any] = {}
+
+        def apply_recipient_gain(
+            recipient: Any = recipient,
+            total_gain: int = total_gain,
+            applied: dict[str, Any] = applied,
+        ) -> None:
+            before = recipient.sexual.pleasure.value
+            apply_pleasure_gain(recipient, total_gain)
+            applied["amount"] = max(0, recipient.sexual.pleasure.value - before)
+
         pending.append(
             PendingEffect(
                 recipient,
                 f"pleasure_gain|{_entity_key(recipient)}|{total_gain}",
                 frozenset({"sexual", "traits", "buffs"}),
-                lambda r=recipient, g=total_gain: apply_pleasure_gain(r, g),
+                apply_recipient_gain,
+                applied=applied,
             )
         )
     return pending

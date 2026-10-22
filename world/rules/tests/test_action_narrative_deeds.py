@@ -5,6 +5,8 @@ Specs: openspec/specs/narrative-events/spec.md
 Design: docs/superpowers/specs/2026-10-22-epithet-recent-deeds-design.md §5, §5.1, §5.2, §6, §10
 """
 
+import json
+import unittest
 from unittest.mock import patch
 
 from django.db import transaction
@@ -13,11 +15,15 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.lore.sexual_vocab import BODY_PARTS
 from world.narrative.events import get_committed_award_results
 from world.narrative.models import NarrativeEvent
+from world.narrative.recent_deeds import select_authorized_recent_deeds
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.affinity import AffinitySource, apply_affinity_change
+from world.rules.buffs import BuffDefinition, apply_buff, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
 from world.quests.catalog import register_catalog
 from world.rules.combat import Battlefield, _stored_hp
@@ -25,6 +31,7 @@ from world.rules.combat.rounds import _end_of_round_upkeep
 from world.rules.targeting import RoomActionContext
 from world.rules.titles import award_automatic_title, read_title_state
 from world.rules.titles.awards import AutomaticTitleAward
+from world.rules.titles.ballot import read_pending_ballot
 from world.rules.titles.state import _FIXED_KIND
 from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
@@ -613,3 +620,1036 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         for ms in milestones:
             self.assertEqual(ms.visibility, "private")
             self.assertTrue(ms.content["privacy"]["private_experience"])
+
+
+# A single file-local buff mount so the buff families have a real registered row.
+_T_DEED_WARD = BuffDefinition(
+    key="t_deed_ward",
+    duration=60,
+    tick_interval=None,
+    stacking="refresh",
+    modifiers={},
+    polarity="buff",
+)
+
+_T_BUFF_SKILL = make_skill(
+    key="t_synth_buff_deed",
+    element=None,
+    target_spec=TargetSpec.SINGLE,
+    effects=["buff_apply:t_deed_ward"],
+    effect_policies=(EffectPolicy(1.0),),
+)
+
+_T_SELF_BUFF_SKILL = make_skill(
+    key="t_synth_self_buff_deed",
+    element=None,
+    target_spec=TargetSpec.SELF,
+    effects=["self_buff_apply:t_deed_ward"],
+    effect_policies=(EffectPolicy(1.0),),
+)
+
+_T_CLEANSE_SKILL = make_skill(
+    key="t_synth_cleanse_deed",
+    element="light",
+    target_spec=TargetSpec.SINGLE,
+    effects=["cleanse:status"],
+    effect_policies=(EffectPolicy(1.0),),
+)
+
+# Two cleanse components in one occurrence: the second removes nothing.
+_T_DOUBLE_CLEANSE_SKILL = make_skill(
+    key="t_synth_double_cleanse_deed",
+    element="light",
+    target_spec=TargetSpec.SINGLE,
+    effects=["cleanse:status", "cleanse:status"],
+    effect_policies=(EffectPolicy(1.0), EffectPolicy(1.0)),
+)
+
+# Two heals in one occurrence: only the remaining HP gap can be restored.
+_T_DOUBLE_HEAL_SKILL = make_skill(
+    key="t_synth_double_heal_deed",
+    element="light",
+    target_spec=TargetSpec.SINGLE,
+    effects=["heal:single", "heal:single"],
+    effect_policies=(EffectPolicy(1.0), EffectPolicy(1.0)),
+)
+
+# A restore whose requested amount exceeds a nearly full gauge.
+_T_RESTORE_SKILL = make_skill(
+    key="t_synth_restore_deed",
+    element="light",
+    target_spec=TargetSpec.SINGLE,
+    effects=["gauge_transfer:mp:restore:fixed:40"],
+    effect_policies=(EffectPolicy(1.0),),
+)
+
+# A high-pleasure self act: its staged gain exceeds any remaining gauge room, so
+# the committed amount and the requested magnitude differ observably.
+_T_FLOOD_ACT = SexualActDef(
+    key="t_synth_flood_act",
+    unlock={},
+    base_pleasure=80,
+    actor_part=BODY_PARTS[0],
+    target_part=BODY_PARTS[0],
+    actor_pleasure_ratio=0.5,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+    resistible=False,
+)
+
+_T_FLOOD_SKILL = make_skill(
+    key="t_synth_flood_act",
+    label="t_溢滿行為",
+    description="t_合成高快感性愛行為",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    category=SkillCategory.SEXUAL_ACT,
+    usable_out_of_combat=True,
+    effects=[f"pleasure:{_T_FLOOD_ACT.key}", f"sexual_counter:{_T_FLOOD_ACT.key}"],
+)
+
+# A self act whose settled sexual event is an own-state transition.
+_T_SELF_ACT = SexualActDef(
+    key="t_synth_self_deed_act",
+    unlock={},
+    base_pleasure=5,
+    actor_part=BODY_PARTS[0],
+    target_part=BODY_PARTS[0],
+    actor_pleasure_ratio=1.0,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+    resistible=False,
+)
+
+_T_SELF_ACT_SKILL = make_skill(
+    key="t_synth_self_deed_act",
+    label="t_自身性愛行為",
+    description="t_合成自身性愛行為",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SELF,
+    category=SkillCategory.SEXUAL_ACT,
+    usable_out_of_combat=True,
+    effects=[
+        f"pleasure:{_T_SELF_ACT.key}",
+        f"sexual_counter:{_T_SELF_ACT.key}",
+        "sexual_event:stimulus_applied",
+    ],
+)
+
+
+class SettledEffectVocabularyTests(EvenniaTestCase):
+    """Committed effect vocabulary, committed amounts and legal absent rolls."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.room = create_object(Room, key="effect_deeds_room")
+        self.actor = create_object(PlayerCharacter, key="EffectActor", location=self.room)
+        self.target = create_object(PlayerCharacter, key="EffectTarget", location=self.room)
+        self.bystander = create_object(PlayerCharacter, key="EffectBystander", location=self.room)
+        for entity in (self.actor, self.target, self.bystander):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        self.actor.traits.hp.current = 100
+        self.target.traits.hp.current = 50
+        self.actor.traits.mp.current = 100
+        self.context = RoomActionContext(self.room)
+        buff_patch = patch.dict(
+            "world.rules.buffs.BUFF_DEFINITIONS",
+            {_T_DEED_WARD.key: _T_DEED_WARD},
+            clear=False,
+        )
+        buff_patch.start()
+        self.addCleanup(buff_patch.stop)
+
+    def _cast(self, skill, targets, *, source_id=None, acts=None):
+        self.actor.db.skills = {"active": [skill.key], "passive": []}
+        request = ActionRequest(
+            self.actor, skill.key, targets, self.context, source_id=source_id
+        )
+        act_patch = patch.dict(
+            "world.skills.sexual_acts.SEXUAL_ACT_REGISTRY",
+            acts or {},
+            clear=False,
+        )
+        with (
+            patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}),
+            act_patch,
+        ):
+            return ActionResolver.resolve(request)
+
+    def _action_evidence(self):
+        events = list(NarrativeEvent.objects.filter(event_type__in=["skill_use", "adult_action"]))
+        self.assertEqual(len(events), 1)
+        return events[0]
+
+    def _effect_rows(self, content):
+        """Return the committed effect rows of one evidence record."""
+        if "outcomes" in content:
+            return content["outcomes"]["effects"]
+        return content["effects"]
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_committed_pleasure_gain_keeps_actor_recipient_and_result(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN a settled adult act applies pleasure gain
+        THEN its committed effect states the actual actor, recipient and result.
+        """
+        with patch("world.rules.action.gates.roll_d100", return_value=1):
+            result = self._cast(
+                _T_RESISTIBLE_ADULT_SKILL,
+                [self.target],
+                acts={_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT},
+            )
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        content = self._action_evidence().content
+        rows = [row for row in self._effect_rows(content) if row["kind"] == "pleasure_gain"]
+        recipient_rows = [row for row in rows if row["target_id"] == str(self.target.pk)]
+        self.assertEqual(len(recipient_rows), 1)
+        row = recipient_rows[0]
+        self.assertEqual(row["actor_id"], str(self.actor.pk))
+        self.assertEqual(row["target_name"], self.target.key)
+        self.assertGreater(row["result"]["amount"], 0)
+        self.assertEqual(
+            set(row["result"]), {"amount"}
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_committed_target_buff_keeps_actor_recipient_and_result(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN a settled skill applies a target buff
+        THEN the committed effect states actor, recipient and the applied buff.
+        """
+        result = self._cast(_T_BUFF_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "buff_applied"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor_id"], str(self.actor.pk))
+        self.assertEqual(rows[0]["target_id"], str(self.target.pk))
+        self.assertEqual(rows[0]["target_name"], self.target.key)
+        self.assertEqual(rows[0]["result"], {"buff_key": _T_DEED_WARD.key})
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_committed_self_buff_keeps_actor_and_result(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN a settled skill applies a self buff
+        THEN the committed effect states the actor as its own recipient and result.
+        """
+        result = self._cast(_T_SELF_BUFF_SKILL, [])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "self_buff_applied"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor_id"], str(self.actor.pk))
+        self.assertEqual(rows[0]["target_id"], str(self.actor.pk))
+        self.assertEqual(rows[0]["result"], {"buff_key": _T_DEED_WARD.key})
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_committed_cleanse_keeps_actor_recipient_and_result(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN a settled skill cleanses a recipient's debuffs
+        THEN the committed effect states actor, recipient and the removal count.
+        """
+        apply_buff(self.target, "poisoned")
+        result = self._cast(_T_CLEANSE_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "buffs_cleansed"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor_id"], str(self.actor.pk))
+        self.assertEqual(rows[0]["target_id"], str(self.target.pk))
+        self.assertEqual(rows[0]["result"], {"count": 1})
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_clamped_gain_states_the_committed_amount(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN an effect requests more pleasure than the recipient can receive
+        THEN the deed states the committed amount, not the requested magnitude,
+        AND a non-participant keeps an unchanged gauge and no effect row.
+        """
+        self.target.sexual.pleasure.base = 95
+        bystander_pleasure = self.bystander.sexual.pleasure.value
+
+        result = self._cast(
+            _T_FLOOD_SKILL,
+            [self.target],
+            acts={_T_FLOOD_ACT.key: _T_FLOOD_ACT},
+        )
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+        self.assertEqual(self.target.sexual.pleasure.value, 100)
+
+        requested = [
+            entry.data["amount"]
+            for entry in result.event_log.entries
+            if entry.kind == "pleasure_gain" and entry.target == self.target.key
+        ]
+        self.assertEqual(len(requested), 1)
+        self.assertGreater(requested[0], 5)
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "pleasure_gain"]
+        recipient_rows = [row for row in rows if row["target_id"] == str(self.target.pk)]
+        self.assertEqual(len(recipient_rows), 1)
+        self.assertEqual(recipient_rows[0]["result"]["amount"], 5)
+        self.assertNotIn(
+            str(self.bystander.pk),
+            [row["target_id"] for row in rows],
+        )
+        self.assertEqual(self.bystander.sexual.pleasure.value, bystander_pleasure)
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_clamped_gauge_restore_states_the_committed_amount(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN a restore requests more of a resource than the recipient can hold
+        THEN the deed states the committed restoration, not the requested one.
+        """
+        self.target.traits.mp.current = 95
+        result = self._cast(_T_RESTORE_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+        staged = [
+            entry.data["amount"]
+            for entry in result.event_log.entries
+            if entry.kind == "gauge_transfer" and entry.target == self.target.key
+        ]
+        self.assertEqual(len(staged), 1)
+        self.assertGreater(staged[0], 5)
+        self.assertEqual(self.target.traits.mp.current, 100)
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "gauge_transfer"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["target_id"], str(self.target.pk))
+        self.assertEqual(
+            rows[0]["result"], {"gauge": "mp", "direction": "restore", "amount": 5}
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_each_heal_states_the_hp_it_actually_restored(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN one occurrence stages two heals for a recipient with room for only
+        the first
+        THEN each staged component states the HP its own application restored.
+        """
+        maximum = int(self.target.traits.hp.max)
+        self.target.traits.hp.current = maximum - 2
+
+        result = self._cast(_T_DOUBLE_HEAL_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+        self.assertEqual(int(self.target.traits.hp.value), maximum)
+
+        # Both components stage the same clamped restoration against the same
+        # pre-settlement gap, so only the first can commit HP. Each record
+        # states what its own application restored, never the staged request.
+        staged = {
+            entry.data["amount"]
+            for entry in result.event_log.entries
+            if entry.kind == "heal" and entry.target == self.target.key
+        }
+        self.assertEqual(staged, {2})
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "heal"]
+        self.assertEqual(len(rows), 2)
+        amounts = [row["result"]["amount"] for row in rows]
+        self.assertEqual(amounts, [2, 0])
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_snapshot_read_creates_no_buff_storage(self):
+        """Scenario: Action rollback and replay (read-only snapshot).
+
+        WHEN a pre-settlement snapshot is taken for a buff-free entity
+        THEN the snapshot creates no buff storage to roll back.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        fresh = create_object(PlayerCharacter, key="EffectFresh", location=self.room)
+        fresh.race = "human"
+        fresh.apply_race_baseline()
+        self.assertFalse(fresh.attributes.has("buffs"))
+
+        snapshot = adapter_module.capture_milestone_snapshot(fresh)
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.gauges.buff_keys, frozenset())
+        self.assertFalse(fresh.attributes.has("buffs"))
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_repeated_cleanse_states_the_committed_removal_count(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN one occurrence stages two cleanses but only one debuff is present
+        THEN the deed states the committed removal count once for the recipient.
+        """
+        apply_buff(self.target, "poisoned")
+
+        result = self._cast(_T_DOUBLE_CLEANSE_SKILL, [self.target])
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+        self.assertEqual(entity_active_buffs(self.target), set())
+
+        rows = [row for row in self._effect_rows(self._action_evidence().content)
+                if row["kind"] == "buffs_cleansed"]
+        # Each cleanse component states the removals its own application made:
+        # the second finds nothing left and can never repeat the first's count.
+        self.assertEqual([row["target_id"] for row in rows], [str(self.target.pk)] * 2)
+        self.assertEqual(
+            [row["result"]["count"] for row in rows], [1, 0]
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_committed_log_form_states_the_same_settled_results(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN the committed event log is the only input form
+        THEN repeated bounded results collapse to one committed record per
+        recipient and the other families state the same values as the staged form.
+        """
+        import world.narrative.action_adapters as adapter_module
+        from world.rules.event_log import EventEntry, EventLog
+
+        self.target.sexual.pleasure.base = 95
+        snapshot = adapter_module.capture_milestone_snapshot(self.target)
+        self.target.sexual.pleasure.base = 100
+        log = EventLog(
+            actor=str(self.actor.pk),
+            skill_key=_T_RESISTIBLE_ADULT_SKILL.key,
+            targets=(self.target.key,),
+            entries=(
+                EventEntry(
+                    kind="pleasure_gain",
+                    actor=str(self.actor.pk),
+                    target=self.target.key,
+                    data={"amount": 40},
+                    text_template="{done}",
+                ),
+                EventEntry(
+                    kind="pleasure_gain",
+                    actor=str(self.actor.pk),
+                    target=self.target.key,
+                    data={"amount": 10},
+                    text_template="{done}",
+                ),
+                EventEntry(
+                    kind="sexual_counter",
+                    actor=str(self.actor.pk),
+                    target=self.target.key,
+                    data={"counter": "duo_act_count"},
+                    text_template="{done}",
+                ),
+                EventEntry(
+                    kind="sexual_resist",
+                    actor=str(self.actor.pk),
+                    target=self.target.key,
+                    data={"resisted": False, "auto_comply": True, "roll": None},
+                    text_template="{done}",
+                ),
+            ),
+            time_cost_seconds=0,
+        )
+        request = ActionRequest(
+            self.actor,
+            _T_RESISTIBLE_ADULT_SKILL.key,
+            [self.target],
+            self.context,
+            source_id="occurrence:entry_form:1",
+        )
+        with (
+            patch.dict(
+                "world.skills.registry.SKILL_REGISTRY",
+                {_T_RESISTIBLE_ADULT_SKILL.key: _T_RESISTIBLE_ADULT_SKILL},
+            ),
+            patch.dict(
+                "world.skills.sexual_acts.SEXUAL_ACT_REGISTRY",
+                {_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT},
+            ),
+        ):
+            adapter_module.record_action_settlement_evidence(
+                request,
+                log,
+                (),
+                {id(self.target): snapshot},
+                tick=7,
+                delivered_targets=[self.target],
+            )
+
+        event = NarrativeEvent.objects.filter(
+            source_id="occurrence:entry_form:1"
+        ).first()
+        self.assertIsNotNone(event)
+        rows = [
+            row
+            for row in event.content["outcomes"]["effects"]
+            if row["kind"] == "pleasure_gain"
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["target_id"], str(self.target.pk))
+        self.assertEqual(rows[0]["result"], {"amount": 5})
+        self.assertEqual(
+            event.content["outcomes"]["counters"],
+            [
+                {
+                    "target_id": str(self.target.pk),
+                    "target_name": self.target.key,
+                    "counter": "duo_act_count",
+                }
+            ],
+        )
+        self.assertEqual(len(event.content["outcomes"]["resistance"]), 1)
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_shared_display_key_never_joins_a_committed_log_recipient(self):
+        """Scenario: Untouched recipient is excluded.
+
+        WHEN two requested targets share a display key and the committed log
+        names that key
+        THEN neither untouched target is attributed a recipient role.
+        """
+        import world.narrative.action_adapters as adapter_module
+        from world.rules.event_log import EventEntry, EventLog
+
+        twin = create_object(PlayerCharacter, key="EffectTarget", location=self.room)
+        twin.race = "human"
+        twin.apply_race_baseline()
+        log = EventLog(
+            actor=str(self.actor.pk),
+            skill_key=_T_HEAL_SKILL.key,
+            targets=(self.target.key, twin.key),
+            entries=(
+                EventEntry(
+                    kind="heal",
+                    actor=str(self.actor.pk),
+                    target=self.target.key,
+                    data={"amount": 3},
+                    text_template="{done}",
+                ),
+            ),
+            time_cost_seconds=0,
+        )
+        request = ActionRequest(
+            self.actor,
+            _T_HEAL_SKILL.key,
+            [self.target, twin],
+            self.context,
+            source_id="occurrence:entry_twin:1",
+        )
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {_T_HEAL_SKILL.key: _T_HEAL_SKILL},
+        ):
+            with self.assertRaises(ValueError):
+                adapter_module.record_action_settlement_evidence(
+                    request, log, (), {}, tick=7
+                )
+
+        self.assertFalse(
+            NarrativeEvent.objects.filter(source_id="occurrence:entry_twin:1").exists()
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_actor_named_key_never_joins_a_committed_log_recipient(self):
+        """Scenario: Untouched recipient is excluded.
+
+        WHEN the acting entity and one submitted target share a display key
+        THEN an entry naming that key (the actor's own self-effect) is not
+        evidence that the untouched target took part.
+        """
+        import world.narrative.action_adapters as adapter_module
+        from world.rules.event_log import EventEntry, EventLog
+
+        self.actor.key = "EffectTarget"
+        log = EventLog(
+            actor=str(self.actor.pk),
+            skill_key=_T_SELF_BUFF_SKILL.key,
+            targets=(self.target.key,),
+            entries=(
+                EventEntry(
+                    kind="self_buff_applied",
+                    actor=str(self.actor.pk),
+                    target=self.actor.key,
+                    data={"buff_key": _T_DEED_WARD.key},
+                    text_template="{done}",
+                ),
+            ),
+            time_cost_seconds=0,
+        )
+        request = ActionRequest(
+            self.actor,
+            _T_SELF_BUFF_SKILL.key,
+            [self.target],
+            self.context,
+            source_id="occurrence:entry_actor_key:1",
+        )
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {_T_SELF_BUFF_SKILL.key: _T_SELF_BUFF_SKILL},
+        ):
+            adapter_module.record_action_settlement_evidence(
+                request, log, (), {}, tick=7
+            )
+
+        event = NarrativeEvent.objects.filter(
+            source_id="occurrence:entry_actor_key:1"
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.content["recipients"], [])
+        self.assertEqual(event.participants, [str(self.actor.pk)])
+        self.assertEqual(
+            [row["target_id"] for row in event.content["effects"]],
+            [str(self.actor.pk)],
+        )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_repeated_gains_are_stated_once_as_the_committed_change(self):
+        """Scenario: Actual bounded effect remains actual.
+
+        WHEN one occurrence applies several pleasure gains to the same recipient
+        THEN the deed states one committed change for that recipient instead of
+        repeating the same observed delta for each staged component.
+        """
+        repeated = make_skill(
+            key="t_synth_repeated_pleasure_deed",
+            label="t_重複快感行為",
+            description="t_合成重複快感性愛行為",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            category=SkillCategory.SEXUAL_ACT,
+            usable_out_of_combat=True,
+            effects=[
+                f"pleasure:{_T_FLOOD_ACT.key}",
+                f"pleasure:{_T_FLOOD_ACT.key}",
+                f"sexual_counter:{_T_FLOOD_ACT.key}",
+            ],
+        )
+        self.target.sexual.pleasure.base = 0
+
+        result = self._cast(
+            repeated,
+            [self.target],
+            acts={_T_FLOOD_ACT.key: _T_FLOOD_ACT},
+        )
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        staged = sum(
+            entry.data["amount"]
+            for entry in result.event_log.entries
+            if entry.kind == "pleasure_gain" and entry.target == self.target.key
+        )
+        committed = self.target.sexual.pleasure.value
+        self.assertGreater(staged, 0)
+        self.assertEqual(committed, min(100, staged))
+
+        rows = [
+            row
+            for row in self._effect_rows(self._action_evidence().content)
+            if row["kind"] == "pleasure_gain"
+            and row["target_id"] == str(self.target.pk)
+        ]
+        # Each staged component states what its own application committed; the
+        # shared gauge can only absorb the total, so the amounts sum to the
+        # observed committed change and never repeat it.
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(sum(row["result"]["amount"] for row in rows), committed)
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_auto_complied_adult_action_commits_evidence_the_feed_renders(self):
+        """Scenarios: Auto-compliance has no resistance roll; producer-to-renderer.
+
+        WHEN a legal resistible act auto-complies and its authoritative verdict
+        has no roll
+        THEN the action commits, its evidence keeps the actual verdict, and the
+        rendered deed feed reads that committed evidence.
+        """
+        npc = create_object(NPC, key="AutoComplyNpc", location=self.room)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        apply_affinity_change(
+            npc, self.actor, AffinitySource.QUEST_COMPLETION, 90
+        )
+
+        result = self._cast(
+            _T_RESISTIBLE_ADULT_SKILL,
+            [npc],
+            source_id="occurrence:auto_comply:1",
+            acts={_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT},
+        )
+        self.assertEqual(result.outcome, "success", f"{result.reason}: {result.detail}")
+
+        event = NarrativeEvent.objects.filter(
+            source_id="occurrence:auto_comply:1"
+        ).first()
+        self.assertIsNotNone(event)
+        verdicts = event.content["outcomes"]["resistance"]
+        self.assertEqual(len(verdicts), 1)
+        self.assertIs(verdicts[0]["resisted"], False)
+        self.assertIs(verdicts[0]["auto_comply"], True)
+        self.assertIsNone(verdicts[0]["roll"])
+
+        feed = select_authorized_recent_deeds(self.actor, frozen_tick=event.tick)
+        self.assertIn("occurrence:auto_comply:1", feed.source_ids)
+        rendered = json.loads(feed.rendered_json)
+        group = next(
+            group for group in rendered["recent_deeds"]
+            if "occurrence:auto_comply:1" in group["source_ids"]
+        )
+        self.assertEqual(group["count"], 1)
+        self.assertEqual(
+            group["facts"]["outcomes"]["resistance"][0]["resisted"], False
+        )
+        self.assertEqual(
+            set(group["facts"]["outcomes"]["resistance"][0]),
+            {"target_id", "target_name", "resisted"},
+        )
+        self.assertNotIn('"roll":', feed.rendered_json)
+
+    @covers_requirement(
+        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay"
+    )
+    def test_failure_after_the_evidence_write_rolls_back_everything(self):
+        """Scenario: Action rollback and replay.
+
+        WHEN a source fails after its evidence write but before the action commit
+        THEN the action, its effects, gauges and evidence roll back together and
+        no nomination is admitted.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        real_record = adapter_module.record_action_settlement_evidence
+        observed: dict[str, int] = {}
+
+        def failing_record(*args, **kwargs):
+            real_record(*args, **kwargs)
+            observed["evidence"] = NarrativeEvent.objects.filter(
+                source_id="occurrence:rollback:1"
+            ).count()
+            raise RuntimeError("injected failure after the evidence write")
+
+        target_hp = self.target.traits.hp.current
+        actor_mp = self.actor.traits.mp.current
+        with (
+            patch.object(
+                adapter_module,
+                "record_action_settlement_evidence",
+                failing_record,
+            ),
+            patch(
+                "server.title_nomination_service.schedule_epithet_nomination"
+            ) as nomination,
+        ):
+            result = self._cast(
+                _T_HEAL_SKILL,
+                [self.target],
+                source_id="occurrence:rollback:1",
+            )
+
+        nomination.assert_not_called()
+        self.assertEqual(observed["evidence"], 1)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertFalse(
+            NarrativeEvent.objects.filter(source_id="occurrence:rollback:1").exists()
+        )
+        self.assertEqual(self.target.traits.hp.current, target_hp)
+        self.assertEqual(self.actor.traits.mp.current, actor_mp)
+        self.assertEqual(read_pending_ballot(self.actor), ())
+
+    @covers_requirement(
+        "title-system::nomination-prompts-contain-authorized-structured-deeds-and-advisory-identity"
+    )
+    def test_structured_adult_results_survive_prompt_construction(self):
+        """Scenario: Adult outcome survives construction.
+
+        WHEN real adult and skill settlements commit through storage
+        THEN their structured results survive prompt construction and the counts
+        represent committed occurrences only.
+        """
+        self._cast(
+            _T_SELF_ACT_SKILL,
+            [],
+            source_id="occurrence:1:self",
+            acts={_T_SELF_ACT.key: _T_SELF_ACT},
+        )
+        self._cast(
+            _T_SELF_ACT_SKILL,
+            [],
+            source_id="occurrence:2:self",
+            acts={_T_SELF_ACT.key: _T_SELF_ACT},
+        )
+        self._cast(
+            _T_RESISTIBLE_ADULT_SKILL,
+            [self.target],
+            source_id="occurrence:3:resist",
+            acts={_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT},
+        )
+        self._cast(_T_HEAL_SKILL, [self.target], source_id="occurrence:4:heal")
+        self._cast(_T_HEAL_SKILL, [self.target], source_id="occurrence:5:heal")
+        # A replay of an already committed occurrence adds no second occurrence.
+        self._cast(_T_HEAL_SKILL, [self.target], source_id="occurrence:4:heal")
+
+        from server.title_nomination_service import _build_context
+
+        tick = NarrativeEvent.objects.order_by("-tick").first().tick
+        context = _build_context(self.actor, frozen_tick=tick)
+        payload = json.loads(context.recent_deeds_json)
+        groups = payload["recent_deeds"]
+
+        adult_groups = [
+            group for group in groups
+            if group["facts"].get("act_key") == _T_SELF_ACT_SKILL.key
+        ]
+        self.assertEqual(len(adult_groups), 1)
+        adult_group = adult_groups[0]
+        self.assertEqual(adult_group["count"], 2)
+        outcomes = adult_group["facts"]["outcomes"]
+        self.assertEqual(
+            [row["event"] for row in outcomes["transitions"]], ["stimulus_applied"]
+        )
+        self.assertTrue(outcomes["counters"])
+        self.assertTrue(outcomes["effects"])
+        self.assertEqual(outcomes["transitions"][0]["target_id"], str(self.actor.pk))
+        self.assertIn("occurrence:1:self", adult_group["source_ids"])
+        self.assertIn("occurrence:2:self", adult_group["source_ids"])
+
+        resist_groups = [
+            group for group in groups
+            if group["facts"].get("act_key") == _T_RESISTIBLE_ADULT_SKILL.key
+        ]
+        self.assertEqual(len(resist_groups), 1)
+        self.assertTrue(resist_groups[0]["facts"]["outcomes"]["resistance"])
+
+        skill_groups = [
+            group for group in groups
+            if group["facts"].get("skill_key") == _T_HEAL_SKILL.key
+        ]
+        self.assertEqual(len(skill_groups), 1)
+        self.assertEqual(skill_groups[0]["count"], 2)
+        self.assertIn("occurrence:4:heal", context.supplied_source_ids)
+        self.assertIn("occurrence:5:heal", context.supplied_source_ids)
+
+
+class SettledResultNormalizationTests(unittest.TestCase):
+    """Both accepted input forms converge on one committed-result vocabulary."""
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_pending_and_entry_forms_state_identical_effects(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN the staged pending description and the committed event payload
+        state the same effect
+        THEN both forms yield the identical committed result.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        cases = {
+            "damage": (("7", "1", "12"), {"amount": 12}, {"amount": 12, "hit": True}),
+            "heal": (("9",), {"amount": 9}, {"amount": 9}),
+            "self_heal": (("9",), {"amount": 9}, {"amount": 9}),
+            "pleasure_gain": (("4",), {"amount": 4}, {"amount": 4}),
+            "buff_applied": (("focus",), {"buff_key": "focus"}, {"buff_key": "focus"}),
+            "self_buff_applied": (
+                ("focus",),
+                {"buff_key": "focus"},
+                {"buff_key": "focus"},
+            ),
+            "buffs_cleansed": (("2",), {"count": 2}, {"count": 2}),
+            "gauge_transfer": (
+                ("mp", "drain", "5"),
+                {"gauge": "mp", "direction": "drain", "amount": 5},
+                {"gauge": "mp", "direction": "drain", "amount": 5},
+            ),
+        }
+        for kind, (values, entry_data, expected) in cases.items():
+            with self.subTest(kind=kind):
+                from_values = adapter_module._settled_result_from_values(
+                    kind, values, source="equivalence"
+                )
+                from_entry = adapter_module._settled_result_from_entry(
+                    kind, entry_data, source="equivalence"
+                )
+                self.assertEqual(from_values, expected)
+                self.assertEqual(from_entry, expected)
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_uncommitted_and_malformed_results_fail_closed(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN a staged damage misses, or required evidence is malformed
+        THEN a miss states no committed effect and malformed evidence raises
+        instead of becoming an empty or invented result.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        self.assertIsNone(
+            adapter_module._settled_result_from_values(
+                "damage", ("7", "0", "12"), source="miss"
+            )
+        )
+        with self.assertRaises(ValueError):
+            adapter_module._settled_result_from_values(
+                "pleasure_gain", ("not-an-int",), source="malformed"
+            )
+        with self.assertRaises(ValueError):
+            adapter_module._settled_result_from_entry(
+                "pleasure_gain", {}, source="missing-amount"
+            )
+        with self.assertRaises(ValueError):
+            adapter_module._settled_result_from_entry(
+                "buff_applied", {"buff_key": 7}, source="not-text"
+            )
+        with self.assertRaises(ValueError):
+            adapter_module._settled_result_from_values(
+                "title_granted", ("t_synth",), source="unadmitted"
+            )
+
+        # An absent roll is a normal result; a verdict with no outcome at all,
+        # or one that is not a two-flag verdict, fails its source transaction.
+        self.assertEqual(
+            adapter_module._pending_resistance_values(
+                ("0", "1", "none"), source="absented"
+            ),
+            (False, True, None),
+        )
+        self.assertEqual(
+            adapter_module._entry_resistance_values(
+                {"resisted": False, "auto_comply": True, "roll": None},
+                source="absented",
+            ),
+            (False, True, None),
+        )
+        for malformed in (
+            {},
+            {"resisted": False},
+            {"resisted": False, "auto_comply": True},
+            {"resisted": 0, "auto_comply": 1, "roll": None},
+            {"resisted": False, "auto_comply": True, "roll": "7"},
+        ):
+            with self.subTest(resistance=malformed):
+                with self.assertRaises(ValueError):
+                    adapter_module._entry_resistance_values(
+                        malformed, source="malformed"
+                    )
+        for malformed_values in (("0", "1"), ("0", "1", "bogus"), ("2", "0", "7")):
+            with self.subTest(resistance=malformed_values):
+                with self.assertRaises(ValueError):
+                    adapter_module._pending_resistance_values(
+                        malformed_values, source="malformed"
+                    )
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_shared_display_keys_never_resolve_to_a_guessed_recipient(self):
+        """Scenario: Untouched recipient is excluded.
+
+        WHEN two candidates share one display key, or a committed entry names an
+        unknown target
+        THEN identity resolution refuses rather than attributing a recipient.
+        """
+        import types
+
+        import world.narrative.action_adapters as adapter_module
+
+        first = types.SimpleNamespace(pk=1, key="Twin")
+        second = types.SimpleNamespace(pk=2, key="Twin")
+        self.assertEqual(adapter_module._unique_key_index([first, second]), {})
+
+        entry = types.SimpleNamespace(target="Twin")
+        with self.assertRaises(ValueError):
+            adapter_module._entry_target(
+                entry,
+                "damage",
+                adapter_module._unique_key_index([first, second]),
+                "3",
+                "Actor",
+                source="ambiguous",
+            )
+        with self.assertRaises(ValueError):
+            adapter_module._entry_target(
+                entry,
+                "damage",
+                {},
+                "3",
+                "Actor",
+                source="unknown",
+            )
+
+
+class SettledEffectVocabularyDocumentationTests(unittest.TestCase):
+    """The documented settled-result vocabulary is the adapter's own table."""
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_documented_vocabulary_matches_the_adapter(self):
+        """Scenario: Production effect vocabulary survives persistence.
+
+        WHEN the narrative evidence contract documents its accepted results
+        THEN the document names exactly the kinds and result fields the adapter
+        accepts, so producer and consumer vocabulary cannot drift.
+        """
+        import world.narrative.action_adapters as adapter_module
+
+        documentation = adapter_module.__doc__ or ""
+        marker = "Accepted settled-effect results:"
+        self.assertIn(marker, documentation)
+
+        documented: dict[str, tuple[str, ...]] = {}
+        for line in documentation.split(marker, 1)[1].splitlines():
+            entry = line.strip()
+            if not entry:
+                if documented:
+                    break
+                continue
+            self.assertTrue(entry.startswith("- "), entry)
+            kind, _, fields = entry[2:].partition(": ")
+            documented[kind] = tuple(
+                field.strip() for field in fields.split(",") if field.strip()
+            )
+
+        declared = {
+            kind: tuple(field for field, _ in fields)
+            for kind, fields in adapter_module._SETTLED_EFFECT_RESULTS.items()
+        }
+        self.assertEqual(documented, declared)

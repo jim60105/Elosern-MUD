@@ -76,8 +76,7 @@ Completed combat facts SHALL summarize actual victory, defeat or escape with dur
 - **THEN** rollback leaves no fact or title grant and replay leaves one immutable source with original awards
 
 ### Requirement: Settled skill and adult actions retain deterministic roles and results
-
-Settled skill and adult actions SHALL produce deterministic facts identifying the skill or act, actual actor, recipients and committed effects. Adult actions SHALL have equal evidence standing. Proximity or party membership SHALL NOT imply participation. Skill names and repeated casting SHALL NOT establish rescue, exceptional difficulty or merit.
+Settled skill and adult actions SHALL yield deterministic facts naming the skill or act, actual actor, recipients and actual committed results, with adult evidence holding equal standing. Proximity or party membership SHALL NOT imply participation; skill names or repetition SHALL NOT establish rescue, exceptional difficulty or merit. An absent optional resistance roll SHALL be normal. Producer and consumer SHALL share one committed-result vocabulary, so no supported effect is lost over a name.
 
 #### Scenario: Concrete skill effects
 - **WHEN** a skill heals a recipient without protection evidence
@@ -94,6 +93,18 @@ Settled skill and adult actions SHALL produce deterministic facts identifying th
 #### Scenario: Action rollback and replay
 - **WHEN** a source fails after deed/title writes, then later commits and replays
 - **THEN** the failed transaction leaves no effects or evidence and the replay retains one committed occurrence and its original award results
+
+#### Scenario: Auto-compliance has no resistance roll
+- **WHEN** a legal resistible action auto-complies and its authoritative resistance result has no roll
+- **THEN** the normal gameplay result and deed commit without a parsing failure, and the evidence retains the actual verdict without inventing willingness
+
+#### Scenario: Production effect vocabulary survives persistence
+- **WHEN** real settled skill or adult effects apply pleasure gain, a target or self buff, or cleansing
+- **THEN** each committed effect is represented with its actual actor, recipient and result; no supported effect disappears because producer and adapter vocabulary differ
+
+#### Scenario: Actual bounded effect remains actual
+- **WHEN** an effect requests a change greater than the recipient can actually receive
+- **THEN** its deed states the actual committed result rather than the requested magnitude and leaves an untouched recipient unchanged
 
 ### Requirement: Adult milestones record newly crossed transitions
 

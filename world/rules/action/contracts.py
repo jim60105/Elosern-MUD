@@ -149,6 +149,12 @@ class PendingEffect:
     notify: str | None = None
     hit_evidence: tuple[DamageHitEvidence, ...] = ()
     title_awards: list[AutomaticTitleAward] | tuple[AutomaticTitleAward, ...] | None = None
+    # The result this effect's own ``apply`` actually committed, keyed by the
+    # settled-result field it states (``amount``, ``count``, ...). Staging hands
+    # in the mutable box, ``apply`` fills it, and the settlement evidence reads
+    # it afterwards, so evidence never has to infer an applied result from a
+    # whole-action net change. ``None`` means the effect states nothing.
+    applied: dict[str, Any] | None = None
 
 
 class UnsnapshottedSurfaceError(Exception):

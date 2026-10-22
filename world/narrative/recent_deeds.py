@@ -211,6 +211,39 @@ def _project_adult_action_for_player(
                 if isinstance(eff, dict) and str(eff.get("target_id", "")) == player_pk
             ]
 
+    # Own-state transitions and counter changes: a separately granted permission
+    # and the player's own rows only. Another participant's internal state stays
+    # absent even for the actor, because knowability is per field and per subject.
+    transitions_token = (
+        "own_state_transitions" if is_actor else "target_state_transitions"
+    )
+    raw_transitions = outcomes.get("transitions", [])
+    if isinstance(raw_transitions, list) and transitions_token in allowed_tokens:
+        projected_outcomes["transitions"] = [
+            {
+                "target_id": str(row.get("target_id", "")),
+                "target_name": str(row.get("target_name", "")),
+                "event": str(row.get("event", "")),
+            }
+            for row in raw_transitions
+            if isinstance(row, dict) and str(row.get("target_id", "")) == player_pk
+        ]
+
+    counters_token = (
+        "own_counter_changes" if is_actor else "target_counter_changes"
+    )
+    raw_counters = outcomes.get("counters", [])
+    if isinstance(raw_counters, list) and counters_token in allowed_tokens:
+        projected_outcomes["counters"] = [
+            {
+                "target_id": str(row.get("target_id", "")),
+                "target_name": str(row.get("target_name", "")),
+                "counter": str(row.get("counter", "")),
+            }
+            for row in raw_counters
+            if isinstance(row, dict) and str(row.get("target_id", "")) == player_pk
+        ]
+
     # Resistance verdicts (only actual resisted boolean and identity, NEVER dice rolls or auto_comply)
     raw_resist = outcomes.get("resistance", [])
     if isinstance(raw_resist, list) and "resistance_verdict" in allowed_tokens:
@@ -519,18 +552,26 @@ def _build_compressed_action_fact(
                         seen_effects.add(e_json)
                         distinct_effects.append(e)
 
-    # Collect distinct resistance verdicts
-    distinct_resist: list[dict[str, Any]] = []
-    seen_resist: set[str] = set()
-    for r in records:
-        res_list = r.data.get("outcomes", {}).get("resistance", [])
-        if isinstance(res_list, list):
-            for res in res_list:
-                if isinstance(res, dict):
-                    res_json = json.dumps(res, sort_keys=True)
-                    if res_json not in seen_resist:
-                        seen_resist.add(res_json)
-                        distinct_resist.append(res)
+    def _distinct_rows(family: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for record in records:
+            raw_rows = record.data.get("outcomes", {}).get(family, [])
+            if not isinstance(raw_rows, list):
+                continue
+            for row in raw_rows:
+                if isinstance(row, dict):
+                    row_json = json.dumps(row, sort_keys=True)
+                    if row_json not in seen:
+                        seen.add(row_json)
+                        rows.append(row)
+        return rows
+
+    # Collect distinct resistance, transition and counter results across the
+    # whole run: a result present only in a later occurrence is not lost.
+    distinct_resist = _distinct_rows("resistance")
+    distinct_transitions = _distinct_rows("transitions")
+    distinct_counters = _distinct_rows("counters")
 
     # Collect distinct milestones
     combined_milestones: list[dict[str, Any]] = []
@@ -558,6 +599,8 @@ def _build_compressed_action_fact(
         outcomes = dict(base_data.get("outcomes", {}))
         outcomes["effects"] = distinct_effects
         outcomes["resistance"] = distinct_resist
+        outcomes["transitions"] = distinct_transitions
+        outcomes["counters"] = distinct_counters
         base_data["outcomes"] = outcomes
         base_data["milestones"] = combined_milestones
     else:
@@ -615,6 +658,16 @@ def _group_and_aggregate_deeds(
             standalone_milestones.extend(ms_list)
             del milestones_by_action_source[action_src]
 
+    # Milestones joined to an admitted action belong to that occurrence, so they
+    # are not independent occurrences: they neither break a repetition run nor
+    # form a group of their own. A milestone whose action was not admitted stays
+    # standalone and keeps acting as an ordinary boundary.
+    joined_milestone_sources: set[str] = {
+        ms.source_id
+        for ms_list in milestones_by_action_source.values()
+        for ms in ms_list
+    }
+
     # 2. Identify consecutive action runs across the chronological action stream
     # A run breaks if action type, actor, recipients, encounter, or role changes.
     action_runs: list[list[AuthorizedDeedRecord]] = []
@@ -622,6 +675,13 @@ def _group_and_aggregate_deeds(
     current_key: tuple[str, str, str, str, str] | None = None
 
     for r in sorted_stream:
+        if (
+            r.event_type == "adult_milestone"
+            and r.source_id in joined_milestone_sources
+        ):
+            # Attached before compression: this occurrence's own result joins
+            # its action later, through that action's run.
+            continue
         if r.event_type not in ("skill_use", "adult_action"):
             # Non-action record breaks consecutive action run!
             if current_run:
