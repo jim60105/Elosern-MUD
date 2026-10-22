@@ -24,7 +24,7 @@
 | **`scene_builder`** | `world/ai/scene_flavor.py` | 玩家進入動態副本房間 | 正體中文氛圍散文 (50-200 字) | 回傳 `None`（房間不附加額外氛圍） |
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |
 | **`action_options`** | `world/ai/action_options.py` | 移動進房、行動結算、登入 | JSON（3～5 張行動卡片） | 回傳 `None`（前端僅呈現原生按鈕） |
-| **`title_nomination`** | `world/ai/title_nomination.py` | 登出、休息結算、公會升階、任務通關 | JSON（候選異名與事蹟引用） | 回傳空選票（不生成新稱號） |
+| **`title_nomination`** | `world/ai/title_nomination.py` | 登出、休息結算、公會升階、任務通關 | JSON（候選異名、事蹟引用與來源引用代碼） | 回傳空選票（不生成新稱號） |
 | **`story_director`** | `world/ai/story_director/` | 決定性敘事核心排定故事橋段（`world/narrative/director.py`） | JSON（單一橋段提案：後續／線索／邀請／信件／任務種子） | 回傳 `None`（不排定任何橋段，不生成替代內容） |
 
 ---
@@ -225,7 +225,7 @@ LLM 必須輸出 JSON 格式：
 ## 7. 異名稱號提名層 (`title_nomination`)
 
 ### 業務定位
-在冒險的重要休息節點，根據玩家近期的真實冒險歷程（`EventLog`），提煉出 5 個具備事蹟佐證的候選異名（Epithet），並過濾出前 3 名合格者組成投票選票。
+在冒險的重要休息節點，根據玩家近期的真實冒險事蹟（`recent_deeds` 結構化資料），提煉出 5 個具備事蹟佐證的候選異名（Epithet），並過濾出前 3 名合格者組成投票選票。
 
 ### 呼叫鏈路
 ```text
@@ -242,7 +242,7 @@ LLM 必須輸出 JSON 格式：
 * **預留位置**：`{player_name}`、`{full_title}`、`{recent_events}`（近期事件紀錄）、`{declined}`（歷史拒絕清單）、`{removed}`（主動卸除清單）。
 
 ### 輸出與碰撞過濾
-* **輸出格式**：5 筆 `{"display": "2~8字異名", "basis": "80字以內事蹟引用"}`。
+* **輸出格式**：5 筆 `{"display": "2~8字異名", "basis": "80字以內事蹟引用", "source_ids": ["事蹟來源代碼"]}`。
 * **碰撞過濾器**：
   1. 字符必須為 2 到 8 個 CJK 漢字。
   2. 絕對不得包含玩家角色姓名。

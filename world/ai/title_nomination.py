@@ -53,15 +53,7 @@ BASIS_MAX_CHARS = 80
 DISPLAY_WIRE_MAX_CHARS = 64
 _CJK_START = "\u4e00"
 _CJK_END = "\u9fff"
-
-# Bounded prompt feed for the recent-event summary (the caller hands over
-# plain EventLog-shaped records; serialization mirrors the narrator's
-# discipline: entity keys and entry data only, hard-truncated, never live
-# objects).
-SUMMARY_MAX_LOGS = 8
-SUMMARY_MAX_ENTRIES = 32
-SUMMARY_MAX_FIELD_CHARS = 120
-SUMMARY_MAX_TOTAL_CHARS = 8000
+EMPTY_RECENT_DEEDS_JSON = '{"recent_deeds":[]}'
 
 
 class TitleNominationClientRequiredError(TypeError):
@@ -82,7 +74,8 @@ class NominationContext:
     declined: tuple[str, ...]
     owned_epithet_displays: frozenset[str]
     fixed_displays: frozenset[str]
-    event_logs: tuple[Any, ...] = ()
+    recent_deeds_json: str = EMPTY_RECENT_DEEDS_JSON
+    supplied_source_ids: frozenset[str] = frozenset()
     removed: tuple[str, ...] = ()
 
 
@@ -124,6 +117,7 @@ def filter_candidates(
     player_name: str,
     fixed_displays: frozenset[str],
     owned_epithet_displays: frozenset[str],
+    supplied_source_ids: frozenset[str] = frozenset(),
 ) -> tuple[EpithetCandidate, ...]:
     """Apply the deterministic collision filters in the fixed spec order.
 
@@ -140,6 +134,22 @@ def filter_candidates(
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             continue
+        # Citation validation: non-empty, distinct, valid members of supplied_source_ids
+        source_ids = candidate.get("source_ids")
+        if not isinstance(source_ids, (list, tuple)):
+            continue
+        if not source_ids:
+            continue
+        if not all(isinstance(s, str) for s in source_ids):
+            continue
+        # Must be distinct
+        if len(set(source_ids)) != len(source_ids):
+            continue
+        # All cited IDs must belong to supplied_source_ids
+        if any(s not in supplied_source_ids for s in source_ids):
+            continue
+
+        # Form and collision filters
         display = candidate.get("display")
         basis = candidate.get("basis")
         if not display_form_valid(display, player_name):
@@ -157,66 +167,6 @@ def filter_candidates(
     return tuple(survivors)
 
 
-def summarize_event_logs(event_logs: Iterable[Any]) -> str:
-    """Serialize the recent-event feed to bounded JSON text (never raises).
-
-    Mirrors the narrator's serialization shape (actor / skill_key / targets /
-    entries with plain data only) under hard caps; oversized feeds drop the
-    oldest logs and entries. An empty feed renders ``{"event_logs": []}``.
-    """
-    logs: list[dict[str, Any]] = []
-    total_entries = 0
-    for log in event_logs:
-        if log is None:
-            continue
-        entries = list(getattr(log, "entries", ()) or ())
-        if total_entries >= SUMMARY_MAX_ENTRIES:
-            break
-        remaining = SUMMARY_MAX_ENTRIES - total_entries
-        kept_entries = entries[-remaining:] if len(entries) > remaining else entries
-        total_entries += len(kept_entries)
-        if len(logs) >= SUMMARY_MAX_LOGS:
-            break
-        logs.append(
-            {
-                "actor": _clamp(getattr(log, "actor", None)),
-                "skill_key": _clamp(getattr(log, "skill_key", None)),
-                "targets": [
-                    _clamp(target) for target in (getattr(log, "targets", ()) or ())
-                ][:8],
-                "entries": [
-                    {
-                        "kind": _clamp(getattr(entry, "kind", None)),
-                        "actor": _clamp(getattr(entry, "actor", None)),
-                        "target": _clamp(getattr(entry, "target", None)),
-                        "text_template": _clamp(
-                            getattr(entry, "text_template", None)
-                        ),
-                    }
-                    for entry in kept_entries
-                ],
-            }
-        )
-    def _size() -> int:
-        return len(json.dumps({"event_logs": logs}, ensure_ascii=False))
-
-    while len(logs) > 1 and _size() > SUMMARY_MAX_TOTAL_CHARS:
-        logs.pop(0)
-    # A single retained oversized log cannot be dropped whole (the feed must
-    # keep something); trim its OLDEST entries until the serialized feed fits.
-    while logs and logs[0]["entries"] and _size() > SUMMARY_MAX_TOTAL_CHARS:
-        logs[0]["entries"].pop(0)
-    if logs and _size() > SUMMARY_MAX_TOTAL_CHARS:
-        logs.clear()
-    return json.dumps({"event_logs": logs}, ensure_ascii=False)
-
-
-def _clamp(value: Any) -> Any:
-    if isinstance(value, str) and len(value) > SUMMARY_MAX_FIELD_CHARS:
-        return value[:SUMMARY_MAX_FIELD_CHARS]
-    return value
-
-
 def build_nomination_prompt(context: NominationContext) -> tuple[dict, dict]:
     """Render the deterministic (system, user) pair from plain context data.
 
@@ -230,7 +180,7 @@ def build_nomination_prompt(context: NominationContext) -> tuple[dict, dict]:
             "title_nomination.user",
             player_name=context.player_name or "",
             full_title=context.full_title or "",
-            recent_events=summarize_event_logs(context.event_logs),
+            recent_events=context.recent_deeds_json or EMPTY_RECENT_DEEDS_JSON,
             declined="、".join(context.declined) if context.declined else "無",
             removed="、".join(context.removed) if context.removed else "無",
         ),
@@ -249,7 +199,7 @@ TITLE_NOMINATION_OUTPUT_SCHEMA: dict[str, Any] = {
             "maxItems": CANDIDATES_PER_ROUND,
             "items": {
                 "type": "object",
-                "required": ["display", "basis"],
+                "required": ["display", "basis", "source_ids"],
                 "additionalProperties": False,
                 "properties": {
                     "display": {
@@ -261,6 +211,10 @@ TITLE_NOMINATION_OUTPUT_SCHEMA: dict[str, Any] = {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": BASIS_MAX_CHARS,
+                    },
+                    "source_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
                 },
             },
@@ -356,6 +310,9 @@ def generate_epithet_candidates(context: NominationContext, client: Any):
     if not get_profile("title_nomination").enabled:
         return None
     _require_registered()
+    # Empty feed: no nomination attempt without eligible material
+    if not context.supplied_source_ids or not context.recent_deeds_json:
+        return None
     try:
         system, user = build_nomination_prompt(context)
     except (PromptUnavailableError, KeyError, TypeError) as exc:
@@ -375,11 +332,24 @@ def generate_epithet_candidates(context: NominationContext, client: Any):
     candidates = parsed.get("candidates") if isinstance(parsed, Mapping) else None
     if not isinstance(candidates, Sequence) or len(candidates) != CANDIDATES_PER_ROUND:
         return None
+    # Check for response field-size violation across all candidates:
+    # A citation array larger than the request-bound count voids the whole round.
+    # Malformed field types also retain round-void behavior.
+    supplied_count = len(context.supplied_source_ids)
+    for c in candidates:
+        if not isinstance(c, Mapping):
+            return None
+        s_ids = c.get("source_ids")
+        if not isinstance(s_ids, (list, tuple)):
+            return None
+        if len(s_ids) > supplied_count:
+            return None
     return filter_candidates(
         candidates,
         player_name=context.player_name,
         fixed_displays=context.fixed_displays,
         owned_epithet_displays=context.owned_epithet_displays,
+        supplied_source_ids=context.supplied_source_ids,
     )
 
 
@@ -387,6 +357,7 @@ __all__ = [
     "BALLOT_TOP",
     "BASIS_MAX_CHARS",
     "CANDIDATES_PER_ROUND",
+    "EMPTY_RECENT_DEEDS_JSON",
     "DISPLAY_MAX_CHARS",
     "DISPLAY_MIN_CHARS",
     "TITLE_NOMINATION_OUTPUT_SCHEMA",
@@ -398,5 +369,4 @@ __all__ = [
     "filter_candidates",
     "generate_epithet_candidates",
     "register_title_nomination",
-    "summarize_event_logs",
 ]

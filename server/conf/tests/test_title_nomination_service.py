@@ -27,6 +27,7 @@ from world.ai.title_nomination import register_title_nomination
 from world.rules import guild_exams
 from world.rules import titles as title_rules
 from world.quests import runtime as quest_runtime
+from world.narrative.events import record_narrative_event
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
 
@@ -53,11 +54,11 @@ def _good_client():
         lambda descriptor: True,
         _reply(
             [
-                {"display": "火焰之心", "basis": "焚盡匪寨"},
-                {"display": "破曉之刃", "basis": "曙間退敵"},
-                {"display": "沉默守望", "basis": "夜守村口"},
-                {"display": "荒野行者", "basis": "穿林三日"},
-                {"display": "月影之舞", "basis": "月下退賊"},
+                {"display": "火焰之心", "basis": "焚盡匪寨", "source_ids": ["quest:test_001"]},
+                {"display": "破曉之刃", "basis": "曙間退敵", "source_ids": ["quest:test_001"]},
+                {"display": "沉默守望", "basis": "夜守村口", "source_ids": ["quest:test_001"]},
+                {"display": "荒野行者", "basis": "穿林三日", "source_ids": ["quest:test_001"]},
+                {"display": "月影之舞", "basis": "月下退賊", "source_ids": ["quest:test_001"]},
             ]
         ),
     )
@@ -93,6 +94,18 @@ class NominationSchedulingTests(EvenniaTest):
         self.push_patcher = patch.object(service, "_push_ballot_panel", self.push)
         self.push_patcher.start()
         self.addCleanup(self.push_patcher.stop)
+        # Seed an authorized recent deed so the player has eligible material by default
+        record_narrative_event(
+            source_id="quest:test_001",
+            event_type="quest_completion",
+            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
+            participants=[self.player.pk],
+            tick=100,
+        )
+        self.clock = SimpleNamespace(tick=100)
+        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher.start()
+        self.addCleanup(self.clock_patcher.stop)
 
     def _schedule(self, client, **kwargs):
         with override_settings(LLM_PROFILES=_profiles()):
@@ -167,6 +180,49 @@ class NominationSchedulingTests(EvenniaTest):
         user_text = client.calls[0].messages[1]["content"]
         self.assertIn("已拒之名", user_text)
 
+    @covers_requirement("title-system::nomination-prompts-contain-authorized-structured-deeds-and-advisory-identity")
+    def test_adult_action_structured_outcome_survives_into_prompt(self):
+        # Record an authorized adult deed with field_access, actor, recipients and outcomes
+        # along with a private/forbidden field on another participant
+        player_pk = str(self.player.pk)
+        record_narrative_event(
+            source_id="adult:committed_act_001",
+            event_type="adult_action",
+            content={
+                "act_key": "synth_touch",
+                "act_name": "撫觸測試",
+                "player_id": player_pk,
+                "actor": {"id": player_pk, "name": "nominee"},
+                "recipients": [{"id": "npc_partner", "name": "花語者", "private_feeling": "forbidden_secret_value"}],
+                "outcomes": {
+                    "effects": [{"target_id": "npc_partner", "effect": "pleasure"}],
+                },
+                "field_access": {
+                    player_pk: ["actor", "recipients", "physical_effects"],
+                },
+            },
+            participants=[player_pk, "npc_partner"],
+            tick=100,
+        )
+        # Record an unauthorized narrative event (player is not a participant)
+        record_narrative_event(
+            source_id="adult:unauthorized_act_999",
+            event_type="adult_action",
+            content={"act_key": "secret", "outcome": "unauthorized_outcome"},
+            participants=["other_person_1", "other_person_2"],
+            tick=100,
+        )
+        client = _good_client()
+        self._schedule(client)
+        self.assertEqual(len(client.calls), 1)
+        user_text = client.calls[0].messages[1]["content"]
+        self.assertIn("adult:committed_act_001", user_text)
+        self.assertIn("synth_touch", user_text)
+        self.assertIn("花語者", user_text)
+        # Verify unauthorized event and private forbidden fields never enter the prompt
+        self.assertNotIn("unauthorized_outcome", user_text)
+        self.assertNotIn("forbidden_secret_value", user_text)
+
     def test_removal_digest_flows_into_the_prompt(self):
         # The durable removal log is the second soft-learning feed: the
         # removed display must appear in the next round's user message.
@@ -234,9 +290,19 @@ class NominationSchedulingTests(EvenniaTest):
         ):
             self.assertIsNone(service.schedule_epithet_nomination(self.player))
 
+    def test_empty_feed_skips_nomination(self):
+        # Character with no recorded deeds produces no nomination attempt
+        empty_player = create_object(PlayerCharacter, key="empty-nominee")
+        client = _good_client()
+        with override_settings(LLM_PROFILES=_profiles()):
+            deferred = service.schedule_epithet_nomination(empty_player, client=client)
+        self.assertIsNone(deferred)
+        self.assertEqual(client.calls, [])
+        self.assertFalse(empty_player.attributes.has(title_rules.PENDING_BALLOT_KEY))
+
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_void_rounds_store_nothing(self):
-        cases = ["{not json", _reply([{"display": "甲名", "basis": "一"}])]
+        cases = ["{not json", _reply([{"display": "甲名", "basis": "一", "source_ids": ["quest:test_001"]}])]
         for text in cases:
             with self.subTest(text=text[:16]):
                 client = FakeLLMClient()
@@ -251,7 +317,7 @@ class NominationSchedulingTests(EvenniaTest):
         client = FakeLLMClient()
         client.add_response(
             lambda descriptor: True,
-            _reply([{"display": SYNTH_STARTER_EPITHET.display, "basis": "撞名"}] * 5),
+            _reply([{"display": SYNTH_STARTER_EPITHET.display, "basis": "撞名", "source_ids": ["quest:test_001"]}] * 5),
         )
         title_rules.award_first_quest_epithet(self.player, source_id="test:init:first_quest")
         self._schedule(client)
