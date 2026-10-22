@@ -52,3 +52,17 @@ After drawer and minimap cutovers the old MapOverlay, overlay pitch branch, cell
 #### Scenario: Clean production cutover
 - **WHEN** the normal map opener and minimap run after the new drawer is integrated
 - **THEN** they render their new real components without importing or executing the removed overlay lattice path
+
+### Requirement: Area view memory resets on coordinate-frame changes
+Area pan/zoom and selection SHALL be retained only while the authoritative map_id and frame key/unit match. A map or coordinate-frame transition SHALL clear incompatible selection/view state and fit the new current node and adjacency; world view remains independent and all memory clears on epoch retirement.
+
+#### Scenario: Gate and interior transitions change frames
+- **WHEN** an active area tab moves city to wilderness to interior, or from one settlement to another
+- **THEN** each changed map/frame initializes the correct metre, kilometre or radial view centred on current adjacency instead of reusing the previous coordinates
+
+### Requirement: The drawer current marker makes one truthful position claim
+The area drawer SHALL retain one concentric, decorative current-location ring with readable labels and visible incident connector segments. The world view SHALL likewise show one current-position marker. Decoration SHALL have no separate identity, accessible label, pointer action or fabricated position, and island marker behavior SHALL remain unchanged.
+
+#### Scenario: Current marker meets a path
+- **WHEN** the area map shows connectors in several directions around current
+- **THEN** its ring stays concentric, clear of labels and does not obscure the connectors or create a second selectable place

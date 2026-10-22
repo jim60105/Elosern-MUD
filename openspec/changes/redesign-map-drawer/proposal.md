@@ -17,7 +17,7 @@ The completed panel and view slices need the approved option-A shell, session re
 - `webclient-map-drawer`: Area/world shell, request lifecycle, floating controls and clean map cutover.
 
 ### Modified Capabilities
-- None.
+- `webclient-local-map`: retire five mixed legacy-overlay contracts, preserve effective minimap behavior and amend inherited metric/naming/motion/chrome obligations.
 
 ## Impact
 
