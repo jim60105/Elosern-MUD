@@ -204,18 +204,37 @@ The old overlay lattice path (`cellSize`, the rank-compressed lattice, and the o
 
 ## 9. Proposed changes
 
-Dependency-ordered, each sized to about one workday:
+This design was turned into thirteen proposal-only OpenSpec changes on `master`,
+each sized at 8 hours or less for a mid-tier implementing worker. The six scopes
+above remain the groups; a group is split further wherever one change would
+exceed the budget (rows 2, 4, 5, and 6). Apply them strictly in the listed
+order.
 
-| Order | Change | Scope |
-| --- | --- | --- |
-| 1 | `author-border-river-and-forest-edge` | Border river and fords, meandering forest edge, classifier and `nation_key` updates, derived national borders |
-| 2 | `establish-map-districts` | District and landmark registry, partition tool and frozen data, region districts, lighting rule |
-| 3 | `author-district-landmarks` | About 110–130 authored landmarks and names, regenerated partition |
-| 4 | `publish-area-map-panel` | `map.view`, `area_map` for grid, instance, interior, and wilderness, quest marker resolution |
-| 5 | `publish-world-map-panel` | `world_map`, caching, trail encoding, approximate markers, first-arrival narrative |
-| 6 | `redesign-map-drawer` | `MapDrawer`, `AreaMapView`, `WorldMapView`, `map_viewport.js`, stories, removal of the overlay lattice |
+| Order | Change | Hours | Depends on | Scope |
+| --- | --- | ---: | --- | --- |
+| 1 | `author-border-river-and-forest-edge` | 8 | — | Border river and fords, meandering forest edge, classifier and `nation_key` updates, derived national borders |
+| 2 | `establish-map-districts` | 5 | 1 | Frozen district and landmark registry, canonical landmarks, knowledge-derived lighting rule |
+| 3 | `compute-map-district-partition` | 8 | 2 | Deterministic 5 km walking-distance partition, exact cell ownership, frozen RLE outlines, recomputation test |
+| 4 | `author-district-landmarks` | 8 | 3 | About 110–130 authored landmark and name pairs, regenerated partition data |
+| 5 | `resolve-map-quest-destinations` | 5 | 1 | Shared canonical destination resolution for accepted commissions |
+| 6 | `define-map-panel-protocol` | 8 | minimap 1 | Exact `area_map` and `world_map` wire contracts, on-demand snapshot semantics, bounded atomic part codec |
+| 7 | `publish-area-map-panel` | 8 | 3, 5, 6, minimap 1 | `map.view`, `area_map` for grid, instance, interior, and wilderness, gateways, quest markers |
+| 8 | `transport-world-map-panel` | 6 | 4, 6, 7 | Real payload measurement, finite world bounds, confirmed socket and browser delivery of the large panel |
+| 9 | `publish-world-map-panel` | 8 | 2, 5, 8 | Filtered `world_map`, caches, trail encoding, approximate markers, first-arrival narrative |
+| 10 | `establish-map-viewport` | 5 | — | Pure `map_viewport.js`: projection, pan, anchored zoom, stops, drawer-aware clamping |
+| 11 | `render-area-map-view` | 7 | 7, 10 | Real settlement, dungeon, interior, and wilderness area views with stories |
+| 12 | `render-world-map-view` | 8 | 9, 10 | Real world layers, level of detail, precision-aware markers, accessible reveal motion |
+| 13 | `redesign-map-drawer` | 8 | 7, 9, 11, 12, minimap 5 | Option-A drawer shell, requests, pointers, keyboard, story work, removal of the overlay lattice |
 
-Dependencies: 1 → 2 → 3; 2 → 5; 4 needs the minimap design's `gateway` field; 6 needs 4 and 5.
+Groups: geography is 1; districts are 2–4; server panels are 5–9; client work is
+10–13. `map.view` and the panel protocol (6) are prerequisites for both panel
+changes. `redesign-map-drawer` also waits for the minimap chain to finish,
+because the overlay lattice it deletes has no consumer only after both changes
+land. Total: 92 hours.
+
+Every change requires Storybook `play` assertions, agent-browser inspection of
+the affected stories, and focused single-file, single-class, or single-method
+tests with the shard, traceability, and contract gates.
 
 ## 10. Alternatives rejected
 

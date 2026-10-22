@@ -149,7 +149,27 @@ The FLIP pan in `web/webclient-app/lib/map_pan.js` assumes equal scales before a
 - Server tests: `gateway` values for a city gate room, an adjacent city gate in the wilderness, and an ordinary node; validator rejections for malformed values.
 - OpenSpec: modify the `webclient-local-map` requirements that describe the island window, the stationary dot field, and cross-layer gate nodes.
 
-## 9. Alternatives rejected
+## 9. Proposed changes
+
+This design was turned into five proposal-only OpenSpec changes on `master`, each
+sized at 8 hours or less for a mid-tier implementing worker. Apply them strictly
+in the listed order; each change's delta requirements come from the completed
+predecessor.
+
+| Order | Change | Hours | Depends on | Scope |
+| --- | --- | ---: | --- | --- |
+| 1 | `add-local-map-gateway-metadata` | 6.5 | — | `gateway` payload field, server and browser validators, model pass-through, fixture cutover |
+| 2 | `compute-minimap-auto-scale-projection` | 7.5 | 1 | Pure `minimap_projection.js`: uniform and compressed modes, level ladder and hysteresis, exit stubs, background geometry, every §3.5 edge case |
+| 3 | `render-auto-scaled-minimap-island` | 8 | 2 | Island renderer cutover, scale-true dot field and distance rings, five metric Storybook fixture families |
+| 4 | `label-minimap-exits-and-gateways` | 7.5 | 3 | Eight-position label placement, gate glyphs, accessible exit-stub controls |
+| 5 | `animate-minimap-scale-transitions` | 7 | 4 | Scale-aware motion, inherited HUD contract amendment, complete gateway visual journey |
+
+Total: 36.5 hours. Every change requires Storybook `play` assertions,
+agent-browser inspection of the affected stories, and focused single-file or
+single-class tests with the shard, traceability, and contract gates. The final
+change adds the real-client walk south gate → wilderness → back.
+
+## 10. Alternatives rejected
 
 - Quantising the lattice cell and relaxing the island minimum scale: smallest change, but snapping shifts bearings, merges nearby nodes, and cannot compress extremes.
 - Server-computed minimap display coordinates: moves presentation into the server against the parent design's rule that server coordinates are authoritative and display coordinates are presentation-only.
