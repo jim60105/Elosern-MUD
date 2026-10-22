@@ -23,6 +23,12 @@ The adult source contains mixed knowability and may be public because a third li
 - Partial projection after failure -> verify memory/progress rollback, restart and per-owner counts alongside returned content.
 - Internal award evidence can ride the raw event -> authorize exposed fields explicitly; do not copy source dictionaries wholesale.
 
+## Ownership
+
+The shared projector is `world/narrative/adult_projection.py`; its consumers are `world/narrative/recent_deeds.py` and `world/narrative/memory.py`. `world/narrative/action_adapters.py` stays the producer and keeps its settled-effect vocabulary, which the projector now enforces as an allowlist rather than copying effect rows wholesale. The change also owns the focused memory/selector test modules, the new `world/narrative/tests/test_adult_memory_projection.py` (registered in shard 4 of `.github/evennia-shards.json`) and the knowledge-boundary section of `docs/development/narrative-memory-and-recall.md`.
+
+Two seams are touched beyond those files because the admitted evidence shape is now enforced: legacy adult fixtures in `world/narrative/tests/test_recent_deeds_selection.py` and `server/conf/tests/test_title_nomination_service.py` were updated from non-production effect rows to the settled-effect shape the producer emits. Both fixtures keep their original intent (an adult occurrence with an effect and a milestone, and an authorized adult outcome reaching the prompt).
+
 ## Migration Plan
 
 A is required. Cut over both consumers in one change. No persisted-event or memory rewrite, parser aliases or backfill. This change protects newly projected sources and pending projection recovery under the current contract. Update knowledge-boundary documentation and traceability.

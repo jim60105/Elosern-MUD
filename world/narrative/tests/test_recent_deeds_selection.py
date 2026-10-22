@@ -521,7 +521,19 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                 "act_name": "相擁",
                 "actor": {"id": self.player_pk},
                 "recipients": [{"id": self.other_pk}],
-                "outcomes": {"effects": [{"warmth": 1}]},
+                # A committed settled effect, in the one admitted shape: an
+                # unsupported effect row fails the whole record closed.
+                "outcomes": {
+                    "effects": [
+                        {
+                            "kind": "pleasure_gain",
+                            "actor_id": self.player_pk,
+                            "target_id": self.other_pk,
+                            "target_name": "相擁之人",
+                            "result": {"amount": 6},
+                        }
+                    ]
+                },
                 "milestones": [],
                 "field_access": {
                     self.player_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
@@ -552,7 +564,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         # Lists both immutable source IDs
         self.assertEqual(sorted(group.source_ids), sorted([action_source, ms_source]))
         # Facts contain both effects and milestone
-        self.assertIn("warmth", str(group.facts))
+        self.assertIn("pleasure_gain", str(group.facts))
         self.assertIn("emotional_bond", str(group.facts))
         # No invented aggregate event ID in the group dict
         self.assertNotIn("aggregate_id", group.facts)

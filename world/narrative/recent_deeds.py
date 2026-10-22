@@ -13,6 +13,7 @@ from typing import Any, Iterable, Sequence
 
 from django.db.models import QuerySet
 
+from world.narrative.adult_projection import project_adult_action_for_recipient
 from world.narrative.models import NarrativeEvent
 from world.observability import log_warn, log_error
 from world.rules.clock import CLOCK_YAML, read_world_clock
@@ -122,170 +123,6 @@ class RecentDeedsSelectionResult:
     groups: tuple[DeedFactGroup, ...]
     source_ids: tuple[str, ...]
     rendered_json: str
-
-
-def _project_adult_action_for_player(
-    event: NarrativeEvent,
-    player_pk: str,
-) -> dict[str, Any] | None:
-    """Project adult_action content strictly according to player's authorized field access.
-
-    Ensures other participants' private internal states never leak into rendered facts
-    or counts, even if other participants' states are malformed or mutated.
-    """
-    content = event.content if isinstance(event.content, dict) else {}
-    field_access = content.get("field_access")
-    if not isinstance(field_access, dict):
-        return None
-
-    perms = field_access.get(player_pk)
-    if not isinstance(perms, (list, tuple, set)):
-        return None
-    allowed_tokens = set(perms)
-
-    actor_info = content.get("actor")
-    if not isinstance(actor_info, dict) or not str(actor_info.get("id", "")).strip():
-        raise ValueError(f"malformed adult_action actor in {event.source_id}")
-    actor_id = str(actor_info.get("id", ""))
-    is_actor = actor_id == player_pk
-
-    act_key = content.get("act_key")
-    if not (isinstance(act_key, str) and act_key.strip()):
-        raise ValueError(f"malformed adult_action act_key in {event.source_id}")
-
-    projected: dict[str, Any] = {
-        "action_source_id": content.get("action_source_id", event.source_id),
-        "act_key": content.get("act_key", ""),
-        "act_name": content.get("act_name", ""),
-        "category": "sexual_act",
-        "encounter_context": content.get("encounter_context"),
-    }
-
-    # Actor identity
-    if "actor" in allowed_tokens:
-        projected["actor"] = {
-            "id": actor_id,
-            "name": str(actor_info.get("name", "")),
-            "role": "actor",
-        }
-    elif is_actor and "target_own_outcome" in allowed_tokens:
-        projected["actor"] = {"id": actor_id, "role": "actor"}
-    elif not is_actor:
-        projected["actor"] = {"id": actor_id, "role": "actor"}
-
-    # Recipients
-    recipients = content.get("recipients", [])
-    if isinstance(recipients, list) and "recipients" in allowed_tokens:
-        projected["recipients"] = [
-            {"id": str(r.get("id", "")), "name": str(r.get("name", "")), "role": "recipient"}
-            for r in recipients
-            if isinstance(r, dict)
-        ]
-    elif not is_actor and "target_own_outcome" in allowed_tokens:
-        # Recipient seeing themselves
-        matching_recip = [
-            {"id": str(r.get("id", "")), "name": str(r.get("name", "")), "role": "recipient"}
-            for r in recipients
-            if isinstance(r, dict) and str(r.get("id", "")) == player_pk
-        ]
-        projected["recipients"] = matching_recip
-    else:
-        projected["recipients"] = []
-
-    # Outcomes projection
-    outcomes = content.get("outcomes", {})
-    if not isinstance(outcomes, dict):
-        outcomes = {}
-
-    projected_outcomes: dict[str, Any] = {}
-
-    # Physical / target effects
-    raw_effects = outcomes.get("effects", [])
-    if isinstance(raw_effects, list):
-        if "physical_effects" in allowed_tokens:
-            projected_outcomes["effects"] = [dict(eff) for eff in raw_effects if isinstance(eff, dict)]
-        elif "effects_on_target" in allowed_tokens:
-            projected_outcomes["effects"] = [
-                dict(eff)
-                for eff in raw_effects
-                if isinstance(eff, dict) and str(eff.get("target_id", "")) == player_pk
-            ]
-
-    # Own-state transitions and counter changes: a separately granted permission
-    # and the player's own rows only. Another participant's internal state stays
-    # absent even for the actor, because knowability is per field and per subject.
-    transitions_token = (
-        "own_state_transitions" if is_actor else "target_state_transitions"
-    )
-    raw_transitions = outcomes.get("transitions", [])
-    if isinstance(raw_transitions, list) and transitions_token in allowed_tokens:
-        projected_outcomes["transitions"] = [
-            {
-                "target_id": str(row.get("target_id", "")),
-                "target_name": str(row.get("target_name", "")),
-                "event": str(row.get("event", "")),
-            }
-            for row in raw_transitions
-            if isinstance(row, dict) and str(row.get("target_id", "")) == player_pk
-        ]
-
-    counters_token = (
-        "own_counter_changes" if is_actor else "target_counter_changes"
-    )
-    raw_counters = outcomes.get("counters", [])
-    if isinstance(raw_counters, list) and counters_token in allowed_tokens:
-        projected_outcomes["counters"] = [
-            {
-                "target_id": str(row.get("target_id", "")),
-                "target_name": str(row.get("target_name", "")),
-                "counter": str(row.get("counter", "")),
-            }
-            for row in raw_counters
-            if isinstance(row, dict) and str(row.get("target_id", "")) == player_pk
-        ]
-
-    # Resistance verdicts (only actual resisted boolean and identity, NEVER dice rolls or auto_comply)
-    raw_resist = outcomes.get("resistance", [])
-    if isinstance(raw_resist, list) and "resistance_verdict" in allowed_tokens:
-        verdicts = []
-        for r in raw_resist:
-            if not isinstance(r, dict):
-                continue
-            r_target = str(r.get("target_id", ""))
-            if is_actor or r_target == player_pk:
-                resisted_val = bool(r.get("resisted", False))
-                verdicts.append({
-                    "target_id": r_target,
-                    "target_name": str(r.get("target_name", "")),
-                    "resisted": resisted_val,
-                })
-        projected_outcomes["resistance"] = verdicts
-
-    # Embedded milestones: ONLY the player's own milestones
-    embedded_ms = content.get("milestones", [])
-    player_ms = []
-    has_ms_perm = "actor_milestones" in allowed_tokens or "target_milestones" in allowed_tokens
-    if isinstance(embedded_ms, list) and has_ms_perm:
-        for ms in embedded_ms:
-            if isinstance(ms, dict) and str(ms.get("entity_id", "")) == player_pk:
-                player_ms.append({
-                    "source_id": str(ms.get("source_id", "")),
-                    "milestone_kind": str(ms.get("milestone_kind", "")),
-                    "identifier": str(ms.get("identifier", "")),
-                    "entity_id": player_pk,
-                })
-    projected["milestones"] = player_ms
-    projected["outcomes"] = projected_outcomes
-
-    # Privacy declaration
-    projected["privacy"] = {
-        "consent_inferred": False,
-        "willingness_inferred": False,
-        "relationship_inferred": False,
-        "public_notoriety": False,
-    }
-
-    return projected
 
 
 def _validate_and_project_record(
@@ -429,7 +266,11 @@ def _validate_and_project_record(
         )
 
     elif event_type == "adult_action":
-        projected = _project_adult_action_for_player(event, player_pk)
+        projected = project_adult_action_for_recipient(
+            event.content,
+            recipient_pk=player_pk,
+            source_id=event.source_id,
+        )
         if projected is None:
             # Not authorized or malformed permission block
             return None

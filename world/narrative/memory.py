@@ -10,6 +10,13 @@ from typing import Any, Iterable, Optional
 from django.db import transaction
 from django.db.models import F
 
+from world.narrative.adult_projection import (
+    ADULT_EVENT_TYPE,
+    ADULT_MEMORY_CATEGORY,
+    AdultProjectionError,
+    build_adult_memory_content,
+    project_adult_action_for_recipient,
+)
 from world.narrative.models import (
     MemoryRecord,
     MemoryRevision,
@@ -17,7 +24,7 @@ from world.narrative.models import (
     OwnerMemoryGeneration,
     ProjectionProgress,
 )
-from world.observability import log_error, log_info
+from world.observability import log_error, log_info, log_warn
 
 VALID_SCOPES = frozenset({"witnessed", "told", "inferred", "public"})
 VALID_AVAILABILITY = frozenset({"active", "superseded", "inactive"})
@@ -360,6 +367,73 @@ def get_owner_memories(
     return views
 
 
+def _adult_memory_subjects(projection: dict[str, Any]) -> list[str]:
+    """Return the participant identities one authorized projection names."""
+    subjects: list[str] = []
+    actor = projection.get("actor")
+    if isinstance(actor, dict):
+        actor_id = str(actor.get("id", "")).strip()
+        if actor_id:
+            subjects.append(actor_id)
+    for row in projection.get("recipients", []):
+        if not isinstance(row, dict):
+            continue
+        recipient_id = str(row.get("id", "")).strip()
+        if recipient_id and recipient_id not in subjects:
+            subjects.append(recipient_id)
+    return subjects
+
+
+def _authorized_adult_memories(
+    event: NarrativeEvent,
+    projector_version: int,
+) -> list[MemoryRecord]:
+    """Create one cognition record per adult participant authorized to know it.
+
+    Event visibility only made this occurrence consumable; it never authorizes
+    a participant's fields. Every envelope is prepared before the first write,
+    so a rejected record creates no partial memory, and the caller's
+    transaction settles memory and progress together.
+    """
+    source_id = str(event.source_id).strip()
+    prepared: list[tuple[str, dict[str, Any], list[str]]] = []
+    for owner_id in [str(p) for p in event.participants]:
+        projection = project_adult_action_for_recipient(
+            event.content,
+            recipient_pk=owner_id,
+            source_id=source_id,
+        )
+        if projection is None:
+            # No field grant for this owner: they gain no memory at all rather
+            # than a raw copy of the occurrence.
+            continue
+        prepared.append(
+            (
+                owner_id,
+                build_adult_memory_content(projection, recipient_pk=owner_id),
+                _adult_memory_subjects(projection),
+            )
+        )
+
+    records: list[MemoryRecord] = []
+    for owner_id, content, subjects in prepared:
+        rec, _, _ = record_memory(
+            owner_id=owner_id,
+            content=content,
+            tick=event.tick,
+            category=ADULT_MEMORY_CATEGORY,
+            tier="working",
+            salience=event.salience,
+            knowledge_scope="witnessed",
+            confidence=1.0,
+            subjects=subjects,
+            source_id=source_id,
+            projector_version=projector_version,
+        )
+        records.append(rec)
+    return records
+
+
 def project_narrative_event_to_memories(
     event: NarrativeEvent,
     projector_version: int = 1,
@@ -374,6 +448,13 @@ def project_narrative_event_to_memories(
     - Claim event (e.g. event_type == 'claim_receipt'):
       - Eligible recipients gain a 'told' MemoryRecord containing the claim.
       - Never instantiates or mutates world truth (no rules/maps/quests writes).
+    - Adult action:
+      - Event visibility only makes the occurrence consumable; each owner's
+        memory content comes from the one recipient-authorized projection
+        shared with nomination (``world.narrative.adult_projection``).
+      - A participant without a field grant gains no memory, and an
+        unsupported payload settles fail-closed with a bounded diagnostic
+        instead of falling through to the raw-content branch.
     - Idempotency & atomicity:
       - Uses transaction.atomic() to create memories and mark ProjectionProgress 'completed'.
       - If already completed or records exist, does not duplicate records.
@@ -463,22 +544,40 @@ def project_narrative_event_to_memories(
                 progress.save(update_fields=["status", "updated_at"])
                 return []
 
-            # Generic event projection for public or participant awareness
-            for p_id in [str(p) for p in event.participants]:
-                rec, _, _ = record_memory(
-                    owner_id=p_id,
-                    content=dict(event.content),
-                    tick=event.tick,
-                    category="observation",
-                    tier="working",
-                    salience=event.salience,
-                    knowledge_scope="witnessed",
-                    confidence=1.0,
-                    subjects=[str(p) for p in event.participants],
-                    source_id=source_id,
-                    projector_version=projector_version,
-                )
-                records.append(rec)
+            if event.event_type == ADULT_EVENT_TYPE:
+                try:
+                    records.extend(
+                        _authorized_adult_memories(event, projector_version)
+                    )
+                except AdultProjectionError:
+                    # Fail closed for this record: no raw-content memory, no
+                    # private field, and a diagnostic that names only the
+                    # source and version.
+                    log_warn(
+                        "adult_memory_projection_rejected",
+                        context={
+                            "source_id": source_id,
+                            "event_type": str(event.event_type),
+                            "projector_version": projector_version,
+                        },
+                    )
+            else:
+                # Generic event projection for public or participant awareness
+                for p_id in [str(p) for p in event.participants]:
+                    rec, _, _ = record_memory(
+                        owner_id=p_id,
+                        content=dict(event.content),
+                        tick=event.tick,
+                        category="observation",
+                        tier="working",
+                        salience=event.salience,
+                        knowledge_scope="witnessed",
+                        confidence=1.0,
+                        subjects=[str(p) for p in event.participants],
+                        source_id=source_id,
+                        projector_version=projector_version,
+                    )
+                    records.append(rec)
 
         # Mark progress as completed inside the same transaction
         progress.status = "completed"
