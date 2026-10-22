@@ -4,7 +4,9 @@
 isolated browser-test runtime: it initializes the temporary SQLite database,
 seeds the deterministic account/character, boots Evennia through the
 ``evennia --settings browser_settings start`` launcher, polls the allocated
-WebClient URL until ready, and always stops only its own processes (via the
+WebClient URL until ready, waits for the server process's ordered startup
+steps to finish (the world bootstrap, not just the portal), and always stops
+only its own processes (via the
 launcher's AMP shutdown with a direct kill fallback) before removing temporary
 state -- on success, failure, or timeout.
 
@@ -184,6 +186,7 @@ class ManagedServer:
         self.runner = runner or fixtures.run_launcher
         self.started = False
         self.ready = False
+        self.world_ready = False
         self.pids: dict[str, int] = {}
         self._pidfile_originals: dict[Path, str | None] = {}
         self.migrate_result: subprocess.CompletedProcess[str] | None = None
@@ -193,9 +196,10 @@ class ManagedServer:
     # -- lifecycle ----------------------------------------------------------
 
     def start(self) -> None:
-        """Migrate, seed, boot, and wait until the WebClient URL answers 200.
+        """Migrate, seed, boot, and wait until the world is up.
 
-        On any failure (migrate, seed, boot, or readiness timeout), owned
+        On any failure (migrate, seed, boot, readiness, or world-bootstrap
+        timeout), owned
         processes are stopped and temporary state is removed so a failing run
         cannot leak live servers, occupied ports, or databases.
 
@@ -262,6 +266,17 @@ class ManagedServer:
         if not self.ready:
             raise HarnessError(
                 "managed server did not become ready in time\n"
+                + self._diagnostics()
+            )
+        # The portal answering is not the world being up: the server process
+        # runs its ordered startup steps a few seconds later, and a session that
+        # logs in before them commits a snapshot resolved without them (a scene
+        # descriptor with no operator room position, for one). Wait for the
+        # bootstrap's own log marker so every journey reads a booted world.
+        self.world_ready = fixtures.world_bootstrapped(self.runtime)
+        if not self.world_ready:
+            raise HarnessError(
+                "the server's world bootstrap never finished\n"
                 + self._diagnostics()
             )
         self.started = True

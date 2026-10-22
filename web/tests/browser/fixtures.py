@@ -296,6 +296,40 @@ def webclient_ready(runtime: BrowserRuntime, timeout: float = _READY_TIMEOUT_SEC
     return False
 
 
+# The last FAIL-LOUD startup step (``server.conf.at_server_startstop``'s
+# ordered catalog). Every step logs one ``startup_step`` event into the
+# runtime's ``server.log``; this one is logged on every healthy boot, and only
+# after the map syncs and the official art catalog have finished.
+_WORLD_BOOTSTRAP_MARKER = "step=narrative_projection_init"
+
+
+def world_bootstrapped(
+    runtime: BrowserRuntime, timeout: float = 120.0, poll: float = 0.5
+) -> bool:
+    """Wait until the server process finished its ordered startup steps.
+
+    :func:`webclient_ready` proves the PORTAL answers; the server's own world
+    bootstrap runs a few seconds later in the other process (map syncs, the
+    official artwork catalog, the art sync and the art push). A session that
+    logs in inside that window receives the snapshot resolved BEFORE those
+    steps ran — a scene descriptor without the operator catalog's room
+    position, for instance — and nothing republishes it, so a server that has
+    not logged its bootstrap is not ready for a journey that reads world facts.
+    """
+    log_path = runtime.log_dir / "server.log"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if _WORLD_BOOTSTRAP_MARKER in log_path.read_text(
+                encoding="utf-8", errors="replace"
+            ):
+                return True
+        except OSError:
+            pass
+        time.sleep(poll)
+    return False
+
+
 def web_server_settled(
     runtime: BrowserRuntime, timeout: float = 120.0, poll: float = 1.0
 ) -> bool:

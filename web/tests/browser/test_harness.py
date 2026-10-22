@@ -76,7 +76,11 @@ class ManagedServerFastTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.webclient_ready",
             return_value=ready,
         )
-        for patcher in (migrate, seed, poll):
+        booted = mock.patch(
+            "web.tests.browser.harness.fixtures.world_bootstrapped",
+            return_value=True,
+        )
+        for patcher in (migrate, seed, poll, booted):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -148,7 +152,11 @@ class ManagedServerFastTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.webclient_ready",
             side_effect=flaky_ready,
         )
-        for patcher in (migrate, seed, poll):
+        booted = mock.patch(
+            "web.tests.browser.harness.fixtures.world_bootstrapped",
+            return_value=True,
+        )
+        for patcher in (migrate, seed, poll, booted):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -191,7 +199,11 @@ class ManagedServerFastTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.webclient_ready",
             side_effect=always_conflicting,
         )
-        for patcher in (migrate, seed, poll):
+        booted = mock.patch(
+            "web.tests.browser.harness.fixtures.world_bootstrapped",
+            return_value=True,
+        )
+        for patcher in (migrate, seed, poll, booted):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -218,6 +230,33 @@ class ManagedServerFastTests(unittest.TestCase):
         self.assertFalse(self.runtime.root_dir.exists())
         # ``stop()`` is idempotent after the automatic cleanup.
         self.server.stop()
+        self.assertFalse(self.runtime.root_dir.exists())
+
+    def test_a_pre_bootstrap_server_is_not_ready(self):
+        """The portal answering is not the world being up.
+
+        The server process runs its ordered startup steps a few seconds after
+        the portal first answers; a session that logs in inside that window
+        commits a snapshot resolved without them (a scene descriptor with no
+        operator room position, for one) and nothing republishes it. The
+        harness must refuse such a server instead of starting a journey on it.
+        """
+        ready = mock.patch(
+            "web.tests.browser.harness.fixtures.webclient_ready",
+            return_value=True,
+        )
+        booted = mock.patch(
+            "web.tests.browser.harness.fixtures.world_bootstrapped",
+            return_value=False,
+        )
+        for patcher in (ready, booted):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with self.assertRaises(HarnessError) as caught:
+            self.server.start()
+        self.assertIn("world bootstrap never finished", str(caught.exception))
+        self.assertFalse(self.server.started)
+        self.assertFalse(self.server.world_ready)
         self.assertFalse(self.runtime.root_dir.exists())
 
     def test_boot_failure_raised(self):
