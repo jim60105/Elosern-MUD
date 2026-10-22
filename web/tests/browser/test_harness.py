@@ -474,12 +474,16 @@ class StartupSerializationTests(unittest.TestCase):
             )
             patcher.start()
             self.addCleanup(patcher.stop)
-        poll = mock.patch(
-            "web.tests.browser.harness.fixtures.webclient_ready",
-            return_value=True,
-        )
-        poll.start()
-        self.addCleanup(poll.stop)
+        for target, value in (
+            ("webclient_ready", True),
+            ("world_bootstrapped", True),
+        ):
+            patcher = mock.patch(
+                f"web.tests.browser.harness.fixtures.{target}",
+                return_value=value,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def test_boot_and_allocation_run_under_the_startup_lock(self):
         """Ports are allocated and the launcher boots inside the lock span.
@@ -559,6 +563,10 @@ class StartupSerializationTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.webclient_ready",
             side_effect=counting_ready,
         )
+        booted = mock.patch(
+            "web.tests.browser.harness.fixtures.world_bootstrapped",
+            return_value=True,
+        )
         migrate = mock.patch(
             "web.tests.browser.harness.fixtures.run_migrate",
             return_value=_ok_result("migrate"),
@@ -571,7 +579,7 @@ class StartupSerializationTests(unittest.TestCase):
             "web.tests.browser.harness._startup_lock",
             side_effect=lambda: _RecordingLock(),
         )
-        for patcher in (migrate, seed, poll, lock):
+        for patcher in (migrate, seed, poll, booted, lock):
             patcher.start()
             self.addCleanup(patcher.stop)
 
