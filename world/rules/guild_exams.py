@@ -24,6 +24,7 @@ from django.db import transaction
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC
+from world.rules.clock import get_world_clock
 from world.observability import log_info, log_warn
 from world.rules.equipment import normalized_equipment
 from world.rules.exam_schedule_holds import (
@@ -709,8 +710,17 @@ def settle_exam_outcome(
     record = next((r for r in records if r.exam_id == exam_id), None)
     if record is None:
         raise GuildExamError(ExamReason.UNKNOWN_EXAM)
+    source_id = f"guild_exam:{exam_id}:settlement:{actor.pk}"
     if record.state is not ExamState.ACTIVE:
-        return {"exam_id": exam_id, "state": record.state.value}
+        from world.narrative.events import get_committed_award_results
+        committed_awards = get_committed_award_results(source_id)
+        res = {"exam_id": exam_id, "state": record.state.value}
+        if committed_awards:
+            res["title_awards"] = [a.to_dict() for a in committed_awards]
+            res["title_notifications"] = []
+        else:
+            res["title_awards"] = []
+        return res
 
     passed = outcome == "exam_passed"
     new_state = ExamState.PASSED if passed else ExamState.FAILED
@@ -719,6 +729,7 @@ def settle_exam_outcome(
     title_collection_snapshot = attribute_snapshot(actor, "title_collection")
     title_equipped_snapshot = attribute_snapshot(actor, "title_equipped")
     title_notifications: tuple[str, ...] = ()
+    title_awards: list[Any] = []
     try:
         from django.db import transaction
 
@@ -734,11 +745,32 @@ def settle_exam_outcome(
             _write_exams(actor, new_records)
             if passed:
                 actor.guild_rank = _next_rank(actor.guild_rank)
-                from world.rules.titles import grant_rank_title
+                from world.rules.titles import award_guild_rank_title
 
                 # D3: the promotion transaction banks the new rank's paired
                 # fixed title (auto-equipping the fixed slot only when empty).
-                title_notifications = grant_rank_title(actor, actor.guild_rank)
+                award, note = award_guild_rank_title(actor, actor.guild_rank, source_id=source_id)
+                if award is not None:
+                    title_awards.append(award)
+                if note:
+                    title_notifications = (note,)
+
+            # Finalize award results inside the same transaction
+            from world.narrative.events import record_narrative_event
+            record_narrative_event(
+                source_id=source_id,
+                event_type="guild_exam_settlement",
+                content={
+                    "exam_id": exam_id,
+                    "passed": passed,
+                    "target_rank": record.target_rank,
+                },
+                participants=[str(actor.pk)],
+                tick=get_world_clock().tick,
+                visibility="public",
+                salience=1,
+                award_results=title_awards,
+            )
     except Exception:
         from world.rules.surfaces import restore_attribute_best_effort
 
@@ -759,6 +791,7 @@ def settle_exam_outcome(
     result = {"exam_id": exam_id, "state": new_state.value, "passed": passed}
     if title_notifications:
         result["title_notifications"] = list(title_notifications)
+    result["title_awards"] = [a.to_dict() for a in title_awards]
     return result
 
 

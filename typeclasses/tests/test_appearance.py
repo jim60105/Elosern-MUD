@@ -677,20 +677,20 @@ class TitleAppearanceLineTests(EvenniaTest):
 
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_entity_shows_the_composed_full_title(self):
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
-        grant_rank_title(self.target, "F")
+        award_guild_rank_title(self.target, "F", source_id="test:init:rank:F")
 
-        grant_first_quest_epithet(self.target)
+        award_first_quest_epithet(self.target, source_id="test:init:first_quest")
         appearance = self.char1.at_look(self.target)
         self.assertIn(f"稱號：F級冒險者　{SYNTH_STARTER_EPITHET.display}", appearance)
 
     def test_the_line_follows_the_description_and_the_displayed_stats_block(self):
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
-        grant_rank_title(self.target, "F")
+        award_guild_rank_title(self.target, "F", source_id="test:init:rank:F")
 
-        grant_first_quest_epithet(self.target)
+        award_first_quest_epithet(self.target, source_id="test:init:first_quest")
         appearance = self.char1.at_look(self.target)
         self.assertLess(
             appearance.index("一位沉默的旅人。"), appearance.index("稱號：")
@@ -700,11 +700,11 @@ class TitleAppearanceLineTests(EvenniaTest):
     def test_the_displayed_stats_block_is_untouched_by_titles(self):
         from world.rules.displayed_stats import display_stat_block
 
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
         before = display_stat_block(self.target, looker=self.char1)
-        grant_rank_title(self.target, "F")
-        grant_first_quest_epithet(self.target)
+        award_guild_rank_title(self.target, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.target, source_id="test:init:first_quest")
         self.assertEqual(display_stat_block(self.target, looker=self.char1), before)
         self.assertNotIn("稱號", before)
 
@@ -713,11 +713,11 @@ class TitleAppearanceLineTests(EvenniaTest):
 
         from web.webclient.actions.exploration_actions import _look_adapter
 
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
-        grant_rank_title(self.target, "F")
+        award_guild_rank_title(self.target, "F", source_id="test:init:rank:F")
 
-        grant_first_quest_epithet(self.target)
+        award_first_quest_epithet(self.target, source_id="test:init:first_quest")
         with _patch.object(self.char1, "msg") as msg:
             result = _look_adapter(self.char1, {"target_id": int(self.target.pk)})
         self.assertEqual(result["outcome"], "success")
@@ -727,11 +727,11 @@ class TitleAppearanceLineTests(EvenniaTest):
         )
 
     def test_malformed_title_state_degrades_to_the_untitled_appearance(self):
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
         baseline = self.char1.at_look(self.target)
-        grant_rank_title(self.target, "F")
-        grant_first_quest_epithet(self.target)
+        award_guild_rank_title(self.target, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.target, source_id="test:init:first_quest")
         self.target.attributes.add("title_collection", "damaged")
         self.assertEqual(self.char1.at_look(self.target), baseline)
 

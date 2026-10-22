@@ -18,10 +18,16 @@ from world.rules.progression import skill_proficiency_level
 from world.rules.titles.state import (
     _FIXED_KIND,
     _LINEAGE_CROWN_CAP,
+    _require_identifier,
     TitleDataError,
-    bank_epithet,
-    bank_fixed,
     fixed_display_name,
+    read_title_state,
+)
+from world.rules.titles.awards import (
+    AutomaticTitleAward,
+    award_automatic_title,
+    award_first_quest_epithet,
+    award_guild_rank_title,
     read_title_state,
 )
 # ---------------------------------------------------------------------------
@@ -175,6 +181,7 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
     still guards every mutator and command.
     """
     from world.rules.action import PendingEffect
+    from world.rules.titles.awards import award_automatic_title
 
     actor = request.actor
     from typeclasses.characters import PlayerCharacter
@@ -204,9 +211,32 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
         key = definition.key
         display = definition.display_name_zh
         notify = f"獲得稱號：{display}"
+        
+        # Build stable occurrence identity for the action effect
+        actor_pk = getattr(actor, "pk", getattr(actor, "id", str(actor)))
+        req_context = getattr(request, "context", None)
+        skill_key = getattr(request, "skill_key", "skill")
+        session_id = getattr(getattr(req_context, "battlefield", None), "session_id", None)
+        action_id = getattr(request, "action_id", None) or getattr(req_context, "action_id", None)
+        if action_id:
+            source_id = f"action:{action_id}:{actor_pk}"
+        elif session_id:
+            source_id = f"action:{session_id}:{actor_pk}:{skill_key}"
+        else:
+            source_id = f"action:cast:{actor_pk}:{skill_key}:{tick}"
 
-        def _apply(actor=actor, key=key, tick=tick) -> None:
-            bank_fixed(actor, key, tick)
+        awards_box: list[AutomaticTitleAward] = []
+
+        def _apply(actor=actor, key=key, tick=tick, source_id=source_id, box=awards_box) -> None:
+            award, _ = award_automatic_title(
+                actor,
+                source_id=source_id,
+                kind=_FIXED_KIND,
+                title_id=key,
+                tick=tick,
+            )
+            if award is not None:
+                box.append(award)
 
         pending.append(
             PendingEffect(
@@ -215,6 +245,7 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
                 frozenset({"titles"}),
                 _apply,
                 notify=notify,
+                hit_evidence=(),
             )
         )
     return pending
@@ -225,49 +256,4 @@ def register_title_planner() -> None:
     from world.rules.action import register_event_effect_planner
 
     register_event_effect_planner("title", title_event_effect_planner)
-
-
-# ---------------------------------------------------------------------------
-# Guild title grants (D3/D8 §6.5).
-#
-# Registration grants the F-rank fixed title only; the starter epithet moved
-# to the claim path (``grant_first_quest_epithet``, quest-reward-settlement).
-# ---------------------------------------------------------------------------
-
-
-def grant_rank_title(actor: Any, rank: str) -> tuple[str, ...]:
-    """Bank the rank's paired fixed title; returns grant notification lines.
-
-    Called inside the rank-change transaction (F registration and PASS exam
-    promotion). New grants return their OOB notification line; repeats return
-    nothing (dedupe).
-    """
-    definition = GUILD_RANK_REGISTRY.get(rank)
-    if definition is None:
-        return ()
-    title_key = definition.title_key
-    display = fixed_display_name(title_key)
-    tick = get_world_clock().tick
-    if bank_fixed(actor, title_key, tick):
-        return (f"獲得稱號：{display}",)
-    return ()
-
-
-def grant_first_quest_epithet(actor: Any) -> tuple[str, ...]:
-    """Bank the starter epithet at the actor's first guild reward claim.
-
-    Called inside ``turn_in_quest``'s claim transaction
-    (quest-reward-settlement). A real bank returns its OOB notification line
-    and auto-equips an empty epithet slot through the regular ``bank_epithet``
-    writer; a duplicate display is a silent no-op returning nothing, so any
-    replayed or repeated invocation is inert.
-    """
-    from world.lore.titles import STARTER_EPITHET
-
-    tick = get_world_clock().tick
-    if bank_epithet(
-        actor, STARTER_EPITHET.display, STARTER_EPITHET.origin_basis, tick
-    ):
-        return (f"獲得異名：{STARTER_EPITHET.display}",)
-    return ()
 

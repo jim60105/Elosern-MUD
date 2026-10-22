@@ -86,8 +86,6 @@ from world.rules.titles.planner import (  # noqa: F401
     _owned_skill_keys,
     _quest_completed,
     _sexual_counter_value,
-    grant_first_quest_epithet,
-    grant_rank_title,
     predicate_satisfied,
     register_title_planner,
     title_event_effect_planner,
@@ -114,4 +112,10 @@ from world.rules.titles.removal import (  # noqa: F401
     removal_digest,
     removal_records,
     remove_epithet,
+)
+from world.rules.titles.awards import (  # noqa: F401
+    AutomaticTitleAward,
+    award_automatic_title,
+    award_first_quest_epithet,
+    award_guild_rank_title,
 )

@@ -253,7 +253,7 @@ class NominationSchedulingTests(EvenniaTest):
             lambda descriptor: True,
             _reply([{"display": SYNTH_STARTER_EPITHET.display, "basis": "撞名"}] * 5),
         )
-        title_rules.grant_first_quest_epithet(self.player)
+        title_rules.award_first_quest_epithet(self.player, source_id="test:init:first_quest")
         self._schedule(client)
         self.assertFalse(self.player.attributes.has(title_rules.PENDING_BALLOT_KEY))
         self.assertEqual(self.push.calls, [])
