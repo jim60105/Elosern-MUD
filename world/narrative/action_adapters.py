@@ -29,16 +29,69 @@ Payload contracts:
    - milestone_kind (str): "experience_type", "act_unlock", or "state_transition".
    - identifier (str): Transition name or token.
    - details (dict): Specific structured transition data.
+
+4. Accepted settled-effect results (event evidence, written into
+   `skill_use.effects` and `adult_action.outcomes.effects`):
+   every admitted effect is a detached record of `kind`, `actor_id`,
+   `target_id`, `target_name` and the committed `result` fields listed below.
+   The kind names are the staged vocabulary production handlers emit
+   (`world.rules.action.event_log`); a staged kind that is not listed here is
+   not an effect of the settled action and SHALL NOT become deed evidence.
+   Both accepted input forms — a staged `PendingEffect` description and a
+   committed `EventEntry` — are normalized through the same table, so neither
+   form can recognize a name the other does not.
+
+   Accepted settled-effect results:
+   - damage: amount, hit
+   - heal: amount
+   - self_heal: amount
+   - gauge_transfer: gauge, direction, amount
+   - pleasure_gain: amount
+   - buff_applied: buff_key
+   - self_buff_applied: buff_key
+   - buffs_cleansed: count
+
+   A `damage` result exists only for a hit: the canonical parser emits a roll
+   entry alone for a miss, so a mistarget or a miss is never evidence of a
+   committed effect. A `pleasure_gain` amount is the recipient's committed
+   gauge change observed against the pre-settlement snapshot — the bounded
+   gauge is the one staged amount production applies through a cap — never the
+   requested magnitude.
 """
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from world.observability import log_info
 from world.rules.event_log import EventLog
 from world.rules.titles.awards import AutomaticTitleAward
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+
+#: Committed settled-effect kinds the deed evidence admits, with the committed
+#: result fields each states, in declaration order. The names and result fields
+#: mirror the staging sites in ``world.rules.action.event_log`` and its effect
+#: handlers; the module docstring's "Accepted settled-effect results" list is
+#: the reader-facing statement of this table.
+_SETTLED_EFFECT_RESULTS: dict[str, tuple[tuple[str, type], ...]] = {
+    "damage": (("amount", int), ("hit", bool)),
+    "heal": (("amount", int),),
+    "self_heal": (("amount", int),),
+    "gauge_transfer": (("gauge", str), ("direction", str), ("amount", int)),
+    "pleasure_gain": (("amount", int),),
+    "buff_applied": (("buff_key", str),),
+    "self_buff_applied": (("buff_key", str),),
+    "buffs_cleansed": (("count", int),),
+}
+
+#: Effect kinds whose semantics bind them to the acting entity, so a committed
+#: entry naming any target is still the actor's own result.
+_SELF_BOUND_EFFECT_KINDS = frozenset({"self_heal", "self_buff_applied"})
+
+#: Bounded gauge gain kinds whose staged amount is the requested magnitude, and
+#: the pre-settlement snapshot field carrying the value they started from.
+_BOUNDED_GAUGE_SNAPSHOT_FIELD = {"pleasure_gain": "pleasure_value"}
 
 
 @dataclass(frozen=True)
@@ -50,6 +103,7 @@ class MilestoneSnapshot:
     virgin: bool
     climax_count: int
     climax_phase: str
+    pleasure_value: int | None
 
 
 def _durable_pk(entity: Any) -> str:
@@ -81,10 +135,31 @@ def capture_milestone_snapshot(entity: Any) -> MilestoneSnapshot | None:
             virgin=bool(sexual.virgin),
             climax_count=int(sexual.climax_count),
             climax_phase=str(current_phase),
+            pleasure_value=_stored_pleasure_value(entity),
         )
-    except (AttributeError, TypeError, ValueError):
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: a non-character or uninitialized entity without full sexual fields has no milestone surface to capture; the entry's own writes are the report
         # A non-character or uninitialized entity without full sexual fields
         return None
+
+
+def _stored_pleasure_value(entity: Any) -> int | None:
+    """Read one entity's stored pleasure gauge, or ``None`` when unreadable.
+
+    The bounded pleasure counter trait is read through its ``.value`` surface
+    both before and after settlement, so an observed committed change compares
+    like with like. An entity whose gauge cannot be read keeps every other
+    captured field: an unreadable gauge only disables the observed committed
+    amount, it never disables milestone capture.
+    """
+    try:
+        return int(entity.sexual.pleasure.value)
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: an unreadable gauge only disables the observed committed amount; the record still commits with the staged magnitude
+        return None
+
+
+#: Post-settlement readers for the bounded gauge gains above, read through the
+#: same surface their snapshot captured.
+_BOUNDED_GAUGE_READERS = {"pleasure_gain": _stored_pleasure_value}
 
 
 def detect_new_milestones(entity: Any, before: MilestoneSnapshot | None) -> list[dict[str, Any]]:
@@ -265,6 +340,270 @@ def _check_external_observers(actor: Any, target_entities: Sequence[Any], room: 
     return False
 
 
+def _validated_settled_result(
+    kind: str,
+    candidate: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """State one committed effect's result in its admitted field vocabulary.
+
+    Every admitted kind declares its result fields and their stated type in
+    ``_SETTLED_EFFECT_RESULTS``. A payload that cannot state them (a missing
+    field, or a value that is not a real integer, string or boolean) is
+    malformed required evidence and fails its source transaction rather than
+    becoming an empty or invented deed record.
+    """
+    result: dict[str, Any] = {}
+    for field, stated_type in _SETTLED_EFFECT_RESULTS[kind]:
+        if field not in candidate:
+            raise ValueError(
+                f"malformed {kind} committed result in {source}: missing {field}"
+            )
+        value = candidate[field]
+        if stated_type is bool:
+            if not isinstance(value, bool):
+                raise ValueError(
+                    f"malformed {kind} committed result in {source}: "
+                    f"{field} is not a boolean"
+                )
+            result[field] = value
+        elif stated_type is int:
+            if isinstance(value, bool):
+                raise ValueError(
+                    f"malformed {kind} committed result in {source}: "
+                    f"{field} is not an integer"
+                )
+            try:
+                result[field] = int(value)
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"malformed {kind} committed result in {source}: "
+                    f"{field} is not an integer"
+                ) from error
+        else:
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"malformed {kind} committed result in {source}: "
+                    f"{field} is not text"
+                )
+            result[field] = value
+    return result
+
+
+def _settled_result_from_values(
+    kind: str,
+    values: Sequence[str],
+    *,
+    source: str,
+) -> dict[str, Any] | None:
+    """Decode a staged ``PendingEffect`` description's trailing values.
+
+    The decoding mirrors ``world.rules.action.event_log._entries_from_effect``,
+    the canonical pending-description parser: the same arities, the same stated
+    types and the same optional-field defaults. A damage miss stages no
+    committed damage, so it yields ``None`` exactly as the canonical parser
+    emits no damage entry for it.
+    """
+    if kind == "damage":
+        if len(values) != 3:
+            raise ValueError(f"malformed damage committed result in {source}")
+        try:
+            _roll, hit_flag, amount = (int(value) for value in values)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"malformed damage committed result in {source}"
+            ) from error
+        if not hit_flag:
+            return None
+        return _validated_settled_result(
+            kind, {"amount": amount, "hit": True}, source=source
+        )
+    if kind in ("heal", "self_heal", "pleasure_gain"):
+        if len(values) != 1:
+            raise ValueError(f"malformed {kind} committed result in {source}")
+        return _validated_settled_result(
+            kind, {"amount": int(values[0])}, source=source
+        )
+    if kind == "gauge_transfer":
+        candidate = {
+            "gauge": values[0] if len(values) > 0 else "mp",
+            "direction": values[1] if len(values) > 1 else "drain",
+            "amount": int(values[2]) if len(values) > 2 else 0,
+        }
+        return _validated_settled_result(kind, candidate, source=source)
+    if kind in ("buff_applied", "self_buff_applied"):
+        if len(values) != 1:
+            raise ValueError(f"malformed {kind} committed result in {source}")
+        return _validated_settled_result(
+            kind, {"buff_key": values[0]}, source=source
+        )
+    if kind == "buffs_cleansed":
+        if len(values) != 1:
+            raise ValueError(f"malformed {kind} committed result in {source}")
+        return _validated_settled_result(
+            kind, {"count": int(values[0])}, source=source
+        )
+    raise ValueError(f"unadmitted settled-effect kind {kind!r} in {source}")
+
+
+def _settled_result_from_entry(
+    kind: str,
+    data: Mapping[str, Any],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Decode one committed ``EventEntry`` payload into the same result shape.
+
+    The canonical parser emits a damage entry only for a hit, so the entry
+    itself establishes ``hit``; every other field is read from the entry's own
+    committed data and validated against the same admitted vocabulary the
+    staged form uses.
+    """
+    candidate = {
+        field: data[field]
+        for field, _ in _SETTLED_EFFECT_RESULTS[kind]
+        if field in data
+    }
+    if kind == "damage":
+        candidate.setdefault("hit", True)
+    return _validated_settled_result(kind, candidate, source=source)
+
+
+def _settled_effect_record(
+    kind: str,
+    actor_pk: str,
+    target_id: str | None,
+    target_name: str,
+    result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build one detached committed-effect record for deed evidence.
+
+    The result is narrowed to the kind's declared fields, so a caller cannot
+    widen the evidence vocabulary by passing an extra key; the decode helpers
+    have already validated the values.
+    """
+    return {
+        "kind": kind,
+        "actor_id": actor_pk,
+        "target_id": target_id,
+        "target_name": target_name,
+        "result": {
+            field: result[field] for field, _ in _SETTLED_EFFECT_RESULTS[kind]
+        },
+    }
+
+
+def _committed_gauge_gain(
+    entity: Any,
+    kind: str,
+    requested: int,
+    milestone_snapshots: Mapping[int, MilestoneSnapshot],
+) -> int:
+    """Return the recipient's committed bounded-gauge change for one gain.
+
+    The staged pleasure amount is the requested magnitude; the committed change
+    is what the recipient's gauge actually holds after the action applied. It is
+    observed once per recipient for the whole action (several staged gains sum
+    into one committed change) and stated as the recipient's actual result. A
+    recipient without a readable pre-settlement snapshot falls back to the
+    requested amount, which is the only committed value left to state.
+    """
+    reader = _BOUNDED_GAUGE_READERS.get(kind)
+    if reader is None:
+        return requested
+    snapshot = milestone_snapshots.get(id(entity))
+    before = (
+        getattr(snapshot, _BOUNDED_GAUGE_SNAPSHOT_FIELD[kind], None)
+        if snapshot is not None
+        else None
+    )
+    after = reader(entity)
+    if before is None or after is None:
+        return requested
+    return max(0, after - before)
+
+
+def _unique_key_index(entities: Sequence[Any]) -> dict[str, str]:
+    """Map display keys to durable identities only where the key is unique.
+
+    A display key is not an identifier, so a key two distinct candidates share
+    resolves to nothing rather than to one of them.
+    """
+    seen: dict[str, list[str]] = {}
+    for entity in entities:
+        key = str(getattr(entity, "key", "") or "")
+        if not key:
+            continue
+        pk = _durable_pk(entity)
+        known = seen.setdefault(key, [])
+        if pk not in known:
+            known.append(pk)
+    return {key: pks[0] for key, pks in seen.items() if len(pks) == 1}
+
+
+def _entry_target(
+    entry: Any,
+    kind: str,
+    key_index: Mapping[str, str],
+    actor_pk: str,
+    actor_key: str,
+    *,
+    source: str,
+) -> tuple[str, str]:
+    """Resolve one committed entry's target to ``(durable pk, display name)``.
+
+    A kind whose semantics bind it to the acting entity resolves to the actor;
+    every other entry resolves only through a unique candidate key. An
+    ambiguous or unknown target fails its source transaction instead of being
+    attributed to a guessed recipient.
+    """
+    raw = str(getattr(entry, "target", "") or "")
+    if kind in _SELF_BOUND_EFFECT_KINDS or not raw:
+        return actor_pk, actor_key
+    resolved = key_index.get(raw)
+    if resolved is None:
+        raise ValueError(f"unresolvable settled evidence target in {source}")
+    return resolved, raw
+
+
+def _resistance_record(
+    actor_pk: str,
+    target_id: str,
+    target_name: str,
+    *,
+    resisted: bool,
+    auto_comply: bool,
+    roll: int | None,
+) -> dict[str, Any]:
+    """Build one committed resistance verdict record."""
+    return {
+        "actor_id": actor_pk,
+        "target_id": target_id,
+        "target_name": target_name,
+        "resisted": bool(resisted),
+        "auto_comply": bool(auto_comply),
+        "roll": None if roll is None else int(roll),
+    }
+
+
+def _transition_record(target_id: str, target_name: str, event: str) -> dict[str, Any]:
+    """Build one committed own-state transition record."""
+    return {"target_id": target_id, "target_name": target_name, "event": event}
+
+
+def _counter_record(target_id: str, target_name: str, counter: str) -> dict[str, Any]:
+    """Build one committed counter-change record."""
+    return {"target_id": target_id, "target_name": target_name, "counter": counter}
+
+
+def _required_text(value: Any, what: str, *, source: str) -> str:
+    """Return one required committed text value or fail its source transaction."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"malformed {what} in {source}")
+    return value
+
+
 def record_action_settlement_evidence(
     request: Any,
     event_log: EventLog,
@@ -288,6 +627,7 @@ def record_action_settlement_evidence(
         (skill is not None and getattr(skill, "category", None) is SkillCategory.SEXUAL_ACT)
         or (skill is not None and getattr(skill, "key", "") in SEXUAL_ACT_REGISTRY)
     )
+    event_type = "adult_action" if is_adult else "skill_use"
 
     actor = request.actor
     actor_pk = _durable_pk(actor)
@@ -336,88 +676,161 @@ def record_action_settlement_evidence(
     observed = _check_external_observers(actor, actual_target_entities, location)
     visibility = "public" if observed else "private"
 
-    # Read structured event log entries
+    # Read settled results through the one admitted-result normalizer. Both
+    # accepted input forms — the staged pending effects production passes and
+    # the committed event log — converge here, so a kind one form recognizes is
+    # never dropped by the other.
     effects_data: list[dict[str, Any]] = []
     resist_entries: list[dict[str, Any]] = []
     transition_entries: list[dict[str, Any]] = []
     counter_entries: list[dict[str, Any]] = []
 
+    # Recipients of a bounded gauge gain, in first-appearance order. The staged
+    # amount is the requested magnitude, so each recipient's committed change
+    # is observed once for the whole action after every effect has applied.
+    gauge_gains: dict[int, dict[str, Any]] = {}
+
     if pending_effects:
         for eff in pending_effects:
-            desc = getattr(eff, "description", "")
+            desc = str(getattr(eff, "description", ""))
             eff_entity = getattr(eff, "entity", None)
             eff_pk = _durable_pk(eff_entity) if eff_entity is not None else actor_pk
             eff_name = str(getattr(eff_entity, "key", ""))
             parts = desc.split("|")
-            eff_kind = parts[0] if parts else ""
-            if eff_kind == "sexual_resist" and len(parts) >= 5:
+            kind = parts[0] if parts else ""
+            values = parts[2:]
+            source = f"{kind}:{eff_pk}"
+            if kind == "sexual_resist":
+                if len(values) != 3:
+                    raise ValueError(f"malformed resistance evidence in {source}")
                 # "none" is the canonical absent-roll sentinel staged by
                 # ``action.gates._resist_pending_effect`` and parsed by
-                # ``action.event_log``; auto-complied verdicts never roll.
-                roll_val = None if parts[4] == "none" else int(parts[4])
-                resist_entries.append({
-                    "actor_id": actor_pk,
-                    "target_id": eff_pk,
-                    "target_name": eff_name,
-                    "resisted": bool(int(parts[2])),
-                    "auto_comply": bool(int(parts[3])),
-                    "roll": roll_val,
-                })
-            elif eff_kind == "sexual_transition" and len(parts) >= 3:
-                transition_entries.append({
-                    "target_id": eff_pk,
-                    "target_name": eff_name,
-                    "event": parts[2],
-                })
-            elif eff_kind == "sexual_counter" and len(parts) >= 3:
-                counter_entries.append({
-                    "target_id": eff_pk,
-                    "target_name": eff_name,
-                    "counter": parts[2],
-                })
-            elif eff_kind in {
-                "damage", "heal", "self_heal", "buff_apply", "self_buff_apply",
-                "pleasure", "gauge_transfer",
-            }:
-                effects_data.append({
-                    "kind": eff_kind,
-                    "actor_id": actor_pk,
-                    "target_id": eff_pk,
-                    "target_name": eff_name,
-                    "description": desc,
-                })
-    else:
-        for entry in event_log.entries:
-            kind = getattr(entry, "kind", None)
-            data = dict(entry.data) if isinstance(getattr(entry, "data", None), Mapping) else {}
-            if kind == "sexual_resist":
-                resist_entries.append({
-                    "actor_id": actor_pk,
-                    "target_id": str(entry.target),
-                    "resisted": bool(data.get("resisted")),
-                    "auto_comply": bool(data.get("auto_comply")),
-                    "roll": data.get("roll"),
-                })
+                # ``action.event_log``; auto-complied verdicts never roll, so
+                # an absent roll is a normal result, never a parse failure.
+                resist_entries.append(_resistance_record(
+                    actor_pk,
+                    eff_pk,
+                    eff_name,
+                    resisted=bool(int(values[0])),
+                    auto_comply=bool(int(values[1])),
+                    roll=None if values[2] == "none" else int(values[2]),
+                ))
             elif kind == "sexual_transition":
-                transition_entries.append({
-                    "target_id": str(entry.target or actor_pk),
-                    "event": data.get("event"),
-                })
+                if len(values) != 1:
+                    raise ValueError(f"malformed transition evidence in {source}")
+                transition_entries.append(
+                    _transition_record(eff_pk, eff_name, values[0])
+                )
             elif kind == "sexual_counter":
-                counter_entries.append({
-                    "target_id": str(entry.target or actor_pk),
-                    "counter": data.get("counter"),
-                })
-            elif kind in {
-                "damage", "heal", "self_heal", "buff_applied", "self_buff_applied",
-                "buffs_cleansed", "pleasure_gain", "gauge_transfer",
-            }:
-                effects_data.append({
+                if len(values) != 1:
+                    raise ValueError(f"malformed counter evidence in {source}")
+                counter_entries.append(_counter_record(eff_pk, eff_name, values[0]))
+            elif kind in _SETTLED_EFFECT_RESULTS:
+                result = _settled_result_from_values(kind, values, source=source)
+                if result is None:
+                    # A damage miss commits no effect, exactly as the canonical
+                    # parser emits no damage entry for it.
+                    continue
+                if kind in _BOUNDED_GAUGE_SNAPSHOT_FIELD:
+                    identity = id(eff_entity)
+                    gain = gauge_gains.get(identity)
+                    if gain is None:
+                        gauge_gains[identity] = {
+                            "kind": kind,
+                            "entity": eff_entity,
+                            "target_id": eff_pk,
+                            "target_name": eff_name,
+                            "requested": int(result["amount"]),
+                        }
+                    else:
+                        gain["requested"] += int(result["amount"])
+                    continue
+                effects_data.append(
+                    _settled_effect_record(kind, actor_pk, eff_pk, eff_name, result)
+                )
+    else:
+        actor_key = str(getattr(actor, "key", "") or "")
+        candidates = [actor, *actual_target_entities]
+        if isinstance(getattr(request, "targets", None), list):
+            candidates.extend(request.targets)
+        key_index = _unique_key_index(candidates)
+        for entry in event_log.entries:
+            kind = str(getattr(entry, "kind", "") or "")
+            data = (
+                dict(entry.data)
+                if isinstance(getattr(entry, "data", None), Mapping)
+                else {}
+            )
+            source = f"{kind}:{source_id}"
+            if kind == "sexual_resist":
+                target_id, target_name = _entry_target(
+                    entry, kind, key_index, actor_pk, actor_key, source=source
+                )
+                resist_entries.append(_resistance_record(
+                    actor_pk,
+                    target_id,
+                    target_name,
+                    resisted=bool(data.get("resisted")),
+                    auto_comply=bool(data.get("auto_comply")),
+                    roll=data.get("roll"),
+                ))
+            elif kind == "sexual_transition":
+                target_id, target_name = _entry_target(
+                    entry, kind, key_index, actor_pk, actor_key, source=source
+                )
+                transition_entries.append(_transition_record(
+                    target_id,
+                    target_name,
+                    _required_text(data.get("event"), "transition result", source=source),
+                ))
+            elif kind == "sexual_counter":
+                target_id, target_name = _entry_target(
+                    entry, kind, key_index, actor_pk, actor_key, source=source
+                )
+                counter_entries.append(_counter_record(
+                    target_id,
+                    target_name,
+                    _required_text(data.get("counter"), "counter result", source=source),
+                ))
+            elif kind in _SETTLED_EFFECT_RESULTS:
+                target_id, target_name = _entry_target(
+                    entry, kind, key_index, actor_pk, actor_key, source=source
+                )
+                effects_data.append(_settled_effect_record(
+                    kind,
+                    actor_pk,
+                    target_id,
+                    target_name,
+                    _settled_result_from_entry(kind, data, source=source),
+                ))
+
+    for gain in gauge_gains.values():
+        kind = str(gain["kind"])
+        committed = _committed_gauge_gain(
+            gain["entity"], kind, int(gain["requested"]), milestone_snapshots
+        )
+        effects_data.append(_settled_effect_record(
+            kind,
+            actor_pk,
+            str(gain["target_id"]),
+            str(gain["target_name"]),
+            {"amount": committed},
+        ))
+        if committed != int(gain["requested"]):
+            # A bounded gauge change is the one committed result that can differ
+            # from the staged amount; the repair is reported with identifiers
+            # and numbers only, never the staged payload.
+            log_info(
+                "action_deed_evidence_normalized",
+                context={
+                    "source_id": source_id,
+                    "event_type": event_type,
                     "kind": kind,
-                    "actor_id": actor_pk,
-                    "target_id": str(entry.target) if entry.target else None,
-                    "data": data,
-                })
+                    "target_id": str(gain["target_id"]),
+                    "requested": int(gain["requested"]),
+                    "committed": committed,
+                },
+            )
 
     # Detect and record milestones for all involved participants
     milestone_events: list[Any] = []
@@ -473,7 +886,6 @@ def record_action_settlement_evidence(
         }
 
     if is_adult:
-        event_type = "adult_action"
         content: dict[str, Any] = {
             "action_source_id": source_id,
             "act_key": skill.key if skill else request.skill_key,
@@ -502,13 +914,28 @@ def record_action_settlement_evidence(
                 "public_notoriety": False,       # Private stays personal
             },
             "field_access": {
-                actor_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
+                actor_pk: [
+                    "actor",
+                    "act_key",
+                    "recipients",
+                    "resistance_verdict",
+                    "physical_effects",
+                    "own_state_transitions",
+                    "own_counter_changes",
+                    "actor_milestones",
+                ],
             },
         }
         for r in actual_recipient_records:
-            content["field_access"][r["id"]] = ["target_own_outcome", "resistance_verdict", "effects_on_target", "target_milestones"]
+            content["field_access"][r["id"]] = [
+                "target_own_outcome",
+                "resistance_verdict",
+                "effects_on_target",
+                "target_state_transitions",
+                "target_counter_changes",
+                "target_milestones",
+            ]
     else:
-        event_type = "skill_use"
         content = {
             "action_source_id": source_id,
             "skill_key": skill.key if skill else request.skill_key,
