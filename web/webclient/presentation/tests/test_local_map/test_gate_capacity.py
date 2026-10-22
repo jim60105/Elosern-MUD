@@ -18,6 +18,8 @@ from ._support import (
     _T_MAP_KEY,
     _T_PLAZA_XYZ,
     _context,
+    _inserted_multiple,
+    _payload_cell_divisor,
     _t_grid_id,
     _t_wild_id,
 )
@@ -107,9 +109,14 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertIn(_t_grid_id(*EAST_GATE_XYZ[:2]), ids)
         self.assertIn(_t_grid_id(*east_market), ids)
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
-        self.assertEqual(
-            (gate_node["x"], gate_node["y"]),
-            (EAST_GATE_XYZ[0] + 1, EAST_GATE_XYZ[1]),
+        divisor = _payload_cell_divisor(payload, exclude=self.ENTRY_ID)
+        self.assertEqual(_payload_cell_divisor(payload), divisor)
+        self.assertEqual(gate_node["y"], EAST_GATE_XYZ[1])
+        self.assertGreaterEqual(
+            _inserted_multiple(
+                (gate_node["x"], gate_node["y"]), EAST_GATE_XYZ[:2], 0, divisor
+            ),
+            1,
         )
         self.assertIsNotNone(gate_node["action"])
 
@@ -238,9 +245,14 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         by_id = {node["id"]: node for node in payload["nodes"]}
         self.assertIn(self.ENTRY_ID, by_id)
         gate_node = by_id[self.ENTRY_ID]
-        self.assertEqual(
-            (gate_node["x"], gate_node["y"]),
-            (_T_PLAZA_XYZ[0] + 1, _T_PLAZA_XYZ[1]),
+        divisor = _payload_cell_divisor(payload, exclude=self.ENTRY_ID)
+        self.assertEqual(_payload_cell_divisor(payload), divisor)
+        self.assertEqual(gate_node["y"], _T_PLAZA_XYZ[1])
+        self.assertGreaterEqual(
+            _inserted_multiple(
+                (gate_node["x"], gate_node["y"]), _T_PLAZA_XYZ[:2], 0, divisor
+            ),
+            1,
         )
         slots = [(n["x"], n["y"]) for n in payload["nodes"] if n["id"] != self.ENTRY_ID]
         self.assertNotIn((gate_node["x"], gate_node["y"]), slots)

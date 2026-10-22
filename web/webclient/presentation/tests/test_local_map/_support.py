@@ -73,6 +73,37 @@ def _t_grid_id(x: int, y: int) -> str:
     return f"grid:{_T_MAP_KEY}:{x}:{y}"
 
 
+def _payload_cell_divisor(payload: dict, exclude: str | None = None) -> int:
+    """The renderer's lattice divisor for a payload, or 1.
+
+    Mirrors the billboard model's own rule (``local_map.js::cellSize``): the
+    smallest positive pairwise coordinate delta on either axis. ``exclude``
+    omits one slot so a gate's insertion can be compared against the drawing
+    it was added to.
+    """
+    coordinates = [
+        (node["x"], node["y"])
+        for node in payload["nodes"]
+        if node["id"] != exclude
+    ]
+    smallest = 0
+    for axis in (0, 1):
+        values = sorted({point[axis] for point in coordinates})
+        for lower, upper in zip(values, values[1:]):
+            delta = upper - lower
+            if delta > 0 and (smallest == 0 or delta < smallest):
+                smallest = delta
+    return smallest or 1
+
+
+def _inserted_multiple(gate: tuple[int, int], room: tuple[int, int], axis: int, divisor: int) -> int:
+    """How many lattice cells the gate slot stands beyond ``room``, or 0."""
+    delta = gate[axis] - room[axis]
+    if delta == 0 or delta % divisor:
+        return 0
+    return delta // divisor
+
+
 def _t_wild_id(x: int, y: int) -> str:
     """The wilderness layer's node id for one cell (provider map name read
     from the wilderness_provider module, never authored here)."""

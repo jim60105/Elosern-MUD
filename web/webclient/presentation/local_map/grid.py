@@ -138,9 +138,27 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
     # (never a parse of the exit's key/aliases -- every gate exit is keyed
     # 荒野); an occupied slot probes outward deterministically instead of
     # dropping the gate.
+    #
+    # The slot stands a whole number of the drawing's own lattice cells from
+    # the current node. Metric settlements space adjacent rooms tens to
+    # hundreds of metres apart, so a one-unit offset would become the payload's
+    # smallest pairwise delta and collapse the renderer's cell divisor to 1
+    # (thousands of cells, the drawing off the canvas). The renderer's divisor
+    # is the smallest positive pairwise coordinate delta of every node it
+    # lays out, so the gate placement is measured against that same set and
+    # may never introduce a finer one; unit-pitch grids keep a step of 1.
+    gate_points = [(x, y)] + [(node.X, node.Y) for node in in_range]
+    gate_step = _lattice_divisor(gate_points)
     for gate_id, (landing_cell, gate, direction) in gate_candidates.items():
         dx, dy = DIRECTION_DELTAS[direction]
-        slot_x, slot_y = _free_slot(builder, x + dx, y + dy)
+        slot_x, slot_y = _free_slot(
+            builder,
+            x,
+            y,
+            direction=(dx, dy),
+            cell=gate_step,
+            points=gate_points,
+        )
         action = (
             {"kind": "move", "exit_ref": _exit_ref(gate), "destination": gate_id}
             if _traversable(gate, actor)
@@ -286,34 +304,79 @@ def _trim_visible(nodes: list, current_node, cap: int) -> list:
     return [node for node in nodes if node.node_index in kept]
 
 
-def _free_slot(builder: _GraphBuilder, x: int, y: int) -> tuple[int, int]:
-    """Return ``(x, y)`` or the nearest free renderer-local slot (design D2).
+def _lattice_divisor(points: list[tuple[int, int]]) -> int:
+    """The renderer's cell divisor for one coordinate set, or 1.
 
-    Deterministic probe order: ring sweep by ``(|dx| + |dy|)``, then ``dy``,
-    then ``dx``, staying within the payload coordinate bounds. A free slot
-    always exists -- the payload caps at 64 nodes while the COORD window
-    offers far more slots -- but the sweep stays bounded and fails closed.
+    The browser's ``cellSize`` projects col/row with the smallest positive
+    pairwise coordinate delta on either axis (``web/static/webclient/js/
+    elosern/local_map.js``); a renderer-local slot has to be expressed in that
+    same unit or it silently changes the divisor of everything else.
+    """
+    smallest = 0
+    for axis in (0, 1):
+        values = sorted({point[axis] for point in points})
+        for lower, upper in zip(values, values[1:]):
+            delta = upper - lower
+            if delta > 0 and (smallest == 0 or delta < smallest):
+                smallest = delta
+    return smallest or 1
+
+
+def _refines_divisor(slot: tuple[int, int], points: list[tuple[int, int]], divisor: int) -> bool:
+    """Whether adding ``slot`` would introduce a delta finer than ``divisor``."""
+    for point in points:
+        for axis in (0, 1):
+            delta = abs(slot[axis] - point[axis])
+            if 0 < delta < divisor:
+                return True
+    return False
+
+
+def _free_slot(
+    builder: _GraphBuilder,
+    x: int,
+    y: int,
+    *,
+    direction: tuple[int, int],
+    cell: int,
+    points: list[tuple[int, int]],
+) -> tuple[int, int]:
+    """Return the gate's renderer-local slot (design D2).
+
+    The preferred slot stands one ``cell`` from the current node on the gate's
+    own facing axis; an occupied or out-of-bounds preferred slot probes the
+    deterministic diamond ring around it — in whole ``cell`` units — until a
+    slot is inside the payload bounds, unoccupied, and introduces no pairwise
+    delta smaller than ``cell`` against every already plotted coordinate.
+    Insertion safety matters because an irregular metric residue (a node 70 m
+    off a 900 m road) can otherwise recreate the one-unit collapse this slot
+    exists to avoid. The sweep stays bounded and fails closed.
     """
     occupied = {(node["x"], node["y"]) for node in builder.nodes}
-    if (
-        (x, y) not in occupied
-        and COORD_MIN <= x <= COORD_MAX
-        and COORD_MIN <= y <= COORD_MAX
-    ):
-        return (x, y)
+    dx, dy = direction
+    preferred = (x + dx * cell, y + dy * cell)
+    # A previously placed gate is already a plotted coordinate, so it joins
+    # the insertion-safety set as well.
+    existing = [*points, *occupied]
+
+    def usable(slot: tuple[int, int]) -> bool:
+        if slot in occupied:
+            return False
+        if not (COORD_MIN <= slot[0] <= COORD_MAX and COORD_MIN <= slot[1] <= COORD_MAX):
+            return False
+        return not _refines_divisor(slot, existing, cell)
+
+    if usable(preferred):
+        return preferred
     for radius in range(1, MAX_NODES + 1):
-        for _distance, dy, dx in sorted(
-            (abs(dx) + abs(dy), dy, dx)
-            for dx in range(-radius, radius + 1)
-            for dy in range(-radius, radius + 1)
-            if abs(dx) + abs(dy) == radius
+        for _distance, ring_dy, ring_dx in sorted(
+            (abs(ring_dx) + abs(ring_dy), ring_dy, ring_dx)
+            for ring_dx in range(-radius, radius + 1)
+            for ring_dy in range(-radius, radius + 1)
+            if abs(ring_dx) + abs(ring_dy) == radius
         ):
-            slot = (x + dx, y + dy)
-            if (
-                COORD_MIN <= slot[0] <= COORD_MAX
-                and COORD_MIN <= slot[1] <= COORD_MAX
-                and slot not in occupied
-            ):
+            slot = (preferred[0] + ring_dx * cell, preferred[1] + ring_dy * cell)
+            if usable(slot):
                 return slot
     raise PanelUnavailableError
 

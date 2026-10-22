@@ -13,7 +13,9 @@ from ._support import (
     SOUTH_APPROACH,
     SOUTH_GATE_XYZ,
     _context,
+    _inserted_multiple,
     _live_gateway_entry,
+    _payload_cell_divisor,
     _t_grid_id,
 )
 
@@ -107,12 +109,14 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
     )
     def test_both_gates_render_independently_on_the_grid_side(self):
         # Each city gate room shows its OWN approach cell, drawn toward its
-        # registry face -- never the other gate's approach cell.
-        sx, sy = SOUTH_GATE_XYZ[:2]
-        ex, ey = EAST_GATE_XYZ[:2]
-        for room, approach_id, other_id, slot in (
-            (self.south_gate, self.SOUTH_APPROACH, self.EAST_APPROACH, (sx, sy - 1)),
-            (self.east_gate, self.EAST_APPROACH, self.SOUTH_APPROACH, (ex + 1, ey)),
+        # registry face -- never the other gate's approach cell. The slot
+        # stands whole lattice cells beyond the gate room on its facing axis
+        # and never introduces a finer pairwise delta than the drawing it is
+        # added to: a metric settlement's spacing is tens to hundreds of
+        # metres, so a one-unit slot would collapse the renderer's divisor.
+        for room, approach_id, other_id, dx, dy in (
+            (self.south_gate, self.SOUTH_APPROACH, self.EAST_APPROACH, 0, -1),
+            (self.east_gate, self.EAST_APPROACH, self.SOUTH_APPROACH, 1, 0),
         ):
             with self.subTest(room=room.key):
                 self.char1.location = room
@@ -122,7 +126,19 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
                 self.assertIn(approach_id, by_id)
                 self.assertNotIn(other_id, by_id)
                 node = by_id[approach_id]
-                self.assertEqual((node["x"], node["y"]), slot)
+                divisor = _payload_cell_divisor(payload, exclude=approach_id)
+                self.assertEqual(
+                    _payload_cell_divisor(payload),
+                    divisor,
+                    "the gate slot must not refine the drawing's cell",
+                )
+                slot = (node["x"], node["y"])
+                if dx:
+                    self.assertEqual(slot[1], room.xyz[1])
+                    self.assertGreaterEqual(_inserted_multiple(slot, room.xyz, 0, divisor) * dx, 1)
+                else:
+                    self.assertEqual(slot[0], room.xyz[0])
+                    self.assertGreaterEqual(_inserted_multiple(slot, room.xyz, 1, divisor) * dy, 1)
                 self.assertIsNotNone(node["action"])
 
     @covers_requirement(
@@ -180,11 +196,9 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         east_exit.aliases.clear()
         east_exit.aliases.add("west", "w")
 
-        sx, sy = SOUTH_GATE_XYZ[:2]
-        ex, ey = EAST_GATE_XYZ[:2]
-        for room, approach_id, face_slot, exit_obj in (
-            (self.south_gate, self.SOUTH_APPROACH, (sx, sy - 1), south_exit),
-            (self.east_gate, self.EAST_APPROACH, (ex + 1, ey), east_exit),
+        for room, approach_id, dx, dy, exit_obj in (
+            (self.south_gate, self.SOUTH_APPROACH, 0, -1, south_exit),
+            (self.east_gate, self.EAST_APPROACH, 1, 0, east_exit),
         ):
             with self.subTest(room=room.key):
                 self.char1.location = room
@@ -193,7 +207,19 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
                 by_id = {node["id"]: node for node in payload["nodes"]}
                 self.assertIn(approach_id, by_id)
                 node = by_id[approach_id]
-                self.assertEqual((node["x"], node["y"]), face_slot)
+                divisor = _payload_cell_divisor(payload, exclude=approach_id)
+                self.assertEqual(
+                    _payload_cell_divisor(payload),
+                    divisor,
+                    "the gate slot must not refine the drawing's cell",
+                )
+                slot = (node["x"], node["y"])
+                if dx:
+                    self.assertEqual(slot[1], room.xyz[1])
+                    self.assertGreaterEqual(_inserted_multiple(slot, room.xyz, 0, divisor) * dx, 1)
+                else:
+                    self.assertEqual(slot[0], room.xyz[0])
+                    self.assertGreaterEqual(_inserted_multiple(slot, room.xyz, 1, divisor) * dy, 1)
                 self.assertEqual(node["action"]["exit_ref"], str(int(exit_obj.id)))
 
     @covers_requirement(
