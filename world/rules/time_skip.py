@@ -580,6 +580,17 @@ def continue_sleep(
                 elapsed, AdvanceSource.SKIP, entities, mental=mental
             )
             woke = _wake_voluntary(member)
+            if woke:
+                from typeclasses.characters import PlayerCharacter
+                from world.rules.fatigue import _notify_wake_transition_observers
+
+                if isinstance(member, PlayerCharacter):
+                    occ_id = f"wake:voluntary:{getattr(member, 'pk', '')}:{operation_id or entry.operation_id}"
+                    transaction.on_commit(
+                        lambda ent=member, oid=occ_id: _notify_wake_transition_observers(
+                            ent, occurrence_id=oid, in_combat=False
+                        )
+                    )
     except Exception:
         _restore_clock_tick(clock, tick_snapshot)
         _restore_advance_registry(registry, entities)

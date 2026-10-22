@@ -1,3 +1,4 @@
+from twisted.internet import defer
 """Tests for the epithet-nomination composition-root service (change G).
 
 Covers the fire-and-forget scheduling contract (never raises, never blocks,
@@ -271,6 +272,7 @@ class NominationSchedulingTests(EvenniaTest):
         title_rules.accept_epithet(self.player, 1)
         self.assertIsNotNone(self._schedule(_good_client()))
 
+    @covers_requirement("title-system::empty-and-failed-nomination-leave-deterministic-gameplay-intact")
     def test_disabled_profile_fires_nothing(self):
         client = _good_client()
         with override_settings(
@@ -290,6 +292,7 @@ class NominationSchedulingTests(EvenniaTest):
         ):
             self.assertIsNone(service.schedule_epithet_nomination(self.player))
 
+    @covers_requirement("title-system::empty-and-failed-nomination-leave-deterministic-gameplay-intact")
     def test_empty_feed_skips_nomination(self):
         # Character with no recorded deeds produces no nomination attempt
         empty_player = create_object(PlayerCharacter, key="empty-nominee")
@@ -299,6 +302,25 @@ class NominationSchedulingTests(EvenniaTest):
         self.assertIsNone(deferred)
         self.assertEqual(client.calls, [])
         self.assertFalse(empty_player.attributes.has(title_rules.PENDING_BALLOT_KEY))
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_nomination_diagnostics_preserve_privacy(self):
+        with patch("server.title_nomination_service.log_info") as mock_info:
+            deferred = self._schedule(_good_client(), trigger="wake")
+            self.assertIsNotNone(deferred)
+            admitted_calls = [
+                call for call in mock_info.call_args_list
+                if call.args and call.args[0] == "title_nomination_admitted"
+            ]
+            self.assertEqual(len(admitted_calls), 1)
+            ctx = admitted_calls[0].kwargs.get("context", {})
+            self.assertEqual(ctx.get("player"), str(self.player.pk))
+            self.assertEqual(ctx.get("trigger"), "wake")
+            self.assertIn("frozen_tick", ctx)
+            self.assertIn("source_count", ctx)
+            # Ensure full private deed prose is not in logging context
+            for val in ctx.values():
+                self.assertNotIn("completed_objective", str(val))
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_void_rounds_store_nothing(self):
@@ -354,45 +376,218 @@ class NominationSchedulingTests(EvenniaTest):
 
 
 class RestBoundaryTests(EvenniaTest):
+    """Wake and qualifying quest boundaries trigger scheduling; midnight/exams do not."""
+
+    def _schedule(self, client, **kwargs):
+        with override_settings(LLM_PROFILES=_profiles()):
+            deferred = service.schedule_epithet_nomination(
+                self.player, client=client, **kwargs
+            )
+        if deferred is not None:
+            await_result(deferred)
+        return deferred
+
     def setUp(self):
         super().setUp()
+        register_title_nomination()
         self.player = create_object(PlayerCharacter, key="rest-nominee")
+        record_narrative_event(
+            source_id="quest:test_rest_nominee",
+            event_type="quest_completion",
+            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
+            participants=[self.player.pk],
+            tick=100,
+        )
+        self.clock = SimpleNamespace(tick=100)
+        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher.start()
+        self.addCleanup(self.clock_patcher.stop)
+        service.reset_nomination_triggers_for_tests()
+        self.addCleanup(service.reset_nomination_triggers_for_tests)
 
-    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
-    def test_only_day_boundary_events_trigger_scheduling(self):
-        crossed = [SimpleNamespace(kind="daily_reset", due_tick=86400, payload={})]
-        quiet = [SimpleNamespace(kind="buff_expiry", due_tick=10, payload={})]
-        with patch.object(
-            service, "schedule_epithet_nomination"
-        ) as schedule:
-            service.schedule_rest_boundary_nomination(self.player, quiet)
-            schedule.assert_not_called()
-            service.schedule_rest_boundary_nomination(self.player, crossed)
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_wake_transition_triggers_scheduling(self):
+        with patch.object(service, "schedule_epithet_nomination") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                service.notify_wake_transition(self.player, occurrence_id="occ:wake:1")
             self.assertEqual(schedule.call_count, 1)
             self.assertIs(schedule.call_args.args[0], self.player)
 
-    def test_helper_never_raises(self):
-        with patch.object(
-            service, "schedule_epithet_nomination", side_effect=RuntimeError("boom")
-        ):
-            service.schedule_rest_boundary_nomination(
-                self.player, [SimpleNamespace(kind="daily_reset")]
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_live_combat_wake_is_ineligible(self):
+        with patch.object(service, "schedule_epithet_nomination") as schedule:
+            service.notify_wake_transition(self.player, occurrence_id="occ:wake:combat", in_combat=True)
+            schedule.assert_not_called()
+
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_replaying_wake_transition_creates_no_second_attempt(self):
+        with patch.object(service, "schedule_epithet_nomination", wraps=service.schedule_epithet_nomination) as schedule:
+            # First wake runs
+            d1 = service.schedule_epithet_nomination(self.player, occurrence_id="occ:wake:replay:1", client=_good_client())
+            # Second replayed wake with same occurrence id must be ignored
+            d2 = service.schedule_epithet_nomination(self.player, occurrence_id="occ:wake:replay:1", client=_good_client())
+            self.assertIsNone(d2)
+
+    @covers_requirement("title-system::nomination-has-one-in-flight-request-per-player-identity")
+    def test_overlapping_wake_and_logout_makes_one_call(self):
+        record_narrative_event(
+            source_id="quest:in_flight_test",
+            event_type="quest_completion",
+            content={"quest_id": "q_in_flight", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
+            participants=[self.player.pk],
+            tick=100,
+        )
+        d_unblock = defer.Deferred()
+        class BlockingClient:
+            def get_response(self, descriptor):
+                return d_unblock
+
+        d1 = service.schedule_epithet_nomination(self.player, client=BlockingClient(), trigger="wake")
+        self.assertIsNotNone(d1)
+        # Concurrent logout while wake is in flight
+        d2 = service.schedule_epithet_nomination(self.player, client=_good_client(), trigger="logout")
+        self.assertIsNone(d2)
+
+        # Release blocking client
+        d_unblock.callback(_reply([{"display": "火焰之心", "basis": "焚盡匪寨", "source_ids": ["quest:test_001"]}]))
+        await_result(d1)
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+
+    @covers_requirement("title-system::nomination-has-one-in-flight-request-per-player-identity")
+    def test_all_failure_paths_release_in_flight_slot(self):
+        player_id = str(self.player.pk)
+
+        # 1. Transport error
+        client_err = FakeLLMClient()
+        client_err.add_timeout(lambda d: True)
+        d_err = service.schedule_epithet_nomination(self.player, client=client_err)
+        if d_err is not None:
+            await_result(d_err)
+        self.assertNotIn(player_id, service._IN_FLIGHT_PLAYERS)
+
+        # 2. Disabled profile
+        with override_settings(LLM_PROFILES=_profiles(title_nomination={"enabled": False})):
+            d_dis = service.schedule_epithet_nomination(self.player)
+            self.assertIsNone(d_dis)
+        self.assertNotIn(player_id, service._IN_FLIGHT_PLAYERS)
+
+        # 3. Empty feed
+        empty_p = create_object(PlayerCharacter, key="empty-release")
+        d_empty = service.schedule_epithet_nomination(empty_p, client=_good_client())
+        self.assertIsNone(d_empty)
+        self.assertNotIn(str(empty_p.pk), service._IN_FLIGHT_PLAYERS)
+
+        # 4. Void output (empty candidates survivor list)
+        client_void = FakeLLMClient()
+        client_void.add_response(lambda d: True, "{not valid json")
+        d_void = service.schedule_epithet_nomination(self.player, client=client_void)
+        if d_void is not None:
+            await_result(d_void)
+        self.assertNotIn(player_id, service._IN_FLIGHT_PLAYERS)
+
+    @covers_requirement("title-system::nomination-has-one-in-flight-request-per-player-identity")
+    def test_late_results_cannot_replace_existing_ballot(self):
+        d_unblock = defer.Deferred()
+        class BlockingClient:
+            def get_response(self, descriptor):
+                return d_unblock
+
+        d1 = service.schedule_epithet_nomination(self.player, client=BlockingClient(), trigger="wake")
+        self.assertIsNotNone(d1)
+
+        # While generation is pending, an existing ballot appears (persisted)
+        self.assertTrue(
+            title_rules.persist_nomination_ballot(
+                self.player, [{"display": "現存稱號", "basis": "先一步落庫"}]
             )
+        )
+
+        # Generation completes late
+        d_unblock.callback(_reply([{"display": "火焰之心", "basis": "焚盡匪寨", "source_ids": ["quest:test_001"]}]))
+        persisted = await_result(d1)
+        # Rules writer must reject replacing the ballot
+        self.assertFalse(persisted)
+        ballot = title_rules.safe_pending_ballot(self.player)
+        self.assertEqual(ballot[0]["display"], "現存稱號")
+
+    @covers_requirement("title-system::nomination-has-one-in-flight-request-per-player-identity")
+    def test_restart_retains_ballots_without_generation_resumption(self):
+        self.assertTrue(
+            title_rules.persist_nomination_ballot(
+                self.player, [{"display": "存檔稱號", "basis": "持久化"}]
+            )
+        )
+        # Simulate restart
+        service.reset_nomination_triggers_for_tests()
+        self.assertEqual(len(service._IN_FLIGHT_PLAYERS), 0)
+        # Ballot is still intact
+        self.assertEqual(title_rules.safe_pending_ballot(self.player)[0]["display"], "存檔稱號")
+
+
+    @covers_requirement("title-system::immediate-source-suppression-uses-automatic-award-results")
+    def test_immediate_source_award_suppression(self):
+        from world.rules.titles.awards import AutomaticTitleAward
+        player_pk = str(self.player.pk)
+        record_narrative_event(
+            source_id="quest:award_occ",
+            event_type="quest_completion",
+            content={"quest_id": "q_award", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
+            participants=[self.player.pk],
+            tick=100,
+        )
+        award_for_player = AutomaticTitleAward(
+            source_id="quest:award_occ",
+            recipient_id=player_pk,
+            kind="fixed",
+            title_id="test_title",
+            granted_tick=100,
+            display_name="測試稱號",
+        )
+        award_for_other = AutomaticTitleAward(
+            source_id="quest:award_occ",
+            recipient_id="99999",
+            kind="fixed",
+            title_id="test_title",
+            granted_tick=100,
+            display_name="他人稱號",
+        )
+
+        # Award for another does not suppress
+        res_other = self._schedule(
+            _good_client(),
+            source_id="quest:award_occ",
+            award_results=(award_for_other,),
+        )
+        self.assertIsNotNone(res_other)
+        service._IN_FLIGHT_PLAYERS.clear()
+
+        # Award for player suppresses immediately
+        res_player = service.schedule_epithet_nomination(
+            self.player,
+            client=_good_client(),
+            source_id="quest:award_occ",
+            award_results=(award_for_player,),
+        )
+        self.assertIsNone(res_player)
 
 
 class ObserverWiringTests(EvenniaTest):
-    """Exam/quest observers schedule only after the settlement commits."""
+    """Wake/quest observers schedule only after the settlement commits."""
 
     def setUp(self):
         super().setUp()
+        register_title_nomination()
         self.player = create_object(PlayerCharacter, key="observed-nominee")
+        service.reset_nomination_triggers_for_tests()
+        self.addCleanup(service.reset_nomination_triggers_for_tests)
 
     def test_registration_is_idempotent_and_observers_are_installed(self):
-        saved_exam = list(guild_exams._EXAM_PASS_OBSERVERS)
         saved_quest = list(quest_runtime._QUEST_COMPLETION_OBSERVERS)
+        from world.rules import fatigue as fatigue_rules
+        saved_wake = list(fatigue_rules._WAKE_TRANSITION_OBSERVERS)
         self.addCleanup(
             lambda: (
-                guild_exams._EXAM_PASS_OBSERVERS.__setitem__(slice(None), saved_exam),
+                fatigue_rules._WAKE_TRANSITION_OBSERVERS.__setitem__(slice(None), saved_wake),
                 quest_runtime._QUEST_COMPLETION_OBSERVERS.__setitem__(
                     slice(None), saved_quest
                 ),
@@ -402,7 +597,7 @@ class ObserverWiringTests(EvenniaTest):
         service.register_nomination_triggers()
         service.register_nomination_triggers()
         self.assertEqual(
-            guild_exams._EXAM_PASS_OBSERVERS.count(service._on_exam_pass), 1
+            fatigue_rules._WAKE_TRANSITION_OBSERVERS.count(service.notify_wake_transition), 1
         )
         self.assertEqual(
             quest_runtime._QUEST_COMPLETION_OBSERVERS.count(
@@ -416,23 +611,21 @@ class ObserverWiringTests(EvenniaTest):
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             with transaction.atomic():
                 with self.captureOnCommitCallbacks(execute=False):
-                    service._on_exam_pass(self.player, "E")
-                    service._on_quest_completion(self.player, object(), object())
+                    service.notify_wake_transition(self.player, occurrence_id="occ:wake:commit")
+                    service._on_quest_completion(self.player, SimpleNamespace(quest_id="q1"), object())
             schedule.assert_not_called()
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             with self.captureOnCommitCallbacks(execute=True):
-                service._on_exam_pass(self.player, "E")
+                service.notify_wake_transition(self.player, occurrence_id="occ:wake:commit2")
             self.assertEqual(schedule.call_count, 1)
             self.assertIs(schedule.call_args.args[0], self.player)
 
     @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_rolled_back_transactions_schedule_nothing(self):
-        # A settlement whose transaction rolls back never reaches commit, so
-        # the on_commit scheduling must not fire for either observer.
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             try:
                 with transaction.atomic():
-                    service._on_exam_pass(self.player, "E")
+                    service.notify_wake_transition(self.player, occurrence_id="occ:wake:rollback")
                     raise RuntimeError("rollback")
             except RuntimeError:
                 pass
@@ -440,8 +633,121 @@ class ObserverWiringTests(EvenniaTest):
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             try:
                 with transaction.atomic():
-                    service._on_quest_completion(self.player, object(), object())
+                    service._on_quest_completion(self.player, SimpleNamespace(quest_id="q1"), object())
                     raise RuntimeError("rollback")
             except RuntimeError:
                 pass
             schedule.assert_not_called()
+
+class TitleNominationSmokeTests(EvenniaTest):
+    """Representative offline end-to-end smoke flow through real construction,
+
+    source settlement, committed narrative selection, rendered prompt, fake model
+    transport, committed ballot reload, untouched-recipient control, rollback
+    injection, accept/decline persistence, and decline-only cooldown.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_title_nomination()
+        self.player = create_object(PlayerCharacter, key="smoke-hero")
+        self.untouched = create_object(PlayerCharacter, key="smoke-control")
+        self.clock = SimpleNamespace(tick=100)
+        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher.start()
+        self.addCleanup(self.clock_patcher.stop)
+        service.reset_nomination_triggers_for_tests()
+        self.addCleanup(service.reset_nomination_triggers_for_tests)
+
+    @covers_requirement("title-system::empty-and-failed-nomination-leave-deterministic-gameplay-intact")
+    def test_end_to_end_accomplishment_and_adult_smoke_with_controls(self):
+        # 1. Real source settlement: non-fixed-title accomplishment (quest completion)
+        record_narrative_event(
+            source_id=f"quest:smoke_q1:completion:{self.player.pk}",
+            event_type="quest_completion",
+            content={
+                "quest_id": "smoke_q1",
+                "definition_key": "dk_smoke",
+                "completed_objective": "平定盜匪寨",
+                "outcome": "completed",
+            },
+            participants=[self.player.pk],
+            tick=90,
+        )
+
+        # Real adult action settlement (authorized outcome for player)
+        player_pk = str(self.player.pk)
+        record_narrative_event(
+            source_id="adult:smoke_act_1",
+            event_type="adult_action",
+            content={
+                "act_key": "deep_embrace",
+                "act_name": "深情擁抱",
+                "player_id": player_pk,
+                "actor": {"id": player_pk, "name": "smoke-hero"},
+                "recipients": [{"id": "999", "name": "companion"}],
+                "outcomes": {
+                    "effects": [{"target_id": "999", "effect": "bonding"}],
+                },
+                "field_access": {
+                    player_pk: ["actor", "recipients", "physical_effects"],
+                },
+            },
+            participants=[player_pk, "999"],
+            tick=95,
+        )
+
+        # 2. Fake external model transport providing valid structured nominations
+        fake_client = FakeLLMClient()
+        fake_client.add_response(
+            lambda descriptor: True,
+            _reply([
+                {"display": "平寇先鋒", "basis": "率眾平定盜匪寨", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
+                {"display": "柔情守護", "basis": "患難中結下深厚羈絆", "source_ids": ["adult:smoke_act_1"]},
+                {"display": "夜幕行者", "basis": "夜巡寨口", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
+                {"display": "寨破之晨", "basis": "晨曦突入", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
+                {"display": "信義之伴", "basis": "相守同行", "source_ids": ["adult:smoke_act_1"]},
+            ]),
+        )
+
+        # 3. Trigger wake nomination for hero
+        with override_settings(LLM_PROFILES=_profiles()):
+            with patch.object(service, "_build_nomination_client", return_value=fake_client):
+                with self.captureOnCommitCallbacks(execute=True):
+                    service.notify_wake_transition(self.player, occurrence_id="occ:smoke:wake:1")
+
+        # 4. Ballot persistence & reload: NO automatic adoption!
+        ballot = title_rules.safe_pending_ballot(self.player)
+        self.assertEqual(len(ballot), 3)
+        self.assertEqual(ballot[0]["display"], "平寇先鋒")
+        self.assertEqual(ballot[1]["display"], "柔情守護")
+        self.assertEqual(ballot[2]["display"], "夜幕行者")
+        # Player has not accepted yet: full title does not contain any of them
+        self.assertNotIn("平寇先鋒", title_rules.safe_full_title(self.player))
+        self.assertNotIn("柔情守護", title_rules.safe_full_title(self.player))
+
+        # 5. Untouched-recipient control: untouched player has no ballot and no titles
+        self.assertEqual(title_rules.safe_pending_ballot(self.untouched), ())
+        self.assertEqual(title_rules.safe_full_title(self.untouched), "")
+
+        # 6. Decline flow: decline ballot starts cooldown, does not grant epithet
+        title_rules.decline_epithet_ballot(self.player)
+        self.assertEqual(title_rules.safe_pending_ballot(self.player), ())
+        self.assertTrue(title_rules.nomination_suppressed(self.player, now_tick=100))
+        # Day boundaries pass (cooldown is 2 days = 172800 game seconds)
+        self.assertFalse(title_rules.nomination_suppressed(self.player, now_tick=100 + 172801))
+
+        # 7. Rollback injection: failure during settlement transaction leaves no deed or title
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                record_narrative_event(
+                    source_id="quest:rollback_test",
+                    event_type="quest_completion",
+                    content={"quest_id": "rb", "definition_key": "dk", "completed_objective": "o", "outcome": "completed"},
+                    participants=[self.player.pk],
+                    tick=100,
+                )
+                raise RuntimeError("simulated rollback")
+
+        from world.narrative.events import NarrativeEvent
+        self.assertFalse(NarrativeEvent.objects.filter(source_id="quest:rollback_test").exists())

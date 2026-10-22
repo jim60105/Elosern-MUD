@@ -114,13 +114,11 @@ class DreamSurfaceTests(EvenniaTest):
         command = CmdSleep()
         command.caller = self.actor
         command.args = ""
-        with patch("commands.skip._maybe_nominate_after_rest"):
-            command.func()
+        command.func()
         self.assertIsNone(service.dream_state(self.actor))
         command.args = "dream"
         before = self.physical()
-        with patch("commands.skip._maybe_nominate_after_rest"):
-            command.func()
+        command.func()
         self.assertIsNone(service.dream_state(self.actor))
         self.assertEqual(before, self.physical())
         self.assertIn("沒有進入夢境", command.caller.msg.call_args_list[-1].args[0])
@@ -136,8 +134,7 @@ class DreamSurfaceTests(EvenniaTest):
         )
         with patch("web.webclient.actions.exploration_actions.advance_wait", return_value=empty), patch(
                 "web.webclient.actions.exploration_actions.begin_sleep",
-                return_value=SleepOutcome(entry, zero)), patch(
-                "server.title_nomination_service.schedule_rest_boundary_nomination"):
+                return_value=SleepOutcome(entry, zero)):
             for payload in ({"sleep": True}, {"seconds": 5}):
                 self.assertEqual(
                     _wait_adapter(
@@ -146,8 +143,7 @@ class DreamSurfaceTests(EvenniaTest):
                     "success",
                 )
                 self.assertIsNone(service.dream_state(self.actor))
-        with patch("web.webclient.actions.exploration_actions.begin_sleep", return_value=SleepOutcome(entry, zero)), patch(
-                "server.title_nomination_service.schedule_rest_boundary_nomination"):
+        with patch("web.webclient.actions.exploration_actions.begin_sleep", return_value=SleepOutcome(entry, zero)):
             result = _wait_adapter(
                 self.actor, validate_wait_payload({"sleep": True, "dream": True})
             )
@@ -200,16 +196,12 @@ class DreamSurfaceTests(EvenniaTest):
             clock = get_world_clock()
             before = clock.tick
             if browser:
-                with patch(
-                    "server.title_nomination_service.schedule_rest_boundary_nomination"
-                ):
-                    _wait_adapter(self.actor, {"sleep": True, "dream": True})
+                _wait_adapter(self.actor, {"sleep": True, "dream": True})
             else:
                 command = CmdSleep()
                 command.caller = self.actor
                 command.args = "dream"
-                with patch("commands.skip._maybe_nominate_after_rest"):
-                    command.func()
+                command.func()
             state = service.dream_state(self.actor)
             self.assertEqual(state["sleep"]["seconds"], 7)
             self.assertEqual(state["sleep"]["requested_seconds"], 30)
