@@ -208,7 +208,7 @@ class ClockTests(unittest.TestCase):
         clock = WorldClock()
         with patch("world.rules.clock._settle_buffs_and_decay") as settle:
             clock.advance(10, AdvanceSource.COMMAND, [entity])
-        settle.assert_called_once_with((entity,), 10)
+        settle.assert_called_once_with((entity,), 10, start_tick=0)
 
     def test_daily_resets_use_crossed_boundary_count(self):
         entity = Entity()
