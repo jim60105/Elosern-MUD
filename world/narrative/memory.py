@@ -26,6 +26,12 @@ VALID_TIERS = frozenset({"core", "working", "archive"})
 # Forbidden categories / tags for private authoring
 PRIVATE_AUTHORING_CATEGORIES = frozenset({"dream_authoring", "private_authoring", "authoring_draft"})
 
+# Ledger-only event types: nomination/deed evidence read directly from the
+# durable record. They are not a participant's personal recollection, so the
+# generic projection must not copy their payload into every participant's
+# cognition (which would also duplicate an encounter in dialogue recall).
+NON_COGNITION_EVENT_TYPES = frozenset({"combat_encounter"})
+
 
 class NarrativeMemoryError(Exception):
     """Base exception for narrative memory errors."""
@@ -446,8 +452,13 @@ def project_narrative_event_to_memories(
                 records.append(rec)
 
         else:
-            # Exclude private authoring events from cognition projection
-            if event.event_type in PRIVATE_AUTHORING_CATEGORIES or event.visibility == "private":
+            # Exclude private authoring and ledger-only evidence from cognition
+            # projection; the progress row still settles as completed.
+            if (
+                event.event_type in PRIVATE_AUTHORING_CATEGORIES
+                or event.event_type in NON_COGNITION_EVENT_TYPES
+                or event.visibility == "private"
+            ):
                 progress.status = "completed"
                 progress.save(update_fields=["status", "updated_at"])
                 return []
