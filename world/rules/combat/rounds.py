@@ -24,9 +24,13 @@ from world.rules.combat.battlefield import (
     roll_initiative,
 )
 from world.rules.combat.decision_scope import (
+    CombatProvenance,
     ExecutionScopeBase,
+    combat_provenance,
+    current_combat_provenance,
     decision_scope,
     decision_scope_for,
+    round_provenance,
     stable_actor_id,
 )
 from world.rules.combat_modifiers import (
@@ -190,9 +194,20 @@ def _end_of_round_upkeep(
     ``tick_buffs`` always returns a tuple; a patched non-tuple return (a
     test seam or an out-of-combat caller) is treated as no ticks so existing
     ``world.rules.combat.tick_buffs`` patches stay green.
+
+    An upkeep boundary that commits an adult milestone reads its occurrence
+    identity from the round's authoritative provenance
+    (:func:`~world.rules.combat.decision_scope.current_combat_provenance`):
+    the engagement identity, the real round ordinal and the entity, plus the
+    transition discriminator each milestone appends. No battlefield attribute
+    and no world tick takes part, so two rounds of one engagement, and two
+    transitions resolved by one upkeep, can never share a source. A committed
+    upkeep milestone outside any provenance is malformed evidence and fails
+    closed rather than inventing an identity.
     """
     from world.narrative.action_adapters import (
         capture_milestone_snapshot,
+        detect_new_milestones,
         record_non_resolver_adult_milestones,
     )
     seconds = int(COMBAT_YAML["round"]["seconds"])
@@ -209,10 +224,23 @@ def _end_of_round_upkeep(
             apply_event(entity, "climax_extended")
         elif action == "end":
             apply_event(entity, "climax_ends")
-        session_id = getattr(battlefield, "session_id", "combat")
-        round_num = getattr(battlefield, "round_number", 1)
+        if before_ms is None:
+            # No milestone surface was captured, so this boundary can commit no
+            # milestone and therefore allocates no occurrence identity.
+            continue
+        if not detect_new_milestones(entity, before_ms):
+            continue
+        provenance = current_combat_provenance()
+        if provenance is None:
+            raise ValueError(
+                "combat upkeep has no combat provenance: an upkeep milestone "
+                "requires the encounter's engagement identity"
+            )
         e_pk = getattr(entity, "pk", key)
-        upkeep_source_id = f"combat:{session_id}:round:{round_num}:upkeep:climax:{e_pk}"
+        upkeep_source_id = (
+            f"combat:{provenance.engagement_id}:round:"
+            f"{provenance.round_ordinal}:upkeep:climax:{e_pk}"
+        )
         from world.rules.clock import get_world_clock
         record_non_resolver_adult_milestones(
             entity,
@@ -220,6 +248,7 @@ def _end_of_round_upkeep(
             source_id=upkeep_source_id,
             tick=get_world_clock().tick,
             location=str(getattr(entity, "location", "") or ""),
+            encounter_provenance=provenance,
         )
     return records_by_key
 
@@ -397,11 +426,20 @@ def _resolve_round(
     The entire round resolution stays within one outer database transaction
     (the session's existing boundary); multiple action slots provisioned for a
     single combatant execute sequentially inside that same transaction.
+
+    The round installs its authoritative occurrence provenance
+    (:func:`~world.rules.combat.decision_scope.combat_provenance`) for the
+    whole body and narrows it to the resolved slot around each action: the
+    engagement identity, the real round ordinal and the slot ordinal every
+    committed action and its evidence inherit. The end-of-round upkeep runs
+    under the round-level provenance (no slot), so an upkeep milestone is
+    never attributed to whichever slot happened to run last.
     """
     logs: list[EventLog] = []
     session_id = "" if decision_scope_base is None else decision_scope_base.session_id
     round_index = 0 if decision_scope_base is None else decision_scope_base.round_index
     round_scope = f"{session_id}|{round_index}"
+    provenance = round_provenance(decision_scope_base)
     observe = None
     if session_id:
         # Local import: the session-owned observation memory lives in
@@ -418,146 +456,149 @@ def _resolve_round(
                 battlefield=battlefield,
             )
 
-    remaining = list(roll_initiative(battlefield) if initiative is None else initiative)
-    while remaining:
-        remaining = _fold_round_order(remaining, battlefield)
-        key = remaining.pop(0)
-        if key not in battlefield.roster:
-            continue
-        entity = battlefield.roster[key]
-        if (
-            key in battlefield.fled
-            or battlefield.is_knocked_out(key)
-            or _stored_hp(entity) <= 0
-        ):
-            continue
-        modifiers = evaluate_combat_modifiers(entity)
-        if "actions_per_turn" in modifiers:
-            matched = matched_combat_modifiers(entity)
-            zero_rules = [adj for _, adj in matched if adj.get("actions_per_turn") == 0]
-
-            if zero_rules or modifiers.get("actions_per_turn") == 0:
-                certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
-                if certain:
-                    logs.append(
-                        _action_skipped_event_log(
-                            entity,
-                            narration_scope=f"{round_scope}|skipped|{key}",
-                        )
-                    )
-                    continue
-                max_chance = max(int(adj["chance"]) for adj in zero_rules)
-                roll = roll_d100()
-                if roll <= max_chance:
-                    logs.append(
-                        _action_skipped_event_log(
-                            entity,
-                            data={"chance": max_chance, "roll": roll},
-                            narration_scope=f"{round_scope}|skipped|{key}",
-                        )
-                    )
-                    continue
-                count = max(1, int(modifiers.get("actions_per_turn", 1)))
-            else:
-                raw_count = modifiers.get("actions_per_turn", 1)
-                if raw_count == 0:
-                    logs.append(
-                        _action_skipped_event_log(
-                            entity,
-                            narration_scope=f"{round_scope}|skipped|{key}",
-                        )
-                    )
-                    continue
-                count = max(1, int(raw_count))
-        else:
-            count = 1
-
-        is_interactive_ally_fn = getattr(action_provider, "is_interactive_ally", None)
-        if is_interactive_ally_fn is not None and is_interactive_ally_fn(entity):
-            count = min(count, 1)
-
-        count = min(count, _MAX_ACTIONS_PER_TURN)
-
-        for slot_index in range(count):
+    with combat_provenance(provenance):
+        remaining = list(roll_initiative(battlefield) if initiative is None else initiative)
+        while remaining:
+            remaining = _fold_round_order(remaining, battlefield)
+            key = remaining.pop(0)
+            if key not in battlefield.roster:
+                continue
+            entity = battlefield.roster[key]
             if (
                 key in battlefield.fled
                 or battlefield.is_knocked_out(key)
                 or _stored_hp(entity) <= 0
             ):
-                break
-            with decision_scope(
-                decision_scope_for(
-                    decision_scope_base,
-                    actor_id=stable_actor_id(entity),
-                    slot_index=slot_index,
-                )
-            ):
-                request = action_provider(entity, battlefield)
-            if request is None:
                 continue
-            if isinstance(request, ItemUseRequest):
-                # The battlefield doubles as the action context (design D2):
-                # every scope — self, single, and group — resolves against the
-                # same roster presence/relation/range validators a skill's
-                # targets pass. The resulting multi-entity journal rides the
-                # existing sink, whose restore() walks every captured entity
-                # (design D3), so the outer rollback contract already covers
-                # companion traits, buffs, and sexual state.
-                item_result = resolve_item_use(
-                    request,
-                    in_combat=True,
-                    context=BattlefieldActionContext(battlefield),
-                )
-                if item_result.outcome == "success":
-                    if item_result.journal is not None and journal_sink is not None:
-                        journal_sink.append(item_result.journal)
-                    if item_result.event_log is not None:
-                        logs.append(item_result.event_log)
+            modifiers = evaluate_combat_modifiers(entity)
+            if "actions_per_turn" in modifiers:
+                matched = matched_combat_modifiers(entity)
+                zero_rules = [adj for _, adj in matched if adj.get("actions_per_turn") == 0]
+
+                if zero_rules or modifiers.get("actions_per_turn") == 0:
+                    certain = any("chance" not in adj for adj in zero_rules) if zero_rules else True
+                    if certain:
+                        logs.append(
+                            _action_skipped_event_log(
+                                entity,
+                                narration_scope=f"{round_scope}|skipped|{key}",
+                            )
+                        )
+                        continue
+                    max_chance = max(int(adj["chance"]) for adj in zero_rules)
+                    roll = roll_d100()
+                    if roll <= max_chance:
+                        logs.append(
+                            _action_skipped_event_log(
+                                entity,
+                                data={"chance": max_chance, "roll": roll},
+                                narration_scope=f"{round_scope}|skipped|{key}",
+                            )
+                        )
+                        continue
+                    count = max(1, int(modifiers.get("actions_per_turn", 1)))
+                else:
+                    raw_count = modifiers.get("actions_per_turn", 1)
+                    if raw_count == 0:
+                        logs.append(
+                            _action_skipped_event_log(
+                                entity,
+                                narration_scope=f"{round_scope}|skipped|{key}",
+                            )
+                        )
+                        continue
+                    count = max(1, int(raw_count))
+            else:
+                count = 1
+
+            is_interactive_ally_fn = getattr(action_provider, "is_interactive_ally", None)
+            if is_interactive_ally_fn is not None and is_interactive_ally_fn(entity):
+                count = min(count, 1)
+
+            count = min(count, _MAX_ACTIONS_PER_TURN)
+
+            for slot_index in range(count):
+                if (
+                    key in battlefield.fled
+                    or battlefield.is_knocked_out(key)
+                    or _stored_hp(entity) <= 0
+                ):
+                    break
+                with combat_provenance(provenance.at_slot(slot_index)):
+                    with decision_scope(
+                        decision_scope_for(
+                            decision_scope_base,
+                            actor_id=stable_actor_id(entity),
+                            slot_index=slot_index,
+                        )
+                    ):
+                        request = action_provider(entity, battlefield)
+                    if request is None:
+                        continue
+                    if isinstance(request, ItemUseRequest):
+                        # The battlefield doubles as the action context (design
+                        # D2): every scope — self, single, and group — resolves
+                        # against the same roster presence/relation/range
+                        # validators a skill's targets pass. The resulting
+                        # multi-entity journal rides the existing sink, whose
+                        # restore() walks every captured entity (design D3), so
+                        # the outer rollback contract already covers companion
+                        # traits, buffs, and sexual state.
+                        item_result = resolve_item_use(
+                            request,
+                            in_combat=True,
+                            context=BattlefieldActionContext(battlefield),
+                        )
+                        if item_result.outcome == "success":
+                            if item_result.journal is not None and journal_sink is not None:
+                                journal_sink.append(item_result.journal)
+                            if item_result.event_log is not None:
+                                logs.append(item_result.event_log)
+                                if observe is not None:
+                                    observe(item_result.event_log)
+                        continue
+                    result = ActionResolver.resolve(
+                        request,
+                        narration_scope=f"{round_scope}|{slot_index}",
+                    )
+                    if result.outcome == "rejected":
+                        # Distinguish technical failure (CommitFailed) from gameplay invalidation
+                        from world.rules.action import RejectReason
+                        if result.reason in {
+                            RejectReason.COMMIT_FAILED,
+                            RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE,
+                            RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
+                        }:
+                            raise RuntimeError(f"technical failure during round execution: {result.reason} ({result.detail})")
+                        continue
+                    if result.outcome == "success" and result.event_log is not None:
+                        logs.append(result.event_log)
                         if observe is not None:
-                            observe(item_result.event_log)
-                continue
-            result = ActionResolver.resolve(
-                request,
-                narration_scope=f"{round_scope}|{slot_index}",
-            )
-            if result.outcome == "rejected":
-                # Distinguish technical failure (CommitFailed) from gameplay invalidation
-                from world.rules.action import RejectReason
-                if result.reason in {
-                    RejectReason.COMMIT_FAILED,
-                    RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE,
-                    RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
-                }:
-                    raise RuntimeError(f"technical failure during round execution: {result.reason} ({result.detail})")
-                continue
-            if result.outcome == "success" and result.event_log is not None:
-                logs.append(result.event_log)
-                if observe is not None:
-                    observe(result.event_log)
-            # The action provider is a duck-typed seam: a result without the
-            # notification field (an injected double, or a pre-notification
-            # provider) simply stages nothing.
-            notifications = getattr(result, "notifications", ())
-            if notifications and notifications_sink is not None:
-                notifications_sink.extend(notifications)
-            # The structured unlocks of the same committed action: the outer
-            # boundary delivers each rendered line once and records the
-            # session marks from these notices.
-            unlocks = getattr(result, "unlock_notices", ())
-            if unlocks and notifications_sink is not None:
-                notifications_sink.extend(unlocks)
-    records_by_key = _end_of_round_upkeep(battlefield)
-    upkeep_logs = settle_upkeep(
-        battlefield,
-        records_by_key,
-        simulated=simulated,
-        nonlethal_keys=nonlethal_keys,
-        narration_scope=f"{round_scope}|upkeep",
-    )
-    if observe is not None:
-        for log in upkeep_logs:
-            observe(log)
-    logs.extend(upkeep_logs)
+                            observe(result.event_log)
+                    # The action provider is a duck-typed seam: a result without
+                    # the notification field (an injected double, or a
+                    # pre-notification provider) simply stages nothing.
+                    notifications = getattr(result, "notifications", ())
+                    if notifications and notifications_sink is not None:
+                        notifications_sink.extend(notifications)
+                    # The structured unlocks of the same committed action: the
+                    # outer boundary delivers each rendered line once and
+                    # records the session marks from these notices.
+                    unlocks = getattr(result, "unlock_notices", ())
+                    if unlocks and notifications_sink is not None:
+                        notifications_sink.extend(unlocks)
+        records_by_key = _end_of_round_upkeep(battlefield)
+        upkeep_logs = settle_upkeep(
+            battlefield,
+            records_by_key,
+            simulated=simulated,
+            nonlethal_keys=nonlethal_keys,
+            narration_scope=f"{round_scope}|upkeep",
+        )
+        if observe is not None:
+            for log in upkeep_logs:
+                observe(log)
+        logs.extend(upkeep_logs)
     return logs
 
 
@@ -579,6 +620,8 @@ def run_battle(
     battlefield: Battlefield,
     action_provider: ActionProvider = default_attack_policy,
     max_rounds: int = 100,
+    *,
+    engagement_id: str = "",
 ) -> BattleResult:
     """Run a bounded encounter and report, but do not settle, elapsed time.
 
@@ -589,6 +632,12 @@ def run_battle(
     ``rounds_elapsed + 1``; the two conventions coexist deliberately and can
     never collide, because the empty session id is a different encounter
     namespace from a durable one (``combat_session.rounds._submit_request``).
+
+    ``engagement_id`` is the bounded encounter's own authoritative occurrence
+    identity, supplied by the caller that owns this battle. A bounded
+    encounter that resolves a real action must declare one: the committed
+    action's deed evidence is keyed by it, and an encounter without an
+    identity fails closed instead of sharing another encounter's source.
     """
     if max_rounds < 0:
         raise ValueError("max_rounds must be non-negative")
@@ -599,7 +648,10 @@ def run_battle(
             run_round(
                 battlefield,
                 action_provider,
-                decision_scope_base=ExecutionScopeBase(round_index=rounds),
+                decision_scope_base=ExecutionScopeBase(
+                    round_index=rounds,
+                    engagement_id=engagement_id,
+                ),
             )
         )
         rounds += 1

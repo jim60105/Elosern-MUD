@@ -26,7 +26,12 @@ from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.buffs import BuffDefinition, apply_buff, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
 from world.quests.catalog import register_catalog
-from world.rules.combat import Battlefield, _stored_hp
+from world.rules.combat import (
+    Battlefield,
+    CombatProvenance,
+    _stored_hp,
+    combat_provenance,
+)
 from world.rules.combat.rounds import _end_of_round_upkeep
 from world.rules.targeting import RoomActionContext
 from world.rules.titles import award_automatic_title, read_title_state
@@ -454,10 +459,20 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
             {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
             {str(self.target.key): self.target},
         )
+        # Optional battlefield attributes are not an identity source: the
+        # occurrence provenance is. Attaching look-alike attributes proves the
+        # upkeep source ignores them.
         battlefield.session_id = "test_sess_upkeep"
-        battlefield.round_number = 2
+        battlefield.round_number = 9
 
-        _end_of_round_upkeep(battlefield)
+        with combat_provenance(
+            CombatProvenance(
+                engagement_id="hostile:1000:1",
+                round_ordinal=2,
+                session_id="test_sess_upkeep",
+            )
+        ):
+            _end_of_round_upkeep(battlefield)
 
         milestones = NarrativeEvent.objects.filter(
             event_type="adult_milestone",
@@ -466,7 +481,12 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         )
         self.assertEqual(milestones.count(), 1)
         ms = milestones.first()
-        self.assertIn("combat:test_sess_upkeep:round:2:upkeep:climax:", ms.source_id)
+        self.assertIn("combat:hostile:1000:1:round:2:upkeep:climax:", ms.source_id)
+        self.assertNotIn("round:9", ms.source_id)
+        self.assertEqual(
+            ms.content["encounter_context"]["encounter_id"], "hostile:1000:1"
+        )
+        self.assertEqual(ms.content["encounter_context"]["round_number"], 2)
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
@@ -543,21 +563,30 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
     )
-    def test_combat_slot_narration_scope_preserves_title_award_provenance(self):
-        """Combat action with round/slot narration scope establishes exact source_id parity with awards."""
+    def test_combat_slot_provenance_preserves_title_award_provenance(self):
+        """A combat action's round/slot provenance establishes exact source_id parity with its awards."""
         self._grant_skills(self.actor, _T_HEAL_SKILL.key)
         combat_ctx = RoomActionContext(self.room)
         combat_ctx.battlefield = Battlefield(
             {"party": frozenset({str(self.actor.key), str(self.target.key)}), "foes": frozenset()},
             {str(self.actor.key): self.actor, str(self.target.key): self.target},
         )
-        combat_ctx.battlefield.session_id = "sess_combat_prov"
-        combat_ctx.battlefield.round_number = 3
+        # Look-alike optional attributes must never become the identity: the
+        # occurrence provenance is the only source.
+        combat_ctx.battlefield.session_id = "sess_not_authoritative"
+        combat_ctx.battlefield.round_number = 7
 
         request = ActionRequest(self.actor, _T_HEAL_SKILL.key, [self.target], combat_ctx)
-        narration_scope = "combat:sess_combat_prov:round:3|2"
+        provenance = CombatProvenance(
+            engagement_id="hostile:42:1",
+            round_ordinal=3,
+            slot_ordinal=2,
+            session_id="sess_combat_prov",
+        )
 
-        expected_source_id = f"action:combat:sess_combat_prov:r3:s2:{self.actor.pk}:{_T_HEAL_SKILL.key}"
+        expected_source_id = (
+            f"action:combat:hostile:42:1:r3:s2:{self.actor.pk}:{_T_HEAL_SKILL.key}"
+        )
 
         synth_award = AutomaticTitleAward(
             source_id=expected_source_id,
@@ -577,8 +606,9 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         with (
             patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_HEAL_SKILL.key: _T_HEAL_SKILL}),
             patch.dict("world.rules.action.contracts._EVENT_EFFECT_PLANNERS", {"fake_combat_title": fake_planner}),
+            combat_provenance(provenance),
         ):
-            result = ActionResolver.resolve(request, narration_scope=narration_scope)
+            result = ActionResolver.resolve(request)
 
         self.assertEqual(result.outcome, "success", f"Failed with {result.reason}: {result.detail}")
         self.assertEqual(result.title_awards[0].source_id, expected_source_id)
@@ -586,6 +616,15 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertIsNotNone(event)
         self.assertEqual(event.content["action_source_id"], expected_source_id)
         self.assertEqual(event.content["award_results"][0]["source_id"], expected_source_id)
+        self.assertEqual(
+            event.content["encounter_context"],
+            {
+                "encounter_id": "hostile:42:1",
+                "session_id": "sess_combat_prov",
+                "round_number": 3,
+                "slot_ordinal": 2,
+            },
+        )
 
     @covers_requirement(
         "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",

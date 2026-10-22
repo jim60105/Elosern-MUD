@@ -104,12 +104,17 @@ class ActionResolver:
         """Resolve one action; ``narration_scope`` seeds its prose only."""
         try:
             skill = _step1_ownership(request)
-            if not getattr(request, "source_id", None):
-                from world.narrative.action_adapters import build_action_source_id
-                request = replace(
-                    request,
-                    source_id=build_action_source_id(request, narration_scope=narration_scope),
-                )
+            # The occurrence's source identity is resolved on every call, even
+            # when the request already carries one: a combat action's identity
+            # is derived from the round's authoritative provenance, so an
+            # inherited, explicit or cast-labelled source that disagrees with
+            # it is rejected instead of silently committing evidence under the
+            # wrong occurrence.
+            from world.narrative.action_adapters import build_action_source_id
+            request = replace(
+                request,
+                source_id=build_action_source_id(request),
+            )
             _step2_resource_check(request.actor, skill, request.scale)
             targets = _step3_targeting(request, skill)
             _step4_capability(request.actor)
@@ -235,7 +240,6 @@ class ActionResolver:
                 event_log,
                 committed_awards_box,
                 milestone_snapshots,
-                narration_scope=narration_scope,
                 delivered_targets=delivered_recipients,
                 resisted_targets=resisted_recipients,
                 pending_effects=pending,

@@ -23,7 +23,11 @@ from world.rules.overwhelm import (
     resolve_overwhelm,
 )
 
-from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
+from ._combat_session_helpers import (
+    engagement_base,
+    open_synthetic_scope,
+    synth_damage_skill,
+)
 from .combat_fixtures import FakeEntity
 
 
@@ -479,12 +483,17 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
         omitted_order: list[str] = []
         explicit_order: list[str] = []
         random.seed(1017)
-        omitted_logs = run_round(omitted, self._recording_provider(omitted_order))
+        omitted_logs = run_round(
+            omitted,
+            self._recording_provider(omitted_order),
+            decision_scope_base=engagement_base(),
+        )
         random.seed(1017)
         explicit_logs = run_round(
             explicit,
             self._recording_provider(explicit_order),
             first_actor=None,
+            decision_scope_base=engagement_base(),
         )
         self.assertEqual(omitted_order, explicit_order)
         self.assertEqual(self._state(omitted), self._state(explicit))
@@ -505,12 +514,15 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
         plain = self._field("plain", strong_first=True)
         stale = self._field("stale", strong_first=True)
         random.seed(1017)
-        baseline = resolve_overwhelm(plain, default_attack_policy)
+        baseline = resolve_overwhelm(
+            plain, default_attack_policy, decision_scope_base=engagement_base()
+        )
         random.seed(1017)
         result = resolve_overwhelm(
             stale,
             default_attack_policy,
             first_actor="not-in-roster",
+            decision_scope_base=engagement_base(),
         )
         self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
         self.assertEqual(result.total_seconds, result.rounds_elapsed * 6)
@@ -531,12 +543,19 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             resolved,
             default_attack_policy,
             12,
+            decision_scope_base=engagement_base(),
         )
         manual = self._field("manual", strong_first=strong_first)
         random.seed(1017)
         manual_logs = []
         for _ in range(rounds):
-            manual_logs.extend(run_round(manual, default_attack_policy))
+            manual_logs.extend(
+                run_round(
+                    manual,
+                    default_attack_policy,
+                    decision_scope_base=engagement_base(),
+                )
+            )
         expected_team = "first" if strong_first else "second"
         self.assertEqual(initial, expected_team)
         self.assertEqual(verdict, expected_team)
@@ -561,7 +580,9 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
     def test_commanded_identity_never_changes_resolution(self):
         plain = self._field("plain", strong_first=True)
         random.seed(1017)
-        baseline = resolve_overwhelm(plain, default_attack_policy)
+        baseline = resolve_overwhelm(
+            plain, default_attack_policy, decision_scope_base=engagement_base()
+        )
         marked = self._field("marked", strong_first=True)
         random.seed(1017)
         result = resolve_overwhelm(
@@ -569,6 +590,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             default_attack_policy,
             commanded_actor="first-marked",
             commanded_action_kind="skill", commanded_action_key=_T_STRIKE.key,
+            decision_scope_base=engagement_base(),
         )
         self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
         self.assertEqual(result.total_seconds, baseline.total_seconds)
@@ -626,7 +648,9 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             },
         )
         random.seed(2029)
-        result = resolve_overwhelm(field, default_attack_policy)
+        result = resolve_overwhelm(
+            field, default_attack_policy, decision_scope_base=engagement_base()
+        )
         self.assertTrue(result.battle_over)
         self.assertGreater(result.rounds_elapsed, 1)
         self.assertLessEqual(result.rounds_elapsed, 5)

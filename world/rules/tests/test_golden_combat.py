@@ -127,10 +127,14 @@ class GoldenResolverBattleTests(EvenniaTestCase):
     def test_fixed_seed_full_battle_is_reproducible_through_resolver(self):
         first = self._battlefield("one")
         random.seed(730)
-        first_result = run_battle(first, max_rounds=3)
+        first_result = run_battle(
+            first, max_rounds=3, engagement_id="t:golden-battle:first:1"
+        )
         second = self._battlefield("two")
         random.seed(730)
-        second_result = run_battle(second, max_rounds=3)
+        second_result = run_battle(
+            second, max_rounds=3, engagement_id="t:golden-battle:second:1"
+        )
         self.assertEqual(
             self._signature(first_result),
             self._signature(second_result),

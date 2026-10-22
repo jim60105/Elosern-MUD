@@ -9,7 +9,10 @@ Payload contracts:
    - skill_key (str): Registered skill key.
    - skill_name (str): Display snapshot label.
    - category (str): Skill taxonomy category.
-   - encounter_context (dict | None): Context if in combat (session_id, round_number).
+   - encounter_context (dict | None): Typed combat provenance when in combat:
+     `encounter_id` (the unique engagement occurrence every encounter join
+     uses), `round_number`, `slot_ordinal`, and the reusable transport
+     `session_id` as diagnostic metadata only.
    - actor (dict): Actual actor ID, name, and role="actor".
    - recipients (list[dict]): Explicit list of actual targets who received effects.
    - effects (list[dict]): Concrete committed effects (damage, heal, buffs).
@@ -284,42 +287,96 @@ def detect_new_milestones(entity: Any, before: MilestoneSnapshot | None) -> list
     return milestones
 
 
-def build_action_source_id(
-    request: Any,
-    tick: int | None = None,
-    narration_scope: str = "",
-) -> str:
-    """Format a stable, unique source identity for an action occurrence."""
-    explicit_source = getattr(request, "source_id", None)
-    if explicit_source:
-        return str(explicit_source).strip()
+def combat_occurrence_source_id(provenance: Any, actor_pk: str, skill_key: str) -> str:
+    """Format one committed combat action's authoritative source identity.
+
+    The identity is the encounter's engagement identity, the real round
+    ordinal and the actor's action-slot ordinal, then the acting entity and
+    the skill. Nothing about it comes from the world tick, the display text or
+    the reusable transport session token, so two occurrences of one skill in
+    distinct slots or rounds stay distinct even when no world time advanced
+    and even when both render identical prose.
+    """
+    if not provenance.engagement_id:
+        raise ValueError(
+            "combat action has no engagement identity: a committed combat "
+            "occurrence cannot be identified by a session token or a world tick"
+        )
+    if provenance.slot_ordinal is None:
+        raise ValueError(
+            "combat action has no action-slot ordinal: a resolver action is a "
+            "slot occurrence, never a round-owned boundary"
+        )
+    return (
+        f"action:combat:{provenance.engagement_id}"
+        f":r{provenance.round_ordinal}:s{provenance.slot_ordinal}"
+        f":{actor_pk}:{skill_key}"
+    )
+
+
+def combat_encounter_context(provenance: Any) -> dict[str, Any]:
+    """Return one combat occurrence's typed provenance for deed evidence.
+
+    ``encounter_id`` is the unique occurrence every encounter join uses;
+    ``session_id`` is the reusable transport token carried as diagnostic
+    metadata only, and ``round_number``/``slot_ordinal`` are the occurrence's
+    real ordinals.
+    """
+    if not provenance.engagement_id:
+        raise ValueError(
+            "combat evidence has no engagement identity: a committed combat "
+            "occurrence cannot be identified by a session token or a world tick"
+        )
+    return {
+        "encounter_id": provenance.engagement_id,
+        "session_id": provenance.session_id,
+        "round_number": provenance.round_ordinal,
+        "slot_ordinal": provenance.slot_ordinal,
+    }
+
+
+def build_action_source_id(request: Any, tick: int | None = None) -> str:
+    """Format a stable, unique source identity for an action occurrence.
+
+    Precedence: the combat occurrence's authoritative provenance, then an
+    identity the owning operation already assigned (an explicit ``source_id``
+    or an accepted action id), then the out-of-combat cast identity the
+    accepted out-of-combat cast operation owns. A combat context without
+    combat provenance, or an explicit source that disagrees with the
+    provenance being resolved, is malformed required evidence and fails
+    closed: it is never relabeled as an out-of-combat cast.
+    """
+    from world.rules.combat.decision_scope import current_combat_provenance
 
     actor = request.actor
     actor_pk = _durable_pk(actor)
     req_context = getattr(request, "context", None)
     skill_key = getattr(request, "skill_key", "skill")
-    battlefield = getattr(req_context, "battlefield", None)
-    session_id = getattr(battlefield, "session_id", None)
-    action_id = getattr(request, "action_id", None) or getattr(req_context, "action_id", None)
+    raw_source = getattr(request, "source_id", None)
+    explicit_source = str(raw_source).strip() if raw_source else ""
+    provenance = current_combat_provenance()
+    in_combat = getattr(req_context, "battlefield", None) is not None
 
+    if in_combat or provenance is not None:
+        if provenance is None:
+            raise ValueError(
+                "combat action has no combat provenance: the round's "
+                "engagement, round and slot identity is required evidence"
+            )
+        authoritative = combat_occurrence_source_id(provenance, actor_pk, skill_key)
+        if explicit_source and explicit_source != authoritative:
+            raise ValueError(
+                f"combat action carries an incompatible occurrence source "
+                f"{explicit_source!r} for {authoritative!r}"
+            )
+        return authoritative
+
+    if explicit_source:
+        return explicit_source
+
+    action_id = getattr(request, "action_id", None) or getattr(req_context, "action_id", None)
     if action_id:
         return f"action:{action_id}:{actor_pk}"
-
-    if session_id:
-        round_idx = None
-        slot_idx = None
-        if narration_scope:
-            parts = narration_scope.replace(":", "|").split("|")
-            numeric = [p for p in parts if p.isdigit()]
-            if len(numeric) >= 2:
-                round_idx, slot_idx = numeric[-2], numeric[-1]
-            elif len(numeric) == 1:
-                slot_idx = numeric[-1]
-        if round_idx is None:
-            round_idx = str(getattr(battlefield, "round_number", 1))
-        if slot_idx is not None:
-            return f"action:combat:{session_id}:r{round_idx}:s{slot_idx}:{actor_pk}:{skill_key}"
-        return f"action:combat:{session_id}:r{round_idx}:{actor_pk}:{skill_key}"
 
     from world.rules.clock import get_world_clock
     current_tick = get_world_clock().tick if tick is None else int(tick)
@@ -333,13 +390,26 @@ def record_non_resolver_adult_milestones(
     source_id: str,
     tick: int,
     location: str = "",
+    encounter_provenance: Any | None = None,
 ) -> list[Any]:
-    """Record newly crossed adult milestones for non-resolver transition owners."""
+    """Record newly crossed adult milestones for non-resolver transition owners.
+
+    ``encounter_provenance`` is the combat occurrence the boundary resolves
+    under. When supplied, every milestone carries the same typed encounter
+    context the action evidence does, so selection can join an upkeep
+    milestone to its own encounter outcome instead of treating it as a
+    standalone fact or merging it with another engagement.
+    """
     milestones = detect_new_milestones(entity, before)
     if not milestones:
         return []
 
     entity_pk = _durable_pk(entity)
+    encounter_context = (
+        None
+        if encounter_provenance is None
+        else combat_encounter_context(encounter_provenance)
+    )
     from world.narrative.events import record_narrative_event
     recorded = []
     for m in milestones:
@@ -358,6 +428,8 @@ def record_non_resolver_adult_milestones(
                 "public_notoriety": False,
             },
         }
+        if encounter_context is not None:
+            ms_content["encounter_context"] = dict(encounter_context)
         event, _, _ = record_narrative_event(
             source_id=ms_source_id,
             event_type="adult_milestone",
@@ -788,7 +860,6 @@ def record_action_settlement_evidence(
     title_awards: Sequence[AutomaticTitleAward],
     milestone_snapshots: Mapping[int, MilestoneSnapshot],
     *,
-    narration_scope: str = "",
     tick: int | None = None,
     delivered_targets: Sequence[Any] = (),
     resisted_targets: Sequence[Any] = (),
@@ -798,7 +869,23 @@ def record_action_settlement_evidence(
     """Record immutable narrative event and milestones for a settled action."""
     current_tick = get_world_clock().tick if tick is None else int(tick)
     from world.narrative.events import record_narrative_event
-    source_id = build_action_source_id(request, tick=current_tick, narration_scope=narration_scope)
+    source_id = build_action_source_id(request, tick=current_tick)
+
+    # Evidence classification follows the same authority as source
+    # construction: the occurrence provenance decides. The reusable transport
+    # session token rides along as diagnostics only, never as the encounter
+    # key, and a combat request context with no provenance is malformed.
+    from world.rules.combat.decision_scope import current_combat_provenance
+
+    provenance = current_combat_provenance()
+    if provenance is None:
+        if getattr(request.context, "battlefield", None) is not None:
+            raise ValueError(
+                f"combat evidence for {source_id} has no combat provenance"
+            )
+        encounter_context = None
+    else:
+        encounter_context = combat_encounter_context(provenance)
 
     skill = SKILL_REGISTRY.get(request.skill_key)
     is_adult = (
@@ -1084,6 +1171,8 @@ def record_action_settlement_evidence(
                         "public_notoriety": False,
                     },
                 }
+                if encounter_context is not None:
+                    ms_content["encounter_context"] = dict(encounter_context)
                 ms_event, _, _ = record_narrative_event(
                     source_id=ms_source_id,
                     event_type="adult_milestone",
@@ -1101,15 +1190,6 @@ def record_action_settlement_evidence(
                     "identifier": m["identifier"],
                     "entity_id": e_pk,
                 })
-
-    # Build encounter context
-    battlefield = getattr(request.context, "battlefield", None)
-    encounter_context = None
-    if battlefield is not None:
-        encounter_context = {
-            "session_id": str(getattr(battlefield, "session_id", "")),
-            "round_number": int(getattr(battlefield, "round_number", 1)),
-        }
 
     if is_adult:
         content: dict[str, Any] = {

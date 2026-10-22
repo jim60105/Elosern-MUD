@@ -453,7 +453,7 @@ class RealEncounterTests(EvenniaTestCase):
             logs = run_round(
                 self.field,
                 self._decide,
-                decision_scope_base=ExecutionScopeBase(SESSION, 1),
+                decision_scope_base=ExecutionScopeBase(SESSION, 1, engagement_id=f"{SESSION}:1"),
             )
         # The decision really was the utility decision, in this session's scope.
         self.assertEqual(len(self.traces), 1)
@@ -570,7 +570,9 @@ class RollbackTests(EvenniaTestCase):
                 logs = run_round(
                     self.field,
                     self._decide,
-                    decision_scope_base=ExecutionScopeBase(ROLLBACK_SESSION, 1),
+                    decision_scope_base=ExecutionScopeBase(
+                    ROLLBACK_SESSION, 1, engagement_id=f"{ROLLBACK_SESSION}:1"
+                ),
                 )
             kinds = [entry.kind for log in logs for entry in log.entries]
             self.assertIn("damage", kinds)
@@ -597,7 +599,9 @@ class RollbackTests(EvenniaTestCase):
                 flee_logs = run_round(
                     self.field,
                     self._decide,
-                    decision_scope_base=ExecutionScopeBase(ROLLBACK_SESSION, 2),
+                    decision_scope_base=ExecutionScopeBase(
+                    ROLLBACK_SESSION, 2, engagement_id=f"{ROLLBACK_SESSION}:2"
+                ),
                 )
             flee_kinds = [entry.kind for log in flee_logs for entry in log.entries]
             self.assertIn("disengage_attempt", flee_kinds)
@@ -642,7 +646,9 @@ class RollbackTests(EvenniaTestCase):
             logs = run_round(
                 self.field,
                 self._decide,
-                decision_scope_base=ExecutionScopeBase(ROLLBACK_SESSION, 1),
+                decision_scope_base=ExecutionScopeBase(
+                    ROLLBACK_SESSION, 1, engagement_id=f"{ROLLBACK_SESSION}:1"
+                ),
             )
         with self.captureOnCommitCallbacks(execute=True):
             for log in logs:

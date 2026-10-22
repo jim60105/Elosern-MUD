@@ -204,7 +204,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="combat:admitted",
             event_type="combat_encounter",
-            content={"session_id": "s1", "outcome": "victory", "mode": "hostile", "participant_ids": [self.player_pk]},
+            content={"encounter_id": "s1:1", "session_id": "s1", "outcome": "victory", "mode": "hostile", "participant_ids": [self.player_pk]},
             participants=[self.player_pk],
             tick=t,
         )
@@ -470,14 +470,14 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="enc:enc1",
             event_type="combat_encounter",
-            content={"session_id": "sess_1", "outcome": "victory"},
+            content={"encounter_id": "sess_1:1", "session_id": "sess_1", "outcome": "victory"},
             participants=[self.player_pk],
             tick=t + 30,
         )
         record_narrative_event(
             source_id="enc:enc2",
             event_type="combat_encounter",
-            content={"session_id": "sess_2", "outcome": "escape"},
+            content={"encounter_id": "sess_2:1", "session_id": "sess_2", "outcome": "escape"},
             participants=[self.player_pk],
             tick=t + 40,
         )
@@ -494,8 +494,12 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
 
         enc_groups = [g for g in result.groups if g.group_type == "combat_encounter"]
         self.assertEqual(len(enc_groups), 2)
-        enc_sessions = {g.facts["session_id"] for g in enc_groups}
-        self.assertEqual(enc_sessions, {"sess_1", "sess_2"})
+        enc_encounters = {g.facts["encounter_id"] for g in enc_groups}
+        self.assertEqual(enc_encounters, {"sess_1:1", "sess_2:1"})
+        # The reusable transport token stays diagnostic only.
+        self.assertEqual(
+            {g.facts["session_id"] for g in enc_groups}, {"sess_1", "sess_2"}
+        )
 
     @covers_requirement("title-system::recent-deed-groups-retain-outcomes-and-stable-provenance")
     def test_action_milestones_do_not_double_count_and_no_invented_aggregate_identity(self):

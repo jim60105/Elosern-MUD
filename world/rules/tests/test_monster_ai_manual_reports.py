@@ -897,7 +897,11 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
         run_round(
             battlefield,
             provider,
-            decision_scope_base=ExecutionScopeBase(session_id="smoke:ord", round_index=3),
+            decision_scope_base=ExecutionScopeBase(
+                session_id="smoke:ord",
+                round_index=3,
+                engagement_id="smoke:ord:3",
+            ),
         )
         self.assertTrue(seen)
         for scope in seen:
@@ -957,7 +961,9 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
                 provider,
                 max_rounds=3,
                 decision_scope_base=ExecutionScopeBase(
-                    session_id="smoke:ovw", round_index=1
+                    session_id="smoke:ovw",
+                    round_index=1,
+                    engagement_id="smoke:ovw:1",
                 ),
             )
         self.assertTrue(seen and traces)

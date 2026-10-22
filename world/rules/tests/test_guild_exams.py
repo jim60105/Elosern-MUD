@@ -25,9 +25,12 @@ from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import (
+    engage,
     forfeit,
     read_session,
+    reconstruct_battlefield,
     restore_active_session,
+    settle_session,
     submit_player_action,
 )
 from world.rules.exam_schedule_holds import HOLD_ATTRIBUTE, read_exam_schedule_hold
@@ -51,6 +54,7 @@ from world.rules.npc_persona import (
 )
 from world.rules.surfaces import read_counter_trait, write_counter_trait
 from world.rules.tests._combat_session_helpers import (
+    _monster,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -318,6 +322,170 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
         self._give_merit(50)
         self.host.db.schedule_state = "busy"
         self._assert_rejected_without_writes(ExamReason.EXAMINER_BUSY)
+
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
+    )
+    def test_examination_and_hostile_engagement_at_one_tick_keep_distinct_identities(self):
+        """A simulated examination never reuses a hostile engagement's identity."""
+        from world.narrative.events import build_encounter_source_id
+        from world.narrative.models import NarrativeEvent
+
+        self._give_merit(50)
+        tick = self.clock.tick
+        monster = _monster("identity goblin", hp=50, atk=1)
+        monster.location = self.hall
+        engage(self.player, monster)
+        hostile = read_session(self.player)
+        self.assertTrue(hostile.engagement_id)
+        settle_session(
+            self.player,
+            hostile,
+            reconstruct_battlefield(self.player, hostile),
+            "escape",
+        )
+        self.assertEqual(self.clock.tick, tick)
+        hostile_terminal = NarrativeEvent.objects.get(
+            source_id=build_encounter_source_id(
+                hostile.engagement_id, kind="terminal", ordinal=1
+            )
+        )
+        self.assertEqual(hostile_terminal.content["encounter_id"], hostile.engagement_id)
+
+        record = start_guild_exam(self.player, self.host, "E")
+        exam = read_session(self.player)
+        self.assertEqual(exam.mode, "guild_exam")
+        self.assertTrue(exam.engagement_id)
+        self.assertEqual(
+            exam.session_id, f"guild_exam:{self.player.pk}:{record.exam_id}"
+        )
+        # Same tick and the same candidate, yet the two encounters keep
+        # distinct occurrence identities and their own terminal sources.
+        self.assertNotEqual(exam.engagement_id, hostile.engagement_id)
+        self.assertNotEqual(
+            build_encounter_source_id(exam.engagement_id, kind="terminal", ordinal=1),
+            build_encounter_source_id(
+                hostile.engagement_id, kind="terminal", ordinal=1
+            ),
+        )
+
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_an_examination_that_lost_its_engagement_identity_is_retired(self):
+        """Recovery retires the exam and releases its host, never stranding either."""
+        from world.rules.combat_session import restore_active_session
+
+        self._give_merit(50)
+        normal_before = self._host_normal()
+        record = start_guild_exam(self.player, self.host, "E")
+        stored = dict(self.player.db.active_combat)
+        self.assertTrue(stored.pop("engagement_id"))
+        self.player.db.active_combat = stored
+
+        restore_active_session(self.player)
+
+        self.assertIsNone(self.player.db.active_combat)
+        exams = {entry.exam_id: entry for entry in _read_exams(self.player)}
+        self.assertIs(exams[record.exam_id].state, ExamState.FAILED)
+        # The persistent host is free again: normal outfit, no restriction,
+        # no schedule hold, and a fresh examination is admitted.
+        normal_after = self._host_normal()
+        for field in ("equipment", "inventory", "buffs", "skills", "proficiency"):
+            self.assertEqual(normal_after[field], normal_before[field], field)
+        self.assertIsNone(normal_after["restriction"])
+        self.assertIsNone(normal_after["normal_state"])
+        hold = read_exam_schedule_hold(self.host)
+        self.assertTrue(hold.known)
+        self.assertTrue(hold.hold is None or hold.hold.released)
+        self.assertEqual(self.host.traits.hp.max, 200)
+        retried = start_guild_exam(self.player, self.host, "E")
+        self.assertIs(retried.state, ExamState.ACTIVE)
+        # No combat occurrence was fabricated for the retired examination.
+        from world.narrative.models import NarrativeEvent
+
+        self.assertFalse(
+            NarrativeEvent.objects.filter(
+                event_type="combat_encounter",
+                content__mode="guild_exam",
+            ).exists()
+        )
+
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_retirement_resolves_the_examination_from_the_candidate_record(self):
+        """Corrupt roster hints never strand the host the record already names."""
+        from world.rules.combat_session import restore_active_session
+
+        self._give_merit(50)
+        normal_before = self._host_normal()
+        record = start_guild_exam(self.player, self.host, "E")
+        # Lose the identity, the named examination AND every roster hint: the
+        # candidate's own ACTIVE examination is the remaining authority.
+        stored = dict(self.player.db.active_combat)
+        stored.pop("engagement_id")
+        stored.pop("exam_id")
+        stored["enemy_ids"] = []
+        stored["player_ids"] = []
+        self.player.db.active_combat = stored
+
+        restore_active_session(self.player)
+
+        self.assertIsNone(self.player.db.active_combat)
+        exams = {entry.exam_id: entry for entry in _read_exams(self.player)}
+        self.assertIs(exams[record.exam_id].state, ExamState.FAILED)
+        normal_after = self._host_normal()
+        self.assertEqual(normal_after["equipment"], normal_before["equipment"])
+        self.assertIsNone(normal_after["restriction"])
+        self.assertIsNone(normal_after["normal_state"])
+        hold = read_exam_schedule_hold(self.host)
+        self.assertTrue(hold.hold is None or hold.hold.released)
+
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_a_failed_host_release_is_retried_by_the_next_recovery(self):
+        """A release failure leaves a durable obligation, never an owned host forever."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.combat_session import restore_active_session
+
+        self._give_merit(50)
+        record = start_guild_exam(self.player, self.host, "E")
+        stored = dict(self.player.db.active_combat)
+        stored.pop("engagement_id")
+        # Even with every hint gone, the obligation still names the host.
+        stored.pop("exam_id")
+        stored.pop("session_id")
+        stored["enemy_ids"] = []
+        stored["player_ids"] = []
+        self.player.db.active_combat = stored
+
+        with mock_patch(
+            "world.rules.guild_exams.restore_exam_host",
+            side_effect=RuntimeError("clock unavailable"),
+        ):
+            restore_active_session(self.player)
+        # The session is retired (a retained unparseable payload would block
+        # every new engagement), the candidate is terminal, and the host
+        # release is a durable obligation naming the authoritative identities.
+        exams = {entry.exam_id: entry for entry in _read_exams(self.player)}
+        self.assertIs(exams[record.exam_id].state, ExamState.FAILED)
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertIsNotNone(self._host_normal()["restriction"])
+        self.assertEqual(
+            self.player.db.combat_exam_release_pending,
+            {"exam_id": record.exam_id, "host_id": int(self.host.pk)},
+        )
+
+        restore_active_session(self.player)
+
+        self.assertIsNone(self.player.db.combat_exam_release_pending)
+        self.assertIsNone(self._host_normal()["restriction"])
+        retried = start_guild_exam(self.player, self.host, "E")
+        self.assertIs(retried.state, ExamState.ACTIVE)
 
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_requested_by_metadata_grants_no_extra_authority(self):

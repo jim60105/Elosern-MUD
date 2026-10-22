@@ -10,7 +10,7 @@ from typing import Any
 from evennia.objects.models import ObjectDB
 
 from world.rules.action import _stored_trait_value
-from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat import Battlefield, BattlefieldActionContext, ExecutionScopeBase
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.buffs import active_buff_keys_from_storage, BLOCKING_BUFF_KEYS
 from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
@@ -82,6 +82,28 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
         if dbref in key_by_pk
     }
     return battlefield
+
+
+def execution_scope_base(record: CombatSessionRecord) -> ExecutionScopeBase:
+    """Return the durable session's authoritative execution identity.
+
+    One composition point for every interactive combat surface: the transport
+    session id (diagnostics and decision numbering), the round this resolution
+    consumes, and the engagement identity every committed action and upkeep
+    occurrence is keyed by. A durable record without an engagement identity is
+    malformed and fails closed here, before any action is provisioned, so no
+    settlement can fall back to the reusable session token or to a world tick.
+    """
+    if not record.engagement_id:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "the combat session carries no engagement identity",
+        )
+    return ExecutionScopeBase(
+        session_id=record.session_id,
+        round_index=record.rounds_elapsed + 1,
+        engagement_id=record.engagement_id,
+    )
 
 
 def is_actor_eligible_to_act(

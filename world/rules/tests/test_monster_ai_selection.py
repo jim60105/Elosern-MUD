@@ -47,6 +47,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
     ExecutionScopeBase,
+    combat_provenance,
     current_decision_scope,
     decision_scope,
     run_battle,
@@ -132,6 +133,18 @@ TIER = "t_sel_tier"
 ARCHETYPE = "t_sel_stalker"
 OTHER_ARCHETYPE = "t_sel_bruiser"
 SESSION = "hostile:1:0"
+
+
+def _selection_provenance(round_ordinal: int = 1):
+    """The occurrence provenance a directly resolved combat action commits under."""
+    from world.rules.combat import CombatProvenance
+
+    return CombatProvenance(
+        engagement_id=f"{SESSION}:1",
+        round_ordinal=round_ordinal,
+        slot_ordinal=0,
+        session_id=SESSION,
+    )
 OTHER_SESSION = "hostile:2:0"
 #: The lowest non-default freeform rung: non-default, yet the ladder's first.
 SCALE = min(scale for scale in FREEFORM_SCALE_VALUES if scale != 1.0)
@@ -1272,7 +1285,9 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertIsNotNone(request)
         self.assertEqual(request.targets, "all-enemies")
         self.assertEqual(request.scale, 1.0)
-        with patch("world.rules.combat.damage.roll_d100", return_value=95):
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=95
+        ), combat_provenance(_selection_provenance()):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success", result.detail)
         # Only legal recipients changed, and the change is committed.
@@ -1302,7 +1317,9 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             self.assertEqual(request.scale, SCALE)
             self.assertEqual(request.targets, "all-enemies")
             allowed = round(4 * SCALE)
-            with patch("world.rules.combat.damage.roll_d100", return_value=95):
+            with patch(
+                "world.rules.combat.damage.roll_d100", return_value=95
+            ), combat_provenance(_selection_provenance()):
                 result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success", result.detail)
         self.assertEqual(_committed(self.monster, "mp"), 100 - allowed)
@@ -1413,7 +1430,9 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
                 self._battlefield(self.player),
                 provider,
                 max_rounds=2,
-                decision_scope_base=ExecutionScopeBase(SESSION, 1),
+                decision_scope_base=ExecutionScopeBase(
+                    SESSION, 1, engagement_id=f"{SESSION}:1"
+                ),
             )
         self.assertLessEqual(_committed(self.monster, "mp"), before_mp - 4)
 

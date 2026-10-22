@@ -32,13 +32,25 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
     COMBAT_YAML,
+    ExecutionScopeBase,
     RoundTactical,
     _handle_damage,
     _heal_magnitude,
+    CombatProvenance,
     _stored_hp,
+    combat_provenance,
     is_battle_over,
     run_round,
 )
+def _calibration_provenance(branch: str) -> CombatProvenance:
+    """One resolved calibration action's authoritative combat provenance."""
+    return CombatProvenance(
+        engagement_id=f"t:calibration:{branch}:1",
+        round_ordinal=1,
+        slot_ordinal=0,
+    )
+
+
 from world.rules.combat.scalars import (
     crosses_knockout,
     nonlethal_projection,
@@ -196,6 +208,7 @@ def _run_single_trial(
 
     dummy_record = CombatSessionRecord(
         session_id="sim-trial",
+        engagement_id="sim-trial:1",
         mode="guild_exam",
         room_id=0,
         player_ids=tuple(h.pk for h in humans),
@@ -235,7 +248,15 @@ def _run_single_trial(
                     req.context.event_context["simulated"] = True
                 return req
 
-            run_round(battlefield, trial_provider, simulated=True)
+            run_round(
+                battlefield,
+                trial_provider,
+                simulated=True,
+                decision_scope_base=ExecutionScopeBase(
+                    round_index=rounds_elapsed,
+                    engagement_id=f"sim-trial:{seed}",
+                ),
+            )
             rounds_elapsed += 1
 
     monster_defeated = _stored_hp(monster) <= 0
@@ -465,13 +486,15 @@ class HumanCombatCalibrationTests(EvenniaTest):
         )
         sim_ctx = BattlefieldActionContext(bfield, event_context={"battlefield": bfield, "simulated": True})
         req = ActionRequest(player, "basic_swordplay", [target_dummy], sim_ctx)
-        ActionResolver.resolve(req)
+        with combat_provenance(_calibration_provenance("simulated")):
+            ActionResolver.resolve(req)
         after_sim_xp = (player.db.skill_proficiency or {}).get("basic_swordplay", 0.0)
         self.assertEqual(after_sim_xp, initial_xp)
 
         live_ctx = BattlefieldActionContext(bfield, event_context={"battlefield": bfield})
         req_live = ActionRequest(player, "basic_swordplay", [target_dummy], live_ctx)
-        ActionResolver.resolve(req_live)
+        with combat_provenance(_calibration_provenance("live")):
+            ActionResolver.resolve(req_live)
         after_live_xp = (player.db.skill_proficiency or {}).get("basic_swordplay", 0.0)
         self.assertGreater(after_live_xp, initial_xp)
 
@@ -1394,11 +1417,18 @@ class CombatFactorBudgetTests(EvenniaTest):
                     with patch(
                         "world.rules.combat.damage.roll_d100", return_value=face
                     ):
-                        result = ActionResolver.resolve(
-                            ActionRequest(
-                                monster, skill_key, [target], context, scale=1.0
+                        with combat_provenance(
+                            CombatProvenance(
+                                engagement_id="t:calibration-factor:1",
+                                round_ordinal=1,
+                                slot_ordinal=0,
                             )
-                        )
+                        ):
+                            result = ActionResolver.resolve(
+                                ActionRequest(
+                                    monster, skill_key, [target], context, scale=1.0
+                                )
+                            )
                     self.assertEqual(result.outcome, "success", result.detail)
                     settled += target.traits.hp.base - _stored_hp(target)
                 self.assertAlmostEqual(settled / 100, expected, places=4)
@@ -1792,6 +1822,7 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
     before = _invariant_snapshot(allies, monster)
     record = CombatSessionRecord(
         session_id=f"encounter-{cell.label}-{seed}",
+        engagement_id=f"encounter-{cell.label}-{seed}:1",
         mode="hostile",
         room_id=int(room.pk),
         player_ids=tuple(int(ally.pk) for ally in allies),
@@ -2121,6 +2152,7 @@ class EncounterCalibrationTests(EvenniaTest):
         monster.traits.hp.current = monster.traits.hp.base
         record = CombatSessionRecord(
             session_id=f"encounter-{cell.label}-no-command",
+            engagement_id=f"encounter-{cell.label}-no-command:1",
             mode="hostile",
             room_id=int(self.room.pk),
             player_ids=(int(commander.pk), int(companion.pk)),

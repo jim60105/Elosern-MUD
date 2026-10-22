@@ -16,7 +16,7 @@ from world.observability import log_info
 from world.rules import combat
 from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
 from world.rules.action_preview import revalidate_submission
-from world.rules.combat import Battlefield, ExecutionScopeBase, run_round
+from world.rules.combat import Battlefield, run_round
 from world.rules.combat_beats import RoundRecord, capture_round_hp
 from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
@@ -24,6 +24,7 @@ from world.rules.combat_session.battlefield import (
     _context_for,
     _session_policy,
     authorize_combat_actor,
+    execution_scope_base,
     get_required_combat_actors,
     reconstruct_battlefield,
 )
@@ -1092,13 +1093,12 @@ def _submit_request(
             # nonlethal policy threads into resolution so upkeep-settled ticks
             # honor the same credit rules as direct damage
             # (fix-dot-kill-credit D4). The round carries the encounter's real
-            # decision identity (monster-ai-attack-selection): the durable
-            # session id and the actual round number this resolution consumes,
-            # counted from the record's committed rounds.
-            scope_base = ExecutionScopeBase(
-                session_id=record.session_id,
-                round_index=record.rounds_elapsed + 1,
-            )
+            # decision identity (monster-ai-attack-selection) and the
+            # authoritative occurrence provenance
+            # (preserve-combat-deed-provenance): the session id, the actual
+            # round number this resolution consumes, counted from the record's
+            # committed rounds, and the encounter's engagement identity.
+            scope_base = execution_scope_base(record)
             # The round also records its own beats inputs (combat-beats-panel
             # D1): the roster identities and every participant's stored HP
             # before the round.
@@ -1384,10 +1384,7 @@ def _failed_party_retreat(
     item_journals: list[Any] = []
     grants: list[str] = []
     simulated, nonlethal_keys = _session_policy(battlefield, record)
-    scope_base = ExecutionScopeBase(
-        session_id=record.session_id,
-        round_index=record.rounds_elapsed + 1,
-    )
+    scope_base = execution_scope_base(record)
     round_identities, round_hp_before = capture_round_hp(battlefield)
     hp_before = _stored_trait_value(commander.traits.hp)
     try:

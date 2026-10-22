@@ -327,6 +327,36 @@ def _monster(key="goblin", hp=100, atk=10):
     return monster
 
 
+def engagement_base(
+    engagement_id: str = "t:synthetic-engagement:1", round_index: int = 1
+):
+    """Return an explicit bounded-encounter execution identity.
+
+    The round engine reads the encounter's authoritative occurrence identity
+    from the caller's execution base. A test that drives ``run_round``
+    directly owns that one encounter and states its identity here instead of
+    leaving the round without one (which fails closed).
+    """
+    from world.rules.combat import ExecutionScopeBase
+
+    return ExecutionScopeBase(
+        session_id="", round_index=round_index, engagement_id=engagement_id
+    )
+
+
+def engagement_provenance(
+    engagement_id: str = "t:synthetic-engagement:1",
+    *,
+    round_ordinal: int = 1,
+):
+    """Return one round's authoritative occurrence provenance for a test."""
+    from world.rules.combat import CombatProvenance
+
+    return CombatProvenance(
+        engagement_id=engagement_id, round_ordinal=round_ordinal
+    )
+
+
 def complete_party_draft(commander, enemy, admitted):
     """Confirm one basic attack for every actor the party draft still needs.
 

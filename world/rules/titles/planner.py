@@ -30,7 +30,20 @@ from world.rules.titles.awards import (
     award_guild_rank_title,
     read_title_state,
 )
-from world.narrative.action_adapters import build_action_source_id
+
+
+def _action_source_id(request: Any, tick: int) -> str:
+    """Return the occurrence identity the action already resolved to.
+
+    Imported at call time: ``world.narrative.action_adapters`` imports the
+    title award types from this package, so a module-level import here would
+    close a cycle whenever a caller reaches the adapters first.
+    """
+    from world.narrative.action_adapters import build_action_source_id
+
+    return build_action_source_id(request, tick=tick)
+
+
 # ---------------------------------------------------------------------------
 # Predicate evaluation and the event-effect planner.
 # ---------------------------------------------------------------------------
@@ -220,9 +233,10 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
         display = definition.display_name_zh
         notify = f"獲得稱號：{display}"
         
-        # Build stable occurrence identity for the action effect
-        narration_scope = getattr(request, "narration_scope", "")
-        source_id = build_action_source_id(request, tick=tick, narration_scope=narration_scope)
+        # The occurrence identity the action already resolved to. A combat
+        # action's identity is its engagement/round/slot provenance, so a
+        # title award always rides the occurrence it was granted for.
+        source_id = _action_source_id(request, tick)
 
         awards_box: list[AutomaticTitleAward] = []
 

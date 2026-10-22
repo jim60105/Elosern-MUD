@@ -31,6 +31,9 @@ from world.rules.action import (
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
+    CombatProvenance,
+    ExecutionScopeBase,
+    combat_provenance,
     default_attack_policy,
     run_round,
 )
@@ -97,7 +100,11 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=100
+        ), combat_provenance(
+            CombatProvenance(engagement_id="t:quest-offline:1", round_ordinal=1, slot_ordinal=0)
+        ):
             return ActionResolver.resolve(request)
 
     # NOTE: this API-level seam is NOT a player-command acceptance test. Change
@@ -163,7 +170,11 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
             [monster],
             BattlefieldActionContext(field),
         )
-        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=100
+        ), combat_provenance(
+            CombatProvenance(engagement_id="t:quest-planner:1", round_ordinal=1, slot_ordinal=0)
+        ):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.calls.count("quest"), 1)
@@ -217,6 +228,9 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
                     if isinstance(entity, PlayerCharacter)
                     else None
                 ),
+                decision_scope_base=ExecutionScopeBase(
+                    round_index=1, engagement_id="t:quest-round:1"
+                ),
             )
         self.assertFalse(monster.traits.hp.current > 0)
         self.assertEqual(self.calls.count("quest"), 1)
@@ -230,7 +244,13 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         monster = self._monster("overwhelmed", hp=1)
         field = self._field(self.player, [monster])
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = resolve_overwhelm(field, default_attack_policy)
+            result = resolve_overwhelm(
+                field,
+                default_attack_policy,
+                decision_scope_base=ExecutionScopeBase(
+                    round_index=1, engagement_id="t:quest-overwhelm:1"
+                ),
+            )
         self.assertTrue(result.battle_over)
         self.assertGreaterEqual(self.calls.count("quest"), 1)
 

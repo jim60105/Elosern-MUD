@@ -1281,7 +1281,11 @@ class CoordinationRoundTests(EvenniaTestCase):
             run_round(
                 field,
                 provider,
-                decision_scope_base=ExecutionScopeBase(SUPPORT_SESSION, ROUND),
+                decision_scope_base=ExecutionScopeBase(
+                    SUPPORT_SESSION,
+                    ROUND,
+                    engagement_id=f"{SUPPORT_SESSION}:{ROUND}",
+                ),
                 first_actor=str(first.key),
             )
 
@@ -1359,7 +1363,9 @@ class CoordinationRoundTests(EvenniaTestCase):
             run_round(
                 field,
                 provider,
-                decision_scope_base=ExecutionScopeBase(SESSION, ROUND),
+                decision_scope_base=ExecutionScopeBase(
+                    SESSION, ROUND, engagement_id=f"{SESSION}:{ROUND}"
+                ),
                 first_actor=str(first.key),
             )
 
