@@ -18,7 +18,7 @@ Add controlled metric movement stories under `World/LocalMap` for same-scale mov
 
 ## Risks / Trade-offs
 
-The existing pre/post watcher logic assumes the previous current node remains drawn. Handle the cross-layer journey through the existing no-shared-frame behavior while applying the approved mode/level decision. Do not synthesize world distance across a gateway. If an inherited general scene-transition contract needs an island-only clarification, preserve unchanged graph/overlay assertions and use matching existing traceability IDs rather than adding unrelated requirements.
+The existing pre/post watcher logic assumes the previous current node remains drawn. Handle the cross-layer journey through the existing no-shared-frame behavior while applying the approved mode/level decision. Do not synthesize world distance across a gateway. The `webclient-contextual-hud` delta explicitly restricts its inherited pan scenarios to unchanged island mode/level and preserves graph/overlay behavior; use the existing matching motion requirement ID on focused evidence.
 
 ## Focused evidence
 
@@ -27,6 +27,10 @@ Extend `web/webclient-app/tests/map_pan.test.js` and focused MapLattice/scene tr
 Completion requires agent-browser capture of all five metric `World/LocalMap` fixture stories plus the scale-change stories, inspecting images at the reference desktop size and the existing chrome cap. Then walk south gate → wilderness → back in the real client, using current snapshots and real move controls, recording before/after node IDs, visible exit set, gate labels, scale mode/level and screenshot paths. Verify return action matches the existing gateway descriptor and that dots move on a same-scale street step. Check one unchanged full-map lattice and instance/interior control. Any missing exit, unusable return, clipped required label or reduced/off animated scale change blocks task completion.
 
 ## Verification workflow (required during implementation)
+
+### Traceability gate ordering
+
+Existing-title IDs can use the normal live-tree gates. When implementation adds IDs absent from unsynchronized main specs, use a complete disposable directory snapshot of the current implementation, manifests and tooling with predecessor/current deltas applied to its equivalent main-spec tree. This is an ordinary copy, not a branch or registered git worktree. Obtain IDs with `uv run --locked python -m tools.spec_traceability --repo-root <equivalent-root> list`, then run `check` with the same root. Run the complete gate using the copied script, `uv run --locked python <equivalent-root>/tools/contract_gate.py`, so its file-derived root and subprocess working directories select that snapshot. Retain the implementation annotations unchanged. After the authorized archive step synchronizes the real main specs, repeat ordinary live-tree `tools.spec_traceability check` and `tools.contract_gate`. All task references to those gates follow this phase-aware sequence; listing IDs in the snapshot alone is insufficient, and an unsynchronized live-tree unknown-ID failure must never be suppressed.
 
 Use `World/LocalMap` as the production component showcase and retain `Overlays/MapOverlay` plus the instance/interior stories as unchanged-surface controls. No `Design/...` prototype is needed for this approved algorithmic change; if an existing relevant Design story is used for token/chrome comparison, it cannot replace a production-component story or the real client.
 

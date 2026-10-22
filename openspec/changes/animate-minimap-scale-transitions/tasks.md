@@ -4,7 +4,7 @@ Estimated effort: 7 hours for the implementing worker, including every required 
 
 ## 1. Scale-aware transition decision (2 hours)
 
-- [ ] 1.1 Record previous mode/level with the existing MapLattice pre/post pan frame. Reuse FLIP only for unchanged mode/level and include world-anchored dots in the pan transform; leave radial/overlay behavior unchanged.
+- [ ] 1.1 Record previous mode/level with the existing MapLattice pre/post pan frame. Reuse FLIP only for unchanged mode/level and include world-anchored dots in the pan transform; leave radial/overlay behavior unchanged. Apply the cumulative webclient-contextual-hud motion amendment and preserve its unrelated scene/location/vitals scenarios.
 - [ ] 1.2 For changed level or mode, full motion uses a short token-controlled crossfade with inert outgoing content; reduced/off switch immediately without equal-scale FLIP. Cover changed-scale replacement even with unchanged current ID and clean up interrupted frames on unmount/replacement.
 
 ## 2. Focused motion evidence (2 hours)

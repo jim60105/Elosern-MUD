@@ -19,6 +19,7 @@ None.
 ### Modified Capabilities
 
 - `webclient-local-map`: Scale-sensitive motion and completed-design acceptance, approved design §6.5, §7–§8.
+- `webclient-contextual-hud`: Scope inherited minimap pan scenarios to unchanged island scale and mode, with the approved full/reduced/off scale-change behavior.
 
 ## Impact
 
