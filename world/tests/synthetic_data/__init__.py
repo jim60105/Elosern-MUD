@@ -185,6 +185,7 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_ARCHETYPES,
     SYNTH_DIALOGUE,
     SYNTH_BUFFS,
+    PHYSIOLOGICAL_PROJECTION_KEYS,
 )
 from world.tests.synthetic_data.data_presets_quests import (
     SYNTH_PRESETS,

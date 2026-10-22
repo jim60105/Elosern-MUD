@@ -31,7 +31,11 @@ from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
 from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
 
-from world.tests.synthetic_data.vocab import _SYNTH_GATE_XY, _SYNTH_MAP_KEY
+from world.tests.synthetic_data.vocab import (
+    _SYNTH_GATE_XY,
+    _SYNTH_MAP_KEY,
+    _SYNTH_SECOND_GATE_XY,
+)
 
 SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
     # Rank keys mirror the shipped letter-rank vocabulary shape; the kit's
@@ -176,14 +180,16 @@ SYNTH_WILDERNESS_ENTRIES: dict[str, WildernessEntryPoint] = {
         anchor_key="t_hollow_tarn",
         shape=("###", "###", "###"),
         origin_xy=(500, 500),
-        gates=(WildernessGate("s", (3, 3), _SYNTH_MAP_KEY),),
+        # Gate cells are borrowed shipped grid cells: a synthetic gate must
+        # name a cell the shipped map materializes, never a stale literal.
+        gates=(WildernessGate("w", _SYNTH_SECOND_GATE_XY, _SYNTH_MAP_KEY),),
     ),
     # Point-shape entry: exactly one '#' cell and exactly one gate.
     "t_split_cairn": WildernessEntryPoint(
         anchor_key="t_split_cairn",
         shape=(".#.",),
         origin_xy=(520, 520),
-        gates=(WildernessGate("n", (3, 2), _SYNTH_MAP_KEY),),
+        gates=(WildernessGate("n", _SYNTH_GATE_XY, _SYNTH_MAP_KEY),),
     ),
 }
 
@@ -350,6 +356,16 @@ SYNTH_BUFFS: dict[str, BuffDefinition] = {
     ),
 }
 
+#: The physiological projection's own buff keys. They are production
+#: *mechanism* keys, not authored content: mental settlement validates every
+#: projection key against the live buff catalog and fails closed when one is
+#: absent, so a scoped catalog must still carry the four protected,
+#: modifier-free rows. ``world/tests/test_synthetic_data.py`` lists them as a
+#: documented borrowed seam beside the map key and the element vocabulary.
+PHYSIOLOGICAL_PROJECTION_KEYS: frozenset[str] = frozenset(
+    PROJECTION_BUFF_KEYS.values()
+)
+
 # The physiological projection is deterministic mechanics, not authored lore:
 # a scoped buff catalog must still carry its protected, indefinite rows so
 # mental settlement can project a stage during a synthetic-scope test.
@@ -364,6 +380,6 @@ SYNTH_BUFFS.update(
             polarity="debuff",
             protection=PHYSIOLOGICAL_PROTECTION,
         )
-        for key in PROJECTION_BUFF_KEYS.values()
+        for key in PHYSIOLOGICAL_PROJECTION_KEYS
     }
 )

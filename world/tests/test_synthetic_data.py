@@ -88,15 +88,19 @@ def _catalog_maps() -> dict[str, dict]:
 def _borrowed_seams() -> set[str]:
     """The shipped tokens the kit is allowed to carry (design D1 seams).
 
-    Exactly the two runtime-resolved shipped references the kit documents:
+    Exactly the runtime-resolved shipped references the kit documents:
     the single known grid map key (gate/placement rows must name a map the
     validator's extent scan knows) and the borrowed element key (element
-    vocab is a closed shipped enum). Nothing else may collide.
+    vocab is a closed shipped enum), plus the physiological projection's four
+    mechanism keys (mental settlement validates them against the live buff
+    catalog and fails closed when a scoped catalog omits one). Nothing else
+    may collide.
     """
     return {
         kit._SYNTH_MAP_KEY,
         kit._SYNTH_ELEMENT,
         kit._SYNTH_ELEMENT_ROW.display_name_zh,
+        *kit.PHYSIOLOGICAL_PROJECTION_KEYS,
     }
 
 

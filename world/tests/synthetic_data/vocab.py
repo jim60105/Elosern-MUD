@@ -59,6 +59,30 @@ def _shipped_first_gate_xy() -> tuple[int, int]:
 _SYNTH_GATE_XY = _shipped_first_gate_xy()
 
 
+def _shipped_second_wilderness_gate_xy() -> tuple[int, int]:
+    """The shipped capital entry's other gate cell, borrowed at kit assembly.
+
+    A synthetic wilderness gate must land on a cell ``sync_grid()`` really
+    materializes, or the fixtures' ``filter_xyz`` probe resolves no room and
+    the gateway silently disappears from the seeded map knowledge. The kit's
+    first gate already borrows the shipped city-gate cell; its second gate
+    borrows the same entry's remaining gate, resolved from the live registry
+    (still shipped when this module imports).
+    """
+    module = importlib.import_module(
+        ".".join(("world", "lore", "wilderness_entry"))
+    )
+    registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
+    entry = registry[sorted(registry)[0]]
+    for gate in entry.gates:
+        if tuple(gate.grid_xy) != _SYNTH_GATE_XY:
+            return tuple(gate.grid_xy)
+    return _SYNTH_GATE_XY
+
+
+_SYNTH_SECOND_GATE_XY = _shipped_second_wilderness_gate_xy()
+
+
 def _shipped_first_element_key() -> str:
     """Return the shipped element vocabulary's first key, lint-safely.
 
