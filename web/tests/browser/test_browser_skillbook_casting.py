@@ -12,6 +12,7 @@ combat-menu journeys.
 
 from __future__ import annotations
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from tools.spec_traceability import covers_requirement
 
 import os
@@ -52,28 +53,106 @@ class _SkillBookJourney:
         page.wait_for_selector('[data-testid="party-skill-tab__tree"]', timeout=15000)
 
     def _select_by_search(self, page, label):
-        """Keyboard-only: `/` → search → ↓ into the tree → Enter to the actions."""
-        self._press(page, "/")
+        """Keyboard-only: `/` → search → ↓ into the tree → Enter to the actions.
+
+        Every handover is waited for, never slept through, because each key
+        belongs to whichever element holds focus when it lands and a key sent
+        to the wrong one is swallowed without a trace.
+
+        The last wait is the row's own selection: ↓ starts a `party.view_member`
+        request, and while it is unanswered the tab disables both actions, so
+        an Enter arriving in that window is a no-op that leaves focus on the
+        row. Enter is pressed only once an action is actually available — the
+        same state that hands focus to it.
+        """
+        page.keyboard.press("/")
+        page.wait_for_function(
+            "() => document.activeElement"
+            " && document.activeElement.getAttribute('data-testid') === 'party-skill-tab__search'",
+            timeout=15000,
+        )
         page.keyboard.type(label)
-        page.wait_for_timeout(120)
-        self._press(page, "ArrowDown")
-        self._press(page, "Enter")
+        page.wait_for_function(
+            "(label) => { const el = document.activeElement;"
+            " return !!el && el.value === label"
+            " && document.querySelectorAll("
+            "'[data-testid=\"party-skill-tab__tree\"] [data-node-id^=\"skill:\"]').length > 0; }",
+            arg=label,
+            timeout=15000,
+        )
+        page.keyboard.press("ArrowDown")
+        page.wait_for_function(
+            "() => { const el = document.activeElement;"
+            " return !!el && (el.getAttribute('data-node-id') || '').startsWith('skill:'); }",
+            timeout=15000,
+        )
+        try:
+            page.wait_for_function(
+                """() => {
+                  const tab = document.querySelector('[data-testid="party-skill-tab"]');
+                  if (!tab) return false;
+                  return ['cast', 'practice'].some((key) => {
+                    const button = tab.querySelector(`[data-testid="action-bar__btn--${key}"]`);
+                    return !!button && button.getAttribute('aria-disabled') !== 'true';
+                  });
+                }""",
+                timeout=15000,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise AssertionError(
+                f"no action was ever available for {label!r}: {self._focus_snapshot(page)}"
+            ) from exc
+        page.keyboard.press("Enter")
+        self._wait_focus(page, ("action-bar__btn--cast", "action-bar__btn--practice"))
 
     def _wait_focus(self, page, testids, timeout=30000):
         """Wait for keyboard focus to land on one of ``testids``.
 
-        The tab selects through a server round trip and hands focus to the
-        action bar only after the committed selection republishes, so a
-        fixed press delay races the handover on a loaded worker; the budget
-        is a load allowance, not a behavioural bound.
+        The budget is a load allowance, not a behavioural bound: a timeout
+        reports the focus and selection state it ended in, so a stranded flow
+        names its own cause instead of expiring silently.
         """
-        page.wait_for_function(
-            """(ids) => {
+        try:
+            page.wait_for_function(
+                """(ids) => {
+                  const el = document.activeElement;
+                  return !!el && ids.includes(el.getAttribute('data-testid'));
+                }""",
+                arg=list(testids),
+                timeout=timeout,
+            )
+        except PlaywrightTimeoutError as exc:
+            raise AssertionError(
+                f"focus never reached {list(testids)}: {self._focus_snapshot(page)}"
+            ) from exc
+
+    def _focus_snapshot(self, page):
+        """The keyboard and selection state a stranded journey ended in."""
+        return page.evaluate(
+            """() => {
               const el = document.activeElement;
-              return !!el && ids.includes(el.getAttribute('data-testid'));
-            }""",
-            arg=list(testids),
-            timeout=timeout,
+              const tab = document.querySelector('[data-testid="party-skill-tab"]');
+              const q = (sel) => document.querySelector(sel);
+              const buttons = [...(tab ? tab.querySelectorAll('[data-testid^="action-bar__btn--"]') : [])];
+              const row = q('[data-testid="party-skill-tab__row"][aria-selected="true"]');
+              const state = (window.__elosernBridge && window.__elosernBridge.store.view) || {};
+              const segment = q('[data-testid="party-skill-tab__segment--active"]');
+              return {
+                focus: el ? (el.getAttribute('data-testid') || el.getAttribute('data-node-id') || el.tagName) : null,
+                drawer: q('[data-testid="hud-drawer"]')?.getAttribute('data-drawer-key') ?? null,
+                search: q('[data-testid="party-skill-tab__search"]')?.value ?? null,
+                selected: row ? row.getAttribute('data-key') : null,
+                segmentActive: segment ? segment.getAttribute('aria-pressed') : 'absent',
+                mode: state.mode ?? null,
+                actions: buttons.map((b) => ({
+                  testid: b.getAttribute('data-testid'),
+                  ariaDisabled: b.getAttribute('aria-disabled'),
+                  disabled: b.disabled,
+                })),
+                skillUse: (state.skillUse || {}).skillKey ?? null,
+                inFlight: !!(state.dispatch || {}).inFlight,
+              };
+            }"""
         )
 
     def _skill_label(self, page, key):
