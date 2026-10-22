@@ -4,7 +4,7 @@ OpenSpec change: unify-automatic-title-award-results
 Specs: openspec/changes/unify-automatic-title-award-results/specs/title-system/spec.md
 """
 
-from copy import deepcopy
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from django.db import transaction
@@ -13,10 +13,9 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
+from world.lore.guild import GuildRank
 from world.lore.titles import (
-    FIXED_TITLE_REGISTRY,
     FixedTitleDef,
-    StarterEpithet,
     TitleCategory,
     TitlePredicate,
     TitlePredicateFamily,
@@ -35,7 +34,14 @@ from world.rules.titles import (
     persist_nomination_ballot,
     read_title_state,
 )
-from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, SYNTH_TITLES
+
+
+_SYNTH_RANK_KEY = "t_synth_award_rank"
+_SYNTH_FIXED_KEY = "t_synth_first_hunt"
+_SYNTH_RANK = GuildRank(
+    _SYNTH_RANK_KEY, 1, 10, 100, "Synthetic award rank.", _SYNTH_FIXED_KEY
+)
 
 
 class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
@@ -50,6 +56,21 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         )
         self.starter_patcher.start()
         self.addCleanup(self.starter_patcher.stop)
+        rows = dict(SYNTH_TITLES)
+        self.registry_stack = ExitStack()
+        self.addCleanup(self.registry_stack.close)
+        for target in (
+            "world.lore.titles.FIXED_TITLE_REGISTRY",
+            "world.rules.titles.state.FIXED_TITLE_REGISTRY",
+            "world.rules.titles.awards.FIXED_TITLE_REGISTRY",
+        ):
+            self.registry_stack.enter_context(patch(target, rows))
+        self.registry_stack.enter_context(
+            patch(
+                "world.rules.titles.awards.GUILD_RANK_REGISTRY",
+                {_SYNTH_RANK_KEY: _SYNTH_RANK},
+            )
+        )
 
     @covers_requirement(
         "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
@@ -63,17 +84,17 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         """
         source_id = "occurrence:multigrant:session:101"
 
-        # char1 receives fixed title F and starter epithet
+        # char1 receives the synthetic rank's fixed title and starter epithet
         award_1a, note_1a = award_guild_rank_title(
-            self.char1, "F", source_id=source_id, tick=10
+            self.char1, _SYNTH_RANK_KEY, source_id=source_id, tick=10
         )
         award_1b, note_1b = award_first_quest_epithet(
             self.char1, source_id=source_id, tick=10
         )
 
-        # char2 receives fixed title F
+        # char2 receives the same fixed title
         award_2, note_2 = award_guild_rank_title(
-            self.char2, "F", source_id=source_id, tick=10
+            self.char2, _SYNTH_RANK_KEY, source_id=source_id, tick=10
         )
 
         self.assertIsNotNone(award_1a)
@@ -83,7 +104,7 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         self.assertEqual(award_1a.source_id, source_id)
         self.assertEqual(award_1a.recipient_id, str(self.char1.pk))
         self.assertEqual(award_1a.kind, "fixed")
-        self.assertEqual(award_1a.title_id, "g_f_rank")
+        self.assertEqual(award_1a.title_id, _SYNTH_FIXED_KEY)
 
         self.assertEqual(award_1b.source_id, source_id)
         self.assertEqual(award_1b.recipient_id, str(self.char1.pk))
@@ -93,15 +114,15 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         self.assertEqual(award_2.source_id, source_id)
         self.assertEqual(award_2.recipient_id, str(self.char2.pk))
         self.assertEqual(award_2.kind, "fixed")
-        self.assertEqual(award_2.title_id, "g_f_rank")
+        self.assertEqual(award_2.title_id, _SYNTH_FIXED_KEY)
 
         # Verify auto-equipped slots
         _, eq1 = read_title_state(self.char1)
-        self.assertEqual(eq1["fixed"], "g_f_rank")
+        self.assertEqual(eq1["fixed"], _SYNTH_FIXED_KEY)
         self.assertEqual(eq1["epithet"], SYNTH_STARTER_EPITHET.display)
 
         _, eq2 = read_title_state(self.char2)
-        self.assertEqual(eq2["fixed"], "g_f_rank")
+        self.assertEqual(eq2["fixed"], _SYNTH_FIXED_KEY)
 
     @covers_requirement(
         "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
@@ -116,13 +137,13 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         source_2 = "occurrence:second:2"
 
         award_first, _ = award_guild_rank_title(
-            self.char1, "F", source_id=source_1, tick=20
+            self.char1, _SYNTH_RANK_KEY, source_id=source_1, tick=20
         )
         self.assertIsNotNone(award_first)
 
         # Now try granting same title from a new, different occurrence
         award_dup, note_dup = award_guild_rank_title(
-            self.char1, "F", source_id=source_2, tick=30
+            self.char1, _SYNTH_RANK_KEY, source_id=source_2, tick=30
         )
         self.assertIsNone(award_dup)
         self.assertIsNone(note_dup)
@@ -147,7 +168,7 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
             hint_zh="在荒野遭遇中擊敗巨龍。",
             predicate=TitlePredicate(TitlePredicateFamily.QUEST_COMPLETED, quest_key="dummy"),
         )
-        new_registry = dict(FIXED_TITLE_REGISTRY)
+        new_registry = dict(SYNTH_TITLES)
         new_registry[synth_key] = synth_def
         with patch("world.rules.titles.state.FIXED_TITLE_REGISTRY", new_registry), patch(
             "world.lore.titles.FIXED_TITLE_REGISTRY", new_registry
@@ -216,7 +237,7 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         try:
             with transaction.atomic():
                 award, _ = award_guild_rank_title(
-                    self.char1, "F", source_id=source_id, tick=100
+                    self.char1, _SYNTH_RANK_KEY, source_id=source_id, tick=100
                 )
                 self.assertIsNotNone(award)
                 record_narrative_event(
@@ -256,7 +277,7 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
 
         with transaction.atomic():
             award, _ = award_guild_rank_title(
-                self.char1, "F", source_id=source_id, tick=200
+                self.char1, _SYNTH_RANK_KEY, source_id=source_id, tick=200
             )
             self.assertIsNotNone(award)
             record_narrative_event(
@@ -271,12 +292,12 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         first_committed = get_committed_award_results(source_id)
         self.assertIsNotNone(first_committed)
         self.assertEqual(len(first_committed), 1)
-        self.assertEqual(first_committed[0].title_id, "g_f_rank")
+        self.assertEqual(first_committed[0].title_id, _SYNTH_FIXED_KEY)
 
         replay_awards = get_committed_award_results(source_id)
         self.assertIsNotNone(replay_awards)
         self.assertEqual(len(replay_awards), 1)
-        self.assertEqual(replay_awards[0].title_id, "g_f_rank")
+        self.assertEqual(replay_awards[0].title_id, _SYNTH_FIXED_KEY)
 
         event, progress, created = record_narrative_event(
             source_id=source_id,
@@ -289,6 +310,6 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         self.assertFalse(created)
         raw_results = event.content.get("award_results")
         self.assertEqual(len(raw_results), 1)
-        self.assertEqual(raw_results[0]["title_id"], "g_f_rank")
+        self.assertEqual(raw_results[0]["title_id"], _SYNTH_FIXED_KEY)
 
         self.assertEqual(NarrativeEvent.objects.filter(source_id=source_id).count(), 1)
