@@ -12,6 +12,68 @@ from world.rules.titles.awards import AutomaticTitleAward
 from world.observability import log_info
 
 
+#: Maximum code points of a persisted readable location label.
+LOCATION_LABEL_MAX_CHARS = 120
+
+
+@dataclass(frozen=True)
+class LocationSnapshot:
+    """One settlement-time location reference persisted with a committed fact.
+
+    ``identity`` is the durable identity of the source's actual location owner
+    and ``label`` its detached, readable name at settlement. ``known`` states
+    whether an identity was recorded at all: an occurrence whose producer held
+    no authoritative location carries neither, and its consumers render that
+    state explicitly instead of inferring a location later.
+    """
+
+    identity: str = ""
+    label: str = ""
+
+    @property
+    def known(self) -> bool:
+        return bool(self.identity)
+
+    def to_content(self) -> dict[str, str]:
+        """Return the detached content snapshot a producer persists."""
+        return {"id": self.identity, "label": self.label}
+
+    def to_json(self) -> dict[str, Any]:
+        """Return the rendered reference; unknown never carries an identity."""
+        if not self.identity:
+            return {"known": False}
+        return {"known": True, "id": self.identity, "label": self.label}
+
+
+def snapshot_location(location: Any) -> LocationSnapshot:
+    """Return the settlement-time reference for one fact's location owner.
+
+    A live location owner yields its durable identity plus its own readable key
+    (bounded). A plain identity value (an integer or a non-empty string) yields
+    an identity-only reference, because a bare value can never state the owner's
+    readable label. ``None`` or an empty value states unknown explicitly and is
+    never replaced by a later lookup.
+    """
+    if isinstance(location, LocationSnapshot):
+        return location
+    identity = getattr(location, "pk", None)
+    if identity is not None:
+        label = getattr(location, "key", None)
+        if not isinstance(label, str) or not label.strip():
+            label = getattr(location, "name", "")
+        return LocationSnapshot(
+            identity=str(identity),
+            label=str(label or "")[:LOCATION_LABEL_MAX_CHARS],
+        )
+    if isinstance(location, bool):
+        return LocationSnapshot()
+    if isinstance(location, int):
+        return LocationSnapshot(identity=str(location))
+    if isinstance(location, str):
+        return LocationSnapshot(identity=location.strip())
+    return LocationSnapshot()
+
+
 @dataclass(frozen=True)
 class NarrativeEventRecord:
     source_id: str

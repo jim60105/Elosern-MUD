@@ -26,6 +26,7 @@ from typing import Any
 from twisted.internet import defer
 
 from world.observability import log_info, log_warn
+from world.rules.clock import read_world_clock
 
 
 # The registered WebClient panel that renders the pending ballot.
@@ -64,15 +65,23 @@ def _build_nomination_client() -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _build_context(entity: Any, *, frozen_tick: int | None = None) -> Any:
+def _build_context(entity: Any, *, frozen_tick: int) -> Any:
     """Freeze the nomination inputs from rules reads. Raises fail-closed on
-    malformed title state (the caller swallows: no round, no state change)."""
+    malformed title state (the caller swallows: no round, no state change).
+
+    ``frozen_tick`` is the admission's single clock read; it is passed
+    explicitly to selection and carried in the detached context so no later
+    step can recalculate the request's window.
+    """
     from world.ai.title_nomination import NominationContext
     from world.lore.titles import FIXED_TITLE_REGISTRY
     from world.narrative.recent_deeds import select_authorized_recent_deeds
     from world.rules import titles as title_rules
 
-    deeds_result = select_authorized_recent_deeds(entity, frozen_tick=frozen_tick)
+    admitted_tick = int(frozen_tick)
+    deeds_result = select_authorized_recent_deeds(
+        entity, frozen_tick=admitted_tick
+    )
     return NominationContext(
         player_name=str(entity.key or ""),
         full_title=title_rules.safe_full_title(entity),
@@ -85,6 +94,7 @@ def _build_context(entity: Any, *, frozen_tick: int | None = None) -> Any:
         recent_deeds_json=deeds_result.rendered_json,
         supplied_source_ids=frozenset(deeds_result.source_ids),
         removed=title_rules.removal_digest(entity),
+        frozen_tick=int(deeds_result.frozen_tick),
     )
 
 
@@ -105,7 +115,12 @@ def _generate(
     frozen_tick: int = 0,
     source_count: int = 0,
 ):
-    """One guarded proposal; persist through the rules writer; push panels."""
+    """One guarded proposal; persist through the rules writer; push panels.
+
+    ``frozen_tick`` is the tick admitted before the feed was built. It is the
+    only time value this workflow reports: generation, persistence and every
+    diagnostic use it, and no later clock read can widen or shift the window.
+    """
     from world.ai.title_nomination import generate_epithet_candidates
     from world.rules.titles import persist_nomination_ballot
 
@@ -114,6 +129,17 @@ def _generate(
         if not candidates:
             # None: round void (transport/schema/degraded); (): every candidate
             # was filtered out. Both leave no ballot and start no cooldown.
+            log_info(
+                "title_nomination_completed",
+                context={
+                    "player": player_id,
+                    "trigger": trigger,
+                    "frozen_tick": frozen_tick,
+                    "source_count": source_count,
+                    "candidate_count": 0,
+                    "persisted": False,
+                },
+            )
             return False
         persisted = persist_nomination_ballot(
             entity,
@@ -121,6 +147,17 @@ def _generate(
         )
         if persisted:
             _push_ballot_panel(entity, watchers)
+        log_info(
+            "title_nomination_completed",
+            context={
+                "player": player_id,
+                "trigger": trigger,
+                "frozen_tick": frozen_tick,
+                "source_count": source_count,
+                "candidate_count": len(candidates),
+                "persisted": bool(persisted),
+            },
+        )
         return persisted
     except Exception as error:
         log_warn(
@@ -170,12 +207,30 @@ def _push_ballot_panel(entity: Any, watchers: tuple) -> None:
             )
 
 
-def _log_generation_error(failure: Any) -> None:
-    """Swallow a generation Deferred that still errbacks after routing."""
+def _log_generation_error(
+    failure: Any,
+    *,
+    player_id: str = "",
+    trigger: str = "unknown",
+    frozen_tick: int = 0,
+    source_count: int = 0,
+) -> None:
+    """Swallow a generation Deferred that still errbacks after routing.
+
+    The admitted workflow identifiers ride along, so this late failure names
+    the same frozen tick as admission and selection instead of a contextless
+    message.
+    """
     log_warn(
         "title_nomination_generation_failed",
         exc=failure.value,
-        context={"reason": failure.getErrorMessage()},
+        context={
+            "reason": failure.getErrorMessage(),
+            "player": player_id,
+            "trigger": trigger,
+            "frozen_tick": frozen_tick,
+            "source_count": source_count,
+        },
     )
     failure.trap(Exception)
 
@@ -228,6 +283,26 @@ def _check_source_award_suppression(
     return False
 
 
+def _freeze_admitted_tick(frozen_tick: int | None) -> int | None:
+    """Return the one world tick this nomination admits.
+
+    An explicit tick (a transition that already froze its own occurrence) is
+    used as given; otherwise the clock is read exactly once here, before the
+    feed is built. An unavailable clock returns ``None``: the read workflow
+    ends without a ballot, a cooldown or any gameplay change.
+    """
+    if frozen_tick is not None:
+        return int(frozen_tick)
+    clock = read_world_clock()
+    if clock is None:
+        log_warn(
+            "title_nomination_clock_unavailable",
+            context={"reason": "world clock unavailable"},
+        )
+        return None
+    return int(clock.tick)
+
+
 def schedule_epithet_nomination(
     entity: Any,
     *,
@@ -244,8 +319,13 @@ def schedule_epithet_nomination(
     Returns the joinable generation Deferred when a round was scheduled, or
     ``None`` when suppressed, un-gated, offline, or synchronously broken.
     Never raises into the caller: any synchronous failure logs a bounded
-    diagnostic and resolves to nothing.
+    diagnostic and resolves to nothing. The admitted tick is frozen once
+    before the feed is built and reused by selection, generation and every
+    diagnostic, so a late clock read never describes an old request.
     """
+    player_id: str | None = None
+    admitted_tick: int | None = None
+    source_count: int | None = None
     try:
         from typeclasses.characters import PlayerCharacter
 
@@ -288,7 +368,13 @@ def schedule_epithet_nomination(
         _IN_FLIGHT_PLAYERS.add(player_id)
 
         try:
-            context = _build_context(entity, frozen_tick=frozen_tick)
+            # Freeze the request's world tick exactly once, before any feed is
+            # constructed; every later step reuses this integer.
+            admitted_tick = _freeze_admitted_tick(frozen_tick)
+            if admitted_tick is None:
+                _IN_FLIGHT_PLAYERS.discard(player_id)
+                return None
+            context = _build_context(entity, frozen_tick=admitted_tick)
             if not context.supplied_source_ids:
                 _IN_FLIGHT_PLAYERS.discard(player_id)
                 return None
@@ -300,11 +386,7 @@ def schedule_epithet_nomination(
             _IN_FLIGHT_PLAYERS.discard(player_id)
             raise
 
-        actual_frozen_tick = (
-            int(frozen_tick)
-            if frozen_tick is not None
-            else getattr(context, "frozen_tick", 0)
-        )
+        admitted_tick = int(context.frozen_tick)
         source_count = len(context.supplied_source_ids)
 
         log_info(
@@ -312,7 +394,7 @@ def schedule_epithet_nomination(
             context={
                 "player": player_id,
                 "trigger": trigger,
-                "frozen_tick": actual_frozen_tick,
+                "frozen_tick": admitted_tick,
                 "source_count": source_count,
             },
         )
@@ -324,16 +406,32 @@ def schedule_epithet_nomination(
             resolved,
             player_id,
             trigger=trigger,
-            frozen_tick=actual_frozen_tick,
+            frozen_tick=admitted_tick,
             source_count=source_count,
         )
-        generation.addErrback(_log_generation_error)
+        generation.addErrback(
+            _log_generation_error,
+            player_id=player_id,
+            trigger=trigger,
+            frozen_tick=admitted_tick,
+            source_count=source_count,
+        )
         return generation
     except Exception as error:  # noqa: BLE001 - fire-and-forget contract
+        context: dict[str, Any] = {
+            "char": getattr(entity, "pk", 0) or 0,
+            "trigger": trigger,
+        }
+        if player_id is not None:
+            context["player"] = player_id
+        if admitted_tick is not None:
+            context["frozen_tick"] = admitted_tick
+        if source_count is not None:
+            context["source_count"] = source_count
         log_warn(
             "title_nomination_scheduling_failed",
             exc=error,
-            context={"char": getattr(entity, "pk", 0) or 0},
+            context=context,
         )
         return None
 

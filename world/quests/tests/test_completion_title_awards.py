@@ -241,6 +241,7 @@ class CompletionTitleSettlementTests(
             source_id=source_id,
             event_type="quest_completion",
             content={
+                "location": {"id": "", "label": ""},
                 "quest_id": self.record.quest_id,
                 "definition_key": self.definition.key,
                 "completed_objective": {"kind": "defeat", "quantity": 1},

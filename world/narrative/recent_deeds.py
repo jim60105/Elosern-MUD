@@ -3,20 +3,30 @@
 OpenSpec change: select-authorized-recent-deeds
 Design: docs/superpowers/specs/2026-10-22-epithet-recent-deeds-design.md §5, §5.1, §6, §9, §10
 Specs: openspec/specs/title-system/spec.md
+
+Producer metadata contract: every supported producer persists its settlement
+location reference in the fact content as ``"location": {"id": <durable
+identity>, "label": <readable label at settlement>}``; both are empty when the
+producer held no authoritative location. Selection reads only that snapshot —
+never a live room, quest registry or clock — and renders each retained fact's
+own ``tick`` and ``location`` plus, for a compressed repetition run, one
+source-linked ``occurrences`` reference per occurrence so differing times and
+places are never misattributed.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 from django.db.models import QuerySet
 
 from world.narrative.adult_projection import project_adult_action_for_recipient
+from world.narrative.events import LOCATION_LABEL_MAX_CHARS, LocationSnapshot
 from world.narrative.models import NarrativeEvent
-from world.observability import log_warn, log_error
-from world.rules.clock import CLOCK_YAML, read_world_clock
+from world.observability import log_warn
+from world.rules.clock import CLOCK_YAML
 
 #: Maximum Unicode code points allowed for rendered recent deeds JSON envelope
 RECENT_DEEDS_JSON_CODE_POINTS_LIMIT = 8000
@@ -88,6 +98,7 @@ class AuthorizedDeedRecord:
     tick: int
     data: dict[str, Any]
     award_results: tuple[dict[str, Any], ...] = ()
+    location: LocationSnapshot = LocationSnapshot()
 
 
 @dataclass
@@ -125,6 +136,53 @@ class RecentDeedsSelectionResult:
     rendered_json: str
 
 
+def _record_location(content: dict[str, Any], source_id: str) -> LocationSnapshot:
+    """Read the settlement-time location reference of one committed occurrence.
+
+    The producer's snapshot is the only authority: a supported record always
+    carries the key (an empty identity states unknown explicitly), so an absent
+    or malformed snapshot is unsupported evidence and fails closed for that
+    record. No live room and no stored column value is ever substituted for a
+    missing snapshot.
+    """
+    raw = content.get("location")
+    if not isinstance(raw, dict) or set(raw) - {"id", "label"}:
+        raise ValueError(f"malformed location snapshot in {source_id}")
+    identity = raw.get("id")
+    label = raw.get("label", "")
+    if (
+        not isinstance(identity, str)
+        or not isinstance(label, str)
+        or (not identity and label)
+    ):
+        raise ValueError(f"malformed location snapshot in {source_id}")
+    return LocationSnapshot(
+        identity=identity,
+        label=label[:LOCATION_LABEL_MAX_CHARS],
+    )
+
+
+def _authorized_record(
+    event: NarrativeEvent,
+    event_type: str,
+    data: dict[str, Any],
+    award_results: list[dict[str, Any]],
+    location: LocationSnapshot,
+) -> AuthorizedDeedRecord:
+    """Build one authorized record whose facts state their own time and place."""
+    facts = dict(data)
+    facts["tick"] = int(event.tick)
+    facts["location"] = location.to_json()
+    return AuthorizedDeedRecord(
+        source_id=event.source_id,
+        event_type=event_type,
+        tick=int(event.tick),
+        data=facts,
+        award_results=tuple(award_results),
+        location=location,
+    )
+
+
 def _validate_and_project_record(
     event: NarrativeEvent,
     player_pk: str,
@@ -147,6 +205,7 @@ def _validate_and_project_record(
         return None
 
     content = event.content if isinstance(event.content, dict) else {}
+    location = _record_location(content, str(event.source_id))
 
     raw_awards = content.get("award_results", [])
     award_results: list[dict[str, Any]] = []
@@ -166,12 +225,8 @@ def _validate_and_project_record(
             "completed_objective": dict(completed_objective) if isinstance(completed_objective, dict) else str(completed_objective),
             "outcome": str(outcome),
         }
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=data,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, data, award_results, location
         )
 
     elif event_type == "guild_exam_settlement":
@@ -191,12 +246,8 @@ def _validate_and_project_record(
             "attained_rank": str(attained_rank),
             "passed": True,
         }
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=data,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, data, award_results, location
         )
 
     elif event_type == "combat_encounter":
@@ -218,12 +269,8 @@ def _validate_and_project_record(
             "rounds_elapsed": int(content.get("rounds_elapsed", 0)),
             "display_snapshots": dict(content.get("display_snapshots", {})),
         }
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=data,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, data, award_results, location
         )
 
     elif event_type == "skill_use":
@@ -257,12 +304,8 @@ def _validate_and_project_record(
                 "exceptional_difficulty": False,
             },
         }
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=data,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, data, award_results, location
         )
 
     elif event_type == "adult_action":
@@ -274,12 +317,8 @@ def _validate_and_project_record(
         if projected is None:
             # Not authorized or malformed permission block
             return None
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=projected,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, projected, award_results, location
         )
 
     elif event_type == "adult_milestone":
@@ -304,12 +343,8 @@ def _validate_and_project_record(
                 "public_notoriety": False,
             },
         }
-        return AuthorizedDeedRecord(
-            source_id=event.source_id,
-            event_type=event_type,
-            tick=int(event.tick),
-            data=data,
-            award_results=tuple(award_results),
+        return _authorized_record(
+            event, event_type, data, award_results, location
         )
 
     return None
@@ -319,10 +354,13 @@ def _load_authorized_records(
     player_pk: str,
     lower_bound: int,
     upper_bound: int,
+    frozen_tick: int,
 ) -> list[AuthorizedDeedRecord]:
     """Query durable storage and project authorized records within the frozen window.
 
-    Malformed eligible records fail closed for that record only with a diagnostic warning.
+    Malformed eligible records fail closed for that record only with a diagnostic
+    warning; the warning carries the admitted window's frozen tick so it
+    correlates with admission and failure diagnostics.
     """
     qs: QuerySet[NarrativeEvent] = NarrativeEvent.objects.filter(
         tick__gte=lower_bound,
@@ -345,7 +383,12 @@ def _load_authorized_records(
             # Privacy-safe diagnostic warning: IDs and event_type only, never raw payload
             log_warn(
                 "recent_deed_record_malformed",
-                context={"source_id": str(event.source_id), "event_type": str(event.event_type)},
+                exc=error,
+                context={
+                    "source_id": str(event.source_id),
+                    "event_type": str(event.event_type),
+                    "frozen_tick": int(frozen_tick),
+                },
             )
             continue
 
@@ -385,6 +428,28 @@ def _get_action_compression_key(record: AuthorizedDeedRecord) -> tuple[str, str,
     player_role = "actor" if actor_id == data.get("player_id") else "recipient"
 
     return (action_type, actor_id, recip_key, enc_encounter, player_role)
+
+
+def _occurrence_context(
+    records: Sequence[AuthorizedDeedRecord],
+) -> list[dict[str, Any]]:
+    """Return one source-linked time/location reference per compressed occurrence.
+
+    Compression keeps every occurrence's own committed time and location, so a
+    later occurrence's tick is never folded into an earlier fact and no
+    occurrence is given the run's first location. A single occurrence needs no
+    list: its fact already carries its own tick and location.
+    """
+    if len(records) < 2:
+        return []
+    return [
+        {
+            "source_id": record.source_id,
+            "tick": record.tick,
+            "location": record.location.to_json(),
+        }
+        for record in records
+    ]
 
 
 def _build_compressed_action_fact(
@@ -431,27 +496,31 @@ def _build_compressed_action_fact(
     distinct_transitions = _distinct_rows("transitions")
     distinct_counters = _distinct_rows("counters")
 
-    # Collect distinct milestones
-    combined_milestones: list[dict[str, Any]] = []
-    seen_ms: set[str] = set()
+    # Collect distinct milestones keyed by their immutable source identity. An
+    # embedded summary is the same occurrence as its authorized milestone row,
+    # so the richer authorized record replaces it in place: the occurrence
+    # keeps its own committed tick and location instead of the action's.
+    combined_milestones: dict[str, dict[str, Any]] = {}
     for r in records:
         for ms in r.data.get("milestones", []):
             if isinstance(ms, dict):
-                ms_id = str(ms.get("source_id") or f"{ms.get('milestone_kind')}:{ms.get('identifier')}")
-                if ms_id not in seen_ms:
-                    seen_ms.add(ms_id)
-                    combined_milestones.append(ms)
+                ms_id = str(
+                    ms.get("source_id")
+                    or f"{ms.get('milestone_kind')}:{ms.get('identifier')}"
+                )
+                combined_milestones.setdefault(ms_id, ms)
 
     for ms_rec in milestones:
-        ms_id = ms_rec.source_id
-        if ms_id not in seen_ms:
-            seen_ms.add(ms_id)
-            combined_milestones.append({
-                "source_id": ms_id,
-                "milestone_kind": ms_rec.data.get("milestone_kind"),
-                "identifier": ms_rec.data.get("identifier"),
-                "details": ms_rec.data.get("details"),
-            })
+        combined_milestones[ms_rec.source_id] = {
+            "source_id": ms_rec.source_id,
+            "milestone_kind": ms_rec.data.get("milestone_kind"),
+            "identifier": ms_rec.data.get("identifier"),
+            "details": ms_rec.data.get("details"),
+            "tick": ms_rec.tick,
+            "location": ms_rec.location.to_json(),
+        }
+
+    milestone_rows = list(combined_milestones.values())
 
     if is_adult:
         outcomes = dict(base_data.get("outcomes", {}))
@@ -460,10 +529,15 @@ def _build_compressed_action_fact(
         outcomes["transitions"] = distinct_transitions
         outcomes["counters"] = distinct_counters
         base_data["outcomes"] = outcomes
-        base_data["milestones"] = combined_milestones
+        base_data["milestones"] = milestone_rows
     else:
         base_data["effects"] = distinct_effects
-        base_data["milestones"] = combined_milestones
+        base_data["milestones"] = milestone_rows
+
+    # A compressed run keeps every occurrence's own time and location.
+    occurrences = _occurrence_context(records)
+    if occurrences:
+        base_data["occurrences"] = occurrences
 
     return base_data
 
@@ -656,6 +730,8 @@ def _group_and_aggregate_deeds(
                 "milestone_kind": ms.data.get("milestone_kind"),
                 "identifier": ms.data.get("identifier"),
                 "details": ms.data.get("details"),
+                "tick": ms.tick,
+                "location": ms.location.to_json(),
             }
             for ms in milestones_by_encounter.get(encounter_id, ())
             if ms.source_id not in all_enc_sources
@@ -778,25 +854,23 @@ def _budget_and_render_groups(
 def select_authorized_recent_deeds(
     entity: Any,
     *,
-    frozen_tick: int | None = None,
+    frozen_tick: int,
 ) -> RecentDeedsSelectionResult:
     """Select, authorize, aggregate and render recent deeds for a player character.
 
     Selection never consumes deeds, permitting subsequent requests to reuse them.
-    Admitted request freezes world tick T.
+    The caller freezes world tick T once at admission and passes it here: the
+    selector never reads a clock, so a late caller can never widen or shift the
+    admitted window after generation or persistence.
     """
     player_pk = _durable_pk(entity)
-    if frozen_tick is None:
-        clock = read_world_clock()
-        if clock is None:
-            raise RuntimeError("world clock is unavailable")
-        frozen_tick = int(clock.tick)
-    else:
-        frozen_tick = int(frozen_tick)
+    frozen_tick = int(frozen_tick)
 
     lower_bound, upper_bound = compute_recent_deeds_window(frozen_tick)
 
-    authorized_records = _load_authorized_records(player_pk, lower_bound, upper_bound)
+    authorized_records = _load_authorized_records(
+        player_pk, lower_bound, upper_bound, frozen_tick
+    )
     groups = _group_and_aggregate_deeds(authorized_records, player_pk)
     final_groups, final_sources, rendered_json = _budget_and_render_groups(groups)
 

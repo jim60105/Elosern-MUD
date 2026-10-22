@@ -3,6 +3,12 @@
 OpenSpec change: record-action-adult-recent-deeds
 Design: docs/superpowers/specs/2026-10-22-epithet-recent-deeds-design.md §5, §5.1, §5.2, §6, §10
 
+Every record below also carries `location` (dict): the settlement-time
+reference `{"id": <durable room identity>, "label": <readable room label>}` of
+the occurrence's actual room. Both fields are empty when the settlement held no
+authoritative location; consumers render that state as unknown instead of
+looking a room up later.
+
 Payload contracts:
 1. Settled skill use (event_type="skill_use"):
    - action_source_id (str): Stable occurrence identity.
@@ -32,6 +38,8 @@ Payload contracts:
    - milestone_kind (str): "experience_type", "act_unlock", or "state_transition".
    - identifier (str): Transition name or token.
    - details (dict): Specific structured transition data.
+   - location (dict): The milestone occurrence's own room reference (the
+     transition owner's room at that boundary), never the action's.
 
 4. Accepted settled-effect results (event evidence, written into
    `skill_use.effects` and `adult_action.outcomes.effects`):
@@ -75,6 +83,7 @@ Payload contracts:
      happened, and a transition only when the attempt itself crossed the
      victim into 進行中.
    - milestones: Only the victim's own newly crossed transitions.
+   - location: The aftermath's own room reference at the attempt.
    `visibility` is "private", so the existing memory consumer deliberately
    projects no cognition record for it while its progress row still settles;
    the authorized recent-deed projection still reads it.
@@ -430,7 +439,7 @@ def record_non_resolver_adult_milestones(
     *,
     source_id: str,
     tick: int,
-    location: str = "",
+    location: Any = None,
     encounter_provenance: Any | None = None,
 ) -> RecordedAdultMilestones:
     """Record newly crossed adult milestones for non-resolver transition owners.
@@ -440,6 +449,12 @@ def record_non_resolver_adult_milestones(
     context the action evidence does, so selection can join an upkeep
     milestone to its own encounter outcome instead of treating it as a
     standalone fact or merging it with another engagement.
+
+    ``location`` is the owner's actual location object (or a durable identity
+    at an identity-bearing call site). Its settlement-time reference is
+    snapshotted once here and persisted into every milestone this call commits;
+    an owner with no authoritative location states that explicitly instead of
+    having one inferred later.
 
     The returned summaries use the ``adult_action.milestones`` payload shape,
     so an owner that records an action occurrence alongside its milestones can
@@ -455,7 +470,9 @@ def record_non_resolver_adult_milestones(
         if encounter_provenance is None
         else combat_encounter_context(encounter_provenance)
     )
-    from world.narrative.events import record_narrative_event
+    from world.narrative.events import record_narrative_event, snapshot_location
+
+    location_ref = snapshot_location(location)
     recorded = []
     summaries = []
     for m in milestones:
@@ -469,6 +486,7 @@ def record_non_resolver_adult_milestones(
             "details": m["details"],
             "tick": int(tick),
             "visibility": "private",
+            "location": location_ref.to_content(),
             "privacy": {
                 "private_experience": True,
                 "public_notoriety": False,
@@ -481,7 +499,7 @@ def record_non_resolver_adult_milestones(
             event_type="adult_milestone",
             content=ms_content,
             participants=[entity_pk],
-            location=str(location or ""),
+            location=location_ref.identity,
             tick=int(tick),
             visibility="private",
             salience=1,
@@ -911,7 +929,7 @@ def record_defeat_attempt_evidence(
     before: MilestoneSnapshot | None,
     tick: int,
     encounter_id: str,
-    location: str = "",
+    location: Any = None,
     session_id: str = "",
 ) -> tuple[Any, list[Any]]:
     """Record one defeat aftermath attempt's adult occurrence and victim milestones.
@@ -924,6 +942,10 @@ def record_defeat_attempt_evidence(
     when the victim's own phase crossed into 進行中 between ``before`` and the
     applied deltas — on a landed *and* on a resisted attempt. Unselected pool
     members and untouched allies never reach this record.
+
+    ``location`` is the aftermath owner's actual location object. Its
+    settlement-time reference is snapshotted once and persisted into the
+    attempt's adult occurrence and its victim milestones.
     """
     clean_encounter = str(encounter_id or "").strip()
     if not clean_encounter:
@@ -935,6 +957,7 @@ def record_defeat_attempt_evidence(
     # A committed attempt's evidence is immutable: re-delivering it reuses the
     # original action and its original milestone rows instead of re-detecting
     # the victim's later state under the old attempt identity.
+    from world.narrative.events import snapshot_location
     from world.narrative.models import NarrativeEvent
 
     existing = NarrativeEvent.objects.filter(source_id=attempt_source_id).first()
@@ -950,12 +973,13 @@ def record_defeat_attempt_evidence(
     aggressor_pk = _durable_pk(aggressor)
     victim_pk = _durable_pk(victim)
     victim_name = str(getattr(victim, "key", ""))
+    location_ref = snapshot_location(location)
     recorded = record_non_resolver_adult_milestones(
         victim,
         before,
         source_id=attempt_source_id,
         tick=tick,
-        location=location,
+        location=location_ref,
     )
 
     crossed_onset = False
@@ -1018,6 +1042,7 @@ def record_defeat_attempt_evidence(
         # ``_rows`` reads a plain list; the summaries stay detached copies.
         "milestones": [dict(summary) for summary in recorded.summaries],
         "visibility": "private",
+        "location": location_ref.to_content(),
         "privacy": {
             "private_experience": True,
             "consent_inferred": False,
@@ -1053,7 +1078,7 @@ def record_defeat_attempt_evidence(
         event_type="adult_action",
         content=content,
         participants=[aggressor_pk, victim_pk],
-        location=str(location or ""),
+        location=location_ref.identity,
         tick=int(tick),
         visibility="private",
         salience=1,
@@ -1082,7 +1107,7 @@ def record_action_settlement_evidence(
     from world.rules.clock import get_world_clock
     """Record immutable narrative event and milestones for a settled action."""
     current_tick = get_world_clock().tick if tick is None else int(tick)
-    from world.narrative.events import record_narrative_event
+    from world.narrative.events import record_narrative_event, snapshot_location
     source_id = build_action_source_id(request, tick=current_tick)
 
     # Evidence classification follows the same authority as source
@@ -1172,9 +1197,11 @@ def record_action_settlement_evidence(
     # Participants list: actual actor and actual recipients only
     participants = [actor_pk] + [r["id"] for r in actual_recipient_records if r["id"] != actor_pk]
 
-    # Location
+    # Location: the action's actual room at settlement. Its reference is
+    # snapshotted here, inside the settlement, and carried by the action and
+    # every milestone this settlement records.
     location = getattr(request.context, "room", None) or getattr(actor, "location", None)
-    location_str = str(getattr(location, "pk", getattr(location, "id", str(location or ""))))
+    location_ref = snapshot_location(location)
 
     # Visibility: third party observers check
     observed = _check_external_observers(actor, actual_target_entities, location)
@@ -1380,6 +1407,7 @@ def record_action_settlement_evidence(
                     "details": m["details"],
                     "tick": current_tick,
                     "visibility": "private",
+                    "location": location_ref.to_content(),
                     "privacy": {
                         "private_experience": True,
                         "public_notoriety": False,
@@ -1392,7 +1420,7 @@ def record_action_settlement_evidence(
                     event_type="adult_milestone",
                     content=ms_content,
                     participants=[e_pk],
-                    location=location_str,
+                    location=location_ref.identity,
                     tick=current_tick,
                     visibility="private",
                     salience=1,
@@ -1426,6 +1454,7 @@ def record_action_settlement_evidence(
             },
             "milestones": milestone_summaries,
             "visibility": visibility,
+            "location": location_ref.to_content(),
             "privacy": {
                 "private_experience": not observed,
                 "consent_inferred": False,       # NEVER infer consent from arousal/climax/auto-comply
@@ -1470,6 +1499,7 @@ def record_action_settlement_evidence(
             "recipients": actual_recipient_records,
             "effects": effects_data,
             "visibility": "public",
+            "location": location_ref.to_content(),
             "claim_limits": {
                 "rescue_claimed": False,         # NEVER infer rescue or protection
                 "protection_claimed": False,
@@ -1482,7 +1512,7 @@ def record_action_settlement_evidence(
         event_type=event_type,
         content=content,
         participants=participants,
-        location=location_str,
+        location=location_ref.identity,
         tick=current_tick,
         visibility=visibility,
         salience=1,

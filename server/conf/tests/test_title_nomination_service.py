@@ -124,12 +124,14 @@ class NominationSchedulingTests(EvenniaTest):
         record_narrative_event(
             source_id="quest:test_001",
             event_type="quest_completion",
-            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
             participants=[self.player.pk],
             tick=100,
         )
         self.clock = SimpleNamespace(tick=100)
-        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher = patch(
+            "server.title_nomination_service.read_world_clock", return_value=self.clock
+        )
         self.clock_patcher.start()
         self.addCleanup(self.clock_patcher.stop)
 
@@ -215,6 +217,7 @@ class NominationSchedulingTests(EvenniaTest):
             source_id="adult:committed_act_001",
             event_type="adult_action",
             content={
+                "location": {"id": "", "label": ""},
                 "act_key": "synth_touch",
                 "act_name": "撫觸測試",
                 "player_id": player_pk,
@@ -244,7 +247,7 @@ class NominationSchedulingTests(EvenniaTest):
         record_narrative_event(
             source_id="adult:unauthorized_act_999",
             event_type="adult_action",
-            content={"act_key": "secret", "outcome": "unauthorized_outcome"},
+            content={"location": {"id": "", "label": ""}, "act_key": "secret", "outcome": "unauthorized_outcome"},
             participants=["other_person_1", "other_person_2"],
             tick=100,
         )
@@ -429,12 +432,14 @@ class RestBoundaryTests(EvenniaTest):
         record_narrative_event(
             source_id="quest:test_rest_nominee",
             event_type="quest_completion",
-            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj", "outcome": "completed"},
             participants=[self.player.pk],
             tick=100,
         )
         self.clock = SimpleNamespace(tick=100)
-        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher = patch(
+            "server.title_nomination_service.read_world_clock", return_value=self.clock
+        )
         self.clock_patcher.start()
         self.addCleanup(self.clock_patcher.stop)
         service.reset_nomination_triggers_for_tests()
@@ -489,7 +494,7 @@ class RestBoundaryTests(EvenniaTest):
         record_narrative_event(
             source_id="quest:in_flight_test",
             event_type="quest_completion",
-            content={"quest_id": "q_in_flight", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_in_flight", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
             participants=[self.player.pk],
             tick=100,
         )
@@ -587,7 +592,7 @@ class RestBoundaryTests(EvenniaTest):
         record_narrative_event(
             source_id="quest:award_occ",
             event_type="quest_completion",
-            content={"quest_id": "q_award", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_award", "definition_key": "dk", "completed_objective": "obj", "outcome": "completed"},
             participants=[self.player.pk],
             tick=100,
         )
@@ -727,7 +732,9 @@ class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
         self.player = create_object(PlayerCharacter, key="smoke-hero")
         self.untouched = create_object(PlayerCharacter, key="smoke-control")
         self.clock = SimpleNamespace(tick=100)
-        self.clock_patcher = patch("world.narrative.recent_deeds.read_world_clock", return_value=self.clock)
+        self.clock_patcher = patch(
+            "server.title_nomination_service.read_world_clock", return_value=self.clock
+        )
         self.clock_patcher.start()
         self.addCleanup(self.clock_patcher.stop)
         service.reset_nomination_triggers_for_tests()
@@ -768,6 +775,7 @@ class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
             source_id="adult:smoke_act_1",
             event_type="adult_action",
             content={
+                "location": {"id": "", "label": ""},
                 "act_key": "deep_embrace",
                 "act_name": "深情擁抱",
                 "player_id": player_pk,
@@ -838,7 +846,7 @@ class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
                 record_narrative_event(
                     source_id="quest:rollback_test",
                     event_type="quest_completion",
-                    content={"quest_id": "rb", "definition_key": "dk", "completed_objective": "o", "outcome": "completed"},
+                    content={"location": {"id": "", "label": ""}, "quest_id": "rb", "definition_key": "dk", "completed_objective": "o", "outcome": "completed"},
                     participants=[self.player.pk],
                     tick=100,
                 )

@@ -52,7 +52,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:before_lower",
             event_type="quest_completion",
-            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
             participants=[self.player_pk],
             tick=lower - 1,
         )
@@ -60,7 +60,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:at_lower",
             event_type="quest_completion",
-            content={"quest_id": "q2", "definition_key": "dk2", "completed_objective": "obj2", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q2", "definition_key": "dk2", "completed_objective": "obj2", "outcome": "completed"},
             participants=[self.player_pk],
             tick=lower,
         )
@@ -68,7 +68,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:inside",
             event_type="quest_completion",
-            content={"quest_id": "q3", "definition_key": "dk3", "completed_objective": "obj3", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q3", "definition_key": "dk3", "completed_objective": "obj3", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t - 100,
         )
@@ -76,7 +76,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:at_t",
             event_type="quest_completion",
-            content={"quest_id": "q4", "definition_key": "dk4", "completed_objective": "obj4", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q4", "definition_key": "dk4", "completed_objective": "obj4", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -84,7 +84,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:future",
             event_type="quest_completion",
-            content={"quest_id": "q5", "definition_key": "dk5", "completed_objective": "obj5", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q5", "definition_key": "dk5", "completed_objective": "obj5", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t + 1,
         )
@@ -116,7 +116,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:zero_tick",
             event_type="quest_completion",
-            content={"quest_id": "q_zero", "definition_key": "dk_zero", "completed_objective": "obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_zero", "definition_key": "dk_zero", "completed_objective": "obj", "outcome": "completed"},
             participants=[self.player_pk],
             tick=0,
         )
@@ -139,6 +139,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                 source_id=f"action:straddle:before:{i}",
                 event_type="skill_use",
                 content={
+                    "location": {"id": "", "label": ""},
                     "skill_key": "fireball",
                     "actor": {"id": self.player_pk, "name": "Caster"},
                     "recipients": [{"id": self.other_pk, "name": "Target"}],
@@ -154,6 +155,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                 source_id=f"action:straddle:inside:{i}",
                 event_type="skill_use",
                 content={
+                    "location": {"id": "", "label": ""},
                     "skill_key": "fireball",
                     "actor": {"id": self.player_pk, "name": "Caster"},
                     "recipients": [{"id": self.other_pk, "name": "Target"}],
@@ -190,21 +192,21 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:admitted",
             event_type="quest_completion",
-            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q1", "definition_key": "dk1", "completed_objective": "obj1", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t,
         )
         record_narrative_event(
             source_id="exam:admitted",
             event_type="guild_exam_settlement",
-            content={"exam_id": "e1", "attained_rank": "D", "target_rank": "D", "passed": True},
+            content={"location": {"id": "", "label": ""}, "exam_id": "e1", "attained_rank": "D", "target_rank": "D", "passed": True},
             participants=[self.player_pk],
             tick=t,
         )
         record_narrative_event(
             source_id="combat:admitted",
             event_type="combat_encounter",
-            content={"encounter_id": "s1:1", "session_id": "s1", "outcome": "victory", "mode": "hostile", "participant_ids": [self.player_pk]},
+            content={"location": {"id": "", "label": ""}, "encounter_id": "s1:1", "session_id": "s1", "outcome": "victory", "mode": "hostile", "participant_ids": [self.player_pk]},
             participants=[self.player_pk],
             tick=t,
         )
@@ -249,7 +251,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="exam:failed_excluded",
             event_type="guild_exam_settlement",
-            content={"exam_id": "e_fail", "attained_rank": "E", "passed": False},
+            content={"location": {"id": "", "label": ""}, "exam_id": "e_fail", "attained_rank": "E", "passed": False},
             participants=[self.player_pk],
             tick=t,
         )
@@ -322,6 +324,8 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                     self.player_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
                     self.other_pk: ["target_own_outcome", "resistance_verdict", "effects_on_target", "target_milestones"],
                 },
+                # Explicit unknown: this synthetic payload settles no location.
+            "location": {"id": "", "label": ""},
             }
             return data
 
@@ -369,7 +373,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:usable",
             event_type="quest_completion",
-            content={"quest_id": "q_ok", "definition_key": "dk_ok", "completed_objective": "obj_ok", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_ok", "definition_key": "dk_ok", "completed_objective": "obj_ok", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -377,7 +381,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:corrupt",
             event_type="quest_completion",
-            content={"quest_id": "q_bad"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_bad"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -390,7 +394,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="exam:string_passed",
             event_type="guild_exam_settlement",
-            content={"exam_id": "e_str", "target_rank": "D", "attained_rank": "D", "passed": "true"},
+            content={"location": {"id": "", "label": ""}, "exam_id": "e_str", "target_rank": "D", "attained_rank": "D", "passed": "true"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -402,6 +406,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             source_id="adult:no_actor",
             event_type="adult_action",
             content={
+                "location": {"id": "", "label": ""},
                 "action_source_id": "adult:no_actor",
                 "actor": {"id": ""},
                 "recipients": [],
@@ -429,6 +434,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
                 source_id=f"act:run1:{i}",
                 event_type="skill_use",
                 content={
+                    "location": {"id": "", "label": ""},
                     "skill_key": "fireball",
                     "actor": {"id": self.player_pk},
                     "recipients": [{"id": self.other_pk}],
@@ -443,6 +449,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             source_id="act:run2:1",
             event_type="skill_use",
             content={
+                "location": {"id": "", "label": ""},
                 "skill_key": "ice_bolt",
                 "actor": {"id": self.player_pk},
                 "recipients": [{"id": self.other_pk}],
@@ -457,6 +464,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             source_id="act:run3:1",
             event_type="skill_use",
             content={
+                "location": {"id": "", "label": ""},
                 "skill_key": "fireball",
                 "actor": {"id": self.player_pk},
                 "recipients": [{"id": self.other_pk}],
@@ -470,14 +478,14 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="enc:enc1",
             event_type="combat_encounter",
-            content={"encounter_id": "sess_1:1", "session_id": "sess_1", "outcome": "victory"},
+            content={"location": {"id": "", "label": ""}, "encounter_id": "sess_1:1", "session_id": "sess_1", "outcome": "victory"},
             participants=[self.player_pk],
             tick=t + 30,
         )
         record_narrative_event(
             source_id="enc:enc2",
             event_type="combat_encounter",
-            content={"encounter_id": "sess_2:1", "session_id": "sess_2", "outcome": "escape"},
+            content={"location": {"id": "", "label": ""}, "encounter_id": "sess_2:1", "session_id": "sess_2", "outcome": "escape"},
             participants=[self.player_pk],
             tick=t + 40,
         )
@@ -516,6 +524,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             source_id=action_source,
             event_type="adult_action",
             content={
+                "location": {"id": "", "label": ""},
                 "action_source_id": action_source,
                 "act_key": "embrace",
                 "act_name": "相擁",
@@ -546,6 +555,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             source_id=ms_source,
             event_type="adult_milestone",
             content={
+                "location": {"id": "", "label": ""},
                 "action_source_id": action_source,
                 "milestone_kind": "state_transition",
                 "identifier": "emotional_bond",
@@ -585,7 +595,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             record_narrative_event(
                 source_id=sid,
                 event_type="quest_completion",
-                content={"quest_id": f"q_{i}", "definition_key": f"dk_{i}", "completed_objective": f"obj_{i}", "outcome": "completed"},
+                content={"location": {"id": "", "label": ""}, "quest_id": f"q_{i}", "definition_key": f"dk_{i}", "completed_objective": f"obj_{i}", "outcome": "completed"},
                 participants=[self.player_pk],
                 tick=t,
             )
@@ -611,7 +621,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:huge_newest",
             event_type="quest_completion",
-            content={"quest_id": "q_huge", "definition_key": "dk_huge", "completed_objective": huge_text, "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_huge", "definition_key": "dk_huge", "completed_objective": huge_text, "outcome": "completed"},
             participants=[self.player_pk],
             tick=t + 10,
         )
@@ -620,7 +630,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:normal_older",
             event_type="quest_completion",
-            content={"quest_id": "q_small", "definition_key": "dk_small", "completed_objective": "small obj", "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q_small", "definition_key": "dk_small", "completed_objective": "small obj", "outcome": "completed"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -643,7 +653,7 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
         record_narrative_event(
             source_id="quest:only_huge",
             event_type="quest_completion",
-            content={"quest_id": "q1", "definition_key": "dk1", "completed_objective": huge_text, "outcome": "completed"},
+            content={"location": {"id": "", "label": ""}, "quest_id": "q1", "definition_key": "dk1", "completed_objective": huge_text, "outcome": "completed"},
             participants=[self.player_pk],
             tick=t,
         )
@@ -702,6 +712,7 @@ def _adult_action_content(
                 "target_milestones",
             ],
         },
+    "location": {"id": "", "label": ""},
     }
 
 
@@ -741,6 +752,7 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
             source_id=source_id,
             event_type="adult_milestone",
             content={
+                "location": {"id": "", "label": ""},
                 "action_source_id": parent,
                 "milestone_kind": "state_transition",
                 "identifier": identifier,
@@ -1019,6 +1031,7 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
             source_id="adult:split:independent",
             event_type="adult_milestone",
             content={
+                "location": {"id": "", "label": ""},
                 "action_source_id": "",
                 "milestone_kind": "state_transition",
                 "identifier": "independent_transition",

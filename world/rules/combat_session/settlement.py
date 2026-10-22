@@ -413,6 +413,7 @@ def settle_session(
         build_encounter_source_id,
         get_committed_award_results,
         record_narrative_event,
+        snapshot_location,
     )
 
     # The terminal fact is keyed by the encounter's own engagement identity.
@@ -600,6 +601,20 @@ def settle_session(
             elif committed_awards:
                 title_awards_list.extend(committed_awards)
 
+            # The encounter's actual location owner is the durable session
+            # room. Its readable label is snapshotted here, from that owner,
+            # and an already-removed room keeps its durable identity without
+            # an invented label.
+            session_room = getattr(actor, "location", None)
+            if (
+                session_room is None
+                or int(getattr(session_room, "pk", 0) or 0) != int(record.room_id)
+            ):
+                session_room = ObjectDB.objects.filter(id=record.room_id).first()
+            location_ref = snapshot_location(session_room)
+            if not location_ref.known and record.room_id:
+                location_ref = snapshot_location(int(record.room_id))
+
             record_narrative_event(
                 source_id=encounter_source_id,
                 event_type="combat_encounter",
@@ -613,9 +628,10 @@ def settle_session(
                     "display_snapshots": display_snapshots,
                     "rounds_elapsed": int(record.rounds_elapsed),
                     "session_id": record.session_id,
+                    "location": location_ref.to_content(),
                 },
                 participants=[str(actor.pk), *participant_ids, *opponent_ids],
-                location=str(record.room_id or ""),
+                location=location_ref.identity,
                 tick=int(settled_record.settled_tick or get_world_clock().tick),
                 visibility="public",
                 salience=1,

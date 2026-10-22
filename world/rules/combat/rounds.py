@@ -244,7 +244,7 @@ def _end_of_round_upkeep(
             before,
             source_id=source_id,
             tick=tick,
-            location=str(getattr(entity, "location", "") or ""),
+            location=getattr(entity, "location", None),
             encounter_provenance=provenance,
         )
         return len(recorded.events)

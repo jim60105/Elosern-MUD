@@ -147,6 +147,9 @@ def adult_content(
         "field_access": grants
         if grants is not None
         else {actor_pk: list(ACTOR_GRANTS), recipient_pk: list(RECIPIENT_GRANTS)},
+        # The producer snapshot every supported fact carries: this synthetic
+        # payload states no authoritative location.
+        "location": {"id": "", "label": ""},
     }
 
 
@@ -528,7 +531,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         private_skill, private_skill_progress, _ = record_narrative_event(
             source_id="skill:private:1",
             event_type="skill_use",
-            content={"skill_key": "t_probe", "actor": {"id": self.player_pk}},
+            content={"location": {"id": "", "label": ""}, "skill_key": "t_probe", "actor": {"id": self.player_pk}},
             participants=[self.player_pk],
             tick=100,
             visibility="private",
@@ -542,7 +545,7 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         public_skill, _, _ = record_narrative_event(
             source_id="skill:public:1",
             event_type="skill_use",
-            content={"skill_key": "t_probe", "actor": {"id": self.player_pk}},
+            content={"location": {"id": "", "label": ""}, "skill_key": "t_probe", "actor": {"id": self.player_pk}},
             participants=[self.player_pk],
             tick=100,
         )

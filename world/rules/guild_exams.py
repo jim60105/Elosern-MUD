@@ -760,7 +760,14 @@ def settle_exam_outcome(
                     title_notifications = (note,)
 
                 # Finalize award results inside the same transaction
-                from world.narrative.events import record_narrative_event
+                from world.narrative.events import (
+                    record_narrative_event,
+                    snapshot_location,
+                )
+
+                # The promotion's own location owner is snapshotted inside this
+                # settlement; the fact never reads a live room afterwards.
+                location_ref = snapshot_location(getattr(actor, "location", None))
                 record_narrative_event(
                     source_id=source_id,
                     event_type="guild_exam_settlement",
@@ -769,8 +776,10 @@ def settle_exam_outcome(
                         "passed": True,
                         "target_rank": record.target_rank,
                         "attained_rank": actor.guild_rank,
+                        "location": location_ref.to_content(),
                     },
                     participants=[str(actor.pk)],
+                    location=location_ref.identity,
                     tick=get_world_clock().tick,
                     visibility="public",
                     salience=1,

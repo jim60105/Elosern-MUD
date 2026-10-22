@@ -399,8 +399,33 @@ def _completion_objective_payload(record: Any, source: Any) -> dict[str, Any]:
     payload = _serialize_objective(objective)
     payload["stage_index"] = stage_index
     payload["destination_room_id"] = getattr(binding_source, "stage_room_id", None)
+    payload["destination_room_label"] = _room_label(
+        payload["destination_room_id"]
+    )
     payload["bound_identities"] = _bound_identities(binding_source, objective)
     return payload
+
+
+def _room_label(room_id: Any) -> str:
+    """Return the readable key of one committed room identity, or ``""``.
+
+    The label is snapshotted at settlement, so a completed objective stays
+    intelligible after the room is renamed or removed. An absent identity or a
+    room that no longer exists yields an empty label instead of an inferred one.
+    """
+    from world.narrative.events import LOCATION_LABEL_MAX_CHARS
+
+    if room_id is None:
+        return ""
+    try:
+        key = (
+            ObjectDB.objects.filter(pk=int(room_id))
+            .values_list("db_key", flat=True)
+            .first()
+        )
+    except (TypeError, ValueError):
+        return ""
+    return str(key or "")[:LOCATION_LABEL_MAX_CHARS]
 
 
 def _settle_quest_completion_events(
@@ -435,10 +460,17 @@ def _settle_quest_completion_events(
     )
     from world.rules.clock import get_world_clock
     from world.rules.titles.awards import settle_quest_completion_awards
-    from world.narrative.events import get_committed_award_results, record_narrative_event
+    from world.narrative.events import (
+        get_committed_award_results,
+        record_narrative_event,
+        snapshot_location,
+    )
 
     current_tick = get_world_clock().tick
-    location_str = str(getattr(getattr(actor, "location", None), "pk", "") or "")
+    # The completion's actual location owner is snapshotted here, inside the
+    # settlement: the fact keeps a detached readable label and the durable
+    # identity no later selection-time room read can change.
+    location_ref = snapshot_location(getattr(actor, "location", None))
     before = _pre_completion_records(old_entries)
     for record in completed:
         objective_payload = _completion_objective_payload(
@@ -463,9 +495,10 @@ def _settle_quest_completion_events(
                 "definition_key": str(record.definition_key),
                 "completed_objective": objective_payload,
                 "outcome": "completed",
+                "location": location_ref.to_content(),
             },
             participants=[str(actor.pk)],
-            location=location_str,
+            location=location_ref.identity,
             tick=current_tick,
             visibility="public",
             salience=1,
