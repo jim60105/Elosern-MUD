@@ -737,7 +737,8 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "title-system::recent-deed-eligibility-is-closed-and-personally-authorized"
+        "title-system::recent-deed-eligibility-is-closed-and-personally-authorized",
+        "title-system::authorized-adult-result-families-survive-aggregation",
     )
     def test_own_state_families_respect_per_participant_knowability(self):
         """Scenario: Other participant state stays absent.
@@ -855,7 +856,8 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance",
+        "title-system::authorized-adult-result-families-survive-aggregation",
     )
     def test_grouped_run_retains_every_family_from_later_occurrences(self):
         """Scenario: Own adult outcomes reach the rendered feed.
@@ -943,7 +945,8 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
         self.assertNotIn('"roll":', group["facts"].__repr__())
 
     @covers_requirement(
-        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance",
+        "title-system::authorized-adult-result-families-survive-aggregation",
     )
     def test_attached_milestone_is_not_a_separate_occurrence_boundary(self):
         """Scenario: Attached milestone is not a separate action boundary.
