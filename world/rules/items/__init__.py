@@ -25,6 +25,15 @@ per-family payload: gauge steps add ``stat`` plus the signed ``amount``
 actually applied (never the configured magnitude), and status steps add
 ``status_keys`` plus the ``count`` actually applied or removed.
 
+Accepted-operation identity: ``preflight_item_use`` is the advisory
+eligibility oracle and allocates nothing. ``accept_item_use`` is the
+execution-boundary owner: it revalidates the request and returns an
+``AcceptedItemUse`` carrying the immutable plan and the operation's identity
+— the combat action-slot occurrence in a round, otherwise a fresh
+accepted-operation identity. Settlement consumes that pair, so an accepted
+item use owns its own adult milestones under exactly one identity and two
+uses at one world tick stay distinct.
+
 The split:
 
 - :mod:`world.rules.items.contracts` — ``ItemUseError``, ``ItemUseReason``,
@@ -36,8 +45,8 @@ The split:
   inventory, and pleasure reads (mirroring ``status_query``'s strict
   no-create reads) plus group-candidate expansion and effect-target
   resolution.
-- :mod:`world.rules.items.planning` — the gauge/status step planners and
-  ``preflight_item_use``.
+- :mod:`world.rules.items.planning` — the gauge/status step planners,
+  ``preflight_item_use`` and ``accept_item_use``.
 - :mod:`world.rules.items.settlement` — the appliers, the ``item_used``
   event log, ``resolve_item_use``, and the public ``use_item`` facade.
 
@@ -46,6 +55,7 @@ here.
 """
 
 from world.rules.items.contracts import (  # noqa: F401
+    AcceptedItemUse,
     ItemChoice,
     ItemEffectStep,
     ItemUseError,
@@ -67,6 +77,8 @@ from world.rules.items.planning import (  # noqa: F401
     _plan_gauge_step,
     _plan_status_step,
     _status_matches,
+    accept_item_use,
+    accepted_item_operation_id,
     enumerate_actor_item_choices,
     preflight_item_use,
 )

@@ -39,6 +39,7 @@ from world.rules.combat_session import (
     submit_opening_action,
 )
 from world.rules.event_log import EventEntry, EventLog
+from world.narrative.models import NarrativeEvent
 from world.rules.equipment import (
     materialize_registry_object,
     registry_key_for_object,
@@ -203,6 +204,66 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             if log.entries and log.actor == self.monster.key
         ]
         self.assertEqual(len(monster_actions), 1)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_combat_item_crossing_joins_its_own_slot_operation(self):
+        """Scenario: Combat item use joins its own accepted operation."""
+        key = "t_combat_bliss"
+        live_item_registry()[key] = make_item(
+            key,
+            display_name_zh="合成戰中快感藥",
+            price_table_key="t_mossmeals",
+            use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
+        )
+        live_item_effect_profiles()[key] = ItemEffectProfile(
+            effects=(GaugeAdjustEffect(stat=ItemStat.PLEASURE, amount=20),)
+        )
+        self.player.sexual.climax_phase.value = "接近"
+        self.player.sexual.pleasure.base = 40
+        self.player.db.inventory = [key]
+        engage(self.player, self.monster)
+        clock = WorldClock()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+            patch(
+                "world.rules.combat_session.settlement.get_world_clock",
+                return_value=clock,
+            ),
+        ):
+            result = submit_player_item_use(self.player, key)
+        self.assertEqual(result["outcome"], "round")
+        record = read_session(self.player)
+        operation = (
+            f"item:combat:{record.engagement_id}:r1:s0:{self.player.pk}:{key}"
+        )
+        milestones = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__entity_id=str(self.player.pk),
+                content__action_source_id=operation,
+            )
+        )
+        self.assertEqual(len(milestones), 1)
+        self.assertEqual(
+            milestones[0].content["encounter_context"]["encounter_id"],
+            record.engagement_id,
+        )
+        # The item's slot operation never collapses into the round-owned
+        # upkeep source the same round also records.
+        sources = set(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__entity_id=str(self.player.pk),
+            ).values_list("content__action_source_id", flat=True)
+        )
+        self.assertIn(operation, sources)
+        self.assertTrue(any(source.startswith("combat:") for source in sources))
+        self.assertEqual(len(sources), 2)
 
     @covers_requirement(
         "item-use-resolution::item-use-preflight-is-side-effect-free-and-revalidates-current-conditions"

@@ -1,4 +1,4 @@
-"""Item-use settlement: apply the plan, emit events, advance the clock.
+"""Item-use settlement: accept, apply the plan, emit events, advance the clock.
 
 Part of the ``world.rules/items`` package: the write side of the pipeline —
 per-step appliers, the ``item_used`` event log, ``resolve_item_use`` (one
@@ -6,6 +6,18 @@ transaction around the whole plan with the rollback journal), and the public
 out-of-combat ``use_item`` facade composing the item plan with the canonical
 command-source clock advance inside one outer transaction (mirroring
 ``cast_settlement``).
+
+Accepted-operation identity contract: an accepted item use has exactly one
+immutable operation identity, allocated by
+:func:`~world.rules.items.planning.accept_item_use` at the execution
+boundary and consumed together with the plan by :func:`_apply_plan`. In
+combat the identity is the action-slot occurrence (engagement, round, slot,
+actor, item) — never the reusable session token, the world tick or the
+effect display. Out of combat it is a fresh accepted-operation identity, so
+two accepted uses at one tick stay distinct. Eligibility probes
+(``preflight_item_use``, choice enumeration, party inventory) allocate
+nothing, and settlement never invents an identity: a missing or malformed
+one is required evidence and fails closed.
 """
 
 from typing import Any
@@ -13,6 +25,7 @@ from typing import Any
 from django.db import transaction
 
 from world.lore.items import ITEM_REGISTRY
+from world.observability import log_info
 from world.rules.buffs import BUFF_DEFINITIONS, apply_buff, remove_by_selector
 from world.rules.clock import (
     MAX_ADVANCE_SECONDS,
@@ -39,6 +52,7 @@ from world.rules.item_effects import (
     StatusRemoveEffect,
 )
 from world.rules.items.contracts import (
+    AcceptedItemUse,
     ItemEffectStep,
     ItemUseError,
     ItemUsePlan,
@@ -48,7 +62,7 @@ from world.rules.items.contracts import (
     ItemUseSettlement,
 )
 from world.rules.items.journal import ItemTouchedJournal
-from world.rules.items.planning import preflight_item_use
+from world.rules.items.planning import accept_item_use, preflight_item_use
 from world.rules.items.reads import _gauge_from_storage, _pleasure_current
 from world.rules.party_scope import present_party_scope
 from world.rules.pleasure import apply_pleasure_gain
@@ -234,7 +248,7 @@ def _apply_status_step(step: ItemEffectStep, item_key: str) -> int:
 
 
 def _apply_plan(
-    plan: ItemUsePlan, journal: ItemTouchedJournal
+    accepted: AcceptedItemUse, journal: ItemTouchedJournal
 ) -> list[tuple[ItemEffectStep, int]]:
     """Commit every planned step in order and return each step's applied count.
 
@@ -245,7 +259,30 @@ def _apply_plan(
     Inventory removal goes through the inventory planner so ACQUIRE/quest
     journals compose with it; a key-only consumable deletes nothing and no
     mirror is ever fabricated.
+
+    Every affected recipient's milestone-relevant adult state is captured
+    before the first effect step, and each recipient's genuinely new
+    milestones are recorded inside this same transaction under the accepted
+    operation's identity. Only actual transitions become evidence: a
+    recipient whose state did not cross a threshold writes nothing, and an
+    ordinary item use is never stated as an adult action.
     """
+    from world.narrative.action_adapters import (
+        capture_milestone_snapshot,
+        record_non_resolver_adult_milestones,
+    )
+    from world.rules.combat.decision_scope import current_combat_provenance
+
+    plan = accepted.plan
+    provenance = current_combat_provenance()
+    captures: list[tuple[Any, Any]] = []
+    captured: set[int] = set()
+    for step in plan.steps:
+        if id(step.target) in captured:
+            continue
+        captured.add(id(step.target))
+        captures.append((step.target, capture_milestone_snapshot(step.target)))
+
     settled: list[tuple[ItemEffectStep, int]] = []
     for step in plan.steps:
         if isinstance(step.effect, GaugeAdjustEffect):
@@ -258,6 +295,39 @@ def _apply_plan(
             plan_inventory_delta(plan.actor, removals=(plan.item_key,))
         )
     _delete_mirror(plan.actor, plan, journal)
+
+    from world.rules.clock import get_world_clock
+
+    tick = int(get_world_clock().tick)
+    location = str(getattr(plan.actor, "location", "") or "")
+    recorded = 0
+    for entity, before in captures:
+        if before is None:
+            continue
+        recorded += len(
+            record_non_resolver_adult_milestones(
+                entity,
+                before,
+                source_id=accepted.operation_id,
+                tick=tick,
+                location=location,
+                encounter_provenance=provenance,
+            ).events
+        )
+    if recorded:
+        boundary = {
+            "source_id": accepted.operation_id,
+            "item": plan.item_key,
+            "char": str(getattr(plan.actor, "pk", "")),
+            "tick": tick,
+            "milestones": recorded,
+        }
+        transaction.on_commit(
+            lambda boundary=boundary: log_info(
+                "item_use_adult_milestone", context=boundary
+            ),
+            robust=True,
+        )
     return settled
 
 
@@ -274,12 +344,14 @@ def resolve_item_use(
     performs no write and emits no EventLog, carrying the preflight detail
     (the resolver's own reason for a ``target_invalid``) unchanged.
     """
-    preflight = preflight_item_use(request, in_combat=in_combat, context=context)
-    if not preflight.allowed or preflight.plan is None:
+    preflight, accepted = accept_item_use(
+        request, in_combat=in_combat, context=context
+    )
+    if accepted is None:
         return ItemUseResult(
             outcome="rejected", reason=preflight.reason, detail=preflight.detail
         )
-    plan = preflight.plan
+    plan = accepted.plan
     # Capture every entity the plan steps on before the first write (design
     # D3): a lazy per-target capture could not restore state an earlier
     # target's write cascade touched.
@@ -288,7 +360,7 @@ def resolve_item_use(
     )
     try:
         with transaction.atomic():
-            settled = _apply_plan(plan, journal)
+            settled = _apply_plan(accepted, journal)
             event_log = _item_used_event_log(
                 plan,
                 str(request.actor.key),

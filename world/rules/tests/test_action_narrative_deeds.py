@@ -23,16 +23,24 @@ from world.narrative.models import NarrativeEvent
 from world.narrative.recent_deeds import select_authorized_recent_deeds
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.affinity import AffinitySource, apply_affinity_change
-from world.rules.buffs import BuffDefinition, apply_buff, entity_active_buffs
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    BuffDefinition,
+    apply_buff,
+    entity_active_buffs,
+)
 from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
 from world.quests.catalog import register_catalog
 from world.rules.combat import (
     Battlefield,
+    COMBAT_YAML,
     CombatProvenance,
     _stored_hp,
     combat_provenance,
 )
 from world.rules.combat.rounds import _end_of_round_upkeep
+from world.rules.rulebook.schema import Rule
+from world.rules.state_reactions import STATE_REACTION_RULES
 from world.rules.targeting import RoomActionContext
 from world.rules.titles import award_automatic_title, read_title_state
 from world.rules.titles.awards import AutomaticTitleAward
@@ -481,12 +489,131 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         )
         self.assertEqual(milestones.count(), 1)
         ms = milestones.first()
-        self.assertIn("combat:hostile:1000:1:round:2:upkeep:climax:", ms.source_id)
+        self.assertIn("combat:hostile:1000:1:round:2:upkeep:", ms.source_id)
         self.assertNotIn("round:9", ms.source_id)
         self.assertEqual(
             ms.content["encounter_context"]["encounter_id"], "hostile:1000:1"
         )
         self.assertEqual(ms.content["encounter_context"]["round_number"], 2)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_buff_reaction_crossing_is_recorded_once_by_its_upkeep(self):
+        """Scenario: Upkeep buff reaction crossing is retained once.
+
+        A real damage-over-time tick's ``hp_loss`` reaction raises pleasure and
+        pushes the victim from 接近 into 進行中 *before* the later state
+        snapshot. That crossing belongs to this upkeep boundary and is recorded
+        exactly once under (engagement, round, entity); it is not re-dated by a
+        later clock read, and a later round never reuses this source.
+        """
+        passive = make_skill(
+            "t_upkeep_feedback",
+            element="light",
+            kind=SkillKind.PASSIVE,
+            effects=(),
+        )
+        self.target.db.skills = {"active": [], "passive": [passive.key]}
+        self.target.traits.hp.current = 100
+        reaction = Rule(
+            id="t_upkeep_feedback_rule",
+            when={"event": "hp_loss", "skill_qualified": passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        rounds_seconds = int(COMBAT_YAML["round"]["seconds"])
+        dot = BuffDefinition(
+            key="t_upkeep_reaction_dot",
+            duration=60,
+            polarity="debuff",
+            tick_interval=rounds_seconds,
+            stacking="refresh",
+            modifiers={"rate": {"target": "hp", "delta": -10}},
+        )
+        battlefield = Battlefield(
+            {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
+            {str(self.target.key): self.target},
+        )
+        first_round = CombatProvenance(
+            engagement_id="hostile:upkeep-reaction:1",
+            round_ordinal=1,
+            session_id="test_sess_reaction",
+        )
+
+        with patch.dict(BUFF_DEFINITIONS, {dot.key: dot}, clear=False), patch.dict(
+            "world.skills.registry.SKILL_REGISTRY", {passive.key: passive}
+        ), patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction],
+        ):
+            apply_buff(self.target, dot.key)
+            # Park the victim one step below the active phase only after the
+            # debuff's own application reaction, so the tick is the crossing.
+            self.target.sexual.climax_phase.value = "接近"
+            self.target.sexual.pleasure.base = 60
+            # A staged extension keeps settlement in the active phase, so the
+            # crossing this very upkeep applied stays observable afterwards.
+            self.target.sexual.stage_climax_extension()
+            with patch("world.rules.combat.rounds.log_info") as info:
+                with self.captureOnCommitCallbacks(execute=True):
+                    with combat_provenance(first_round):
+                        _end_of_round_upkeep(battlefield)
+
+        self.assertEqual(self.target.sexual.climax_phase.level, "進行中")
+        first_source = (
+            f"combat:hostile:upkeep-reaction:1:round:1:upkeep:{self.target.pk}"
+            f":milestone:{self.target.pk}:state_transition:climax_onset"
+        )
+        onset = NarrativeEvent.objects.filter(
+            event_type="adult_milestone", source_id=first_source
+        )
+        self.assertEqual(onset.count(), 1)
+        self.assertEqual(
+            onset.first().content["encounter_context"]["encounter_id"],
+            "hostile:upkeep-reaction:1",
+        )
+        boundary = [
+            call.kwargs["context"]
+            for call in info.call_args_list
+            if call.args and call.args[0] == "combat_upkeep_milestone"
+        ]
+        self.assertEqual(len(boundary), 1)
+        self.assertEqual(boundary[0]["engagement"], "hostile:upkeep-reaction:1")
+        self.assertEqual(boundary[0]["round"], 1)
+        self.assertEqual(boundary[0]["entity"], str(self.target.pk))
+        self.assertGreaterEqual(boundary[0]["milestones"], 1)
+
+        # A later clock read re-reads the already-recorded state: the crossing
+        # is not dated again (a genuinely new later transition may still be).
+        with patch.dict(BUFF_DEFINITIONS, {dot.key: dot}, clear=False), patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction],
+        ):
+            WorldClock(tick=get_world_clock().tick).advance(
+                6, AdvanceSource.COMMAND, (self.target,)
+            )
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                source_id=first_source,
+            ).count(),
+            1,
+        )
+
+        # Later rounds own distinct sources: the round discriminator is part
+        # of the identity (pinned for both rounds by the provenance suite).
+        self.assertIn(":round:1:upkeep:", first_source)
+        self.assertEqual(
+            len(
+                {
+                    event.source_id
+                    for event in NarrativeEvent.objects.filter(
+                        event_type="adult_milestone"
+                    )
+                }
+            ),
+            NarrativeEvent.objects.filter(event_type="adult_milestone").count(),
+        )
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"

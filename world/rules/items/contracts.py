@@ -108,6 +108,23 @@ class ItemUsePreflight:
 
 
 @dataclass(frozen=True)
+class AcceptedItemUse:
+    """One item use accepted at the execution boundary.
+
+    ``plan`` is the complete immutable settlement the revalidated eligibility
+    check produced, and ``operation_id`` is this accepted operation's
+    immutable identity: the combat slot occurrence when the use resolves in a
+    round, otherwise a fresh accepted-operation identity. Settlement consumes
+    both together, so a milestone can never be written under an identity the
+    settlement did not actually accept, and a presentation-only preflight
+    never allocates one.
+    """
+
+    plan: ItemUsePlan
+    operation_id: str
+
+
+@dataclass(frozen=True)
 class ItemChoice:
     """One immutable actor-scoped usable item choice with preflighted availability.
 

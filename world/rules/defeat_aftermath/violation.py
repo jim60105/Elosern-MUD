@@ -12,6 +12,7 @@ from dataclasses import replace
 from typing import Any
 
 from django.conf import settings
+from django.db import transaction
 
 from world.observability import log_info, log_warn
 from world.rules.action import (
@@ -309,6 +310,19 @@ def _rewrite_wake_line(entries: list[EventEntry], violated_wake_line: str) -> No
             return
 
 
+def _record_attempt_evidence(**evidence: Any) -> tuple[Any, list[Any]]:
+    """Record one attempt's adult occurrence and victim milestones.
+
+    The narrative adapter owns the payload contract; the import is late so
+    the defeat package keeps its existing import order. The attempt identity
+    and the victim's before-state are required evidence — this call never
+    invents either.
+    """
+    from world.narrative.action_adapters import record_defeat_attempt_evidence
+
+    return record_defeat_attempt_evidence(**evidence)
+
+
 def _schedule_violation_boundary(
     actor: Any,
     clock: Any,
@@ -496,6 +510,14 @@ def run_violation_sequence(
     rolled-back retry re-derives the identical sequence; the sequence
     persists only its state writes, counter credits, EventLog entries, and
     the clock advances themselves.
+
+    Each executed attempt also records its own adult occurrence and the
+    victim's newly crossed milestones under the attempt identity — the
+    unique engagement, the aggressor, the attempt ordinal and the selected
+    victim. The victim's before-state is captured immediately before that
+    attempt's declared deltas, so a crossing belongs to the attempt that
+    applied it, whether the contest landed or was resisted, and a pool member
+    the draw never selected never appears in any record.
     """
     actor = context.actor
     session = context.session
@@ -516,6 +538,14 @@ def run_violation_sequence(
 
     clock = get_world_clock()
     scope = _violation_scope(actor)
+    from world.narrative.action_adapters import capture_milestone_snapshot
+
+    engagement_id = str(getattr(session, "engagement_id", "") or "").strip()
+    if not engagement_id:
+        raise ValueError(
+            "defeat violation has no engagement identity: an attempt "
+            "occurrence cannot be identified by a session token or a world tick"
+        )
 
     # Undo layering: every pool member's sexual surfaces are snapshotted
     # before any write (any companion may be selected); each row-carrying
@@ -562,6 +592,9 @@ def run_violation_sequence(
                 ),
             )
             player_victim = victim is actor
+            # This attempt's own baseline, captured before its first declared
+            # adult change: a threshold already met here is never recent.
+            victim_before = capture_milestone_snapshot(victim)
             entries.append(
                 _violation_attempt_entry(
                     violator,
@@ -572,6 +605,7 @@ def run_violation_sequence(
                     player_victim=player_victim,
                 )
             )
+            landed = not verdict.resisted
             if verdict.resisted:
                 tally[2] += 1
                 _apply_violation_deltas(victim, violator, row.resisted)
@@ -583,29 +617,59 @@ def run_violation_sequence(
                         player_victim=player_victim,
                     )
                 )
-                _advance_attempt_clock(
-                    clock, row.attempt_duration_seconds, scope, restores
+            else:
+                tally[1] += 1
+                climax = _victim_climax_onset(victim, violator, row.landed)
+                tally[3] += int(climax)
+                _credit_violation_counters(victim, violator, row.credited_counters)
+                entries.append(
+                    _violation_act_entry(
+                        violator,
+                        victim,
+                        attempt_index,
+                        climax,
+                        player_victim=player_victim,
+                    )
                 )
-                # D-V5: the first successful resistance cancels this
-                # violator's remaining attempts; the shrunk deltas and the
-                # spent duration of the resisted attempt are its last.
-                break
-            tally[1] += 1
-            climax = _victim_climax_onset(victim, violator, row.landed)
-            tally[3] += int(climax)
-            _credit_violation_counters(victim, violator, row.credited_counters)
-            entries.append(
-                _violation_act_entry(
-                    violator,
-                    victim,
-                    attempt_index,
-                    climax,
-                    player_victim=player_victim,
-                )
+            attempt_source_id = (
+                f"defeat:{engagement_id}:{violator.pk}"
+                f":attempt:{attempt_index}:victim:{victim.pk}"
+            )
+            action_event, milestone_events = _record_attempt_evidence(
+                attempt_source_id=attempt_source_id,
+                aggressor=violator,
+                victim=victim,
+                resisted=bool(verdict.resisted),
+                auto_comply=bool(verdict.auto_comply),
+                roll=verdict.roll,
+                credited_counters=row.credited_counters if landed else (),
+                before=victim_before,
+                tick=int(clock.tick),
+                location=str(getattr(actor, "location", "") or ""),
+                encounter_id=engagement_id,
+                session_id=str(getattr(session, "session_id", "") or ""),
+            )
+            evidence_boundary = {
+                "source_id": action_event.source_id,
+                "char": str(actor.key),
+                "tick": int(clock.tick),
+                "resisted": bool(verdict.resisted),
+                "milestones": len(milestone_events),
+            }
+            transaction.on_commit(
+                lambda boundary=evidence_boundary: log_info(
+                    "defeat_aftermath_adult_evidence", context=boundary
+                ),
+                robust=True,
             )
             _advance_attempt_clock(
                 clock, row.attempt_duration_seconds, scope, restores
             )
+            if verdict.resisted:
+                # D-V5: the first successful resistance cancels this
+                # violator's remaining attempts; the shrunk deltas and the
+                # spent duration of the resisted attempt are its last.
+                break
     outcomes = {
         key: ViolationOutcome(
             participant=key,

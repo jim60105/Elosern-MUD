@@ -1,12 +1,15 @@
-"""Side-effect-free item-use planning: per-step eligibility and preflight.
+"""Item-use planning: per-step eligibility, the preflight oracle, and acceptance.
 
 Part of the ``world.rules.items`` package: the bound-reached reason table, the
-gauge/status step planners, and ``preflight_item_use`` — the single
-eligibility oracle shared by presentation and settlement that writes nothing.
+gauge/status step planners, ``preflight_item_use`` — the single eligibility
+oracle shared by presentation and settlement that writes nothing — and
+``accept_item_use``, the execution-boundary acceptance owner that revalidates
+the request and allocates the accepted operation's immutable identity.
 """
 
 from collections.abc import Callable
 from typing import Any
+from uuid import uuid4
 
 from world.lore.items import ITEM_REGISTRY
 from world.rules.buffs import BUFF_DEFINITIONS
@@ -21,6 +24,7 @@ from world.rules.item_effects import (
     StatusRemoveEffect,
 )
 from world.rules.items.contracts import (
+    AcceptedItemUse,
     ItemEffectStep,
     ItemChoice,
     ItemUsePlan,
@@ -268,6 +272,79 @@ def preflight_item_use(
         mirror_pk=mirror.id if mirror is not None else None,
     )
     return ItemUsePreflight(allowed=True, reason=None, plan=plan)
+
+
+def accepted_item_operation_id(
+    actor_pk: str, item_key: str, *, context: Any | None = None
+) -> str:
+    """Allocate one accepted item operation's immutable identity.
+
+    Identity is the accepted operation's occurrence, never the item key, the
+    effect display text or the world tick alone:
+
+    - Inside a resolved combat action slot it is that slot occurrence — the
+      encounter's engagement identity, the real round ordinal, the acting
+      combatant's slot ordinal, the actor and the item, in the same field
+      order the combat action source uses. Two slots of one engagement
+      therefore stay distinct however equal their prose or effects are.
+    - Out of combat it is a fresh accepted-operation identity, so two
+      accepted uses at the same tick can never share a source.
+
+    A combat request context without combat provenance is malformed required
+    evidence and fails closed instead of being relabeled as an out-of-combat
+    use. Presentation-only probes never call this allocator.
+    """
+    from world.rules.combat.decision_scope import current_combat_provenance
+
+    provenance = current_combat_provenance()
+    if provenance is None:
+        if getattr(context, "battlefield", None) is not None:
+            raise ValueError(
+                "combat item use has no combat provenance: the round's "
+                "engagement and slot identity is required evidence"
+            )
+        return f"item:accept:{uuid4().hex}"
+    if not provenance.engagement_id:
+        raise ValueError(
+            "combat item use has no engagement identity: an accepted "
+            "operation cannot be identified by a session token or a world tick"
+        )
+    if provenance.slot_ordinal is None:
+        raise ValueError(
+            "combat item use has no action-slot ordinal: an item use is a "
+            "slot occurrence, never a round-owned upkeep boundary"
+        )
+    return (
+        f"item:combat:{provenance.engagement_id}"
+        f":r{provenance.round_ordinal}:s{provenance.slot_ordinal}"
+        f":{actor_pk}:{item_key}"
+    )
+
+
+def accept_item_use(
+    request: ItemUseRequest,
+    *,
+    in_combat: bool,
+    context: Any | None = None,
+) -> tuple[ItemUsePreflight, AcceptedItemUse | None]:
+    """Revalidate one item use at the execution boundary and accept it.
+
+    Returns the repeated eligibility outcome and, when the plan is accepted,
+    the accepted operation (its immutable plan plus its allocated identity).
+    A rejected request allocates no identity and writes nothing; a presented
+    plan is never trusted, because eligibility is revalidated here.
+    """
+    preflight = preflight_item_use(request, in_combat=in_combat, context=context)
+    if not preflight.allowed or preflight.plan is None:
+        return preflight, None
+    actor_pk = str(getattr(request.actor, "pk", "") or request.actor)
+    accepted = AcceptedItemUse(
+        plan=preflight.plan,
+        operation_id=accepted_item_operation_id(
+            actor_pk, request.item_key, context=context
+        ),
+    )
+    return preflight, accepted
 
 
 def enumerate_actor_item_choices(

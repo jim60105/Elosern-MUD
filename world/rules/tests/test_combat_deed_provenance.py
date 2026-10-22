@@ -384,7 +384,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
                 self.player,
                 snapshot,
                 source_id=(
-                    f"combat:{record.engagement_id}:round:2:upkeep:climax:"
+                    f"combat:{record.engagement_id}:round:2:upkeep:"
                     f"{self.player.pk}"
                 ),
                 tick=get_world_clock().tick,
@@ -499,7 +499,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(
             first.source_id,
-            f"combat:hostile:900:1:round:2:upkeep:climax:{self.player.pk}"
+            f"combat:hostile:900:1:round:2:upkeep:{self.player.pk}"
             f":milestone:{self.player.pk}:state_transition:first_climax",
         )
         self.assertEqual(
@@ -518,7 +518,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
                 self.player,
                 snapshot,
                 source_id=(
-                    f"combat:hostile:900:1:round:2:upkeep:climax:{self.player.pk}"
+                    f"combat:hostile:900:1:round:2:upkeep:{self.player.pk}"
                 ),
                 tick=get_world_clock().tick,
                 encounter_provenance=provenance,

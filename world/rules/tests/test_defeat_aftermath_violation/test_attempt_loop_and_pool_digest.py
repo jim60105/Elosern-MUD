@@ -32,6 +32,9 @@ from world.rules.clock import WorldClock
 from world.rules.event_log import render_plain_text
 from world.rules.party import join_party
 from world.rules.state_derived_roll import derived_roll
+from world.narrative.action_adapters import capture_milestone_snapshot
+from world.narrative.models import NarrativeEvent
+from world.narrative.recent_deeds import select_authorized_recent_deeds
 from tools.spec_traceability import covers_requirement
 from .._combat_session_helpers import BattlefieldIsolation, _player
 
@@ -166,6 +169,151 @@ class AttemptLoopTests(ViolationBase):
         # onset, flagged on the second act entry only.
         self.assertEqual([entry.data["climax"] for entry in acts], [False, True])
 
+    @covers_requirement(
+        "narrative-events::durable-source-identity-makes-projection-recoverable"
+    )
+    def test_attempt_identities_distinguish_ordinals_victims_and_aftermaths(self):
+        """Scenario: each attempt is identified by engagement/aggressor/ordinal/victim."""
+        self._equalize_scores()
+        self._arouse(13)
+        engage(self.player, self.monster)
+        first_record = read_session(self.player)
+        with self._patch_rolls([1, 1]):
+            self._settle()
+        first_sources = sorted(
+            NarrativeEvent.objects.filter(
+                event_type="adult_action",
+                content__act_key="defeat_violation",
+            ).values_list("source_id", flat=True)
+        )
+        self.assertEqual(
+            first_sources,
+            [
+                f"defeat:{first_record.engagement_id}:{self.monster.pk}"
+                f":attempt:{attempt}:victim:{self.player.pk}"
+                for attempt in (0, 1)
+            ],
+        )
+
+        # A later aftermath is a distinct engagement: it never reuses one of
+        # the earlier identities.
+        second_monster = self._lore_monster("哥布林")
+        second_monster.location = self.room
+        self._equalize_scores(second_monster)
+        second_monster.sexual.pleasure.base = 13
+        engage(self.player, second_monster)
+        second_record = read_session(self.player)
+        self.assertNotEqual(second_record.engagement_id, first_record.engagement_id)
+        with patch(
+            "world.rules.combat.battlefield.roll_d100", return_value=1
+        ), patch("world.rules.combat.damage.roll_d100", return_value=1), patch(
+            "world.rules.combat.rounds.roll_d100", return_value=1
+        ), self._patch_rolls([1, 1]):
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [second_monster])
+            forfeit(self.player)
+        second_sources = {
+            source
+            for source in NarrativeEvent.objects.filter(
+                event_type="adult_action",
+                content__act_key="defeat_violation",
+            ).values_list("source_id", flat=True)
+        } - set(first_sources)
+        self.assertTrue(second_sources)
+        for source in second_sources:
+            self.assertIn(second_record.engagement_id, source)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_resisted_attempt_records_the_crossing_it_actually_caused(self):
+        """Scenario: a resisted attempt keeps resistance and its real transition."""
+        self._equalize_scores()
+        self._arouse(13)
+        self.player.sexual.climax_phase.value = "接近"
+        self.player.sexual.pleasure.base = 40
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        with self._patch_rolls([100]):
+            self._settle()
+        event = NarrativeEvent.objects.get(
+            event_type="adult_action",
+            source_id=(
+                f"defeat:{record.engagement_id}:{self.monster.pk}"
+                f":attempt:0:victim:{self.player.pk}"
+            ),
+        )
+        self.assertTrue(event.content["outcomes"]["resistance"][0]["resisted"])
+        self.assertEqual(
+            [row["event"] for row in event.content["outcomes"]["transitions"]],
+            ["climax_onset"],
+        )
+        self.assertEqual(event.content["outcomes"]["counters"], [])
+        self.assertEqual(
+            [row["identifier"] for row in event.content["milestones"]],
+            ["climax_onset"],
+        )
+        # The later digest/settlement phases may move the phase on; the
+        # attempt's own record is the transition-time evidence.
+        self.assertNotEqual(self.player.sexual.climax_phase.level, "接近")
+        self.assertEqual(self.player.sexual.hostile_act_count, 0)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_landed_attempt_records_the_counter_unlock_it_actually_crossed(self):
+        """A landed attempt's own counter credit unlocks only at the real threshold."""
+        self._equalize_scores()
+        self._arouse(13)
+        for _ in range(4):
+            self.player.sexual.record_hostile_act()
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        with self._patch_rolls([1, 1]):
+            self._settle()
+        first = NarrativeEvent.objects.get(
+            event_type="adult_action",
+            source_id=(
+                f"defeat:{record.engagement_id}:{self.monster.pk}"
+                f":attempt:0:victim:{self.player.pk}"
+            ),
+        )
+        self.assertFalse(first.content["outcomes"]["resistance"][0]["resisted"])
+        self.assertIn(
+            "act_unlock",
+            [row["milestone_kind"] for row in first.content["milestones"]],
+        )
+        counters = first.content["outcomes"]["counters"]
+        self.assertEqual(
+            {row["target_id"] for row in counters},
+            {str(self.player.pk), str(self.monster.pk)},
+        )
+
+        # A threshold already met before the attempt is never dated as recent.
+        while self.player.sexual.hostile_act_count < 5:
+            self.player.sexual.record_hostile_act()
+        second_monster = self._lore_monster("哥布林")
+        second_monster.location = self.room
+        self._equalize_scores(second_monster)
+        second_monster.sexual.pleasure.base = 13
+        engage(self.player, second_monster)
+        second_record = read_session(self.player)
+        with patch(
+            "world.rules.combat.battlefield.roll_d100", return_value=1
+        ), patch("world.rules.combat.damage.roll_d100", return_value=1), patch(
+            "world.rules.combat.rounds.roll_d100", return_value=1
+        ), self._patch_rolls([1, 1]):
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [second_monster])
+            forfeit(self.player)
+        for event in NarrativeEvent.objects.filter(
+            event_type="adult_action",
+            content__act_key="defeat_violation",
+            source_id__startswith=f"defeat:{second_record.engagement_id}:",
+        ):
+            self.assertNotIn(
+                "act_unlock",
+                [row["milestone_kind"] for row in event.content["milestones"]],
+            )
+
 
 class PoolAndDigestTests(ViolationBase):
     """The victim pool's player baseline and the digest handoff (D-V7)."""
@@ -197,6 +345,52 @@ class PoolAndDigestTests(ViolationBase):
         self.assertEqual(companion.sexual.pleasure.value, companion_pleasure)
         self.assertEqual(companion.sexual.hostile_act_count, 0)
         self.assertEqual(companion.sexual.interspecies_act_count, 0)
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_unselected_pool_member_and_untouched_ally_receive_no_adult_evidence(self):
+        """Scenario: no invented participation for unselected or untouched allies."""
+        unselected = self._companion("unselected companion")
+        untouched = self._companion("untouched standing ally")
+        self._equalize_scores(unselected, untouched)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(unselected)
+        # The target draw selects pool index 0 (the player) for both attempts.
+        with self._patch_purpose_rolls([0, 0], [1, 1]):
+            self._settle()
+
+        actions = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_action",
+                content__act_key="defeat_violation",
+            )
+        )
+        self.assertEqual(len(actions), 2)
+        for event in actions:
+            self.assertEqual(
+                [row["id"] for row in event.content["recipients"]],
+                [str(self.player.pk)],
+            )
+            for entity in (unselected, untouched):
+                self.assertNotIn(str(entity.pk), event.content["field_access"])
+                self.assertNotIn(str(entity.pk), event.participants)
+        milestone_entities = {
+            event.content["entity_id"]
+            for event in NarrativeEvent.objects.filter(event_type="adult_milestone")
+        }
+        self.assertEqual(milestone_entities - {str(self.player.pk)}, set())
+
+        # No disclosure either: neither ally is authorized any adult group.
+        for entity in (unselected, untouched):
+            selection = select_authorized_recent_deeds(
+                entity, frozen_tick=self.clock.tick
+            )
+            self.assertFalse(
+                {group.group_type for group in selection.groups}
+                & {"adult_action", "adult_milestone"}
+            )
 
     @covers_requirement(
         "defeat-aftermath-violation-sequence::the-sequence-hands-digest-ready-outcomes-to-the-same-settlement-call",
