@@ -219,6 +219,36 @@ def _end_of_round_upkeep(
         detect_new_milestones,
         record_non_resolver_adult_milestones,
     )
+    from world.rules.clock import get_world_clock
+
+    def _upkeep_occurrence(entity: Any, key: Any) -> tuple[str, int, Any]:
+        """Return this boundary's occurrence identity, tick and provenance."""
+        provenance = current_combat_provenance()
+        if provenance is None:
+            raise ValueError(
+                "combat upkeep has no combat provenance: an upkeep milestone "
+                "requires the encounter's engagement identity"
+            )
+        e_pk = getattr(entity, "pk", key)
+        return (
+            f"combat:{provenance.engagement_id}:round:"
+            f"{provenance.round_ordinal}:upkeep:{e_pk}",
+            int(get_world_clock().tick),
+            provenance,
+        )
+
+    def _record(entity: Any, before: Any, source_id: str, tick: int, provenance: Any) -> int:
+        """Record one crossing batch under the upkeep occurrence."""
+        recorded = record_non_resolver_adult_milestones(
+            entity,
+            before,
+            source_id=source_id,
+            tick=tick,
+            location=str(getattr(entity, "location", "") or ""),
+            encounter_provenance=provenance,
+        )
+        return len(recorded.events)
+
     seconds = int(COMBAT_YAML["round"]["seconds"])
     records_by_key: dict[str, tuple[TickRecord, ...]] = {}
     for key, entity in battlefield.roster.items():
@@ -227,45 +257,49 @@ def _end_of_round_upkeep(
         before_ms = capture_milestone_snapshot(entity)
         records = tick_buffs(entity, seconds)
         records_by_key[key] = records if isinstance(records, tuple) else ()
+        buff_ms = capture_milestone_snapshot(entity)
+        buff_crossing = (
+            before_ms is not None
+            and buff_ms is not None
+            and bool(detect_new_milestones(entity, before_ms))
+        )
+        upkeep_source_id = ""
+        tick = 0
+        provenance = None
+        recorded_count = 0
+        if buff_crossing:
+            # A buff reaction's crossing is recorded here, before decay and
+            # climax settlement can move the phase on and erase the onset from
+            # the later comparison. Both batches still share one occurrence.
+            upkeep_source_id, tick, provenance = _upkeep_occurrence(entity, key)
+            recorded_count += _record(
+                entity, before_ms, upkeep_source_id, tick, provenance
+            )
         decay_tick(entity, seconds)
         action = climax_settlement_action(entity)
         if action == "extend":
             apply_event(entity, "climax_extended")
         elif action == "end":
             apply_event(entity, "climax_ends")
-        if before_ms is None:
+        if buff_ms is None:
             # No milestone surface was captured, so this boundary can commit no
             # milestone and therefore allocates no occurrence identity.
             continue
-        if not detect_new_milestones(entity, before_ms):
-            continue
-        provenance = current_combat_provenance()
-        if provenance is None:
-            raise ValueError(
-                "combat upkeep has no combat provenance: an upkeep milestone "
-                "requires the encounter's engagement identity"
+        if detect_new_milestones(entity, buff_ms):
+            if provenance is None:
+                upkeep_source_id, tick, provenance = _upkeep_occurrence(entity, key)
+            recorded_count += _record(
+                entity, buff_ms, upkeep_source_id, tick, provenance
             )
+        if not recorded_count:
+            continue
         e_pk = getattr(entity, "pk", key)
-        upkeep_source_id = (
-            f"combat:{provenance.engagement_id}:round:"
-            f"{provenance.round_ordinal}:upkeep:{e_pk}"
-        )
-        from world.rules.clock import get_world_clock
-        tick = int(get_world_clock().tick)
-        recorded = record_non_resolver_adult_milestones(
-            entity,
-            before_ms,
-            source_id=upkeep_source_id,
-            tick=tick,
-            location=str(getattr(entity, "location", "") or ""),
-            encounter_provenance=provenance,
-        )
         boundary = {
             "engagement": provenance.engagement_id,
             "round": int(provenance.round_ordinal),
             "entity": str(e_pk),
             "tick": tick,
-            "milestones": len(recorded.events),
+            "milestones": recorded_count,
         }
         transaction.on_commit(
             lambda boundary=boundary: log_info(

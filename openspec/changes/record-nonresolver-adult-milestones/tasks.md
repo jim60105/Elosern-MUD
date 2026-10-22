@@ -24,5 +24,5 @@
 
 ## 4. Integration verification
 
-- [ ] 4.1 Run a real upkeep crossing, item acceptance and defeat aftermath through storage and selection, verifying each transition-time milestone is cited once by its own source and existing balance values are unchanged.
-- [ ] 4.2 Run the focused upkeep, item, defeat and narrative test labels plus `uv run --locked python -m tools.contract_gate`, verifying no ordinary item or upkeep nomination trigger was introduced.
+- [x] 4.1 Run a real upkeep crossing, item acceptance and defeat aftermath through storage and selection, verifying each transition-time milestone is cited once by its own source and existing balance values are unchanged.
+- [x] 4.2 Run the focused upkeep, item, defeat and narrative test labels plus `uv run --locked python -m tools.contract_gate`, verifying no ordinary item or upkeep nomination trigger was introduced.

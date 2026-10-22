@@ -246,6 +246,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self._arouse(13)
         self.player.sexual.climax_phase.value = "接近"
         self.player.sexual.pleasure.base = 40
+        before = capture_milestone_snapshot(self.player)
         engage(self.player, self.monster)
         record = read_session(self.player)
         with self._patch_rolls([1, 1]):
@@ -270,7 +271,7 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
                 auto_comply=False,
                 roll=None,
                 credited_counters=("hostile_act_count",),
-                before=None,
+                before=before,
                 tick=action.tick,
                 encounter_id=record.engagement_id,
                 session_id=record.session_id,

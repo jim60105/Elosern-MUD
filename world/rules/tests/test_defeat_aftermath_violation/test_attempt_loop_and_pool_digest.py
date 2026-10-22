@@ -382,7 +382,12 @@ class PoolAndDigestTests(ViolationBase):
         }
         self.assertEqual(milestone_entities - {str(self.player.pk)}, set())
 
-        # No disclosure either: neither ally is authorized any adult group.
+        # No disclosure either: neither ally is authorized any adult group,
+        # and no forbidden source rides inside another factual group.
+        forbidden = {event.source_id for event in actions} | {
+            event.source_id
+            for event in NarrativeEvent.objects.filter(event_type="adult_milestone")
+        }
         for entity in (unselected, untouched):
             selection = select_authorized_recent_deeds(
                 entity, frozen_tick=self.clock.tick
@@ -391,6 +396,12 @@ class PoolAndDigestTests(ViolationBase):
                 {group.group_type for group in selection.groups}
                 & {"adult_action", "adult_milestone"}
             )
+            cited = {
+                source_id
+                for group in selection.groups
+                for source_id in group.source_ids
+            }
+            self.assertFalse(cited & forbidden)
 
     @covers_requirement(
         "defeat-aftermath-violation-sequence::the-sequence-hands-digest-ready-outcomes-to-the-same-settlement-call",

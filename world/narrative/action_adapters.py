@@ -932,6 +932,21 @@ def record_defeat_attempt_evidence(
             "never identifiable by a session token or a world tick"
         )
 
+    # A committed attempt's evidence is immutable: re-delivering it reuses the
+    # original action and its original milestone rows instead of re-detecting
+    # the victim's later state under the old attempt identity.
+    from world.narrative.models import NarrativeEvent
+
+    existing = NarrativeEvent.objects.filter(source_id=attempt_source_id).first()
+    if existing is not None:
+        originals = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__action_source_id=attempt_source_id,
+            )
+        )
+        return existing, originals
+
     aggressor_pk = _durable_pk(aggressor)
     victim_pk = _durable_pk(victim)
     victim_name = str(getattr(victim, "key", ""))

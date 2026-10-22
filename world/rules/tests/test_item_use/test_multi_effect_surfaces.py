@@ -395,8 +395,18 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
             before_ids,
         )
 
-        # A later clock read never re-dates this operation's crossing.
+        # A later clock read never re-dates this operation's crossing, under
+        # this or any other source.
+        onsets_before = NarrativeEvent.objects.filter(
+            event_type="adult_milestone", content__identifier="climax_onset"
+        ).count()
         WorldClock(tick=0).advance(6, AdvanceSource.COMMAND, (self.ally,))
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone", content__identifier="climax_onset"
+            ).count(),
+            onsets_before,
+        )
         self.assertEqual(len(self._operation_milestones(operation_id)), 2)
 
     @covers_requirement(
@@ -444,6 +454,65 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
                 str(self.actor.pk),
                 _GROUP_BLISS_KEY,
                 context=SimpleNamespace(battlefield=object()),
+            )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_two_slots_of_one_engagement_keep_distinct_operation_sources(self):
+        """Scenario: two accepted operations in different slots stay distinct."""
+        from world.rules.items import ItemUseRequest
+        from world.rules.targeting import RoomActionContext
+
+        key = "t_slot_bliss"
+        self.register_fixture(
+            _fixture_item(key, consumable=True),
+            ItemEffectProfile(
+                effects=(GaugeAdjustEffect(stat=ItemStat.PLEASURE, amount=20),)
+            ),
+        )
+        for entity, slot in ((self.actor, 0), (self.ally, 1)):
+            entity.sexual.climax_phase.value = "接近"
+            entity.sexual.pleasure.base = 40
+            entity.db.inventory = [key]
+            with combat_provenance(
+                CombatProvenance(
+                    engagement_id="hostile:slots:1",
+                    round_ordinal=1,
+                    slot_ordinal=slot,
+                )
+            ):
+                result = resolve_item_use(
+                    ItemUseRequest(entity, key),
+                    in_combat=True,
+                    context=RoomActionContext(self.room),
+                )
+            self.assertEqual(result.outcome, "success")
+
+        milestones = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__identifier="climax_onset",
+            )
+        )
+        self.assertEqual(
+            {m.content["action_source_id"] for m in milestones},
+            {
+                f"item:combat:hostile:slots:1:r1:s0:{self.actor.pk}:{key}",
+                f"item:combat:hostile:slots:1:r1:s1:{self.ally.pk}:{key}",
+            },
+        )
+        for milestone in milestones:
+            self.assertEqual(
+                milestone.content["encounter_context"]["encounter_id"],
+                "hostile:slots:1",
+            )
+            self.assertEqual(
+                NarrativeEvent.objects.filter(
+                    event_type="adult_milestone",
+                    content__action_source_id=milestone.content["action_source_id"],
+                ).count(),
+                1,
             )
 
     @covers_requirement(

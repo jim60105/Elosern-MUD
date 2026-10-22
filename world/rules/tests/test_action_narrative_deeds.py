@@ -15,8 +15,10 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
+from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from world.lore.items import ItemUseMechanics
 from world.lore.sexual_vocab import BODY_PARTS
 from world.narrative.events import get_committed_award_results
 from world.narrative.models import NarrativeEvent
@@ -39,6 +41,16 @@ from world.rules.combat import (
     combat_provenance,
 )
 from world.rules.combat.rounds import _end_of_round_upkeep
+from world.rules.combat_session import engage, forfeit, read_session
+from world.rules.defeat_aftermath import DEFEAT_AFTERMATH_RULEBOOK
+from world.rules.item_effects import (
+    GaugeAdjustEffect,
+    ItemEffectProfile,
+    ItemStat,
+    ItemTargetScope,
+)
+from world.rules.items import use_item
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.rulebook.schema import Rule
 from world.rules.state_reactions import STATE_REACTION_RULES
 from world.rules.targeting import RoomActionContext
@@ -49,7 +61,7 @@ from world.rules.titles.state import _FIXED_KIND
 from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SexualActDef
-from world.tests.synthetic_data import make_skill
+from world.tests.synthetic_data import make_item, make_skill
 
 
 _T_HEAL_SKILL = make_skill(
@@ -614,6 +626,67 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
             ),
             NarrativeEvent.objects.filter(event_type="adult_milestone").count(),
         )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_buff_onset_settled_in_the_same_boundary_is_retained(self):
+        """An onset erased by the same boundary's settlement is still recorded."""
+        passive = make_skill(
+            "t_upkeep_feedback_settled",
+            element="light",
+            kind=SkillKind.PASSIVE,
+            effects=(),
+        )
+        self.target.db.skills = {"active": [], "passive": [passive.key]}
+        # A previous climax exists, so ``first_climax`` cannot stand in for
+        # the onset this boundary is responsible for.
+        self.target.sexual.record_climax_count()
+        reaction = Rule(
+            id="t_upkeep_feedback_settled_rule",
+            when={"event": "hp_loss", "skill_qualified": passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        dot = BuffDefinition(
+            key="t_upkeep_settled_dot",
+            duration=60,
+            polarity="debuff",
+            tick_interval=int(COMBAT_YAML["round"]["seconds"]),
+            stacking="refresh",
+            modifiers={"rate": {"target": "hp", "delta": -10}},
+        )
+        battlefield = Battlefield(
+            {"party": frozenset({str(self.target.key)}), "foes": frozenset()},
+            {str(self.target.key): self.target},
+        )
+        provenance = CombatProvenance(
+            engagement_id="hostile:upkeep-settled:1",
+            round_ordinal=1,
+            session_id="test_sess_settled",
+        )
+        with patch.dict(BUFF_DEFINITIONS, {dot.key: dot}, clear=False), patch.dict(
+            "world.skills.registry.SKILL_REGISTRY", {passive.key: passive}
+        ), patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction],
+        ):
+            apply_buff(self.target, dot.key)
+            self.target.sexual.climax_phase.value = "接近"
+            self.target.sexual.pleasure.base = 60
+            with combat_provenance(provenance):
+                _end_of_round_upkeep(battlefield)
+
+        self.assertEqual(self.target.sexual.climax_phase.level, "餘韻")
+        self.assertEqual(self.target.sexual.climax_count, 2)
+        upkeep_source = (
+            f"combat:hostile:upkeep-settled:1:round:1:upkeep:{self.target.pk}"
+        )
+        milestone = NarrativeEvent.objects.get(
+            event_type="adult_milestone",
+            content__action_source_id=upkeep_source,
+            content__identifier="climax_onset",
+        )
+        self.assertTrue(milestone.source_id.startswith(upkeep_source))
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
@@ -1819,3 +1892,275 @@ class SettledEffectVocabularyDocumentationTests(unittest.TestCase):
             for kind, fields in adapter_module._SETTLED_EFFECT_RESULTS.items()
         }
         self.assertEqual(documented, declared)
+
+
+class TransitionTimeMilestoneSelectionTests(EvenniaTestCase):
+    """Each owner's transition-time milestone reaches selection exactly once.
+
+    Spec: ``narrative-events`` — non-resolver adult milestones are recorded at
+    transition time under their own operation/encounter identity and are not
+    dated again by a later clock read; existing balance values are unchanged.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.room = create_object(Room, key="milestone selection room")
+        self.player = create_object(
+            PlayerCharacter, key="MilestonePlayer", location=self.room
+        )
+        self.ally = create_object(
+            PlayerCharacter, key="MilestoneAlly", location=self.room
+        )
+        for entity in (self.player, self.ally):
+            entity.race = "human"
+            entity.apply_race_baseline()
+            entity.traits.hp.current = 100
+        self.item_key = "t_selection_bliss"
+        open_synthetic_scope(
+            self,
+            "items",
+            extra={
+                "items": {
+                    self.item_key: make_item(
+                        self.item_key,
+                        display_name_zh="合成快感藥",
+                        price_table_key="t_mossmeals",
+                        use_mechanics=ItemUseMechanics(
+                            consumable=True, combat_allowed=True
+                        ),
+                    )
+                },
+                "item_effect_profiles": {
+                    self.item_key: ItemEffectProfile(
+                        effects=(
+                            GaugeAdjustEffect(
+                                stat=ItemStat.PLEASURE,
+                                amount=20,
+                                scope=ItemTargetScope.ALL_ALLIES,
+                            ),
+                        )
+                    )
+                },
+            },
+        )
+
+    def _selection(self, entity):
+        return select_authorized_recent_deeds(
+            entity, frozen_tick=int(get_world_clock().tick)
+        )
+
+    def _assert_cited_once(self, selection, source_id: str) -> None:
+        self.assertIn(source_id, selection.source_ids)
+        self.assertEqual(selection.source_ids.count(source_id), 1)
+        # ``source_ids`` is deduplicated; the factual groups are the citation.
+        hits = [g for g in selection.groups if source_id in g.source_ids]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(
+            sum(group.source_ids.count(source_id) for group in selection.groups), 1
+        )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_upkeep_crossing_reaches_selection_once_with_declared_balance(self):
+        """Scenario: a real upkeep crossing is cited once by its own source."""
+        passive = make_skill(
+            "t_selection_feedback",
+            element="light",
+            kind=SkillKind.PASSIVE,
+            effects=(),
+        )
+        self.player.db.skills = {"active": [], "passive": [passive.key]}
+        reaction = Rule(
+            id="t_selection_feedback_rule",
+            when={"event": "hp_loss", "skill_qualified": passive.key},
+            then={"pleasure_gain": {"max_hp_coefficient": 140}},
+        )
+        seconds = int(COMBAT_YAML["round"]["seconds"])
+        dot = BuffDefinition(
+            key="t_selection_dot",
+            duration=60,
+            polarity="debuff",
+            tick_interval=seconds,
+            stacking="refresh",
+            modifiers={"rate": {"target": "hp", "delta": -10}},
+        )
+        battlefield = Battlefield(
+            {"party": frozenset({str(self.player.key)}), "foes": frozenset()},
+            {str(self.player.key): self.player},
+        )
+        provenance = CombatProvenance(
+            engagement_id="hostile:selection:1",
+            round_ordinal=1,
+            session_id="selection_session",
+        )
+        max_hp = int(self.player.traits.hp.max)
+        with patch.dict(BUFF_DEFINITIONS, {dot.key: dot}, clear=False), patch.dict(
+            "world.skills.registry.SKILL_REGISTRY", {passive.key: passive}
+        ), patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction],
+        ):
+            apply_buff(self.player, dot.key)
+            self.player.sexual.climax_phase.value = "接近"
+            self.player.sexual.pleasure.base = 60
+            self.player.sexual.stage_climax_extension()
+            hp_before = int(self.player.traits.hp.current)
+            pleasure_before = int(self.player.sexual.pleasure.base)
+            with patch(
+                "server.title_nomination_service.schedule_epithet_nomination"
+            ) as trigger:
+                with combat_provenance(provenance):
+                    _end_of_round_upkeep(battlefield)
+            trigger.assert_not_called()
+
+        hp_loss = hp_before - int(self.player.traits.hp.current)
+        self.assertEqual(hp_loss, -dot.modifiers["rate"]["delta"])
+        self.assertEqual(
+            int(self.player.sexual.pleasure.base) - pleasure_before,
+            (140 * hp_loss) // max_hp,
+        )
+        upkeep_source = (
+            f"combat:hostile:selection:1:round:1:upkeep:{self.player.pk}"
+        )
+        milestone = NarrativeEvent.objects.get(
+            event_type="adult_milestone",
+            content__action_source_id=upkeep_source,
+            content__identifier="climax_onset",
+        )
+        self.assertTrue(milestone.source_id.startswith(upkeep_source))
+        selection = self._selection(self.player)
+        self._assert_cited_once(selection, milestone.source_id)
+
+        # A later clock read never dates this crossing again, under this or
+        # any other source.
+        onsets_before = NarrativeEvent.objects.filter(
+            event_type="adult_milestone",
+            content__entity_id=str(self.player.pk),
+            content__identifier="climax_onset",
+        ).count()
+        with patch.dict(BUFF_DEFINITIONS, {dot.key: dot}, clear=False), patch(
+            "world.rules.state_reactions.STATE_REACTION_RULES",
+            STATE_REACTION_RULES + [reaction],
+        ):
+            WorldClock(tick=int(get_world_clock().tick)).advance(
+                seconds, AdvanceSource.COMMAND, (self.player,)
+            )
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone",
+                content__entity_id=str(self.player.pk),
+                content__identifier="climax_onset",
+            ).count(),
+            onsets_before,
+        )
+        self.assertEqual(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone", source_id=milestone.source_id
+            ).count(),
+            1,
+        )
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_accepted_item_crossing_reaches_selection_once_with_declared_balance(self):
+        """Scenario: an accepted item use's recipients are cited once each."""
+        from world.rules.items import ItemUseRequest, resolve_item_use
+
+        for entity in (self.player, self.ally):
+            entity.sexual.climax_phase.value = "接近"
+            entity.sexual.pleasure.base = 40
+        self.player.db.inventory = [self.item_key]
+        with patch(
+            "server.title_nomination_service.schedule_epithet_nomination"
+        ) as trigger:
+            result = resolve_item_use(
+                ItemUseRequest(self.player, self.item_key),
+                in_combat=False,
+                context=RoomActionContext(self.room),
+            )
+        trigger.assert_not_called()
+        self.assertEqual(result.outcome, "success")
+        for entity in (self.player, self.ally):
+            self.assertEqual(int(entity.sexual.pleasure.base), 60)
+
+        milestones = list(
+            NarrativeEvent.objects.filter(
+                event_type="adult_milestone", content__identifier="climax_onset"
+            )
+        )
+        self.assertEqual(len(milestones), 2)
+        (operation_id,) = {m.content["action_source_id"] for m in milestones}
+        self.assertTrue(operation_id.startswith("item:accept:"))
+        player_milestone = next(
+            m for m in milestones if m.content["entity_id"] == str(self.player.pk)
+        )
+        ally_milestone = next(
+            m for m in milestones if m.content["entity_id"] == str(self.ally.pk)
+        )
+        player_selection = self._selection(self.player)
+        self._assert_cited_once(player_selection, player_milestone.source_id)
+        # The ally's private milestone is never disclosed to the player.
+        self.assertNotIn(ally_milestone.source_id, player_selection.source_ids)
+        self._assert_cited_once(self._selection(self.ally), ally_milestone.source_id)
+
+    @covers_requirement(
+        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+    )
+    def test_defeat_attempt_crossing_reaches_selection_once_with_declared_balance(self):
+        """Scenario: a defeat aftermath attempt is cited once by its own source."""
+        import world.rules.defeat_aftermath.violation as violation_module
+
+        monster = create_object(Monster, key="哥布林", location=self.room)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        monster.traits.hp.base = 100
+        monster.traits.hp.current = 100
+        monster.traits.atk_phys.base = 10
+        row = DEFEAT_AFTERMATH_RULEBOOK.violation.rows[str(monster.key)]
+        self.player.traits.agility.base = 10
+        self.player.traits.atk_phys.base = 10
+        monster.sexual.pleasure.base = 13
+        for _ in range(4):
+            self.player.sexual.record_hostile_act()
+        pleasure_before = int(self.player.sexual.pleasure.base)
+        hostile_before = self.player.sexual.hostile_act_count
+        engage(self.player, monster)
+        record = read_session(self.player)
+        with patch.object(
+            violation_module, "derived_roll", return_value=1
+        ), patch(
+            "server.title_nomination_service.schedule_epithet_nomination"
+        ) as trigger:
+            forfeit(self.player)
+        trigger.assert_not_called()
+
+        attempt_source = (
+            f"defeat:{record.engagement_id}:{monster.pk}"
+            f":attempt:0:victim:{self.player.pk}"
+        )
+        action = NarrativeEvent.objects.get(
+            event_type="adult_action", source_id=attempt_source
+        )
+        self.assertFalse(action.content["outcomes"]["resistance"][0]["resisted"])
+        unlocks = [
+            NarrativeEvent.objects.get(
+                event_type="adult_milestone", source_id=summary["source_id"]
+            )
+            for summary in action.content["milestones"]
+            if summary["milestone_kind"] == "act_unlock"
+        ]
+        self.assertTrue(unlocks)
+        # Both attempts landed through the shipped formula, so the declared
+        # landed deltas and counter credits are exactly what applied.
+        self.assertEqual(
+            int(self.player.sexual.pleasure.base) - pleasure_before,
+            2 * row.landed.victim_pleasure,
+        )
+        self.assertEqual(self.player.sexual.hostile_act_count, hostile_before + 2)
+        selection = self._selection(self.player)
+        self._assert_cited_once(selection, action.source_id)
+        for unlock in unlocks:
+            self._assert_cited_once(selection, unlock.source_id)
