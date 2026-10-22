@@ -22,6 +22,7 @@ from typeclasses.components import Merchant
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, Room
 from world.narrative.models import NarrativeEvent
+from world.narrative.events import record_narrative_event
 from world.quests import runtime as quest_runtime
 from world.quests.binding import bind_stage_runtime
 from world.quests.catalog import register_catalog
@@ -578,19 +579,51 @@ class CompletionReplayTests(
         "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
     )
     def test_replayed_completion_notification_is_inert(self):
-        self._complete_once()
-        first = self.receipts[0]
+        # The durable fact already exists for this source identity: the writer
+        # must treat its own fresh completion transition as a replay
+        # (``created`` is False) and register no notification for it.
+        source_id = f"quest:{self.record.quest_id}:completion:{self.player.pk}"
+        record_narrative_event(
+            source_id=source_id,
+            event_type="quest_completion",
+            content={
+                "quest_id": self.record.quest_id,
+                "definition_key": self.record.definition_key,
+                "completed_objective": {"kind": "defeat", "quantity": 1},
+                "outcome": "completed",
+            },
+            participants=[self.player.pk],
+            tick=0,
+        )
 
-        # The same durable fact is delivered again to the writer's settle seam.
         with self.captureOnCommitCallbacks(execute=True):
             apply_quest_log_replacement(
-                self.player, [replace(read_records(self.player)[0], tracked=True)]
+                self.player, [fulfill_record(self.record, self.definition)]
             )
-            apply_quest_log_replacement(self.player, [read_records(self.player)[0]])
+
+        self.assertEqual(self.receipts, [])
+        self.assertEqual(_completion_events().count(), 1)
+        self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
+
+    @covers_requirement(
+        "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled"
+    )
+    def test_failing_projection_never_swallows_the_owner_notification(self):
+        # The memory projection is a recoverable post-commit side effect: its
+        # failure must leave the completion fact and its notification intact,
+        # and must never re-enter the writer's rollback compensation.
+        with patch(
+            "world.narrative.memory.project_narrative_event_to_memories",
+            side_effect=RuntimeError("projection boom"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                apply_quest_log_replacement(
+                    self.player, [fulfill_record(self.record, self.definition)]
+                )
 
         self.assertEqual(len(self.receipts), 1)
-        self.assertEqual(first.source_id, self.receipts[0].source_id)
         self.assertEqual(_completion_events().count(), 1)
+        self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
 
 
 class CompletionObserverContractTests(EvenniaTest):

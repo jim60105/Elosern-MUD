@@ -83,6 +83,13 @@ def _good_client():
     return client
 
 
+def _void_client():
+    """A client whose round produces no candidate and therefore no ballot."""
+    client = FakeLLMClient()
+    client.add_response(lambda descriptor: True, _reply([]))
+    return client
+
+
 class _NoPush:
     """Patch target recorder for the bounded panel push."""
 
@@ -449,14 +456,17 @@ class RestBoundaryTests(EvenniaTest):
     def test_replayed_completion_notification_creates_no_second_attempt(self):
         # The occurrence identity is the committed completion's own source id;
         # replaying it after the in-flight slot cleared must still be inert.
+        # The first round is deliberately void, so no pending ballot can stand
+        # in for the occurrence guard being tested.
         source_id = _quest_receipt(self.player).source_id
         d1 = service.schedule_epithet_nomination(
             self.player, occurrence_id=source_id, source_id=source_id,
-            client=_good_client(),
+            client=_void_client(),
         )
         self.assertIsNotNone(d1)
         await_result(d1)
-        service._IN_FLIGHT_PLAYERS.clear()
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+        self.assertEqual(title_rules.safe_pending_ballot(self.player), ())
         d2 = service.schedule_epithet_nomination(
             self.player, occurrence_id=source_id, source_id=source_id,
             client=_good_client(),

@@ -360,7 +360,9 @@ def _on_quest_completion(receipt: Any) -> None:
     notification carries the canonical ``source_id`` and the committed award
     envelope: the service never rebuilds either. The occurrence identity
     reuses that same ``source_id``, so delivering one completion receipt twice
-    admits at most one attempt.
+    admits at most one attempt within this server process (the occurrence set
+    is intentionally process-local; durable replay suppression belongs to the
+    fact writer, which refuses to re-notify an existing source id).
     """
     _schedule_after_commit(
         receipt.actor,

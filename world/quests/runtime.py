@@ -609,23 +609,16 @@ def fulfill_record(record: QuestRecord, definition: QuestDefinition) -> QuestRec
 
 
 @dataclass(frozen=True)
-class BoundQuestIdentity:
-    """One identity the satisfied objective bound, with its readable role."""
-
-    role: str
-    identity: int
-    label: str
-
-
-@dataclass(frozen=True)
 class QuestCompletionReceipt:
     """The detached, immutable evidence handed to a completion observer.
 
     ``source_id`` is the canonical durable occurrence identity the owner
     committed (never rebuilt downstream), ``objective`` is the finalized
-    ``completed_objective`` payload of that fact, and ``awards`` is the award
-    result envelope committed with it. ``actor`` names the owning player so an
-    observer can schedule its own post-commit work without re-resolving one.
+    ``completed_objective`` payload of that fact (including the satisfied
+    stage, its destination and the bound identities with their readable
+    roles), and ``awards`` is the award result envelope committed with it.
+    ``actor`` names the owning player so an observer can schedule its own
+    post-commit work without re-resolving one.
     """
 
     source_id: str

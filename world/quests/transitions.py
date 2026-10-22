@@ -314,6 +314,8 @@ def _bound_identities(source: Any, objective: Any) -> list[dict[str, Any]]:
     exact identities the objective bound before the terminal transition
     cleared them. A declared meeting role resolves through the published
     package's role binding — the same lookup the rendezvous predicate used.
+    Exact ``(role, identity)`` pairs appear once; one identity may carry
+    several distinct roles (a protected escortee that a rendezvous meets).
     """
     from .scene_store import get_role_binding
 
@@ -333,6 +335,7 @@ def _bound_identities(source: Any, objective: Any) -> list[dict[str, Any]]:
             binding = get_role_binding(package_id, role)
             if binding is not None:
                 pairs.append((f"meeting:{role}", int(binding.npc_id)))
+    pairs = list(dict.fromkeys(pairs))
     labels = _identity_labels(identity for _, identity in pairs)
     return [
         {"role": role, "identity": identity, "label": labels.get(identity, "")}
