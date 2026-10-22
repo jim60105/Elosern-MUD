@@ -54,9 +54,17 @@ def _dream_art_fixture(character) -> None:
     if safe_room:
         from evennia.utils.create import create_object
         from typeclasses.rooms import Room
+        from world.rules.fatigue import SleepPosture, get_policy, write_fatigue_state
 
         room = create_object(Room, key="夢境測試起點")
         character.location = room
+        # A freshly seeded character sits at full reserves, so a voluntary
+        # sleep would settle exactly zero seconds and the dream service is
+        # never entered (it requires a positive elapsed sleep). Seed half a
+        # reserve: the sleep then advances the clock by a deterministic
+        # positive gap and the dream stage really opens.
+        policy = get_policy()
+        write_fatigue_state(character, policy.max_units // 2, SleepPosture.AWAKE)
         character.save()
         print(f"seeded dream room {room.key} ({room.pk})")
     if not preferred_art:

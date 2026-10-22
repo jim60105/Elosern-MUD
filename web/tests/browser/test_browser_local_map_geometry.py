@@ -165,42 +165,80 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     timeout=30000,
                 )
 
-                # Every node marker's bounding box is inside the map canvas.
-                # (Remembered remote nodes render in the bounded list below
-                # the canvas and are excluded here.) The check targets the
-                # marker shapes (current rect / unvisited & visited circles),
-                # not the whole node group whose decorative label may
-                # overhang the canvas bottom edge (H2 re-map, task 9.2).
+                # Every marker the island's window actually shows whole is
+                # inside the map canvas, and the current marker is always
+                # shown. An oversized drawing is clipped through a
+                # current-centred scale-1 window (webclient-local-map, the
+                # "oversized drawings clip instead of shrinking" scenario),
+                # so a marker outside that window is clipped by the island's
+                # own overflow rather than painted beside it. (Remembered
+                # remote nodes render in the bounded list below the canvas
+                # and are excluded here.) The check targets the marker shapes
+                # (current rect / unvisited & visited circles), not the whole
+                # node group whose decorative label may overhang the canvas
+                # bottom edge (H2 re-map, task 9.2).
                 canvas = page.locator('[data-testid="local-map__lattice"]')
                 canvas_box = canvas.bounding_box()
                 canvas_side = 240.0 * ui_scale(viewport)
                 self.assertAlmostEqual(canvas_box["width"], canvas_side, delta=1.0)
                 self.assertAlmostEqual(canvas_box["height"], canvas_side, delta=1.0)
-                # Every node's primary marker shape (the current rect, the
-                # unvisited/visited circles) — selected by the shared
-                # `local-map__marker` class, not just the testid hooks (the
-                # circle markers carry no testid).
                 canvas_markers = page.locator(
                     '[data-testid="local-map__lattice"] .local-map__marker'
                 )
                 marker_count = canvas_markers.count()
                 self.assertGreaterEqual(marker_count, 1)
-                for index in range(marker_count):
-                    inside = page.evaluate(
-                        """(i) => {
-                          const canvas = document.querySelector('[data-testid="local-map__lattice"]');
-                          const marker = document.querySelectorAll(
-                            '[data-testid="local-map__lattice"] .local-map__marker')[i];
-                          const cr = canvas.getBoundingClientRect();
-                          const nr = marker.getBoundingClientRect();
-                          return nr.left >= cr.left - 1 && nr.right <= cr.right + 1 &&
-                                 nr.top >= cr.top - 1 && nr.bottom <= cr.bottom + 1;
-                        }""",
-                        index,
-                    )
+                audit = page.evaluate(
+                    """() => {
+                      const svg = document.querySelector('[data-testid="local-map__lattice"]');
+                      const cr = svg.getBoundingClientRect();
+                      const vb = svg.viewBox.baseVal;
+                      const inside = (r) => r.left >= cr.left - 1 && r.right <= cr.right + 1 &&
+                        r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1;
+                      const markers = Array.from(svg.querySelectorAll('.local-map__marker'));
+                      const rows = markers.map((marker) => {
+                        const group = marker.closest('.local-map__node');
+                        const matrix = group && group.transform.baseVal.consolidate();
+                        const pos = matrix ? { x: matrix.matrix.e, y: matrix.matrix.f } : null;
+                        const r = marker.getBoundingClientRect();
+                        // The marker's own half-extent (r8 seal + stroke, the
+                        // largest marker) stays inside the window, so the
+                        // shape is shown whole rather than clipped.
+                        const INSET = 12;
+                        const shownWhole = pos !== null &&
+                          pos.x - vb.x >= INSET && pos.x - vb.x <= vb.width - INSET &&
+                          pos.y - vb.y >= INSET && pos.y - vb.y <= vb.height - INSET;
+                        return {
+                          current: marker.classList.contains('local-map__marker--current'),
+                          shownWhole: shownWhole,
+                          inside: inside(r),
+                          box: { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+                        };
+                      });
+                      return {
+                        current: rows.filter((row) => row.current),
+                        fullyInsideWindow: rows.filter((row) => row.shownWhole),
+                        canvas: { left: cr.left, right: cr.right, top: cr.top, bottom: cr.bottom },
+                      };
+                    }"""
+                )
+                self.assertEqual(
+                    len(audit["current"]),
+                    1,
+                    f"exactly one current marker at {viewport}",
+                )
+                self.assertTrue(
+                    audit["current"][0]["inside"],
+                    f"the current marker must be inside the map canvas at {viewport}",
+                )
+                self.assertGreaterEqual(
+                    len(audit["fullyInsideWindow"]),
+                    1,
+                    f"the window must show at least the current node at {viewport}",
+                )
+                for row in audit["fullyInsideWindow"]:
                     self.assertTrue(
-                        inside,
-                        f"marker {index} must stay inside the map canvas at {viewport}",
+                        row["inside"],
+                        f"a shown marker must stay inside the map canvas at {viewport}: {row}",
                     )
                 self.assertIsNotNone(canvas_box)
 

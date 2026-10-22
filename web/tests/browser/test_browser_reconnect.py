@@ -279,12 +279,16 @@ class ReconnectTest(BrowserAcceptanceTest):
               const store = window.__elosernBridge.store;
               const before = store.view;
               const status = {
-                schema_version: 3, available: true,
+                schema_version: 4, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
                              sp: {current: 10, maximum: 10} },
-                conditions: [], disguise_active: false, combat: null,
+                conditions: [],
+                fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
+                            stage: 'normal', label: '精神充沛',
+                            severity: 'informational', restriction: null }],
+                disguise_active: false, combat: null,
               };
               const env = (epoch, revision) => ({
                 protocol_version: 1, presentation_epoch: epoch,
@@ -325,12 +329,16 @@ class ReconnectTest(BrowserAcceptanceTest):
         result = page.evaluate(
             """() => {
               const status = {
-                schema_version: 3, available: true,
+                schema_version: 4, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
                              sp: {current: 10, maximum: 10} },
-                conditions: [], disguise_active: false, combat: null,
+                conditions: [],
+                fatigue: [{ identity: 'y', name: 'X', reserve_percent: 100,
+                            stage: 'normal', label: '精神充沛',
+                            severity: 'informational', restriction: null }],
+                disguise_active: false, combat: null,
               };
               function env(epoch, revision) {
                 return { protocol_version: 1, presentation_epoch: epoch,

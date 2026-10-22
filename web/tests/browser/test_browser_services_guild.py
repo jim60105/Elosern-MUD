@@ -429,14 +429,17 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
             "(s) => Elosern.actions.submit('explore.wait', { seconds: s })",
             SYNTH_EXAM_APPOINTMENT["wait_seconds"],
         )
-        hour_before = store_state(page)["serverTime"]["hour"]
         request_before = store_state(page)["lastActionResult"]["requestId"]
         wait_for_store_state(
             page,
             lambda s: (s.get("lastActionResult") or {}).get("requestId") != request_before
             and (s.get("lastActionResult") or {}).get("outcome") == "success"
             and (s.get("serverTime") or {}).get("hour")
-            == hour_before + SYNTH_EXAM_APPOINTMENT["wait_seconds"] // 3600,
+            # A skip is bounded by the next registered schedule boundary
+            # (mental-time contract): the host's own arrival time is exactly
+            # that boundary here, so the wait lands on it rather than running
+            # the requested three hours through the appointment it proves.
+            == SYNTH_EXAM_APPOINTMENT["arrive_offset"] // 3600,
         )
         result = self._request_exam(page, "below_threshold")
         self.assertEqual(result["outcome"], "rejected")

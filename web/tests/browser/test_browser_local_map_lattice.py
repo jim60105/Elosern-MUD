@@ -489,10 +489,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(result["insideCanvasCount"], 0)
         for text in result["texts"]:
             self.assertIn("…", text)
-            # The overlay's marker-name step is the shared 16-unit legibility
-            # floor (retarget D7); against the same, unchanged gutter the
-            # 14-glyph names truncate to eight glyphs plus the ellipsis.
-            self.assertEqual(len(text), 9)
+            # The overlay draws through the fitted viewBox window, whose
+            # gutter now admits the renderer's own label budget: ten glyphs
+            # (`:label-max="10"`) plus the ellipsis, still truncated, still
+            # outside the canvas (asserted above).
+            self.assertEqual(len(text), 11)
 
         page.close()
 

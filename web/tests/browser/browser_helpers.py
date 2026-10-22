@@ -1074,13 +1074,16 @@ def wait_for_narrative_settled(page: Page, before: int, timeout: int = 30000) ->
 def valid_status_panel(name: str, identity: str) -> dict:
     """A schema-valid available status panel for injected snapshots.
 
-    Tracks ``STATUS_SCHEMA_VERSION = 3`` (``web/webclient/presentation/
-    status.py``), including required provenance on each condition and the
-    optional ``full_title`` actor field. The client's
-    ``validateStatusPanel`` rejects any other registered version outright.
+    Tracks ``STATUS_SCHEMA_VERSION = 4`` (``web/webclient/presentation/
+    status.py``), including required provenance on each condition, the
+    optional ``full_title`` actor field and the physiological subject rows
+    (at least the status source's own body, projected as a full, awake body:
+    the ``normal`` stage carries 精神充沛 with no restriction line). The
+    client's ``validateStatusPanel`` rejects any other registered version
+    outright.
     """
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "actor": {"name": name, "identity": identity, "location": None},
         "resources": {
@@ -1089,9 +1092,54 @@ def valid_status_panel(name: str, identity: str) -> dict:
             "sp": {"current": 20, "maximum": 20},
         },
         "conditions": [],
+        "fatigue": [
+            {
+                "identity": identity,
+                "name": name,
+                "reserve_percent": 100,
+                "stage": "normal",
+                "label": "精神充沛",
+                "severity": "informational",
+                "restriction": None,
+            }
+        ],
         "disguise_active": False,
         "combat": None,
     }
+
+
+def visible_minimap_actionable(page: Page):
+    """The first actionable minimap node the island actually shows.
+
+    An oversized lattice is drawn through a current-centred, scale-1 window
+    (webclient-local-map), so a node outside that window is clipped by the
+    island and cannot be clicked — Playwright reports it outside the
+    viewport. A journey that exercises the island's own move path therefore
+    selects a control with a hit area inside the canvas, exactly as a reader
+    would, and never clicks through the clip.
+    """
+    canvas = page.locator('[data-testid="local-map__lattice"]')
+    canvas_box = canvas.bounding_box()
+    if canvas_box is None:
+        return None
+    nodes = page.locator(
+        '[data-testid="local-map"] [data-testid="local-map__actionable"]'
+    )
+    for index in range(nodes.count()):
+        candidate = nodes.nth(index)
+        node_box = candidate.bounding_box()
+        if node_box is None:
+            continue
+        if (
+            node_box["x"] >= canvas_box["x"]
+            and node_box["y"] >= canvas_box["y"]
+            and node_box["x"] + node_box["width"]
+            <= canvas_box["x"] + canvas_box["width"]
+            and node_box["y"] + node_box["height"]
+            <= canvas_box["y"] + canvas_box["height"]
+        ):
+            return candidate
+    return None
 
 
 def valid_local_map_panel(**overrides) -> dict:

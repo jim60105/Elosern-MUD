@@ -75,13 +75,20 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement("webclient-local-map::adjacent-traversable-map-nodes-submit-explore-move-through-their-move-descriptor")
     def test_adjacent_traversable_node_submits_explore_move(self):
         page = self.logged_in_page()
-        from .browser_helpers import install_outbound_recorder, sent_action_count
+        from .browser_helpers import (
+            install_outbound_recorder,
+            sent_action_count,
+            visible_minimap_actionable,
+        )
 
         install_outbound_recorder(page)
         self._wait_local_map_available(page)
-        action_ready = page.locator('[data-testid="local-map__actionable"]')
-        self.assertGreaterEqual(action_ready.count(), 1)
-        action_ready.first.click()
+        action_ready = visible_minimap_actionable(page)
+        self.assertIsNotNone(
+            action_ready,
+            "the island must show at least one actionable node unclipped",
+        )
+        action_ready.click()
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:
@@ -621,7 +628,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         clicking actionable node dispatches explore.move without opening overlay.
         """
         import time
-        from .browser_helpers import install_outbound_recorder, sent_action_count
+        from .browser_helpers import (
+            install_outbound_recorder,
+            sent_action_count,
+            visible_minimap_actionable,
+        )
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_local_map_available(page)
@@ -645,10 +656,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
 
         # 2. Click actionable node: dispatches move without opening overlay
-        actionable = page.locator('[data-testid="local-map__actionable"]')
-        self.assertGreaterEqual(actionable.count(), 1)
+        actionable = visible_minimap_actionable(page)
+        self.assertIsNotNone(
+            actionable,
+            "the island must show at least one actionable node unclipped",
+        )
         moves_before = sent_action_count(page, "explore.move")
-        actionable.first.click()
+        actionable.click()
         self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
 
         deadline = time.monotonic() + 10.0

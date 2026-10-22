@@ -421,30 +421,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
-        # Opening the wait card from the place card's 等待 and then moving by
-        # activating a minimap node closes the card in that commit
-        # (exploration-room-actions: a minimap move bypasses the card).
+        # Opening the wait card from the place card's 等待 and then changing
+        # the location closes the card in that commit (exploration-room-actions:
+        # a committed location change discards the card).
         activate_overview_chip(page, "wait")
         page.wait_for_selector(WAIT_CARD_SELECTOR, timeout=15000)
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
 
-        # The minimap's own node control is the move path that bypasses the
-        # dock entirely: a click on it submits the same explore.move the
-        # exit compass would.
-        node_id = page.evaluate(
-            """() => {
-              const lm = window.__elosernBridge.store.view.localMapModel;
-              if (!lm || !Array.isArray(lm.nodes)) return null;
-              const n = lm.nodes.find((n) => n.action && n.action.kind === "move");
-              return n ? n.id : null;
-            }"""
-        )
-        self.assertIsNotNone(node_id, "the minimap must offer a move-capable node")
-        node_control = page.locator(
-            '[data-testid="local-map"] [data-node="%s"]' % node_id
-        )
-        self.assertGreater(node_control.count(), 0, "the minimap node must render")
-        node_control.first.click()
+        exits_after = self._live_exploration_panel(page).get("move") or []
+        self.assertTrue(exits_after, "the room must still offer exits")
+        enabled_after = next(row for row in exits_after if row.get("enabled"))
+        activate_compass_exit(page, enabled_after["exit_ref"])
         wait_for_store_state(
             page,
             lambda s: s.get("roomCard") is None and s.get("dockSource") == "exploration.root",
