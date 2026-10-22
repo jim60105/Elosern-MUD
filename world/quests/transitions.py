@@ -423,7 +423,7 @@ def _room_label(room_id: Any) -> str:
             .values_list("db_key", flat=True)
             .first()
         )
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # observability: ignore R2: a non-integer room identity states no label instead of inventing one
         return ""
     return str(key or "")[:LOCATION_LABEL_MAX_CHARS]
 
