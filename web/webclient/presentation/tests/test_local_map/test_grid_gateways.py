@@ -16,7 +16,9 @@ from ._support import (
     _T_MAP_KEY,
     _T_PLAZA_XYZ,
     _context,
+    _inserted_multiple,
     _live,
+    _payload_cell_divisor,
     _t_grid_id,
     _t_region_display_for,
 )
@@ -298,10 +300,17 @@ class LocalMapGatewayPairTests(EvenniaTest):
                 region_for_coordinates(*EAST_APPROACH)
             ].display_name_zh,
         )
-        # The gate's key normalizes to east; the cell east of the gate room
-        # is free at this room.
-        self.assertEqual(
-            (node["x"], node["y"]), (EAST_GATE_XYZ[0] + 1, EAST_GATE_XYZ[1])
+        # The gate's key normalizes to east; the slot stands whole lattice
+        # cells east of the gate room and never refines the drawing's cell
+        # (a metric settlement's spacing is not one coordinate unit).
+        divisor = _payload_cell_divisor(payload, exclude=self.ENTRY_ID)
+        self.assertEqual(_payload_cell_divisor(payload), divisor)
+        self.assertEqual(node["y"], EAST_GATE_XYZ[1])
+        self.assertGreaterEqual(
+            _inserted_multiple(
+                (node["x"], node["y"]), EAST_GATE_XYZ[:2], 0, divisor
+            ),
+            1,
         )
         self.assertEqual(node["action"]["kind"], "move")
         self.assertEqual(node["action"]["exit_ref"], str(int(self.gate.id)))

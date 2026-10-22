@@ -182,15 +182,6 @@ class TerrainModelTests(unittest.TestCase):
         self.assertEqual(description, terrain_description(*EAST_APPROACH))
         self.assertEqual(region_key, region_for_coordinates(*CAPITAL_ANCHOR))
 
-    @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
-    def test_description_formula_is_pinned_at_a_literal_coordinate(self):
-        # (860 * 92821 + 1080 * 68917) % 3 == 2 selects the third western-hills
-        # variant: the arithmetic constants and the flavor text are contract.
-        self.assertEqual(
-            terrain_description(860, 1080),
-            "低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。",
-        )
-
     def test_no_llm_or_random_dependency_in_source(self):
         source = inspect.getsource(__import__("world.maps.wilderness_provider"))
         self.assertNotIn("world.ai", source)

@@ -23,6 +23,7 @@ from world.maps.wilderness_provider import (
     is_land_cell,
     is_valid_wilderness_cell,
     region_for_coordinates,
+    terrain_description,
 )
 
 
@@ -75,6 +76,15 @@ class AuthoredTerrainContractTests(unittest.TestCase):
         for anchor_key, region_key in expected.items():
             cell = ANCHOR_GEOGRAPHY_REGISTRY[anchor_key].cell
             self.assertEqual(region_for_coordinates(*cell), region_key, anchor_key)
+
+    @covers_requirement("wilderness-terrain::terrain-description-is-a-pure-deterministic-function-with-no-llm-or-randomness")
+    def test_description_formula_is_pinned_at_a_literal_coordinate(self):
+        # (860 * 92821 + 1080 * 68917) % 3 == 2 selects the third western-hills
+        # variant: the arithmetic constants and the flavor text are authored.
+        self.assertEqual(
+            terrain_description(860, 1080),
+            "低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。",
+        )
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
     def test_principal_pass_is_open_mountain_trail_and_ridge_blocks_elsewhere(self):
