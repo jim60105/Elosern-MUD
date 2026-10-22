@@ -81,11 +81,11 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_actor_shares_one_composed_title_on_both_panels(self):
         _open_title_scope(self)
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
-        grant_rank_title(self.player, _T_RANK.key)
+        award_guild_rank_title(self.player, _T_RANK.key, source_id="test:init:rank")
 
-        grant_first_quest_epithet(self.player)
+        award_first_quest_epithet(self.player, source_id="test:init:first_quest")
         character = self._character()
         status = self._status()
         self.assertEqual(character["full_title"], _T_COMPOSED_TITLE)
@@ -102,11 +102,11 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
 
     def test_a_corrupt_title_record_fails_the_panel_closed(self):
         _open_title_scope(self)
-        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
+        from world.rules.titles import award_first_quest_epithet, award_guild_rank_title
 
-        grant_rank_title(self.player, _T_RANK.key)
+        award_guild_rank_title(self.player, _T_RANK.key, source_id="test:init:rank")
 
-        grant_first_quest_epithet(self.player)
+        award_first_quest_epithet(self.player, source_id="test:init:first_quest")
         self.player.attributes.add("title_collection", "damaged")
         self.assertFalse(self._character()["available"])
         self.assertFalse(self._status()["available"])

@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 
 from world.narrative.models import NarrativeEvent, ProjectionProgress
+from world.rules.titles.awards import AutomaticTitleAward
 from world.observability import log_info
 
 
@@ -29,6 +30,32 @@ def build_encounter_source_id(session_id: str, kind: str = "round", ordinal: int
     return f"encounter:{clean_session}:{kind}:{int(ordinal)}"
 
 
+def get_committed_award_results(source_id: str) -> tuple[AutomaticTitleAward, ...] | None:
+    """Look up committed automatic title awards for an existing occurrence.
+
+    Returns a tuple of ``AutomaticTitleAward`` records if ``source_id`` exists
+    in durable storage (which may be empty ``()`` if no titles were granted),
+    or ``None`` if the occurrence has not yet been committed.
+    """
+    clean_source = str(source_id).strip()
+    existing = NarrativeEvent.objects.filter(source_id=clean_source).first()
+    if existing is None:
+        return None
+    raw_awards = existing.content.get("award_results")
+    if not isinstance(raw_awards, list):
+        return ()
+    return tuple(AutomaticTitleAward.from_dict(item) for item in raw_awards if isinstance(item, dict))
+
+
+def serialize_award_results(awards: Iterable[AutomaticTitleAward | dict[str, Any]]) -> list[dict[str, Any]]:
+    """Serialize an iterable of award results into plain JSON dicts."""
+    out = []
+    for award in awards:
+        item = award.to_dict() if isinstance(award, AutomaticTitleAward) else dict(award)
+        out.append(item)
+    return out
+
+
 def record_narrative_event(
     *,
     source_id: str,
@@ -39,6 +66,7 @@ def record_narrative_event(
     tick: int = 0,
     visibility: str = "public",
     salience: int = 1,
+    award_results: Iterable[AutomaticTitleAward | dict[str, Any]] = (),
     projector_version: int = 1,
 ) -> tuple[NarrativeEvent, ProjectionProgress, bool]:
     """Durably record a narrative event and pending projection in the current transaction.
@@ -50,6 +78,10 @@ def record_narrative_event(
     clean_source = str(source_id).strip()
     clean_participants = [str(p) for p in participants]
     clean_content = dict(content)
+    if award_results:
+        clean_content["award_results"] = serialize_award_results(award_results)
+    elif "award_results" not in clean_content:
+        clean_content["award_results"] = []
 
     existing_event = NarrativeEvent.objects.filter(source_id=clean_source).first()
     if existing_event is not None:

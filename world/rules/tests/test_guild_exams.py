@@ -687,7 +687,7 @@ class ExamSettlementRecoveryTests(ExamHostFixture, EvenniaTestCase):
         from world.rules.combat_session.settlement import _settle_with_restore
 
         checkpoints = {
-            "title": ("world.rules.titles.grant_rank_title", "exam_passed"),
+            "title": ("world.rules.titles.award_guild_rank_title", "exam_passed"),
             "outfit": ("world.rules.guild_exam_restrictions.remove_exam_restriction", "exam_failed"),
             "session": ("world.rules.combat_session.settlement.clear_session", "exam_failed"),
             "hold": ("world.rules.guild_exams.release_exam_schedule_hold", "exam_failed"),

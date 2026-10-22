@@ -62,8 +62,8 @@ from world.rules.titles import (
     equip_fixed,
     epithet_removal_gate,
     fixed_display_name,
-    grant_rank_title,
-    grant_first_quest_epithet,
+    award_guild_rank_title,
+    award_first_quest_epithet,
     nomination_cooldown_active,
     nomination_suppressed,
     owned_epithet_displays,
@@ -122,9 +122,9 @@ class TitleGuildPairingTests(EvenniaTest):
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_first_quest_epithet_grant_banks_and_auto_equips_the_epithet_slot(self):
-        with patch("world.rules.titles.planner.get_world_clock", return_value=WorldClock(42)):
-            lines = grant_first_quest_epithet(self.player)
-        self.assertEqual(lines, (f"獲得異名：{_starter().display}",))
+        with patch("world.rules.titles.awards.get_world_clock", return_value=WorldClock(42)):
+            award, line = award_first_quest_epithet(self.player, source_id="test:claim:1")
+        self.assertEqual((line,), (f"獲得異名：{_starter().display}",))
         self.assertEqual(compose_full_title(self.player), _starter().display)
         collection, equipped = read_title_state(self.player)
         self.assertEqual(equipped, {"fixed": None, "epithet": _starter().display})
@@ -132,11 +132,11 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertEqual(collection[0]["origin_quote"], _starter().origin_basis)
 
     def test_a_second_first_quest_epithet_grant_is_silent_and_inert(self):
-        first = grant_first_quest_epithet(self.player)
+        first_award, first_line = award_first_quest_epithet(self.player, source_id="test:claim:1")
         before = deepcopy(read_title_state(self.player))
-        self.assertEqual(grant_first_quest_epithet(self.player), ())
+        self.assertEqual(award_first_quest_epithet(self.player, source_id="test:claim:2"), (None, None))
         self.assertEqual(read_title_state(self.player), before)
-        self.assertEqual(first, (f"獲得異名：{_starter().display}",))
+        self.assertEqual((first_line,), (f"獲得異名：{_starter().display}",))
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_rank_titles_pair_one_to_one_with_the_guild_ranks(self):
@@ -145,13 +145,13 @@ class TitleGuildPairingTests(EvenniaTest):
                 title_row = live_fixed_title_registry()[definition.title_key]
                 holder = create_object(PlayerCharacter, key=f"title-rank-{rank}")
                 self.assertEqual(
-                    grant_rank_title(holder, rank),
-                    (f"獲得稱號：{title_row.display_name_zh}",),
+                    award_guild_rank_title(holder, rank, source_id=f"test:rank:{rank}")[1],
+                    f"獲得稱號：{title_row.display_name_zh}",
                 )
                 self.assertEqual(compose_full_title(holder), title_row.display_name_zh)
-                self.assertEqual(grant_rank_title(holder, rank), ())
+                self.assertEqual(award_guild_rank_title(holder, rank, source_id=f"test:rank:{rank}:dup"), (None, None))
         # An unknown rank grants nothing at all.
-        self.assertEqual(grant_rank_title(self.player, "Z"), ())
+        self.assertEqual(award_guild_rank_title(self.player, "Z", source_id="test:rank:Z"), (None, None))
         self.assertEqual(
             read_title_state(self.player), ([], {"fixed": None, "epithet": None})
         )
@@ -253,7 +253,7 @@ class TitleGuildPairingTests(EvenniaTest):
         from world.rules.guild_exams import _read_exams
 
         with patch(
-            "world.rules.titles.grant_rank_title",
+            "world.rules.titles.award_guild_rank_title",
             side_effect=RuntimeError("db failure"),
         ):
             with self.assertRaises(RuntimeError):

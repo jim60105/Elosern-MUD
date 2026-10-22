@@ -1188,13 +1188,16 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
 
             # Check and grant any newly satisfied church clergy fixed titles
             from world.lore.titles import FIXED_TITLE_REGISTRY, TitlePredicateFamily
-            from world.rules.titles import bank_fixed, banked_fixed_keys
+            from world.rules.titles import award_automatic_title, banked_fixed_keys
             from world.rules.titles.planner import predicate_satisfied
             from world.rules.titles.state import TitleDataError
 
             owned_titles = banked_fixed_keys(entity)
             tick = get_world_clock().tick
             granted_notifications: list[str] = []
+            church_awards: list[Any] = []
+            entity_pk = getattr(entity, "pk", getattr(entity, "id", str(entity)))
+            source_id = f"church:redemption:{entity_pk}:{skill_key}:{tick}"
             for definition in FIXED_TITLE_REGISTRY.values():
                 if definition.key in owned_titles:
                     continue
@@ -1204,9 +1207,32 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
                     except (TitleDataError, AttributeError, TypeError, ValueError):  # observability: ignore R2: malformed foreign title predicate skips row per planner contract
                         continue
                     if satisfied:
-                        if bank_fixed(entity, definition.key, tick):
-                            display = definition.display_name_zh
-                            granted_notifications.append(f"獲得稱號：{display}")
+                        award, note = award_automatic_title(
+                            entity,
+                            source_id=source_id,
+                            kind="fixed",
+                            title_id=definition.key,
+                            tick=tick,
+                        )
+                        if award is not None:
+                            church_awards.append(award)
+                        if note:
+                            granted_notifications.append(note)
+
+            # Finalize award results inside the same transaction
+            from world.narrative.events import record_narrative_event
+            record_narrative_event(
+                source_id=source_id,
+                event_type="church_skill_redemption",
+                content={
+                    "skill_key": skill_key,
+                },
+                participants=[str(entity_pk)],
+                tick=tick,
+                visibility="public",
+                salience=1,
+                award_results=church_awards,
+            )
 
             def _on_commit_actions() -> None:
                 log_info(
@@ -1229,4 +1255,5 @@ def redeem_step(entity: Any, key: str) -> dict[str, Any]:
         "row": row.skill_key,
         "price": row.merit_price,
         "merit": merit_after,
+        "title_awards": [a.to_dict() for a in church_awards],
     }

@@ -38,8 +38,8 @@ from world.rules.titles import (
     TITLE_EQUIPPED_KEY,
     bank_epithet,
     bank_fixed,
-    grant_first_quest_epithet,
-    grant_rank_title,
+    award_first_quest_epithet,
+    award_guild_rank_title,
 )
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
@@ -157,8 +157,8 @@ class TitleCodexViewTests(EvenniaTest):
 
     def test_can_remove_follows_the_server_gate_verdict(self):
         # Sole epithet (starter pair): never removable, and equipped.
-        grant_rank_title(self.character, "F")
-        grant_first_quest_epithet(self.character)
+        award_guild_rank_title(self.character, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.character, source_id="test:init:first_quest")
         view = build_title_codex_view(self.character)
         self.assertEqual(len(view.epithet_rows), 1)
         self.assertTrue(view.epithet_rows[0].equipped)
@@ -180,8 +180,8 @@ class TitleCodexViewTests(EvenniaTest):
         self.assertTrue(by_display[starter_display].can_remove)
 
     def test_full_title_and_equipped_dict_describe_the_live_composition(self):
-        grant_rank_title(self.character, "F")
-        grant_first_quest_epithet(self.character)
+        award_guild_rank_title(self.character, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.character, source_id="test:init:first_quest")
         view = build_title_codex_view(self.character)
         self.assertEqual(
             view.full_title, titles_module.compose_full_title(self.character)
@@ -215,8 +215,8 @@ class TitleCodexViewTests(EvenniaTest):
         )
 
     def test_row_lists_clip_while_counters_stay_full_view(self):
-        grant_rank_title(self.character, "F")
-        grant_first_quest_epithet(self.character)
+        award_guild_rank_title(self.character, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.character, source_id="test:init:first_quest")
         for index in range(1, 6):
             bank_epithet(self.character, f"異名{index}", f"事蹟{index}。", 100 + index)
         view = build_title_codex_view(self.character, max_rows=3)
@@ -231,8 +231,8 @@ class TitleCodexViewTests(EvenniaTest):
         self.assertEqual(view.total, len(live_fixed_title_registry()))
 
     def test_build_is_repeatable_and_byte_identical(self):
-        grant_rank_title(self.character, "F")
-        grant_first_quest_epithet(self.character)
+        award_guild_rank_title(self.character, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.character, source_id="test:init:first_quest")
         bank_fixed(self.character, T_FIRST, 100)
         first = build_title_codex_view(self.character)
         second = build_title_codex_view(self.character)
@@ -277,8 +277,8 @@ class TitleCodexViewTests(EvenniaTest):
         self.assertEqual(TITLE_MAX_DISPLAY_CHARS, MAX_EPITHET_DISPLAY_CODE_POINTS)
 
     def test_view_mutates_nothing(self):
-        grant_rank_title(self.character, "F")
-        grant_first_quest_epithet(self.character)
+        award_guild_rank_title(self.character, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.character, source_id="test:init:first_quest")
         before = (
             self.character.attributes.get(TITLE_COLLECTION_KEY),
             self.character.attributes.get(TITLE_EQUIPPED_KEY),

@@ -48,7 +48,7 @@ from world.rules.titles import (
     bank_epithet,
     decline_records,
     declined_digest,
-    grant_rank_title,
+    award_guild_rank_title,
     persist_nomination_ballot,
     read_pending_ballot,
     read_title_state,
@@ -317,7 +317,7 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         self.player.msg = lambda text, **kwargs: self.messages.append(text)
 
     def _bank_pair(self):
-        grant_rank_title(self.player, _T_RANK.key)
+        award_guild_rank_title(self.player, _T_RANK.key, source_id="test:init:rank")
         bank_epithet(self.player, _T_STARTER_EPITHET, _T_STARTER_BASIS, 1)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
 

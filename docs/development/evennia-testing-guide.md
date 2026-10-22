@@ -1132,7 +1132,7 @@ NPC 的人物設定、角色卡、語音與劇本台詞是作者文字，行為�
 
 啟始異名的顯示名與事蹟依據是 `world/lore/titles.py` 的凍結宣告 `STARTER_EPITHET`，它是唯一的
 顯示／來源權威；該宣告在玩家**生涯第一次成功回報公會任務**時，由
-`world/rules/titles/planner.py::grant_first_quest_epithet` 透過一般寫入者 `bank_epithet` 於該次
+`world/rules/titles/awards.py::award_first_quest_epithet` 透過一般寫入者 `bank_epithet` 於該次
 回報交易內入庫（不是公會註冊時），維持 display 去重、只自動裝備空槽，並隨交易快照回滾。
 「獲得異名：」是呈現文法，其後的顯示名才是資料。固定公會位階稱號「F級冒險者」、教士階梯
 與六個稱號分類頁籤都是保留契約，不隨這項資料所有權變更。

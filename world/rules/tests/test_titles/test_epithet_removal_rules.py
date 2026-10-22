@@ -62,8 +62,8 @@ from world.rules.titles import (
     equip_fixed,
     epithet_removal_gate,
     fixed_display_name,
-    grant_rank_title,
-    grant_first_quest_epithet,
+    award_guild_rank_title,
+    award_first_quest_epithet,
     nomination_cooldown_active,
     nomination_suppressed,
     owned_epithet_displays,
@@ -107,8 +107,8 @@ class EpithetRemovalRulesTests(EvenniaTest):
 
     def _bank_pair(self):
         """The titled pair (F fixed + starter epithet) plus a removable one."""
-        grant_rank_title(self.entity, "F")
-        grant_first_quest_epithet(self.entity)
+        award_guild_rank_title(self.entity, "F", source_id="test:init:rank:F")
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
 
     @covers_requirement(
@@ -117,7 +117,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
     def test_gate_precedence_unknown_then_last_then_equipped(self):
         # Unknown before anything: no epithets at all, fixed keys, blanks,
         # and non-strings all read TARGET_UNKNOWN.
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         for target in (" nonexistent", T_F_KEY, "", None, 7, True, ["破城先鋒"]):
             with self.subTest(target=target):
                 self.assertIs(
@@ -247,7 +247,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
         )
 
     def test_removal_log_is_bounded_newest_first(self):
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         previous = _starter().display
         for index in range(1, 6):
             display = f"異名{index}"
@@ -280,7 +280,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
         self.assertEqual(removal_digest(self.entity), ("破城先鋒",))
 
     def test_digest_dedupes_and_degrades_on_malformed_history(self):
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         bank_epithet(self.entity, "甲名", "甲事蹟。", 100)
         bank_epithet(self.entity, "乙名", "乙事蹟。", 200)
         equip_epithet(self.entity, "乙名")

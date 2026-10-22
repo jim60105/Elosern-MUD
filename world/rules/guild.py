@@ -187,8 +187,17 @@ def register_adventurer(
         raise GuildError(RegistrationReason.NOT_A_PLAYER)
     current = parse_guild_registration(actor)
     if current is not None:
-        # Re-registration banks nothing, so the notification channel is empty.
-        current["title_notifications"] = []
+        # Re-registration resolves the original committed occurrence if present
+        registered_tick = current.get("registered_tick", 0)
+        source_id = f"guild:registration:{actor.pk}:{registered_tick}"
+        from world.narrative.events import get_committed_award_results
+        original_awards = get_committed_award_results(source_id)
+        if original_awards:
+            current["title_awards"] = [a.to_dict() for a in original_awards]
+            current["title_notifications"] = []
+        else:
+            current["title_awards"] = []
+            current["title_notifications"] = []
         return current
     if actor.guild_rank is not None and current is None:
         raise GuildDataError(
@@ -216,11 +225,14 @@ def register_adventurer(
 
     snapshot = _registration_snapshot(actor, staff)
     title_notifications: tuple[str, ...] = ()
+    title_awards: list[Any] = []
+    registered_tick = get_world_clock().tick
+    source_id = f"guild:registration:{actor.pk}:{registered_tick}"
     try:
         with transaction.atomic():
             actor.db.guild_registration = {
                 "branch_key": branch_key,
-                "registered_tick": get_world_clock().tick,
+                "registered_tick": registered_tick,
                 "displayed_stats": {
                     key: int(get_display_value(actor, key))
                     for key in REGISTRATION_TRAIT_KEYS
@@ -230,12 +242,32 @@ def register_adventurer(
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
             apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
-            from world.rules.titles import grant_rank_title
+            from world.rules.titles import award_guild_rank_title
 
             # D8 §6.5: the F-rank title banks and auto-equips inside the same
             # all-or-nothing registration commit. The starter epithet is NOT
             # granted here; it rides the first reward claim (turn_in_quest).
-            title_notifications = grant_rank_title(actor, "F")
+            award, note = award_guild_rank_title(actor, "F", source_id=source_id, tick=registered_tick)
+            if award is not None:
+                title_awards.append(award)
+            if note:
+                title_notifications = (note,)
+
+            # Finalize award evidence into an immutable narrative event inside the same transaction
+            from world.narrative.events import record_narrative_event
+            record_narrative_event(
+                source_id=source_id,
+                event_type="guild_registration",
+                content={
+                    "branch_key": branch_key,
+                    "guild_rank": "F",
+                },
+                participants=[str(actor.pk)],
+                tick=registered_tick,
+                visibility="public",
+                salience=1,
+                award_results=title_awards,
+            )
     except Exception:
         _restore_registration(actor, staff, snapshot)
         raise
@@ -246,6 +278,7 @@ def register_adventurer(
     if parsed is None:
         raise GuildDataError("registration write produced no parseable record")
     parsed["title_notifications"] = list(title_notifications)
+    parsed["title_awards"] = [a.to_dict() for a in title_awards]
     return parsed
 
 
@@ -385,6 +418,8 @@ def turn_in_quest(
 
     claims = parse_reward_claims(actor)
     if quest_id in claims:
+        source_id = f"quest:{quest_id}:claim:{actor.pk}"
+        from world.narrative.events import get_committed_award_results
         raise RewardClaimError(RewardClaim.ALREADY_CLAIMED)
     # The starter epithet rides the actor's first-ever reward claim, decided
     # from the pre-append claims list (any definition; never keyed to one).
@@ -448,6 +483,8 @@ def turn_in_quest(
     }
 
     title_notifications: list[str] = []
+    title_awards: list[Any] = []
+    source_id = f"quest:{quest_id}:claim:{actor.pk}"
 
     def writer():
         actor.db.wallet = int(actor.db.wallet or 0) + reward.copper
@@ -473,9 +510,13 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         if first_claim:
-            from world.rules.titles import grant_first_quest_epithet
+            from world.rules.titles import award_first_quest_epithet
 
-            title_notifications.extend(grant_first_quest_epithet(actor))
+            award, note = award_first_quest_epithet(actor, source_id=source_id)
+            if award is not None:
+                title_awards.append(award)
+            if note:
+                title_notifications.append(note)
         from world.rules.affinity import apply_affinity_change, raise_affinity_cap
 
         # Cap breaks apply before the quest-completion gains so a record
@@ -484,6 +525,21 @@ def turn_in_quest(
             raise_affinity_cap(npc, actor, new_cap)
         for npc in companions:
             apply_affinity_change(npc, actor, "quest_completion", companion_gain)
+
+        # Finalize award results inside the same transaction
+        from world.narrative.events import record_narrative_event
+        record_narrative_event(
+            source_id=source_id,
+            event_type="quest_reward_claim",
+            content={
+                "quest_id": quest_id,
+            },
+            participants=[str(actor.pk)],
+            tick=get_world_clock().tick,
+            visibility="public",
+            salience=1,
+            award_results=title_awards,
+        )
 
     def restore():
         from world.rules.surfaces import restore_attribute_best_effort
@@ -519,6 +575,7 @@ def turn_in_quest(
         "merit": reward.merit,
         "items": [str(item.item_key) for item in reward.items],
         "title_notifications": list(title_notifications),
+        "title_awards": [a.to_dict() for a in title_awards],
     }
 
 

@@ -12,6 +12,7 @@ from typing import Any, Callable, Literal
 from world.rules.event_log import EventLog
 from world.rules.targeting import ActionContext
 from world.rules.unlock_notices import UnlockNotice
+from world.rules.titles.awards import AutomaticTitleAward
 
 
 class RejectReason(StrEnum):
@@ -109,6 +110,7 @@ class ActionResult:
     # that channel exactly once and forwards these to
     # :func:`world.rules.unlock_notices.deliver_unlocks` for the session marks.
     unlock_notices: tuple[UnlockNotice, ...] = ()
+    title_awards: tuple[AutomaticTitleAward, ...] = ()
 
     @classmethod
     def success(
@@ -117,9 +119,10 @@ class ActionResult:
         time_cost: int,
         notifications: tuple[str, ...] = (),
         unlock_notices: tuple[UnlockNotice, ...] = (),
+        title_awards: tuple[AutomaticTitleAward, ...] = (),
     ) -> "ActionResult":
         return cls(
-            "success", event_log, time_cost, None, None, notifications, unlock_notices
+            "success", event_log, time_cost, None, None, notifications, unlock_notices, title_awards
         )
 
     @classmethod

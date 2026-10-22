@@ -134,7 +134,7 @@ inventory planning boundary.
 actor's `guild_reward_claims` list is empty — the actor's first-ever reward
 claim for any quest definition (never keyed to a particular `definition_key`) —
 and inside that same all-or-nothing claim transaction call
-`world/rules/titles.py::grant_first_quest_epithet`.
+`world/rules/titles/awards.py::award_first_quest_epithet`.
 
 #### Scenario: First completed claim grants the epithet
 - **WHEN** a registered member with an empty claims list turns in any completed quest

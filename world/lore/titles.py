@@ -117,7 +117,7 @@ class StarterEpithet:
     """The deterministic first-quest epithet: display plus origin basis.
 
     Granted by the actor's first guild reward claim
-    (``world/rules/titles/planner.py::grant_first_quest_epithet``), not at
+    (``world/rules/titles/awards.py::award_first_quest_epithet``), not at
     registration.
     """
 

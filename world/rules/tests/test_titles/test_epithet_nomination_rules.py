@@ -62,8 +62,8 @@ from world.rules.titles import (
     equip_fixed,
     epithet_removal_gate,
     fixed_display_name,
-    grant_rank_title,
-    grant_first_quest_epithet,
+    award_guild_rank_title,
+    award_first_quest_epithet,
     nomination_cooldown_active,
     nomination_suppressed,
     owned_epithet_displays,
@@ -190,7 +190,7 @@ class EpithetNominationRulesTests(EvenniaTest):
 
     @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_with_occupied_slot_banks_without_touching_it(self):
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         self._persist(("新月", "月下救人"))
         _, equipped_before = read_title_state(self.entity)
         self.assertEqual(equipped_before["epithet"], _starter().display)
@@ -199,7 +199,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertEqual(equipped_after["epithet"], _starter().display)
 
     def test_duplicate_display_accept_consumes_ballot_without_new_entry(self):
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         self._persist((_starter().display, "再次入票的事蹟"))
         display, banked = accept_epithet(self.entity, 1)
         self.assertEqual((display, banked), (_starter().display, False))
@@ -313,7 +313,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertEqual(read_pending_ballot(self.entity)[0]["display"], "甲名")
 
     def test_owned_displays_and_digest_reads(self):
-        grant_first_quest_epithet(self.entity)
+        award_first_quest_epithet(self.entity, source_id="test:init:first_quest")
         self.assertEqual(
                 owned_epithet_displays(self.entity),
                 frozenset({_starter().display}),
