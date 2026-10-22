@@ -12,7 +12,11 @@ no network, no live LLM: the client is always ``FakeLLMClient``.
 
 import json
 import unittest
+from datetime import date
+from tempfile import TemporaryDirectory
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.test import override_settings
 
@@ -26,7 +30,7 @@ from world.ai.title_nomination import (
     BASIS_MAX_CHARS,
     CANDIDATES_PER_ROUND,
     DISPLAY_WIRE_MAX_CHARS,
-    SUMMARY_MAX_TOTAL_CHARS,
+    EMPTY_RECENT_DEEDS_JSON,
     EpithetCandidate,
     NominationContext,
     TITLE_NOMINATION_OUTPUT_SCHEMA,
@@ -36,8 +40,8 @@ from world.ai.title_nomination import (
     filter_candidates,
     generate_epithet_candidates,
     register_title_nomination,
-    summarize_event_logs,
 )
+from world.observability import transcript
 
 
 def _profiles(**overrides):
@@ -65,6 +69,10 @@ PLAYER = "艾洛希雅"
 # suite names invented prose instead of shipped title text.
 FIXED = frozenset({"苔徑守誓者", "受矚者"})
 OWNED = frozenset({"苔徑新客"})
+SOURCE_A = "quest:test_quest_001"
+SOURCE_B = "exam:guild_exam_002"
+SOURCE_C = "combat:encounter_003"
+DEFAULT_SOURCES = frozenset({SOURCE_A, SOURCE_B, SOURCE_C})
 
 
 def _context(**overrides):
@@ -74,13 +82,23 @@ def _context(**overrides):
         "declined": (),
         "owned_epithet_displays": OWNED,
         "fixed_displays": FIXED,
-        "event_logs": (),
+        "recent_deeds_json": json.dumps({
+            "recent_deeds": [
+                {"group_type": "quest_completion", "source_ids": [SOURCE_A, SOURCE_B, SOURCE_C]}
+            ]
+        }, ensure_ascii=False),
+        "supplied_source_ids": DEFAULT_SOURCES,
     }
     base.update(overrides)
     return NominationContext(**base)
 
 
-def _candidate(index: int, display: str | None = None, basis: str | None = None):
+def _candidate(
+    index: int,
+    display: str | None = None,
+    basis: str | None = None,
+    source_ids: list[str] | None = None,
+):
     # Displays default to pure-CJK names (the display form gate rejects
     # digits); basis carries no form gate at all — schema + storage parse
     # (non-empty, <=80) are its only bounds, per the spec filter list.
@@ -88,6 +106,7 @@ def _candidate(index: int, display: str | None = None, basis: str | None = None)
     return {
         "display": display if display is not None else f"異名{numeral}",
         "basis": basis if basis is not None else f"事蹟引用{index}",
+        "source_ids": source_ids if source_ids is not None else [SOURCE_A],
     }
 
 
@@ -98,11 +117,11 @@ def _reply(candidates):
 def _good_reply():
     return _reply(
         [
-            _candidate(1, "火焰之心"),
-            _candidate(2, "破曉之刃"),
-            _candidate(3, "沉默守望"),
-            _candidate(4, "荒野行者"),
-            _candidate(5, "月影之舞"),
+            _candidate(1, "火焰之心", source_ids=[SOURCE_A]),
+            _candidate(2, "破曉之刃", source_ids=[SOURCE_B]),
+            _candidate(3, "沉默守望", source_ids=[SOURCE_C]),
+            _candidate(4, "荒野行者", source_ids=[SOURCE_A]),
+            _candidate(5, "月影之舞", source_ids=[SOURCE_B]),
         ]
     )
 
@@ -121,6 +140,7 @@ class FilterMatrixTests(unittest.TestCase):
             "player_name": PLAYER,
             "fixed_displays": FIXED,
             "owned_epithet_displays": OWNED,
+            "supplied_source_ids": DEFAULT_SOURCES,
         }
         kwargs.update(over)
         return filter_candidates(candidates, **kwargs)
@@ -192,6 +212,43 @@ class FilterMatrixTests(unittest.TestCase):
         self.assertEqual(len(survivors), BALLOT_TOP)
         self.assertEqual(
             [c.display for c in survivors], ["異名一", "異名二", "異名三"]
+        )
+
+    @covers_requirement("title-system::candidate-citations-refer-only-to-actually-rendered-sources")
+    def test_citation_validation_empty_duplicate_unknown_eliminated(self):
+        candidates = [
+            _candidate(1, "有效異名", source_ids=[SOURCE_A]),
+            _candidate(2, "空引異名", source_ids=[]),
+            _candidate(3, "重複異名", source_ids=[SOURCE_A, SOURCE_A]),
+            _candidate(4, "未知異名", source_ids=["quest:unknown_999"]),
+            _candidate(5, "次效異名", source_ids=[SOURCE_B]),
+        ]
+        survivors = self._filter(candidates)
+        self.assertEqual(
+            [(c.display, c.basis) for c in survivors],
+            [("有效異名", "事蹟引用1"), ("次效異名", "事蹟引用5")],
+        )
+
+    @covers_requirement("title-system::candidate-citations-refer-only-to-actually-rendered-sources")
+    def test_citation_invalid_duplicate_cannot_reserve_display(self):
+        # Candidate 1 has invalid citation (unknown ID) with display "破曉之刃".
+        # Candidate 2 has valid citation with the same display "破曉之刃".
+        # Candidate 2 must survive and not be dropped as duplicate.
+        candidates = [
+            _candidate(1, "破曉之刃", source_ids=["unknown:id"]),
+            _candidate(2, "破曉之刃", source_ids=[SOURCE_A]),
+            _candidate(3, "沉默守望", source_ids=[SOURCE_B]),
+            _candidate(4, "荒野行者", source_ids=[SOURCE_C]),
+            _candidate(5, "月影之舞", source_ids=[SOURCE_A]),
+        ]
+        survivors = self._filter(candidates)
+        self.assertEqual(
+            [(c.display, c.basis) for c in survivors],
+            [
+                ("破曉之刃", "事蹟引用2"),
+                ("沉默守望", "事蹟引用3"),
+                ("荒野行者", "事蹟引用4"),
+            ],
         )
 
     @covers_requirement(
@@ -275,6 +332,47 @@ class SchemaBoundaryTests(unittest.TestCase):
         with override_settings(LLM_PROFILES=_profiles()):
             result = await_result(generate_epithet_candidates(_context(), client))
         self.assertIsNone(result)
+
+    @covers_requirement("title-system::candidate-citations-refer-only-to-actually-rendered-sources")
+    def test_oversized_citation_array_voids_round(self):
+        # Candidate 4 (after 3 valid survivors) carries 4 source IDs when supplied has 3.
+        # Must void the whole round (return None).
+        oversized_ids = [SOURCE_A, SOURCE_B, SOURCE_C, "extra:fourth"]
+        candidates = [
+            _candidate(1, "火焰之心", source_ids=[SOURCE_A]),
+            _candidate(2, "破曉之刃", source_ids=[SOURCE_B]),
+            _candidate(3, "沉默守望", source_ids=[SOURCE_C]),
+            _candidate(4, "超量引用", source_ids=oversized_ids),
+            _candidate(5, "月影之舞", source_ids=[SOURCE_A]),
+        ]
+        client = _client_replying(_reply(candidates))
+        with override_settings(
+            LLM_PROFILES=_profiles(title_nomination={"max_retries": 0})
+        ):
+            result = await_result(generate_epithet_candidates(_context(), client))
+        self.assertIsNone(result)
+
+    @covers_requirement("title-system::candidate-citations-refer-only-to-actually-rendered-sources")
+    def test_empty_duplicate_and_unknown_citations_eliminate_candidate_only_not_round(self):
+        # Generation-level test: candidate with invalid citation is eliminated,
+        # but unrelated valid candidates still survive.
+        candidates = [
+            _candidate(1, "火焰之心", source_ids=[SOURCE_A]),
+            _candidate(2, "空引異名", source_ids=[]),
+            _candidate(3, "重複異名", source_ids=[SOURCE_A, SOURCE_A]),
+            _candidate(4, "未知異名", source_ids=["quest:unknown_999"]),
+            _candidate(5, "破曉之刃", source_ids=[SOURCE_B]),
+        ]
+        client = _client_replying(_reply(candidates))
+        with override_settings(LLM_PROFILES=_profiles()):
+            result = await_result(generate_epithet_candidates(_context(), client))
+        self.assertEqual(
+            result,
+            (
+                EpithetCandidate("火焰之心", "事蹟引用1"),
+                EpithetCandidate("破曉之刃", "事蹟引用5"),
+            ),
+        )
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_basis_over_80_voids_whole_round(self):
@@ -365,6 +463,14 @@ class DegradeTests(unittest.TestCase):
             result = await_result(generate_epithet_candidates(_context(), client))
         self.assertIsNone(result)
 
+    def test_empty_feed_makes_no_model_call(self):
+        client = FakeLLMClient()
+        empty_ctx = _context(supplied_source_ids=frozenset(), recent_deeds_json=EMPTY_RECENT_DEEDS_JSON)
+        with override_settings(LLM_PROFILES=_profiles()):
+            result = await_result(generate_epithet_candidates(empty_ctx, client))
+        self.assertIsNone(result)
+        self.assertEqual(client.calls, [])
+
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_all_candidates_filtered_returns_empty_tuple_not_none(self):
         text = _reply([_candidate(i, "苔徑新客") for i in range(1, 6)])
@@ -382,7 +488,8 @@ class DegradeTests(unittest.TestCase):
 class PromptShapeTests(unittest.TestCase):
     """Collision vocabulary is absent from the prompt; digest is present."""
 
-    def test_prompt_carries_context_and_empty_summary(self):
+    @covers_requirement("title-system::nomination-prompts-contain-authorized-structured-deeds-and-advisory-identity")
+    def test_prompt_carries_context_and_deeds_json(self):
         system, user = build_nomination_prompt(
             _context(declined=("舊異名", "另一個名"))
         )
@@ -392,7 +499,26 @@ class PromptShapeTests(unittest.TestCase):
         summary_line = user["content"].split(
             "近期事件紀錄（JSON；可能為空）：", 1
         )[1].split("\n", 1)[0]
-        self.assertEqual(json.loads(summary_line), {"event_logs": []})
+        parsed = json.loads(summary_line)
+        self.assertIn("recent_deeds", parsed)
+
+    @covers_requirement("title-system::nomination-prompts-contain-authorized-structured-deeds-and-advisory-identity")
+    def test_factual_prompt_instructions_and_adult_outcome_survives(self):
+        adult_deeds = json.dumps({
+            "recent_deeds": [
+                {
+                    "group_type": "adult_action",
+                    "source_ids": ["adult:act_001"],
+                    "facts": {"actor": "elosia", "recipient": "partner", "outcome": "compliant", "act_key": "caress"},
+                }
+            ]
+        }, ensure_ascii=False)
+        system, user = build_nomination_prompt(_context(recent_deeds_json=adult_deeds))
+        self.assertIn("嚴格禁止虛構未發生的結果", system["content"])
+        self.assertIn("顛倒行動者與承受者角色", system["content"])
+        self.assertIn("自數值效果妄加推斷意願或關係承諾", system["content"])
+        self.assertIn("亦不得虛構公眾見證或知名度", system["content"])
+        self.assertIn("compliant", user["content"])
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_prompt_never_states_collision_rules(self):
@@ -425,54 +551,44 @@ class PromptShapeTests(unittest.TestCase):
         self.assertTrue(line.endswith("：無"))
 
 
-class EventSummaryTests(unittest.TestCase):
-    """The bounded recent-event feed shape."""
+class TranscriptAndProvenanceTests(unittest.TestCase):
+    """Scenario: Traceability without private operational prose."""
 
-    def _log(self, filler=0):
-        entries = [
-            SimpleNamespace(
-                kind="damage",
-                actor="elosia",
-                target="monster",
-                text_template="{actor}造成了傷害",
-            )
-        ] * 3
-        for _ in range(filler):
-            entries.append(
-                SimpleNamespace(
-                    kind="damage",
-                    actor="x" * 5000,
-                    target=None,
-                    text_template="y" * 5000,
-                )
-            )
-        return SimpleNamespace(
-            actor="elosia",
-            skill_key="t_synth_slash",
-            targets=("monster",),
-            entries=entries,
-        )
+    def setUp(self):
+        _reset_all()
+        register_title_nomination()
+        self.addCleanup(_reset_all)
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patch_dir = patch.object(transcript, "_transcript_dir", return_value=self.tmp.name)
+        patch_today = patch.object(transcript, "_today", return_value=date(2026, 10, 22))
+        settings_patch = override_settings(LLM_TRANSCRIPT_ENABLED=True)
+        settings_patch.enable()
+        patch_dir.start()
+        patch_today.start()
+        self.addCleanup(patch_dir.stop)
+        self.addCleanup(patch_today.stop)
+        self.addCleanup(settings_patch.disable)
 
-    def test_empty_feed_serializes_empty_record(self):
-        self.assertEqual(summarize_event_logs(()), '{"event_logs": []}')
+    @covers_requirement("title-system::citation-provenance-stops-at-the-generation-boundary")
+    def test_transcript_records_provenance_and_candidate_strips_citations(self):
+        client = _client_replying(_good_reply())
+        with override_settings(LLM_PROFILES=_profiles()):
+            survivors = await_result(generate_epithet_candidates(_context(), client))
+        self.assertEqual(len(survivors), 3)
+        # EpithetCandidate only carries display and basis (source_ids consumed at boundary)
+        for s in survivors:
+            self.assertFalse(hasattr(s, "source_ids"))
+            self.assertTrue(hasattr(s, "display"))
+            self.assertTrue(hasattr(s, "basis"))
 
-    def test_feed_is_bounded_and_json(self):
-        text = summarize_event_logs([self._log() for _ in range(40)])
-        parsed = json.loads(text)
-        self.assertLessEqual(len(parsed["event_logs"]), 8)
-
-    def test_oversized_feed_stays_within_total_bound(self):
-        text = summarize_event_logs([self._log(filler=30)])
-        json.loads(text)
-        self.assertLessEqual(len(text), SUMMARY_MAX_TOTAL_CHARS)
-
-    def test_single_oversized_log_is_trimmed_to_the_bound(self):
-        # One log alone can exceed the budget; the newest entries are kept
-        # and the serialized feed still honors the hard cap.
-        text = summarize_event_logs([self._log(filler=200)])
-        parsed = json.loads(text)
-        self.assertLessEqual(len(text), SUMMARY_MAX_TOTAL_CHARS)
-        self.assertLessEqual(len(parsed["event_logs"]), 1)
+        # Verify transcript recorded the exchange with source_ids
+        path = Path(self.tmp.name) / "2026-10-22.jsonl"
+        self.assertTrue(path.exists())
+        lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        outcomes = [r for r in lines if r.get("kind") == "outcome"]
+        self.assertEqual(len(outcomes), 1)
+        self.assertIn("source_ids", path.read_text(encoding="utf-8"))
 
 
 class RegistrationTests(unittest.TestCase):

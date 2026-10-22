@@ -60,13 +60,15 @@ def _build_nomination_client() -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _build_context(entity: Any, event_logs: Any) -> Any:
+def _build_context(entity: Any, *, frozen_tick: int | None = None) -> Any:
     """Freeze the nomination inputs from rules reads. Raises fail-closed on
     malformed title state (the caller swallows: no round, no state change)."""
     from world.ai.title_nomination import NominationContext
     from world.lore.titles import FIXED_TITLE_REGISTRY
+    from world.narrative.recent_deeds import select_authorized_recent_deeds
     from world.rules import titles as title_rules
 
+    deeds_result = select_authorized_recent_deeds(entity, frozen_tick=frozen_tick)
     return NominationContext(
         player_name=str(entity.key or ""),
         full_title=title_rules.safe_full_title(entity),
@@ -76,7 +78,8 @@ def _build_context(entity: Any, event_logs: Any) -> Any:
             definition.display_name_zh
             for definition in FIXED_TITLE_REGISTRY.values()
         ),
-        event_logs=tuple(event_logs or ()),
+        recent_deeds_json=deeds_result.rendered_json,
+        supplied_source_ids=frozenset(deeds_result.source_ids),
         removed=title_rules.removal_digest(entity),
     )
 
@@ -156,7 +159,7 @@ def _log_generation_error(failure: Any) -> None:
 def schedule_epithet_nomination(
     entity: Any,
     *,
-    event_logs: Any = (),
+    frozen_tick: int | None = None,
     watchers: Any = (),
     client: Any = None,
 ) -> "defer.Deferred | None":
@@ -176,7 +179,9 @@ def schedule_epithet_nomination(
 
         if nomination_suppressed(entity):
             return None
-        context = _build_context(entity, event_logs)
+        context = _build_context(entity, frozen_tick=frozen_tick)
+        if not context.supplied_source_ids:
+            return None
         resolved = client if client is not None else _build_nomination_client()
         if resolved is None:
             return None
