@@ -567,6 +567,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
                 source_id=f"action:combat:{encounter_id}:r1:s0:{self.player.pk}:{BASIC_ATTACK_KEY}",
                 event_type="skill_use",
                 content={
+                    "location": {"id": "", "label": ""},
                     "action_source_id": f"action:combat:{encounter_id}:r1:s0:{self.player.pk}:{BASIC_ATTACK_KEY}",
                     "skill_key": BASIC_ATTACK_KEY,
                     "skill_name": "普通攻擊",
@@ -629,6 +630,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
             source_id=build_encounter_source_id(encounter_id, kind="terminal", ordinal=1),
             event_type="combat_encounter",
             content={
+                "location": {"id": "", "label": ""},
                 "encounter_id": encounter_id,
                 "session_id": "hostile:1:0",
                 "outcome": "victory",
@@ -646,6 +648,7 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
                 source_id=source,
                 event_type="skill_use",
                 content={
+                    "location": {"id": "", "label": ""},
                     "action_source_id": source,
                     "skill_key": BASIC_ATTACK_KEY,
                     "skill_name": "普通攻擊",

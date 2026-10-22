@@ -66,7 +66,9 @@ class NominationContext:
 
     Nothing here references a game entity: the service reads the collection,
     decline log, removal log, and full title through rules readers and hands
-    the values over as frozen data.
+    the values over as frozen data. ``frozen_tick`` is the single world tick
+    the admission froze before building this context; selection, generation
+    and every diagnostic report that integer, never a later clock read.
     """
 
     player_name: str
@@ -77,6 +79,7 @@ class NominationContext:
     recent_deeds_json: str = EMPTY_RECENT_DEEDS_JSON
     supplied_source_ids: frozenset[str] = frozenset()
     removed: tuple[str, ...] = ()
+    frozen_tick: int = 0
 
 
 @dataclass(frozen=True)

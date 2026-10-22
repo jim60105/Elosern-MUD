@@ -6,6 +6,7 @@ Specs: openspec/specs/narrative-events/spec.md
 
 from copy import deepcopy
 from dataclasses import replace
+import json
 import unittest
 from unittest.mock import patch
 
@@ -31,6 +32,8 @@ from world.narrative.events import (
     record_narrative_event,
 )
 from world.narrative.models import NarrativeEvent
+from world.narrative.recent_deeds import select_authorized_recent_deeds
+from world.observability.render import render_context
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -773,3 +776,294 @@ class RecentDeedsLifecycleBehaviorTests(
         )
         _, equipped = read_title_state(self.char)
         self.assertNotEqual(equipped.get("fixed"), _SYNTH_FIXED_KEY)
+
+    @covers_requirement(
+        "narrative-events::completed-quest-and-passed-examination-facts-are-durable",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
+    )
+    def test_quest_and_exam_facts_retain_their_settled_locations(self):
+        """Quest completion and exam promotion snapshot their own settlement room."""
+        quest_room = create_object(Room, key="t_lifecycle_quest_room")
+        exam_room = create_object(Room, key="t_lifecycle_exam_room")
+        original_room = self.char.location
+
+        # Quest completion settles in its own room.
+        self.char.location = quest_room
+        record = accept_quest(self.char, self._definition.key, TEST_ISSUER_KEY)
+        advanced = fulfill_record(record, self._definition)
+        completed = fulfill_record(advanced, self._definition)
+        apply_quest_log_replacement(self.char, [completed])
+        quest_event = NarrativeEvent.objects.get(
+            source_id=f"quest:{completed.quest_id}:completion:{self.char.pk}"
+        )
+        self.assertEqual(
+            quest_event.content["location"],
+            {"id": str(quest_room.pk), "label": quest_room.key},
+        )
+        self.assertEqual(quest_event.location, str(quest_room.pk))
+
+        # Examination promotion settles in a different room.
+        self.char.location = exam_room
+        self.char.guild_rank = "F"
+        exam_id = f"exam:{self.char.pk}:loc:1"
+        session_id = f"guild_exam:{self.char.pk}:{exam_id}"
+        self.char.db.guild_exams = [
+            exam_to_storage(
+                GuildExamRecord(
+                    exam_id=exam_id,
+                    character_id=int(self.char.pk),
+                    target_rank="E",
+                    requested_by="counter",
+                    opponent_id=9999,
+                    session_id=session_id,
+                    state=ExamState.ACTIVE,
+                    terminal_reason=None,
+                )
+            )
+        ]
+        exam_session = CombatSessionRecord(
+            session_id=session_id,
+            mode="guild_exam",
+            room_id=exam_room.pk,
+            player_ids=(int(self.char.pk),),
+            enemy_ids=(9999,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=2,
+            exam_id=exam_id,
+        )
+        settle_exam_outcome(self.char, exam_session, None, "exam_passed")
+        exam_event = NarrativeEvent.objects.get(
+            source_id=f"guild_exam:{exam_id}:settlement:{self.char.pk}"
+        )
+        self.assertEqual(
+            exam_event.content["location"],
+            {"id": str(exam_room.pk), "label": exam_room.key},
+        )
+        self.assertEqual(exam_event.location, str(exam_room.pk))
+
+        # Both committed facts render their own location through selection.
+        tick = max(quest_event.tick, exam_event.tick)
+        rendered = json.loads(
+            select_authorized_recent_deeds(self.char, frozen_tick=tick).rendered_json
+        )["recent_deeds"]
+        by_source = {
+            source: group
+            for group in rendered
+            for source in group["source_ids"]
+        }
+        self.assertEqual(
+            by_source[quest_event.source_id]["facts"]["location"],
+            {"known": True, "id": str(quest_room.pk), "label": quest_room.key},
+        )
+        self.assertEqual(
+            by_source[exam_event.source_id]["facts"]["location"],
+            {"known": True, "id": str(exam_room.pk), "label": exam_room.key},
+        )
+        self.assertNotEqual(
+            by_source[quest_event.source_id]["facts"]["location"]["id"],
+            by_source[exam_event.source_id]["facts"]["location"]["id"],
+        )
+        self.char.location = original_room
+
+    @covers_requirement(
+        "narrative-events::completed-combat-evidence-preserves-the-actual-encounter-outcome",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
+    )
+    def test_terminal_combat_snapshots_the_session_room(self):
+        """The terminal encounter keeps its durable session room and readable label."""
+        room = self.char.location
+        session = CombatSessionRecord(
+            session_id=f"hostile:{self.char.pk}:loc:1",
+            engagement_id=f"hostile:{self.char.pk}:loc:1:1",
+            mode="hostile",
+            room_id=room.pk,
+            player_ids=(int(self.char.pk),),
+            enemy_ids=(8888,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=1,
+            exam_id=None,
+        )
+        settle_session(self.char, session, None, "victory")
+        event = NarrativeEvent.objects.get(
+            source_id=build_encounter_source_id(
+                session.engagement_id, kind="terminal", ordinal=1
+            )
+        )
+        self.assertEqual(
+            event.content["location"], {"id": str(room.pk), "label": room.key}
+        )
+        self.assertEqual(event.location, str(room.pk))
+
+        # The actor has left the room before settlement: the label still comes
+        # from the session's own room, never from the actor's later location.
+        elsewhere = create_object(Room, key="t_lifecycle_elsewhere")
+        self.char.location = elsewhere
+        moved_session = CombatSessionRecord(
+            session_id=f"hostile:{self.char.pk}:loc:2",
+            engagement_id=f"hostile:{self.char.pk}:loc:2:1",
+            mode="hostile",
+            room_id=room.pk,
+            player_ids=(int(self.char.pk),),
+            enemy_ids=(8888,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=1,
+            exam_id=None,
+        )
+        settle_session(self.char, moved_session, None, "defeat")
+        moved_event = NarrativeEvent.objects.get(
+            source_id=build_encounter_source_id(
+                moved_session.engagement_id, kind="terminal", ordinal=1
+            )
+        )
+        self.assertEqual(
+            moved_event.content["location"],
+            {"id": str(room.pk), "label": room.key},
+        )
+
+        # A removed session room keeps its durable identity without an invented label.
+        removed_room = create_object(Room, key="t_lifecycle_removed_room")
+        removed_pk = removed_room.pk
+        removed_room.delete()
+        removed_session = CombatSessionRecord(
+            session_id=f"hostile:{self.char.pk}:loc:3",
+            engagement_id=f"hostile:{self.char.pk}:loc:3:1",
+            mode="hostile",
+            room_id=removed_pk,
+            player_ids=(int(self.char.pk),),
+            enemy_ids=(8888,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=1,
+            exam_id=None,
+        )
+        settle_session(self.char, removed_session, None, "escape")
+        removed_event = NarrativeEvent.objects.get(
+            source_id=build_encounter_source_id(
+                removed_session.engagement_id, kind="terminal", ordinal=1
+            )
+        )
+        self.assertEqual(
+            removed_event.content["location"],
+            {"id": str(removed_pk), "label": ""},
+        )
+        self.assertEqual(removed_event.location, str(removed_pk))
+
+    @covers_requirement(
+        "title-system::recent-deed-rendering-has-complete-bounded-groups"
+    )
+    def test_real_settlements_render_committed_locations_and_frozen_tick(self):
+        """A real settlement round-trip renders each own room under the admitted tick.
+
+        Closest canonical requirement: the location-snapshot delta has no
+        canonical ID before archive sync; rendering is the consumer this
+        requirement bounds.
+        """
+        room_a = create_object(Room, key="t_settle_room_a")
+        room_b = create_object(Room, key="t_settle_room_b")
+
+        self.char.location = room_b
+        record = accept_quest(self.char, self._definition.key, TEST_ISSUER_KEY)
+        advanced = fulfill_record(record, self._definition)
+        completed = fulfill_record(advanced, self._definition)
+        apply_quest_log_replacement(self.char, [completed])
+        quest_event = NarrativeEvent.objects.get(
+            source_id=f"quest:{completed.quest_id}:completion:{self.char.pk}"
+        )
+
+        self.char.location = room_a
+        self.char.guild_rank = "F"
+        exam_id = f"exam:{self.char.pk}:settle:1"
+        session_id = f"guild_exam:{self.char.pk}:{exam_id}"
+        self.char.db.guild_exams = [
+            exam_to_storage(
+                GuildExamRecord(
+                    exam_id=exam_id,
+                    character_id=int(self.char.pk),
+                    target_rank="E",
+                    requested_by="counter",
+                    opponent_id=9999,
+                    session_id=session_id,
+                    state=ExamState.ACTIVE,
+                    terminal_reason=None,
+                )
+            )
+        ]
+        exam_session = CombatSessionRecord(
+            session_id=session_id,
+            mode="guild_exam",
+            room_id=room_a.pk,
+            player_ids=(int(self.char.pk),),
+            enemy_ids=(9999,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=2,
+            exam_id=exam_id,
+        )
+        settle_exam_outcome(self.char, exam_session, None, "exam_passed")
+        exam_event = NarrativeEvent.objects.get(
+            source_id=f"guild_exam:{exam_id}:settlement:{self.char.pk}"
+        )
+
+        # An unsupported record inside the same window must fail closed and
+        # never leak its private prose into the operational diagnostic.
+        record_narrative_event(
+            source_id="quest:unsupported:1",
+            event_type="quest_completion",
+            content={
+                "quest_id": "q_unsupported",
+                "definition_key": "dk_unsupported",
+                "completed_objective": "private_prose_marker in the payload",
+                "outcome": "completed",
+            },
+            participants=[str(self.char.pk)],
+            tick=int(exam_event.tick),
+        )
+
+        frozen_tick = int(max(quest_event.tick, exam_event.tick))
+        with patch("world.narrative.recent_deeds.log_warn") as warn:
+            result = select_authorized_recent_deeds(
+                self.char, frozen_tick=frozen_tick
+            )
+
+        self.assertEqual(result.frozen_tick, frozen_tick)
+        rendered_groups = json.loads(result.rendered_json)["recent_deeds"]
+        by_source = {
+            source: group for group in rendered_groups for source in group["source_ids"]
+        }
+        self.assertIn(quest_event.source_id, by_source)
+        self.assertIn(exam_event.source_id, by_source)
+        self.assertNotIn("quest:unsupported:1", result.source_ids)
+        self.assertEqual(
+            by_source[quest_event.source_id]["facts"]["location"],
+            {"known": True, "id": str(room_b.pk), "label": room_b.key},
+        )
+        self.assertEqual(
+            by_source[quest_event.source_id]["facts"]["tick"], quest_event.tick
+        )
+        self.assertEqual(
+            by_source[exam_event.source_id]["facts"]["location"],
+            {"known": True, "id": str(room_a.pk), "label": room_a.key},
+        )
+        self.assertEqual(
+            by_source[exam_event.source_id]["facts"]["tick"], exam_event.tick
+        )
+        self.assertEqual(
+            set(result.source_ids), {quest_event.source_id, exam_event.source_id}
+        )
+        # The fail-closed diagnostic names only committed identities.
+        self.assertEqual(warn.call_count, 1)
+        self.assertEqual(
+            set(warn.call_args.kwargs["context"]),
+            {"source_id", "event_type", "frozen_tick"},
+        )
+        self.assertEqual(
+            warn.call_args.kwargs["context"]["frozen_tick"], frozen_tick
+        )
+        self.assertNotIn("private_prose_marker", str(warn.call_args))
+        rendered_context = render_context(warn.call_args.kwargs["context"])
+        self.assertNotIn("private_prose_marker", rendered_context)
+        self.assertIn(f"frozen_tick={frozen_tick}", rendered_context)
+        self.assertNotIn("private_prose_marker", result.rendered_json)

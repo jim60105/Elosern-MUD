@@ -645,7 +645,7 @@ def run_violation_sequence(
                 credited_counters=row.credited_counters if landed else (),
                 before=victim_before,
                 tick=int(clock.tick),
-                location=str(getattr(actor, "location", "") or ""),
+                location=getattr(actor, "location", None),
                 encounter_id=engagement_id,
                 session_id=str(getattr(session, "session_id", "") or ""),
             )

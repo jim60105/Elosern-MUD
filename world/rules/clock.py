@@ -286,7 +286,7 @@ def _settle_buffs_and_decay(
                 before_ms,
                 source_id=f"clock:climax:{q_tick}:{e_id}",
                 tick=q_tick,
-                location=str(getattr(entity, "location", "") or ""),
+                location=getattr(entity, "location", None),
             )
     if remainder and any(_has_settlement_work(entity) for entity in entities):
         rem_tick = start_tick + elapsed_seconds
@@ -305,7 +305,7 @@ def _settle_buffs_and_decay(
                 before_ms,
                 source_id=f"clock:climax:{rem_tick}:{e_id}",
                 tick=rem_tick,
-                location=str(getattr(entity, "location", "") or ""),
+                location=getattr(entity, "location", None),
             )
 
 

@@ -299,7 +299,9 @@ def _apply_plan(
     from world.rules.clock import get_world_clock
 
     tick = int(get_world_clock().tick)
-    location = str(getattr(plan.actor, "location", "") or "")
+    # The accepted use's own location owner; the milestone evidence snapshots
+    # its identity and readable label inside this settlement.
+    location = getattr(plan.actor, "location", None)
     recorded = 0
     for entity, before in captures:
         if before is None:

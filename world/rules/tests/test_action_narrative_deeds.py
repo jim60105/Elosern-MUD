@@ -244,6 +244,74 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertNotIn(str(self.bystander.pk), event.participants)
 
     @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results",
+        "narrative-events::settled-deeds-retain-readable-location-snapshots",
+    )
+    def test_settled_actions_and_their_milestones_keep_their_room(self):
+        """A settled action states the room it happened in; its milestones too."""
+        self._grant_skills(self.actor, _T_PENETRATION_SKILL.key)
+        self.target.sexual.virgin = True
+        request = ActionRequest(
+            self.actor, _T_PENETRATION_SKILL.key, [self.target], self.context
+        )
+        with (
+            patch.dict(
+                "world.skills.registry.SKILL_REGISTRY",
+                {_T_PENETRATION_SKILL.key: _T_PENETRATION_SKILL},
+            ),
+            patch.dict(
+                "world.skills.sexual_acts.SEXUAL_ACT_REGISTRY",
+                {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT},
+            ),
+        ):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+
+        room_reference = {"id": str(self.room.pk), "label": self.room.key}
+        action = NarrativeEvent.objects.get(event_type="adult_action")
+        self.assertEqual(action.content["location"], room_reference)
+        self.assertEqual(action.location, str(self.room.pk))
+
+        milestones = list(
+            NarrativeEvent.objects.filter(event_type="adult_milestone")
+        )
+        self.assertTrue(milestones)
+        for milestone in milestones:
+            self.assertEqual(milestone.content["location"], room_reference)
+            self.assertEqual(milestone.location, str(self.room.pk))
+
+        selection = select_authorized_recent_deeds(
+            self.actor, frozen_tick=int(action.tick) + 10
+        )
+        rendered = json.loads(selection.rendered_json)["recent_deeds"]
+        action_group = next(
+            group for group in rendered if action.source_id in group["source_ids"]
+        )
+        self.assertEqual(
+            action_group["facts"]["location"],
+            {"known": True, "id": str(self.room.pk), "label": self.room.key},
+        )
+        for milestone in milestones:
+            if milestone.source_id not in selection.source_ids:
+                continue
+            citing = [
+                group
+                for group in rendered
+                if milestone.source_id in group["source_ids"]
+            ]
+            self.assertEqual(len(citing), 1)
+            rows = citing[0]["facts"].get("milestones", [])
+            row = next(
+                (row for row in rows if row["source_id"] == milestone.source_id),
+                None,
+            )
+            if row is not None:
+                self.assertEqual(
+                    row["location"],
+                    {"known": True, "id": str(self.room.pk), "label": self.room.key},
+                )
+
+    @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
     )
     def test_untouched_recipient_is_excluded_from_participants(self):
@@ -2032,8 +2100,20 @@ class TransitionTimeMilestoneSelectionTests(EvenniaTestCase):
             content__identifier="climax_onset",
         )
         self.assertTrue(milestone.source_id.startswith(upkeep_source))
+        self.assertEqual(milestone.location, str(self.room.pk))
+        self.assertEqual(
+            milestone.content["location"],
+            {"id": str(self.room.pk), "label": self.room.key},
+        )
         selection = self._selection(self.player)
         self._assert_cited_once(selection, milestone.source_id)
+        selected_group = next(
+            group for group in selection.groups if milestone.source_id in group.source_ids
+        )
+        self.assertEqual(
+            selected_group.facts["location"],
+            {"known": True, "id": str(self.room.pk), "label": self.room.key},
+        )
 
         # A later clock read never dates this crossing again, under this or
         # any other source.

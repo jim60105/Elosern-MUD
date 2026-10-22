@@ -241,6 +241,7 @@ class CompletionTitleSettlementTests(
             source_id=source_id,
             event_type="quest_completion",
             content={
+                "location": {"id": "", "label": ""},
                 "quest_id": self.record.quest_id,
                 "definition_key": self.definition.key,
                 "completed_objective": {"kind": "defeat", "quantity": 1},
@@ -923,7 +924,11 @@ class CompletionTitleNominationTests(
 
         # The suppression is local to that occurrence: a later rest point can
         # still cite the completion deed, and no ballot was created by it.
-        context = self.service._build_context(self.player)
+        committed_tick = NarrativeEvent.objects.get(source_id=source_id).tick
+        context = self.service._build_context(
+            self.player, frozen_tick=committed_tick
+        )
+        self.assertEqual(context.frozen_tick, committed_tick)
         self.assertIn(source_id, context.supplied_source_ids)
         self.assertIn(self.definition.key, context.recent_deeds_json)
         from world.rules import titles as title_rules
