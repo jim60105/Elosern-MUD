@@ -275,6 +275,7 @@ def record_action_settlement_evidence(
     tick: int | None = None,
     delivered_targets: Sequence[Any] = (),
     resisted_targets: Sequence[Any] = (),
+    pending_effects: Sequence[Any] = (),
 ) -> tuple[Any, list[Any]]:
     from world.rules.clock import get_world_clock
     """Record immutable narrative event and milestones for a settled action."""
@@ -341,45 +342,79 @@ def record_action_settlement_evidence(
     transition_entries: list[dict[str, Any]] = []
     counter_entries: list[dict[str, Any]] = []
 
-    # Map target keys to durable IDs for outcome attribution
-    key_to_pk = {str(getattr(actor, "key", "")): actor_pk}
-    for t in actual_target_entities:
-        key_to_pk[str(getattr(t, "key", ""))] = _durable_pk(t)
-
-    for entry in event_log.entries:
-        kind = getattr(entry, "kind", None)
-        entry_actor_pk = key_to_pk.get(str(entry.actor), str(entry.actor))
-        entry_target_pk = key_to_pk.get(str(entry.target), str(entry.target)) if entry.target else None
-        data = dict(entry.data) if isinstance(getattr(entry, "data", None), Mapping) else {}
-
-        if kind == "sexual_resist":
-            resist_entries.append({
-                "actor_id": entry_actor_pk,
-                "target_id": entry_target_pk,
-                "resisted": bool(data.get("resisted")),
-                "auto_comply": bool(data.get("auto_comply")),
-                "roll": data.get("roll"),
-            })
-        elif kind == "sexual_transition":
-            transition_entries.append({
-                "target_id": entry_target_pk or entry_actor_pk,
-                "event": data.get("event"),
-            })
-        elif kind == "sexual_counter":
-            counter_entries.append({
-                "target_id": entry_target_pk or entry_actor_pk,
-                "counter": data.get("counter"),
-            })
-        elif kind in {
-            "damage", "heal", "self_heal", "buff_applied", "self_buff_applied",
-            "buffs_cleansed", "pleasure_gain", "gauge_transfer",
-        }:
-            effects_data.append({
-                "kind": kind,
-                "actor_id": entry_actor_pk,
-                "target_id": entry_target_pk,
-                "data": data,
-            })
+    if pending_effects:
+        for eff in pending_effects:
+            desc = getattr(eff, "description", "")
+            eff_entity = getattr(eff, "entity", None)
+            eff_pk = _durable_pk(eff_entity) if eff_entity is not None else actor_pk
+            eff_name = str(getattr(eff_entity, "key", ""))
+            parts = desc.split("|")
+            eff_kind = parts[0] if parts else ""
+            if eff_kind == "sexual_resist" and len(parts) >= 5:
+                roll_val = None if parts[4] in {"None", ""} else int(parts[4])
+                resist_entries.append({
+                    "actor_id": actor_pk,
+                    "target_id": eff_pk,
+                    "target_name": eff_name,
+                    "resisted": bool(int(parts[2])),
+                    "auto_comply": bool(int(parts[3])),
+                    "roll": roll_val,
+                })
+            elif eff_kind == "sexual_transition" and len(parts) >= 3:
+                transition_entries.append({
+                    "target_id": eff_pk,
+                    "target_name": eff_name,
+                    "event": parts[2],
+                })
+            elif eff_kind == "sexual_counter" and len(parts) >= 3:
+                counter_entries.append({
+                    "target_id": eff_pk,
+                    "target_name": eff_name,
+                    "counter": parts[2],
+                })
+            elif eff_kind in {
+                "damage", "heal", "self_heal", "buff_apply", "self_buff_apply",
+                "pleasure", "gauge_transfer",
+            }:
+                effects_data.append({
+                    "kind": eff_kind,
+                    "actor_id": actor_pk,
+                    "target_id": eff_pk,
+                    "target_name": eff_name,
+                    "description": desc,
+                })
+    else:
+        for entry in event_log.entries:
+            kind = getattr(entry, "kind", None)
+            data = dict(entry.data) if isinstance(getattr(entry, "data", None), Mapping) else {}
+            if kind == "sexual_resist":
+                resist_entries.append({
+                    "actor_id": actor_pk,
+                    "target_id": str(entry.target),
+                    "resisted": bool(data.get("resisted")),
+                    "auto_comply": bool(data.get("auto_comply")),
+                    "roll": data.get("roll"),
+                })
+            elif kind == "sexual_transition":
+                transition_entries.append({
+                    "target_id": str(entry.target or actor_pk),
+                    "event": data.get("event"),
+                })
+            elif kind == "sexual_counter":
+                counter_entries.append({
+                    "target_id": str(entry.target or actor_pk),
+                    "counter": data.get("counter"),
+                })
+            elif kind in {
+                "damage", "heal", "self_heal", "buff_applied", "self_buff_applied",
+                "buffs_cleansed", "pleasure_gain", "gauge_transfer",
+            }:
+                effects_data.append({
+                    "kind": kind,
+                    "actor_id": actor_pk,
+                    "target_id": str(entry.target) if entry.target else None,
+                    "data": data,
+                })
 
     # Detect and record milestones for all involved participants
     milestone_events: list[Any] = []
@@ -401,9 +436,9 @@ def record_action_settlement_evidence(
                     "entity_name": str(getattr(entity, "key", "")),
                     "details": m["details"],
                     "tick": current_tick,
-                    "visibility": visibility,
+                    "visibility": "private",
                     "privacy": {
-                        "private_experience": not observed,
+                        "private_experience": True,
                         "public_notoriety": False,
                     },
                 }
@@ -414,7 +449,7 @@ def record_action_settlement_evidence(
                     participants=[e_pk],
                     location=location_str,
                     tick=current_tick,
-                    visibility=visibility,
+                    visibility="private",
                     salience=1,
                 )
                 milestone_events.append(ms_event)
@@ -464,11 +499,11 @@ def record_action_settlement_evidence(
                 "public_notoriety": False,       # Private stays personal
             },
             "field_access": {
-                actor_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects"],
+                actor_pk: ["actor", "act_key", "recipients", "resistance_verdict", "physical_effects", "actor_milestones"],
             },
         }
         for r in actual_recipient_records:
-            content["field_access"][r["id"]] = ["target_own_outcome", "resistance_verdict", "effects_on_target"]
+            content["field_access"][r["id"]] = ["target_own_outcome", "resistance_verdict", "effects_on_target", "target_milestones"]
     else:
         event_type = "skill_use"
         content = {

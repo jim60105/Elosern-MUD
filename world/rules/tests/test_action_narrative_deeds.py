@@ -28,7 +28,7 @@ from world.rules.titles.awards import AutomaticTitleAward
 from world.rules.titles.state import _FIXED_KIND
 from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY, SexualActDef
+from world.skills.sexual_acts import SexualActDef
 from world.tests.synthetic_data import make_skill
 
 
@@ -178,7 +178,7 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
 
         with (
             patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_RESISTIBLE_ADULT_SKILL.key: _T_RESISTIBLE_ADULT_SKILL}),
-            patch.dict(SEXUAL_ACT_REGISTRY, {_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT}),
+            patch.dict("world.skills.sexual_acts.SEXUAL_ACT_REGISTRY", {_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT}),
             patch("world.rules.action.gates.roll_d100", return_value=100),  # Resisted successfully
         ):
             result = ActionResolver.resolve(request)
@@ -298,7 +298,7 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
 
         with (
             patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_PENETRATION_SKILL.key: _T_PENETRATION_SKILL}),
-            patch.dict(SEXUAL_ACT_REGISTRY, {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT}),
+            patch.dict("world.skills.sexual_acts.SEXUAL_ACT_REGISTRY", {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT}),
         ):
             result = ActionResolver.resolve(request)
 
@@ -324,7 +324,7 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         # Replay the same action occurrence: replay must be inert
         with (
             patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_PENETRATION_SKILL.key: _T_PENETRATION_SKILL}),
-            patch.dict(SEXUAL_ACT_REGISTRY, {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT}),
+            patch.dict("world.skills.sexual_acts.SEXUAL_ACT_REGISTRY", {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT}),
         ):
             ActionResolver.resolve(request)
 
@@ -387,7 +387,7 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
 
         with (
             patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_RESISTIBLE_ADULT_SKILL.key: _T_RESISTIBLE_ADULT_SKILL}),
-            patch.dict(SEXUAL_ACT_REGISTRY, {_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT}),
+            patch.dict("world.skills.sexual_acts.SEXUAL_ACT_REGISTRY", {_T_RESISTIBLE_ADULT_ACT.key: _T_RESISTIBLE_ADULT_ACT}),
             patch("world.rules.action.gates.roll_d100", return_value=100),
         ):
             result = ActionResolver.resolve(request)
@@ -493,6 +493,10 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertIn(str(self.target.pk), recipient_ids)
         self.assertIn(str(target2.pk), recipient_ids)
         self.assertEqual(len(event.content["recipients"]), 2)
+        # Verify distinct per-effect target_id attribution
+        effect_target_ids = {eff.get("target_id") for eff in event.content["effects"]}
+        self.assertIn(str(self.target.pk), effect_target_ids)
+        self.assertIn(str(target2.pk), effect_target_ids)
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
@@ -528,3 +532,84 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertIsNotNone(event)
         self.assertEqual(len(event.content.get("award_results", [])), 1)
         self.assertEqual(event.content["award_results"][0]["title_id"], "t_synth_action_title")
+
+    @covers_requirement(
+        "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
+    )
+    def test_combat_slot_narration_scope_preserves_title_award_provenance(self):
+        """Combat action with round/slot narration scope establishes exact source_id parity with awards."""
+        self._grant_skills(self.actor, _T_HEAL_SKILL.key)
+        combat_ctx = RoomActionContext(self.room)
+        combat_ctx.battlefield = Battlefield(
+            {"party": frozenset({str(self.actor.key), str(self.target.key)}), "foes": frozenset()},
+            {str(self.actor.key): self.actor, str(self.target.key): self.target},
+        )
+        combat_ctx.battlefield.session_id = "sess_combat_prov"
+        combat_ctx.battlefield.round_number = 3
+
+        request = ActionRequest(self.actor, _T_HEAL_SKILL.key, [self.target], combat_ctx)
+        narration_scope = "combat:sess_combat_prov:round:3|2"
+
+        expected_source_id = f"action:combat:sess_combat_prov:r3:s2:{self.actor.pk}:{_T_HEAL_SKILL.key}"
+
+        synth_award = AutomaticTitleAward(
+            source_id=expected_source_id,
+            recipient_id=str(self.actor.pk),
+            kind=_FIXED_KIND,
+            title_id="t_combat_title",
+            granted_tick=100,
+            display_name="戰鬥稱號",
+        )
+
+        from world.rules.action import PendingEffect
+        def fake_planner(req, log):
+            # Planner must observe the identical request.source_id
+            self.assertEqual(req.source_id, expected_source_id)
+            return [PendingEffect(self.actor, "title_granted|t_combat", frozenset(), lambda: None, title_awards=[synth_award])]
+
+        with (
+            patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_HEAL_SKILL.key: _T_HEAL_SKILL}),
+            patch.dict("world.rules.action.contracts._EVENT_EFFECT_PLANNERS", {"fake_combat_title": fake_planner}),
+        ):
+            result = ActionResolver.resolve(request, narration_scope=narration_scope)
+
+        self.assertEqual(result.outcome, "success", f"Failed with {result.reason}: {result.detail}")
+        self.assertEqual(result.title_awards[0].source_id, expected_source_id)
+        event = NarrativeEvent.objects.filter(source_id=expected_source_id).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.content["action_source_id"], expected_source_id)
+        self.assertEqual(event.content["award_results"][0]["source_id"], expected_source_id)
+
+    @covers_requirement(
+        "narrative-events::adult-evidence-does-not-invent-consent-or-public-standing",
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+    )
+    def test_room_occupancy_does_not_promote_private_milestones_to_public(self):
+        """Room occupancy by third-party living entities keeps personal milestones strictly private."""
+        # Bystander is in room
+        self.assertEqual(self.bystander.location, self.room)
+
+        self._grant_skills(self.actor, _T_PENETRATION_SKILL.key)
+        request = ActionRequest(
+            self.actor, _T_PENETRATION_SKILL.key, [self.target], self.context
+        )
+
+        with (
+            patch.dict("world.skills.registry.SKILL_REGISTRY", {_T_PENETRATION_SKILL.key: _T_PENETRATION_SKILL}),
+            patch.dict("world.skills.sexual_acts.SEXUAL_ACT_REGISTRY", {_T_PENETRATION_ACT.key: _T_PENETRATION_ACT}),
+        ):
+            result = ActionResolver.resolve(request)
+
+        self.assertEqual(result.outcome, "success")
+
+        # While the action itself was observed by bystander:
+        action_event = NarrativeEvent.objects.filter(event_type="adult_action").first()
+        self.assertIsNotNone(action_event)
+        self.assertEqual(action_event.visibility, "public")
+
+        # BUT individual adult_milestone records remain strictly private to their subject!
+        milestones = NarrativeEvent.objects.filter(event_type="adult_milestone")
+        self.assertTrue(milestones.count() >= 1)
+        for ms in milestones:
+            self.assertEqual(ms.visibility, "private")
+            self.assertTrue(ms.content["privacy"]["private_experience"])
