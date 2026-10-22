@@ -78,6 +78,7 @@ from web.webclient.presentation.local_map.validate import (
     _require_node_id,
     _validate_action,
     _validate_edge,
+    _validate_gateway,
     _validate_node,
     validate_local_map,
 )
@@ -127,6 +128,7 @@ __all__ = [
     "_trim_visible",
     "_validate_action",
     "_validate_edge",
+    "_validate_gateway",
     "_validate_node",
     "_visited_map",
     "_wild_region_label",

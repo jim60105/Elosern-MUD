@@ -202,6 +202,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": True,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
                 {
@@ -213,6 +214,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": False,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": {"kind": "move", "exit_ref": "e_hall_training", "destination": "room:202"},
                 },
                 {
@@ -224,6 +226,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": False,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
             ],

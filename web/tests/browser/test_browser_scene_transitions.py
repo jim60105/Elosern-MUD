@@ -86,6 +86,7 @@ def _street(current: str) -> dict:
                 "current": node_id == current,
                 "anchor": False,
                 "landmark": False,
+                "gateway": None,
                 "action": None,
             }
         )

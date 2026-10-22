@@ -148,6 +148,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": True,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
                 {
@@ -159,6 +160,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": False,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
             ],
@@ -265,6 +267,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": is_current,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": (
                         {"kind": "move", "exit_ref": f"exit-{x}-{y}", "destination": node_id}
                         if adjacent_to_current or far_top_action
@@ -280,6 +283,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "current": False,
             "anchor": False,
             "landmark": True,
+            "gateway": None,
             "action": None,
         })
         edges = []

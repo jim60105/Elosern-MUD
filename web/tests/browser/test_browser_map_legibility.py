@@ -25,6 +25,7 @@ def _node(x, y, label, visibility, *, action=None, landmark=False):
         "current": visibility == "current",
         "anchor": visibility == "current",
         "landmark": landmark,
+        "gateway": None,
         "action": action,
     }
 
@@ -258,7 +259,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
             "nodes": [
                 {"id": f"wild:vertical:{y}", "label": "北岸鐘樓" if y == 2 else "共用地區",
                  "x": 0, "y": y, "visibility": "current" if y == 0 else "visible_visited",
-                 "current": y == 0, "anchor": False, "landmark": False, "action": None}
+                 "current": y == 0, "anchor": False, "landmark": False, "gateway": None, "action": None}
                 for y in range(8)
             ],
             "edges": [], "legend": [],

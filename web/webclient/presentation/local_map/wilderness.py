@@ -17,6 +17,7 @@ from web.webclient.presentation.local_map.builder import (
 )
 from web.webclient.presentation.local_map.gateways import (
     _gateway_far_side_label,
+    _grid_gateway_at,
     _wilderness_gateway_at,
 )
 from web.webclient.presentation.local_map.grid import _grid_room_label
@@ -126,6 +127,20 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             room = GridRoom.objects.filter_xyz(
                 xyz=(decoded["x"], decoded["y"], decoded["z_map_key"])
             ).first()
+            # The resolved grid gate names the settlement it leads into,
+            # looked up from the destination's own registry entry.
+            grid_gateway = _grid_gateway_at(
+                decoded["x"], decoded["y"], decoded["z_map_key"]
+            )
+            gateway = (
+                None
+                if grid_gateway is None
+                else {
+                    "leads_to": _gateway_far_side_label(
+                        "wilderness", grid_gateway[0], grid_gateway[2]
+                    )
+                }
+            )
             if room is None:
                 label, is_anchor = destination, False
             else:
@@ -156,6 +171,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
                 anchor=is_anchor,
                 landmark=is_anchor,
                 action=action,
+                gateway=gateway,
             )
             builder.add_edge(current_id, destination, direction, action is not None)
             continue

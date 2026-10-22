@@ -104,6 +104,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         anchor=isinstance(location, AnchorRoom),
         landmark=isinstance(location, AnchorRoom),
         action=None,
+        gateway=_grid_gate_metadata(x, y, str(z)),
     )
 
     # In-range neighbor nodes with real exit edges.
@@ -129,6 +130,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
             anchor=is_anchor,
             landmark=is_anchor,
             action=action,
+            gateway=_grid_gate_metadata(node.X, node.Y, str(z)),
         )
         builder.add_edge(current_id, node_id, _grid_direction_label(current_node, node), action is not None)
 
@@ -177,6 +179,9 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
             anchor=False,
             landmark=False,
             action=action,
+            # The cross-layer wild target is not itself the gate room: its
+            # far side is named by the current gate room's own metadata.
+            gateway=None,
         )
         builder.add_edge(current_id, gate_id, direction, action is not None)
 
@@ -226,9 +231,26 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
             anchor=False,
             landmark=True,
             action=None,
+            # A remembered gate room still hosts its registered gateway: the
+            # metadata carries the unqualified far-side name, while the
+            # visible label may add the boundary qualifier.
+            gateway={"leads_to": far_label},
         )
 
     return "grid"
+
+
+def _grid_gate_metadata(x: int, y: int, z: str) -> dict[str, str] | None:
+    """Gateway metadata for one grid room: its far-side region, or ``None``.
+
+    A grid room hosting a registered gateway (``_grid_gateway_at``) names the
+    wilderness region its gate opens onto; every other room carries ``None``.
+    """
+    gateway = _grid_gateway_at(x, y, z)
+    if gateway is None:
+        return None
+    approach_cell, _, anchor_key = gateway
+    return {"leads_to": _gateway_far_side_label("grid", approach_cell, anchor_key)}
 
 
 def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any, str]]:

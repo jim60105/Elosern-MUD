@@ -25,6 +25,7 @@ function validLocalMapNode(overrides) {
       current: true,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     overrides || {}
@@ -246,6 +247,57 @@ test("rejects malformed movement descriptors and unknown node ids", () => {
   assert.throws(() => Protocol.validateLocalMapPanel(unknownEdge));
 });
 
+test("requires exact gateway metadata: null or a bounded non-empty leads_to", () => {
+  const LOCAL_MAP_MAX_STRING = Protocol.LOCAL_MAP_MAX_STRING;
+  const panelWith = (gateway) =>
+    validLocalMapPanel({ nodes: [validLocalMapNode({ gateway: gateway })], edges: [] });
+
+  // Accepted forms normalize unchanged.
+  for (const gateway of [null, { leads_to: "北境" }, { leads_to: "字".repeat(LOCAL_MAP_MAX_STRING) }]) {
+    const normalized = Protocol.validateLocalMapPanel(panelWith(gateway));
+    assert.deepEqual(normalized.nodes[0].gateway, gateway);
+  }
+
+  // Omission and an aliased key are rejected: no default, no alias.
+  const omitted = validLocalMapNode();
+  delete omitted.gateway;
+  assert.throws(
+    () => Protocol.validateLocalMapPanel(validLocalMapPanel({ nodes: [omitted], edges: [] })),
+    /gateway/
+  );
+  const aliased = validLocalMapNode();
+  delete aliased.gateway;
+  aliased.gateway_leads_to = null;
+  assert.throws(
+    () => Protocol.validateLocalMapPanel(validLocalMapPanel({ nodes: [aliased], edges: [] })),
+    /gateway/
+  );
+
+  for (const malformed of [
+    undefined,
+    "北境",
+    0,
+    false,
+    [],
+    [{ leads_to: "北境" }],
+    {},
+    { leads_to: "北境", label: "北境" },
+    { to: "北境" },
+    { leads_to: "" },
+    { leads_to: "   " },
+    { leads_to: null },
+    { leads_to: 5 },
+    { leads_to: ["北境"] },
+    { leads_to: "字".repeat(LOCAL_MAP_MAX_STRING + 1) },
+  ]) {
+    assert.throws(
+      () => Protocol.validateLocalMapPanel(panelWith(malformed)),
+      /gateway|leads_to/,
+      JSON.stringify(malformed)
+    );
+  }
+});
+
 test("a local_map snapshot with an invalid panel is rejected atomically", () => {
   const bad = snapshot({
     panels: {
@@ -276,6 +328,8 @@ test("a structurally maximal realistic local_map payload fits the envelope", () 
         y: i % 2 === 0 ? Protocol.LOCAL_MAP_COORD_MAX : Protocol.LOCAL_MAP_COORD_MIN,
         visibility: i === 0 ? "current" : "remembered",
         current: i === 0,
+        // Realistic gateway metadata on every eighth node.
+        gateway: i % 8 === 0 ? { leads_to: "測試遠方荒原" } : null,
         action:
           i === 0
             ? null
@@ -331,6 +385,7 @@ test("local_map byte budget fails closed on the theoretical worst case", () => {
         y: Protocol.LOCAL_MAP_COORD_MIN,
         visibility: i === 0 ? "current" : "remembered",
         current: i === 0,
+        gateway: { leads_to: label },
         action: i === 0 ? null : { kind: "move", exit_ref: "e".repeat(Protocol.LOCAL_MAP_MAX_EXIT_REF), destination: nodeIds[i] },
       })
     );

@@ -142,6 +142,7 @@ def _valid_node(**overrides):
         "current": True,
         "anchor": False,
         "landmark": False,
+        "gateway": None,
         "action": None,
     }
     value.update(overrides)

@@ -26,6 +26,7 @@ function node(overrides) {
       current: true,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     overrides || {}
@@ -925,4 +926,71 @@ test("radial canvas size follows the D1 recurrence", () => {
   for (const n of layout.nodes.filter((x) => x.ring === 2)) {
     assert.ok(Math.abs(n.radius - r2) < 1e-9);
   }
+});
+
+test("reducePanel passes node gateway metadata through unchanged", () => {
+  const gate = { leads_to: "測試遠方荒原" };
+  const model = LocalMap.reducePanel(
+    panel({
+      nodes: [
+        node({ gateway: gate }),
+        node({
+          id: "grid:capital_altoria:2:1",
+          label: "南大道",
+          x: 2,
+          y: 1,
+          visibility: "visible_visited",
+          current: false,
+        }),
+        node({
+          id: "grid:capital_altoria:0:3",
+          label: "市場街",
+          x: 0,
+          y: 3,
+          visibility: "remembered",
+          current: false,
+          landmark: true,
+          gateway: { leads_to: "北境" },
+        }),
+      ],
+      edges: [],
+    })
+  );
+  const byId = Object.fromEntries(
+    model.nodes.concat(model.remembered).map((entry) => [entry.id, entry])
+  );
+  assert.deepEqual(byId["grid:capital_altoria:2:0"].gateway, gate);
+  assert.equal(byId["grid:capital_altoria:2:1"].gateway, null);
+  assert.deepEqual(byId["grid:capital_altoria:0:3"].gateway, { leads_to: "北境" });
+  // The radial placement and lattice coordinates are unaffected by metadata.
+  const plain = LocalMap.reducePanel(
+    panel({
+      nodes: [
+        node(),
+        node({
+          id: "grid:capital_altoria:2:1",
+          label: "南大道",
+          x: 2,
+          y: 1,
+          visibility: "visible_visited",
+          current: false,
+        }),
+        node({
+          id: "grid:capital_altoria:0:3",
+          label: "市場街",
+          x: 0,
+          y: 3,
+          visibility: "remembered",
+          current: false,
+          landmark: true,
+        }),
+      ],
+      edges: [],
+    })
+  );
+  assert.deepEqual(
+    model.nodes.map((entry) => [entry.id, entry.col, entry.row]),
+    plain.nodes.map((entry) => [entry.id, entry.col, entry.row])
+  );
+  assert.deepEqual([model.cols, model.rows, model.cell], [plain.cols, plain.rows, plain.cell]);
 });

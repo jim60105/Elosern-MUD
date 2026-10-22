@@ -347,6 +347,7 @@ describe("store view slices", () => {
           current: true,
           anchor: true,
           landmark: false,
+          gateway: null,
           action: null,
         },
       ],
@@ -499,6 +500,7 @@ describe("store view slices", () => {
           current: true,
           anchor: true,
           landmark: true,
+          gateway: null,
           action: null,
           },
         {
@@ -510,6 +512,7 @@ describe("store view slices", () => {
           current: false,
           anchor: false,
           landmark: true,
+          gateway: null,
           action: null,
           },
       ],

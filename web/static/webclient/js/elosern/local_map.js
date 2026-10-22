@@ -79,6 +79,9 @@
         exit_ref: node.action.exit_ref,
         destination: node.action.destination,
       },
+      // Gateway metadata passes through unchanged from the validated panel
+      // (null or {leads_to}); a model-only fixture without it reads as null.
+      gateway: node.gateway === undefined ? null : node.gateway,
     };
   }
 

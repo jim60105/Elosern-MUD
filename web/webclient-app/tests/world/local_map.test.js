@@ -680,11 +680,11 @@ const METRIC_PAYLOAD = {
   current_node: "grid:metric:0:0",
   title: "度量城區",
   nodes: [
-    { id: "grid:metric:0:0", label: "原點", x: 0, y: 0, visibility: "current", current: true, anchor: false, landmark: false, action: null },
-    { id: "grid:metric:100:0", label: "東街", x: 100, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: { kind: "move", exit_ref: "e", destination: "grid:metric:100:0" } },
-    { id: "grid:metric:1000:0", label: "遠東", x: 1000, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
-    { id: "grid:metric:1000:6500", label: "北關", x: 1000, y: 6500, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
-    { id: "grid:metric:100:100", label: "東北", x: 100, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, action: null },
+    { id: "grid:metric:0:0", label: "原點", x: 0, y: 0, visibility: "current", current: true, anchor: false, landmark: false, gateway: null, action: null },
+    { id: "grid:metric:100:0", label: "東街", x: 100, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, gateway: null, action: { kind: "move", exit_ref: "e", destination: "grid:metric:100:0" } },
+    { id: "grid:metric:1000:0", label: "遠東", x: 1000, y: 0, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, gateway: null, action: null },
+    { id: "grid:metric:1000:6500", label: "北關", x: 1000, y: 6500, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, gateway: null, action: null },
+    { id: "grid:metric:100:100", label: "東北", x: 100, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, gateway: null, action: null },
   ],
   edges: [
     { source: "grid:metric:0:0", destination: "grid:metric:100:0", label: "e", known: true, traversable: true },
@@ -741,8 +741,8 @@ function nodeCenter(wrapper, id) {
       nodes: [
         METRIC_PAYLOAD.nodes[0],
         METRIC_PAYLOAD.nodes[1],
-        { id: "grid:metric:0:100", label: "北街", x: 0, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, action: null },
-        { id: "grid:metric:250:350", label: "西北", x: 250, y: 350, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, action: null },
+        { id: "grid:metric:0:100", label: "北街", x: 0, y: 100, visibility: "visible_visited", current: false, anchor: false, landmark: false, gateway: null, action: null },
+        { id: "grid:metric:250:350", label: "西北", x: 250, y: 350, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, gateway: null, action: null },
       ],
       edges: [],
     };

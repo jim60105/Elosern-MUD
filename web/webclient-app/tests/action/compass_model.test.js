@@ -24,7 +24,7 @@ import {
 const CURRENT = "node:here";
 
 function node(id, x, y, visibility = "visible_unvisited") {
-  return { id, label: `地點${id}`, x, y, visibility, current: visibility === "current", anchor: false, landmark: false, action: null };
+  return { id, label: `地點${id}`, x, y, visibility, current: visibility === "current", anchor: false, landmark: false, gateway: null, action: null };
 }
 
 // A committed local-map model exactly as the store builds it.
