@@ -1113,6 +1113,7 @@ class TitleNominationRealSettlementTests(
     """
 
     @covers_requirement(
+        "title-system::recent-deeds-are-selectable-from-their-own-committed-settlement",
         "title-system::recent-deed-eligibility-is-closed-and-personally-authorized",
         "title-system::quest-nomination-observes-the-committed-completion-owner",
         "title-system::candidate-citations-refer-only-to-actually-rendered-sources",
@@ -1762,6 +1763,7 @@ class TitleNominationCommittedReloadTests(
         return fresh
 
     @covers_requirement(
+        "title-system::committed-nomination-state-survives-reload",
         "title-system::the-ballot-persists-unchanged-until-consent",
         "title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only",
         "title-system::award-evidence-finalizes-atomically-and-survives-replay",
