@@ -99,12 +99,17 @@ class LocalMapValidatorParityContract(unittest.TestCase):
         js_source = protocol_client_source()
         mismatches = []
         for py_name, js_name in _LOCAL_MAP_CONSTANTS:
-            py_match = re.search(rf"^{py_name}\s*=\s*([0-9-]+)", py_source, re.MULTILINE)
-            js_match = re.search(rf"var {js_name}\s*=\s*([0-9-]+)", js_source)
+            # Numeric literals may carry Python's digit separators
+            # (``-10_000_000``); compare the parsed integers, never the
+            # spelled literal, so a separator is not read as a shorter bound.
+            py_match = re.search(rf"^{py_name}\s*=\s*(-?[0-9_]+)", py_source, re.MULTILINE)
+            js_match = re.search(rf"var {js_name}\s*=\s*(-?[0-9_]+)", js_source)
             if py_match is None or js_match is None:
                 mismatches.append(f"{py_name}/{js_name}: missing constant")
                 continue
-            if py_match.group(1) != js_match.group(1):
+            py_value = int(py_match.group(1).replace("_", ""))
+            js_value = int(js_match.group(1).replace("_", ""))
+            if py_value != js_value:
                 mismatches.append(
                     f"{py_name}={py_match.group(1)} vs {js_name}={js_match.group(1)}"
                 )
