@@ -324,7 +324,8 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
         self._assert_rejected_without_writes(ExamReason.EXAMINER_BUSY)
 
     @covers_requirement(
-        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
     )
     def test_examination_and_hostile_engagement_at_one_tick_keep_distinct_identities(self):
         """A simulated examination never reuses a hostile engagement's identity."""

@@ -96,7 +96,9 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
+        "title-system::encounter-grouping-uses-unique-occurrence-identity",
     )
     def test_repeated_skill_rounds_at_one_tick_keep_distinct_sources(self):
         """Scenario: same skill in distinct combat slots remains distinct."""
@@ -165,7 +167,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertEqual(summary["action_type"], BASIC_ATTACK_KEY)
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
     )
     def test_opening_hostile_engagement_carries_its_own_provenance(self):
         """An opening action commits under the engagement it opened."""
@@ -193,7 +196,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
     )
     def test_compressed_rounds_keep_the_engagement_and_real_round_ordinals(self):
         """Compressed execution preserves the encounter identity it resolves under."""
@@ -238,7 +242,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
     )
     def test_two_real_slots_of_one_actor_commit_distinct_occurrences(self):
         """Scenario: same skill in distinct combat slots remains distinct."""
@@ -424,7 +429,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
             )
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::combat-deed-provenance-reaches-every-settlement-path",
     )
     def test_missing_or_contradictory_combat_provenance_fails_closed(self):
         """A malformed combat source is never relabeled as an out-of-combat cast."""
@@ -527,7 +533,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(len({event.source_id for event in recorded}), len(recorded))
 
     @covers_requirement(
-        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance"
+        "title-system::recent-deed-groups-retain-outcomes-and-stable-provenance",
+        "title-system::encounter-grouping-uses-unique-occurrence-identity",
     )
     def test_zero_time_reengagement_retains_both_terminal_encounters(self):
         """Scenario: zero-time reengagement survives selection."""
@@ -606,7 +613,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement(
-        "title-system::recent-deeds-use-a-frozen-inclusive-two-day-world-window"
+        "title-system::recent-deeds-use-a-frozen-inclusive-two-day-world-window",
+        "title-system::encounter-grouping-uses-unique-occurrence-identity",
     )
     def test_window_filtering_precedes_the_encounter_join(self):
         """Scenario: window filtering precedes the encounter join."""
