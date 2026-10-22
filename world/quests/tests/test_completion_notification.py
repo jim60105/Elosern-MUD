@@ -806,6 +806,9 @@ class CompletionNominationEnvelopeTests(
         self.assertEqual(schedule.call_args.kwargs["occurrence_id"], source_id)
 
         # The rendered nomination context can cite that committed completion.
-        context = self.service._build_context(self.player)
+        committed_tick = NarrativeEvent.objects.get(source_id=source_id).tick
+        context = self.service._build_context(
+            self.player, frozen_tick=committed_tick
+        )
         self.assertIn(source_id, context.supplied_source_ids)
         self.assertIn(self.record.definition_key, context.recent_deeds_json)

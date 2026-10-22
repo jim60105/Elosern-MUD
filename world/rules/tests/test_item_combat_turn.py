@@ -254,6 +254,12 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             milestones[0].content["encounter_context"]["encounter_id"],
             record.engagement_id,
         )
+        room = self.player.location
+        self.assertEqual(
+            milestones[0].content["location"],
+            {"id": str(room.pk), "label": room.key},
+        )
+        self.assertEqual(milestones[0].location, str(room.pk))
         # The item's slot operation never collapses into the round-owned
         # upkeep source the same round also records.
         sources = set(

@@ -254,6 +254,19 @@ class AttemptLoopTests(ViolationBase):
             [row["identifier"] for row in event.content["milestones"]],
             ["climax_onset"],
         )
+        room = self.player.location
+        self.assertEqual(
+            event.content["location"], {"id": str(room.pk), "label": room.key}
+        )
+        self.assertEqual(event.location, str(room.pk))
+        milestone = NarrativeEvent.objects.get(
+            event_type="adult_milestone",
+            content__action_source_id=event.source_id,
+        )
+        self.assertEqual(
+            milestone.content["location"], {"id": str(room.pk), "label": room.key}
+        )
+        self.assertEqual(milestone.location, str(room.pk))
         # The later digest/settlement phases may move the phase on; the
         # attempt's own record is the transition-time evidence.
         self.assertNotEqual(self.player.sexual.climax_phase.level, "接近")

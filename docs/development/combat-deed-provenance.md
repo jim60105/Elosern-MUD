@@ -87,6 +87,14 @@ milestone was committed under a combat occurrence (upkeep boundaries included).
 `combat_encounter` (terminal) content carries `encounter_id` plus the transport
 `session_id` as diagnostic metadata.
 
+Every supported deed payload also carries the settlement-time location
+reference `"location": {"id": <durable room identity>, "label": <readable room
+label>}`. Combat evidence snapshots the durable session room and its label;
+both fields are empty when the settlement held no authoritative location.
+`world.narrative.recent_deeds` reads only this snapshot (never a live room),
+renders each fact's own `tick` and `location`, and keeps one source-linked
+`occurrences` reference per occurrence when consecutive actions compress.
+
 ## Selection join
 
 `world.narrative.recent_deeds` joins only on `encounter_id`:

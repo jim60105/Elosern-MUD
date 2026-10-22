@@ -7,6 +7,7 @@ Specs: openspec/specs/title-system/spec.md
 from copy import deepcopy
 import json
 import unittest
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -1057,3 +1058,337 @@ class AdultResultFamilyAggregationTests(EvenniaTestCase):
             "adult:split:independent",
             [source for group in result.groups for source in group.source_ids],
         )
+
+
+class SettledLocationContextTests(EvenniaTestCase):
+    """Settled location references survive selection, grouping and rendering."""
+
+    def setUp(self):
+        super().setUp()
+        self.char = create_object(PlayerCharacter, key="t_loc_player")
+        self.other = create_object(PlayerCharacter, key="t_loc_other")
+        self.room_a = create_object(Room, key="t_loc_room_a")
+        self.room_b = create_object(Room, key="t_loc_room_b")
+        self.char.location = self.room_a
+        self.other.location = self.room_a
+        self.player_pk = str(self.char.pk)
+        self.other_pk = str(self.other.pk)
+
+    def _location(self, room):
+        return {"known": True, "id": str(room.pk), "label": room.key}
+
+    def _record_action(
+        self,
+        source_id,
+        room,
+        tick,
+        *,
+        skill_key="fireball",
+        encounter_id=None,
+    ):
+        content = {
+            "location": {"id": str(room.pk), "label": room.key},
+            "action_source_id": source_id,
+            "skill_key": skill_key,
+            "skill_name": skill_key,
+            "actor": {"id": self.player_pk, "name": self.char.key, "role": "actor"},
+            "recipients": [
+                {"id": self.other_pk, "name": self.other.key, "role": "recipient"}
+            ],
+            "effects": [
+                {
+                    "kind": "damage",
+                    "actor_id": self.player_pk,
+                    "target_id": self.other_pk,
+                    "target_name": self.other.key,
+                    "result": {"amount": 3, "hit": True},
+                }
+            ],
+            "claim_limits": {
+                "rescue_claimed": False,
+                "protection_claimed": False,
+                "exceptional_difficulty": False,
+            },
+        }
+        if encounter_id is not None:
+            content["encounter_context"] = {"encounter_id": encounter_id}
+        record_narrative_event(
+            source_id=source_id,
+            event_type="skill_use",
+            content=content,
+            participants=[self.player_pk, self.other_pk],
+            location=str(room.pk),
+            tick=tick,
+        )
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_compressed_run_keeps_each_occurrence_time_and_place(self):
+        """Scenario: Different locations are rendered without misattribution.
+
+        WHEN consecutive matching occurrences settle in different rooms
+        THEN the compressed group keeps every occurrence's own tick and
+        location instead of assigning the first location to all of them.
+        """
+        t = 1000
+        self._record_action("act:loc:1", self.room_a, t)
+        self._record_action("act:loc:2", self.room_b, t + 10)
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 20)
+        self.assertEqual(len(result.groups), 1)
+        group = result.groups[0]
+        self.assertEqual(group.count, 2)
+        self.assertEqual(group.latest_tick, t + 10)
+        self.assertEqual(sorted(group.source_ids), ["act:loc:1", "act:loc:2"])
+        self.assertEqual(group.facts["tick"], t)
+        self.assertEqual(group.facts["location"], self._location(self.room_a))
+        self.assertEqual(
+            group.facts["occurrences"],
+            [
+                {
+                    "source_id": "act:loc:1",
+                    "tick": t,
+                    "location": self._location(self.room_a),
+                },
+                {
+                    "source_id": "act:loc:2",
+                    "tick": t + 10,
+                    "location": self._location(self.room_b),
+                },
+            ],
+        )
+
+        rendered = json.loads(result.rendered_json)["recent_deeds"][0]
+        self.assertEqual(rendered["latest_tick"], t + 10)
+        self.assertEqual(
+            rendered["facts"]["occurrences"][1],
+            {
+                "source_id": "act:loc:2",
+                "tick": t + 10,
+                "location": self._location(self.room_b),
+            },
+        )
+        # The retained occurrence's committed outcome survives its place.
+        self.assertEqual(
+            rendered["facts"]["effects"][0]["result"], {"amount": 3, "hit": True}
+        )
+        self.assertEqual(sorted(result.source_ids), ["act:loc:1", "act:loc:2"])
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_compressed_run_keeps_each_occurrence_tick_in_one_room(self):
+        """A same-room run still keeps every occurrence's own committed time."""
+        t = 1500
+        self._record_action("act:same:1", self.room_a, t)
+        self._record_action("act:same:2", self.room_a, t + 5)
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+        group = result.groups[0]
+        self.assertEqual(group.count, 2)
+        self.assertEqual(
+            [
+                (row["source_id"], row["tick"])
+                for row in group.facts["occurrences"]
+            ],
+            [("act:same:1", t), ("act:same:2", t + 5)],
+        )
+        self.assertEqual(
+            {json.dumps(row["location"], sort_keys=True) for row in group.facts["occurrences"]},
+            {json.dumps(self._location(self.room_a), sort_keys=True)},
+        )
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_encounter_action_in_another_room_keeps_its_own_location(self):
+        """Scenario: Different locations are rendered without misattribution.
+
+        WHEN an encounter settles in one room and its admitted action in
+        another THEN each fact states its own room and time.
+        """
+        t = 2000
+        record_narrative_event(
+            source_id="enc:loc:1",
+            event_type="combat_encounter",
+            content={
+                "location": {"id": str(self.room_a.pk), "label": self.room_a.key},
+                "encounter_id": "eng:loc:1",
+                "session_id": "sess:loc",
+                "outcome": "victory",
+                "gameplay_outcome": "victory",
+                "mode": "hostile",
+                "participant_ids": [self.player_pk],
+                "opponent_ids": ["999999"],
+                "rounds_elapsed": 2,
+                "display_snapshots": {},
+            },
+            participants=[self.player_pk],
+            location=str(self.room_a.pk),
+            tick=t + 20,
+        )
+        self._record_action("act:loc:enc", self.room_b, t, encounter_id="eng:loc:1")
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 30)
+        self.assertEqual(len(result.groups), 1)
+        group = result.groups[0]
+        self.assertEqual(group.group_type, "combat_encounter")
+        self.assertEqual(group.latest_tick, t + 20)
+        self.assertEqual(group.facts["tick"], t + 20)
+        self.assertEqual(group.facts["location"], self._location(self.room_a))
+        action_summary = group.facts["actions"][0]
+        self.assertEqual(action_summary["latest_tick"], t)
+        self.assertEqual(action_summary["facts"]["tick"], t)
+        self.assertEqual(
+            action_summary["facts"]["location"], self._location(self.room_b)
+        )
+        self.assertEqual(sorted(group.source_ids), ["act:loc:enc", "enc:loc:1"])
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_unknown_location_renders_explicitly_unknown(self):
+        """A fact whose producer stated no location stays explicitly unknown."""
+        record_narrative_event(
+            source_id="quest:loc:unknown",
+            event_type="quest_completion",
+            content={
+                "location": {"id": "", "label": ""},
+                "quest_id": "q_unknown",
+                "definition_key": "dk_unknown",
+                "completed_objective": "obj",
+                "outcome": "completed",
+            },
+            participants=[self.player_pk],
+            location="",
+            tick=3000,
+        )
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=3010)
+        group = result.groups[0]
+        self.assertEqual(group.facts["location"], {"known": False})
+        rendered = json.loads(result.rendered_json)["recent_deeds"][0]
+        self.assertEqual(rendered["facts"]["location"], {"known": False})
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_committed_objective_snapshot_survives_room_rename_and_removal(self):
+        """Scenario: Renamed room does not change a committed fact.
+
+        WHEN the settled room is renamed and then removed after settlement
+        THEN the request still renders the committed identity and label without
+        consulting the quest registry or a live room.
+        """
+        t = 4000
+        room_pk = str(self.room_a.pk)
+        room_key = self.room_a.key
+        record_narrative_event(
+            source_id="quest:loc:snapshot",
+            event_type="quest_completion",
+            content={
+                "location": {"id": room_pk, "label": room_key},
+                "quest_id": "q_snapshot",
+                "definition_key": "dk_snapshot",
+                "completed_objective": {
+                    "kind": "deliver",
+                    "quantity": 1,
+                    "stage_index": 1,
+                    "destination_room_id": int(room_pk),
+                    "destination_room_label": room_key,
+                    "bound_identities": [
+                        {
+                            "role": "recipient",
+                            "identity": self.other.pk,
+                            "label": self.other.key,
+                        }
+                    ],
+                },
+                "outcome": "completed",
+            },
+            participants=[self.player_pk],
+            location=room_pk,
+            tick=t,
+        )
+        first = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+
+        self.room_a.key = "t_loc_room_renamed"
+        self.room_a.save()
+        self.room_a.delete()
+
+        with patch(
+            "world.quests.runtime.definition_for",
+            side_effect=AssertionError("selection resolved the quest registry"),
+        ):
+            again = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+
+        self.assertEqual(again.rendered_json, first.rendered_json)
+        self.assertEqual(tuple(again.source_ids), ("quest:loc:snapshot",))
+        self.assertEqual(again.frozen_tick, t + 10)
+        facts = json.loads(again.rendered_json)["recent_deeds"][0]["facts"]
+        self.assertEqual(
+            facts["location"], {"known": True, "id": room_pk, "label": room_key}
+        )
+        self.assertEqual(facts["completed_objective"]["destination_room_id"], int(room_pk))
+        self.assertEqual(
+            facts["completed_objective"]["destination_room_label"], room_key
+        )
+        self.assertEqual(
+            facts["completed_objective"]["bound_identities"][0]["label"],
+            self.other.key,
+        )
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_location_context_growth_drops_only_whole_groups(self):
+        """Scenario: Context growth removes only whole groups.
+
+        WHEN authorized location context pushes the envelope past 8000 code
+        points THEN the oldest complete groups are dropped and every retained
+        group keeps its source IDs, outcomes and per-occurrence references.
+        """
+        t = 10000
+        long_label = "t_loc_" + "x" * 110
+        rooms = [
+            create_object(Room, key=f"{long_label}{index}") for index in range(2)
+        ]
+        expected_ticks: dict[str, int] = {}
+        group_sources: dict[int, list[str]] = {}
+        for group_index in range(8):
+            sources = []
+            for occurrence in range(8):
+                source_id = f"act:budget:{group_index}:{occurrence}"
+                tick = t + group_index * 100 + occurrence
+                self._record_action(
+                    source_id,
+                    rooms[occurrence % 2],
+                    tick,
+                    skill_key=f"budget_skill_{group_index}",
+                )
+                expected_ticks[source_id] = tick
+                sources.append(source_id)
+            group_sources[group_index] = sources
+
+        result = select_authorized_recent_deeds(self.char, frozen_tick=t + 1000)
+        self.assertLess(len(result.groups), 8)
+        self.assertLessEqual(
+            len(result.rendered_json), RECENT_DEEDS_JSON_CODE_POINTS_LIMIT
+        )
+        retained_sources = set(result.source_ids)
+        # Whole-group removal: a dropped group never leaves a partial source set.
+        for sources in group_sources.values():
+            self.assertIn(
+                len(retained_sources.intersection(sources)), (0, len(sources))
+            )
+        # The newest groups are the retained ones.
+        self.assertTrue(set(group_sources[0]).isdisjoint(retained_sources))
+        self.assertTrue(set(group_sources[7]).issubset(retained_sources))
+        for group in result.groups:
+            self.assertEqual(group.group_type, "skill_use")
+            self.assertEqual(group.count, 8)
+            occurrences = group.facts["occurrences"]
+            self.assertEqual(
+                sorted(group.source_ids),
+                sorted(row["source_id"] for row in occurrences),
+            )
+            self.assertEqual(
+                [row["tick"] for row in occurrences],
+                [expected_ticks[row["source_id"]] for row in occurrences],
+            )
+            self.assertEqual(
+                len({row["location"]["id"] for row in occurrences}), 2
+            )
+            self.assertEqual(group.latest_tick, max(expected_ticks[s] for s in group.source_ids))
+            self.assertEqual(
+                group.facts["effects"][0]["result"], {"amount": 3, "hit": True}
+            )

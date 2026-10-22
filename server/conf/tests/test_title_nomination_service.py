@@ -354,8 +354,9 @@ class NominationSchedulingTests(EvenniaTest):
             ctx = admitted_calls[0].kwargs.get("context", {})
             self.assertEqual(ctx.get("player"), str(self.player.pk))
             self.assertEqual(ctx.get("trigger"), "wake")
-            self.assertIn("frozen_tick", ctx)
-            self.assertIn("source_count", ctx)
+            # The admitted tick is the frozen one, never zero or a later read.
+            self.assertEqual(ctx.get("frozen_tick"), 100)
+            self.assertEqual(ctx.get("source_count"), 1)
             # Ensure full private deed prose is not in logging context
             for val in ctx.values():
                 self.assertNotIn("completed_objective", str(val))
@@ -853,3 +854,214 @@ class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
                 raise RuntimeError("simulated rollback")
 
         self.assertFalse(NarrativeEvent.objects.filter(source_id="quest:rollback_test").exists())
+
+
+class FrozenAdmissionTickTests(EvenniaTest):
+    """The admitted world tick is frozen once and reused by every diagnostic."""
+
+    def setUp(self):
+        super().setUp()
+        register_title_nomination()
+        self.player = create_object(PlayerCharacter, key="frozen-tick-nominee")
+        push_patcher = patch.object(service, "_push_ballot_panel", lambda *args: None)
+        push_patcher.start()
+        self.addCleanup(push_patcher.stop)
+        record_narrative_event(
+            source_id="quest:test_001",
+            event_type="quest_completion",
+            content={
+                "location": {"id": str(self.player.pk), "label": "frozen tick room"},
+                "quest_id": "q1",
+                "definition_key": "dk1",
+                "completed_objective": "obj",
+                "outcome": "completed",
+            },
+            participants=[self.player.pk],
+            tick=100,
+        )
+        self.clock = SimpleNamespace(tick=100)
+        self.clock_reads = 0
+
+        def _read_clock():
+            self.clock_reads += 1
+            return self.clock
+
+        self.clock_patcher = patch(
+            "server.title_nomination_service.read_world_clock",
+            side_effect=_read_clock,
+        )
+        self.clock_patcher.start()
+        self.addCleanup(self.clock_patcher.stop)
+        service.reset_nomination_triggers_for_tests()
+        self.addCleanup(service.reset_nomination_triggers_for_tests)
+
+    def _schedule(self, client, **kwargs):
+        with override_settings(LLM_PROFILES=_profiles()):
+            deferred = service.schedule_epithet_nomination(
+                self.player, client=client, **kwargs
+            )
+        if deferred is not None:
+            await_result(deferred)
+        return deferred
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_admission_and_completion_report_the_frozen_tick(self):
+        with patch.object(service, "log_info") as info:
+            deferred = self._schedule(_good_client(), trigger="wake")
+            self.assertIsNotNone(deferred)
+            self.assertTrue(deferred.result)
+
+        self.assertEqual(self.clock_reads, 1)
+        events = [call for call in info.call_args_list if call.args]
+        names = [call.args[0] for call in events]
+        self.assertIn("title_nomination_admitted", names)
+        self.assertIn("title_nomination_completed", names)
+        admitted = next(
+            call.kwargs["context"]
+            for call in events
+            if call.args[0] == "title_nomination_admitted"
+        )
+        completed = next(
+            call.kwargs["context"]
+            for call in events
+            if call.args[0] == "title_nomination_completed"
+        )
+        self.assertEqual(admitted["frozen_tick"], 100)
+        self.assertEqual(completed["frozen_tick"], 100)
+        self.assertEqual(admitted["source_count"], 1)
+        self.assertEqual(completed["source_count"], 1)
+        self.assertEqual(completed["candidate_count"], 3)
+        self.assertTrue(completed["persisted"])
+        self.assertTrue(title_rules.safe_pending_ballot(self.player))
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_explicit_tick_reads_no_clock(self):
+        deferred = self._schedule(_good_client(), frozen_tick=100)
+        self.assertIsNotNone(deferred)
+        self.assertEqual(self.clock_reads, 0)
+        self.assertTrue(title_rules.safe_pending_ballot(self.player))
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_clock_advancing_during_generation_keeps_the_admitted_window(self):
+        clock = self.clock
+        day = title_rules._DAY_SECONDS
+
+        class AdvancingClient:
+            def get_response(self, descriptor):
+                # Gameplay time advances while the model round is pending.
+                clock.tick = 40 * day
+                return defer.succeed(
+                    _reply(
+                        [
+                            {
+                                "display": "火焰之心",
+                                "basis": "焚盡匪寨",
+                                "source_ids": ["quest:test_001"],
+                            }
+                        ]
+                        * 5
+                    )
+                )
+
+        with patch.object(service, "log_info") as info:
+            deferred = service.schedule_epithet_nomination(
+                self.player, client=AdvancingClient(), trigger="wake"
+            )
+            self.assertIsNotNone(deferred)
+            await_result(deferred)
+
+        self.assertEqual(self.clock_reads, 1)
+        completed = next(
+            call.kwargs["context"]
+            for call in info.call_args_list
+            if call.args and call.args[0] == "title_nomination_completed"
+        )
+        self.assertEqual(completed["frozen_tick"], 100)
+        # The citation resolves only inside the admitted two-day window; a
+        # recalculated window would have eliminated every candidate.
+        self.assertTrue(title_rules.safe_pending_ballot(self.player))
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_generation_failure_reports_the_frozen_tick(self):
+        with (
+            patch(
+                "world.ai.title_nomination.generate_epithet_candidates",
+                side_effect=RuntimeError("model transport failed"),
+            ),
+            patch.object(service, "log_warn") as warn,
+        ):
+            deferred = service.schedule_epithet_nomination(
+                self.player, client=_good_client(), trigger="wake"
+            )
+            self.assertIsNotNone(deferred)
+            await_result(deferred)
+
+        failures = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "title_nomination_generation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        context = failures[0].kwargs["context"]
+        self.assertEqual(context["frozen_tick"], 100)
+        self.assertEqual(context["trigger"], "wake")
+        self.assertEqual(context["player"], str(self.player.pk))
+        self.assertEqual(context["source_count"], 1)
+        self.assertFalse(title_rules.safe_pending_ballot(self.player))
+        self.assertFalse(title_rules.nomination_suppressed(self.player, 100))
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_persistence_failure_reports_the_frozen_tick(self):
+        with (
+            patch(
+                "world.rules.titles.persist_nomination_ballot",
+                side_effect=RuntimeError("ballot write failed"),
+            ),
+            patch.object(service, "log_warn") as warn,
+        ):
+            deferred = service.schedule_epithet_nomination(
+                self.player, client=_good_client(), trigger="logout"
+            )
+            self.assertIsNotNone(deferred)
+            await_result(deferred)
+
+        failures = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "title_nomination_generation_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        context = failures[0].kwargs["context"]
+        self.assertEqual(context["frozen_tick"], 100)
+        self.assertEqual(context["trigger"], "logout")
+        self.assertEqual(context["source_count"], 1)
+        self.assertFalse(title_rules.safe_pending_ballot(self.player))
+        self.assertFalse(title_rules.nomination_suppressed(self.player, 100))
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+
+    @covers_requirement("title-system::empty-and-failed-nomination-leave-deterministic-gameplay-intact")
+    def test_unavailable_clock_ends_the_workflow_without_side_effects(self):
+        client = _good_client()
+        title_state_before = title_rules.read_title_state(self.player)
+        with (
+            patch(
+                "server.title_nomination_service.read_world_clock",
+                return_value=None,
+            ),
+            patch.object(service, "log_warn") as warn,
+        ):
+            deferred = service.schedule_epithet_nomination(self.player, client=client)
+
+        self.assertIsNone(deferred)
+        self.assertEqual(client.calls, [])
+        self.assertFalse(self.player.attributes.has(title_rules.PENDING_BALLOT_KEY))
+        self.assertFalse(title_rules.nomination_suppressed(self.player, 100))
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+        self.assertEqual(title_rules.read_title_state(self.player), title_state_before)
+        unavailable = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "title_nomination_clock_unavailable"
+        ]
+        self.assertEqual(len(unavailable), 1)
