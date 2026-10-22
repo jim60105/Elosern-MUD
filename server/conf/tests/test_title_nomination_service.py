@@ -221,7 +221,17 @@ class NominationSchedulingTests(EvenniaTest):
                 "actor": {"id": player_pk, "name": "nominee"},
                 "recipients": [{"id": "npc_partner", "name": "花語者", "private_feeling": "forbidden_secret_value"}],
                 "outcomes": {
-                    "effects": [{"target_id": "npc_partner", "effect": "pleasure"}],
+                    # One committed settled effect in the admitted shape; an
+                    # unsupported effect row fails the whole record closed.
+                    "effects": [
+                        {
+                            "kind": "pleasure_gain",
+                            "actor_id": player_pk,
+                            "target_id": "npc_partner",
+                            "target_name": "花語者",
+                            "result": {"amount": 12},
+                        }
+                    ],
                 },
                 "field_access": {
                     player_pk: ["actor", "recipients", "physical_effects"],
@@ -764,7 +774,15 @@ class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
                 "actor": {"id": player_pk, "name": "smoke-hero"},
                 "recipients": [{"id": "999", "name": "companion"}],
                 "outcomes": {
-                    "effects": [{"target_id": "999", "effect": "bonding"}],
+                    "effects": [
+                        {
+                            "kind": "pleasure_gain",
+                            "actor_id": player_pk,
+                            "target_id": "999",
+                            "target_name": "companion",
+                            "result": {"amount": 9},
+                        }
+                    ],
                 },
                 "field_access": {
                     player_pk: ["actor", "recipients", "physical_effects"],

@@ -289,6 +289,7 @@
         "world.narrative.tests.test_narrative_fast_recall",
         "world.narrative.tests.test_narrative_memory",
         "world.narrative.tests.test_narrative_threads",
+        "world.narrative.tests.test_adult_memory_projection",
         "world.narrative.tests.test_recent_deeds_selection",
         "world.narrative.tests.test_dream_authoring",
         "world.narrative.tests.test_dream_session",
