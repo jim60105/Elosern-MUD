@@ -27,6 +27,12 @@ _RECORD_FIELDS = frozenset(
         "draft_version",
         "draft_entries",
         "confirmed_actors",
+        # The encounter's authoritative occurrence identity. Every committed
+        # combat action, upkeep milestone and terminal outcome is keyed by it,
+        # so a persisted session without one is not a valid session: it is
+        # malformed and recovery retires it instead of restoring a session
+        # whose every action and settlement would fail closed.
+        "engagement_id",
     }
 )
 # Optional fields: ``settled_tick`` is written only when the terminal
@@ -43,7 +49,6 @@ _OPTIONAL_RECORD_FIELDS = frozenset(
         "opening_first_actor",
         "initial_sleep_ids",
         "sleep_transitions",
-        "engagement_id",
     }
 )
 
@@ -343,13 +348,11 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         data.get("initial_sleep_ids", []), "initial_sleep_ids"
     )
     sleep_transitions = _parse_sleep_transitions(data.get("sleep_transitions"))
-    engagement_id = data.get("engagement_id")
-    if engagement_id is not None and (
-        not isinstance(engagement_id, str) or not engagement_id
-    ):
+    engagement_id = data["engagement_id"]
+    if not isinstance(engagement_id, str) or not engagement_id:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION,
-            "engagement_id must be a non-empty string or None",
+            "engagement_id must be a non-empty string",
         )
     record = CombatSessionRecord(
         session_id=session_id,
@@ -467,7 +470,7 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
             for transition in record.sleep_transitions
         ],
     }
-    if record.engagement_id is not None:
+    if record.engagement_id:
         result["engagement_id"] = record.engagement_id
     return result
 

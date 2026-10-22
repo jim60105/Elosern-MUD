@@ -871,20 +871,20 @@ def record_action_settlement_evidence(
     from world.narrative.events import record_narrative_event
     source_id = build_action_source_id(request, tick=current_tick)
 
-    # A combat context must state its occurrence provenance; the reusable
-    # transport session token rides along as diagnostics only, never as the
-    # encounter key. Out-of-combat evidence has no encounter context at all.
-    battlefield = getattr(request.context, "battlefield", None)
-    if battlefield is None:
-        encounter_context = None
-    else:
-        from world.rules.combat.decision_scope import current_combat_provenance
+    # Evidence classification follows the same authority as source
+    # construction: the occurrence provenance decides. The reusable transport
+    # session token rides along as diagnostics only, never as the encounter
+    # key, and a combat request context with no provenance is malformed.
+    from world.rules.combat.decision_scope import current_combat_provenance
 
-        provenance = current_combat_provenance()
-        if provenance is None:
+    provenance = current_combat_provenance()
+    if provenance is None:
+        if getattr(request.context, "battlefield", None) is not None:
             raise ValueError(
                 f"combat evidence for {source_id} has no combat provenance"
             )
+        encounter_context = None
+    else:
         encounter_context = combat_encounter_context(provenance)
 
     skill = SKILL_REGISTRY.get(request.skill_key)

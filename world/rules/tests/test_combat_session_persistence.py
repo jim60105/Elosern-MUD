@@ -41,6 +41,7 @@ class CombatSessionRecordTests(unittest.TestCase):
                 "knocked_out_ids": [],
                 "rounds_elapsed": 0,
                 "exam_id": None,
+                "engagement_id": "hostile:1:0:1",
                 "round_revision": 0,
                 "draft_version": 0,
                 "draft_entries": {},
@@ -61,6 +62,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+                "engagement_id": "hostile:1:0:1",
             "round_revision": 0,
             "draft_version": 0,
             "draft_entries": {},
@@ -83,6 +85,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+                "engagement_id": "hostile:1:0:1",
             "round_revision": 0,
             "draft_version": 0,
             "draft_entries": {},
@@ -107,6 +110,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+                "engagement_id": "hostile:1:0:1",
             "round_revision": 0,
             "draft_version": 0,
             "draft_entries": {},
@@ -153,6 +157,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "knocked_out_ids": [],
             "rounds_elapsed": 2,
             "exam_id": None,
+                "engagement_id": "hostile:1:0:1",
             "round_revision": 2,
             "draft_version": 0,
             "draft_entries": {},
@@ -227,6 +232,30 @@ class CombatSessionRecordTests(unittest.TestCase):
 
 
 class CombatSessionIdTests(EvenniaTest):
+    def test_a_persisted_record_without_an_engagement_identity_is_malformed(self):
+        """Every committed occurrence is keyed by the engagement identity."""
+        base = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 5,
+            "player_ids": [1],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        with self.assertRaises(CombatSessionError):
+            from_storage(base)
+        for value in (None, "", 7):
+            with self.subTest(engagement_id=value):
+                with self.assertRaises(CombatSessionError):
+                    from_storage({**base, "engagement_id": value})
+
     def test_deterministic_session_ids(self):
         player = _player()
         with patch("world.rules.clock.get_world_clock", return_value=WorldClock(42)):
@@ -241,6 +270,29 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room
         self.monster = _monster("persist goblin")
         self.monster.location = self.room
+
+    def test_restoring_a_session_without_an_engagement_identity_retires_it(self):
+        """A stored session with no occurrence identity never resumes or settles."""
+        from world.narrative.models import NarrativeEvent
+
+        self.player.db.active_combat = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": int(self.room.pk),
+            "player_ids": [int(self.player.pk)],
+            "enemy_ids": [int(self.monster.pk)],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        restore_active_session(self.player)
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertEqual(NarrativeEvent.objects.count(), 0)
 
     def _waiting_companion(self):
         from typeclasses.npcs import NPC
