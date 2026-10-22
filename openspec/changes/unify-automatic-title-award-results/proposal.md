@@ -32,18 +32,7 @@ depends-on: none
 
 Code-conflict notes: Shared title writers, action result contracts, guild and examination settlements, narrative event finalization and title-system main-spec application conflict with later slices. Serialize these edits.
 
-### Dependency and conflict matrix
-
-| ID | Change | Direct dependencies | Code conflicts |
-|---|---|---|---|
-| A | unify-automatic-title-award-results | none | B/C settlement contracts and event finalization; D/E/F title-system spec application; F source notifications |
-| B | record-lifecycle-recent-deeds | A | C narrative event contract and narrative-events spec application; F quest/combat settlement notifications |
-| C | record-action-adult-recent-deeds | A | B narrative event contract and narrative-events spec application; D adapter payloads; F combat/action settlement integration |
-| D | select-authorized-recent-deeds | B, C | E/F composition-root context; A/E/F title-system spec application |
-| E | cite-recent-deeds-in-epithets | D | F nomination service, prompt/service tests; A/D/F title-system spec application |
-| F | trigger-epithets-on-committed-wake | A, B, C, D, E | A/B/C settlement observers; D/E nomination service; A/D/E title-system spec application |
-
-Use A, then B and C with shared-file serialization, then D, E and F. B and C are semantically independent after A; their shared event contract and spec edits require integration ownership. No change automatically creates a new eligible trigger merely by producing an award result or evidence.
+The authoritative proposal inventory, dependency/conflict matrix and parallel implementation waves are in [the approved design, section 12](../../../docs/superpowers/specs/2026-10-22-epithet-recent-deeds-design.md#12-proposals-dependencies-and-parallel-implementation).
 
 ## Authority
 

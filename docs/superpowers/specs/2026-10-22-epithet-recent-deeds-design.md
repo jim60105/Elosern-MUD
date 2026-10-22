@@ -158,3 +158,26 @@ Update the main title capability through OpenSpec deltas, affected traceability 
 Preserve built-in-title award conditions and benefits while unifying their award-result reporting. Do not change fatigue balance, adult mechanics, party relationships, reputation, player acceptance, ballot expiry, or the decline cooldown. Do not remove the existing protection projector from other narrative consumers. Do not add historical backfill, migrations, or compatibility paths for the empty-feed interface.
 
 Replace old input producers and callers together. Remove the obsolete rest-day trigger and unused event-log-only nomination serializer when the structured feed takes over. Use the repository OpenSpec proposal and apply workflow for implementation after written-spec review and planning.
+
+## 12. Proposals, dependencies and parallel implementation
+
+This section is the authoritative batch matrix. Each change lives under `openspec/changes/<change>/` and contains a proposal, technical design, capability deltas and implementation tasks.
+
+| ID | Change | Scope | Direct dependencies | Code conflicts |
+| --- | --- | --- | --- | --- |
+| A | [unify-automatic-title-award-results](../../../openspec/changes/unify-automatic-title-award-results/proposal.md) | Unified occurrence-linked automatic awards and replay-safe results | none | B/C settlement contracts and event finalization; D/E/F title-system spec application; F source notifications |
+| B | [record-lifecycle-recent-deeds](../../../openspec/changes/record-lifecycle-recent-deeds/proposal.md) | Quest, examination and terminal combat evidence | A | C narrative event contract and narrative-events spec application; F quest/combat settlement notifications |
+| C | [record-action-adult-recent-deeds](../../../openspec/changes/record-action-adult-recent-deeds/proposal.md) | Skill/adult outcomes and newly crossed adult milestones | A | B narrative event contract and narrative-events spec application; D adapter payloads; F combat/action settlement integration |
+| D | [select-authorized-recent-deeds](../../../openspec/changes/select-authorized-recent-deeds/proposal.md) | Authorized 48-hour selection, aggregation and bounded rendering | B, C | E/F composition-root context; A/E/F title-system spec application |
+| E | [cite-recent-deeds-in-epithets](../../../openspec/changes/cite-recent-deeds-in-epithets/proposal.md) | Structured prompts and source-citation validation | D | F nomination service, prompt/service tests; A/D/F title-system spec application |
+| F | [trigger-epithets-on-committed-wake](../../../openspec/changes/trigger-epithets-on-committed-wake/proposal.md) | Wake cutover, generic award suppression, single-flight and end-to-end verification | A, B, C, D, E | A/B/C settlement observers; D/E nomination service; A/D/E title-system spec application |
+
+### 12.1 Implementation waves
+
+1. Implement and integrate A.
+2. Implement B and C in parallel after A. They are semantically independent, but their shared narrative-event contract and specification edits require one integration owner and serialized shared-file changes. If that ownership cannot be assigned, implement B and C sequentially.
+3. Implement D after both B and C are integrated.
+4. Implement E after D is integrated.
+5. Implement F after all preceding changes are integrated, including the representative offline end-to-end smoke flows.
+
+The maximum change-level parallelism in this batch is two, for B and C only. Shared capability-spec synchronization is serialized. No change automatically creates a new eligible trigger merely by producing an award result or evidence. These waves describe future implementation; creating this plan does not start an apply worker.
