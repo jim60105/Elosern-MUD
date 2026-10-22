@@ -1,0 +1,54 @@
+# Spec Delta
+
+## Purpose
+
+Provide the production area/world map drawer with on-demand refresh, keyboard navigation and selection-aware commission pointers in the existing overlay shell.
+
+## ADDED Requirements
+
+### Requirement: The map drawer opens the appropriate scope and preserves session views
+MapDrawer SHALL replace MapOverlay inside the existing OverlayHost shell. It SHALL expose ARIA 區域/世界 tabs with 1/2 shortcuts, a place caption and close control. Opening SHALL choose area in settlement/dungeon/interior and world in wilderness. Each tab SHALL retain its view for the session. New area views SHALL centre on current and fit adjacent nodes; new world views SHALL start at country centred on the player and fit a tracked commission within 800 km.
+
+#### Scenario: Opening and returning to a tab
+- **WHEN** the player opens in a settlement, switches tabs, pans and switches back
+- **THEN** area opens first, each tab retains its own pan/zoom, and world initial fit includes an eligible tracked commission
+
+#### Scenario: Epoch change retires prior map data
+- **WHEN** the client reconnects or changes puppet
+- **THEN** old map payloads, view memory and pending responses cannot appear for the new epoch
+
+### Requirement: Map requests follow explicit scope and committed moves only while open
+Opening or switching the active map scope SHALL send map.view for that scope. Each committed move while open SHALL request the active scope once; closed maps SHALL send no map refresh requests. Client request/adoption SHALL obey existing dispatcher ordering and epoch/revision rules.
+
+#### Scenario: Open movement refreshes only the active map
+- **WHEN** a movement commits with world selected
+- **THEN** the client re-requests world once after the committed publication rather than optimistically on input or once per room/panel render
+
+#### Scenario: Failed movement and closed drawer do not refresh
+- **WHEN** a move is rejected or the drawer is closed
+- **THEN** there is no new map.view caused by that move
+
+### Requirement: Floating map chrome avoids selected details
+The map SHALL fill the drawer with a floating minus/stop/plus/recentre/full-map/legend pill, top-left quest dropdown and bottom-left scale bar. Selection SHALL open an approximately 360 px right detail drawer; pill and HTML edge pointers SHALL move left of it. Offscreen quest pointers SHALL be keyboard reachable, stack by distance and collapse beyond three into ＋n. Quest list and detail SHALL mirror permitted map facts as text.
+
+#### Scenario: Offscreen pointers exceed three
+- **WHEN** four or more accepted commissions point offscreen with a detail drawer open
+- **THEN** the visible pointers are distance-ordered, show at most three plus ＋n, avoid the drawer and retain keyboard access through the quest list
+
+### Requirement: Map keyboard and pointer interaction remains modal and accessible
+Drag SHALL pan, wheel SHALL zoom continuously, click SHALL select a place/district/commission, and adjacent 前往 SHALL submit existing explore.move. Arrows SHALL pan; plus/minus SHALL jump stops; C SHALL recentre; 0 SHALL fit all. Escape SHALL close legend, then selected details, then the map, with final focus restored to the opener. Background game commands SHALL not consume map keys.
+
+#### Scenario: Escape unwinds one layer
+- **WHEN** legend and selected details are open
+- **THEN** the first Escape closes legend, the second details and the third map, without passing a movement or menu key to the game
+
+#### Scenario: Selected adjacent exit is activated
+- **WHEN** a real panel supplies a current adjacent move descriptor
+- **THEN** the drawer forwards its exact existing explore.move intent and never infers a route or moves to a remote marker
+
+### Requirement: The old full-map lattice has no remaining consumer
+After drawer and minimap cutovers the old MapOverlay, overlay pitch branch, cellSize/rank-compressed projection and obsolete map_view path SHALL be removed with all callers, tests and stories migrated. No compatibility alias or fallback overlay SHALL remain.
+
+#### Scenario: Clean production cutover
+- **WHEN** the normal map opener and minimap run after the new drawer is integrated
+- **THEN** they render their new real components without importing or executing the removed overlay lattice path
