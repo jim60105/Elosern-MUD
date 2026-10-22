@@ -509,7 +509,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         self.assertEqual(ms.content["encounter_context"]["round_number"], 2)
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_buff_reaction_crossing_is_recorded_once_by_its_upkeep(self):
         """Scenario: Upkeep buff reaction crossing is retained once.
@@ -628,7 +629,8 @@ class ActionNarrativeDeedsTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_buff_onset_settled_in_the_same_boundary_is_retained(self):
         """An onset erased by the same boundary's settlement is still recorded."""

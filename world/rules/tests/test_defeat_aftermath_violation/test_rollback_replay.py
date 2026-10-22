@@ -193,7 +193,8 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.assertEqual(self.monster.sexual.hostile_act_count, 2)
 
     @covers_requirement(
-        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay"
+        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_failure_after_evidence_recording_rolls_back_the_whole_unit(self):
         """Scenario: Owner rollback removes evidence with the gameplay."""
@@ -238,7 +239,8 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.assertIsNotNone(self.player.db.active_combat)
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_replayed_committed_attempt_evidence_reuses_the_original_crossing(self):
         """Scenario: Replayed owner settlement does not create another crossing."""

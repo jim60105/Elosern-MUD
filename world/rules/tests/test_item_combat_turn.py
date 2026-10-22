@@ -206,7 +206,8 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(len(monster_actions), 1)
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_combat_item_crossing_joins_its_own_slot_operation(self):
         """Scenario: Combat item use joins its own accepted operation."""

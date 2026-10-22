@@ -170,7 +170,8 @@ class AttemptLoopTests(ViolationBase):
         self.assertEqual([entry.data["climax"] for entry in acts], [False, True])
 
     @covers_requirement(
-        "narrative-events::durable-source-identity-makes-projection-recoverable"
+        "narrative-events::durable-source-identity-makes-projection-recoverable",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_attempt_identities_distinguish_ordinals_victims_and_aftermaths(self):
         """Scenario: each attempt is identified by engagement/aggressor/ordinal/victim."""
@@ -223,7 +224,8 @@ class AttemptLoopTests(ViolationBase):
             self.assertIn(second_record.engagement_id, source)
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_resisted_attempt_records_the_crossing_it_actually_caused(self):
         """Scenario: a resisted attempt keeps resistance and its real transition."""
@@ -258,7 +260,8 @@ class AttemptLoopTests(ViolationBase):
         self.assertEqual(self.player.sexual.hostile_act_count, 0)
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_landed_attempt_records_the_counter_unlock_it_actually_crossed(self):
         """A landed attempt's own counter credit unlocks only at the real threshold."""

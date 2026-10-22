@@ -343,7 +343,8 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
         )
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_one_accepted_use_owns_each_affected_recipients_crossing(self):
         """Scenario: Accepted item use crossing uses the accepted operation."""
@@ -410,7 +411,8 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
         self.assertEqual(len(self._operation_milestones(operation_id)), 2)
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_non_adult_use_and_preexisting_state_record_no_milestone(self):
         """A non-adult item use and an already-active phase create nothing."""
@@ -457,7 +459,8 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
             )
 
     @covers_requirement(
-        "narrative-events::adult-milestones-record-newly-crossed-transitions"
+        "narrative-events::adult-milestones-record-newly-crossed-transitions",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_two_slots_of_one_engagement_keep_distinct_operation_sources(self):
         """Scenario: two accepted operations in different slots stay distinct."""
@@ -516,7 +519,8 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
             )
 
     @covers_requirement(
-        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay"
+        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
+        "narrative-events::non-resolver-adult-milestones-are-recorded-at-transition-time",
     )
     def test_evidence_write_failure_rolls_back_consumption_and_milestones(self):
         """Scenario: Owner rollback removes evidence with the gameplay."""
