@@ -80,12 +80,10 @@ def _digest_tree(*roots: Path) -> str:
             if path.is_file():
                 files.append(path)
     for path in sorted(files, key=lambda p: str(p.relative_to(REPO_ROOT))):
-        # A concurrent showcase-evidence gate creates and deletes transient
-        # story trees under the app root (``scripts/component-coverage.mjs``
-        # tolerates the same race for the same reason), so a path can vanish
-        # between the walk and the read. An unreadable path is not a build
-        # input, so it cannot be hashed -- and skipping it must leave the
-        # digest's ``name\0content\0`` form intact, so read first.
+        # A concurrent build or cleanup can delete a path between the walk and
+        # the read. An unreadable path is not a build input, so it cannot be
+        # hashed -- and skipping it must leave the digest's ``name\0content\0``
+        # form intact, so read first.
         try:
             content = path.read_bytes()
         except FileNotFoundError:

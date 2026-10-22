@@ -344,9 +344,10 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     def test_component_coverage_gate_fails_for_an_undocumented_required_story(self):
         """A listed component whose story binds no props fails the gate.
 
-        The probe story file is a temporary sibling under ``stories/`` (the
-        gate walks that tree) and the probe manifest a temporary path, so
-        parallel processes never observe mutated tracked files.
+        The probe story file lives in its own temporary tree, handed to the
+        gate through ``--stories-root``, and the probe manifest is a temporary
+        path, so a concurrently running gate never observes the probe story in
+        the authored stories tree.
         """
         original = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -356,14 +357,19 @@ class VueShowcaseEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             probe_path = Path(tmp) / "manifest.json"
             probe_path.write_text(json.dumps(probe), encoding="utf-8")
-            with tempfile.TemporaryDirectory(dir=str(APP_ROOT / "stories")) as probe_dir:
+            with tempfile.TemporaryDirectory() as probe_dir:
                 (Path(probe_dir) / "DocProbe.stories.js").write_text(
                     "export default { title: 'Core/DocProbe' };\n"
                     "export const Probe = {};\n",
                     encoding="utf-8",
                 )
                 result = run_node(
-                    ["scripts/component-coverage.mjs", str(probe_path)],
+                    [
+                        "scripts/component-coverage.mjs",
+                        "--stories-root",
+                        str(probe_dir),
+                        str(probe_path),
+                    ],
                     timeout=120,
                 )
         self.assertNotEqual(

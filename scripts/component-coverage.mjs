@@ -23,13 +23,31 @@ const gmAppRoot = join(repoRoot, "web/admin-app");
 // Optional first argument: an alternate manifest path (the test suite probes
 // the gate with temporary manifests instead of mutating the tracked file).
 // `--gm-manifest <path>` likewise swaps the GM manifest for a probe.
+// `--stories-root <path>` (repeatable) adds another story tree to the game
+// gate's scan, so a probe story can live in its own directory instead of
+// beside the authored stories; a concurrent gate therefore never observes it.
 const cliArgs = process.argv.slice(2);
-const gmFlag = cliArgs.indexOf("--gm-manifest");
+const positional = [];
+const extraStoryRoots = [];
+const valuedFlags = new Set(["--gm-manifest", "--stories-root"]);
+let gmManifestValue;
+for (let index = 0; index < cliArgs.length; index += 1) {
+  const arg = cliArgs[index];
+  if (!valuedFlags.has(arg)) {
+    positional.push(arg);
+    continue;
+  }
+  const value = cliArgs[index + 1];
+  if (value === undefined) {
+    console.error(`component coverage: ${arg} requires a path`);
+    process.exit(2);
+  }
+  index += 1;
+  if (arg === "--gm-manifest") gmManifestValue = value;
+  else extraStoryRoots.push(value);
+}
 const gmManifestPath =
-  gmFlag === -1 ? join(gmAppRoot, "component-manifest.json") : cliArgs[gmFlag + 1];
-const positional = cliArgs.filter(
-  (arg, index) => arg !== "--gm-manifest" && (gmFlag === -1 || index !== gmFlag + 1),
-);
+  gmManifestValue ?? join(gmAppRoot, "component-manifest.json");
 const manifestPath = positional[0] ?? join(appRoot, "component-manifest.json");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
@@ -50,11 +68,11 @@ if (frozen && required.length === 0) {
 
 const storyFiles = [];
 
-// Concurrent showcase-evidence gates create transient story trees under the
-// app root (mkdtemp tmp directories) and delete them when done. A scan that
-// walks the tree concurrently can therefore observe an entry vanish between
-// enumeration and stat/read; an ENOENT on a transient path means the file is
-// gone (not a required story), never a scan failure. Anything else rethrows.
+// Probe stories live outside the app root (see `--stories-root`), but a scan
+// can still race a concurrent build cleaning its own tree: an entry can vanish
+// between enumeration and stat/read. An ENOENT on a transient path means the
+// file is gone (not a required story), never a scan failure. Anything else
+// rethrows.
 function readdirSafe(dir) {
   try {
     return readdirSync(dir);
@@ -98,6 +116,14 @@ function collectStoryFiles(dir, out = storyFiles) {
 }
 
 collectStoryFiles(appRoot);
+for (const root of extraStoryRoots) {
+  const stat = statSafe(root);
+  if (stat === null || !stat.isDirectory()) {
+    console.error(`component coverage: --stories-root ${root} is not a directory`);
+    process.exit(2);
+  }
+  collectStoryFiles(root);
+}
 
 const collected = new Set(storyFiles.map(({ title }) => title));
 const failures = [];
