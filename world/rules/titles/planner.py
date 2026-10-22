@@ -180,6 +180,11 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
     corrupted storage skips only its own row — a title lookup must never
     reject an otherwise valid player action. The strict ``read_title_state``
     still guards every mutator and command.
+
+    ``quest_completed`` rows are never discovered here: the completing quest
+    owner settles them through the unified automatic award entry point under
+    the completion occurrence's own source, so an unrelated later action can
+    neither rediscover a finished quest nor attribute its title to itself.
     """
     from world.rules.action import PendingEffect
     from world.rules.titles.awards import award_automatic_title
@@ -197,6 +202,8 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
     pending: list[Any] = []
     for definition in FIXED_TITLE_REGISTRY.values():
         if definition.key in owned:
+            continue
+        if definition.predicate.family is TitlePredicateFamily.QUEST_COMPLETED:
             continue
         try:
             satisfied = predicate_satisfied(actor, event_log, definition.predicate)

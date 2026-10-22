@@ -64,7 +64,21 @@ def _repair(target, quest_id, *, state=None, stage=None):
     )
     runtime.validate_record_runtime(replacement)
     pins = transitions.release_stage_binding(actor, record)
-    attrs = snapshot_attributes(actor, ("quest_log", "wallet", "inventory", "guild_reward_claims"))
+    # A repair that sets COMPLETED settles that completion's quest-completed
+    # titles inside ``apply_quest_log_replacement``; the later stage
+    # materialization can still fail, so the title surfaces join this owner's
+    # restore set as well.
+    attrs = snapshot_attributes(
+        actor,
+        (
+            "quest_log",
+            "wallet",
+            "inventory",
+            "guild_reward_claims",
+            "title_collection",
+            "title_equipped",
+        ),
+    )
     from world.quests.settlement import plan_auto_settlement_chain
     revised = [replacement if item.quest_id == quest_id else item for item in records]
     settlement = plan_auto_settlement_chain(actor, entries, revised)

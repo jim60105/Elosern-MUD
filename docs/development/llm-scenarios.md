@@ -248,12 +248,17 @@ LLM 必須輸出 JSON 格式：
 `apply_quest_log_replacement`、`apply_quest_log_delta`、
 `pending_effects_for_transition`）負責，順序固定為：
 
-1. 於外層交易內，以**寫入前的權威綁定**（`old_entries` 中該任務的紀錄）與實際滿足的
+1. 於外層交易內，`quest_completed` 固定稱號先透過統一的自動授予入口
+   （`world/rules/titles/awards.settle_quest_completion_awards`）結算，歸屬到該筆完成的
+   occurrence source，且**所有授予結果都在不可變事實寫入前定稿**；同一次完成的多筆授予
+   共用同一個 source 與收件者，與任務無關的後續行動永不重新發現或代為授予。
+2. 以**寫入前的權威綁定**（`old_entries` 中該任務的紀錄）與實際滿足的
    最終階段 objective 定稿不可變的 `quest_completion` 事實；因此抵達目的地、交付對象、
-   護衛受保護／會面角色與必要關係在終局綁定被清除前就已被快照。
-2. 僅當該事實是**本次新建**時，才在該交易上註冊 `transaction.on_commit`；回滾會丟棄所有
+   護衛受保護／會面角色與必要關係在終局綁定被清除前就已被快照。事實已存在時（重播或
+   不變的終局替換）直接沿用其原始授予結果，不重評審、也不損失該筆完成的提名抑制。
+3. 僅當該事實是**本次新建**時，才在該交易上註冊 `transaction.on_commit`；回滾會丟棄所有
    待送通知，重複寫入不變的終局紀錄或重播同一事實都不會再排入一次嘗試。
-3. 提交後派送 `world.quests.runtime.QuestCompletionReceipt`，其欄位為 `source_id`（權威
+4. 提交後派送 `world.quests.runtime.QuestCompletionReceipt`，其欄位為 `source_id`（權威
    來源識別，服務端不再自行拼組）、`actor`／`actor_id`、`quest_id`、`definition_key`、
    `issuer_key`、定稿的 `objective` 載荷與已提交的 `awards` 信封。
 
@@ -261,6 +266,12 @@ LLM 必須輸出 JSON 格式：
 的 `_on_quest_completion(receipt)` 直接轉送 `receipt.source_id` 與 `receipt.awards`，
 並以同一個 `source_id` 作為 occurrence 身分，所以重播該通知在行程內至多只會有一次嘗試。
 觀察者的例外仍被隔離並記錄，壞掉的觀察者永遠不會改變任務結算。
+
+包住完成寫入的外層擁有者（購買／庫存計畫、交付、抵達、自動結算鏈、行動提交）各自把
+`title_collection`／`title_equipped` 納入既有的 snapshot/restore 面；內層任務寫入者
+不自行復原快取，因此外層失敗時遊戲狀態、稱號、授予證據、事件與待投射工作一起回到原值。
+玩家的啟始異名仍只屬於第一次公會獎勵領取（`quest:{quest_id}:claim:{pk}`），不會被回填
+到完成事實裡。
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/title_nomination.yaml` $\rightarrow$ `title_nomination.system` 與 `title_nomination.user`。

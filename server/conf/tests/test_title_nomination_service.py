@@ -28,6 +28,7 @@ from world.ai.title_nomination import register_title_nomination
 from world.rules import guild_exams
 from world.rules import titles as title_rules
 from world.quests import runtime as quest_runtime
+from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.narrative.events import record_narrative_event
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
@@ -702,7 +703,7 @@ class ObserverWiringTests(EvenniaTest):
         )
 
 
-class TitleNominationSmokeTests(EvenniaTest):
+class TitleNominationSmokeTests(QuestRegistryIsolation, EvenniaTest):
     """Representative offline end-to-end smoke flow through real construction,
 
     source settlement, committed narrative selection, rendered prompt, fake model
@@ -724,19 +725,32 @@ class TitleNominationSmokeTests(EvenniaTest):
 
     @covers_requirement("title-system::empty-and-failed-nomination-leave-deterministic-gameplay-intact")
     def test_end_to_end_accomplishment_and_adult_smoke_with_controls(self):
-        # 1. Real source settlement: non-fixed-title accomplishment (quest completion)
-        record_narrative_event(
-            source_id=f"quest:smoke_q1:completion:{self.player.pk}",
-            event_type="quest_completion",
-            content={
-                "quest_id": "smoke_q1",
-                "definition_key": "dk_smoke",
-                "completed_objective": "平定盜匪寨",
-                "outcome": "completed",
-            },
-            participants=[self.player.pk],
-            tick=90,
+        # 1. Real source settlement: a real quest completion runs through the
+        # quest-owned writer, which finalizes the immutable fact together with
+        # its award envelope. No narrative row is inserted by hand, and no
+        # quest-completed title row is registered, so the deed is eligible.
+        from world.quests.definitions import QuestStage
+        from world.quests.runtime import fulfill_record
+        from world.quests.tests._fixtures import accept, defeat, quest, register
+        from world.quests.transitions import apply_quest_log_replacement
+        from world.narrative.models import NarrativeEvent
+
+        definition = register(
+            quest("smoke_q1", stages=(QuestStage(0, defeat()),))
         )
+        completing = accept(self.player, definition)
+        with self.captureOnCommitCallbacks(execute=False):
+            apply_quest_log_replacement(
+                self.player, [fulfill_record(completing, definition)]
+            )
+        completion_source = (
+            f"quest:{completing.quest_id}:completion:{self.player.pk}"
+        )
+        committed = NarrativeEvent.objects.get(source_id=completion_source)
+        self.assertEqual(committed.event_type, "quest_completion")
+        # The envelope is the writer's own finalized result set, not a fixture
+        # claim: no quest-completed title is registered, so it grants nothing.
+        self.assertEqual(committed.content["award_results"], [])
 
         # Real adult action settlement (authorized outcome for player)
         player_pk = str(self.player.pk)
@@ -765,10 +779,10 @@ class TitleNominationSmokeTests(EvenniaTest):
         fake_client.add_response(
             lambda descriptor: True,
             _reply([
-                {"display": "平寇先鋒", "basis": "率眾平定盜匪寨", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
+                {"display": "平寇先鋒", "basis": "率眾平定盜匪寨", "source_ids": [completion_source]},
                 {"display": "柔情守護", "basis": "患難中結下深厚羈絆", "source_ids": ["adult:smoke_act_1"]},
-                {"display": "夜幕行者", "basis": "夜巡寨口", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
-                {"display": "寨破之晨", "basis": "晨曦突入", "source_ids": [f"quest:smoke_q1:completion:{self.player.pk}"]},
+                {"display": "夜幕行者", "basis": "夜巡寨口", "source_ids": [completion_source]},
+                {"display": "寨破之晨", "basis": "晨曦突入", "source_ids": [completion_source]},
                 {"display": "信義之伴", "basis": "相守同行", "source_ids": ["adult:smoke_act_1"]},
             ]),
         )
@@ -812,5 +826,4 @@ class TitleNominationSmokeTests(EvenniaTest):
                 )
                 raise RuntimeError("simulated rollback")
 
-        from world.narrative.events import NarrativeEvent
         self.assertFalse(NarrativeEvent.objects.filter(source_id="quest:rollback_test").exists())

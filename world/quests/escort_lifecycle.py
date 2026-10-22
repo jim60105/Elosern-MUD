@@ -42,7 +42,16 @@ def escort_compensation(owner: Any, actors: tuple[Any, ...]):
     members = {actor.pk: actor.db.party_member for actor in actors}
     controls = [(actor, snapshot_party_control(owner, actor)) for actor in actors]
     attrs = snapshot_attributes(owner, (
-        "quest_log", "wallet", "inventory", "guild_reward_claims", "dialogue_session",
+        "quest_log",
+        "wallet",
+        "inventory",
+        "guild_reward_claims",
+        "dialogue_session",
+        # A terminal escort release can follow an inner quest-log replacement
+        # that already settled a completion's quest-completed titles; the
+        # originating owner's failure must restore those caches too.
+        "title_collection",
+        "title_equipped",
     ))
     try:
         yield

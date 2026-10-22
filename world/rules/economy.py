@@ -174,6 +174,12 @@ def _snapshot_trade(commander: Any, member: Any, merchant: Any) -> dict[str, Any
         "inventory": attribute_snapshot(member, "inventory"),
         "quest_log": attribute_snapshot(member, "quest_log"),
         "guild_reward_claims": attribute_snapshot(member, "guild_reward_claims"),
+        # That same settlement banks the completion's quest-completed fixed
+        # titles on the member, so the title surfaces join this snapshot set;
+        # the purchase's own transaction is the only commit boundary and its
+        # rollback must return them to their pre-purchase values too.
+        "title_collection": attribute_snapshot(member, "title_collection"),
+        "title_equipped": attribute_snapshot(member, "title_equipped"),
         "merchant_stock": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::merchant_stock"),
         "last_restock_day": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::last_restock_day"),
         "merchant_relations": attribute_snapshot(merchant.host, "relations_data"),
@@ -189,7 +195,13 @@ def _restore_trade(
     restore_attribute_best_effort(commander, "wallet", snapshot["wallet"])
     if snapshot["member_wallet"] is not None:
         restore_attribute_best_effort(member, "wallet", snapshot["member_wallet"])
-    for key in ("inventory", "quest_log", "guild_reward_claims"):
+    for key in (
+        "inventory",
+        "quest_log",
+        "guild_reward_claims",
+        "title_collection",
+        "title_equipped",
+    ):
         restore_attribute_best_effort(member, key, snapshot[key])
     restore_attribute_best_effort(
         merchant.host,

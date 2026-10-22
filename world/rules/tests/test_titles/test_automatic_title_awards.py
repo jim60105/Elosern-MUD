@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from django.db import transaction
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
@@ -31,10 +31,15 @@ from world.rules.titles import (
     award_automatic_title,
     award_first_quest_epithet,
     award_guild_rank_title,
+    banked_fixed_keys,
     persist_nomination_ballot,
     read_title_state,
+    settle_quest_completion_awards,
 )
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, SYNTH_TITLES
+from world.quests.tests._fixtures import QuestRegistryIsolation
+
+from ._support import _patched_fixed_registry
 
 
 _SYNTH_RANK_KEY = "t_synth_award_rank"
@@ -313,3 +318,146 @@ class AutomaticTitleAwardBehaviorTests(EvenniaTestCase):
         self.assertEqual(raw_results[0]["title_id"], _SYNTH_FIXED_KEY)
 
         self.assertEqual(NarrativeEvent.objects.filter(source_id=source_id).count(), 1)
+
+
+class QuestCompletionAwardSettlementTests(QuestRegistryIsolation, EvenniaTest):
+    """The quest owner settles quest-completed rows under its own occurrence."""
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.definitions import QuestStage
+        from world.quests.runtime import fulfill_record, to_storage
+        from world.quests.tests._fixtures import (
+            accept,
+            defeat,
+            quest,
+            register,
+        )
+
+        self.actor = create_object(PlayerCharacter, key="t_completion_award_actor")
+        definition = register(
+            quest("t_completion_award_quest", stages=(QuestStage(0, defeat()),))
+        )
+        record = accept(self.actor, definition)
+        self.actor.db.quest_log = [
+            to_storage(fulfill_record(record, definition))
+        ]
+        self.quest_key = definition.key
+
+    def _row(self, key: str, display: str) -> FixedTitleDef:
+        return FixedTitleDef(
+            key=key,
+            display_name_zh=display,
+            category=TitleCategory.COMBAT,
+            flavor_zh="你把那樁委託收在身後。",
+            hint_zh="完成指定委託即可獲得。",
+            predicate=TitlePredicate(
+                family=TitlePredicateFamily.QUEST_COMPLETED,
+                quest_key=self.quest_key,
+            ),
+        )
+
+    @covers_requirement(
+        "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
+    )
+    def test_completion_grants_record_the_completion_source_and_recipient(self):
+        rows = {"t_completion_source": self._row("t_completion_source", "委託成名")}
+        with _patched_fixed_registry(rows):
+            awards = settle_quest_completion_awards(
+                self.actor,
+                source_id="quest:occ:completion:1",
+                completed_quest_keys=(self.quest_key,),
+                tick=77,
+            )
+            self.assertEqual(len(awards), 1)
+            award = awards[0]
+            self.assertEqual(award.source_id, "quest:occ:completion:1")
+            self.assertEqual(award.recipient_id, str(self.actor.pk))
+            self.assertEqual(award.kind, "fixed")
+            self.assertEqual(award.title_id, "t_completion_source")
+            self.assertEqual(award.display_name, "委託成名")
+            self.assertEqual(award.granted_tick, 77)
+            collection, equipped = read_title_state(self.actor)
+            self.assertEqual(
+                collection,
+                [
+                    {
+                        "kind": "fixed",
+                        "key": "t_completion_source",
+                        "granted_tick": 77,
+                    }
+                ],
+            )
+            self.assertEqual(equipped["fixed"], "t_completion_source")
+
+    @covers_requirement(
+        "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
+    )
+    def test_several_grants_share_the_one_completion_source(self):
+        rows = {
+            "t_completion_first": self._row("t_completion_first", "委託初捷"),
+            "t_completion_second": self._row("t_completion_second", "委託雙捷"),
+        }
+        with _patched_fixed_registry(rows):
+            awards = settle_quest_completion_awards(
+                self.actor,
+                source_id="quest:occ:completion:multi",
+                completed_quest_keys=(self.quest_key,),
+                tick=88,
+            )
+            self.assertEqual(
+                sorted(award.title_id for award in awards),
+                ["t_completion_first", "t_completion_second"],
+            )
+            self.assertEqual(
+                {award.source_id for award in awards},
+                {"quest:occ:completion:multi"},
+            )
+            self.assertEqual(
+                {award.recipient_id for award in awards},
+                {str(self.actor.pk)},
+            )
+            self.assertEqual(
+                sorted(banked_fixed_keys(self.actor)),
+                ["t_completion_first", "t_completion_second"],
+            )
+
+    @covers_requirement(
+        "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
+    )
+    def test_a_new_occurrence_with_an_owned_title_grants_nothing(self):
+        rows = {"t_completion_source": self._row("t_completion_source", "委託成名")}
+        with _patched_fixed_registry(rows):
+            first = settle_quest_completion_awards(
+                self.actor,
+                source_id="quest:occ:completion:first",
+                completed_quest_keys=(self.quest_key,),
+                tick=10,
+            )
+            self.assertEqual(len(first), 1)
+            before = read_title_state(self.actor)
+            second = settle_quest_completion_awards(
+                self.actor,
+                source_id="quest:occ:completion:second",
+                completed_quest_keys=(self.quest_key,),
+                tick=20,
+            )
+            self.assertEqual(second, ())
+            self.assertEqual(read_title_state(self.actor), before)
+
+    @covers_requirement(
+        "title-system::automatic-built-in-title-awards-report-occurrence-linked-grants"
+    )
+    def test_an_unrelated_quest_key_settles_no_row(self):
+        rows = {"t_completion_source": self._row("t_completion_source", "委託成名")}
+        with _patched_fixed_registry(rows):
+            self.assertEqual(
+                settle_quest_completion_awards(
+                    self.actor,
+                    source_id="quest:occ:completion:other",
+                    completed_quest_keys=("t_some_other_quest",),
+                    tick=30,
+                ),
+                (),
+            )
+            self.assertEqual(banked_fixed_keys(self.actor), ())

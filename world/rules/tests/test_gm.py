@@ -11,6 +11,12 @@ class RulesConsoleTests(ConsoleOwnerTest):
     @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_acquire_auto_reward_chain_pins_and_every_surface_survive_late_mirror_failure(self):
         from evennia.utils.create import create_object
+        from world.lore.titles import (
+            FixedTitleDef,
+            TitleCategory,
+            TitlePredicate,
+            TitlePredicateFamily,
+        )
         from world.tests.synthetic_data import make_quest
         from world.quests.definitions import QuestStage, register_quest_definition
         from world.quests.tests._fixtures import acquire, register_auto_issuance
@@ -18,6 +24,9 @@ class RulesConsoleTests(ConsoleOwnerTest):
         from world.quests.binding import bind_stage_runtime
         from world.rules.guild_offers import QuestReward, ItemQuantity
         from world.rules.surfaces import attribute_snapshot
+        from world.rules.tests._knowledge_probes import live_fixed_title_registry
+        from world.rules.titles import banked_fixed_keys
+
         definitions = (
             make_quest('t_gm_direct',stages=(QuestStage(0,acquire('t_huskapple')),)),
             make_quest('t_gm_chain',stages=(QuestStage(0,acquire('t_ember_spray')),)),
@@ -31,7 +40,36 @@ class RulesConsoleTests(ConsoleOwnerTest):
             room=create_object('typeclasses.rooms.InstanceRoom',key=f't_gm_pin_{index}')
             bind_stage_runtime(self.player,record.quest_id,room=room)
             rooms.append(room)
-        before={key:attribute_snapshot(self.player,key) for key in ('inventory','equipment','buffs','wallet','guild_reward_claims','quest_log')}
+        # The nested AUTO chain settles both completions and banks their
+        # quest-completed fixed titles, so the outer console owner must
+        # compensate those surfaces too.
+        granted = ('t_gm_direct_deed', 't_gm_chain_deed')
+        titles = dict(live_fixed_title_registry())
+        for title_key, quest_key in zip(granted, ('t_gm_direct', 't_gm_chain')):
+            titles[title_key] = FixedTitleDef(
+                title_key,
+                '合成賜名',
+                TitleCategory.GUILD,
+                '你把兩樁委託一起收下。',
+                '完成自動結算鏈上的委託即可獲得。',
+                TitlePredicate(
+                    family=TitlePredicateFamily.QUEST_COMPLETED,
+                    quest_key=quest_key,
+                ),
+            )
+        before={
+            key: attribute_snapshot(self.player, key)
+            for key in (
+                'inventory',
+                'equipment',
+                'buffs',
+                'wallet',
+                'guild_reward_claims',
+                'quest_log',
+                'title_collection',
+                'title_equipped',
+            )
+        }
         traits=snapshot_traits(self.player)
         pins=[attribute_snapshot(room,'pin_reasons') for room in rooms]
         original=equipment.materialize_registry_object
@@ -40,10 +78,16 @@ class RulesConsoleTests(ConsoleOwnerTest):
             self.assertEqual(actor.db.wallet,14)
             self.assertEqual(len(actor.db.guild_reward_claims),2)
             self.assertTrue(all(not room.db.pin_reasons for room in rooms))
+            self.assertEqual(sorted(banked_fixed_keys(actor)), sorted(granted))
             raise RuntimeError('after automatic reward chain')
-        with mock.patch.object(equipment,'materialize_registry_object',side_effect=late):
-            with self.assertRaises(RuntimeError):
-                gm.give_item(self.target,'t_huskapple',1)
+        with (
+            mock.patch("world.rules.titles.planner.FIXED_TITLE_REGISTRY", titles),
+            mock.patch("world.rules.titles.state.FIXED_TITLE_REGISTRY", titles),
+            mock.patch("world.rules.titles.awards.FIXED_TITLE_REGISTRY", titles),
+        ):
+            with mock.patch.object(equipment,'materialize_registry_object',side_effect=late):
+                with self.assertRaises(RuntimeError):
+                    gm.give_item(self.target,'t_huskapple',1)
         for key,value in before.items():
             self.assertEqual(attribute_snapshot(self.player,key),value)
         self.assertEqual(snapshot_traits(self.player),traits)

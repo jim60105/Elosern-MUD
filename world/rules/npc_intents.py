@@ -36,7 +36,18 @@ from world.rules.surfaces import (
 # deterministic capability surface.
 _FORWARD_DECLARED_KINDS: tuple[str, ...] = ()
 
-_INVENTORY_SURFACE_KEYS = ("inventory", "quest_log", "wallet", "guild_reward_claims")
+#: Every surface one inventory-backed transfer owns. ``title_collection`` and
+#: ``title_equipped`` are here because the nested ACQUIRE/DELIVER quest-delta
+#: settles completions (and the quest-completed fixed titles they earn) inside
+#: the transfer's transaction.
+_INVENTORY_SURFACE_KEYS = (
+    "inventory",
+    "quest_log",
+    "wallet",
+    "guild_reward_claims",
+    "title_collection",
+    "title_equipped",
+)
 
 _MAX_RELATION_DELTA = 10
 
@@ -511,11 +522,13 @@ def _transfer_items(
     Verifies the giver's ``db.inventory`` actually holds ``item_key`` × ``qty``
     *before* constructing the removal tuple (so a pathological ``qty`` can never
     allocate an unbounded tuple), precomputes both inventory plans, snapshots
-    both entities' affected surfaces (inventory, quest log, traits, and the
-    receiver's ACQUIRE and giver's DELIVER pin state), applies both plans and
-    any giver delivery replacement inside one outer transaction, and restores
-    both entities' in-process caches on any failure so no partial transfer is
-    observable.
+    both entities' affected surfaces (inventory, quest log, wallet, reward
+    claims, title collection and equipped record, traits, and the receiver's
+    ACQUIRE and giver's DELIVER pin state), applies both plans and any giver
+    delivery replacement inside one outer transaction, and restores both
+    entities' in-process caches on any failure so no partial transfer is
+    observable — including the quest-completed fixed titles a delivered or
+    acquired completion banks inside that transaction.
     """
     holdings = giver.db.inventory or []
     if holdings.count(item_key) < qty:

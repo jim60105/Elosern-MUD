@@ -239,10 +239,15 @@ def _patched_fixed_registry(rows):
     own module binding while ``bank_fixed``/``fixed_display_name`` resolve
     through the state binding, so one seam must patch both to outlive the
     grant (composition asserts made after the patch closes would correctly
-    see the key fallback, not the display name).
+    see the key fallback, not the display name). The awards module scans it
+    for quest-completion settlement, so it joins the same seam.
     """
     with contextlib.ExitStack() as stack:
-        for _module in ("world.rules.titles.planner", "world.rules.titles.state"):
+        for _module in (
+            "world.rules.titles.planner",
+            "world.rules.titles.state",
+            "world.rules.titles.awards",
+        ):
             stack.enter_context(patch(f"{_module}.FIXED_TITLE_REGISTRY", rows))
         yield rows
 

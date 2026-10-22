@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Fixed-title grants ride the triggering action's atomic transaction
-A registered event-effect planner SHALL evaluate pending predicates against the step-7 EventLog (non-EventLog faces read through the existing shared read helpers) and stage fixed-title grants as `PendingEffect` values committed inside the triggering action's own transaction; collection membership short-circuits re-grants, so a staged-then-rolled-back grant re-applies naturally when its events next appear and nothing can be written twice. Quest-completed predicates SHALL be excluded from action-time discovery; the completing quest owner SHALL settle them through the unified automatic award entry point under the completion occurrence.
+An event-effect planner SHALL evaluate pending predicates against the step-7 EventLog (non-EventLog faces read via shared helpers) and stage fixed-title grants as `PendingEffect` values in the action's transaction; membership short-circuits re-grants, so a rolled-back grant re-applies when its events recur and nothing is written twice. Quest-completed predicates SHALL be excluded from action-time discovery and settle in the completing quest owner through the unified automatic award entry point.
 
 #### Scenario: A predicate-satisfying kill grants inside the same commit
 - **WHEN** an action commits an EventLog satisfying a `first_kill_tier` predicate

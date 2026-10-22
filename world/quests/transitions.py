@@ -231,6 +231,23 @@ def _apply_pin_operations(
 _IDENTITY_LABEL_LIMIT = 64
 
 
+def _push_title_notifications(actor: Any, lines: tuple[str, ...]) -> None:
+    """Push one OOB grant line per newly banked title after the owner commits.
+
+    Presentation only: a delivery failure is logged and never turns a
+    committed completion into a failed one.
+    """
+    for line in lines:
+        try:
+            actor.msg(line)
+        except Exception as error:  # noqa: BLE001 - presentation is best-effort
+            log_warn(
+                "quest_title_notification_failed",
+                context={"char": str(getattr(actor, "pk", "") or "")},
+                exc=error,
+            )
+
+
 def _enum_value(value: Any) -> str:
     return value.value if hasattr(value, "value") else str(value)
 
@@ -395,7 +412,13 @@ def _settle_quest_completion_events(
 
     The immutable fact is finalized HERE, in the owner's transaction and from
     the authoritative pre-completion entries, before the terminal bindings are
-    gone from storage. Notification is then dispatched through an outer
+    gone from storage. Quest-completed fixed titles are settled FIRST, through
+    the unified automatic award entry point and under that completion
+    occurrence's own source, so the finalized envelope already holds every new
+    grant when the fact is first committed. A source that already committed
+    keeps its original results untouched: replay returns them before any
+    reevaluation, so it neither grants again nor loses the occurrence's
+    suppression effect. Notification is then dispatched through an outer
     ``transaction.on_commit`` callback that supplies the canonical source
     identity and the finalized receipt, so an inventory, delivery, arrival or
     action plan that predicted the completion but never wrote it notifies
@@ -411,6 +434,7 @@ def _settle_quest_completion_events(
         dispatch_quest_completion,
     )
     from world.rules.clock import get_world_clock
+    from world.rules.titles.awards import settle_quest_completion_awards
     from world.narrative.events import get_committed_award_results, record_narrative_event
 
     current_tick = get_world_clock().tick
@@ -421,7 +445,15 @@ def _settle_quest_completion_events(
             record, before.get(str(record.quest_id))
         )
         source_id = f"quest:{record.quest_id}:completion:{actor.pk}"
-        committed_awards = get_committed_award_results(source_id) or ()
+        committed_awards = get_committed_award_results(source_id)
+        settled_now = committed_awards is None
+        if settled_now:
+            committed_awards = settle_quest_completion_awards(
+                actor,
+                source_id=source_id,
+                completed_quest_keys=(str(record.definition_key),),
+                tick=current_tick,
+            )
 
         _event, _progress, created = record_narrative_event(
             source_id=source_id,
@@ -443,6 +475,16 @@ def _settle_quest_completion_events(
             # The fact already exists: this is an unchanged terminal
             # replacement or a replay, and neither may admit another attempt.
             continue
+        if settled_now and committed_awards:
+            # One OOB grant line per newly banked title, pushed only after the
+            # enclosing owner commits; a rollback discards it with the grant.
+            lines = tuple(
+                f"獲得稱號：{award.display_name}" for award in committed_awards
+            )
+            transaction.on_commit(
+                lambda lines=lines: _push_title_notifications(actor, lines),
+                robust=True,
+            )
         receipt = QuestCompletionReceipt(
             source_id=source_id,
             actor=actor,
@@ -497,7 +539,10 @@ def _replace_quest_log(
     against the pre-write state, the reward surfaces join the snapshot/restore
     set only when the plan pays, and the ACQUIRE completions the paid items
     trigger are written as a follow-up replacement in the same
-    ``transaction.atomic()`` block.
+    ``transaction.atomic()`` block. Completion settlement also banks
+    quest-completed fixed titles on the actor, so the title collection and
+    equipped record join the snapshot/restore set whenever this write finalizes
+    a completion; the enclosing transaction remains the only commit boundary.
     """
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
     from world.quests.runtime import to_storage
@@ -523,6 +568,10 @@ def _replace_quest_log(
     room_snapshots = {
         id(room): snapshot_pin_reasons(room) for room, _, _ in pin_operations
     }
+    completion_snapshots = [
+        (key, attribute_snapshot(actor, key))
+        for key in ("title_collection", "title_equipped")
+    ] if completing or chain_completing else []
     settlement_snapshots = [
         (key, attribute_snapshot(actor, key))
         for key in ("wallet", "inventory", "guild_reward_claims")
@@ -548,6 +597,8 @@ def _replace_quest_log(
         restore_quest_log(actor, actor_snapshot)
         for room, _, _ in pin_operations:
             restore_pin_reasons(room, room_snapshots[id(room)])
+        for key, snapshot in completion_snapshots:
+            restore_attribute_best_effort(actor, key, snapshot)
         for key, snapshot in settlement_snapshots:
             restore_attribute_best_effort(actor, key, snapshot)
         for room, snapshot in settlement_pin_snapshots:
@@ -579,11 +630,16 @@ def apply_quest_log_delta(
     ``AUTO`` issuance settles inside this call, so the caller's snapshot set
     MUST also cover the actor's ``wallet``, ``inventory``, and
     ``guild_reward_claims``, and a raise from this function must abort the
-    whole surrounding operation. The ACQUIRE completions the paid items
-    trigger release stage pins on rooms the caller cannot know; those rooms
-    are snapshotted and restored here. Completion notification follows the
-    same rule: it is registered on the caller's transaction, so the caller's
-    atomic block is what makes the notification a post-commit effect.
+    whole surrounding operation. A completing record also banks its
+    quest-completed fixed titles on that actor, so the caller's snapshot set
+    MUST cover ``title_collection`` and ``title_equipped`` as well: this
+    function performs no restore of its own, so an outer owner that fails after
+    it returns is the only place those caches can be returned to their prior
+    values. The ACQUIRE completions the paid items trigger release stage pins
+    on rooms the caller cannot know; those rooms are snapshotted and restored
+    here. Completion notification follows the same rule: it is registered on
+    the caller's transaction, so the caller's atomic block is what makes the
+    notification a post-commit effect.
     """
     from world.quests.settlement import (
         commit_auto_settlement,
@@ -664,6 +720,16 @@ def pending_effects_for_transition(
         list(new_records) if plan.chain_records is None else list(plan.chain_records)
     )
     merged_pins = [*pin_operations, *plan.chain_pins]
+    # A transition that finalizes a completion also banks that completion's
+    # quest-completed fixed titles, so the effect must declare the ``titles``
+    # surface: ``ActionResolver`` then snapshots and restores the collection
+    # and equipped record together with the log on a failed commit.
+    completing = just_completed_records(old_entries, final_records)
+    quest_log_surfaces = (
+        frozenset({"quest_log", "titles"})
+        if completing
+        else frozenset({"quest_log"})
+    )
 
     def _apply_quest_log(actor: Any, records: list[Any]) -> None:
         """Write the log and schedule its diff at APPLY time (inside commit)."""
@@ -677,7 +743,7 @@ def pending_effects_for_transition(
         PendingEffect(
             actor,
             f"quest_log|{actor.pk}",
-            frozenset({"quest_log"}),
+            quest_log_surfaces,
             lambda actor=actor, records=final_records: _apply_quest_log(actor, records),
         )
     ]

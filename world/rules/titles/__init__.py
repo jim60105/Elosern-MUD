@@ -118,4 +118,5 @@ from world.rules.titles.awards import (  # noqa: F401
     award_automatic_title,
     award_first_quest_epithet,
     award_guild_rank_title,
+    settle_quest_completion_awards,
 )
