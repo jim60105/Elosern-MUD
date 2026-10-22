@@ -351,7 +351,10 @@ def record_action_settlement_evidence(
             parts = desc.split("|")
             eff_kind = parts[0] if parts else ""
             if eff_kind == "sexual_resist" and len(parts) >= 5:
-                roll_val = None if parts[4] in {"None", ""} else int(parts[4])
+                # "none" is the canonical absent-roll sentinel staged by
+                # ``action.gates._resist_pending_effect`` and parsed by
+                # ``action.event_log``; auto-complied verdicts never roll.
+                roll_val = None if parts[4] == "none" else int(parts[4])
                 resist_entries.append({
                     "actor_id": actor_pk,
                     "target_id": eff_pk,
