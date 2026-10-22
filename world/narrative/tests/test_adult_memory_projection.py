@@ -568,6 +568,24 @@ class AdultMemoryProjectionTests(EvenniaTestCase):
         content = self._content("adult:shared:1")
         event, _ = self._record("adult:shared:1", content)
         self.assertEqual(event.participants, [self.player_pk, self.other_pk])
+        # The producer also records each participant's own milestone row; the
+        # nomination feed renders that row, never the embedded summary.
+        record_narrative_event(
+            source_id="ms:actor:1",
+            event_type="adult_milestone",
+            content={
+                "location": {"id": "", "label": ""},
+                "action_source_id": "adult:shared:1",
+                "milestone_kind": "experience_type",
+                "identifier": "actor_milestone",
+                "entity_id": self.player_pk,
+                "entity_name": "",
+                "details": {},
+            },
+            participants=[self.player_pk],
+            tick=100,
+            visibility="private",
+        )
 
         rendered = recent_deeds.select_authorized_recent_deeds(
             self.player, frozen_tick=100

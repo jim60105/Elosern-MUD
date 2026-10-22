@@ -338,6 +338,28 @@ class RecentDeedsSelectionBehaviorTests(EvenniaTestCase):
             participants=[self.player_pk, self.other_pk],
             tick=t,
         )
+        # Producers record each participant's milestone as its own event; the
+        # rendered row comes from that record, never from the action summary.
+        for milestone_source, milestone_entity, milestone_identifier in (
+            ("ms:player:1", self.player_pk, "caress_exp"),
+            ("ms:other:1", self.other_pk, "virginity_loss"),
+        ):
+            record_narrative_event(
+                source_id=milestone_source,
+                event_type="adult_milestone",
+                content={
+                    "location": {"id": "", "label": ""},
+                    "action_source_id": "adult:priv_test",
+                    "milestone_kind": "experience_type",
+                    "identifier": milestone_identifier,
+                    "entity_id": milestone_entity,
+                    "entity_name": "",
+                    "details": {},
+                },
+                participants=[milestone_entity],
+                tick=t,
+                visibility="private",
+            )
 
         res1 = select_authorized_recent_deeds(self.char, frozen_tick=t)
         rendered1 = res1.rendered_json
@@ -1328,6 +1350,125 @@ class SettledLocationContextTests(EvenniaTestCase):
             facts["completed_objective"]["bound_identities"][0]["label"],
             self.other.key,
         )
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_rejected_milestone_summary_never_substitutes_for_its_record(self):
+        """A milestone whose own record failed closed stays rejected.
+
+        WHEN an admitted action embeds a milestone summary whose standalone
+        record is absent or malformed THEN the rendered group states no
+        milestone and cites no source it did not admit.
+        """
+        t = 5000
+        self._record_action("act:mile:absent", self.room_a, t)
+        self._record_action("act:mile:corrupt", self.room_a, t + 1)
+        action = NarrativeEvent.objects.get(source_id="act:mile:absent")
+        content = dict(action.content)
+        content["milestones"] = [
+            {
+                "source_id": "ms:absent:1",
+                "milestone_kind": "state_transition",
+                "identifier": "absent",
+                "entity_id": self.player_pk,
+            }
+        ]
+        action.content = content
+        action.save()
+        action = NarrativeEvent.objects.get(source_id="act:mile:corrupt")
+        content = dict(action.content)
+        content["milestones"] = [
+            {
+                "source_id": "ms:corrupt:1",
+                "milestone_kind": "state_transition",
+                "identifier": "corrupt",
+                "entity_id": self.player_pk,
+            }
+        ]
+        action.content = content
+        action.save()
+        record_narrative_event(
+            source_id="ms:corrupt:1",
+            event_type="adult_milestone",
+            content={
+                "action_source_id": "act:mile:corrupt",
+                "milestone_kind": "state_transition",
+                "identifier": "corrupt",
+                "entity_id": self.player_pk,
+                "entity_name": self.char.key,
+                "details": {},
+            },
+            participants=[self.player_pk],
+            location=str(self.room_a.pk),
+            tick=t + 1,
+            visibility="private",
+        )
+
+        with patch("world.narrative.recent_deeds.log_warn") as warn:
+            result = select_authorized_recent_deeds(self.char, frozen_tick=t + 10)
+
+        self.assertNotIn("ms:absent:1", result.source_ids)
+        self.assertNotIn("ms:corrupt:1", result.source_ids)
+        self.assertEqual(warn.call_count, 1)
+        rendered = json.loads(result.rendered_json)["recent_deeds"]
+        for group in rendered:
+            self.assertNotIn("ms:absent:1", group["source_ids"])
+            self.assertNotIn("ms:corrupt:1", group["source_ids"])
+            for row in group["facts"].get("milestones", []):
+                self.assertIn(row["source_id"], group["source_ids"])
+                self.assertIn("location", row)
+                self.assertIn("tick", row)
+
+    @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
+    def test_malformed_location_snapshots_fail_closed(self):
+        """Unsupported snapshot shapes are rejected instead of guessed."""
+        t = 6000
+        malformed = {
+            "quest:loc:missing": None,
+            "quest:loc:not-dict": "t_loc_room_a",
+            "quest:loc:int-id": {"id": 5, "label": ""},
+            "quest:loc:extra": {"id": "5", "label": "x", "room": "y"},
+            "quest:loc:orphan-label": {"id": "", "label": "orphan"},
+        }
+        for offset, (source_id, snapshot) in enumerate(malformed.items()):
+            content = {
+                "quest_id": f"q_{offset}",
+                "definition_key": f"dk_{offset}",
+                "completed_objective": "obj",
+                "outcome": "completed",
+            }
+            if snapshot is not None:
+                content["location"] = snapshot
+            record_narrative_event(
+                source_id=source_id,
+                event_type="quest_completion",
+                content=content,
+                participants=[self.player_pk],
+                location=str(self.room_a.pk),
+                tick=t + offset,
+            )
+        record_narrative_event(
+            source_id="quest:loc:usable",
+            event_type="quest_completion",
+            content={
+                "location": {"id": "", "label": ""},
+                "quest_id": "q_ok",
+                "definition_key": "dk_ok",
+                "completed_objective": "obj",
+                "outcome": "completed",
+            },
+            participants=[self.player_pk],
+            location=str(self.room_a.pk),
+            tick=t + 10,
+        )
+
+        with patch("world.narrative.recent_deeds.log_warn") as warn:
+            result = select_authorized_recent_deeds(self.char, frozen_tick=t + 20)
+
+        self.assertEqual(tuple(result.source_ids), ("quest:loc:usable",))
+        self.assertEqual(warn.call_count, len(malformed))
+        # An explicit unknown snapshot wins over the populated stored column.
+        facts = json.loads(result.rendered_json)["recent_deeds"][0]["facts"]
+        self.assertEqual(facts["location"], {"known": False})
 
     @covers_requirement("title-system::recent-deed-rendering-has-complete-bounded-groups")
     def test_location_context_growth_drops_only_whole_groups(self):

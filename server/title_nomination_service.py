@@ -375,7 +375,8 @@ def schedule_epithet_nomination(
                 _IN_FLIGHT_PLAYERS.discard(player_id)
                 return None
             context = _build_context(entity, frozen_tick=admitted_tick)
-            if not context.supplied_source_ids:
+            source_count = len(context.supplied_source_ids)
+            if not source_count:
                 _IN_FLIGHT_PLAYERS.discard(player_id)
                 return None
             resolved = client if client is not None else _build_nomination_client()
@@ -387,7 +388,6 @@ def schedule_epithet_nomination(
             raise
 
         admitted_tick = int(context.frozen_tick)
-        source_count = len(context.supplied_source_ids)
 
         log_info(
             "title_nomination_admitted",

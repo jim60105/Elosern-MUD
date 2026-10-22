@@ -496,31 +496,27 @@ def _build_compressed_action_fact(
     distinct_transitions = _distinct_rows("transitions")
     distinct_counters = _distinct_rows("counters")
 
-    # Collect distinct milestones keyed by their immutable source identity. An
-    # embedded summary is the same occurrence as its authorized milestone row,
-    # so the richer authorized record replaces it in place: the occurrence
-    # keeps its own committed tick and location instead of the action's.
-    combined_milestones: dict[str, dict[str, Any]] = {}
-    for r in records:
-        for ms in r.data.get("milestones", []):
-            if isinstance(ms, dict):
-                ms_id = str(
-                    ms.get("source_id")
-                    or f"{ms.get('milestone_kind')}:{ms.get('identifier')}"
-                )
-                combined_milestones.setdefault(ms_id, ms)
-
+    # Rendered milestone rows come only from admitted milestone records, which
+    # state their own committed tick and location. An embedded summary names
+    # the same occurrence but carries neither context, and a milestone whose
+    # own record was rejected must stay rejected: the action's summary is never
+    # a substitute for evidence that failed closed.
+    milestone_rows: list[dict[str, Any]] = []
+    seen_milestones: set[str] = set()
     for ms_rec in milestones:
-        combined_milestones[ms_rec.source_id] = {
-            "source_id": ms_rec.source_id,
-            "milestone_kind": ms_rec.data.get("milestone_kind"),
-            "identifier": ms_rec.data.get("identifier"),
-            "details": ms_rec.data.get("details"),
-            "tick": ms_rec.tick,
-            "location": ms_rec.location.to_json(),
-        }
-
-    milestone_rows = list(combined_milestones.values())
+        if ms_rec.source_id in seen_milestones:
+            continue
+        seen_milestones.add(ms_rec.source_id)
+        milestone_rows.append(
+            {
+                "source_id": ms_rec.source_id,
+                "milestone_kind": ms_rec.data.get("milestone_kind"),
+                "identifier": ms_rec.data.get("identifier"),
+                "details": ms_rec.data.get("details"),
+                "tick": ms_rec.tick,
+                "location": ms_rec.location.to_json(),
+            }
+        )
 
     if is_adult:
         outcomes = dict(base_data.get("outcomes", {}))

@@ -1065,3 +1065,50 @@ class FrozenAdmissionTickTests(EvenniaTest):
             if call.args and call.args[0] == "title_nomination_clock_unavailable"
         ]
         self.assertEqual(len(unavailable), 1)
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_client_build_failure_reports_the_admitted_workflow(self):
+        with (
+            patch.object(
+                service,
+                "_build_nomination_client",
+                side_effect=RuntimeError("client construction failed"),
+            ),
+            patch.object(service, "log_warn") as warn,
+        ):
+            deferred = service.schedule_epithet_nomination(
+                self.player, trigger="logout"
+            )
+
+        self.assertIsNone(deferred)
+        failures = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "title_nomination_scheduling_failed"
+        ]
+        self.assertEqual(len(failures), 1)
+        context = failures[0].kwargs["context"]
+        self.assertEqual(context["player"], str(self.player.pk))
+        self.assertEqual(context["trigger"], "logout")
+        self.assertEqual(context["frozen_tick"], 100)
+        self.assertEqual(context["source_count"], 1)
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+
+    @covers_requirement("title-system::nomination-diagnostics-preserve-privacy")
+    def test_late_generation_errback_reports_the_admitted_workflow(self):
+        from twisted.python.failure import Failure
+
+        with patch.object(service, "log_warn") as warn:
+            service._log_generation_error(
+                Failure(RuntimeError("late failure")),
+                player_id=str(self.player.pk),
+                trigger="wake",
+                frozen_tick=4321,
+                source_count=3,
+            )
+
+        context = warn.call_args.kwargs["context"]
+        self.assertEqual(context["player"], str(self.player.pk))
+        self.assertEqual(context["trigger"], "wake")
+        self.assertEqual(context["frozen_tick"], 4321)
+        self.assertEqual(context["source_count"], 3)

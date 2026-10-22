@@ -365,6 +365,13 @@ class AcceptedOperationEvidenceTests(_MultiEffectTestCase):
         (operation_id,) = {event.content["action_source_id"] for event in milestones}
         self.assertTrue(operation_id.startswith("item:accept:"))
         self.assertEqual(len(self._operation_milestones(operation_id)), 2)
+        # The accepted non-combat use snapshots the room it actually settled in.
+        for milestone in milestones:
+            self.assertEqual(
+                milestone.content["location"],
+                {"id": str(self.room.pk), "label": self.room.key},
+            )
+            self.assertEqual(milestone.location, str(self.room.pk))
 
         # The unaffected control was ineligible at the top of its gauge: it
         # gained no evidence and kept its state.
