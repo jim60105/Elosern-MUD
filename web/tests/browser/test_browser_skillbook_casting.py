@@ -59,12 +59,13 @@ class _SkillBookJourney:
         self._press(page, "ArrowDown")
         self._press(page, "Enter")
 
-    def _wait_focus(self, page, testids, timeout=15000):
+    def _wait_focus(self, page, testids, timeout=30000):
         """Wait for keyboard focus to land on one of ``testids``.
 
         The tab selects through a server round trip and hands focus to the
         action bar only after the committed selection republishes, so a
-        fixed press delay races the handover on a loaded worker.
+        fixed press delay races the handover on a loaded worker; the budget
+        is a load allowance, not a behavioural bound.
         """
         page.wait_for_function(
             """(ids) => {

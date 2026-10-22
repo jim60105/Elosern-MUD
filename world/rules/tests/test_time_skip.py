@@ -180,6 +180,14 @@ class SkipHelperPureTests(unittest.TestCase):
 class SkipHelperAdvanceTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        # ``_EVENT_SOURCES`` is process-global: a source another test (or the
+        # retained database's own boot) registered would bound these advances
+        # at a boundary this suite never authored. Isolate the registry so the
+        # asserted full-length skips are the helper's own behaviour.
+        self._event_sources = dict(_EVENT_SOURCES)
+        _EVENT_SOURCES.clear()
+        self.addCleanup(_EVENT_SOURCES.update, self._event_sources)
+        self.addCleanup(_EVENT_SOURCES.clear)
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()

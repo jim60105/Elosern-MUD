@@ -143,8 +143,16 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 ((s.get("panels") or {}).get("context_actions") or {}).get("session")
                 or {}
             ).get("round", 0)
-            >= 1,
-            timeout=30000,
+            >= 1
+            # A round that finishes the encounter settles it and returns to
+            # exploration, so the session panel is gone even though the round
+            # really ran; a successful command with the mode left is that
+            # same completion.
+            or (
+                s.get("mode") != "combat"
+                and (s.get("lastActionResult") or {}).get("outcome") == "success"
+            ),
+            timeout=60000,
         )
         self._wait_beat_settled(page)
 

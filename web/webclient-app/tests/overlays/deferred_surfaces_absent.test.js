@@ -503,5 +503,9 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
     });
     expect(wrapper.find('[data-testid="overlay-host"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="settings-overlay"]').exists()).toBe(true);
-  });
+    // Mounting the real overlay body builds the whole settings surface; the
+    // same file's other full-surface mounts carry an explicit budget because
+    // the suite's default 5s is not a CI-load guarantee (this mount measured
+    // 5.6s on a loaded runner).
+  }, 20000);
 });

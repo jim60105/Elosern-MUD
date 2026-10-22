@@ -430,22 +430,25 @@ class CompanionOpeningRefusalTests(_CompanionOpeningCase):
                 "world.rules.combat_initiation.submit_opening_action",
                 side_effect=RuntimeError("injected opening failure"),
             ),
+            # The registry is process-global and other suites may hold entries
+            # of their own; assert this failure registered none while the
+            # scope is the empty one, not after restoring the previous content.
             patch.dict(_BATTLEFIELDS, {}, clear=True),
             self.assertRaises(RuntimeError),
         ):
             initiate_field_combat(
                 self.aila, _CAST, self.wolf, commander=self.commander
             )
-        self.assertIsNone(read_session(self.commander))
-        self.assertIsNone(read_session(self.aila))
-        self.assertEqual(
-            dict(self.commander.db.dialogue_session), commander_dialogue
-        )
-        self.assertEqual(dict(self.aila.db.dialogue_session), caster_dialogue)
-        self.assertEqual(self.aila.traits.mp.current, 20)
-        self.assertFalse(self.aila.db.skill_proficiency)
-        self.assertEqual(read_world_clock().tick, 0)
-        self.assertEqual(_BATTLEFIELDS, {})
+            self.assertIsNone(read_session(self.commander))
+            self.assertIsNone(read_session(self.aila))
+            self.assertEqual(
+                dict(self.commander.db.dialogue_session), commander_dialogue
+            )
+            self.assertEqual(dict(self.aila.db.dialogue_session), caster_dialogue)
+            self.assertEqual(self.aila.traits.mp.current, 20)
+            self.assertFalse(self.aila.db.skill_proficiency)
+            self.assertEqual(read_world_clock().tick, 0)
+            self.assertEqual(_BATTLEFIELDS, {})
 
 
 class CompanionOpeningPreviewTests(_CompanionOpeningCase):
