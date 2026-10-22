@@ -38,79 +38,105 @@ class LogoutTriggerTests(EvenniaTest):
             self.char1.at_post_unpuppet(self.account)  # must not raise
 
 
-class TypedRestTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
-    """rest hands its advance events to the boundary gate."""
+class WakeTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
+    """Voluntary and forced awakening schedule nomination after outer commit."""
 
     def setUp(self):
         super().setUp()
-        self.actor = self.char1
-        self.patcher = patch(
-            "server.title_nomination_service.schedule_rest_boundary_nomination"
+        from server import title_nomination_service
+        title_nomination_service.reset_nomination_triggers_for_tests()
+        title_nomination_service.register_nomination_triggers()
+        self.addCleanup(title_nomination_service.reset_nomination_triggers_for_tests)
+
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_voluntary_sleep_awakening_schedules_nomination(self):
+        from world.rules.time_skip import begin_sleep
+        from world.rules.fatigue import write_fatigue_state, SleepPosture
+
+        write_fatigue_state(self.char1, 359000, SleepPosture.AWAKE)
+        with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                outcome = begin_sleep(self.char1)
+            self.assertEqual(schedule.call_count, 1)
+            self.assertIs(schedule.call_args.args[0], self.char1)
+            self.assertEqual(schedule.call_args.kwargs.get("trigger"), "wake")
+
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_forced_sleep_awakening_schedules_nomination(self):
+        from world.rules.fatigue import (
+            FatigueInterval,
+            FatigueActivity,
+            SleepPosture,
+            settle_fatigue_intervals,
+            write_fatigue_state,
+            read_fatigue_state,
         )
-        self.schedule = self.patcher.start()
-        self.addCleanup(self.patcher.stop)
 
-    def _run(self, cmd, args):
-        return self.call(cmd, args, caller=self.actor, receiver=self.actor)
+        write_fatigue_state(self.char1, 71988, SleepPosture.FORCED)
+        sleeper = read_fatigue_state(self.char1)
+        with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                settlement = settle_fatigue_intervals(
+                    (FatigueInterval(self.char1, FatigueActivity.SLEEP, 1, sleeper),)
+                )
+            self.assertEqual(read_fatigue_state(self.char1).posture, SleepPosture.AWAKE)
+            self.assertEqual(schedule.call_count, 1)
+            self.assertIs(schedule.call_args.args[0], self.char1)
 
-    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
-    def test_rest_passes_events_across_the_gate(self):
-        self._run(CmdRest(), "1h")
-        self.assertEqual(self.schedule.call_count, 1)
-        caller, events = self.schedule.call_args.args
-        self.assertIs(caller, self.actor)
-        kinds = [getattr(event, "kind", None) for event in events]
-        # 1h from tick 0 crosses no day boundary; the gate sees no daily_reset.
-        self.assertNotIn("daily_reset", kinds)
-    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
-    def test_rest_crossing_the_boundary_reports_daily_reset(self):
-        # The shared skip operation resolves the clock through
-        # world.rules.time_skip; a fresh instance two seconds before the day
-        # boundary makes 23h cross exactly one boundary, the trigger's gate.
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_still_sleeping_or_awake_produces_no_wake_nomination(self):
+        from world.rules.fatigue import (
+            FatigueInterval,
+            FatigueActivity,
+            SleepPosture,
+            settle_fatigue_intervals,
+            write_fatigue_state,
+            read_fatigue_state,
+        )
+
+        # Still asleep (not crossing wake boundary)
+        write_fatigue_state(self.char1, 10000, SleepPosture.FORCED)
+        sleeper = read_fatigue_state(self.char1)
+        with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                settle_fatigue_intervals(
+                    (FatigueInterval(self.char1, FatigueActivity.SLEEP, 1, sleeper),)
+                )
+            schedule.assert_not_called()
+
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_teammate_or_npc_waking_does_not_nominate_player(self):
+        from typeclasses.npcs import NPC
+        from evennia.utils.create import create_object
+        from world.rules.fatigue import (
+            FatigueInterval,
+            FatigueActivity,
+            SleepPosture,
+            settle_fatigue_intervals,
+            write_fatigue_state,
+            read_fatigue_state,
+        )
+
+        npc = create_object(NPC, key="sleeping-npc", location=self.room1)
+        write_fatigue_state(npc, 71988, SleepPosture.FORCED)
+        sleeper = read_fatigue_state(npc)
+        with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
+            with self.captureOnCommitCallbacks(execute=True):
+                settle_fatigue_intervals(
+                    (FatigueInterval(npc, FatigueActivity.SLEEP, 1, sleeper),)
+                )
+            schedule.assert_not_called()
+
+    @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
+    def test_midnight_alone_does_not_nominate(self):
+        from commands.skip import CmdRest
+        from world.rules.clock import WorldClock
+        # Run rest crossing midnight
         fresh = WorldClock(86400 - 2)
         with patch("world.rules.time_skip.get_world_clock", return_value=fresh):
-            self._run(CmdRest(), "23h")
-        self.assertEqual(self.schedule.call_count, 1)
-        events = self.schedule.call_args.args[1]
-        self.assertIn("daily_reset", [getattr(e, "kind", None) for e in events])
-
-    def test_scheduling_failure_never_breaks_rest(self):
-        self.schedule.side_effect = RuntimeError("boom")
-        # commands/skip.py swallows inside its own helper; the service helper
-        # swallows too — either way, rest still advances the clock.
-        before = get_world_clock().tick
-        self._run(CmdRest(), "1h")
-        self.assertGreater(get_world_clock().tick, before)
-
-
-class WebWaitAdapterTriggerTests(EvenniaTest):
-    """The ``explore.wait`` adapter routes through the same boundary gate."""
-
-    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
-    def test_wait_adapter_calls_the_gate(self):
-        from web.webclient.actions.exploration_actions import _wait_adapter
-
-        with patch(
-            "server.title_nomination_service.schedule_rest_boundary_nomination"
-        ) as schedule:
-            result = _wait_adapter(self.char1, {"seconds": 60})
-        self.assertEqual(result["code"], "skipped")
-        self.assertEqual(schedule.call_count, 1)
-        self.assertIs(schedule.call_args.args[0], self.char1)
-
-    def test_failed_wait_schedules_nothing(self):
-        from web.webclient.actions.exploration_actions import _wait_adapter
-
-        with (
-            patch("world.rules.time_skip.get_world_clock") as clock,
-            patch(
-                "server.title_nomination_service.schedule_rest_boundary_nomination"
-            ) as schedule,
-        ):
-            clock.return_value.advance.side_effect = RuntimeError("no advance")
-            result = _wait_adapter(self.char1, {"seconds": 60})
-        self.assertEqual(result["code"], "skip_failed")
-        schedule.assert_not_called()
+            with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
+                self.call(CmdRest(), "23h", caller=self.char1, receiver=self.char1)
+                schedule.assert_not_called()
 
 
 class CombatNeverTriggersTests(unittest.TestCase):

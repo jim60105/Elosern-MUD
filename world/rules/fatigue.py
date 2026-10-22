@@ -1031,6 +1031,26 @@ def _transition_event_context(
     return payload
 
 
+_WAKE_TRANSITION_OBSERVERS: list[Any] = []
+
+
+def register_wake_transition_observer(observer: Any) -> None:
+    """Idempotently register an observer for committed sleep-to-awake player transitions.
+
+    Observer signature: ``observer(entity, *, occurrence_id: str, in_combat: bool) -> None``
+    """
+    if observer not in _WAKE_TRANSITION_OBSERVERS:
+        _WAKE_TRANSITION_OBSERVERS.append(observer)
+
+
+def _notify_wake_transition_observers(entity: Any, occurrence_id: str, in_combat: bool) -> None:
+    for obs in tuple(_WAKE_TRANSITION_OBSERVERS):
+        try:
+            obs(entity, occurrence_id=occurrence_id, in_combat=in_combat)
+        except Exception:  # noqa: BLE001 # observability: ignore R2: wake observer isolation; failure cannot abort settlement
+            pass
+
+
 def settle_fatigue_intervals(
     intervals: Iterable[FatigueInterval],
     *,
@@ -1100,6 +1120,22 @@ def settle_fatigue_intervals(
                         "fatigue_transition", context=payload
                     )
                 )
+                if (
+                    prediction.start.posture in (SleepPosture.VOLUNTARY, SleepPosture.FORCED)
+                    and prediction.end.posture is SleepPosture.AWAKE
+                ):
+                    from typeclasses.characters import PlayerCharacter
+
+                    if isinstance(interval.entity, PlayerCharacter):
+                        from world.rules.clock import get_world_clock
+
+                        current_tick = get_world_clock().tick
+                        occ_id = f"wake:forced:{getattr(interval.entity, 'pk', '')}:{prediction.end.reserve_units}:{prediction.seconds}:{current_tick}"
+                        transaction.on_commit(
+                            lambda ent=interval.entity, oid=occ_id, ic=in_combat: _notify_wake_transition_observers(
+                                ent, occurrence_id=oid, in_combat=ic
+                            )
+                        )
     except Exception:
         for entity, snapshots_by_key in snapshots:
             for key, snapshot in snapshots_by_key.items():

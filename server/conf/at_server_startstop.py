@@ -385,9 +385,9 @@ def _register_story_director_layer():
 
 
 def _register_nomination_triggers():
-    """Install the epithet-nomination rest-point trigger observers (change G).
+    """Install the epithet-nomination rest-point trigger observers.
 
-    The composition-root service registers the exam-pass and quest-completion
+    The composition-root service registers the wake and quest-completion
     observers (and owns the schedule path); every rest point silently no-ops
     while the LLM is offline, so this wiring is boot-tolerant with a bounded
     warning: a failure here can never take the deterministic game offline.

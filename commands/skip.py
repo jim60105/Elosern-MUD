@@ -73,23 +73,7 @@ _PRACTICE_ARGS_RE = re.compile(
 _PRACTICE_USAGE = "用法：修煉 <技能> [= <成員>]"
 
 
-def _maybe_nominate_after_rest(caller, events) -> None:
-    """Rest-point nomination trigger (title-system D4 §7.1, change G).
 
-    Fires only when the SKIP-source advance crossed a world-clock day
-    boundary. The composition-root import is function-local (the
-    ``commands/scene.py`` precedent) and every failure is swallowed: resting
-    can never be broken by nomination, and the stage is a silent no-op
-    offline.
-    """
-    try:
-        from server.title_nomination_service import (
-            schedule_rest_boundary_nomination,
-        )
-
-        schedule_rest_boundary_nomination(caller, events)
-    except Exception:
-        pass
 
 
 class CmdRest(Command):
@@ -142,8 +126,7 @@ class CmdRest(Command):
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, result.events)
-
+        
 
 class CmdSleep(Command):
     key = "sleep"
@@ -178,7 +161,6 @@ class CmdSleep(Command):
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, result.events)
         if choice:
             from commands.dream import render_state
             from server.dream_service import enter_after_sleep
@@ -229,8 +211,7 @@ class CmdWaitUntil(Command):
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
-        _maybe_nominate_after_rest(self.caller, result.events)
-
+        
 
 class CmdPractice(Command):
     """Book one present party member's practice for the next time skip."""

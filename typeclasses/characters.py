@@ -111,7 +111,7 @@ def _schedule_nomination_on_logout(character: Any) -> None:
     try:
         from server.title_nomination_service import schedule_epithet_nomination
 
-        schedule_epithet_nomination(character)
+        schedule_epithet_nomination(character, trigger="logout")
     except Exception as error:
         log_warn(
             "title_nomination_trigger_failed",
