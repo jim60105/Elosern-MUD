@@ -27,7 +27,7 @@ from .runtime import (
     QuestState,
     definition_for,
     fail_record,
-    fulfill_record_for,
+    fulfill_record,
     read_records,
 )
 from .transitions import pending_effects_for_transition, release_stage_binding
@@ -198,9 +198,7 @@ def _defeat_progress_changes(
             # Fulfilment clears the counted set with the other runtime bindings,
             # so surplus kills are discarded rather than applied to the next
             # stage (a new objective counts its own identities from empty).
-            replacements[record.quest_id] = fulfill_record_for(
-                owner, record, definition
-            )
+            replacements[record.quest_id] = fulfill_record(record, definition)
             pin_operations.extend(release_stage_binding(owner, record))
         else:
             replacements[record.quest_id] = replace(

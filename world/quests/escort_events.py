@@ -22,7 +22,7 @@ from .definitions import EscortCompletion, ObjectiveKind, QUEST_DEFINITION_REGIS
 from .escort import authoritative_position, destination_satisfied, rendezvous_satisfied, resolve_protected_actors
 from .escort_lifecycle import EscortOperationError, escort_compensation
 from .runtime import (
-    QuestState, definition_for, fulfill_record_for, invalidate_record, read_records,
+    QuestState, definition_for, fulfill_record, invalidate_record, read_records,
 )
 from .transitions import apply_quest_log_replacement, release_stage_binding
 
@@ -265,7 +265,7 @@ def resolve_exclusive_outcome(owner: Any, package_id: str, group_id: str, *, sou
         ):
             raise EscortOperationError("invalid_source")
         replacements[record.quest_id] = (
-            fulfill_record_for(owner, record, definition_for(record))
+            fulfill_record(record, definition_for(record))
             if winner is not None and record.quest_id == winner.quest_id else invalidate_record(record)
         )
         if record.quest_id != winner.quest_id:
@@ -328,7 +328,7 @@ def evaluate_escort_event(owner: Any, package_id: str, *, source: EscortSource) 
             continue
         if not outcome_store.consume_transition(owner_id=owner.pk, record_id=record.quest_id, source_key=source.key):
             continue
-        replacements[record.quest_id] = fulfill_record_for(owner, record, definition)
+        replacements[record.quest_id] = fulfill_record(record, definition)
         pins.extend(release_stage_binding(owner, record))
     if replacements:
         apply_quest_log_replacement(owner, [replacements.get(record.quest_id, record)

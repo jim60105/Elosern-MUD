@@ -39,6 +39,23 @@ def _profiles(**overrides):
     return raw
 
 
+def _quest_receipt(entity, quest_id="q1", awards=()):
+    """The canonical receipt the quest-transition writer hands the observer."""
+    from world.quests.runtime import QuestCompletionReceipt
+
+    return QuestCompletionReceipt(
+        source_id=f"quest:{quest_id}:completion:{entity.pk}",
+        actor=entity,
+        actor_id=int(entity.pk),
+        quest_id=quest_id,
+        definition_key="dk1",
+        issuer_key="npc:test_commission",
+        objective={"kind": "defeat", "quantity": 1, "stage_index": 0,
+                   "destination_room_id": None, "bound_identities": []},
+        awards=tuple(awards),
+    )
+
+
 def await_result(d):
     result = d.result
     d.addErrback(lambda f: None)
@@ -63,6 +80,13 @@ def _good_client():
             ]
         ),
     )
+    return client
+
+
+def _void_client():
+    """A client whose round produces no candidate and therefore no ballot."""
+    client = FakeLLMClient()
+    client.add_response(lambda descriptor: True, _reply([]))
     return client
 
 
@@ -428,6 +452,27 @@ class RestBoundaryTests(EvenniaTest):
             d2 = service.schedule_epithet_nomination(self.player, occurrence_id="occ:wake:replay:1", client=_good_client())
             self.assertIsNone(d2)
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
+    def test_replayed_completion_notification_creates_no_second_attempt(self):
+        # The occurrence identity is the committed completion's own source id;
+        # replaying it after the in-flight slot cleared must still be inert.
+        # The first round is deliberately void, so no pending ballot can stand
+        # in for the occurrence guard being tested.
+        source_id = _quest_receipt(self.player).source_id
+        d1 = service.schedule_epithet_nomination(
+            self.player, occurrence_id=source_id, source_id=source_id,
+            client=_void_client(),
+        )
+        self.assertIsNotNone(d1)
+        await_result(d1)
+        self.assertNotIn(str(self.player.pk), service._IN_FLIGHT_PLAYERS)
+        self.assertEqual(title_rules.safe_pending_ballot(self.player), ())
+        d2 = service.schedule_epithet_nomination(
+            self.player, occurrence_id=source_id, source_id=source_id,
+            client=_good_client(),
+        )
+        self.assertIsNone(d2)
+
     @covers_requirement("title-system::nomination-has-one-in-flight-request-per-player-identity")
     def test_overlapping_wake_and_logout_makes_one_call(self):
         record_narrative_event(
@@ -612,7 +657,7 @@ class ObserverWiringTests(EvenniaTest):
             with transaction.atomic():
                 with self.captureOnCommitCallbacks(execute=False):
                     service.notify_wake_transition(self.player, occurrence_id="occ:wake:commit")
-                    service._on_quest_completion(self.player, SimpleNamespace(quest_id="q1"), object())
+                    service._on_quest_completion(_quest_receipt(self.player))
             schedule.assert_not_called()
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             with self.captureOnCommitCallbacks(execute=True):
@@ -633,11 +678,29 @@ class ObserverWiringTests(EvenniaTest):
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             try:
                 with transaction.atomic():
-                    service._on_quest_completion(self.player, SimpleNamespace(quest_id="q1"), object())
+                    service._on_quest_completion(_quest_receipt(self.player))
                     raise RuntimeError("rollback")
             except RuntimeError:
                 pass
             schedule.assert_not_called()
+
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
+    def test_owner_receipt_supplies_the_canonical_identity_and_envelope(self):
+        # The service never rebuilds the source identity or re-reads the award
+        # envelope: it forwards exactly what the quest-transition owner
+        # committed, and reuses that identity as the occurrence key so a
+        # replayed receipt admits no second attempt.
+        receipt = _quest_receipt(self.player, quest_id="q_forward", awards=("awarded",))
+        with patch.object(service, "_schedule_after_commit") as schedule:
+            service._on_quest_completion(receipt)
+        schedule.assert_called_once_with(
+            self.player,
+            source_id="quest:q_forward:completion:%s" % self.player.pk,
+            award_results=("awarded",),
+            occurrence_id="quest:q_forward:completion:%s" % self.player.pk,
+            trigger="quest_completion",
+        )
+
 
 class TitleNominationSmokeTests(EvenniaTest):
     """Representative offline end-to-end smoke flow through real construction,

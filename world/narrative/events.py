@@ -115,13 +115,20 @@ def record_narrative_event(
             "tick": int(tick),
             "participants": len(clean_participants),
         }
+        # Both boundary side effects are recoverable and must never abort the
+        # remaining commit callbacks: the projection leaving its row pending
+        # IS the documented failure mode, and a raising callback would both
+        # skip every later callback and propagate a post-commit error into the
+        # caller's rollback compensation as if the transaction had failed.
         transaction.on_commit(
-            lambda b=boundary: log_info("narrative_event_recorded", context=b)
+            lambda b=boundary: log_info("narrative_event_recorded", context=b),
+            robust=True,
         )
         # Settle memory projection via on_commit of the outermost transaction
         from world.narrative.memory import project_narrative_event_to_memories
         transaction.on_commit(
-            lambda e=event, pv=projector_version: project_narrative_event_to_memories(e, projector_version=pv)
+            lambda e=event, pv=projector_version: project_narrative_event_to_memories(e, projector_version=pv),
+            robust=True,
         )
         return event, progress, True
 

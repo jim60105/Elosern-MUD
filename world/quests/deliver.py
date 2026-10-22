@@ -21,7 +21,7 @@ from .runtime import (
     QuestRecord,
     QuestState,
     definition_for,
-    fulfill_record_for,
+    fulfill_record,
     read_records,
 )
 from .transitions import release_stage_binding
@@ -126,9 +126,7 @@ def compute_deliver_replacement(
             continue
         new_progress = record.stage_progress + gained
         if new_progress >= objective.quantity:
-            replacements[record.quest_id] = fulfill_record_for(
-                giver, record, definition
-            )
+            replacements[record.quest_id] = fulfill_record(record, definition)
             pin_operations.extend(release_stage_binding(giver, record))
         else:
             replacements[record.quest_id] = replace(

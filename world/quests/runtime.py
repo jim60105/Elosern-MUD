@@ -593,52 +593,76 @@ def fulfill_record(record: QuestRecord, definition: QuestDefinition) -> QuestRec
 
 
 # ---------------------------------------------------------------------------
-# Completion observers (title-system change G trigger seam).
+# Completion receipts and the owner dispatch seam (title-system change G).
 # ---------------------------------------------------------------------------
-# The three quest-log writers (DEFEAT planner, acquisition observer, room
-# observation) all converge on ``fulfill_record``; ``fulfill_record_for`` is
-# the entity-aware wrapper that fires the registered observers exactly when a
-# transition lands on COMPLETED. Observers are scheduling seams only: they
-# must defer side effects through ``transaction.on_commit`` and an exception
-# they raise is isolated and logged — a broken observer can never change
-# quest settlement (the deterministic game stays fully playable offline).
+# Completion PLANNING is pure: ``fulfill_record`` is transition math with no
+# observer side effect, so an inventory, delivery, arrival, or action plan that
+# predicts a completion and is then discarded or rejected produces no fact, no
+# notification and no nomination request. The quest-transition writers in
+# ``world.quests.transitions`` own the notification instead: they finalize the
+# immutable completion fact from the authoritative pre-completion bindings and
+# only then dispatch the registered observers through ``transaction.on_commit``
+# of the enclosing owner transaction, so a rollback discards every pending
+# notification. An exception an observer raises is isolated and logged — a
+# broken observer can never change quest settlement (the deterministic game
+# stays fully playable offline).
 
-_QUEST_COMPLETION_OBSERVERS: list[Callable[[Any, QuestRecord, QuestDefinition], None]] = []
+
+@dataclass(frozen=True)
+class QuestCompletionReceipt:
+    """The detached, immutable evidence handed to a completion observer.
+
+    ``source_id`` is the canonical durable occurrence identity the owner
+    committed (never rebuilt downstream), ``objective`` is the finalized
+    ``completed_objective`` payload of that fact (including the satisfied
+    stage, its destination and the bound identities with their readable
+    roles), and ``awards`` is the award result envelope committed with it.
+    ``actor`` names the owning player so an observer can schedule its own
+    post-commit work without re-resolving one.
+    """
+
+    source_id: str
+    actor: Any
+    actor_id: int
+    quest_id: str
+    definition_key: str
+    issuer_key: str
+    objective: dict[str, Any]
+    awards: tuple[Any, ...]
+    result: str = "completed"
+
+
+_QUEST_COMPLETION_OBSERVERS: list[Callable[[QuestCompletionReceipt], None]] = []
 
 
 def register_quest_completion_observer(
-    observer: Callable[[Any, QuestRecord, QuestDefinition], None],
+    observer: Callable[[QuestCompletionReceipt], None],
 ) -> None:
     """Idempotently install one quest-completion observer."""
     if observer not in _QUEST_COMPLETION_OBSERVERS:
         _QUEST_COMPLETION_OBSERVERS.append(observer)
 
 
-def _notify_quest_completion(
-    entity: Any, record: QuestRecord, definition: QuestDefinition
-) -> None:
+def dispatch_quest_completion(receipt: QuestCompletionReceipt) -> None:
+    """Dispatch one committed completion receipt to every registered observer.
+
+    The quest-transition writer calls this only from an outer
+    ``transaction.on_commit`` callback registered after the completion fact is
+    finalized; observers are scheduling seams that own their own further
+    deferral. Per-observer isolation is the contract.
+    """
     for observer in tuple(_QUEST_COMPLETION_OBSERVERS):
         try:
-            observer(entity, record, definition)
+            observer(receipt)
         except Exception as error:  # noqa: BLE001 - isolation is the contract
             log_warn(
                 "quest_observer_failed",
                 context={
-                    "char": str(getattr(entity, "pk", None)),
+                    "char": str(receipt.actor_id),
                     "observer": type(observer).__qualname__,
                 },
                 exc=error,
             )
-
-
-def fulfill_record_for(
-    entity: Any, record: QuestRecord, definition: QuestDefinition
-) -> QuestRecord:
-    """``fulfill_record`` plus the COMPLETED-transition observer dispatch."""
-    result = fulfill_record(record, definition)
-    if result.state is QuestState.COMPLETED:
-        _notify_quest_completion(entity, result, definition)
-    return result
 
 
 def definition_for(record: QuestRecord) -> QuestDefinition:

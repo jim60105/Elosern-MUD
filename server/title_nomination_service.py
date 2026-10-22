@@ -352,13 +352,25 @@ def _watchers(entity: Any) -> tuple:
         return ()
 
 
-def _on_quest_completion(entity: Any, record: Any, definition: Any) -> None:
-    """Quest-completion observer: schedule only after the settlement commits."""
-    del definition
-    quest_id = getattr(record, "quest_id", "") or ""
-    actor_pk = getattr(entity, "pk", "") or ""
-    source_id = f"quest:{quest_id}:completion:{actor_pk}" if quest_id and actor_pk else None
-    _schedule_after_commit(entity, source_id=source_id, trigger="quest_completion")
+def _on_quest_completion(receipt: Any) -> None:
+    """Quest-completion observer: admit the owner's committed completion.
+
+    The quest-transition writer dispatches this only after the enclosing owner
+    transaction committed and only for a fact it just finalized, so the
+    notification carries the canonical ``source_id`` and the committed award
+    envelope: the service never rebuilds either. The occurrence identity
+    reuses that same ``source_id``, so delivering one completion receipt twice
+    admits at most one attempt within this server process (the occurrence set
+    is intentionally process-local; durable replay suppression belongs to the
+    fact writer, which refuses to re-notify an existing source id).
+    """
+    _schedule_after_commit(
+        receipt.actor,
+        source_id=receipt.source_id,
+        award_results=receipt.awards,
+        occurrence_id=receipt.source_id,
+        trigger="quest_completion",
+    )
 
 
 def _schedule_after_commit(
@@ -433,7 +445,8 @@ def register_nomination_triggers() -> None:
     Called from ``at_server_start`` through a boot-tolerant wrapper. The
     logout and wake triggers call :func:`schedule_epithet_nomination` /
     :func:`notify_wake_transition` directly after commit;
-    this function wires the settlement-embedded quest-completion rest point.
+    this function wires the quest-transition owner's committed
+    quest-completion rest point (never the pure planners).
     """
     global _TRIGGERS_REGISTERED
     if _TRIGGERS_REGISTERED:

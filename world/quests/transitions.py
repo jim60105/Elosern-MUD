@@ -227,16 +227,34 @@ def _apply_pin_operations(
             room.db.pin_reasons = reasons
 
 
+#: Upper bound on one readable identity label copied into completion evidence.
+_IDENTITY_LABEL_LIMIT = 64
+
+
+def _enum_value(value: Any) -> str:
+    return value.value if hasattr(value, "value") else str(value)
+
+
+def _serialize_destination(destination: Any) -> dict[str, Any] | None:
+    """Serialize a QuestObjective's RoomLocator into a JSON-safe payload."""
+    if destination is None:
+        return None
+    payload: dict[str, Any] = {"kind": _enum_value(destination.kind)}
+    anchor_key = getattr(destination, "anchor_key", None)
+    if anchor_key is not None:
+        payload["anchor_key"] = str(anchor_key)
+    xyz = getattr(destination, "xyz", None)
+    if xyz is not None:
+        payload["xyz"] = [int(xyz[0]), int(xyz[1]), str(xyz[2])]
+    return payload
+
+
 def _serialize_objective(objective: Any) -> dict[str, Any]:
     """Serialize a QuestObjective into a JSON-safe fact payload."""
     if objective is None:
         return {}
     payload: dict[str, Any] = {
-        "kind": (
-            objective.kind.value
-            if hasattr(objective.kind, "value")
-            else str(objective.kind)
-        ),
+        "kind": _enum_value(objective.kind),
         "quantity": int(getattr(objective, "quantity", 1)),
     }
     for field in (
@@ -251,42 +269,167 @@ def _serialize_objective(objective: Any) -> dict[str, Any]:
             payload[field] = val
     if getattr(objective, "countable_variant_keys", None):
         payload["countable_variant_keys"] = list(objective.countable_variant_keys)
+    if getattr(objective, "requires_bound_targets", False):
+        payload["requires_bound_targets"] = True
+    destination = _serialize_destination(getattr(objective, "destination", None))
+    if destination is not None:
+        payload["destination"] = destination
+    if getattr(objective, "protected_role_refs", ()):
+        payload["protected_role_refs"] = list(objective.protected_role_refs)
+    if getattr(objective, "meeting_role_refs", ()):
+        payload["meeting_role_refs"] = list(objective.meeting_role_refs)
+    relation = getattr(objective, "relation", None)
+    if relation is not None:
+        payload["relation"] = [str(part) for part in relation]
     if getattr(objective, "completion", None) is not None:
-        payload["completion"] = (
-            objective.completion.value
-            if hasattr(objective.completion, "value")
-            else str(objective.completion)
+        payload["completion"] = _enum_value(objective.completion)
+    return payload
+
+
+def _identity_labels(identities: Iterable[int]) -> dict[int, str]:
+    """Return one readable label per still-existing identity, in one query."""
+    unique = tuple(dict.fromkeys(int(value) for value in identities))
+    if not unique:
+        return {}
+    rows = ObjectDB.objects.filter(pk__in=unique).values_list("id", "db_key")
+    return {
+        int(pk): str(key or "")[:_IDENTITY_LABEL_LIMIT] for pk, key in rows
+    }
+
+
+def _target_role(objective: Any) -> str:
+    """The readable role a plain ``objective_target_ids`` binding carries."""
+    from .definitions import ObjectiveKind
+
+    if getattr(objective, "kind", None) is ObjectiveKind.DELIVER:
+        return "recipient"
+    return "target"
+
+
+def _bound_identities(source: Any, objective: Any) -> list[dict[str, Any]]:
+    """The satisfied objective's bound identities with readable roles.
+
+    ``source`` is the authoritative pre-completion record, so the retained
+    protected role bindings and the declared meeting roles resolve to the
+    exact identities the objective bound before the terminal transition
+    cleared them. A declared meeting role resolves through the published
+    package's role binding — the same lookup the rendezvous predicate used.
+    Exact ``(role, identity)`` pairs appear once; one identity may carry
+    several distinct roles (a protected escortee that a rendezvous meets).
+    """
+    from .scene_store import get_role_binding
+
+    pairs: list[tuple[str, int]] = [
+        (_target_role(objective), int(identity))
+        for identity in source.objective_target_ids
+    ]
+    if source.protected_roles:
+        pairs.extend(
+            (str(role), int(identity)) for role, identity in source.protected_roles
         )
+    else:
+        pairs.extend(("protected", int(identity)) for identity in source.protected_entity_ids)
+    package_id = getattr(source, "package_id", None)
+    if package_id:
+        for role in objective.meeting_role_refs:
+            binding = get_role_binding(package_id, role)
+            if binding is not None:
+                pairs.append((f"meeting:{role}", int(binding.npc_id)))
+    pairs = list(dict.fromkeys(pairs))
+    labels = _identity_labels(identity for _, identity in pairs)
+    return [
+        {"role": role, "identity": identity, "label": labels.get(identity, "")}
+        for role, identity in pairs
+    ]
+
+
+def _pre_completion_records(entries: Iterable[Any]) -> dict[str, Any]:
+    """Map each stored quest id to its strictly parsed pre-completion record.
+
+    The completion diff (``just_completed_records``) rejects the whole
+    boundary on any entry the strict reader would refuse, so every entry here
+    has already been proven parseable.
+    """
+    from world.quests.runtime import from_storage
+
+    return {
+        str(record.quest_id): record
+        for record in (from_storage(dict(entry)) for entry in entries or ())
+    }
+
+
+def _completion_objective_payload(record: Any, source: Any) -> dict[str, Any]:
+    """The finalized ``completed_objective`` payload of one completion fact.
+
+    A quest completes only on its final stage, so the satisfied objective is
+    the definition's last stage no matter how many intermediate stages one
+    automatic chain advanced inside this boundary. The runtime bindings come
+    from ``source`` — the pre-completion record — and only when it still names
+    that same stage; an objective with no bindings therefore degrades to the
+    terminal record's (already empty) binding set instead of borrowing a
+    previous stage's.
+    """
+    from world.quests.runtime import definition_for
+
+    definition = definition_for(record)
+    stage_index = min(int(record.stage_index), len(definition.stages) - 1)
+    objective = definition.stages[stage_index].objective
+    binding_source = (
+        source
+        if source is not None and int(source.stage_index) == stage_index
+        else record
+    )
+    payload = _serialize_objective(objective)
+    payload["stage_index"] = stage_index
+    payload["destination_room_id"] = getattr(binding_source, "stage_room_id", None)
+    payload["bound_identities"] = _bound_identities(binding_source, objective)
     return payload
 
 
 def _settle_quest_completion_events(
-    actor: Any, completed_records: Iterable[Any]
+    actor: Any,
+    old_entries: list[Any],
+    completed_records: Iterable[Any],
 ) -> None:
-    """Record durable narrative events for newly completed quests in the current transaction."""
+    """Record the completion facts and schedule the owner notification.
+
+    The immutable fact is finalized HERE, in the owner's transaction and from
+    the authoritative pre-completion entries, before the terminal bindings are
+    gone from storage. Notification is then dispatched through an outer
+    ``transaction.on_commit`` callback that supplies the canonical source
+    identity and the finalized receipt, so an inventory, delivery, arrival or
+    action plan that predicted the completion but never wrote it notifies
+    nothing, a rollback discards every pending notification, and an unchanged
+    terminal replacement or replayed completion (``created`` is ``False``)
+    schedules no second attempt.
+    """
     completed = list(completed_records)
     if not completed:
         return
-    from world.quests.runtime import definition_for
+    from world.quests.runtime import (
+        QuestCompletionReceipt,
+        dispatch_quest_completion,
+    )
     from world.rules.clock import get_world_clock
     from world.narrative.events import get_committed_award_results, record_narrative_event
 
     current_tick = get_world_clock().tick
     location_str = str(getattr(getattr(actor, "location", None), "pk", "") or "")
+    before = _pre_completion_records(old_entries)
     for record in completed:
-        definition = definition_for(record)
-        stage_idx = min(record.stage_index, len(definition.stages) - 1)
-        objective = definition.stages[stage_idx].objective
+        objective_payload = _completion_objective_payload(
+            record, before.get(str(record.quest_id))
+        )
         source_id = f"quest:{record.quest_id}:completion:{actor.pk}"
-        committed_awards = get_committed_award_results(source_id)
+        committed_awards = get_committed_award_results(source_id) or ()
 
-        record_narrative_event(
+        _event, _progress, created = record_narrative_event(
             source_id=source_id,
             event_type="quest_completion",
             content={
                 "quest_id": str(record.quest_id),
                 "definition_key": str(record.definition_key),
-                "completed_objective": _serialize_objective(objective),
+                "completed_objective": objective_payload,
                 "outcome": "completed",
             },
             participants=[str(actor.pk)],
@@ -294,7 +437,24 @@ def _settle_quest_completion_events(
             tick=current_tick,
             visibility="public",
             salience=1,
-            award_results=committed_awards or (),
+            award_results=committed_awards,
+        )
+        if not created:
+            # The fact already exists: this is an unchanged terminal
+            # replacement or a replay, and neither may admit another attempt.
+            continue
+        receipt = QuestCompletionReceipt(
+            source_id=source_id,
+            actor=actor,
+            actor_id=int(actor.pk),
+            quest_id=str(record.quest_id),
+            definition_key=str(record.definition_key),
+            issuer_key=str(record.issuer_key),
+            objective=dict(objective_payload),
+            awards=tuple(committed_awards),
+        )
+        transaction.on_commit(
+            lambda receipt=receipt: dispatch_quest_completion(receipt)
         )
 
 
@@ -351,14 +511,14 @@ def _replace_quest_log(
     old_entries = list(actor.db.quest_log or [])
     plan = plan_auto_settlement_chain(actor, old_entries, new_records)
     completing = just_completed_records(old_entries, new_records)
+    pre_chain_entries = [to_storage(record) for record in new_records]
     chain_completing = (
         just_completed_records(
-            [to_storage(r) for r in new_records], list(plan.chain_records)
+            pre_chain_entries, list(plan.chain_records)
         )
         if plan.chain_records is not None
         else []
     )
-    all_completing = [*completing, *chain_completing]
     actor_snapshot = snapshot_quest_log(actor)
     room_snapshots = {
         id(room): snapshot_pin_reasons(room) for room, _, _ in pin_operations
@@ -380,7 +540,10 @@ def _replace_quest_log(
                     to_storage(record) for record in plan.chain_records
                 ]
                 _apply_pin_operations(plan.chain_pins)
-            _settle_quest_completion_events(actor, all_completing)
+            _settle_quest_completion_events(actor, old_entries, completing)
+            _settle_quest_completion_events(
+                actor, pre_chain_entries, chain_completing
+            )
     except Exception:
         restore_quest_log(actor, actor_snapshot)
         for room, _, _ in pin_operations:
@@ -418,7 +581,9 @@ def apply_quest_log_delta(
     ``guild_reward_claims``, and a raise from this function must abort the
     whole surrounding operation. The ACQUIRE completions the paid items
     trigger release stage pins on rooms the caller cannot know; those rooms
-    are snapshotted and restored here.
+    are snapshotted and restored here. Completion notification follows the
+    same rule: it is registered on the caller's transaction, so the caller's
+    atomic block is what makes the notification a post-commit effect.
     """
     from world.quests.settlement import (
         commit_auto_settlement,
@@ -430,14 +595,14 @@ def apply_quest_log_delta(
     old_entries = list(actor.db.quest_log or [])
     plan = plan_auto_settlement_chain(actor, old_entries, new_records)
     completing = just_completed_records(old_entries, new_records)
+    pre_chain_entries = [to_storage(record) for record in new_records]
     chain_completing = (
         just_completed_records(
-            [to_storage(r) for r in new_records], list(plan.chain_records)
+            pre_chain_entries, list(plan.chain_records)
         )
         if plan.chain_records is not None
         else []
     )
-    all_completing = [*completing, *chain_completing]
     settlement_pin_snapshots = [
         (room, snapshot_pin_reasons(room)) for room, _, _ in plan.chain_pins
     ]
@@ -450,7 +615,8 @@ def apply_quest_log_delta(
                 to_storage(record) for record in plan.chain_records
             ]
             _apply_pin_operations(plan.chain_pins)
-        _settle_quest_completion_events(actor, all_completing)
+        _settle_quest_completion_events(actor, old_entries, completing)
+        _settle_quest_completion_events(actor, pre_chain_entries, chain_completing)
     except Exception:
         for room, snapshot in settlement_pin_snapshots:
             restore_pin_reasons(room, snapshot)
@@ -478,7 +644,10 @@ def pending_effects_for_transition(
     atomically with the originating action's own effects (D-4/D-6). The
     settlement's ACQUIRE chain is folded into the quest-log and pin effects
     at planning time, so the resolver writes the final record state exactly
-    once.
+    once. Nothing is notified at planning time: a discarded or rejected plan
+    leaves no trace, and the effects finalize the completion fact and register
+    its notification only when the resolver applies them inside its own
+    atomic block.
     """
     from world.quests.settlement import (
         just_completed_records,
@@ -501,7 +670,7 @@ def pending_effects_for_transition(
         old_entries = list(actor.db.quest_log or [])
         completing = just_completed_records(old_entries, records)
         actor.db.quest_log = [to_storage(record) for record in records]
-        _settle_quest_completion_events(actor, completing)
+        _settle_quest_completion_events(actor, old_entries, completing)
         _schedule_transition_events(actor, old_entries, records)
 
     effects: list[Any] = [
