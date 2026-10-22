@@ -60,3 +60,36 @@ Uniform projection SHALL return dots with 20-unit spacing anchored to integer wo
 #### Scenario: Compressed rings use real distances
 - **WHEN** a compressed projection is generated
 - **THEN** a bounded readable set of positive distances, such as 100 m, 300 m and 1 km when in range, receives radii from the same mapping and distance labels; no uniform dot field is returned.
+
+## MODIFIED Requirements
+
+### Requirement: The wilderness payload legend states the cell scale from the provider constant
+The wilderness presenter SHALL append one localized cell-scale note after the four visibility labels, deriving its value at build time from the owning provider constant. No consumer SHALL duplicate legend generation or its conversion. The island projection SHALL convert existing one-kilometre wilderness cell deltas to metres under that fixed coordinate-frame contract without parsing the localized legend or changing payload coordinates.
+
+#### Scenario: The scale note is the fifth entry
+- **WHEN** the scale note is appended
+- **THEN** the four state labels SHALL keep their existing order and positions, so the scale note is the fifth entry
+
+#### Scenario: Other layers keep their legend exactly as before
+- **WHEN** payloads for the `grid`, `instance`, and `interior` layers are built
+- **THEN** they SHALL keep their legend exactly as before (the four state labels)
+
+#### Scenario: The extended legend stays inside the existing bounds
+- **WHEN** the extended legend is validated
+- **THEN** it SHALL remain within the existing bounds (at most 16 entries, 256 code points each) and SHALL pass both validators unchanged; no payload schema field is added or altered
+
+#### Scenario: The constant is read from its owning module
+- **WHEN** the presenter assembles the legend
+- **THEN** it SHALL read the constant as an attribute of its owning module at legend-assembly time, never a value imported into the presenter's own namespace, so patching the provider module attribute is observed by the presenter
+
+#### Scenario: A wilderness payload legend carries the scale note
+- **WHEN** the `local_map` presenter builds an available payload for a `TerrainRoom`
+- **THEN** the legend is the four state labels followed by one entry whose text contains the string form of `WILDERNESS_KM_PER_CELL`, and the payload passes the exact Python validator
+
+#### Scenario: Non-wilderness layers are untouched
+- **WHEN** the presenter builds available payloads for grid, instance, and interior rooms
+- **THEN** each legend equals the four state labels exactly, with no scale note
+
+#### Scenario: The scale note follows the single constant
+- **WHEN** a test patches `world.maps.wilderness_provider.WILDERNESS_KM_PER_CELL` to a different integer and rebuilds a wilderness payload
+- **THEN** the scale note's kilometre figure equals the patched value, proving the note is derived from the provider constant rather than a duplicated literal

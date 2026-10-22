@@ -24,11 +24,17 @@ Resolve similar-radius overlaps symmetrically around the circular mean bearing, 
 
 Zero distances require an explicit finite policy. The previous level for an over-capacity compressed result is the coarsest ladder level, so the next call remains valid; mode still selects compression when required. Context-only mapping uses the same positive-distance policy with context as the scale candidates. Label fitting remains renderer-owned and never changes canonical coordinates.
 
+The modified wilderness-legend requirement narrowly permits this projection-only unit conversion while preserving provider-derived legend generation and its patchability tests. It does not create a configurable client geography scale, duplicate localized note construction or expand the node payload.
+
 ## Focused evidence
 
 Add `web/webclient-app/tests/minimap_projection.test.js` and run only `pnpm exec vitest run web/webclient-app/tests/minimap_projection.test.js`. Cases cover all constants, worked examples, strict threshold boundaries, previous-level keep/reset, zero/no-exit/context-only/equal-distance inputs, exact bearings, monotonic mapping, bounded spreading, cross-layer exclusion and stub action identity, map-key reset through the caller helper, dot anchors under movement and readable rings. Reuse an existing Python evidence module for a single executed-file wrapper and real traceability annotations. Use agent-browser to inspect retained `World/LocalMap` stories as unchanged-renderer controls; this pure slice must not claim the visual auto-scale cutover is already wired.
 
 ## Verification workflow (required during implementation)
+
+### Traceability gate ordering
+
+Existing-title IDs can use the normal live-tree gates. When implementation adds IDs absent from unsynchronized main specs, use a complete disposable directory snapshot of the current implementation, manifests and tooling with predecessor/current deltas applied to its equivalent main-spec tree. This is an ordinary copy, not a branch or registered git worktree. Obtain IDs with `uv run --locked python -m tools.spec_traceability --repo-root <equivalent-root> list`, then run `check` with the same root. Run the complete gate using the copied script, `uv run --locked python <equivalent-root>/tools/contract_gate.py`, so its file-derived root and subprocess working directories select that snapshot. Retain the implementation annotations unchanged. After the authorized archive step synchronizes the real main specs, repeat ordinary live-tree `tools.spec_traceability check` and `tools.contract_gate`. All task references to those gates follow this phase-aware sequence; listing IDs in the snapshot alone is insufficient, and an unsynchronized live-tree unknown-ID failure must never be suppressed.
 
 Use `World/LocalMap` as the production component showcase and retain `Overlays/MapOverlay` plus the instance/interior stories as unchanged-surface controls. No `Design/...` prototype is needed for this approved algorithmic change; if an existing relevant Design story is used for token/chrome comparison, it cannot replace a production-component story or the real client.
 

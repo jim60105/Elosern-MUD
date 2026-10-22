@@ -4,7 +4,7 @@ Estimated effort: 7.5 hours for the implementing worker, including every require
 
 ## 1. Pure projection and scale policy (2 hours)
 
-- [ ] 1.1 Implement the complete minimap_projection.js input/output contract with central constants, correct grid/wilderness metre normalization, tier classification and cross-layer exclusion/stub descriptors. Preserve overlay cellSize and graph paths.
+- [ ] 1.1 Implement the complete minimap_projection.js input/output contract with central constants, correct grid/wilderness metre normalization, tier classification and cross-layer exclusion/stub descriptors. Preserve overlay cellSize and graph paths. Apply the narrow wilderness-legend contract amendment, retaining provider-derived note construction and its focused patchability test.
 - [ ] 1.2 Implement fitting-level selection, hysteresis, same-map caller reset helper, strict compression thresholds, logarithmic/inner-linear/equal-distance mappings and finite zero/no-exit defaults.
 
 ## 2. Geometry and focused evidence (2 hours)
