@@ -25,7 +25,22 @@ def _inventory(target, key, quantity, *, removing):
     from world.quests.transitions import snapshot_pin_reasons, restore_pin_reasons
     from world.quests.settlement import plan_auto_settlement_chain
 
-    surfaces = snapshot_attributes(entity, ("inventory", "equipment", "buffs", "wallet", "guild_reward_claims", "quest_log"))
+    # The nested plan can settle a completion (and bank its quest-completed
+    # titles) before the fallible mirror write; the outer handler is the only
+    # place those caches can be restored.
+    surfaces = snapshot_attributes(
+        entity,
+        (
+            "inventory",
+            "equipment",
+            "buffs",
+            "wallet",
+            "guild_reward_claims",
+            "quest_log",
+            "title_collection",
+            "title_equipped",
+        ),
+    )
     traits = snapshot_traits(entity)
     mirrors = [(obj, obj.pk) for obj in entity.contents if equipment.registry_key_for_object(obj) == key][:quantity] if removing else []
     created = []

@@ -173,12 +173,18 @@ def apply_inventory_plan(plan: InventoryPlan) -> None:
     The snapshot set covers ``wallet`` and ``guild_reward_claims`` alongside
     the plan's own surfaces: a completing record under an ``AUTO`` issuance
     settles inside the nested quest-log delta (quest-auto-settlement caller
-    contract), so a failure restores the settlement's payout too.
+    contract), so a failure restores the settlement's payout too. For the same
+    reason it covers ``title_collection`` and ``title_equipped``: that
+    settlement also banks the completion's quest-completed fixed titles.
     """
     entity = plan.entity
     inventory_snapshot = attribute_snapshot(entity, "inventory")
     wallet_snapshot = attribute_snapshot(entity, "wallet")
     claims_snapshot = attribute_snapshot(entity, "guild_reward_claims")
+    title_snapshots = [
+        (key, attribute_snapshot(entity, key))
+        for key in ("title_collection", "title_equipped")
+    ]
     trait_snapshot = snapshot_traits(entity)
     quest_snapshot = attribute_snapshot(entity, "quest_log")
     pin_snapshots = {}
@@ -197,6 +203,8 @@ def apply_inventory_plan(plan: InventoryPlan) -> None:
         restore_attribute_best_effort(entity, "inventory", inventory_snapshot)
         restore_attribute_best_effort(entity, "wallet", wallet_snapshot)
         restore_attribute_best_effort(entity, "guild_reward_claims", claims_snapshot)
+        for key, snapshot in title_snapshots:
+            restore_attribute_best_effort(entity, key, snapshot)
         restore_traits(entity, trait_snapshot)
         restore_attribute_best_effort(entity, "quest_log", quest_snapshot)
         from world.quests.transitions import restore_pin_reasons

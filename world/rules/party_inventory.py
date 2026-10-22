@@ -95,8 +95,17 @@ TRANSFER_MESSAGES: dict[str, str] = {
     REASON_INVALID_QUANTITY: "數量不正確。",
 }
 
-#: The four inventory-bearing surfaces ``CmdGive`` snapshots around a transfer.
-_SURFACE_KEYS = ("inventory", "quest_log", "wallet", "guild_reward_claims")
+#: The inventory-bearing surfaces ``CmdGive`` snapshots around a transfer. The
+#: title surfaces are here because a nested ACQUIRE settlement banks that
+#: completion's quest-completed fixed titles inside this transfer's transaction.
+_SURFACE_KEYS = (
+    "inventory",
+    "quest_log",
+    "wallet",
+    "guild_reward_claims",
+    "title_collection",
+    "title_equipped",
+)
 
 
 class PartyTransferError(RuntimeError):

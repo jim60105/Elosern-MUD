@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Iterable, Literal
 
 from world.lore.guild import GUILD_RANK_REGISTRY
-from world.lore.titles import FIXED_TITLE_REGISTRY, STARTER_EPITHET
+from world.lore.titles import FIXED_TITLE_REGISTRY, STARTER_EPITHET, TitlePredicateFamily
 from world.rules.clock import get_world_clock
 from world.rules.titles.state import (
     _EPITHET_KIND,
@@ -176,3 +176,60 @@ def award_first_quest_epithet(
         title_id=STARTER_EPITHET.display,
         tick=tick,
     )
+
+
+def settle_quest_completion_awards(
+    entity: Any,
+    *,
+    source_id: str,
+    completed_quest_keys: Iterable[str],
+    tick: int | None = None,
+) -> tuple[AutomaticTitleAward, ...]:
+    """Bank every quest-completed fixed title one completion newly earns.
+
+    The completing quest owner calls this after it applied the new quest state
+    and before it writes the immutable completion fact, so every grant is
+    finalized under the completion occurrence's own ``source_id`` and its
+    results ride that fact's award envelope. Only registry rows whose predicate
+    is the ``quest_completed`` family for one of ``completed_quest_keys`` are
+    considered, and the existing pure evaluator stays authoritative for
+    whether a row is satisfied. Collection membership short-circuits re-grants,
+    so a later occurrence that merely encounters an already owned title
+    contributes no result. Malformed foreign state skips only its own row,
+    mirroring the action-time planner: a title lookup never aborts gameplay.
+    """
+    from world.rules.titles.planner import predicate_satisfied
+
+    quest_keys = {str(key) for key in completed_quest_keys}
+    if not quest_keys:
+        return ()
+    current_tick = get_world_clock().tick if tick is None else int(tick)
+    awards: list[AutomaticTitleAward] = []
+    for definition in FIXED_TITLE_REGISTRY.values():
+        predicate = definition.predicate
+        if predicate.family is not TitlePredicateFamily.QUEST_COMPLETED:
+            continue
+        if str(predicate.quest_key) not in quest_keys:
+            continue
+        try:
+            satisfied = predicate_satisfied(entity, None, predicate)
+        except (TitleDataError, AttributeError, TypeError, ValueError):
+            continue
+        if not satisfied:
+            continue
+        try:
+            award, _note = award_automatic_title(
+                entity,
+                source_id=source_id,
+                kind=_FIXED_KIND,
+                title_id=definition.key,
+                tick=current_tick,
+            )
+        except TitleDataError:
+            # Malformed title storage stays fail-closed for the grant only: a
+            # corrupted collection must never reject an otherwise valid
+            # completion (the strict readers still guard every title surface).
+            continue
+        if award is not None:
+            awards.append(award)
+    return tuple(awards)

@@ -425,7 +425,19 @@ def enroll(actor: Any, host: Any) -> dict[str, Any]:
     # behind a committed DB rollback. Snapshot every surface this transaction
     # touches and restore them best-effort on failure — the same discipline
     # ``turn_in_quest`` and ``apply_inventory_plan`` already follow.
-    snapshots = snapshot_attributes(actor, ("church", "skills", "inventory"))
+    # The vestment grant goes through the inventory plan, which can settle a
+    # completing ACQUIRE quest and bank its quest-completed fixed titles inside
+    # this enrollment transaction.
+    snapshots = snapshot_attributes(
+        actor,
+        (
+            "church",
+            "skills",
+            "inventory",
+            "title_collection",
+            "title_equipped",
+        ),
+    )
     try:
         with transaction.atomic():
 

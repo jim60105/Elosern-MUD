@@ -68,6 +68,11 @@ _TRAVERSER_SURFACES: tuple[str, ...] = (
     "wallet",
     "inventory",
     "guild_reward_claims",
+    # The arrival observation's replacement writer also settles the
+    # completion's quest-completed fixed titles; a later movement failure must
+    # return those caches with every other surface.
+    "title_collection",
+    "title_equipped",
 )
 
 
