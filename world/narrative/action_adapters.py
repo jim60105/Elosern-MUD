@@ -942,7 +942,11 @@ def record_action_settlement_evidence(
                         if field in applied:
                             merged[field] = applied[field]
                     committed = _settled_effect_record(
-                        kind, actor_pk, eff_pk, eff_name, merged
+                        kind,
+                        actor_pk,
+                        eff_pk,
+                        eff_name,
+                        _validated_settled_result(kind, merged, source=source),
                     )
                     effects_data.append(committed)
                     if committed["result"] != result:

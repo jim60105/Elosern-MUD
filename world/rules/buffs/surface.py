@@ -549,6 +549,13 @@ def _handle_cleanse(
         if not debuffs:
             continue
         keys = tuple(buff.buffkey for buff in debuffs)
+        applied: dict[str, Any] = {}
+
+        def apply_cleanse(
+            target: Any = target, applied: dict[str, Any] = applied
+        ) -> None:
+            applied["count"] = int(remove_by_selector(target, "negative"))
+
         pending.append(
             PendingEffect(
                 entity=target,
@@ -559,7 +566,8 @@ def _handle_cleanse(
                 # the shared selector keeps the cleanse effect and every
                 # other debuff-clearing caller on one removal (delta trace
                 # scenario) instead of replaying a snapshot key tuple.
-                apply=lambda target=target: remove_by_selector(target, "negative"),
+                apply=apply_cleanse,
+                applied=applied,
             )
         )
     return pending

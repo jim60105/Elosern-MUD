@@ -1019,9 +1019,12 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
 
         rows = [row for row in self._effect_rows(self._action_evidence().content)
                 if row["kind"] == "buffs_cleansed"]
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["target_id"], str(self.target.pk))
-        self.assertEqual(rows[0]["result"], {"count": 1})
+        # Each cleanse component states the removals its own application made:
+        # the second finds nothing left and can never repeat the first's count.
+        self.assertEqual([row["target_id"] for row in rows], [str(self.target.pk)] * 2)
+        self.assertEqual(
+            [row["result"]["count"] for row in rows], [1, 0]
+        )
 
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"

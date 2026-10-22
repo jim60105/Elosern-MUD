@@ -52,7 +52,7 @@ def _handle_gauge_transfer(
         actual_drained_box = [0]
 
         for target in targets:
-            applied: dict[str, Any] = {}
+            applied: dict[str, Any] = {"amount": 0}
 
             def apply_target_drain(
                 target: Any = target, applied: dict[str, Any] = applied
@@ -179,7 +179,7 @@ def _handle_gauge_transfer(
                 bonus += count * per_stack
 
         for target in targets:
-            applied_restore: dict[str, Any] = {}
+            applied_restore: dict[str, Any] = {"amount": 0}
 
             def apply_target_restore(
                 target: Any = target, applied: dict[str, Any] = applied_restore

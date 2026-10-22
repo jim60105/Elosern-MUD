@@ -12,9 +12,10 @@ extended during apply so the committed-result requirement can be met without
 inference — `world/rules/action/contracts.py` (the staged effect carries the
 result its own `apply` observed), `world/rules/action/effects/sexual.py`,
 `world/rules/action/effects/gauge_transfer.py`,
-`world/rules/combat/healing.py` (each apply reports what it committed) and
-`world/rules/buffs/surface.py` (read-only storage accessor the pre-settlement
-snapshot uses). No other file is touched.
+`world/rules/combat/healing.py` (each apply reports what it committed),
+`world/rules/buffs/surface.py` (the cleanse handler reports the removal count its
+own application made, and the pre-settlement snapshot reads buff keys through
+the read-only storage accessor). No other file is touched.
 
 ## Goals / Non-Goals
 
