@@ -24,10 +24,11 @@ Touches presentation protocol/coordinator, browser protocol constants/validation
 
 ## Sizing
 
-Estimated implementation effort: 6 hours, including focused tests and documentation, for a gpt-luna-level worker. §9 row 5 is split: this 6h measurement/transport slice precedes the 8h world presenter/narrative slice; the combined work exceeds 8h. No implementation is authorized by this proposal.
+Estimated implementation effort: 6 hours, including focused tests and documentation, for a gpt-luna-level worker. §9 row 5 is split: this 6h measurement/transport slice precedes the 8h world presenter/narrative slice; the combined work exceeds 8h. The shared codec/schema work is already complete upstream, so this 6h slice allocates 2h real-data measurement, 2h transport integration and 2h focused socket/parity verification/docs. No implementation is authorized by this proposal.
 
 ## Batch:
 
+depends-on: define-map-panel-protocol
 depends-on: author-district-landmarks
 depends-on: publish-area-map-panel
 

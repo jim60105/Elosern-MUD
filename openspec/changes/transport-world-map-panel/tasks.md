@@ -5,7 +5,7 @@ Implementation budget: 6 hours total. Prerequisites are the exact `depends-on` l
 ## 1. Implement the bounded slice
 
 - [ ] 1.1 Measure representative and supported maximum payloads using final generated world geometry/roster and synthetic all-lit/trail/quest state; inspect actual frame limits and record measured UTF-8 sizes plus a finite selected bound.
-- [ ] 1.2 Implement strict world-map-only envelope and nested collection allowances in Python/JS while keeping local_map and all sibling budgets unchanged; reuse on-demand coordinator policy. If real transport proves insufficient, finish bounded epoch/revision multipart assembly in this same slice.
+- [ ] 1.2 Implement strict world-map-only envelope and nested collection allowances in Python/JS while keeping local_map and all sibling budgets unchanged; reuse on-demand coordinator policy. If real transport proves insufficient, reuse and exercise the fixed upstream bounded epoch/revision map-part codec.
 - [ ] 1.3 Document transport decision, concrete bounds and round-trip evidence in the existing protocol development documentation.
 
 ## 2. Focused behavioral verification
@@ -17,5 +17,5 @@ Implementation budget: 6 hours total. Prerequisites are the exact `depends-on` l
 ## 3. Contracts and focused handoff
 
 - [ ] 3.1 Register any new/moved Evennia package test modules in `.github/evennia-shards.json` and every new browser class/method in `.github/browser-shards.json`; use synthetic fixtures except explicitly registered production data contracts.
-- [ ] 3.2 Obtain canonical requirement IDs through `tools.spec_traceability list` on the current tree and an equivalent merged-spec tree for this delta; attach literal `covers_requirement` annotations to substantive discoverable Python unit/integration/browser tests. Run traceability check with the matching spec tree; never claim a pre-sync root pass covers new deltas.
-- [ ] 3.3 Run only the focused labels/files/classes named above, run observability lint if server logging changes, then `uv run --locked python -m tools.contract_gate` and strict validation. Record commands/results and update the existing behavior documentation; no broad suites, CI shard commands, or local full evidence verification.
+- [ ] 3.2 Copy the complete current implementation/tests/manifests/tooling into a disposable ordinary directory; merge prerequisite/current deltas into its copied main specs. Obtain canonical IDs with `tools.spec_traceability --repo-root <equivalent-root> list`, and retain literal intended `covers_requirement` annotations in implementation tests. Run `check` with that equivalent root and the copied contract gate from that directory before sync; the unsynced real-root gate is not an acceptance gate for new IDs.
+- [ ] 3.3 Run only the focused labels/files/classes named above and observability lint if logging changes; run strict validation and the equivalent-tree gate before handoff, then normal root `tools.spec_traceability check` and `tools.contract_gate` after sync. Record commands/results and existing-doc updates; no broad suites, CI shard commands or local full evidence verification.
