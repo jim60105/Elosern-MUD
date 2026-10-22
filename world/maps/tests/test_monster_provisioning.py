@@ -82,9 +82,12 @@ def _first_cell_outside(regions: frozenset[str]) -> tuple[int, int]:
         for x in range(x_min, x_max + 1):
             for y in range(y_min, y_max + 1):
                 cell = (x, y)
-                if not is_valid_wilderness_cell(cell):
+                # A search box is a bounding envelope; its corners can overlap
+                # a neighbouring region, so a candidate must actually classify
+                # into the box's own region.
+                if region_for_coordinates(*cell) != region:
                     continue
-                if region_for_coordinates(x, y) in regions:
+                if not is_valid_wilderness_cell(cell):
                     continue
                 return cell
     raise AssertionError("no walkable cell outside the requested regions")

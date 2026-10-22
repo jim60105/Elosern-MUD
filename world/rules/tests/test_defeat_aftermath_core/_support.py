@@ -25,6 +25,7 @@ from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
 )
+from world.maps.wilderness_population import CAPITAL_ENTRY_XY
 from world.rules.caravan_arrivals import register_caravan_arrivals
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.tests._guild_service_probes import (
@@ -220,11 +221,17 @@ class WildernessDefeatMixin:
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
         self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        self.assertTrue(enter_wilderness(self.player, coordinates=(60, 103), name=WILDERNESS_NAME))
+        # The capital's own entry cell, derived from the live registry: the
+        # legacy 224-cell frame literal is open ocean under the metric frame.
+        self.assertTrue(
+            enter_wilderness(
+                self.player, coordinates=CAPITAL_ENTRY_XY, name=WILDERNESS_NAME
+            )
+        )
         self.room = self.player.location
         self.monster.location = self.room
 
-    def _mark_population_monster(self, monster, coordinates=(60, 103)):
+    def _mark_population_monster(self, monster, coordinates=CAPITAL_ENTRY_XY):
         """Stamp the population marker and register the bookkeeping entry."""
         monster.db.population_key = f"wilderness:{coordinates[0]}:{coordinates[1]}"
         self.script.db.itemcoordinates[monster] = coordinates

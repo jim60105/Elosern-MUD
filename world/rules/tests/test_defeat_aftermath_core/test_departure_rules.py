@@ -106,12 +106,12 @@ class WildernessDepartureTests(WildernessDefeatMixin, DefeatAftermathBase):
         self.assertFalse(ObjectDB.objects.filter(id=saved_pk).exists())
         self.assertFalse(self._registered(self.monster))
         # The next coordinate activation respawns per the untouched model.
-        from world.maps.wilderness_population import ensure_population
+        from world.maps.wilderness_population import CAPITAL_ENTRY_XY, ensure_population
 
-        ensure_population(self.script, (60, 103))
+        ensure_population(self.script, CAPITAL_ENTRY_XY)
         monsters = [
             obj
-            for obj in self.script.get_objs_at_coordinates((60, 103))
+            for obj in self.script.get_objs_at_coordinates(CAPITAL_ENTRY_XY)
             if isinstance(obj, type(self.monster))
         ]
         self.assertEqual(len(monsters), 1)
