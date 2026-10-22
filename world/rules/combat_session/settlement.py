@@ -414,19 +414,30 @@ def settle_session(
         get_committed_award_results,
         record_narrative_event,
     )
-    from world.narrative.models import NarrativeEvent
 
     encounter_source_id = build_encounter_source_id(
         record.engagement_id or record.session_id,
         kind="terminal",
         ordinal=1,
     )
-    existing_event = NarrativeEvent.objects.filter(source_id=encounter_source_id).first()
-    if record.settled_tick is not None or existing_event is not None:
+    # The durable ``settled_tick`` marker is the only idempotency gate. The
+    # terminal fact itself is written inside this settlement's transaction and
+    # ``record_narrative_event`` is already idempotent, so an existing fact can
+    # only mean the previous attempt committed in full. A rolled-back attempt
+    # must still run the settlement body: the aftermath, the wake state, the
+    # session clear and the clock advance all rolled back with it.
+    if record.settled_tick is not None:
+        from world.narrative.models import NarrativeEvent
+
         committed_awards = get_committed_award_results(encounter_source_id)
+        existing_event = NarrativeEvent.objects.filter(
+            source_id=encounter_source_id
+        ).first()
         effective_outcome = (
-            existing_event.content.get("gameplay_outcome", existing_event.content.get("outcome", outcome))
-            if existing_event
+            existing_event.content.get(
+                "gameplay_outcome", existing_event.content.get("outcome", outcome)
+            )
+            if existing_event is not None
             else outcome
         )
         res = {
