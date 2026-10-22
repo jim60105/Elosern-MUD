@@ -930,17 +930,11 @@ def forfeit(actor: Any) -> dict[str, Any]:
     return _settle_with_restore(actor, record, battlefield, outcome)
 
 
-def _raw_participant_ids(raw: Any) -> tuple[int, ...]:
-    """Read the raw payload's participant dbrefs without trusting its shape."""
-    ids: list[int] = []
-    for field in ("player_ids", "enemy_ids"):
-        values = raw.get(field)
-        if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
-            continue
-        for value in values:
-            if isinstance(value, int) and not isinstance(value, bool):
-                ids.append(value)
-    return tuple(ids)
+#: Durable host-release obligation left behind when an examination's malformed
+#: session is retired but its persistent host could not be released yet. It
+#: names the authoritative identities, never the corrupt payload, so the next
+#: recovery can finish the release without any surviving session record.
+_EXAM_RELEASE_ATTR = "combat_exam_release_pending"
 
 
 def _raw_hint(raw: Any, field: str) -> str | None:
@@ -949,20 +943,12 @@ def _raw_hint(raw: Any, field: str) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _unidentified_exam_record(actor: Any, raw: Any) -> Any | None:
-    """Resolve the authoritative examination a malformed session belonged to.
-
-    The candidate's own persisted examination history is the authority: the raw
-    payload is corrupt by definition here (it lost its occurrence identity), so
-    its ``exam_id``/``session_id`` only corroborate which of the candidate's
-    ACTIVE examinations to retire. When the hints name none, the single ACTIVE
-    examination the duplicate rule permits is retired. Anything ambiguous is
-    left untouched and reported, never guessed.
-    """
-    from world.rules.guild_exams import ExamState, GuildExamError, _read_exams
+def _read_exam_records(actor: Any) -> list[Any] | None:
+    """Read the candidate's persisted examination history, or ``None``."""
+    from world.rules.guild_exams import GuildExamError, _read_exams
 
     try:
-        records = _read_exams(actor)
+        return list(_read_exams(actor))
     except GuildExamError as error:
         log_warn(
             "guild_exam_unidentified_history_unreadable",
@@ -970,33 +956,124 @@ def _unidentified_exam_record(actor: Any, raw: Any) -> Any | None:
             context={"char": str(actor.pk)},
         )
         return None
+
+
+def _unidentified_exam_record(actor: Any, raw: Any) -> tuple[Any | None, bool]:
+    """Resolve the authoritative examination a malformed session belonged to.
+
+    Returns ``(record, resolved)``. The candidate's own persisted history is
+    the authority; the corrupt payload's ``exam_id``/``session_id`` only choose
+    between ACTIVE examinations. A hinted ACTIVE record wins, then the single
+    ACTIVE record the duplicate rule permits. Anything else leaves
+    ``resolved`` false: the caller must not clear the payload on ambiguity,
+    because an ACTIVE examination may still own a host.
+    """
+    from world.rules.guild_exams import ExamState
+
+    records = _read_exam_records(actor)
+    if records is None:
+        return None, True
+    active = [record for record in records if record.state is ExamState.ACTIVE]
+    if not active:
+        return None, True
     exam_hint = _raw_hint(raw, "exam_id")
     session_hint = _raw_hint(raw, "session_id")
-    # A hinted record is authoritative whatever its state: a retry after a
-    # failed host release finds the examination already FAILED and still names
-    # the host that examination owns.
     named = [
         record
-        for record in records
+        for record in active
         if (exam_hint is not None and record.exam_id == exam_hint)
         or (session_hint is not None and record.session_id == session_hint)
     ]
     if len(named) == 1:
-        return named[0]
-    active = [record for record in records if record.state is ExamState.ACTIVE]
+        return named[0], True
     if len(active) == 1:
-        return active[0]
-    if not active:
-        return None
+        return active[0], True
     log_warn(
         "guild_exam_unidentified_ambiguous",
-        context={
-            "char": str(actor.pk),
-            "exam": exam_hint or "",
-            "candidates": len(active),
-        },
+        context={"char": str(actor.pk), "candidates": len(active)},
     )
-    return None
+    return None, False
+
+
+def _release_exam_host(actor: Any, exam_id: str, host_id: int) -> bool:
+    """Release one examination's persistent host; report whether it completed."""
+    from evennia.objects.models import ObjectDB
+    from django.db import transaction
+
+    from world.rules.guild_exams import restore_exam_host
+    from world.rules.traits import restore_gauges_to_full
+
+    host = ObjectDB.objects.filter(id=host_id).first()
+    if host is None:
+        log_warn(
+            "guild_exam_unidentified_host_missing",
+            context={"char": str(actor.pk), "exam": exam_id, "host": host_id},
+        )
+        return True
+    try:
+        with transaction.atomic():
+            restore_exam_host(host, exam_id)
+            restore_gauges_to_full(actor)
+            # The session clear cannot release a roster it cannot reconstruct,
+            # and the corrupt payload's roster is never trusted: only this
+            # examination's own candidate and host are unregistered.
+            from world.rules.skip_safety import (
+                unregister_active_battlefield,
+                unregister_participants,
+            )
+
+            unregister_active_battlefield(host)
+            unregister_active_battlefield(actor)
+            unregister_participants((host_id, int(actor.pk)))
+    except Exception as error:
+        log_warn(
+            "guild_exam_unidentified_host_release_failed",
+            exc=error,
+            context={
+                "char": str(actor.pk),
+                "exam": exam_id,
+                "host": host_id,
+                "retry": _EXAM_RELEASE_ATTR,
+            },
+        )
+        return False
+    return True
+
+
+def _pending_exam_release(actor: Any) -> dict[str, Any] | None:
+    """Read the durable host-release obligation, or ``None``."""
+    raw = getattr(getattr(actor, "db", None), _EXAM_RELEASE_ATTR, None)
+    if not isinstance(raw, Mapping):
+        return None
+    exam_id = raw.get("exam_id")
+    host_id = raw.get("host_id")
+    if not isinstance(exam_id, str) or not exam_id:
+        return None
+    if not isinstance(host_id, int) or isinstance(host_id, bool):
+        return None
+    return {"exam_id": exam_id, "host_id": host_id}
+
+
+def _write_pending_exam_release(
+    actor: Any, exam_id: str | None, host_id: int | None
+) -> None:
+    """Record or clear the durable host-release obligation."""
+    if exam_id is None or host_id is None:
+        actor.db.combat_exam_release_pending = None
+        return
+    actor.db.combat_exam_release_pending = {
+        "exam_id": exam_id,
+        "host_id": int(host_id),
+    }
+
+
+def _retry_pending_exam_release(actor: Any) -> None:
+    """Finish a host release that a previous recovery could not complete."""
+    pending = _pending_exam_release(actor)
+    if pending is None:
+        return
+    if _release_exam_host(actor, pending["exam_id"], pending["host_id"]):
+        _write_pending_exam_release(actor, None, None)
 
 
 def _retire_unidentified_exam(actor: Any) -> bool:
@@ -1007,95 +1084,67 @@ def _retire_unidentified_exam(actor: Any) -> bool:
     occurrence that writer commits is keyed by that identity. The candidate's
     examination record and the persistent host's own surfaces are independent
     authoritative state, so the examination is marked FAILED and the host is
-    restored and released here. No combat occurrence is fabricated and no
-    replacement identity is invented: the raw payload is read only to learn
-    which examination to retire, never to drive a settlement.
+    released here. No combat occurrence is fabricated and no replacement
+    identity is invented: the corrupt payload is read only to learn which
+    examination to retire, never to drive a settlement.
 
-    Returns whether the malformed session is fully retired. The examination
-    terminal state and the host's release are separate units, and a release
-    failure returns ``False`` so recovery keeps the malformed payload as its
-    retry handle instead of abandoning an owned host.
+    The examination terminal state and the host release are separate units. A
+    release that cannot complete leaves a durable host-release obligation and
+    still returns ``True`` -- the session clear must happen, and the obligation
+    is what the next recovery retries. ``False`` means ownership is unresolved
+    (ambiguous ACTIVE examinations), so the payload is kept rather than erased.
     """
-    from evennia.objects.models import ObjectDB
     from django.db import transaction
 
     raw = getattr(getattr(actor, "db", None), "active_combat", None)
     # A persisted Evennia attribute reads back as a mapping proxy, not a dict.
-    if not isinstance(raw, Mapping) or raw.get("mode") != "guild_exam":
+    if isinstance(raw, Mapping) and raw.get("mode") != "guild_exam":
         return True
-    record = _unidentified_exam_record(actor, raw)
+    record, resolved = _unidentified_exam_record(
+        actor, raw if isinstance(raw, Mapping) else {}
+    )
+    if not resolved:
+        return False
     if record is None:
         return True
     from types import SimpleNamespace
 
     from world.rules.guild_exams import (
         GuildExamError,
-        restore_exam_host,
+        ExamState,
         settle_exam_outcome,
     )
-    from world.rules.traits import restore_gauges_to_full
 
     exam_id = record.exam_id
-    try:
-        with transaction.atomic():
-            settle_exam_outcome(
-                actor,
-                SimpleNamespace(mode="guild_exam", exam_id=exam_id),
-                None,
-                "exam_failed",
+    if record.state is ExamState.ACTIVE:
+        try:
+            with transaction.atomic():
+                settle_exam_outcome(
+                    actor,
+                    SimpleNamespace(mode="guild_exam", exam_id=exam_id),
+                    None,
+                    "exam_failed",
+                )
+        except GuildExamError as error:
+            # An unreadable examination history cannot be marked; the host is
+            # still released below.
+            log_warn(
+                "guild_exam_unidentified_retirement_unavailable",
+                exc=error,
+                context={"char": str(actor.pk), "exam": exam_id},
             )
-    except GuildExamError as error:
-        # An unreadable examination history cannot be marked; the host is
-        # still released below, and nothing is left to retry.
-        log_warn(
-            "guild_exam_unidentified_retirement_unavailable",
-            exc=error,
-            context={"char": str(actor.pk), "exam": exam_id},
-        )
-    except Exception as error:
-        log_warn(
-            "guild_exam_unidentified_retirement_failed",
-            exc=error,
-            context={"char": str(actor.pk), "exam": exam_id},
-        )
-        return False
-    host = ObjectDB.objects.filter(id=record.opponent_id).first()
-    if host is None:
-        log_warn(
-            "guild_exam_unidentified_host_missing",
-            context={"char": str(actor.pk), "exam": exam_id},
-        )
-        return True
-    try:
-        with transaction.atomic():
-            restore_exam_host(host, exam_id)
-            restore_gauges_to_full(actor)
-            # The session clear cannot release a roster it cannot reconstruct,
-            # so this examination's own registrations are dropped here: a
-            # stale skip-safety entry would keep the host marked as engaged.
-            from world.rules.skip_safety import (
-                unregister_active_battlefield,
-                unregister_participants,
+        except Exception as error:
+            log_warn(
+                "guild_exam_unidentified_retirement_failed",
+                exc=error,
+                context={"char": str(actor.pk), "exam": exam_id},
             )
-
-            unregister_active_battlefield(host)
-            unregister_participants(
-                (record.opponent_id, *_raw_participant_ids(raw))
-            )
-    except Exception as error:
-        # Keep the malformed payload as the retry handle: the next recovery
-        # retries this release instead of abandoning an owned host.
-        log_warn(
-            "guild_exam_unidentified_host_release_failed",
-            exc=error,
-            context={
-                "char": str(actor.pk),
-                "exam": exam_id,
-                "host": host.pk,
-                "retry": "next_recovery",
-            },
-        )
-        return False
+            return False
+    if not _release_exam_host(actor, exam_id, int(record.opponent_id)):
+        # Hand the release to the next recovery as its own durable obligation:
+        # the corrupt session must not be kept as the retry handle, because a
+        # retained unparseable active_combat blocks every new engagement.
+        _write_pending_exam_release(actor, exam_id, int(record.opponent_id))
     return True
 
 
@@ -1116,6 +1165,9 @@ def restore_active_session(actor: Any) -> None:
     restoration or settlement failures propagate with the durable record
     intact for retry.
     """
+    # A previous recovery may have retired the session but not yet released
+    # its examination host; finish that before anything else.
+    _retry_pending_exam_release(actor)
     try:
         record = read_session(actor)
     except CombatSessionError as error:
@@ -1130,10 +1182,11 @@ def restore_active_session(actor: Any) -> None:
         # An unparseable examination still owns its candidate record and its
         # persistent host, both of which are independent authoritative state:
         # retire them here so a session that lost its occurrence identity can
-        # never strand the candidate or keep the host examination-owned. When
-        # the release cannot complete, the malformed payload stays as the
-        # retry handle for the next recovery instead of being abandoned.
-        if _retire_unidentified_exam(actor):
+        # never strand the candidate or keep the host examination-owned. Only
+        # unresolved ownership keeps the payload; a pending host release is its
+        # own durable obligation and never blocks the session clear.
+        retired = _retire_unidentified_exam(actor)
+        if retired:
             clear_session(actor, None, None)
         return
     if record is None:

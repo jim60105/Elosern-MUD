@@ -446,35 +446,42 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
         "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
     )
     def test_a_failed_host_release_is_retried_by_the_next_recovery(self):
-        """A release failure keeps the malformed payload instead of abandoning the host."""
+        """A release failure leaves a durable obligation, never an owned host forever."""
         from unittest.mock import patch as mock_patch
 
         from world.rules.combat_session import restore_active_session
-        from world.rules.combat_session import settlement as settlement_module
 
         self._give_merit(50)
         record = start_guild_exam(self.player, self.host, "E")
         stored = dict(self.player.db.active_combat)
         stored.pop("engagement_id")
+        # Even with every hint gone, the obligation still names the host.
+        stored.pop("exam_id")
+        stored.pop("session_id")
+        stored["enemy_ids"] = []
+        stored["player_ids"] = []
         self.player.db.active_combat = stored
 
-        real_release = settlement_module.__dict__.get("restore_exam_host")
         with mock_patch(
             "world.rules.guild_exams.restore_exam_host",
             side_effect=RuntimeError("clock unavailable"),
         ):
             restore_active_session(self.player)
-        # The candidate is already terminal, but the payload survives as the
-        # retry handle and the host is still owned.
+        # The session is retired (a retained unparseable payload would block
+        # every new engagement), the candidate is terminal, and the host
+        # release is a durable obligation naming the authoritative identities.
         exams = {entry.exam_id: entry for entry in _read_exams(self.player)}
         self.assertIs(exams[record.exam_id].state, ExamState.FAILED)
-        self.assertIsNotNone(self.player.db.active_combat)
+        self.assertIsNone(self.player.db.active_combat)
         self.assertIsNotNone(self._host_normal()["restriction"])
-        self.assertIsNone(real_release)
+        self.assertEqual(
+            self.player.db.combat_exam_release_pending,
+            {"exam_id": record.exam_id, "host_id": int(self.host.pk)},
+        )
 
         restore_active_session(self.player)
 
-        self.assertIsNone(self.player.db.active_combat)
+        self.assertIsNone(self.player.db.combat_exam_release_pending)
         self.assertIsNone(self._host_normal()["restriction"])
         retried = start_guild_exam(self.player, self.host, "E")
         self.assertIs(retried.state, ExamState.ACTIVE)
