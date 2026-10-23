@@ -24,15 +24,16 @@ const props = defineProps({
   // The trigger control that opened this overlay, captured at open time
   // (design D7). Focus is restored to it on every close path.
   opener: { type: Object, default: null },
-  // The committed `local_map` model, passed straight through to the `map`
-  // body (design D4) so a replaced payload re-renders the available /
-  // unavailable branch live.
-  mapModel: { type: Object, default: null },
   // The committed location label (the status slice) for the map title.
   locationLabel: { type: String, default: "" },
+  // The body draws its own header (redesign-map-drawer): the map drawer's
+  // header carries its scope tabs beside the shared DrawerHeader parts, so
+  // the host renders no second header and no body padding, and hands the
+  // body its `close` (focus restoration included) through the slot.
+  ownHeader: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["close", "move"]);
+const emit = defineEmits(["close"]);
 
 const hostRef = ref(null);
 let trap = null;
@@ -64,7 +65,6 @@ function iconFor(name) {
 }
 
 function subtitleFor(name) {
-  if (name === "map") return "所在位置與相鄰路徑";
   if (name === "settings") return "閱讀偏好與輔助顯示";
   if (name === "codex") return "稱號 ‧ 異名 ‧ 提名中";
   if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
@@ -143,6 +143,7 @@ onBeforeUnmount(() => {
     @keydown="onKeydown"
   >
     <DrawerHeader
+      v-if="!ownHeader"
       data-testid="overlay-host-header"
       surface="overlay-host"
       :icon="iconFor(overlay)"
@@ -150,8 +151,8 @@ onBeforeUnmount(() => {
       :subtitle="subtitleFor(overlay)"
       @close="onClose"
     />
-    <div class="overlay-host__body" data-testid="overlay-host-body">
-      <slot :overlay="overlay" :map-model="mapModel" :mapModel="mapModel"></slot>
+    <div class="overlay-host__body" :class="{ 'overlay-host__body--own-header': ownHeader }" data-testid="overlay-host-body">
+      <slot :overlay="overlay" :close="onClose"></slot>
     </div>
   </section>
 </template>
@@ -203,9 +204,15 @@ onBeforeUnmount(() => {
   scrollbar-width: thin;
 }
 
-/* The full map is a picture, not a reading column: it takes the surface's
-   whole width so the fitted view spends the room on the drawing. */
-.overlay-host[data-elosern-overlay="map"] .overlay-host__body { max-width: none; }
+/* A body with its own header (the map drawer) is full-bleed: the map is a
+   picture, not a reading column, so it spends the surface's whole box. */
+.overlay-host__body.overlay-host__body--own-header {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
 .overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
 
 @media (max-width: 700px) {

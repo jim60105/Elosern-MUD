@@ -43,6 +43,9 @@ defineExpose({ closeButton });
       </svg>
     </span>
     <h3 :id="titleId" class="drawer-header__title" :data-testid="`${surface}__title`">{{ title }}</h3>
+    <!-- An optional host control group beside the title (the map drawer's
+         scope tabs); no other host fills it. -->
+    <div v-if="$slots.default" class="drawer-header__extras"><slot></slot></div>
     <p v-if="subtitle" class="drawer-header__subtitle" :title="subtitle">{{ subtitle }}</p>
     <button
       ref="closeButton"
@@ -125,6 +128,13 @@ defineExpose({ closeButton });
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.drawer-header .drawer-header__extras {
+  flex: none;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
 }
 
 .drawer-header .drawer-header__close {

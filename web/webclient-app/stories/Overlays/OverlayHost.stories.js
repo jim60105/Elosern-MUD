@@ -1,9 +1,9 @@
 import { h } from "vue";
 import OverlayHost from "../../components/OverlayHost.vue";
-import MapOverlay from "../../components/MapOverlay.vue";
+import MapDrawer from "../../components/MapDrawer.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import HelpOverlay from "../../components/HelpOverlay.vue";
-import { LOCAL_MAP_SAMPLE, localMapModelFor } from "../fixtures.js";
+import { townArea } from "../fixtures/area_map.js";
 
 // OverlayHost (H5, task 5.6): the shared full-screen overlay surface. The
 // stories below cover the three overlay names with their real stripped
@@ -21,22 +21,22 @@ const renderHost = (args) => ({
           {
             overlay: args.overlay,
             opener: null,
-            mapModel: args.mapModel,
             locationLabel: "灰河帶",
+            // The map drawer draws its own header (redesign-map-drawer).
+            ownHeader: args.overlay === "map",
             onClose: () => {},
-            onMove: () => {},
           },
           {
             default: (slotProps) => {
-              const { overlay, mapModel } = slotProps;
+              const { overlay, close } = slotProps;
               if (overlay === "map") {
-                // Wave 0: the map family binds through the shared
-                // derived-shape helper, so even this fallback is the exact
-                // store model shape.
-                return h(MapOverlay, {
-                  localMap: mapModel || localMapModelFor(LOCAL_MAP_SAMPLE),
-                  onMove: () => {},
-                  onOpenMap: () => {},
+                return h(MapDrawer, {
+                  area: townArea(),
+                  world: null,
+                  tab: "area",
+                  memory: { area: {}, world: {} },
+                  locationLabel: "灰河帶",
+                  onClose: close,
                 });
               }
               if (overlay === "settings") {
@@ -64,15 +64,15 @@ export default {
 
 export const MapSurface = {
   render: renderHost,
-  args: { overlay: "map", mapModel: localMapModelFor(LOCAL_MAP_SAMPLE) },
+  args: { overlay: "map" },
 };
 
 export const SettingsSurface = {
   render: renderHost,
-  args: { overlay: "settings", mapModel: null },
+  args: { overlay: "settings" },
 };
 
 export const HelpSurface = {
   render: renderHost,
-  args: { overlay: "help", mapModel: null },
+  args: { overlay: "help" },
 };

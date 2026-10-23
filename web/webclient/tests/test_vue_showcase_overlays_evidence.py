@@ -47,7 +47,10 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 # component manifest (B5 extends it to the complete set and then freezes
 # it; design D3).
 OVERLAYS_FAMILY_KEYS = (
-    "Overlays/MapOverlay",
+    # redesign-map-drawer replaced the full-map overlay with the map drawer
+    # and its edge-pointer layer.
+    "Overlays/MapDrawer",
+    "Overlays/MapEdgePointers",
     "Overlays/SettingsOverlay",
     "Overlays/HelpOverlay",
     "Overlays/CreationOverlay",
@@ -69,9 +72,12 @@ OVERLAYS_FAMILY_KEYS = (
 # built Storybook index.json entry ids for every story exported by this
 # change (title "Overlays/<Component>", deterministic story names).
 OVERLAYS_STORY_IDS = {
-    "overlays-mapoverlay--full-lattice",
-    "overlays-mapoverlay--minimal",
-    "overlays-mapoverlay--unavailable",
+    "overlays-mapdrawer--a-area-city",
+    "overlays-mapdrawer--a-area-city-selected",
+    "overlays-mapdrawer--a-world-region",
+    "overlays-mapdrawer--overflow-pointers",
+    "overlays-mapdrawer--legend-escape",
+    "overlays-mapedgepointers--overflow-beside-card",
     "overlays-settingsoverlay--default",
     "overlays-settingsoverlay--motion-reduced",
     "overlays-settingsoverlay--html-narrative",
@@ -420,7 +426,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         self.assertEqual(
             family_titles,
             {f"Overlays/{component}" for component in (
-                "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
+                "MapDrawer", "MapEdgePointers", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
                 "ObjectiveTracker", "PartyWindow", "PartyBagTab", "PartyStatusTab", "PartySkillTab", "PartyLineageTab",
             )},
         )

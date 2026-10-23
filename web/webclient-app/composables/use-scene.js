@@ -64,21 +64,26 @@ export function useScene(store, { panel, panelAvailable, dispatchIntent }) {
   function onMapMove(moveData) {
     // The minimap node action carries `exit_ref` + `destination`; the
     // `explore.move` payload requires exactly `{ exit_ref, current_node }`,
-    // where `current_node` is the actor's current node (the committed
-    // `local_map.current_node`), not the destination. The echo label is the
-    // uniquely matching traversable edge label (else the destination node's
-    // committed label; else nothing — never an invented exit, D3).
+    // where `current_node` is the actor's current node, not the destination.
+    // The map drawer's area view (redesign-map-drawer) emits the canonical
+    // `current_node` of the `area_map` body it drew, plus the destination's
+    // drawn name as `label`; that is forwarded verbatim. The minimap path
+    // carries no `current_node` and keeps the committed
+    // `local_map.current_node`. The echo label is the drawer's label, else
+    // the uniquely matching traversable edge label (else the destination
+    // node's committed label; else nothing — never an invented exit, D3).
     const model = store.view.localMapModel ?? null;
-    const exitLabel = LocalMapLogic.exitLabelFor(
-      model,
-      model?.currentNode ?? null,
-      moveData.destination ?? null
-    );
-    dispatchIntent(
+    const currentNode =
+      typeof moveData.current_node === "string" ? moveData.current_node : model?.currentNode ?? null;
+    const exitLabel =
+      typeof moveData.label === "string" && moveData.label !== ""
+        ? moveData.label
+        : LocalMapLogic.exitLabelFor(model, model?.currentNode ?? null, moveData.destination ?? null);
+    return dispatchIntent(
       "explore.move",
       {
         exit_ref: moveData.exit_ref,
-        current_node: model?.currentNode ?? null,
+        current_node: currentNode,
       },
       exitLabel ? { exitLabel } : null
     );

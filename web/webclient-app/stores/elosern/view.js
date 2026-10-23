@@ -242,6 +242,10 @@ export function applyView(ctx) {
       layoutVersion: rs.layoutVersion,
       serverTime: rs.serverTime,
       panels,
+      // The on-demand map read models (`area_map`, `world_map`) the reducer
+      // keeps apart from the eager panels and clears with the epoch; only
+      // the map drawer reads them (redesign-map-drawer).
+      maps: rs.maps || {},
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
       lastActionResult: rs.lastActionResult,

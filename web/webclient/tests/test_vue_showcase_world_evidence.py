@@ -145,7 +145,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/ConditionChips",
     "Overlays/CreationOverlay",
     "Overlays/HelpOverlay",
-    "Overlays/MapOverlay",
+    "Overlays/MapDrawer",
+    "Overlays/MapEdgePointers",
     "Overlays/SettingsOverlay",
     # The settings overlay's reading preview joined with
     # webclient-settings-reading-preview.

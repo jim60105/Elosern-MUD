@@ -34,6 +34,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AreaMapDetail from "./AreaMapDetail.vue";
 import {
   DETAIL_DRAWER_WIDTH,
+  DRAG_THRESHOLD_PX,
   cellRect,
   centreOn,
   nextStop,
@@ -79,13 +80,17 @@ const props = defineProps({
   selected: { type: String, default: undefined },
   // Render the selection reading inside the map (the host may supply its own).
   showDetail: { type: Boolean, default: true },
+  // The host cannot send a move yet (a request in flight, or this body is
+  // older than the committed position): 前往 waits, visibly, and sends nothing.
+  moveBusy: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:view", "update:selected", "select", "move"]);
 
 // A 0x0 first paint (jsdom, a hidden host) keeps a sane provisional frame;
 // the opening fit is recomputed once the real frame is measured.
 const FALLBACK_FRAME = Object.freeze({ width: 960, height: 600 });
-const DRAG_THRESHOLD_PX = 4;
+// The smallest measured box the opening fit (96 px margins) can use.
+const MIN_FRAME_PX = 240;
 
 let instanceCounter = 0;
 const uid = `area-map-${(instanceCounter += 1)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -563,9 +568,16 @@ watch(
     moveSent = false;
   },
 );
+// A host that held the move until its refresh landed releases the guard too.
+watch(
+  () => props.moveBusy,
+  (busy) => {
+    if (!busy) moveSent = false;
+  },
+);
 
 function onDetailMove(action) {
-  if (moveSent) return;
+  if (moveSent || props.moveBusy) return;
   const node = placedById.value.get(selectedId.value)?.node;
   const current = travelAction(props.area, node, adjacent.value);
   // Only the selected node's live descriptor travels; a stale card sends nothing.
@@ -622,14 +634,16 @@ function panBy(dxPx, dyPx) {
 
 const stopLabel = computed(() => nearestStop(stops.value, view.value.span).label);
 
-defineExpose({ zoomIn, zoomOut, recentre, showWhole, panBy, stops, stopLabel, detail, view });
+defineExpose({ zoomIn, zoomOut, recentre, showWhole, panBy, stops, stopLabel, detail, view, frame, detailShown });
 
 // ── frame measurement ───────────────────────────────────────────────────
 
 let observer = null;
 function applyFrame(width, height) {
   uiScale.value = readUiScale();
-  if (!(width > 0) || !(height > 0)) return;
+  // A host still laying out (a 0x0 or sliver box while the drawer mounts)
+  // is not a frame to fit in: keep the provisional one until it is real.
+  if (!(width >= MIN_FRAME_PX) || !(height >= MIN_FRAME_PX)) return;
   const changed = width !== frame.value.width || height !== frame.value.height;
   frame.value = Object.freeze({ width, height });
   const first = !measured.value;
@@ -826,8 +840,8 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="detailShown" class="area-map__detail" :style="{ width: `${DETAIL_DRAWER_WIDTH}px` }">
-      <slot name="detail" :detail="detail" :move="onDetailMove" :centre="centreNode" :close="closeDetail">
-        <AreaMapDetail :detail="detail" @move="onDetailMove" @centre="centreNode" @close="closeDetail" />
+      <slot name="detail" :detail="detail" :move="onDetailMove" :centre="centreNode" :close="closeDetail" :busy="moveBusy">
+        <AreaMapDetail :detail="detail" :busy="moveBusy" @move="onDetailMove" @centre="centreNode" @close="closeDetail" />
       </slot>
     </div>
     <p class="area-map__live" aria-live="polite" data-testid="area-map__live">{{ announcement }}</p>

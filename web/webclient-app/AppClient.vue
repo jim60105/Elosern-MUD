@@ -19,7 +19,7 @@ import FullLogOverlay from "./components/FullLogOverlay.vue";
 import HudDrawer from "./components/HudDrawer.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
-import MapOverlay from "./components/MapOverlay.vue";
+import MapDrawer from "./components/MapDrawer.vue";
 import RestForm from "./components/RestForm.vue";
 import QuestDrawer from "./components/QuestDrawer.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
@@ -41,6 +41,7 @@ import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./compo
 import { companionRows, portraitFor } from "./components/party-helpers.js";
 import PartyWindow from "./components/PartyWindow.vue";
 import { usePartyWindow } from "./composables/use-party-window.js";
+import { useMapDrawer } from "./composables/use-map-drawer.js";
 import { useWindowHotkeys } from "./composables/use-window-hotkeys.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -107,6 +108,12 @@ const {
   onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
+// The map drawer (redesign-map-drawer): the area/world tab, the per-tab
+// session memory and the on-demand `map.view` requests; its 前往 goes
+// through the same `explore.move` seam as the minimap.
+const {
+  mapTab, mapMemory, mapEpoch, mapBusy, onMapDrawerMove,
+} = useMapDrawer(store, { onMapMove });
 // The party window (webclient-party-window-member-tab): its openers, the one
 // `party.view_member` per rail or bag item selection (webclient-party-bag-
 // tab) and the pending entry or item.
@@ -1304,17 +1311,22 @@ const rootStyle = computed(() => {
       v-if="store.view.hudOverlay"
       :overlay="store.view.hudOverlay"
       :opener="store.view.hudOverlayOpener"
-      :map-model="store.view.localMapModel"
       :location-label="store.view.statusSlice.locationLabel"
+      :own-header="store.view.hudOverlay === 'map'"
       @close="onOverlayClose"
-      @move="onMapMove"
     >
-      <template #default="{ overlay: openName, mapModel }">
-        <MapOverlay
+      <template #default="{ overlay: openName, close: closeOverlayHost }">
+        <MapDrawer
           v-if="openName === 'map'"
-          :local-map="mapModel || store.view.localMapModel || {}"
-          @move="onMapMove"
-          @open-map="onMapExpand"
+          v-model:tab="mapTab"
+          :area="store.view.maps.area_map ?? null"
+          :world="store.view.maps.world_map ?? null"
+          :memory="mapMemory"
+          :epoch="mapEpoch"
+          :location-label="store.view.statusSlice.locationLabel"
+          :busy="mapBusy"
+          @move="onMapDrawerMove"
+          @close="closeOverlayHost"
         />
         <SettingsOverlay
           v-else-if="openName === 'settings'"

@@ -10,7 +10,7 @@ import CreationOverlay from "../../components/CreationOverlay.vue";
 import DockMenu from "../../components/DockMenu.vue";
 import HelpOverlay from "../../components/HelpOverlay.vue";
 import LocalMap from "../../components/LocalMap.vue";
-import MapOverlay from "../../components/MapOverlay.vue";
+import MapDrawer from "../../components/MapDrawer.vue";
 import MessageWindow from "../../components/MessageWindow.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
@@ -185,7 +185,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Core/CharacterSwitcher",
-     "Overlays/MapOverlay",
+     "Overlays/MapDrawer",
+     "Overlays/MapEdgePointers",
      "Overlays/SettingsOverlay",
      // The settings overlay's reading preview (webclient-settings-reading-preview).
      "Overlays/ReadingSample",
@@ -491,14 +492,14 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
     // body proves the named overlay is actually mounted (not just that a
     // trigger emits a name). Cycling the open-overlay name re-mounts the body.
     const wrapper = mount(OverlayHost, {
-      props: { overlay: "settings", mapModel: LOCAL_MAP_SAMPLE },
+      props: { overlay: "settings" },
       slots: {
-        default: ({ overlay: name, mapModel }) =>
+        default: ({ overlay: name }) =>
           name === "settings"
             ? h(SettingsOverlay, {})
             : name === "help"
               ? h(HelpOverlay, {})
-              : h(MapOverlay, { localMap: mapModel }),
+              : h(MapDrawer, { memory: { area: {}, world: {} } }),
       },
     });
     expect(wrapper.find('[data-testid="overlay-host"]').exists()).toBe(true);
