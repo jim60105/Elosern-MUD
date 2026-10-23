@@ -44,6 +44,7 @@ from world.rules.tests._combat_session_helpers import (
     _race_key,
     complete_party_draft,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_innate_overlay,
 )
 from world.rules.tests.combat_fixtures import grant_lineage
@@ -273,7 +274,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(pre_res.reason, RejectReason.CAST_CONDITION_UNMET)
         self.assertIn("displaced", str(pre_res.detail))
 
-        res_strike = ActionResolver.resolve(req_strike)
+        res_strike = resolve_combat_action(req_strike)
         self.assertEqual(res_strike.outcome, "rejected")
         self.assertEqual(res_strike.reason, RejectReason.CAST_CONDITION_UNMET)
 
@@ -281,7 +282,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_before = self.monster.traits.hp.current
             req_magic = ActionRequest(self.player, _SYNTH_MAGIC_SINGLE_SKILL.key, [self.monster], ctx)
-            res_magic = ActionResolver.resolve(req_magic)
+            res_magic = resolve_combat_action(req_magic)
         self.assertEqual(res_magic.outcome, "success")
         self.assertLess(self.monster.traits.hp.current, hp_before)
 
@@ -289,7 +290,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_before_area = self.monster.traits.hp.current
             req_area = ActionRequest(self.player, _SYNTH_AREA_SKILL.key, "all-enemies", ctx)
-            res_area = ActionResolver.resolve(req_area)
+            res_area = resolve_combat_action(req_area)
         self.assertEqual(res_area.outcome, "success")
         self.assertLess(self.monster.traits.hp.current, hp_before_area)
 
@@ -317,14 +318,14 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         # Resolution clears the marker and lands the strike
         hp_before = self.monster.traits.hp.current
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req_strike)
+            res = resolve_combat_action(req_strike)
         self.assertEqual(res.outcome, "success")
         self.assertLess(self.monster.traits.hp.current, hp_before)
         self.assertFalse(has_positional_marker(self.player))
 
         # Subsequent strike resolves ordinarily (no longer displaced)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res_second = ActionResolver.resolve(req_strike)
+            res_second = resolve_combat_action(req_strike)
         self.assertEqual(res_second.outcome, "success")
 
     def test_displaced_holder_magic_and_area_never_climb_back(self):
@@ -341,14 +342,14 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         # Magic cast
         req_magic = ActionRequest(self.player, _SYNTH_MAGIC_SINGLE_SKILL.key, [self.monster], ctx)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res_magic = ActionResolver.resolve(req_magic)
+            res_magic = resolve_combat_action(req_magic)
         self.assertEqual(res_magic.outcome, "success")
         self.assertTrue(has_positional_marker(self.player))
 
         # Area cast
         req_area = ActionRequest(self.player, _SYNTH_AREA_SKILL.key, "all-enemies", ctx)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res_area = ActionResolver.resolve(req_area)
+            res_area = resolve_combat_action(req_area)
         self.assertEqual(res_area.outcome, "success")
         self.assertTrue(has_positional_marker(self.player))
 
@@ -380,7 +381,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(self.player, _SYNTH_STRIKE_SKILL.key, [self.monster], ctx)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertFalse(has_positional_marker(self.player))
         self.assertTrue(has_positional_marker(bystander))
@@ -402,7 +403,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
         ctx = BattlefieldActionContext(bf)
 
         req = ActionRequest(self.player, _SYNTH_STRIKE_SKILL.key, [self.monster], ctx)
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.CAST_CONDITION_UNMET)
 
@@ -430,7 +431,7 @@ class PositionalMarkerReachabilityTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.damage._apply_hp_delta", side_effect=RuntimeError("simulated commit failure")),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.COMMIT_FAILED)
 
@@ -501,6 +502,7 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
         # Mark player as fled in the session record
         fled_rec = CombatSessionRecord(
             session_id=rec.session_id,
+            engagement_id=rec.engagement_id,
             mode=rec.mode,
             room_id=rec.room_id,
             player_ids=rec.player_ids,

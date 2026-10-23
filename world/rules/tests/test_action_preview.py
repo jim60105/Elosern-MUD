@@ -25,7 +25,11 @@ from world.rules.targeting import RoomActionContext
 from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, SkillPrerequisite, TargetSpec
 
-from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import (
+    open_synthetic_scope,
+    resolve_combat_action,
+    synth_innate_overlay,
+)
 from .combat_fixtures import BattlefieldIsolation
 
 # --- locally authored scoped-registry rows (data independence) ---------------
@@ -538,7 +542,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         # 1. Invocation 1: Rolls a HIT (roll=80). Rider executes.
         req1 = ActionRequest(self.player, dep_skill.key, [self.monster], context)
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            res1 = ActionResolver.resolve(req1)
+            res1 = resolve_combat_action(req1)
         self.assertEqual(res1.outcome, "success")
         self.assertTrue(any(e.kind == "gauge_transfer" for e in res1.event_log.entries))
 
@@ -554,7 +558,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         req2 = ActionRequest(self.player, dep_skill.key, [self.monster], forged_ctx)
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            res2 = ActionResolver.resolve(req2)
+            res2 = resolve_combat_action(req2)
         self.assertEqual(res2.outcome, "success")
         # Rider MUST be skipped!
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res2.event_log.entries))
@@ -612,9 +616,8 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
 
     def _resolve(self, row=_DISGUISE_SP10):
         self._own(row)
-        return ActionResolver.resolve(
-            ActionRequest(self.player, row.key, [], self.context)
-        )
+        # An out-of-combat cast keeps its own accepted identity.
+        return ActionResolver.resolve(ActionRequest(self.player, row.key, [], self.context))
 
     @covers_requirement(
         "combat-modifier-table::preview-preflight-and-resolve-agree-on-adjusted-resource-costs"
@@ -719,9 +722,7 @@ class LineageRejectionParityTests(BattlefieldIsolation, EvenniaTestCase):
         preflight = ActionResolver.preflight(
             ActionRequest(self.player, skill_key, targets, context)
         )
-        resolution = ActionResolver.resolve(
-            ActionRequest(self.player, skill_key, targets, context)
-        )
+        resolution = resolve_combat_action(ActionRequest(self.player, skill_key, targets, context))
         self.assertFalse(preview.enabled)
         self.assertEqual(preview.reason, RejectReason.UNKNOWN_SKILL)
         self.assertEqual(preflight.reason, RejectReason.UNKNOWN_SKILL)

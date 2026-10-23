@@ -37,7 +37,8 @@ from world.quests.tests._compile_helpers import (
     _raw,
     await_result,
 )
-from world.rules.action import ActionRequest, ActionResolver
+from world.rules.action import ActionRequest
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.guild import register_adventurer, turn_in_quest
 from world.rules.surfaces import read_counter_trait
@@ -92,7 +93,7 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     @covers_requirement("quest-progress-tracking::change-15-exposes-a-deterministic-no-ai-completion-seam-for-phase-4")
     @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")

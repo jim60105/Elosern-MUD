@@ -25,11 +25,11 @@ from world.quests.catalog import register_catalog
 from world.lore.sexual_vocab import BODY_PARTS
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     RejectReason,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.action_evidence import (
     ACTION_EVIDENCE_ATTR,
     EVIDENCE_KINDS,
@@ -529,7 +529,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
         )
         # Force low resist roll so target fails to resist (resisted is False, auto_comply is False)
         with patch("world.rules.action.gates.roll_d100", return_value=1):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=50))
         self.assertTrue(has_action_evidence(self.actor, "forced_interaction", now=109))
@@ -555,7 +555,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             BattlefieldActionContext(bf, event_context={"now": 200}),
         )
         with patch("world.rules.action.gates.roll_d100", return_value=1):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertTrue(has_action_evidence(npc, "forced_interaction", now=200))
         self.assertTrue(has_action_evidence(npc, "forced_interaction", now=259))
@@ -588,7 +588,7 @@ class ActionEvidenceEventLogPlannerTests(EvenniaTestCase):
             },
             clear=False,
         ):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "rejected")
         # Evidence was rolled back and does not survive
@@ -695,7 +695,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
 
         initial_hp = _stored_hp(self.target)
         with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80]):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         roll_entries = [e for e in result.event_log.entries if e.kind == "roll"]
@@ -725,7 +725,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             ctx,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         roll_entries = [e for e in result.event_log.entries if e.kind == "roll"]
@@ -737,7 +737,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertFalse(has_action_evidence(self.target, "forced_interaction", now=100))
 
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
-            result2 = ActionResolver.resolve(request)
+            result2 = resolve_combat_action(request)
 
         self.assertEqual(result2.outcome, "success")
         roll_entries2 = [e for e in result2.event_log.entries if e.kind == "roll"]
@@ -762,7 +762,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             ctx,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         defeat_entries = [e for e in result.event_log.entries if e.kind == "target_defeated"]
@@ -786,7 +786,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             ctx,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         # HP is floored at 1
@@ -824,7 +824,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
                 ]
             },
         ):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "rejected")
         # HP is restored
@@ -846,7 +846,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
             ctx,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         roll_entries = [e for e in result.event_log.entries if e.kind == "roll"]
@@ -887,7 +887,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         )
 
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
 
         self.assertEqual(result.outcome, "success")
         t1_rolls = [

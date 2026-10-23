@@ -12,7 +12,6 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     RejectReason,
@@ -51,6 +50,7 @@ from .._combat_session_helpers import (
     live_skill_registry,
     SYNTH_SEAM_AREA_SKILL,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_damage_skill,
     synth_innate_overlay,
     synth_lineage_tree,
@@ -124,7 +124,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
     def test_edge_crossing_action_notifies_exactly_one_line(self):
         actor, _, request = self._near_edge_cast("unlock-cast")
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             [line for line in result.notifications if "可用：" in line],
@@ -137,7 +137,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
             2 * SKILL_PROFICIENCY_XP_PER_LEVEL + 1
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual([line for line in result.notifications if "可用：" in line], [])
 
@@ -152,7 +152,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
                 side_effect=CommitFailed(RejectReason.COMMIT_FAILED, "injected"),
             ),
         ):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.notifications, ())
         # The practice award rolled back with the commit: the edge was never
@@ -185,7 +185,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         _EVENT_EFFECT_PLANNERS["test-late-poison"] = poison
         try:
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                result = ActionResolver.resolve(request)
+                result = resolve_combat_action(request)
         finally:
             _EVENT_EFFECT_PLANNERS.clear()
             _EVENT_EFFECT_PLANNERS.update(real)
@@ -195,7 +195,7 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
         # The claims released with the rollback: the legitimate retry accrues,
         # crosses the edge for real, and announces exactly once — last.
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            retry = ActionResolver.resolve(request)
+            retry = resolve_combat_action(request)
         self.assertEqual(retry.outcome, "success")
         self.assertEqual(
             [line for line in retry.notifications if "可用：" in line],

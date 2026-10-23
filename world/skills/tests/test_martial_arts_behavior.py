@@ -44,7 +44,12 @@ from world.rules.progression import (
     proficiency_cap,
 )
 from world.rules.rulebook.schema import Rule
-from world.rules.tests._combat_session_helpers import _monster, _player, live_skill_registry
+from world.rules.tests._combat_session_helpers import (
+    _monster,
+    _player,
+    live_skill_registry,
+    resolve_combat_action,
+)
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.rules.traits import restore_gauges_to_full
 from world.rules.upkeep import settle_upkeep
@@ -188,7 +193,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
     def _cast(self, actor, key, targets, ctx, *, roll=100):
         with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             req = ActionRequest(actor, key, targets, ctx)
-            return ActionResolver.resolve(req)
+            return resolve_combat_action(req)
 
     # --- Scenario: The strike ladder settles at its authored coefficient for its stamina price
 
@@ -274,7 +279,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
 
         restore_gauges_to_full(self.actor)
         with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100]):
-            res = ActionResolver.resolve(ActionRequest(self.actor, two_judgment.key, [target], ctx))
+            res = resolve_combat_action(ActionRequest(self.actor, two_judgment.key, [target], ctx))
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
         damages = [e for e in res.event_log.entries if e.kind == "damage"]
@@ -284,7 +289,7 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
 
         restore_gauges_to_full(self.actor)
         with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100, 100]):
-            res3 = ActionResolver.resolve(ActionRequest(self.actor, three_judgment.key, [target], ctx))
+            res3 = resolve_combat_action(ActionRequest(self.actor, three_judgment.key, [target], ctx))
         self.assertEqual(res3.outcome, "success")
         rolls3 = [e for e in res3.event_log.entries if e.kind == "roll"]
         damages3 = [e for e in res3.event_log.entries if e.kind == "damage"]

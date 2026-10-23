@@ -41,6 +41,7 @@ from .._combat_session_helpers import (
     _race_key,
     _behaviour_archetype_key,
     open_synthetic_scope,
+    resolve_combat_action,
 )
 from ..combat_fixtures import BattlefieldIsolation, grant_lineage
 
@@ -138,7 +139,7 @@ class FreeformResolverGateTests(EvenniaTestCase):
         result = ActionResolver.preflight(self._request(_T_SP_SPELL.key, 2.0))
         self.assertEqual(result.reason, RejectReason.SCALED_CAST_FORBIDDEN)
         sp_before = self.actor.traits.sp.value
-        ActionResolver.resolve(self._request(_T_SP_SPELL.key, 2.0))
+        resolve_combat_action(self._request(_T_SP_SPELL.key, 2.0))
         self.assertEqual(self.actor.traits.sp.value, sp_before)
 
     @covers_requirement("freeform-casting::the-resolver-gates-scaled-casts-at-the-ownership-step")
@@ -197,7 +198,7 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
         )
         self.assertEqual(request.scale, 1.0)
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         spend = next(
             entry
@@ -222,7 +223,7 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
             scale=0.5,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         spend = next(
             entry

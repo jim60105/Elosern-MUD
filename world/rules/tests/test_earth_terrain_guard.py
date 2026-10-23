@@ -27,7 +27,8 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -268,7 +269,7 @@ class EarthTerrainGuardBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=roll):
-            return ActionResolver.resolve(req)
+            return resolve_combat_action(req)
 
     # --- Scenario: The defense ladder guards observable stats at settlement
 

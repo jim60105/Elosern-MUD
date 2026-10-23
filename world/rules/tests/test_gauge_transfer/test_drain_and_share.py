@@ -11,7 +11,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     PendingEffect,
     RejectReason,
     _handle_gauge_transfer,
@@ -19,6 +18,7 @@ from world.rules.action import (
     plan_effect_audiences,
     stored_gauge_pair,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -90,7 +90,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         # 1. Miss skips drain rider entirely
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
             req_miss = ActionRequest(self.actor, skill.key, [self.target], ctx)
-            res_miss = ActionResolver.resolve(req_miss)
+            res_miss = resolve_combat_action(req_miss)
         self.assertEqual(res_miss.outcome, "success")
         self.assertEqual(int(self.target.traits.mp.current), 50)
         self.assertEqual(int(self.actor.traits.mp.current), 50)
@@ -102,7 +102,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         self.target.traits.defense.base = 10
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             req_hit = ActionRequest(self.actor, skill.key, [self.target], ctx)
-            res_hit = ActionResolver.resolve(req_hit)
+            res_hit = resolve_combat_action(req_hit)
         self.assertEqual(res_hit.outcome, "success")
         # Target lost 10 MP -> 40
         self.assertEqual(int(self.target.traits.mp.current), 40)
@@ -342,7 +342,7 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         ctx = RoomActionContext(self.room)
         ctx.event_context["nonlethal"] = True
         request = ActionRequest(self.actor, skill.key, [self.target], ctx)
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
 
         # Under nonlethal projection, lethal crossing clamps to 1 HP

@@ -28,7 +28,11 @@ from world.rules.skill_effects import mundane_veil_values
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 
-from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import (
+    open_synthetic_scope,
+    resolve_combat_action,
+    synth_innate_overlay,
+)
 
 _DAMAGE_PROBE = SkillDef(
     key="gate_probe",
@@ -167,7 +171,7 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
     def test_the_same_skill_resolves_normally_with_a_battlefield(self):
         before = self.target.traits.hp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100) as roller:
-            result = ActionResolver.resolve(
+            result = resolve_combat_action(
                 self._request("gate_probe", self._field_context(), [self.target])
             )
         self.assertEqual(result.outcome, "success")

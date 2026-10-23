@@ -29,12 +29,12 @@ from world.rules.event_log import EventEntry
 from world.quests.catalog import register_catalog
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     RejectReason,
     _handle_climax_extension_stage,
     _handle_divine_pleasure_max,
     _handle_sexual_drain,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.sexual_resist import ResistVerdict
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, climax_settlement_action
@@ -212,14 +212,12 @@ class DivineCastTests(EvenniaTest):
         self.target.location = self.room1
 
     def _cast(self, act_key, targets, context=None):
-        return ActionResolver.resolve(
-            ActionRequest(
-                self.actor,
-                act_key,
-                targets,
-                context or RoomActionContext(self.actor.location, {}),
-            )
-        )
+        return resolve_combat_action(ActionRequest(
+            self.actor,
+            act_key,
+            targets,
+            context or RoomActionContext(self.actor.location, {}),
+        ))
 
     @covers_requirement("sexual-catalog-divine-core::three-hand-built-acts-are-registered-gated-exclusively-by-requires-divine-arts-with-no-counter-unlock")
     @covers_requirement(
@@ -231,14 +229,12 @@ class DivineCastTests(EvenniaTest):
         for key in _DIVINE_KEYS:
             with self.subTest(key=key):
                 with patch("world.rules.action.gates.roll_d100", return_value=1):
-                    result = ActionResolver.resolve(
-                        ActionRequest(
-                            human,
-                            key,
-                            [self.target],
-                            RoomActionContext(human.location, {}),
-                        )
-                    )
+                    result = resolve_combat_action(ActionRequest(
+                        human,
+                        key,
+                        [self.target],
+                        RoomActionContext(human.location, {}),
+                    ))
                 self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("sexual-catalog-divine-core::絕頂律令-sets-every-target-s-pleasure-to-its-ceiling-and-walks-climax-phase-to-進行中-in-one-cast-never-touching-the-actor")
@@ -575,11 +571,9 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
             with self.subTest(key=key):
                 self.assertIn(key, owned)
         with patch("world.rules.action.gates.roll_d100", return_value=1):
-            result = ActionResolver.resolve(
-                ActionRequest(
-                    elf, _GATED_KEY, [elf], RoomActionContext(None, {})
-                )
-            )
+            result = resolve_combat_action(ActionRequest(
+                elf, _GATED_KEY, [elf], RoomActionContext(None, {})
+            ))
         self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
     def test_both_derivation_branches_skip_the_gated_row(self):
@@ -607,11 +601,9 @@ class DivineSexualArtsOwnershipTests(EvenniaTest):
         ]
         self.assertNotIn(_GATED_KEY, holder.skills.owned_keys())
         with patch("world.rules.action.gates.roll_d100", return_value=1):
-            result = ActionResolver.resolve(
-                ActionRequest(
-                    holder, _GATED_KEY, [holder], RoomActionContext(None, {})
-                )
-            )
+            result = resolve_combat_action(ActionRequest(
+                holder, _GATED_KEY, [holder], RoomActionContext(None, {})
+            ))
         self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
 
@@ -628,14 +620,12 @@ class DivineSexualArtsCastTests(EvenniaTest):
         self.target.location = self.room1
 
     def _cast(self, targets):
-        return ActionResolver.resolve(
-            ActionRequest(
-                self.actor,
-                _GATED_KEY,
-                targets,
-                RoomActionContext(self.actor.location, {}),
-            )
-        )
+        return resolve_combat_action(ActionRequest(
+            self.actor,
+            _GATED_KEY,
+            targets,
+            RoomActionContext(self.actor.location, {}),
+        ))
 
     def _resist_entries(self, result):
         return [
@@ -679,14 +669,12 @@ class DivineSexualArtsCastTests(EvenniaTest):
         human.db.skills = {"active": [_GATED_KEY], "passive": []}
         human.location = self.room1
         with patch("world.rules.sexual_resist.resist_verdict") as spy:
-            result = ActionResolver.resolve(
-                ActionRequest(
-                    human,
-                    _GATED_KEY,
-                    [self.target],
-                    RoomActionContext(self.room1, {}),
-                )
-            )
+            result = resolve_combat_action(ActionRequest(
+                human,
+                _GATED_KEY,
+                [self.target],
+                RoomActionContext(self.room1, {}),
+            ))
         self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
         spy.assert_not_called()
 

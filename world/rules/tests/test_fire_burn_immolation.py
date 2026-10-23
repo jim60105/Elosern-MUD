@@ -27,7 +27,8 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from tools.spec_traceability import covers_requirement
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -288,7 +289,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         self.assertIn("t_synth_burn_dot", entity_active_buffs(self.foe))
@@ -330,7 +331,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.caster],
             context=BattlefieldActionContext(self.bf),
         )
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertIn("t_synth_armor_mount", entity_active_buffs(self.caster))
 
@@ -351,7 +352,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res_strike = ActionResolver.resolve(strike_req)
+            res_strike = resolve_combat_action(strike_req)
 
         self.assertEqual(res_strike.outcome, "success")
         # Attacker holds live ignition instance with grant-time attribution to armor holder
@@ -383,7 +384,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            ActionResolver.resolve(magic_req)
+            resolve_combat_action(magic_req)
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
 
         # Missed physical swing does NOT trigger ignite
@@ -394,7 +395,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
                 targets=[self.caster],
                 context=BattlefieldActionContext(self.bf),
             )
-            ActionResolver.resolve(miss_req)
+            resolve_combat_action(miss_req)
         self.assertNotIn("t_synth_ignite_debuff", entity_active_buffs(self.foe2))
 
         # Sourceless write does NOT trigger ignite
@@ -438,7 +439,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         self.assertIn("t_synth_lava_ground", entity_active_buffs(self.foe))
@@ -543,7 +544,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res_hit = ActionResolver.resolve(req_hit)
+            res_hit = resolve_combat_action(req_hit)
         self.assertEqual(res_hit.outcome, "success")
         self.assertIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
 
@@ -551,7 +552,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self.caster.buffs.remove("t_synth_sacrifice_self")
         self.assertNotIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
         with patch("world.rules.combat.damage.roll_d100", return_value=0):  # miss
-            res_miss = ActionResolver.resolve(req_hit)
+            res_miss = resolve_combat_action(req_hit)
         # Self-buff lands regardless of damage hit
         self.assertIn("t_synth_sacrifice_self", entity_active_buffs(self.caster))
 
@@ -594,7 +595,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             context=BattlefieldActionContext(self.bf),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
 
@@ -757,6 +758,6 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
             targets=[self.foe],
             context=BattlefieldActionContext(self.bf),
         )
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.UNKNOWN_SKILL)

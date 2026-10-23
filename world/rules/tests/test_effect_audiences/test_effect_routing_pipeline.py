@@ -19,6 +19,7 @@ from world.rules.action import (
     _stored_trait_value,
     plan_effect_audiences,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.action_preview import (
     _applicable_shorthands,
     preview_skill,
@@ -183,7 +184,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         # Target (enemy): took damage, debuff NOT cleansed
@@ -222,7 +223,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertLess(self.companion.traits.hp.current, comp_hp)
 
@@ -247,7 +248,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
         self.target.traits.hp.current = 40
         req = ActionRequest(self.caster, skill.key, [self.target], self.context)
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertGreater(self.target.traits.hp.current, 40)
 
@@ -280,7 +281,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertGreater(self.caster.traits.hp.current, 50)
         # Verify caster appears in event log
@@ -317,7 +318,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100") as mock_roll,
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         # Damage was skipped: roll_d100 was NEVER called
@@ -356,7 +357,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(pre.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
         # Resolve rejects
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
@@ -393,7 +394,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.battlefield.teams["party"] = frozenset({"caster", "companion", "target"})
         self.battlefield.teams["foes"] = frozenset()
 
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(res.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
 
@@ -445,7 +446,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
                 },
             ),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "rejected")
         # Verify rollback restored target, caster hp, and caster mp
@@ -476,7 +477,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.companion.traits.hp.current = 60
         req = ActionRequest(self.caster, skill.key, [self.companion], self.context)
         with patch("world.rules.action.costs.grant_skill_practice_xp", return_value=True) as mock_grant:
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # Companion received TWO effects (heal + cleanse), but grant_skill_practice_xp was called ONCE for companion!
         self.assertEqual(mock_grant.call_count, 1)
@@ -501,6 +502,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         )
         req = ActionRequest(self.caster, skill.key, [], RoomActionContext(self.room))
         with patch("world.rules.action.costs.grant_skill_practice_xp", return_value=True) as mock_grant:
+            # An out-of-combat cast keeps its own accepted identity.
             res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
         # Verified practiced vs None
@@ -539,7 +541,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         # Target took water damage and kept debuff

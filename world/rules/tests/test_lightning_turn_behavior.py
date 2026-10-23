@@ -58,7 +58,11 @@ from world.rules.state_reactions import (
     dispatch_outcome_reaction,
     load_state_reaction_rules,
 )
-from world.rules.tests._combat_session_helpers import _monster, _player
+from world.rules.tests._combat_session_helpers import (
+    _monster,
+    _player,
+    resolve_combat_action,
+)
 from world.rules.tests.combat_fixtures import FakeEntity, grant_lineage
 from world.rules.traits import restore_gauges_to_full
 from world.skills.effects import (
@@ -384,7 +388,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # All three strikes hit
         with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100, 100]):
             req = ActionRequest(self.actor, combo_skill.key, [target], ctx)
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -444,14 +448,14 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_start = high_def_target.traits.hp.current
             req_exec = ActionRequest(self.actor, exec_skill.key, [high_def_target], ctx)
-            res_exec = ActionResolver.resolve(req_exec)
+            res_exec = resolve_combat_action(req_exec)
             self.assertEqual(res_exec.outcome, "success")
             exec_dmg = hp_start - high_def_target.traits.hp.current
 
             restore_gauges_to_full(high_def_target)
             restore_gauges_to_full(self.actor)
             req_norm = ActionRequest(self.actor, normal_skill.key, [high_def_target], ctx)
-            res_norm = ActionResolver.resolve(req_norm)
+            res_norm = resolve_combat_action(req_norm)
             self.assertEqual(res_norm.outcome, "success")
             norm_dmg = hp_start - high_def_target.traits.hp.current
 
@@ -492,14 +496,14 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
             restore_gauges_to_full(self.actor)
             hp_start = full_hp_target.traits.hp.current
             req_dev = ActionRequest(self.actor, devast_skill.key, [full_hp_target], ctx2)
-            res_dev = ActionResolver.resolve(req_dev)
+            res_dev = resolve_combat_action(req_dev)
             self.assertEqual(res_dev.outcome, "success")
             dev_dmg = hp_start - full_hp_target.traits.hp.current
 
             full_hp_target.traits.hp.current = hp_start
             restore_gauges_to_full(self.actor)
             req_non_dev = ActionRequest(self.actor, non_devast_skill.key, [full_hp_target], ctx2)
-            res_non_dev = ActionResolver.resolve(req_non_dev)
+            res_non_dev = resolve_combat_action(req_non_dev)
             self.assertEqual(res_non_dev.outcome, "success")
             non_dev_dmg = hp_start - full_hp_target.traits.hp.current
 

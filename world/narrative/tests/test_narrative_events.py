@@ -152,6 +152,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         """Scenario: Compressed encounter retains sources."""
         record = CombatSessionRecord(
             session_id="compress_sess_99",
+            engagement_id="compressed:99:1",
             mode="hostile",
             room_id=self.room.pk,
             player_ids=(self.player.pk,),

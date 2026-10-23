@@ -171,7 +171,8 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         self.addCleanup(pool_patch.stop)
 
     def _resolve_lethal(self, target):
-        from world.rules.action import ActionRequest, ActionResolver
+        from world.rules.action import ActionRequest
+        from world.rules.tests._combat_session_helpers import resolve_combat_action
         from world.rules.combat import Battlefield, BattlefieldActionContext
 
         field = Battlefield(
@@ -185,7 +186,7 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def _accept(self, payload):
         compiled = compile_quest_blueprint(payload)

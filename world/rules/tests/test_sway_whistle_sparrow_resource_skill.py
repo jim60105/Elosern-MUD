@@ -20,9 +20,10 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
 from world.rules.action import ActionResolver, RejectReason
+from world.rules.tests._combat_session_helpers import engagement_provenance
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import Battlefield
+from world.rules.combat import Battlefield, combat_provenance
 from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
@@ -112,7 +113,9 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(request.skill_key, SKILL_KEY)
         self.assertEqual(request.targets, [player])
         before = (pecker.traits.mp.current, pecker.traits.sp.current)
-        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
             result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(player.traits.hp.current, 10000)
@@ -143,8 +146,12 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             pecker.traits.sp.current = pecker.traits.sp.max
             refresh_request = _enemy_policy(pecker, field, record)
             self.assertEqual(refresh_request.skill_key, SKILL_KEY)
-            with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                self.assertEqual(ActionResolver.resolve(refresh_request).outcome, "success")
+            with patch(
+                "world.rules.combat.damage.roll_d100", return_value=80
+            ), combat_provenance(engagement_provenance().at_slot(0)):
+                self.assertEqual(
+                    ActionResolver.resolve(refresh_request).outcome, "success"
+                )
             refreshed = _buff_instances(player)
             self.assertEqual(len(refreshed), 1)
             self.assertEqual(refreshed[0].remaining_seconds, duration)
@@ -163,7 +170,9 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         depleted_mp = pecker.traits.mp.current
         fallback = _enemy_policy(pecker, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
-        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
             self.assertEqual(ActionResolver.resolve(fallback).outcome, "success")
         reloaded = Monster.objects.get(pk=pecker.pk)
         self.assertEqual(reloaded.species_key, pecker.species_key)
@@ -184,7 +193,8 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         practice_before = dict(reloaded.db.skill_proficiency or {})
         player_hp = player.traits.hp.current
         player.traits.hp.current = 0
-        late = ActionResolver.resolve(strike)
+        with combat_provenance(engagement_provenance().at_slot(0)):
+            late = ActionResolver.resolve(strike)
         self.assertEqual(late.outcome, "rejected")
         self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(

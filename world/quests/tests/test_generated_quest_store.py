@@ -55,7 +55,8 @@ from world.quests.runtime import (
     read_records,
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin, accept
-from world.rules.action import ActionRequest, ActionResolver
+from world.rules.action import ActionRequest
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.guild import register_adventurer
 from world.rules.guild_config import load_catalog_into_cache, register_catalog_offers
@@ -474,7 +475,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     @covers_requirement("quest-lifecycle::generated-quest-definitions-resolve-after-a-server-restart")
     def test_accepted_generated_quest_reads_resolves_and_abandons_after_restore(self):

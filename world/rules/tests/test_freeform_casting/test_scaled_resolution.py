@@ -10,7 +10,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, E
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.lore.elements import Element
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
 from world.rules.action_preview import preview_skill, revalidate_submission
 from world.rules.clock import WorldClock
 from world.rules.combat import (
@@ -41,6 +41,7 @@ from .._combat_session_helpers import (
     _race_key,
     _behaviour_archetype_key,
     open_synthetic_scope,
+    resolve_combat_action,
 )
 from ..combat_fixtures import BattlefieldIsolation, grant_lineage
 
@@ -107,9 +108,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         mp_before = self.actor.traits.mp.value
         hp_before = self.monster.traits.hp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request(_T_CAST.key, [self.monster], 0.5)
-            )
+            result = resolve_combat_action(self._request(_T_CAST.key, [self.monster], 0.5))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.actor.traits.mp.value,
@@ -125,9 +124,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
     def test_double_scale_cast_deducts_double_mp(self):
         mp_before = self.actor.traits.mp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(
-                self._request(_T_STORM.key, [self.monster], 2.0)
-            )
+            result = resolve_combat_action(self._request(_T_STORM.key, [self.monster], 2.0))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.actor.traits.mp.value,
@@ -147,9 +144,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         hp_before = self.monster.traits.hp.value
         # The fixture budget sits strictly under the ×4 rung of the heavy row.
         self.assertLess(200, scaled_mp_cost(int(_T_TYRANT.cost["mp"]), 4.0))
-        result = ActionResolver.resolve(
-            self._request(_T_TYRANT.key, [self.monster], 4.0)
-        )
+        result = resolve_combat_action(self._request(_T_TYRANT.key, [self.monster], 4.0))
         self.assertEqual(result.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(self.actor.traits.mp.value, 200)
         self.assertEqual(self.monster.traits.hp.value, hp_before)
@@ -163,9 +158,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 200
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request(_T_CAST.key, [self.monster], 0.25)
-            )
+            result = resolve_combat_action(self._request(_T_CAST.key, [self.monster], 0.25))
         self.assertEqual(result.outcome, "success")
         damage_entry = next(
             entry for entry in result.event_log.entries if entry.kind == "damage"
@@ -178,9 +171,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.base = 5
         self.monster.traits.hp.current = 5
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request(_T_CAST.key, [self.monster], 2.0)
-            )
+            result = resolve_combat_action(self._request(_T_CAST.key, [self.monster], 2.0))
         self.assertEqual(result.outcome, "success")
         defeated = [
             entry
@@ -200,9 +191,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.current = 150
         # magic_power 30 → base heal 30 → double scale 60, capped by the gap 50.
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(
-                self._request(_T_TIDE.key, [self.monster], 2.0)
-            )
+            result = resolve_combat_action(self._request(_T_TIDE.key, [self.monster], 2.0))
         self.assertEqual(result.outcome, "success")
         heal_entry = next(
             entry for entry in result.event_log.entries if entry.kind == "heal"
@@ -214,9 +203,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.current = 0
         self.actor.traits.mp.current = 1000
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(
-                self._request(_T_TIDE.key, [self.monster], 2.0)
-            )
+            result = resolve_combat_action(self._request(_T_TIDE.key, [self.monster], 2.0))
         self.assertEqual(result.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
         self.assertEqual(self.monster.traits.hp.value, 0)
 
@@ -229,9 +216,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster.traits.hp.current = 200
         mp_before = self.actor.traits.mp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request(_T_PHOENIX.key, [self.monster], 2.0)
-            )
+            result = resolve_combat_action(self._request(_T_PHOENIX.key, [self.monster], 2.0))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.actor.traits.mp.value,

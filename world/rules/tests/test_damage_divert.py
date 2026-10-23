@@ -22,11 +22,11 @@ from typeclasses.rooms import Room
 from typeclasses.entities import LivingEntity
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     stored_gauge_pair,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -523,7 +523,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
                 patch("world.rules.combat.damage.roll_d100", return_value=50),
                 patch("world.rules.combat.damage.dispatch_outcome_reaction") as mock_reaction,
             ):
-                result = ActionResolver.resolve(req)
+                result = resolve_combat_action(req)
 
         self.assertEqual((result.outcome, result.reason, result.detail), ("success", None, None))
         self.assertIsNotNone(result.event_log)

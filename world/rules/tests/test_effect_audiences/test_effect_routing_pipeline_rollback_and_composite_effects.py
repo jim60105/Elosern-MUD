@@ -13,7 +13,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     PendingEffect,
     RejectReason,
     RejectedAction,
@@ -21,6 +20,7 @@ from world.rules.action import (
     _stored_trait_value,
     plan_effect_audiences,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.action_preview import (
     _applicable_shorthands,
     preview_skill,
@@ -210,7 +210,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res_heal = ActionResolver.resolve(req_heal)
+            res_heal = resolve_combat_action(req_heal)
         self.assertEqual(res_heal.outcome, "success")
         self.assertGreater(self.target.traits.hp.current, 50)
 
@@ -243,7 +243,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res_mixed = ActionResolver.resolve(req_mixed)
+            res_mixed = resolve_combat_action(req_mixed)
         self.assertEqual(res_mixed.outcome, "success")
         self.assertLess(self.target.traits.hp.current, target_hp_before)
         self.assertEqual(self.companion.traits.hp.current, companion_hp_before)
@@ -282,7 +282,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.caster.traits.mp.current, caster_mp_before - 25)
         self.assertGreater(self.companion.traits.hp.current, 50)
@@ -328,7 +328,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         with patch.dict(_EVENT_EFFECT_PLANNERS, {"t_late_fault": late_fault}), (
             patch("world.rules.combat.damage.roll_d100", return_value=60)
         ):
-            failed = ActionResolver.resolve(req)
+            failed = resolve_combat_action(req)
         self.assertNotEqual(failed.outcome, "success")
         self.assertIsNone(failed.event_log)
         self.assertIsNone(failed.time_cost_seconds)
@@ -355,7 +355,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
         ):
-            retried = ActionResolver.resolve(req)
+            retried = resolve_combat_action(req)
         self.assertEqual(retried.outcome, "success")
         self.assertEqual(
             self.caster.traits.mp.current, before[self.caster.pk][1] - 25

@@ -7,7 +7,8 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
-from world.rules.action import ActionRequest, ActionResolver, PendingEffect
+from world.rules.action import ActionRequest, PendingEffect
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -201,7 +202,7 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         field_ctx = BattlefieldActionContext(battlefield)
         req = ActionRequest(self.actor, sage_spell.key, [self.target], field_ctx)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         observed_loss = 200 - self.target.traits.hp.current
         self.assertGreater(observed_loss, 0)

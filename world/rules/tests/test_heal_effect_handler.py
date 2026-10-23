@@ -12,7 +12,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     PendingEffect,
     RejectReason,
     _EFFECT_HANDLERS,
@@ -36,7 +35,7 @@ from world.skills.registry import (
     TargetSpec,
 )
 
-from ._combat_session_helpers import live_skill_registry
+from ._combat_session_helpers import live_skill_registry, resolve_combat_action
 from .combat_fixtures import FakeEntity
 
 
@@ -329,7 +328,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_single_heal_restores_a_damaged_target_up_to_max(self):
         skill = self._grant(["heal:single"], TargetSpec.SINGLE)
         expected = _heal_magnitude(self.actor)
-        result = ActionResolver.resolve(self._request(skill, [self.target]))
+        result = resolve_combat_action(self._request(skill, [self.target]))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.target.traits.hp.current,
@@ -342,7 +341,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_healing_a_full_hp_target_resolves_without_error(self):
         skill = self._grant(["heal:single"], TargetSpec.SINGLE)
         self.target.traits.hp.current = 100
-        result = ActionResolver.resolve(self._request(skill, [self.target]))
+        result = resolve_combat_action(self._request(skill, [self.target]))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.traits.hp.current, 100)
 
@@ -350,9 +349,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_area_heal_restores_each_target_independently_through_the_resolver(self):
         skill = self._grant(["heal:area"], TargetSpec.AREA)
         expected = _heal_magnitude(self.actor)
-        result = ActionResolver.resolve(
-            self._request(skill, [self.target, self.ally])
-        )
+        result = resolve_combat_action(self._request(skill, [self.target, self.ally]))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.traits.hp.current, min(100, 40 + expected))
         self.assertEqual(self.ally.traits.hp.current, min(100, 80 + expected))
@@ -375,7 +372,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
                 return_value={},
             ),
         ):
-            result = ActionResolver.resolve(self._request(skill, [enemy]))
+            result = resolve_combat_action(self._request(skill, [enemy]))
         self.assertEqual(result.outcome, "success")
         self.assertLess(enemy.traits.hp.current, 60)
         self.assertEqual(
@@ -401,7 +398,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
                 return_value={},
             ),
         ):
-            result = ActionResolver.resolve(self._request(skill, [enemy]))
+            result = resolve_combat_action(self._request(skill, [enemy]))
         self.assertEqual(result.outcome, "success")
         self.assertLess(enemy.traits.hp.current, 60)
         # Caster missing HP is 100 - 30 = 70. 10% is 7. HP becomes 37.
@@ -413,7 +410,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         self.target.traits.hp.current = 0
         handler = unittest.mock.MagicMock()
         with patch.dict(_EFFECT_HANDLERS, {"heal": handler}):
-            result = ActionResolver.resolve(self._request(skill, [self.target]))
+            result = resolve_combat_action(self._request(skill, [self.target]))
         self.assertEqual(result.reason, RejectReason.TARGET_DEAD)
         handler.assert_not_called()
         self.assertEqual(self.target.traits.hp.current, 0)
@@ -437,7 +434,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
                 return_value={},
             ),
         ):
-            result = ActionResolver.resolve(self._request(skill, [enemy]))
+            result = resolve_combat_action(self._request(skill, [enemy]))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(enemy.traits.hp.current, 0)
 
@@ -445,7 +442,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_dead_caster_self_heal_does_not_revive(self):
         skill = self._grant(["self_heal"], TargetSpec.NONE)
         self.actor.traits.hp.current = 0
-        result = ActionResolver.resolve(self._request(skill, []))
+        result = resolve_combat_action(self._request(skill, []))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.hp.current, 0)
 
@@ -453,7 +450,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_dead_caster_missing_fraction_self_heal_does_not_revive(self):
         skill = self._grant(["self_heal:missing_fraction:0.2"], TargetSpec.NONE)
         self.actor.traits.hp.current = 0
-        result = ActionResolver.resolve(self._request(skill, []))
+        result = resolve_combat_action(self._request(skill, []))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.hp.current, 0)
 
@@ -461,6 +458,6 @@ class HealResolverIntegrationTests(EvenniaTestCase):
     def test_full_hp_caster_missing_fraction_self_heal_stages_zero(self):
         skill = self._grant(["self_heal:missing_fraction:0.1"], TargetSpec.NONE)
         self.actor.traits.hp.current = 100
-        result = ActionResolver.resolve(self._request(skill, []))
+        result = resolve_combat_action(self._request(skill, []))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.hp.current, 100)

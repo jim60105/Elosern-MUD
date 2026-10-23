@@ -32,7 +32,8 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.rooms import Room
 
 from world.rules import monster_behaviour as behaviour
-from world.rules.action import ActionRequest, ActionResolver, plan_effect_audiences
+from world.rules.action import ActionRequest, plan_effect_audiences
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition, apply_buff
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
@@ -1096,7 +1097,7 @@ class SupportAdapterTests(SupportFixture):
         self.assertIsNotNone(request)
         self.assertEqual(request.skill_key, HEAL.key)
         self.assertEqual([target.key for target in request.targets], [self.ally.key])
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success", getattr(result, "detail", result))
         self.assertGreater(self._committed(self.ally, "hp"), 100)
         self.assertEqual(self._committed(self.monster, "mp"), before_mp - 3)
@@ -1114,7 +1115,7 @@ class SupportAdapterTests(SupportFixture):
             request = _enemy_policy(self.monster, field, self.record)
         self.assertIsNotNone(request)
         self.assertEqual(request.skill_key, LOCK.key)
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success", getattr(result, "detail", result))
         # The chosen recipient carries the lock; the bystander does not.
         chosen = request.targets[0]

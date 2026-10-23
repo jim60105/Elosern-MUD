@@ -23,7 +23,10 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_beats import RoundRecord, build_combat_beats
 from world.rules.event_log import render_entry_text
 from world.rules.sexual_resist import get_resist_config
-from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    resolve_combat_action,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.quests.catalog import register_catalog
 from world.tests.synthetic_data import (
@@ -164,15 +167,13 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
     def _resolve(self, skill, monster, *, narration_scope=""):
         request, field = self._request(skill, monster)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                request, narration_scope=narration_scope
-            )
+            result = resolve_combat_action(request, narration_scope=narration_scope)
         return result, field
 
     def _cast_act(self, monster, *, roll: int):
         request, _ = self._request(self.act_skill, monster)
         with patch("world.rules.action.gates.roll_d100", return_value=roll):
-            return ActionResolver.resolve(request, narration_scope="act-scope")
+            return resolve_combat_action(request, narration_scope="act-scope")
 
     @covers_requirement(
         "action-resolution-pipeline::step-7-selects-narration-without-changing-what-resolution-decides",
@@ -237,9 +238,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                request, narration_scope="area-scope"
-            )
+            result = resolve_combat_action(request, narration_scope="area-scope")
         self.assertEqual(result.outcome, "success", result.detail)
         entries = result.event_log.entries
         action_tier = action_lines(
@@ -283,7 +282,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         with patch(
             "world.rules.combat.damage.roll_d100", side_effect=_counting_roll
         ):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(len(draws), 1)
 
@@ -416,7 +415,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             "world.rules.action.event_log.entry_line",
             side_effect=RuntimeError("narration fault"),
         ), patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request, narration_scope="scope")
+            result = resolve_combat_action(request, narration_scope="scope")
         self.assertEqual(result.outcome, "success")
         self.assertTrue(result.event_log.entries)
         for entry in result.event_log.entries:

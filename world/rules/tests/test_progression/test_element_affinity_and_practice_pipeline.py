@@ -13,7 +13,6 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     RejectReason,
@@ -52,6 +51,7 @@ from .._combat_session_helpers import (
     live_skill_registry,
     SYNTH_SEAM_AREA_SKILL,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_damage_skill,
     synth_innate_overlay,
     synth_lineage_tree,
@@ -189,9 +189,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         monster = self._monsters(1)[0]
         context = self._field([monster], simulated=True)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request(_MAGIC_CASTER, [monster], context)
-            )
+            result = resolve_combat_action(self._request(_MAGIC_CASTER, [monster], context))
         self.assertEqual(result.outcome, "success")
         self.assertLess(monster.traits.hp.current, 200)
         # A real, committed cast that grants nothing.
@@ -204,9 +202,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         monsters = self._monsters(3)
         context = self._field(monsters)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                self._request("t_glitter_cascade", "all-enemies", context)
-            )
+            result = resolve_combat_action(self._request("t_glitter_cascade", "all-enemies", context))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.actor.db.skill_proficiency["t_glitter_cascade"],
@@ -256,7 +252,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         _EVENT_EFFECT_PLANNERS["test-poison"] = poison
         try:
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                first = ActionResolver.resolve(request)
+                first = resolve_combat_action(request)
         finally:
             _EVENT_EFFECT_PLANNERS.clear()
             _EVENT_EFFECT_PLANNERS.update(real)
@@ -285,7 +281,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         )
         # The legitimate same-tick retry accrues normally.
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            retry = ActionResolver.resolve(request)
+            retry = resolve_combat_action(request)
         self.assertEqual(retry.outcome, "success")
         self.assertEqual(
             self.actor.db.skill_proficiency[_MAGIC_CASTER],
@@ -293,7 +289,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         )
         # And the same (actor, skill, target) is then deduped for the tick.
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            again = ActionResolver.resolve(request)
+            again = resolve_combat_action(request)
         self.assertEqual(again.outcome, "success")
         self.assertEqual(
             self.actor.db.skill_proficiency[_MAGIC_CASTER],

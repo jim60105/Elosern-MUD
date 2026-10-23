@@ -30,9 +30,9 @@ from world.quests.runtime import (
 )
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     register_event_effect_planner,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party import join_party
 from world.rules.monster_individual import construct_species_individual
@@ -158,7 +158,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         field = self._field(actor, targets)
         request = ActionRequest(actor, skill_key, targets, BattlefieldActionContext(field))
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def _records(self):
         return [to_storage(record) for record in read_records(self.player)]
@@ -349,7 +349,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             ),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(target.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
@@ -379,7 +379,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             ),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(guard.traits.hp.current, 0)
         stored = self._records()[0]
@@ -451,7 +451,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
             actor, skill_key, targets, BattlefieldActionContext(field)
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def _records(self):
         return [to_storage(record) for record in read_records(self.player)]
@@ -553,7 +553,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
             companion, STRIKE_SKILL.key, [prey], RoomActionContext(self.room)
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
         self.assertEqual(prey.traits.hp.current, 1)
@@ -1027,7 +1027,7 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             actor, skill_key, targets, BattlefieldActionContext(field)
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def _defeat_entry(self, actor, individual, *, simulated: bool = False):
         from world.rules.event_log import EventEntry

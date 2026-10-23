@@ -38,7 +38,6 @@ from typeclasses.rooms import Room
 import world.rules.monster_ai.candidates as candidates
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     RejectReason,
     plan_effect_audiences,
 )
@@ -67,6 +66,7 @@ from ._combat_session_helpers import (
     _monster,
     _player,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_damage_skill,
     synth_innate_overlay,
 )
@@ -1177,11 +1177,9 @@ class CandidateRestrictionTests(EvenniaTestCase):
         context = BattlefieldActionContext(self._field(target))
         before = self._reloaded_hp(target)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            settlement = ActionResolver.resolve(
-                ActionRequest(
-                    self.monster, plan.skill_key, [target], context, scale=plan.scale
-                )
-            )
+            settlement = resolve_combat_action(ActionRequest(
+                self.monster, plan.skill_key, [target], context, scale=plan.scale
+            ))
         self.assertEqual(settlement.outcome, "success", settlement.detail)
         self.assertLess(self._reloaded_hp(target), before)
 

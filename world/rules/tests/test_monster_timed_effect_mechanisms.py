@@ -23,9 +23,9 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     RejectReason,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     active_stack_count,
@@ -142,7 +142,7 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
         )
         with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
             with patch("world.rules.combat.damage.roll_d100", return_value=roll):
-                return ActionResolver.resolve(request)
+                return resolve_combat_action(request)
 
     def _gauges(self, *characters) -> tuple[tuple[int, int, int], ...]:
         return tuple(
@@ -220,9 +220,7 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
         before = self._gauges(self.caster, self.enemy, self.ally, self.control)
         with patch("world.rules.combat.damage.roll_d100") as roller:
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                rejected = ActionResolver.resolve(
-                    ActionRequest(self.caster, skill.key, [self.enemy], self.context)
-                )
+                rejected = resolve_combat_action(ActionRequest(self.caster, skill.key, [self.enemy], self.context))
         self.assertEqual(rejected.outcome, "rejected")
         self.assertEqual(rejected.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(roller.call_count, 0)
@@ -345,7 +343,7 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
                         actor, skill.key, [victim], BattlefieldActionContext(field)
                     )
                     with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                        result = ActionResolver.resolve(request)
+                        result = resolve_combat_action(request)
                     self.assertEqual(result.outcome, "success")
                     observed.append(
                         (

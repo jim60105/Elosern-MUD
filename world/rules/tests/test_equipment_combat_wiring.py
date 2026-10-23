@@ -66,7 +66,7 @@ from world.quests.catalog import register_catalog
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, make_item, make_skill
 
-from ._combat_session_helpers import open_synthetic_scope
+from ._combat_session_helpers import open_synthetic_scope, resolve_combat_action
 from ._equipment_rulebook_probes import first_matching_rule
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -522,9 +522,7 @@ class CostParityTests(BattlefieldIsolation, _WearerCase):
         # A successful cast spends exactly the equipment-adjusted cost.
         player.traits.mp.current = adjusted
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
-            result = ActionResolver.resolve(
-                ActionRequest(player, _MP_SKILL.key, [monster], context)
-            )
+            result = resolve_combat_action(ActionRequest(player, _MP_SKILL.key, [monster], context))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(player.traits.mp.current, 0)
 

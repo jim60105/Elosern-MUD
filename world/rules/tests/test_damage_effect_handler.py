@@ -24,12 +24,12 @@ import world.rules.cross_lineage_unlock  # noqa: F401
 
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     RejectReason,
     SKILL_TIME_OVERRIDES,
     _EFFECT_HANDLER_SURFACES,
     _entries_from_effect,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
@@ -321,7 +321,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
     def test_damage_skill_resolves_and_emits_structured_entries(self):
         before = self.target.traits.hp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(self.request)
+            result = resolve_combat_action(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(self.target.traits.hp.value, before)
         self.assertEqual(
@@ -336,7 +336,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         SKILL_TIME_OVERRIDES[_T_CAST.key] = -1
         try:
             with patch("world.rules.combat.damage.roll_d100", return_value=100) as roller:
-                result = ActionResolver.resolve(self.request)
+                result = resolve_combat_action(self.request)
         finally:
             SKILL_TIME_OVERRIDES.pop(_T_CAST.key, None)
         self.assertEqual(result.reason, RejectReason.TIME_COST_LOOKUP_FAILED)
@@ -345,13 +345,13 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
 
     def test_fled_target_reaches_named_range_rejection(self):
         self.request.context.battlefield.fled.add("target")
-        result = ActionResolver.resolve(self.request)
+        result = resolve_combat_action(self.request)
         self.assertEqual(result.reason, RejectReason.TARGET_OUT_OF_RANGE)
 
     def test_miss_leaves_complete_hp_gauge_backing_data_unchanged(self):
         before = deepcopy(self.target.traits.hp._data)
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(self.request)
+            result = resolve_combat_action(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.traits.hp._data, before)
 
@@ -388,14 +388,14 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         self.addCleanup(spliced.stop)
         self.target.traits.hp.current = 100
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            ActionResolver.resolve(self.request)
+            resolve_combat_action(self.request)
         base_damage = 100 - self.target.traits.hp.value
         self.target.traits.hp.current = 100
         self.target.db.skill_grants = [
             ConferredSkillGrant("elosia", _T_GUARDIAN.key, 0.5)
         ]
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            ActionResolver.resolve(self.request)
+            resolve_combat_action(self.request)
         granted_damage = 100 - self.target.traits.hp.value
         self.assertGreater(base_damage, 0)
         # scale 0.5 of the flat +5 defense adds 2.5 to the subtracted term;
@@ -435,7 +435,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         )
         before = npc.traits.hp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertNotEqual(result.reason, RejectReason.EVENT_LOG_CONSTRUCTION_FAILED)
         self.assertEqual(
@@ -457,7 +457,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         )
         before = _stored_hp(self.target)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(_stored_hp(self.target), before)
 
@@ -478,7 +478,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         )
         before = _stored_hp(self.target)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
         self.assertEqual(_stored_hp(self.target), before)
