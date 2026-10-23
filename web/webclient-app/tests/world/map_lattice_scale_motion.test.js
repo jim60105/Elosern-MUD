@@ -91,6 +91,8 @@ const copies = () => [...host().children];
 const liveSvg = () => wrapper.get('[data-testid="local-map__lattice"]').element;
 const currentId = () => wrapper.get('.local-map__node[data-visibility="current"]').attributes("data-node");
 const nonZeroPan = () => panWrites.filter((write) => write.value !== "0px");
+// The same writes as plain text, for readable equality failures.
+const panStrings = () => nonZeroPan().map(({ name, value }) => `${name}=${value}`);
 const frames = (n) =>
   new Promise((resolve) => {
     const step = (left) => (left === 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
@@ -188,7 +190,7 @@ describe("island movement across a changed mode or level", () => {
     expect(currentId()).toBe(LOCAL_MAP_MOVE_LADDER.to.current_node);
     expect(wrapper.get('[data-testid="local-map__scale"]').text()).toBe("格距 400 m");
     // No equal-scale FLIP and no marker glide.
-    expect(nonZeroPan()).toEqual([]);
+    expect(panStrings()).toEqual([]);
 
     const [copy] = copies();
     expect(copies()).toHaveLength(1);
@@ -241,7 +243,7 @@ describe("island movement across a changed mode or level", () => {
     expect(copy.querySelector(".local-map__rings")).not.toBeNull();
     expect(wrapper.find('[data-testid="local-map__rings"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);
-    expect(nonZeroPan()).toEqual([]);
+    expect(panStrings()).toEqual([]);
   });
 
   for (const level of ["reduced", "off"]) {
@@ -253,7 +255,7 @@ describe("island movement across a changed mode or level", () => {
       expect(copies()).toHaveLength(0);
       await frames(2);
       expect(copies()).toHaveLength(0);
-      expect(panWrites).toEqual([]);
+      expect(panWrites.map(({ name, value }) => `${name}=${value}`)).toEqual([]);
       for (const el of wrapper.findAll(".map-lattice__pan")) {
         expect(el.element.style.getPropertyValue("--pan-x")).toBe("");
       }
@@ -315,6 +317,40 @@ describe("island movement across a changed mode or level", () => {
     expect(copies()).toHaveLength(0);
   });
 
+  it("settles a pan still in flight when a scale change follows within one beat", async () => {
+    mountIsland(LOCAL_MAP_MOVE_SAME_SCALE.from, "full");
+    await commit(LOCAL_MAP_MOVE_SAME_SCALE.to);
+    const field = wrapper.get('[data-testid="map-lattice__pan--field"]').element;
+    // Mid-pan: the field still carries an offset (as a running transition would).
+    field.style.setProperty("--pan-x", "17px");
+    panWrites.length = 0;
+    await commit(LOCAL_MAP_MOVE_LADDER.to);
+    expect(copies()).toHaveLength(1);
+    // The new-scale drawing does not keep easing the old-scale offset: the
+    // live groups rest at 0 with their transition restored (only the frozen
+    // copy keeps the mid-pan offset), and no new FLIP offset was computed.
+    expect(copies()[0].querySelector(".map-lattice__pan").style.transition).toBe("none");
+    for (const el of liveSvg().querySelectorAll(".map-lattice__pan")) {
+      expect(el.style.getPropertyValue("--pan-x")).toBe("0px");
+      expect(el.style.transition).toBe("");
+    }
+  });
+
+  it("keeps at most three fading copies, dropping the oldest", async () => {
+    mountIsland(LOCAL_MAP_MOVE_LADDER.from, "full");
+    // uniform:2000 → compressed:1500 → uniform:1500 → uniform:2000: four changes.
+    const sequence = [LOCAL_MAP_MOVE_LADDER.to, LOCAL_MAP_MOVE_COMPRESSION.from, LOCAL_MAP_MOVE_COMPRESSION.to, LOCAL_MAP_MOVE_LADDER.to];
+    const seen = [];
+    for (const payload of sequence) {
+      await commit(payload);
+      seen.push(copies()[0]);
+    }
+    expect(copies()).toHaveLength(3);
+    const order = copies().map((copy) => seen.indexOf(copy));
+    expect(order).toEqual([3, 2, 1]);
+    expect(seen[0].isConnected).toBe(false);
+  });
+
   it("clears every copy and timer on unmount", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     mountIsland(LOCAL_MAP_MOVE_LADDER.from, "full");
@@ -336,7 +372,7 @@ describe("island movement without a shared scale", () => {
     expect(copies()).toHaveLength(0);
     // The previous node is not in the new drawing: the existing immediate
     // no-shared-frame placement.
-    expect(nonZeroPan()).toEqual([]);
+    expect(panStrings()).toEqual([]);
   });
 
   it("crosses a gateway by the approved mode/level decision, never synthesising a shared frame", async () => {
@@ -349,7 +385,7 @@ describe("island movement without a shared scale", () => {
       expect(currentId()).toBe(LOCAL_MAP_WILDERNESS_RETURN_SAMPLE.current_node);
       expect(copies()).toHaveLength(changed && level === "full" ? 1 : 0);
       // The gate room is not on the wilderness island: no FLIP offset.
-      expect(nonZeroPan()).toEqual([]);
+      expect(panStrings()).toEqual([]);
       wrapper.unmount();
       wrapper = null;
     }

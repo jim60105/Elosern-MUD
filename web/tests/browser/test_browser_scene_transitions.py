@@ -232,7 +232,7 @@ def _ciaran(current: str) -> dict:
 # pan offset of the dot field, over two animation frames.
 _ISLAND_COMMIT = r"""async ([env]) => {
   const island = document.querySelector('.local-map');
-  const seen = { copies: 0, inert: null, testids: null, controls: null, duration: null, fieldPan: 0 };
+  const seen = { copies: 0, inert: null, testids: null, controls: null, duration: null, offset: null, fieldPan: 0 };
   const read = () => {
     const copies = island.querySelectorAll('[data-testid="local-map__leaving"]');
     seen.copies = Math.max(seen.copies, copies.length);
@@ -243,6 +243,10 @@ _ISLAND_COMMIT = r"""async ([env]) => {
       seen.testids = copy.querySelectorAll('[data-testid], [data-node]').length;
       seen.controls = host.querySelectorAll('button, a, [tabindex]').length;
       seen.duration = getComputedStyle(copy).animationDuration;
+      const live = island.querySelector('[data-testid="local-map__lattice"]').getBoundingClientRect();
+      const box = copy.getBoundingClientRect();
+      seen.offset = Math.max(Math.abs(box.left - live.left), Math.abs(box.top - live.top),
+                             Math.abs(box.width - live.width), Math.abs(box.height - live.height));
     }
     const field = island.querySelector('[data-testid="map-lattice__pan--field"]');
     const m = field && getComputedStyle(field).transform.match(/matrix\(([^)]+)\)/);
@@ -584,6 +588,8 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
                     self.assertEqual(ladder["seen"]["testids"], 0, ladder)
                     self.assertEqual(ladder["seen"]["controls"], 0, ladder)
                     self.assertEqual(ladder["seen"]["duration"], "0.3s", ladder)
+                    # The copy lies exactly over the live drawing it dissolves into.
+                    self.assertLess(ladder["seen"]["offset"], 0.5, ladder)
                     page.wait_for_function(
                         "() => !document.querySelector('.local-map [data-testid=\"local-map__leaving\"]')",
                         timeout=15000,

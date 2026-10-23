@@ -339,6 +339,9 @@ const {
 
 const svgEl = ref(null);
 let panFrame = null;
+// A scale change settles any pan still in flight from the previous step: its
+// residual offset is in the old scale's units (the copy keeps it frozen).
+let settlePan = false;
 
 function parseViewBox(svg) {
   const parts = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
@@ -403,6 +406,7 @@ watch(
   [currentNodeId, islandScale],
   ([nextId, nextScale], [prevId, prevScale] = []) => {
     panFrame = null;
+    settlePan = false;
     const svg = svgEl.value;
     if (!props.panOnMove || !svg) return;
     const motion = islandMotion({
@@ -414,12 +418,16 @@ watch(
     });
     if (motion === "crossfade") {
       if (!dissolve.snapshot(svg)) dissolve.clear();
+      settlePan = true;
       return;
     }
     if (motion === "switch") {
       dissolve.clear();
+      settlePan = true;
       return;
     }
+    // A same-scale step during a dissolve lets the copy finish fading above
+    // the panning drawing: cutting it would be a harder jump than the fade.
     if (motion === "pan") panFrame = { id: prevId, frame: readFrame(svg, prevId, true) };
   },
   { flush: "pre" },
@@ -435,6 +443,24 @@ watch(
     const recorded = panFrame;
     panFrame = null;
     const svg = svgEl.value;
+    if (settlePan && svg) {
+      settlePan = false;
+      const offset = (el) =>
+        ["--pan-x", "--pan-y", "--glide-x", "--glide-y"].some((name) => {
+          const value = el.style.getPropertyValue(name);
+          return value !== "" && Number.parseFloat(value) !== 0;
+        });
+      const moving = [
+        ...panGroups(svg),
+        ...svg.querySelectorAll(".map-lattice__pan .local-map__marker--current"),
+      ].filter(offset);
+      for (const el of moving) {
+        el.style.transition = "none";
+        setPan(el, 0, 0);
+      }
+      for (const el of moving) void getComputedStyle(el).transform;
+      for (const el of moving) el.style.transition = "";
+    }
     if (!recorded || !svg) return;
     const offset = panOffset(recorded.frame, readFrame(svg, recorded.id, false));
     if (!offset) return;

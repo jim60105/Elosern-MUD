@@ -18,7 +18,11 @@
 // stylesheet hook could confuse with the live drawing (`id`, `data-testid`,
 // `data-node*`, roles, tab stops, names, titles) is removed or renamed. The
 // island's actionable controls (the stub buttons) live outside the svg, so a
-// copy never duplicates one. Each copy removes itself when its own fade ends
+// copy never duplicates one. The copy keeps its descendants' class names (its
+// painting depends on them), so for one `--motion-base` at `full` a class- or
+// text-based query over the whole island can match a node twice: scope such
+// queries to `[data-testid="local-map__lattice"]` (the copy carries
+// `local-map__leaving` instead). Each copy removes itself when its own fade ends
 // (with a token-derived fallback timer), so an interrupted sequence always
 // settles on the latest committed projection.
 
