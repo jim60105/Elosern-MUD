@@ -488,7 +488,9 @@
         "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_full_map_marks_the_current_place_once",
-        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step"
+        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step",
+        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_representative_world_map_round_trips_intact",
+        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_supported_worst_case_world_map_round_trips_intact"
       ]
     },
     {
