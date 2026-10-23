@@ -5,7 +5,7 @@ Estimated effort: 7.5 hours for the implementing worker, including every require
 ## 1. Navigation-priority labels (2 hours)
 
 - [ ] 1.1 Implement eight candidate label boxes using shipped text measures and marker footprints, resolving exits before current before context. Keep failed exit labels via labelMax truncation and leader lines; omit failed context labels and retain full accessible names.
-- [ ] 1.2 Restrict old duplicate-region suppression to unchanged overlay behavior; add focused long/crowded label cases that establish never-dropped island exits and current/exit label readability at the 16 px floor. When the current label exhausts all eight candidates, retain its existing truncated placement as documented in design.md; assert this fallback without changing marker positions.
+- [ ] 1.2 Keep the duplicate-region suppression of information-free wilderness labels on both surfaces (design.md); add focused long/crowded label cases that establish never-dropped island exits and current/exit label readability at the 16 px floor. When the current label exhausts all eight candidates, retain its existing truncated placement as documented in design.md; assert this fallback without changing marker positions.
 
 ## 2. Gateway rendering and activation (2 hours)
 

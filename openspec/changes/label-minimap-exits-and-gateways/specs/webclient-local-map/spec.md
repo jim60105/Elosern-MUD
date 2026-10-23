@@ -638,11 +638,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: Labels are assigned in navigation priority
 - **WHEN** island marker labels compete for space
-- **THEN** eight candidate positions per marker are tried in exit, current, context priority; an exit label that fits nowhere remains drawn truncated to labelMax with a leader line, a context label that fits nowhere is omitted, and each full name remains in its accessible name. Gateway second-line labels respect the 16 px floor.
+- **THEN** eight candidate positions per marker are tried in exit, current, context priority; an exit label that fits nowhere remains drawn truncated to labelMax with a leader line, a context label that fits nowhere is omitted, and each full name remains in its accessible name. Gateway second-line labels respect the 16 px floor. Remembered edge-marker names are laid out before node labels and are always drawn whole, never truncated; a duplicate wilderness region label suppressed as information-free is not an exit label dropped for lack of room.
 
 
 ### Requirement: The map surfaces state a place name only where it adds information
-On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, while retaining its identity and action. Island one-hop exit labels follow the never-dropped label-placement contract; the overlay retains the existing duplicate-region suppression rule.
+On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, while retaining its identity and action. On both surfaces a `visible_*` wilderness node whose label repeats the `current` node's label draws no visible text, because the repeat carries no information; every island exit label that does carry visible text follows the never-dropped label-placement contract.
 
 #### Scenario: The gate approach cell keeps every other field
 - **WHEN** a gate approach cell is relabelled with its entry's anchor display name
@@ -653,20 +653,23 @@ On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a 
 - **THEN** it SHALL keep the region display name it carries today, and every emitted node label SHALL remain a non-empty string
 
 #### Scenario: Duplicate region labels draw no visible text
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** a payload whose `layer` is `wilderness` is rendered and an in-view node's label string is identical to the `current` node's label string
+- **THEN** the shared map renderer SHALL NOT draw visible label text for that node; that node SHALL keep its full label as its accessible name, and its marker, shape ladder, landmark treatment, and activation SHALL be unaffected
+- **AND** the `current` node SHALL always draw its own label
 
 #### Scenario: Suppression is scoped to shared region names
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** labels are suppressed on any layer
+- **THEN** the suppression is scoped to the `wilderness` layer because that layer's labels are shared region names, where a repeat is the reported defect; on `grid`, `instance`, and `interior` layers a label is an individual room name, where two distinct rooms sharing a name are still two distinct places and SHALL both draw their label
 
 #### Scenario: Suppression touches no payload field
 - **WHEN** label suppression is in effect
 - **THEN** it is a drawing rule about the set on the canvas, not a payload rule: no payload field changes, and both validators keep their existing bounds and their non-empty label rules unchanged
 
 #### Scenario: The wilderness neighbourhood stops repeating one region name
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** the island renders a wilderness payload whose current cell and all eight in-view neighbours
+  lie in one region
+- **THEN** exactly one visible label is drawn — the current node's — and the eight neighbours draw no
+  visible label text while each keeps its full label as its accessible name
 
 #### Scenario: An in-view gate approach cell names the place behind it
 - **WHEN** the player stands one cell from a registered gate's approach cell, so the approach cell is
