@@ -23,7 +23,7 @@ import {
 } from "../lib/minimap_projection.js";
 import { HALO_R } from "../composables/use-map-lattice-geometry.js";
 
-const Z = "altoria";
+const Z = "testmap";
 
 function node(id, x, y, extra = {}) {
   return { id, label: id, x, y, visibility: "visible_unvisited", action: null, gateway: null, ...extra };
@@ -174,7 +174,7 @@ describe("tiers and coordinate frames", () => {
 });
 
 describe("level selection", () => {
-  it("Altoria plaza exits at about 850–1090 m choose 1500 with radii about 57–72", () => {
+  it("central-plaza worked example: exits at about 850–1090 m choose 1500 with radii about 57–72", () => {
     const model = gridModel(3500, 3480, [[0, 850], [1090, 0], [-700, -600], [0, -1000]]);
     const projection = projectIsland(model, null);
     expect(projection.mode).toBe("uniform");
@@ -263,15 +263,15 @@ describe("hysteresis", () => {
     // An ordinary move on the same map keeps the remembered level.
     expect(previousLevelFor(memory, gridId(3010, 3000))).toBe(1500);
     // A different grid map or layer discards it before selection.
-    expect(previousLevelFor(memory, gridId(10, 10, "ciaran"))).toBeNull();
+    expect(previousLevelFor(memory, gridId(10, 10, "othermap"))).toBeNull();
     expect(previousLevelFor(memory, "wild:wilderness:5:5")).toBeNull();
     expect(previousLevelFor(null, gridId(1, 1))).toBeNull();
-    const reset = projectIsland(gridModel(3000, 3000, [[0, 850]], []), previousLevelFor(memory, gridId(1, 1, "ciaran")));
+    const reset = projectIsland(gridModel(3000, 3000, [[0, 850]], []), previousLevelFor(memory, gridId(1, 1, "othermap")));
     expect(reset.level).toBe(1000);
   });
 
   it("derives map keys from the canonical node-id grammar", () => {
-    expect(mapKeyOf("grid:altoria:3500:3480")).toBe("grid:altoria");
+    expect(mapKeyOf("grid:testmap:3500:3480")).toBe("grid:testmap");
     expect(mapKeyOf("wild:wilderness:1:2")).toBe("wild:wilderness");
     expect(mapKeyOf("room:42")).toBe("room");
     expect(mapKeyOf("")).toBeNull();

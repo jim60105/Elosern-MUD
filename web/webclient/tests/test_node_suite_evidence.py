@@ -347,6 +347,43 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("passes node gateway metadata through unchanged", result.stdout)
 
     @covers_requirement(
+        "webclient-local-map::island-projection-selects-a-metric-scale-for-one-hop-exits",
+        "webclient-local-map::island-projection-compresses-extreme-exit-distances-monotonically",
+        "webclient-local-map::island-projection-handles-sparse-and-coincident-nodes-deterministically",
+        "webclient-local-map::island-projection-separates-gateway-stubs-from-node-scale",
+        "webclient-local-map::island-background-describes-the-selected-distance-mapping",
+        "webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant",
+    )
+    def test_minimap_projection_vitest_evidence_passes(self):
+        # The pure island projection (minimap_projection.js): ladder and
+        # worked examples, hysteresis with the map-key reset helper, strict
+        # compression boundaries and the logarithmic mapping, zero/no-exit
+        # inputs, bounded overlap spreading, cross-layer gate stubs, and the
+        # dot/ring background. The wilderness-legend requirement is matched
+        # only by its island clause: the 3x3 case converts one-kilometre cell
+        # deltas to metres (radii 50 and 70.7 at level 2000) without reading
+        # the legend or rewriting payload coordinates; the presenter's scale
+        # note and patchability stay pinned by the Python presenter tests.
+        suite = REPO_ROOT / "web/webclient-app/tests/minimap_projection.test.js"
+        self.assertTrue(suite.is_file(), f"missing Vitest file {suite}")
+        result = subprocess.run(
+            ["npx", "--no-install", "vitest", "run", str(suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "minimap projection Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        # Exactly the one file ran, and every case in it passed.
+        self.assertRegex(result.stdout, r"Test Files\s+1 passed \(1\)")
+        self.assertRegex(result.stdout, r"Tests\s+\d+ passed")
+        self.assertNotIn("failed", result.stdout)
+
+    @covers_requirement(
         "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
     )
     def test_option_cards_node_suite_passes(self):
