@@ -39,10 +39,11 @@ class WorldMapMeasurementTests(unittest.TestCase):
     def setUpClass(cls):
         cls.representative = world_map_payload.representative_payload()
         cls.worst = world_map_payload.worst_payload()
+        cls.one_km = world_map_payload.one_km_payload()
 
     @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_measured_payloads_are_valid_and_canonical(self):
-        for name, body in (("representative", self.representative), ("worst", self.worst)):
+        for name, body in (("representative", self.representative), ("worst", self.worst), ("one_km", self.one_km)):
             with self.subTest(case=name):
                 validated = validate_world_map(body)
                 # The tool emits integral numbers as integers, so its bytes are
@@ -66,7 +67,24 @@ class WorldMapMeasurementTests(unittest.TestCase):
         self.assertEqual(len(districts), len(world_map_payload.district_keys()))
         self.assertTrue(all(row["lit"] for row in districts))
         runs = sum(len(row[1]) for row in self.worst["trail"]["rows"])
-        self.assertEqual(runs, map_panels.TRAIL_MAX_RUNS)
+        self.assertGreater(runs, map_panels.TRAIL_MAX_RUNS)
+        self.assertLessEqual(runs, map_panels.TRAIL_DOWNSAMPLED_MAX_RUNS)
+        self.assertEqual(self.worst["trail"]["resolution_km"], 5)
+        self.assertEqual(self.one_km["trail"]["resolution_km"], 1)
+        self.assertEqual(sum(length for _, runs in self.one_km["trail"]["rows"] for _, length in runs), 20_000)
         self.assertEqual(len(self.worst["quest_markers"]), map_panels.WORLD_MAX_QUEST_MARKERS)
         lit = [row for row in self.representative["districts"] if row["lit"]]
         self.assertEqual(len(lit), world_map_payload.REPRESENTATIVE_LIT_DISTRICTS)
+
+    def test_actual_presenter_geometry_fits_transport(self):
+        from world.lore.map_districts import MAP_DISTRICT_REGISTRY
+        from web.webclient.presentation.world_map import assemble_world_map
+
+        body = assemble_world_map(
+            visit_ids={row.landmark_node for row in MAP_DISTRICT_REGISTRY.values()},
+            current=(1999.5, 1099.5),
+            markers=[],
+        )
+        size = len(world_map_payload.canonical_bytes(body))
+        print(f"Actual all-lit presenter geometry: {size} canonical bytes")
+        self.assertLess(size, map_panels.WORLD_MAX_BYTES)

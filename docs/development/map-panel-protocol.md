@@ -17,9 +17,8 @@ mirrored constant and decides the same wire text in both languages.
 
 ## On-demand semantics
 
-- Only `area_map` and `world_map` may register with `on_demand=True`, and they
-  must. `publish-area-map-panel` registers `area_map`; `world_map` stays absent
-  from the production registry until `publish-world-map-panel` registers it.
+- Only `area_map` and `world_map` may register with `on_demand=True`, and both
+  are registered in production.
 - A full snapshot renders eager panels only. A map presenter runs only when a
   caller names its panel in an update, which is the `map.view` action.
   Movement (`explore.move` publishes a full snapshot) and text-command
@@ -34,10 +33,9 @@ mirrored constant and decides the same wire text in both languages.
 
 `map.view` is an allowlisted read in the production action registry
 (`web/webclient/actions/map_actions.py`). Its payload is exactly
-`{"scope": "area"}`; any other key or value is a `malformed_payload`
-rejection, and the presenter never runs. `publish-world-map-panel` adds
-`"world"` to the same exact union. The adapter changes no location, clock,
-knowledge or quest state. It returns `affected_panels: ("area_map",)`, so the
+`{"scope": "area" | "world"}`; any other key or value is a `malformed_payload`
+rejection, and the presenter never runs. The adapter changes no location, clock,
+knowledge or quest state. It names only the requested map in `affected_panels`, so the
 dispatcher publishes only that panel, plus the dialogue panel the coordinator
 always adds in dialogue mode, through the delivery rules below. The command
 echo declares it a silent presentation control. Nothing pushes a map after a
@@ -53,6 +51,57 @@ road between two seen nodes is never sent. Visits on other maps are ignored,
 and the current node always counts as visited. Move actions appear only on
 the current node's traversable exits, which are resolved by the minimap
 helpers.
+
+## The `world_map` publisher and discovery narrative
+
+`world_map.py` filters every response using the requesting actor's current
+visited record. `world_map_geometry.py` caches common geography and static
+district geometry without any player state. Final payloads are never cached.
+Unlit districts carry a stable nonsemantic wire ID, `lit: false`, and their
+outline only. Lighting derives from exact canonical landmark membership.
+Ordinary places appear in lit districts or after a visit; elven villages and
+dungeons always require an actual visit. Visited places also have an independent
+layer, so a hidden place remains represented before its district lights.
+
+Terrain washes are unions of canonical classifier samples on the 5 km display
+raster. Rivers and the ridge are clipped to district ownership. Authored public
+settlement roads use the canonical local-to-world transform; no overland road
+network is fabricated. The deep forest can list both permitted nations without
+drawing a national border inside it. Wilderness positions use their cell centre,
+grid positions use their canonical world transform, and coordinate-free interiors
+use a registered enclosing place or instance origin. Unresolved interiors report
+the declared unavailable panel without invented coordinates.
+
+The trail encodes unique visited wilderness cells in sorted row runs. Through
+20,000 cells it uses 1 km indices. Larger histories deduplicate floor-divided
+5 km indices. The 1 km run cap stays 20,000; the finite 540 by 540 coarse grid
+allows 145,800 separated runs. No raw visits, landmark node IDs or district
+registry keys appear as alternate trail metadata.
+
+Accepted commissions use the shared canonical destination resolver. Unknown
+district destinations are rounded to a 50 km grid before serialization, with
+ties toward positive infinity and `approximate: true`. The wire marker whitelist
+contains no canonical node identity, exact-derived distance or bearing.
+
+Only explicit exit traversals opt into the shared committed movement narrative.
+The settlement captures pre-arrival landmark membership, invokes the unchanged
+knowledge writer through the existing completion helper, then confirms the
+exact destination node exists after settlement. The single movement message
+appends `已探明：<district>` on first arrival. Corrupt knowledge or a swallowed
+knowledge write failure cannot announce discovery. Delivery runs after commit;
+outer rollbacks discard it, and message-delivery failures log without compensating
+committed movement. Nested NPC relocations, direct teleports, reads and reconnects
+do not produce discovery.
+
+Knowledge confirmation reads the persisted Attribute value with a values query
+and reconciles its in-memory cache before using the unchanged parser. Evennia
+assigns a cached Attribute value before saving, so a second cached parse alone
+cannot establish persistence after a swallowed save failure. The world presenter
+uses the same read boundary and cannot light a district from that dirty cache.
+Missing instance origins are read directly from stored Attributes, avoiding the
+autocreating `origin_room` descriptor during a read-only request.
+
+## Area publisher layer details
 
 | Layer | Graph and identity | Labels and gateways |
 | --- | --- | --- |
@@ -153,9 +202,9 @@ intact `world_map` object (one without `part`) is checked in two pieces:
   65,536-byte, 320-item, depth and string bounds. That includes `local_map`,
   `area_map` and the dialogue companion.
 - The world map passes the generic scalar rules, its exact schema and its
-  logical ceiling of 1,048,576 canonical bytes.
+  logical ceiling of 2,097,152 canonical bytes.
 
-An intact world-map frame is therefore at most 65,536 + 1,048,576 canonical
+An intact world-map frame is therefore at most 65,536 + 2,097,152 canonical
 bytes. Snapshots, part frames and every other panel take the generic check
 only. Both languages use the same routing predicate
 (`carries_intact_world_map` / `carriesIntactWorldMap`) and the same check
@@ -252,7 +301,7 @@ All numeric ceilings are finite and mirrored in both validators:
 | Panel | Ceilings | Owner of the measured values |
 | --- | --- | --- |
 | `area_map` | 512 nodes, 2,048 edges, 32 markers, 393,216 logical bytes (measured) | `publish-area-map-panel` |
-| `world_map` | 1,048,576 logical bytes (measured) plus the per-collection limits in `map_panels.py` | `transport-world-map-panel` |
+| `world_map` | 2,097,152 logical bytes (measured) plus the per-collection limits in `map_panels.py` | `publish-world-map-panel` |
 
 The owning change replaces the constants in both files together and records
 the measurements here.
@@ -271,34 +320,25 @@ the measurements here.
   wilderness window for future settlements and builder interiors. Every unrelated panel keeps its generic budget. That
 includes `local_map` and its 65,536-byte envelope.
 
-`world_map` measurements (transport-world-map-panel). There is no world
-presenter yet, so `tools/world_map_payload.py` assembles the logical body
-from the frozen generated geography the presenter will read. That geography
-is the 120 district outlines of the frozen partition (14,311 points, at most
-954 per ring), the mainland boundary, the derived national borders, the
-waterways and summit ridge clipped per district, the anchors and the
-harbours. The player knowledge is synthetic. Run
+`world_map` measurements (publish-world-map-panel). The measurement tool uses
+the production assembly, geometry caches, privacy filter and trail encoder.
+It supplies exploration histories and full-length marker records without
+maintaining a second geometry builder. Run
 `uv run --locked python -m tools.world_map_payload` to reproduce the table.
 
 | Case | Canonical bytes |
 | --- | --- |
 | Common layer only | 1,267 |
-| Every district unlit (outlines only) | 193,979 |
-| Representative: the 12 districts nearest the Altoria start lit, a walked trail, 2 hidden places, 3 markers | 227,866 |
-| Supported worst case: every district lit, a 1 km trail at the 20,000-run cap, every hidden place, 64 markers with full-length titles and IDs | 659,391 |
+| Every district unlit (outlines only) | 195,220 |
+| Representative: the 12 districts nearest the Altoria start lit | 213,117 |
+| All content, exactly 20,000 wilderness visits at 1 km, full markers | 575,844 |
+| All content, maximal separated 5 km coverage across the frame, full markers | 1,535,088 |
 
-The worst case breaks down into 186,701 bytes of outlines, 228,893 of terrain
-washes, 180,253 of trail and 33,568 of markers. On the socket the portal
-writes `json.dumps` with `ensure_ascii=True`, so each CJK code point costs
-six bytes. The representative frame is about 264 KB on the wire and the
-worst-case frame about 795 KB.
-
-Two figures are estimates, not bounds. No terrain-wash geometry is authored
-yet, so each lit district carries its outline once per terrain region it
-contains. There is no continental road network yet, so `roads` is empty. The
-1 MiB ceiling keeps about 1.6 times the worst case, which leaves room for
-both. `publish-world-map-panel` re-measures its real output against the
-ceiling and amends it if the real terrain or roads need more.
+The original measurement omitted coarse histories with more than 20,000 runs.
+The 2 MiB world-only ceiling covers the measured large history with more than
+25% headroom. Other panel limits stay unchanged. On the socket the portal writes
+`json.dumps` with `ensure_ascii=True`, so each CJK code point costs six bytes;
+the managed socket test compares server and browser canonical UTF-8 digests.
 
 Transport limits on the delivery path:
 

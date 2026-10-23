@@ -750,9 +750,10 @@ class MapViewDispatchTests(EvenniaTestCase):
     )
     def test_map_view_is_an_exact_allowlisted_read(self):
         spec = build_production_action_registry().spec("map.view")
-        self.assertEqual(spec.affected_panels, ("area_map",))
+        self.assertEqual(spec.affected_panels, ("area_map", "world_map"))
         self.assertEqual(spec.validate_payload({"scope": "area"}), {"scope": "area"})
-        for bad in ({}, {"scope": "world"}, {"scope": "area", "x": 1}, {"scope": 1}, ["area"]):
+        self.assertEqual(spec.validate_payload({"scope": "world"}), {"scope": "world"})
+        for bad in ({}, {"scope": "galaxy"}, {"scope": "area", "x": 1}, {"scope": 1}, ["area"]):
             with self.subTest(payload=bad), self.assertRaises(ProtocolValidationError):
                 spec.validate_payload(bad)
 
@@ -789,12 +790,33 @@ class MapViewDispatchTests(EvenniaTestCase):
     )
     def test_rejected_scope_never_runs_the_presenter(self):
         handle_ui_action(
-            self.session, self.char, self._envelope("map.view", {"scope": "world"}),
+            self.session, self.char, self._envelope("map.view", {"scope": "galaxy"}),
             build_production_action_registry(), self.registry,
         )
         self.assertEqual(self.calls, [])
         result = self.session.frames("ui_action_result")[-1]
         self.assertEqual(result["code"], "malformed_payload")
+
+    @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
+    def test_world_request_publishes_only_filtered_world_without_gameplay_writes(self):
+        from web.webclient.presentation.world_map import world_map_presenter
+        from web.webclient.presentation.tests.test_world_map import fixtures, SECRET
+
+        self.registry.register(PresenterSpec("world_map", 1, ("map_unavailable", "地圖無法顯示"),
+                                             world_map_presenter, on_demand=True))
+        before=(self.char.location,parse_knowledge(self.char),get_world_clock().tick,self.char.db.quest_log)
+        with fixtures(), mock.patch("web.webclient.presentation.world_map_geometry.current_point",return_value=(1,2)), \
+             mock.patch("web.webclient.presentation.world_map.quest_markers",return_value=[]):
+            handle_ui_action(
+                self.session,self.char,self._envelope("map.view",{"scope":"world"}),
+                build_production_action_registry(),self.registry,
+            )
+        update=self.session.frames("ui_update")[-1]
+        self.assertEqual(set(update["panels"]),{"world_map"})
+        self.assertTrue(update["panels"]["world_map"]["available"])
+        self.assertNotIn(SECRET,json.dumps(update))
+        self.assertEqual(self.calls,[])
+        self.assertEqual(before,(self.char.location,parse_knowledge(self.char),get_world_clock().tick,self.char.db.quest_log))
 
     @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"

@@ -155,5 +155,21 @@ test("the allowance is world-map only: snapshots, parts, area and local maps sta
 
 test("an intact world map frame is bounded by the generic frame plus the world ceiling", () => {
   assert.equal(Protocol.WORLD_MAP_FRAME_MAX_BYTES, GENERIC + Protocol.MAP_MAX_BYTES.world_map);
-  assert.equal(Protocol.MAP_MAX_BYTES.world_map, 1048576);
+  assert.equal(Protocol.MAP_MAX_BYTES.world_map, 2097152);
+});
+
+test("the full 5 km checkerboard is retained while 1 km trails keep their cap", () => {
+  const body = F.worldMap();
+  body.trail = {
+    resolution_km: 5,
+    rows: Array.from({ length: 540 }, (_, y) => [
+      y, Array.from({ length: 270 }, (_, x) => [x * 2, 1]),
+    ]),
+  };
+  const store = activeStore();
+  assert.equal(store.receive(1, "ui_update", [wire(envelope(2, { world_map: body }))], {}).accepted, true);
+  assert.equal(store.getState().maps.world_map.trail.rows.length, 540);
+  assert.deepEqual(store.getState().maps.world_map.trail.rows[539][1][269], [538, 1]);
+  body.trail.resolution_km = 1;
+  assert.throws(() => Protocol.validateMapPanel("world_map", body), /20000 runs/);
 });

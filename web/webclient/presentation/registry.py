@@ -500,6 +500,8 @@ def build_production_registry() -> PresentationRegistry:
     )
     from web.webclient.presentation.area_map import area_map_presenter
     from web.webclient.presentation.map_panels import AREA_MAP_PANEL, AREA_MAP_SCHEMA_VERSION
+    from web.webclient.presentation.world_map import world_map_presenter
+    from web.webclient.presentation.map_panels import WORLD_MAP_PANEL, WORLD_MAP_SCHEMA_VERSION
 
     # The on-demand area map (publish-area-map-panel): rendered only when
     # ``map.view`` names it, never in a snapshot or a movement refresh.
@@ -509,6 +511,15 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=AREA_MAP_SCHEMA_VERSION,
             unavailable_reason=("map_unavailable", "區域地圖目前無法顯示"),
             presenter=area_map_presenter,
+            on_demand=True,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name=WORLD_MAP_PANEL,
+            schema_version=WORLD_MAP_SCHEMA_VERSION,
+            unavailable_reason=("map_unavailable", "世界地圖目前無法顯示"),
+            presenter=world_map_presenter,
             on_demand=True,
         )
     )

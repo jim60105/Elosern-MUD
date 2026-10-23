@@ -1,6 +1,10 @@
 {
   "contract": [
     {
+      "path": "web/webclient/presentation/tests/test_world_map_measurement.py",
+      "reason": "the shipped continental geography fits the measured world-map bound."
+    },
+    {
       "path": "world/art/tests/test_bundled_interior_art.py",
       "reason": "bundled scene distribution and decode contract"
     },

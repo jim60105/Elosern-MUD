@@ -84,14 +84,9 @@ WILDERNESS_WINDOW = 15
 WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW
 AREA_MAX_CELL_KM = 1_000
 
-# world_map bounds, measured by transport-world-map-panel from the shipped
-# geography (``uv run --locked python -m tools.world_map_payload``; see
-# docs/development/map-panel-protocol.md): every district unlit is about
-# 194 KB, an early exploration about 228 KB and the supported worst case
-# (everything lit, the 20,000-run trail, 64 full markers) about 659 KB. The
-# 1 MiB ceiling leaves room for the terrain washes and continental roads the
-# world presenter will add; that change re-measures against it.
-WORLD_MAX_BYTES = 1_048_576
+# Measured production geometry plus the full 5 km checkerboard trail.
+# The original 1 MiB measurement covered only a 20,000-run 1 km trail.
+WORLD_MAX_BYTES = 2_097_152
 WORLD_MAX_POLYGON_POINTS = 8_192
 WORLD_MAX_POLYLINE_POINTS = 4_096
 WORLD_MAX_BORDERS = 256
@@ -108,6 +103,7 @@ TRAIL_RESOLUTIONS = (1, 5)
 #: Continental frame edge in 1 km cells (mirror of CONTINENT_FRAME_CELLS).
 TRAIL_FRAME_CELLS = 2_700
 TRAIL_MAX_RUNS = 20_000
+TRAIL_DOWNSAMPLED_MAX_RUNS = 145_800
 
 #: Logical byte ceiling per map panel (canonical UTF-8 JSON).
 MAP_MAX_BYTES: dict[str, int] = {
@@ -601,8 +597,9 @@ def _trail(value: Any) -> dict[str, Any]:
             runs.append([start, length])
         total_runs += len(runs)
         rows.append([row_index, runs])
-    if total_runs > TRAIL_MAX_RUNS:
-        raise MapPanelError(f"trail exceeds {TRAIL_MAX_RUNS} runs")
+    maximum_runs = TRAIL_MAX_RUNS if resolution == 1 else TRAIL_DOWNSAMPLED_MAX_RUNS
+    if total_runs > maximum_runs:
+        raise MapPanelError(f"trail exceeds {maximum_runs} runs")
     return {"resolution_km": resolution, "rows": rows}
 
 
