@@ -305,3 +305,102 @@
   );
   transition: transform var(--motion-base) var(--ease-standard);
 }
+
+/* ---- Island labels, gates and exit stubs (label-minimap-exits-and-gateways) ---- */
+
+/* The island's viewport is a positioned box the size of its square, so the
+   gateway stubs' native buttons can sit over their drawn arrows. */
+.local-map__viewport--island {
+  display: block;
+  position: relative;
+  flex: none;
+  align-self: center;
+}
+
+/* A context place's name: the quietest label step, beneath every exit and
+   the current node, so the hierarchy reads current → exits → context. */
+.local-map__node-label--context {
+  fill: var(--map-label-far);
+  fill-opacity: 0.72;
+}
+
+/* A gateway's second line (`通往 <leads_to>`) in the map's gold, the same
+   family as the gate arch it explains. */
+.local-map__via {
+  fill: var(--map-label-gold);
+}
+
+/* The gate arch: a gold outline framing the node's own marker, so a gateway
+   reads by shape over every visibility state. */
+.local-map__gate-glyph {
+  fill: none;
+  stroke: var(--gold-400);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* A label set farther out than its eight candidate spots joins its marker by
+   a hairline in the quiet paper tier. */
+.local-map__leader {
+  stroke: var(--paper-500);
+  stroke-width: 1;
+  stroke-opacity: 0.75;
+  pointer-events: none;
+}
+
+/* A cross-layer exit stub: a solid gold arrowhead on the exit ring with a
+   ground-coloured rim, labelled in gold. A locked stub keeps a hollow dashed
+   arrow and a far-tier label: shape and tone, not colour alone. */
+.local-map__stub {
+  pointer-events: none;
+}
+
+.local-map__stub-arrow {
+  fill: var(--gold-400);
+  stroke: var(--ink-860);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.local-map__stub--locked .local-map__stub-arrow {
+  fill: var(--ink-860);
+  stroke: var(--paper-500);
+  stroke-dasharray: 2 2;
+}
+
+.local-map__stub-label {
+  fill: var(--map-label-gold);
+}
+
+.local-map__stub--locked .local-map__stub-label {
+  fill: var(--map-label-far);
+}
+
+.local-map__stub-button {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* A leadered stub label's own hit area, inside its button's hit target. */
+.local-map__stub-hit {
+  position: absolute;
+  border-radius: var(--radius-sm);
+}
+
+.local-map__stub-button:hover,
+.local-map__stub-button:hover .local-map__stub-hit {
+  background: var(--gold-glow);
+}
+
+.local-map__stub-button:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 1px;
+}

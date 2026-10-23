@@ -15,6 +15,9 @@ import {
   LOCAL_MAP_CIARAN_PLAZA_SAMPLE,
   LOCAL_MAP_EXTREME_RATIO_SAMPLE,
   LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE,
+  LOCAL_MAP_WILDERNESS_RETURN_SAMPLE,
+  LOCAL_MAP_CROWDED_LABELS_SAMPLE,
   localMapModelFor,
 } from "../fixtures.js";
 
@@ -112,8 +115,8 @@ export const Unavailable = {
 // without an action emits nothing — is pinned by the Vitest mount tests in
 // `tests/world/local_map.test.js`. 南門 also carries the required node
 // `gateway` metadata (`{leads_to}`), which the model passes through
-// unchanged; until a gate presentation exists the island draws it
-// exactly like any other actionable node.
+// unchanged; the island draws it with the gate arch and a second
+// `通往 <leads_to>` label line (label-minimap-exits-and-gateways).
 export const ActionableNode = {
   render: renderMap,
   args: {
@@ -175,33 +178,72 @@ function boxesOverlap(a, b) {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
-// The same-layer exits of a payload: the far ends of the current node's
-// labelled edges whose id shares the current node's map key.
-function sameLayerExitIds(payload) {
-  const mapKey = (id) => id.split(":").slice(0, 2).join(":");
+const mapKeyOf = (id) => id.split(":").slice(0, 2).join(":");
+
+// The current node's exits split by layer: same-map exits draw as nodes,
+// cross-map exits (a gate's far side) as exit-ring stubs
+// (label-minimap-exits-and-gateways).
+function exitIdsOf(payload) {
   const current = payload.current_node;
-  return payload.edges
-    .filter((edge) => edge.label && edge.source === current && mapKey(edge.destination) === mapKey(current))
-    .map((edge) => edge.destination);
+  const exits = payload.edges.filter((edge) => edge.label && edge.source === current).map((edge) => edge.destination);
+  return {
+    same: exits.filter((id) => mapKeyOf(id) === mapKeyOf(current)),
+    cross: exits.filter((id) => mapKeyOf(id) !== mapKeyOf(current)),
+  };
 }
 
+function insideBox(box, canvas) {
+  return (
+    box.left >= canvas.left - 0.5 &&
+    box.right <= canvas.right + 0.5 &&
+    box.top >= canvas.top - 0.5 &&
+    box.bottom <= canvas.bottom + 0.5
+  );
+}
+
+// The complete exit set: every same-layer exit marker and every cross-layer
+// exit-ring stub is drawn inside the canvas, no two of them overlap, no
+// cross-layer target draws a node, and every exit keeps a visible label
+// inside the canvas (a wilderness name repeating the current region's is the
+// one information-free label that stays suppressed).
 function assertExitsDrawn(payload, story) {
   return async ({ canvasElement }) => {
     const svg = canvasElement.querySelector('[data-testid="local-map__lattice"]');
     if (!svg) throw new Error(`${story}: lattice canvas missing`);
     const canvas = svg.getBoundingClientRect();
-    const boxes = sameLayerExitIds(payload).map((id) => {
+    const { same, cross } = exitIdsOf(payload);
+    const currentLabel = payload.nodes.find((node) => node.id === payload.current_node)?.label;
+    const boxes = same.map((id) => {
       const group = canvasElement.querySelector(`[data-node="${CSS.escape(id)}"]`);
       const marker = group?.querySelector(".local-map__marker");
       if (!marker) throw new Error(`${story}: exit ${id} has no drawn marker`);
       const box = marker.getBoundingClientRect();
-      const inside =
-        box.left >= canvas.left - 0.5 &&
-        box.right <= canvas.right + 0.5 &&
-        box.top >= canvas.top - 0.5 &&
-        box.bottom <= canvas.bottom + 0.5;
-      if (!inside) throw new Error(`${story}: exit ${id} marker leaves the canvas`);
+      if (!insideBox(box, canvas)) throw new Error(`${story}: exit ${id} marker leaves the canvas`);
+      const node = payload.nodes.find((n) => n.id === id);
+      const suppressed = payload.layer === "wilderness" && node.label === currentLabel;
+      const label = group.querySelector(".local-map__node-label");
+      if (!suppressed) {
+        if (!label || !label.textContent.trim()) throw new Error(`${story}: exit ${id} lost its label`);
+        if (!insideBox(label.getBoundingClientRect(), canvas)) throw new Error(`${story}: exit ${id} label leaves the canvas`);
+      }
       return { id, box };
+    });
+    for (const id of cross) {
+      if (canvasElement.querySelector(`[data-node="${CSS.escape(id)}"]`)) {
+        throw new Error(`${story}: cross-layer target ${id} must not draw as a node`);
+      }
+    }
+    const stubs = [...canvasElement.querySelectorAll(".local-map__stub")];
+    if (stubs.length !== cross.length) {
+      throw new Error(`${story}: expected ${cross.length} exit stubs, found ${stubs.length}`);
+    }
+    stubs.forEach((stub, i) => {
+      const arrow = stub.querySelector(".local-map__stub-arrow").getBoundingClientRect();
+      if (!insideBox(arrow, canvas)) throw new Error(`${story}: exit stub ${i} leaves the canvas`);
+      const label = stub.querySelector(".local-map__stub-label");
+      if (!label || !label.textContent.trim().startsWith("通往 ")) throw new Error(`${story}: exit stub ${i} lost its 通往 label`);
+      if (!insideBox(label.getBoundingClientRect(), canvas)) throw new Error(`${story}: exit stub ${i} label leaves the canvas`);
+      boxes.push({ id: `stub ${i}`, box: arrow });
     });
     for (let i = 0; i < boxes.length; i += 1) {
       for (let j = i + 1; j < boxes.length; j += 1) {
@@ -210,6 +252,41 @@ function assertExitsDrawn(payload, story) {
         }
       }
     }
+  };
+}
+
+// The island's move intents, recorded per story so a play function can
+// count exactly what one activation emitted.
+function moveRecorder() {
+  const moves = [];
+  const opens = [];
+  return { moves, opens, onMove: (payload) => moves.push(payload), onOpenMap: () => opens.push(true) };
+}
+
+// Tab to the gateway stub's native button, then Enter, Space and a pointer
+// click: each submits exactly one move with the target's own descriptor and
+// none opens the full map.
+function assertStubActivates(recorder, expected, story) {
+  return async ({ canvasElement }) => {
+    const button = canvasElement.querySelector('[data-testid^="local-map__stub-button--"]');
+    if (!button || button.tagName !== "BUTTON") throw new Error(`${story}: actionable stub has no native button`);
+    if (button.getAttribute("aria-label") !== expected.name) {
+      throw new Error(`${story}: stub button is named ${button.getAttribute("aria-label")}`);
+    }
+    recorder.moves.length = 0;
+    recorder.opens.length = 0;
+    button.focus();
+    if (document.activeElement !== button) throw new Error(`${story}: stub button is not focusable`);
+    for (const key of ["Enter", " "]) {
+      button.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    }
+    button.click();
+    if (recorder.moves.length !== 1) throw new Error(`${story}: one click emitted ${recorder.moves.length} moves`);
+    const [move] = recorder.moves;
+    if (move.exit_ref !== expected.exit_ref || move.destination !== expected.destination) {
+      throw new Error(`${story}: stub emitted ${JSON.stringify(move)}`);
+    }
+    if (recorder.opens.length !== 0) throw new Error(`${story}: stub activation also opened the full map`);
   };
 }
 
@@ -238,17 +315,72 @@ export const MetricWilderness = {
   play: assertExitsDrawn(LOCAL_MAP_WILDERNESS_METRIC_SAMPLE, "MetricWilderness"),
 };
 
-// 南門 (gate room): the street exit 900 m north is drawn; the gate's
-// cross-layer wilderness target is never drawn as a node (its exit stub is
-// the gateway presentation's, label-minimap-exits-and-gateways).
+// 南門 (gate room): the street exit 900 m north is drawn; the gate room
+// itself wears the gate arch with its 通往 line, and the gate's cross-layer
+// wilderness target is never drawn as a node: it is an exit-ring stub whose
+// native button moves exactly once (label-minimap-exits-and-gateways).
+const southGateMoves = moveRecorder();
 export const MetricAltoriaSouthGate = {
   render: renderMap,
-  args: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE) },
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE),
+    onMove: southGateMoves.onMove,
+    onOpenMap: southGateMoves.onOpenMap,
+  },
   play: async (context) => {
     await assertExitsDrawn(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE, "MetricAltoriaSouthGate")(context);
     if (context.canvasElement.querySelector('[data-node^="wild:"]')) {
       throw new Error("MetricAltoriaSouthGate: the cross-layer gate target must not draw as a node");
     }
+    if (!context.canvasElement.querySelector('[data-testid="local-map__gate-glyph"]')) {
+      throw new Error("MetricAltoriaSouthGate: the current gate room must draw its gate glyph");
+    }
+    await assertStubActivates(
+      southGateMoves,
+      { name: "往 西部丘陵與谷地 移動", exit_ref: "e_south_gate_wild", destination: "wild:elosern:860:1076" },
+      "MetricAltoriaSouthGate",
+    )(context);
+  },
+};
+
+// The same gate barred: the stub keeps its hollow arrow and its 通往 label,
+// but offers no control, so nothing on it can submit a move.
+export const MetricAltoriaSouthGateLocked = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE) },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE, "MetricAltoriaSouthGateLocked")(context);
+    if (!context.canvasElement.querySelector(".local-map__stub--locked")) {
+      throw new Error("MetricAltoriaSouthGateLocked: the barred gate must keep a locked stub");
+    }
+    if (context.canvasElement.querySelector('[data-testid^="local-map__stub-button--"]')) {
+      throw new Error("MetricAltoriaSouthGateLocked: a locked stub must offer no control");
+    }
+  },
+};
+
+// The wilderness side: the south gate's approach cell, whose northern
+// neighbour is the gate's own grid room. The island draws it as an exit stub
+// to 聖潔王都 — no city street, no grid node — and the repeated region name
+// of the other neighbours stays suppressed.
+const returnMoves = moveRecorder();
+export const MetricWildernessReturn = {
+  render: renderMap,
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_RETURN_SAMPLE),
+    onMove: returnMoves.onMove,
+    onOpenMap: returnMoves.onOpenMap,
+  },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_WILDERNESS_RETURN_SAMPLE, "MetricWildernessReturn")(context);
+    if (context.canvasElement.querySelector('[data-node^="grid:"]')) {
+      throw new Error("MetricWildernessReturn: no city node may draw on the wilderness island");
+    }
+    await assertStubActivates(
+      returnMoves,
+      { name: "往 聖潔王都 移動", exit_ref: "e_return_n", destination: "grid:capital_altoria:3050:150" },
+      "MetricWildernessReturn",
+    )(context);
   },
 };
 
@@ -301,6 +433,47 @@ export const MetricRememberedGateways = {
           throw new Error(`MetricRememberedGateways: names of ${boxes[i].id} and ${boxes[j].id} overlap`);
         }
       }
+    }
+  },
+};
+
+// A crowded crossroads: six long-named exits (one of them the east gate,
+// with its gate arch and 通往 line), a long current name, context and two
+// remembered gateways. Every exit keeps a label (truncated with a leader
+// line where its eight spots are taken), the remembered names stay whole,
+// and no drawn label crosses a marker or another label.
+export const MetricCrowdedLabels = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_CROWDED_LABELS_SAMPLE) },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_CROWDED_LABELS_SAMPLE, "MetricCrowdedLabels")(context);
+    const { canvasElement } = context;
+    const svg = canvasElement.querySelector('[data-testid="local-map__lattice"]');
+    const canvas = svg.getBoundingClientRect();
+    const markers = [...svg.querySelectorAll(".local-map__marker")].map((el) => el.getBoundingClientRect());
+    const labels = [...svg.querySelectorAll(".local-map__node-label")].map((el) => el.getBoundingClientRect());
+    for (const label of labels) {
+      if (!insideBox(label, canvas)) throw new Error("MetricCrowdedLabels: a label leaves the canvas");
+      for (const marker of markers) {
+        if (boxesOverlap(label, marker)) throw new Error("MetricCrowdedLabels: a label crosses a marker");
+      }
+    }
+    for (let i = 0; i < labels.length; i += 1) {
+      for (let j = i + 1; j < labels.length; j += 1) {
+        if (boxesOverlap(labels[i], labels[j])) throw new Error("MetricCrowdedLabels: two labels overlap");
+      }
+    }
+    const remembered = LOCAL_MAP_CROWDED_LABELS_SAMPLE.nodes.filter((n) => n.visibility === "remembered");
+    for (const node of remembered) {
+      const text = canvasElement.querySelector(
+        `[data-testid="local-map__edge-marker--${CSS.escape(node.id)}"] .local-map__edge-marker-name--island`,
+      );
+      if (!text || text.textContent.replace(/\s+/g, "") !== node.label) {
+        throw new Error(`MetricCrowdedLabels: remembered ${node.id} must show its whole name`);
+      }
+    }
+    if (!canvasElement.querySelector('[data-testid="local-map__gate-glyph"]')) {
+      throw new Error("MetricCrowdedLabels: the east gate must draw its gate glyph");
     }
   },
 };

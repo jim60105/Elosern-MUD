@@ -42,7 +42,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: A fitted drawing never shrinks text below its declared step
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The coordinate-field layers are inert decoration
 - **WHEN** coordinate-field layers render on either surface
@@ -50,7 +50,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The coordinate dot field states the lattice's coordinate space
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A dot never reads as a fifth node state
 - **WHEN** the dot field renders beside the marker ladder
@@ -58,7 +58,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The vignette is the knowledge edge, not terrain
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The axis cross follows the stated convention
 - **WHEN** a surface considers drawing the axis cross
@@ -72,11 +72,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The render model exports two placements
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The lattice placement is bounded and rank-compresses on overflow
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The radial placement is deterministic and edge-honest
 - **WHEN** the model computes the radial placement
@@ -87,15 +87,15 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: Surfaces declare a fixed square canvas or a fitted view
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A fixed square canvas never magnifies
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The lattice fill grows pitch before taking margin
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The graph fill is a readable window
 - **WHEN** a fixed-square graph variant fills its square
@@ -104,43 +104,43 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 #### Scenario: No cap ever sizes a canvas
 - **WHEN** the renderer resolves canvas dimensions
 - **THEN** it SHALL accept no maximum-width or maximum-height cap and SHALL NOT resolve any cap into a width bound: no surface sizes its canvas by a cap, so there is no definite width to reconcile against a height cap and no engine-specific replaced-element constraint resolution can letterbox or distort a drawing
-- **AND** the canvas's own natural size SHALL NOT be able to breach the island's square however much the edge-marker gutter grows it: the gutter enlarges the drawing's required side, which the square window absorbs as clipping, never as a larger canvas or smaller text
+- **AND** the canvas's own natural size SHALL NOT be able to breach the island's square however many remembered markers it carries: the overlay's edge-marker gutter enlarges only the overlay drawing, while the island keeps its fixed 240-unit square with its markers and their whole names on the square's rim band, never a larger canvas or smaller text
 
 #### Scenario: The island measures nothing and overlaps nothing of its own
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: No marker or label footprint ever intersects another
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The pitch is derived from what needs clearing
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The bare clearance term binds every adjacent pair
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The vertical term clears labels above markers
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The label term measures visible names in monospace cells
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The label term never binds on undrawn labels
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The derived pitch is a floor, bought without truncation
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The square cell keeps drawing and bearings in agreement
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Map rendering logic is shared and variant-resolved
 - **WHEN** the minimap island and the full-map overlay render a committed payload
@@ -249,11 +249,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The lattice names its remembered places by edge direction marker
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Marker names stay inside the outermost gutter band
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A name's room is declared before it is drawn
 - **WHEN** a surface prepares to draw marker names
@@ -262,7 +262,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The fit budget is measured in monospace cells
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Ambiguous names are dropped, never equalled
 - **WHEN** a name does not fit its budget
@@ -322,7 +322,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: In-view nodes occupy distinct lattice cells
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Distant remembered nodes do not distort the local view
 - **WHEN** the payload carries remembered nodes many cells away from the current node
@@ -330,7 +330,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: A remote remembered place marks the canvas edge at its true direction, with its name
 - **WHEN** a coordinate-layer payload remembers a known place outside the drawn extent, e.g. 聖潔王都 to the north-east or a cave to the south-west
-- **THEN** its remembered diamond renders on the corresponding border of the canvas, pointing along the true coordinate bearing, with that place's name drawn as visible text beside it in the marker gutter band, and no distance, angle, or coordinate figure appears with it
+- **THEN** its remembered diamond renders on the corresponding border of the canvas, pointing along the true coordinate bearing, with that place's name drawn as visible text beside it — in the marker gutter band on the overlay, and whole inside the island's square on the island (beside the diamond in the rim band, reading through it, or wrapped onto the next free inward row, never shortened) — and no distance, angle, or coordinate figure appears with it
 
 #### Scenario: The island presents each remembered place once, with no list beneath the map
 - **WHEN** a wilderness payload carrying remembered gateways renders on the minimap island
@@ -370,11 +370,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: Marker names never collide with each other, a node label, or the axis
 - **WHEN** a lattice payload places remembered markers on several canvas edges, including two on one edge, while the drawn lattice carries in-view node labels at the renderer's truncation length and the island draws the axis cross that the invariant names
-- **THEN** every marker name is rendered wholly inside the marker gutter band outside the canvas rect — the rect the coordinate-field padding grows, so the band stays outermost — so no marker name's box intersects any node marker, node label, or the drawn axis line, and no two marker names' boxes intersect each other
+- **THEN** on the overlay every marker name is rendered wholly inside the marker gutter band outside the canvas rect — the rect the coordinate-field padding grows, so the band stays outermost — so no marker name's box intersects any node marker, node label, or the drawn axis line; on the island every marker name is drawn whole inside the fixed square, clear of every diamond and every drawn node marker and, wherever the square leaves room, every drawn node label; on both surfaces no two marker names' boxes intersect each other
 
 #### Scenario: Rank compression never skews a marker's direction
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A coordinate-free payload draws no edge markers and still presents its remembered nodes
 - **WHEN** an interior or instance payload with remembered nodes renders the radial graph on the island and on the full-map surface
@@ -422,19 +422,19 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: A geometrically sparse payload stays bounded
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Adjacent node markers, labels, and connector edges never visually collide
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A densely populated lattice keeps readable collision-free geometry
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A sparse lattice scaled up never reintroduces overlap
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A long remembered list keeps required island content in view
 - **WHEN** a graph-variant payload combines a two-ring in-view placement with the model's maximum of remembered nodes
@@ -442,11 +442,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The name gutter never hands the anchor a scrollbar
 - **WHEN** remembered markers enlarge the required drawing
-- **THEN** the coordinate-bearing island keeps its 240-unit projection, current at (120,120), all exits within the exit ring and readable text; remembered markers keep their existing edge-direction presentation and the anchor has no scrollbar.
+- **THEN** the coordinate-bearing island keeps its 240-unit projection, current at (120,120), all exits within the exit ring and readable text; remembered markers keep their edge-direction presentation as smaller rim-band diamonds whose names are drawn whole inside the square, and the anchor has no scrollbar.
 
 #### Scenario: A single-node room states orientation without any collision risk
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The full-map overlay renders the same lattice at a larger scale
 - **WHEN** the player opens the full-map overlay while a committed `local_map` payload is available
@@ -490,15 +490,15 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The island's canvas claims its content width as coordinate margin
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The island's name band is reserved as band depth, not as an outward box
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A sparse payload reads airy rather than magnified
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The height budget is spent as an equivalent width bound
 - **WHEN** a tall lattice renders on a natural mount, island and full map
@@ -510,7 +510,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The overlay keeps its geometry and gains only the coordinate field
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Repeated budget measurements do not ratchet the canvas down
 - **WHEN** the island re-renders across many successive payload commits and `map` anchor resizes
@@ -554,11 +554,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The coordinate field draws one dot per cell, registered to the placement
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A field whose pitch stopped meaning one cell is rejected
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A coordinate field that went invisible fails
 - **WHEN** the uniform island dot field or an existing overlay dot field and axis are measured against canvas ground
@@ -586,7 +586,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The graph variant draws no coordinate field and no axis
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: A node label never renders larger than the surface's own chrome
 - **WHEN** a sparse or crowded payload renders on the island
@@ -594,15 +594,15 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The pitch clears exactly what the drawn label set needs
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Vertical clearance is derived even above an unlabeled marker
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The drawn cell is square so the lattice and its bearings agree
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The decoration layers stay out of the audit and the accessibility tree
 - **WHEN** geometry audit and assistive technology inspect island decoration
@@ -618,11 +618,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The island scales once with the desktop chrome factor
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: Labels are budgeted in monospace cells
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
-- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and unchanged remembered edge-direction markers. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
+- **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The fixed island consumes automatic projection
 - **WHEN** a grid/wilderness payload with one-hop and two-hop nodes renders in the island
@@ -638,11 +638,11 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: Labels are assigned in navigation priority
 - **WHEN** island marker labels compete for space
-- **THEN** eight candidate positions per marker are tried in exit, current, context priority; an exit label that fits nowhere remains drawn truncated to labelMax with a leader line, a context label that fits nowhere is omitted, and each full name remains in its accessible name. Gateway second-line labels respect the 16 px floor.
+- **THEN** eight candidate positions per marker are tried in exit, current, context priority; an exit label that fits nowhere remains drawn truncated to labelMax with a leader line, a context label that fits nowhere is omitted, and each full name remains in its accessible name. Gateway second-line labels respect the 16 px floor. Remembered edge-marker names are laid out before node labels and are always drawn whole, never truncated; a duplicate wilderness region label suppressed as information-free is not an exit label dropped for lack of room.
 
 
 ### Requirement: The map surfaces state a place name only where it adds information
-On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, while retaining its identity and action. Island one-hop exit labels follow the never-dropped label-placement contract; the overlay retains the existing duplicate-region suppression rule.
+On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of its region's display name. On both surfaces a `visible_*` wilderness node whose label repeats the `current` node's label draws no visible text.
 
 #### Scenario: The gate approach cell keeps every other field
 - **WHEN** a gate approach cell is relabelled with its entry's anchor display name
@@ -653,20 +653,23 @@ On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a 
 - **THEN** it SHALL keep the region display name it carries today, and every emitted node label SHALL remain a non-empty string
 
 #### Scenario: Duplicate region labels draw no visible text
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** a payload whose `layer` is `wilderness` is rendered and an in-view node's label string is identical to the `current` node's label string
+- **THEN** the shared map renderer SHALL NOT draw visible label text for that node; that node SHALL keep its full label as its accessible name, and its marker, shape ladder, landmark treatment, and activation SHALL be unaffected
+- **AND** the `current` node SHALL always draw its own label
 
 #### Scenario: Suppression is scoped to shared region names
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** labels are suppressed on any layer
+- **THEN** the suppression is scoped to the `wilderness` layer because that layer's labels are shared region names, where a repeat is the reported defect; on `grid`, `instance`, and `interior` layers a label is an individual room name, where two distinct rooms sharing a name are still two distinct places and SHALL both draw their label
 
 #### Scenario: Suppression touches no payload field
 - **WHEN** label suppression is in effect
 - **THEN** it is a drawing rule about the set on the canvas, not a payload rule: no payload field changes, and both validators keep their existing bounds and their non-empty label rules unchanged
 
 #### Scenario: The wilderness neighbourhood stops repeating one region name
-- **WHEN** the full-map overlay draws repeated wilderness region names
-- **THEN** its existing duplicate-current-region suppression remains, with the full accessible name and marker/action unchanged. On the island every exit label follows eight-candidate placement with truncated leader-line fallback; context labels may be omitted when no position fits.
+- **WHEN** the island renders a wilderness payload whose current cell and all eight in-view neighbours
+  lie in one region
+- **THEN** exactly one visible label is drawn — the current node's — and the eight neighbours draw no
+  visible label text while each keeps its full label as its accessible name
 
 #### Scenario: An in-view gate approach cell names the place behind it
 - **WHEN** the player stands one cell from a registered gate's approach cell, so the approach cell is

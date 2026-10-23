@@ -12,6 +12,7 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE } from "../stories/fixtures.js";
 
 describe("minimap move echo through AppClient (D6 surface row)", () => {
   let store;
@@ -90,6 +91,25 @@ describe("minimap move echo through AppClient (D6 surface row)", () => {
     await wrapper.find('[data-testid="local-map__node--room:43"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(1);
     expect(echoLines()).toEqual(["西風酒館"]);
+    wrapper.unmount();
+  });
+
+  // label-minimap-exits-and-gateways: a cross-layer gate target is an exit
+  // stub on the island; its native button submits the target's own exit_ref
+  // with the committed current node, exactly once, and never opens the map.
+  it("activating a gateway exit stub submits exactly one explore.move", async () => {
+    openSession(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    mountApp();
+    const button = wrapper.get('[data-testid="local-map"] .local-map__stub-button');
+    expect(button.attributes("aria-label")).toBe("往 西部丘陵與谷地 移動");
+    await button.trigger("click");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0].action_id).toBe("explore.move");
+    expect(sender.sent.actions[0].payload).toEqual({
+      exit_ref: "e_south_gate_wild",
+      current_node: LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE.current_node,
+    });
+    expect(store.view.hudOverlay).toBeNull();
     wrapper.unmount();
   });
 });

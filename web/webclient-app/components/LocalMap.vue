@@ -14,7 +14,9 @@
 // The island chrome (webclient-minimap-04-island-single-affordance):
 // - The single full-map affordance is a full-bleed transparent <button>
 //   layered beneath the island's visual content. It is the island's first
-//   DOM child so keyboard Tab reaches the primary action.
+//   DOM child so keyboard Tab reaches the primary action. A cross-layer
+//   gateway exit stub with a move action adds its own native move button
+//   after it (MapLattice; label-minimap-exits-and-gateways).
 // - No hover or selection state is tracked; the readout is a pure function
 //   of the committed payload's current node (design D3/D6).
 // - The readout states only `座標 x,y` on coordinate-bearing layers
@@ -160,9 +162,10 @@ const detail = computed(() => {
 
 // Pointer-click convenience (webclient-map-01-draft-chrome D5): clicking the
 // island's non-interactive body opens the full map. A click that originated
-// in an interactive descendant — the full-bleed affordance button (a <button>)
-// or a lattice node group (carrying `data-node`) — runs only that control's own
-// behavior.
+// in an interactive descendant — the full-bleed affordance button (a <button>),
+// a gateway exit stub's move button (a <button>, label-minimap-exits-and-
+// gateways) or a lattice node group (carrying `data-node`) — runs only that
+// control's own behavior.
 // The root deliberately gains no role or tabindex: the full-bleed button is
 // the only keyboard path, and the focus-restore contract captures it as the
 // opener (design D2).

@@ -35,6 +35,8 @@ import {
   MARKER_DIAMOND_HALF,
   MARKER_CURRENT_RING_R,
   HALO_R,
+  GATE_ARCH_R,
+  STUB_FOOTPRINT,
 } from "../composables/use-map-lattice-geometry.js";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
 import { useMapView } from "../composables/use-map-view.js";
@@ -146,7 +148,10 @@ const {
   nodeTier,
   islandDots,
   islandRings,
-  islandLabelOffset,
+  islandRingLabels,
+  islandStubs,
+  islandLabels,
+  isGateway,
 } = geometry;
 
 // The island's context tier (two-hop places) draws as a small background dot
@@ -155,9 +160,119 @@ function isContext(node) {
   return nodeTier(node) === "context";
 }
 
-function nodeLabelOffset(node) {
-  return islandLabelOffset(node, visibleNodeLabel(node), labelY());
+// The island's placed label block for a node (lib/island_labels.js), in the
+// node group's own coordinates; null when the block was omitted (a context
+// label with no free position) or the node draws no visible label.
+function placedLabel(node) {
+  const placed = islandLabels.value.get(String(node.id));
+  const pos = nodePos(node);
+  if (!placed || !pos) return null;
+  return relativeTo(placed, pos);
 }
+
+function relativeTo(placed, origin) {
+  return {
+    ...placed,
+    lines: placed.lines.map((line) => ({ ...line, x: line.x - origin.x, y: line.y - origin.y })),
+    leader: placed.leader
+      ? {
+          x1: placed.leader.x1 - origin.x,
+          y1: placed.leader.y1 - origin.y,
+          x2: placed.leader.x2 - origin.x,
+          y2: placed.leader.y2 - origin.y,
+        }
+      : null,
+  };
+}
+
+function stubLabel(stub) {
+  return islandLabels.value.get(`stub:${stub.index}`) ?? null;
+}
+
+// A gateway exit stub's hit boxes in user units: the native button covers
+// its arrow and, while the label sits beside it, the label too. A label set
+// far out on a leader line keeps its own hit box (a child of the button), so
+// the button never spans the unrelated markers between them.
+function stubHitBoxes(stub) {
+  const label = stubLabel(stub);
+  const arrow = {
+    x0: stub.x - STUB_FOOTPRINT,
+    y0: stub.y - STUB_FOOTPRINT,
+    x1: stub.x + STUB_FOOTPRINT,
+    y1: stub.y + STUB_FOOTPRINT,
+  };
+  if (!label) return { button: arrow, label: null };
+  if (label.leader) return { button: arrow, label: label.box };
+  return {
+    button: {
+      x0: Math.min(arrow.x0, label.box.x0),
+      y0: Math.min(arrow.y0, label.box.y0),
+      x1: Math.max(arrow.x1, label.box.x1),
+      y1: Math.max(arrow.y1, label.box.y1),
+    },
+    label: null,
+  };
+}
+
+// The button's box in percent of the square, padded and clamped inside it.
+function stubButtonStyle(stub) {
+  const { button } = stubHitBoxes(stub);
+  const pad = 2;
+  const size = canvasWidth.value || 240;
+  const pct = (v) => `${(v / size) * 100}%`;
+  const x0 = Math.max(0, button.x0 - pad);
+  const y0 = Math.max(0, button.y0 - pad);
+  return {
+    left: pct(x0),
+    top: pct(y0),
+    width: pct(Math.min(size, button.x1 + pad) - x0),
+    height: pct(Math.min(size, button.y1 + pad) - y0),
+  };
+}
+
+// A leadered label's own hit box, relative to (and in units of) the button.
+function stubLabelHitStyle(stub) {
+  const { button, label } = stubHitBoxes(stub);
+  if (!label) return null;
+  const pad = 2;
+  const bx0 = Math.max(0, button.x0 - pad);
+  const by0 = Math.max(0, button.y0 - pad);
+  const bw = Math.min(canvasWidth.value || 240, button.x1 + pad) - bx0;
+  const bh = Math.min(canvasWidth.value || 240, button.y1 + pad) - by0;
+  const pctX = (v) => `${(v / bw) * 100}%`;
+  const pctY = (v) => `${(v / bh) * 100}%`;
+  return {
+    left: pctX(label.x0 - pad - bx0),
+    top: pctY(label.y0 - pad - by0),
+    width: pctX(label.x1 - label.x0 + 2 * pad),
+    height: pctY(label.y1 - label.y0 + 2 * pad),
+  };
+}
+
+// A held Enter repeats the platform's click; only the first press moves.
+function onStubKeydown(event) {
+  if (event.key === "Enter" && event.repeat) event.preventDefault();
+}
+
+// A stub activates its own target's move action, exactly once, and never
+// the island's full-map affordance (the click stops here).
+function onStubActivate(stub) {
+  if (!stub.actionable) return;
+  emit("move", {
+    exit_ref: stub.action.exit_ref,
+    destination: stub.action.destination,
+  });
+}
+
+const STUB_ARROW = "0,-8 6.5,5 0,2 -6.5,5";
+
+// The island paints its quiet context first and the current node last, so
+// the player's own name is never covered by a neighbour's marker or label.
+const paintedNodes = computed(() => {
+  if (!isIsland.value) return drawnNodes.value;
+  const rank = (node) => (isContext(node) ? 0 : node.visibility === "current" ? 2 : 1);
+  return [...drawnNodes.value].sort((a, b) => rank(a) - rank(b));
+});
 
 function onNodeActivate(node) {
   if (isContext(node)) return;
@@ -332,7 +447,9 @@ defineExpose({
     :class="{
       'local-map__viewport--fit': fitView,
       'local-map__viewport--fit--dragging': fitView && isDragging,
+      'local-map__viewport--island': isIsland,
     }"
+    :style="isIsland ? latticeStyle : null"
     @wheel="onWheel"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
@@ -423,7 +540,7 @@ defineExpose({
         :r="ring.radius"
       />
       <text
-        v-for="ring in islandRings"
+        v-for="ring in islandRingLabels"
         :key="`ring-label-${ring.distance}`"
         class="local-map__ring-label"
         :style="{ fontSize: `${labelFont}px` }"
@@ -568,7 +685,7 @@ defineExpose({
     </g>
     <g :class="{ 'map-lattice__pan': panOnMove }" data-testid="map-lattice__pan--nodes">
     <g
-      v-for="node in drawnNodes"
+      v-for="node in paintedNodes"
       :key="node.id"
       class="local-map__node"
       :class="[`local-map__node--${node.visibility}`, { 'local-map__node--context': isContext(node) }, { 'local-map__node--aimed': aimedNode !== null && String(node.id) === String(aimedNode) }]"
@@ -596,6 +713,21 @@ defineExpose({
           :r="2.4 * markerScale"
           aria-hidden="true"
         />
+        <!-- Its name only where a free position remains after every exit
+             and the current node (fits-or-omitted, design §6.4). -->
+        <text
+          v-if="placedLabel(node)"
+          class="local-map__node-label local-map__node-label--context"
+          :style="{ fontSize: `${labelFont}px` }"
+          text-anchor="middle"
+        >
+          <tspan
+            v-for="(line, i) in placedLabel(node).lines"
+            :key="i"
+            :x="line.x"
+            :y="line.y"
+          >{{ line.text }}</tspan>
+        </text>
       </template>
       <template v-else>
       <!-- The draft marker ladder (webclient-map-01-draft-chrome D2): the
@@ -674,12 +806,54 @@ defineExpose({
         :r="HALO_R * markerScale"
         aria-hidden="true"
       />
+      <!-- The island's gate glyph (label-minimap-exits-and-gateways): an
+           arch framing the node's own visibility marker, so a gateway reads
+           by shape whatever its state. Decoration: not a marker class. -->
+      <path
+        v-if="isGateway(node)"
+        class="local-map__gate-glyph"
+        data-testid="local-map__gate-glyph"
+        :d="`M ${-GATE_ARCH_R} ${GATE_ARCH_R - 2} V -1 A ${GATE_ARCH_R} ${GATE_ARCH_R} 0 0 1 ${GATE_ARCH_R} -1 V ${GATE_ARCH_R - 2} M ${-GATE_ARCH_R - 3} ${GATE_ARCH_R - 2} H ${-GATE_ARCH_R + 3} M ${GATE_ARCH_R - 3} ${GATE_ARCH_R - 2} H ${GATE_ARCH_R + 3}`"
+        aria-hidden="true"
+      />
+      <template v-if="isIsland">
+        <!-- A suppressed duplicate region name keeps the full name. -->
+        <title v-if="!placedLabel(node)">{{ node.label }}</title>
+        <!-- A label that found no free position sits farther out, joined to
+             its marker by a hairline leader. -->
+        <line
+          v-if="placedLabel(node)?.leader"
+          class="local-map__leader"
+          data-testid="local-map__leader"
+          :x1="placedLabel(node).leader.x1"
+          :y1="placedLabel(node).leader.y1"
+          :x2="placedLabel(node).leader.x2"
+          :y2="placedLabel(node).leader.y2"
+          aria-hidden="true"
+        />
+        <text
+          v-if="placedLabel(node)"
+          class="local-map__node-label"
+          :class="`local-map__node-label--${labelTier(node)}`"
+          :style="{ fontSize: `${labelFont}px` }"
+          text-anchor="middle"
+        >
+          <title>{{ node.label }}</title>
+          <tspan
+            v-for="(line, i) in placedLabel(node).lines"
+            :key="i"
+            :class="{ 'local-map__via': line.kind === 'via' }"
+            :x="line.x"
+            :y="line.y"
+          >{{ line.text }}</tspan>
+        </text>
+      </template>
       <text
+        v-else
         class="local-map__node-label"
         :class="`local-map__node-label--${labelTier(node)}`"
         :style="{ fontSize: `${labelFont}px` }"
-        :x="isIsland ? nodeLabelOffset(node).dx : null"
-        :y="isIsland ? nodeLabelOffset(node).y : labelY()"
+        :y="labelY()"
         text-anchor="middle"
       >
         <title>{{ node.label }}</title>{{ visibleNodeLabel(node) }}
@@ -687,7 +861,87 @@ defineExpose({
       </template>
     </g>
     </g>
+    <!-- Gateway exit stubs (label-minimap-exits-and-gateways; design §4.2):
+         a cross-layer target is never a node. Its exit is an arrowhead on the
+         exit ring at the target's bearing, a route from the player to it, and
+         a `通往 <leads_to>` label. Fixed to the current node's ring, so it
+         stays outside the pan groups. A locked stub (no action) keeps its
+         hollow arrow and label: information, never a way through. -->
+    <g
+      v-for="stub in islandStubs"
+      :key="`stub-${stub.key}`"
+      class="local-map__stub"
+      :class="{ 'local-map__stub--locked': !stub.actionable }"
+      :data-testid="`local-map__stub--${stub.index}`"
+      aria-hidden="true"
+    >
+      <title>{{ stub.label }}</title>
+      <line
+        class="local-map__edge"
+        :class="stub.actionable ? 'local-map__edge--traversable' : 'local-map__edge--blocked'"
+        :x1="120 + (HALO_R + 1) * Math.sin((stub.bearing * Math.PI) / 180)"
+        :y1="120 - (HALO_R + 1) * Math.cos((stub.bearing * Math.PI) / 180)"
+        :x2="120 + (88 - 6) * Math.sin((stub.bearing * Math.PI) / 180)"
+        :y2="120 - (88 - 6) * Math.cos((stub.bearing * Math.PI) / 180)"
+      />
+      <polygon
+        class="local-map__stub-arrow"
+        data-testid="local-map__stub-arrow"
+        :points="STUB_ARROW"
+        :transform="`translate(${stub.x}, ${stub.y}) rotate(${stub.bearing})`"
+      />
+      <line
+        v-if="stubLabel(stub)?.leader"
+        class="local-map__leader"
+        :x1="stubLabel(stub).leader.x1"
+        :y1="stubLabel(stub).leader.y1"
+        :x2="stubLabel(stub).leader.x2"
+        :y2="stubLabel(stub).leader.y2"
+      />
+      <text
+        v-if="stubLabel(stub)"
+        class="local-map__node-label local-map__stub-label"
+        :style="{ fontSize: `${labelFont}px` }"
+        text-anchor="middle"
+      >
+        <tspan
+          v-for="(line, i) in stubLabel(stub).lines"
+          :key="i"
+          :x="line.x"
+          :y="line.y"
+        >{{ line.text }}</tspan>
+      </text>
+    </g>
   </svg>
+  <!-- An actionable stub's control: a native button over its arrow and
+       label (the island svg is role="img", whose children are presentational,
+       so the control is the svg's sibling). Enter, Space and pointer all
+       reach the one click handler; the click never also opens the map.
+       Space stops at the button so the shell's document key routing (which
+       claims Space for paging and multi-select and prevents its default)
+       never sees it, leaving the platform's own Space activation intact. -->
+  <template v-if="isIsland">
+    <button
+      v-for="stub in islandStubs.filter((s) => s.actionable)"
+      :key="`stub-button-${stub.key}`"
+      type="button"
+      class="local-map__stub-button"
+      :data-testid="`local-map__stub-button--${stub.index}`"
+      :aria-label="`往 ${stub.leadsTo} 移動`"
+      :title="`往 ${stub.leadsTo} 移動`"
+      :style="stubButtonStyle(stub)"
+      @click.stop="onStubActivate(stub)"
+      @keydown.space.stop
+      @keydown="onStubKeydown"
+    >
+      <span
+        v-if="stubLabelHitStyle(stub)"
+        class="local-map__stub-hit"
+        :style="stubLabelHitStyle(stub)"
+        aria-hidden="true"
+      ></span>
+    </button>
+  </template>
   </div>
 </template>
 

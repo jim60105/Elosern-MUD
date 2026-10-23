@@ -105,6 +105,78 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(payload["current_node"], panel["current_node"])
         self.assertTrue(payload["exit_ref"])
 
+    def _stand_on_gate_room(self, page) -> dict:
+        """Teleport onto the fixture's one remembered gateway room and return
+        its panel once the island shows the gate's exit stub."""
+        from .browser_helpers import fixture_home_node_id, fixture_home_xyz_arg
+
+        self._send(page, f"teleport {fixture_home_xyz_arg()}")
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
+            == fixture_home_node_id(),
+            timeout=15000,
+        )
+        panel = self._wait_local_map_available(page)
+        gate_room = next(node for node in panel["nodes"] if node["visibility"] == "remembered")
+        z_map = gate_room["id"].split(":")[1]
+        self._send(page, f"teleport ({gate_room['x']}, {gate_room['y']}, {z_map})")
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
+            == gate_room["id"],
+            timeout=20000,
+        )
+        page.wait_for_selector('[data-testid="local-map"] .local-map__stub-button', timeout=15000)
+        return self._wait_local_map_available(page)
+
+    @covers_requirement("webclient-local-map::island-gateways-expose-labelled-accessible-exit-ring-controls")
+    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    def test_gateway_exit_stub_is_a_named_keyboard_button_moving_once(self):
+        # label-minimap-exits-and-gateways: on the gate room the island's
+        # cross-layer gate target is an exit-ring stub whose native button
+        # follows the full-map affordance in tab order, is named
+        # `往 <leads_to> 移動`, and on Space (then, back on the gate, Enter)
+        # submits exactly one explore.move with the gate's own exit_ref and
+        # the committed current node — never opening the full map too.
+        from .browser_helpers import install_outbound_recorder, outbound_messages, sent_action_count
+
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        for key in (" ", "Enter"):
+            with self.subTest(key=key):
+                panel = self._stand_on_gate_room(page)
+                current = next(node for node in panel["nodes"] if node["id"] == panel["current_node"])
+                target = next(node for node in panel["nodes"] if node["id"].startswith("wild:"))
+                self.assertIsNotNone(target["action"], "the seeded character may traverse the gate")
+                name = f"往 {current['gateway']['leads_to']} 移動"
+                page.locator('[data-testid="local-map__expand"]').focus()
+                page.keyboard.press("Tab")
+                focused = page.evaluate("document.activeElement && document.activeElement.getAttribute('aria-label')")
+                self.assertEqual(focused, name)
+                before = sent_action_count(page, "explore.move")
+                page.keyboard.press(key)
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline and sent_action_count(page, "explore.move") == before:
+                    page.wait_for_timeout(250)
+                page.wait_for_timeout(500)
+                self.assertEqual(sent_action_count(page, "explore.move"), before + 1)
+                payload = [
+                    args[0]["payload"]
+                    for cmd, args, _kw in outbound_messages(page)
+                    if cmd == "ui_action" and args[0]["action_id"] == "explore.move"
+                ][-1]
+                self.assertEqual(
+                    payload,
+                    {"exit_ref": target["action"]["exit_ref"], "current_node": panel["current_node"]},
+                )
+                self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
+                wait_for_store_state(
+                    page,
+                    lambda s: (((s.get("panels") or {}).get("local_map") or {}).get("current_node") or "").startswith("wild:"),
+                    timeout=20000,
+                )
+
     def test_minimap_visible_and_keyboard_usable_at_both_viewports(self):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):

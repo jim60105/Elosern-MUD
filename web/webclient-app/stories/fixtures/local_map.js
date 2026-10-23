@@ -823,8 +823,8 @@ export const LOCAL_MAP_CIARAN_PLAZA_SAMPLE = metricViewAround(CIARAN_METRIC_CORP
 // 900 m north, two-hop streets around it, and the registered gate's
 // cross-layer wilderness target at its renderer-local slot — one lattice
 // divisor (70 m) south of the gate, the presenter's `_free_slot`. The island
-// never draws that target as a node; its exit-stub descriptor waits for the
-// gateway presentation (label-minimap-exits-and-gateways).
+// never draws that target as a node: it draws the projection's exit stub on
+// the exit ring at the target's bearing (label-minimap-exits-and-gateways).
 const SOUTH_GATE_WILD_TARGET = "wild:elosern:860:1076";
 export const LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE = metricViewAround(ALTORIA_METRIC_CORPUS, "south_gate", {
   visited: ["south_avenue"],
@@ -986,3 +986,166 @@ export const LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE = metricViewAround(ALTORIA_MET
     rememberedGate(4500, 6350, "西部丘陵與谷地（北門）", "西部丘陵與谷地"),
   ],
 });
+
+// ---------------------------------------------------------------------------
+// Gateway and label fixtures (label-minimap-exits-and-gateways; approved design
+// §4.2, §6.4, §7).
+// ---------------------------------------------------------------------------
+
+// Altoria's south gate with the gate barred: the cross-layer target keeps
+// its node, edge and far-side metadata, but the server withheld its move
+// action, so the island's exit stub stays visible and inert.
+export const LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE = {
+  ...LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+  nodes: LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE.nodes.map((node) =>
+    node.id === SOUTH_GATE_WILD_TARGET ? { ...node, action: null } : node,
+  ),
+  edges: LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE.edges.map((edge) =>
+    edge.destination === SOUTH_GATE_WILD_TARGET ? { ...edge, traversable: false } : edge,
+  ),
+};
+
+// The wilderness side of the same gateway: the player stands on the south
+// gate's approach cell. The presenter emits the gate's own grid room as the
+// northern neighbour (renderer-local cell geometry, the settlement named in
+// its gateway metadata); the island draws it as an exit stub, never as a
+// node, and no city street appears. The other neighbours share the current
+// region, so their repeated name stays suppressed.
+const RETURN_CENTRE = [860, 1076];
+const RETURN_CURRENT = `wild:elosern:${RETURN_CENTRE[0]}:${RETURN_CENTRE[1]}`;
+const RETURN_GATE = "grid:capital_altoria:3050:150";
+export const LOCAL_MAP_WILDERNESS_RETURN_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "wilderness",
+  current_node: RETURN_CURRENT,
+  title: WILD_REGION,
+  nodes: [
+    {
+      id: RETURN_CURRENT,
+      label: WILD_REGION,
+      x: RETURN_CENTRE[0],
+      y: RETURN_CENTRE[1],
+      visibility: "current",
+      current: true,
+      anchor: false,
+      landmark: false,
+      gateway: null,
+      action: null,
+    },
+    ...WILD_DIRECTIONS.map(([dir, dx, dy]) => {
+      const x = RETURN_CENTRE[0] + dx;
+      const y = RETURN_CENTRE[1] + dy;
+      const gate = dir === "n";
+      const id = gate ? RETURN_GATE : `wild:elosern:${x}:${y}`;
+      return {
+        id,
+        label: gate ? "南門" : WILD_REGION,
+        x,
+        y,
+        visibility: gate ? "visible_visited" : "visible_unvisited",
+        current: false,
+        anchor: false,
+        landmark: false,
+        gateway: gate ? { leads_to: "聖潔王都" } : null,
+        action: { kind: "move", exit_ref: `e_return_${dir}`, destination: id },
+      };
+    }),
+  ],
+  edges: WILD_DIRECTIONS.map(([dir, dx, dy]) => ({
+    source: RETURN_CURRENT,
+    destination: dir === "n" ? RETURN_GATE : `wild:elosern:${RETURN_CENTRE[0] + dx}:${RETURN_CENTRE[1] + dy}`,
+    label: dir,
+    known: dir === "n",
+    traversable: true,
+  })),
+  legend: [...METRIC_LEGEND, "每格約一公里"],
+};
+
+// A crowded crossroads: six exits with long names around the compass, one of
+// them a same-layer gateway (the city's east gate with its far side), a long
+// current name, two-hop context and two remembered gateways on the rim. Not
+// every label fits its eight spots: exit labels then truncate and keep a
+// leader line, context names give way, and the remembered names stay whole.
+const CROWDED_MAP = "trade_crossroads";
+const crowdedId = (x, y) => `grid:${CROWDED_MAP}:${x}:${y}`;
+const CROWDED_CURRENT = crowdedId(1000, 1000);
+const CROWDED_EXITS = [
+  ["n", 1000, 1380, "北市集長廊", null],
+  ["e", 1900, 1010, "東城門", { leads_to: "東部大平原" }],
+  ["se", 1260, 720, "染坊街", null],
+  ["s", 1000, 450, "南運河碼頭", null],
+  ["w", 300, 1040, "鍛冶工匠街", null],
+  ["nw", 760, 1280, "學士院前庭", null],
+];
+const CROWDED_CONTEXT = [
+  [1000, 1700, "北門外驛道"],
+  [1650, 1350, "鐘樓後巷"],
+  [400, 700, "舊城牆外壕"],
+];
+export const LOCAL_MAP_CROWDED_LABELS_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: CROWDED_CURRENT,
+  title: "交易十字路口街道圖",
+  nodes: [
+    {
+      id: CROWDED_CURRENT,
+      label: "交易十字路口中央噴泉",
+      x: 1000,
+      y: 1000,
+      visibility: "current",
+      current: true,
+      anchor: true,
+      landmark: true,
+      gateway: null,
+      action: null,
+    },
+    ...CROWDED_EXITS.map(([dir, x, y, label, gateway], i) => ({
+      id: crowdedId(x, y),
+      label,
+      x,
+      y,
+      visibility: i % 3 === 0 ? "visible_visited" : "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      gateway,
+      action: { kind: "move", exit_ref: `e_cross_${dir}`, destination: crowdedId(x, y) },
+    })),
+    ...CROWDED_CONTEXT.map(([x, y, label]) => ({
+      id: crowdedId(x, y),
+      label,
+      x,
+      y,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      gateway: null,
+      action: null,
+    })),
+    rememberedGate(1100, -3000, "西部丘陵與谷地（南門）", "西部丘陵與谷地"),
+    rememberedGate(900, 5000, "北嶺關", "北嶺關"),
+  ].map((node) =>
+    node.visibility === "remembered" ? { ...node, id: node.id.replace("capital_altoria", CROWDED_MAP) } : node,
+  ),
+  edges: [
+    ...CROWDED_EXITS.map(([dir, x, y]) => ({
+      source: CROWDED_CURRENT,
+      destination: crowdedId(x, y),
+      label: dir,
+      known: true,
+      traversable: true,
+    })),
+    ...CROWDED_CONTEXT.map(([x, y]) => ({
+      source: CROWDED_CURRENT,
+      destination: crowdedId(x, y),
+      label: "",
+      known: false,
+      traversable: false,
+    })),
+  ],
+  legend: [...METRIC_LEGEND],
+};
