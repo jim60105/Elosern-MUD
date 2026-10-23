@@ -45,6 +45,10 @@ export function useMapDrawer(store, { onMapMove }) {
   const sessionScope = computed(() => `${store.view.generation}|${store.view.epoch}`);
   const tab = ref("area");
   const memory = reactive(blankMemory());
+  const opening = ref(0);
+  const worldReady = ref(false);
+  const worldRequest = ref(null);
+  const observedMove = ref(null);
 
   // The scope waiting for the lock, the map.view request in flight, and the
   // drawer's own move whose committed result triggers a refresh.
@@ -71,10 +75,16 @@ export function useMapDrawer(store, { onMapMove }) {
   function flush() {
     if (!open.value || pendingScope.value === null || !lockFree()) return;
     const scope = pendingScope.value;
+    const mark = store.view.mapPublications?.world_map ?? -1;
     const requestId = store.dispatchAction("map.view", { scope }, null);
     if (requestId) {
       pendingScope.value = null;
       awaiting.value = { requestId, scope, epoch: store.view.epoch };
+      if (scope === "world" && !worldReady.value && worldRequest.value === null) {
+        worldRequest.value = {
+          requestId, opening: opening.value, session: sessionScope.value, mark, revision: null,
+        };
+      }
     }
   }
 
@@ -92,12 +102,19 @@ export function useMapDrawer(store, { onMapMove }) {
     open,
     (isOpen) => {
       if (isOpen) {
+        opening.value += 1;
+        worldReady.value = false;
+        worldRequest.value = null;
+        observedMove.value = null;
         baselineResultId = resultOf()?.requestId ?? null;
         trackedMove.value = null;
         awaiting.value = null;
         tab.value = scopeForLayer(store.view.localMapModel?.layer ?? null);
         request(tab.value);
       } else {
+        worldReady.value = false;
+        worldRequest.value = null;
+        observedMove.value = null;
         pendingScope.value = null;
         awaiting.value = null;
         trackedMove.value = null;
@@ -116,13 +133,17 @@ export function useMapDrawer(store, { onMapMove }) {
   // selection and pending request of the previous session; an open drawer
   // asks the new session for its active scope.
   watch(sessionScope, () => {
+    opening.value += 1;
+    worldReady.value = false;
+    worldRequest.value = null;
+    observedMove.value = null;
     resetMemory();
     pendingScope.value = null;
     awaiting.value = null;
     trackedMove.value = null;
     baselineResultId = resultOf()?.requestId ?? null;
     if (open.value) request(tab.value);
-  });
+  }, { flush: "sync" });
 
   // A disconnect drops the pending slot: nothing is sent into a session the
   // drawer has not seen yet (the reconnect's new scope re-requests).
@@ -130,6 +151,9 @@ export function useMapDrawer(store, { onMapMove }) {
     () => store.view.connected,
     (connected) => {
       if (!connected) {
+        worldReady.value = false;
+        worldRequest.value = null;
+        observedMove.value = null;
         pendingScope.value = null;
         awaiting.value = null;
       }
@@ -156,30 +180,39 @@ export function useMapDrawer(store, { onMapMove }) {
   // drawer is open (none is reachable behind the modal today) is recognised
   // by its committed `moved` result code.
   watch(
-    () => [resultOf(), store.view.dispatch?.inFlight ?? null, store.view.revision],
+    () => [resultOf(), store.view.dispatch?.inFlight ?? null, store.view.revision,
+      store.view.mapPublications?.world_map],
     () => {
       const result = resultOf();
       if (!open.value) return;
+      const baseline = worldRequest.value;
+      if (baseline && baseline.opening === opening.value && baseline.session === sessionScope.value) {
+        if (result?.requestId === baseline.requestId && result.epoch === store.view.epoch) {
+          if (result.outcome === "success") baseline.revision = result.presentationRevision;
+          else worldRequest.value = null;
+        }
+        const publication = store.view.mapPublications?.world_map;
+        if (baseline.revision !== null && publication === baseline.revision &&
+            publication > baseline.mark && store.view.maps?.world_map?.available === true && lockFree()) {
+          worldReady.value = true;
+          worldRequest.value = null;
+        }
+      }
       if (awaiting.value && result && result.requestId === awaiting.value.requestId && lockFree()) {
         awaiting.value = null;
       }
-      if (!result || result.requestId === baselineResultId || result.epoch !== store.view.epoch) {
-        flush();
-        return;
-      }
-      const ours = trackedMove.value && result.requestId === trackedMove.value.requestId && result.epoch === trackedMove.value.epoch;
-      const foreignMove = !trackedMove.value && result.code === "moved";
-      if ((ours || foreignMove) && lockFree()) {
+      const ours = result && trackedMove.value && result.requestId === trackedMove.value.requestId && result.epoch === trackedMove.value.epoch;
+      const foreignMove = result && !trackedMove.value && result.code === "moved";
+      if (result && result.requestId !== baselineResultId && result.epoch === store.view.epoch && (ours || foreignMove)) {
         baselineResultId = result.requestId;
         trackedMove.value = null;
         if (result.outcome === "success") {
-          pendingScope.value = tab.value;
+          observedMove.value = { revision: result.presentationRevision };
         }
-      } else if (ours && result.outcome !== "success") {
-        // A rejected move refreshes nothing; the lock may still be held
-        // until its recovery commits, but no refresh will follow.
-        baselineResultId = result.requestId;
-        trackedMove.value = null;
+      }
+      if (observedMove.value && lockFree() && store.view.revision >= observedMove.value.revision) {
+        pendingScope.value = tab.value;
+        observedMove.value = null;
       }
       flush();
     },
@@ -233,6 +266,8 @@ export function useMapDrawer(store, { onMapMove }) {
     mapTab: tab,
     mapMemory: memory,
     mapEpoch: sessionScope,
+    mapOpening: opening,
+    mapWorldReady: worldReady,
     mapBusy: busy,
     onMapDrawerMove: onDrawerMove,
     onMapShowOnWorld: showOnWorld,

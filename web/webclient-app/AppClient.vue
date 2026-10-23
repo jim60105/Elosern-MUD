@@ -112,7 +112,7 @@ const {
 // session memory and the on-demand `map.view` requests; its 前往 goes
 // through the same `explore.move` seam as the minimap.
 const {
-  mapTab, mapMemory, mapEpoch, mapBusy, onMapDrawerMove,
+  mapTab, mapMemory, mapEpoch, mapBusy, mapOpening, mapWorldReady, onMapDrawerMove,
 } = useMapDrawer(store, { onMapMove });
 // The party window (webclient-party-window-member-tab): its openers, the one
 // `party.view_member` per rail or bag item selection (webclient-party-bag-
@@ -1323,6 +1323,8 @@ const rootStyle = computed(() => {
           :world="store.view.maps.world_map ?? null"
           :memory="mapMemory"
           :epoch="mapEpoch"
+          :opening="mapOpening"
+          :world-baseline-ready="mapWorldReady"
           :location-label="store.view.statusSlice.locationLabel"
           :busy="mapBusy"
           @move="onMapDrawerMove"

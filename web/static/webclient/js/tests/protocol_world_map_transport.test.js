@@ -67,6 +67,32 @@ test("an intact world map above 64 KB is adopted in one frame", () => {
   assert.equal(state.revision, 2);
 });
 
+test("map publication marks track logical adoption, never clones or unrelated revisions", () => {
+  const store = activeStore();
+  assert.deepEqual(store.getState().mapPublications, {});
+  store.receive(1, "ui_update", [envelope(2, { world_map: F.worldMap() })], {});
+  store.receive(1, "ui_update", [envelope(3, { area_map: F.gridArea() })], {});
+  assert.deepEqual(store.getState().mapPublications, { world_map: 2, area_map: 3 });
+  const copy = store.getState();
+  copy.mapPublications.world_map = 999;
+  store.receive(1, "ui_snapshot", [envelope(4, { status: validStatusPanel() })], {});
+  assert.deepEqual(store.getState().mapPublications, { world_map: 2, area_map: 3 });
+  assert.ok(store.getState().maps.world_map);
+  const parts = F.encodeParts(F.largeWorldMap(100000), "P".repeat(22));
+  for (const part of parts.slice(0, -1)) {
+    assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: part })], {}).partial, true);
+    assert.equal(store.getState().mapPublications.world_map, 2);
+  }
+  assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: parts.at(-1) })], {}).accepted, true);
+  assert.equal(store.getState().mapPublications.world_map, 5);
+  assert.equal(store.receive(1, "ui_update", [envelope(5, { world_map: F.worldMap() })], {}).accepted, false);
+  assert.equal(store.getState().mapPublications.world_map, 5);
+  store.receive(1, "ui_protocol_error", [{ protocol_version: 1, code: "no_puppet", message: "Detached", reload_required: false }], {});
+  assert.deepEqual(store.getState().mapPublications, {});
+  store.beginTransport(2);
+  assert.deepEqual(store.getState().mapPublications, {});
+});
+
 test("a world map above its logical ceiling is rejected and the prior map retained", () => {
   const store = activeStore();
   const small = F.worldMap();

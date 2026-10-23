@@ -7,9 +7,15 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive, ref } from "vue";
+import { createPinia, setActivePinia } from "pinia";
+import AppClient from "../../AppClient.vue";
+import { useElosernStore } from "../../stores/elosern.js";
+import * as fx from "../store/protocol_fixtures.js";
+import { LOCAL_MAP_WILDERNESS_METRIC_SAMPLE } from "../../stories/fixtures.js";
+import MapFixtures from "../../../static/webclient/js/tests/map_panel_fixtures.js";
 import MapDrawer from "../../components/MapDrawer.vue";
 import MapLattice from "../../components/MapLattice.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
@@ -17,7 +23,7 @@ import { areaMemoryKey, scopeForLayer, useMapDrawer } from "../../composables/us
 import { project, usableRect } from "../../lib/map_viewport.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import { TOWN_IDS, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
-import { QUEST_IDS, worldBase } from "../../stories/fixtures/world_map.js";
+import { QUEST_IDS, newLight, worldBase, worldNewLight } from "../../stories/fixtures/world_map.js";
 
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
 const APP_DIR = resolve(__dirname, "../..");
@@ -27,6 +33,7 @@ afterEach(() => {
   for (const w of wrappers) w.unmount();
   wrappers = [];
   document.body.innerHTML = "";
+  document.documentElement.style.removeProperty("--motion-district-reveal");
 });
 
 // ── fake store ──────────────────────────────────────────────────────────
@@ -338,6 +345,160 @@ describe("the map drawer opens the appropriate scope and preserves session views
 });
 
 describe("map requests follow explicit scope and committed moves only while open", () => {
+  function liveDrawer(layer = "wilderness") {
+    setActivePinia(createPinia());
+    const store = useElosernStore();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    store.beginTransport(1);
+    store.setConnected(true);
+    const local = layer === "wilderness" ? LOCAL_MAP_WILDERNESS_METRIC_SAMPLE : fx.localMapPanel();
+    expect(store.receive(1, "ui_snapshot", [fx.snapshot({
+      panels: { status: fx.statusPanel(), context_actions: fx.explorationActions(), local_map: local },
+    })], {}).accepted).toBe(true);
+    const w = mount(AppClient, { attachTo: document.body });
+    wrappers.push(w);
+    const receive = (name, body) => expect(store.receive(store.view.generation, name, [body], {}).accepted).toBe(true);
+    const publish = (world, revision = store.view.revision + 1) => {
+      receive("ui_update", fx.update({ revision, panels: { world_map: world } }));
+      return revision;
+    };
+    const result = (request, revision, outcome = "success", code = "completed") =>
+      receive("ui_action_result", fx.actionResult({
+        request_id: request.request_id, presentation_revision: revision, outcome, code,
+      }));
+    const reply = async (world, order = "body-first", outcome = "success") => {
+      const request = sender.sent.actions.at(-1);
+      const revision = store.view.revision + 1;
+      if (order === "result-first") { result(request, revision, outcome); await tick(); }
+      publish(world, revision);
+      await tick();
+      if (order === "body-first") { result(request, revision, outcome); await tick(); }
+    };
+    return { store, sender, w, receive, publish, result, reply };
+  }
+
+  it.each(["body-first", "result-first"])("cached reopen waits for its own silent fresh baseline (%s)", async (order) => {
+    const { store, sender, w, receive, reply } = liveDrawer();
+    store.openOverlay("map");
+    await tick();
+    await reply(worldBase(), order);
+    const drawer = w.findComponent(MapDrawer);
+    const saved = { signature: "world|elosern|km", cx: 1100, cy: 1200, span: 420 };
+    drawer.props("memory").world.view = saved;
+    await tick();
+    store.closeOverlay();
+    await tick();
+    // A committed movement while closed publishes no expensive map.
+    receive("ui_snapshot", fx.snapshot({ revision: store.view.revision + 1, panels: { status: fx.statusPanel(), local_map: LOCAL_MAP_WILDERNESS_METRIC_SAMPLE } }));
+    store.openOverlay("map");
+    await tick();
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    const mark = store.view.mapPublications.world_map;
+    receive("ui_snapshot", fx.snapshot({ revision: store.view.revision + 1, panels: { status: fx.statusPanel(), local_map: LOCAL_MAP_WILDERNESS_METRIC_SAMPLE } }));
+    await tick();
+    expect(store.view.mapPublications.world_map).toBe(mark);
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    await reply(worldNewLight(), order);
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(true);
+    expect(w.find('[data-testid="world-map__ink"]').exists()).toBe(false);
+    expect(w.get('[data-testid="world-map__discovery"]').text()).toBe("");
+    expect(w.findComponent(MapDrawer).props("memory").world.view).toEqual(saved);
+    const count = sender.sent.actions.length;
+    const revision = store.view.revision + 1;
+    receive("ui_update", fx.update({ revision, panels: { world_map: worldNewLight() } }));
+    await tick();
+    expect(w.get('[data-testid="world-map__discovery"]').text()).toBe("");
+    expect(sender.sent.actions).toHaveLength(count);
+  });
+
+  it.each(["body-first", "result-first"])("retains a pending movement refresh after the opening baseline (%s)", async (order) => {
+    document.documentElement.style.setProperty("--motion-district-reveal", "600ms");
+    const { store, sender, w, receive, reply } = liveDrawer();
+    // A movement was dispatched before the drawer opened. Its result can
+    // arrive before the baseline, and its refresh obligation survives it.
+    const moveId = store.dispatchAction("explore.move", { exit_ref: "east", current_node: LOCAL_MAP_WILDERNESS_METRIC_SAMPLE.current_node });
+    store.openOverlay("map");
+    await tick();
+    const move = sender.sent.actions.at(-1);
+    expect(move.request_id).toBe(moveId);
+    const rev = store.view.revision + 1;
+    receive("ui_action_result", fx.actionResult({ request_id: moveId, code: "moved", presentation_revision: rev }));
+    receive("ui_update", fx.update({ revision: rev, panels: { status: fx.statusPanel() } }));
+    await tick();
+    expect(sender.sent.actions.filter(a => a.action_id === "map.view")).toHaveLength(1);
+    await reply(worldBase(), order);
+    const view = w.find('[data-testid="world-map"]').element;
+    expect(w.get('[data-testid="world-map__discovery"]').text()).toBe("");
+    // A later committed move triggers exactly one while-open refresh.
+    const movementRevision = store.view.revision + 1;
+    const requestId = store.dispatchAction("explore.move", { exit_ref: "east", current_node: LOCAL_MAP_WILDERNESS_METRIC_SAMPLE.current_node });
+    receive("ui_action_result", fx.actionResult({ request_id: requestId, code: "moved", presentation_revision: movementRevision }));
+    receive("ui_update", fx.update({ revision: movementRevision, panels: { status: fx.statusPanel() } }));
+    await tick();
+    expect(sender.sent.actions.filter(a => a.action_id === "map.view")).toHaveLength(2);
+    expect(w.find('[data-testid="world-map"]').element).toBe(view);
+    await reply(worldNewLight(), order);
+    expect(w.find('[data-testid="world-map"]').element).toBe(view);
+    expect(w.findAll('[data-testid="world-map__ink"]')).toHaveLength(1);
+    expect(w.get('[data-testid="world-map__discovery"]').text()).toBe(`已探明：${newLight().name}`);
+  });
+
+  it("old openings, partial transfers and failed results never qualify cached knowledge", async () => {
+    const { store, sender, w, publish, result, receive, reply } = liveDrawer();
+    store.openOverlay("map");
+    await tick();
+    const oldRequest = sender.sent.actions.at(-1);
+    store.closeOverlay();
+    store.openOverlay("map");
+    await tick();
+    const oldRevision = publish(worldNewLight());
+    result(oldRequest, oldRevision);
+    await tick();
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    const own = sender.sent.actions.at(-1);
+    expect(own.request_id).not.toBe(oldRequest.request_id);
+    const revision = store.view.revision + 1;
+    result(own, revision);
+    const parts = MapFixtures.encodeParts(worldBase(), "P".repeat(22));
+    // A part frame carries exactly its one panel: the shared snapshot fixture
+    // would otherwise merge its default status panel in beside it.
+    const partFrame = (part) => ({ ...fx.update({ revision }), panels: { world_map: part } });
+    receive("ui_update", partFrame(parts[0]));
+    await tick();
+    expect(store.view.mapPublications.world_map).toBe(oldRevision);
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    for (const part of parts.slice(1)) receive("ui_update", partFrame(part));
+    await tick();
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(true);
+    expect(store.view.mapPublications.world_map).toBe(revision);
+    store.closeOverlay();
+    store.openOverlay("map");
+    await tick();
+    await reply(worldNewLight(), "result-first", "rejected");
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    store.beginTransport(2);
+    await tick();
+    expect(w.find('[data-testid="world-map__ink"]').exists()).toBe(false);
+  });
+
+  it("area-first requests only the active scope and qualifies world independently", async () => {
+    const { store, sender, w, receive, result, reply } = liveDrawer("interior");
+    store.openOverlay("map");
+    await tick();
+    expect(sender.sent.actions.map(a => a.payload.scope)).toEqual(["area"]);
+    const request = sender.sent.actions.at(-1);
+    const revision = store.view.revision + 1;
+    receive("ui_update", fx.update({ revision, panels: { area_map: interiorArea() } }));
+    result(request, revision);
+    await tick();
+    await w.get('[data-testid="map-drawer-tab--world"]').trigger("click");
+    expect(sender.sent.actions.map(a => a.payload.scope)).toEqual(["area", "world"]);
+    expect(w.find('[data-testid="world-map"]').exists()).toBe(false);
+    await reply(worldNewLight());
+    expect(w.get('[data-testid="world-map__discovery"]').text()).toBe("");
+  });
+
   it("sends one map.view for the active scope on open and on each tab switch", async () => {
     const store = fakeStore();
     const { api } = withDrawer(store);

@@ -53,6 +53,10 @@ const props = defineProps({
   memory: { type: Object, required: true },
   // The transport/puppet scope the world view's discovery re-baselines on.
   epoch: { type: [String, Number], default: null },
+  opening: { type: Number, default: 0 },
+  // Standalone stories supply their initial body directly. The live host
+  // gates it on the current opening's successfully adopted publication.
+  worldBaselineReady: { type: Boolean, default: true },
   // The committed location label (header caption fallback).
   locationLabel: { type: String, default: "" },
   // The host is settling a request or a move: 前往 waits.
@@ -84,7 +88,7 @@ const legendToggle = ref(null);
 // ── bodies and readings ─────────────────────────────────────────────────
 
 const areaReady = computed(() => props.area?.available === true);
-const worldReady = computed(() => props.world?.available === true);
+const worldReady = computed(() => props.worldBaselineReady && props.world?.available === true);
 const activeBody = computed(() => (props.tab === "world" ? props.world : props.area));
 const activeReady = computed(() => (props.tab === "world" ? worldReady.value : areaReady.value));
 const unavailableText = computed(() => {
@@ -477,7 +481,7 @@ defineExpose({ viewRef });
         :world="world"
         :view="memory.world.view"
         :selected="memory.world.selected"
-        :epoch="epoch"
+        :epoch="`${epoch}|${opening}`"
         @update:view="(view) => (memory.world.view = view)"
         @update:selected="(key) => (memory.world.selected = key)"
       />
