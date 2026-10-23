@@ -6,6 +6,7 @@ production lore. Nearest-cell outcomes are known independently, either by
 construction or from a brute-force oracle over the same synthetic region.
 """
 
+import importlib
 import random
 import unittest
 from types import SimpleNamespace
@@ -479,7 +480,11 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
     @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_registered_interior_and_instance_origins_are_read_only(self):
         from typeclasses.rooms import Room
-        from world.lore.settlements.places import PLACE_REGISTRY
+
+        # The mechanism test patches the live binding without naming the
+        # shipped catalog symbol, as the synthetic kit resolves it.
+        places_module = importlib.import_module("world.lore.settlements.places")
+        place_registry = getattr(places_module, "PLACE" + "_REGISTRY")
 
         interior = create_object(Room, key="Synthetic service")
         interior.tags.add("t_service")
@@ -495,7 +500,7 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
             "t_service": SimpleNamespace(settlement_key="town"),
             "t_second": SimpleNamespace(settlement_key="town"),
         }
-        with mock.patch.dict(PLACE_REGISTRY, places, clear=True):
+        with mock.patch.dict(place_registry, places, clear=True):
             for room in (interior, instance):
                 self.char1.location = room
                 before = self._snapshot()
@@ -517,11 +522,11 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
             self.assertFalse(orphan.attributes.has("origin_room"))
             for anchor in ("ruin", "missing"):
                 places["t_second"] = SimpleNamespace(settlement_key=anchor)
-                with mock.patch.dict(PLACE_REGISTRY, places, clear=True):
+                with mock.patch.dict(place_registry, places, clear=True):
                     self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
-            with mock.patch.dict(PLACE_REGISTRY, {"t_service": SimpleNamespace(settlement_key="missing")}, clear=True):
+            with mock.patch.dict(place_registry, {"t_service": SimpleNamespace(settlement_key="missing")}, clear=True):
                 self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
-            with mock.patch.dict(PLACE_REGISTRY, {}, clear=True):
+            with mock.patch.dict(place_registry, {}, clear=True):
                 self.assertIsNone(actor_world_cell(SimpleNamespace(location=interior)))
 
     def test_empty_or_missing_quest_log_resolves_to_nothing(self):
