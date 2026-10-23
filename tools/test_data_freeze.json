@@ -444,7 +444,6 @@
     "web/webclient-app/tests/components/dock_panes.test.js",
     "web/webclient-app/tests/store/protocol_fixtures.js",
     "web/webclient-app/tests/store/store_slices.test.js",
-    "web/webclient-app/tests/world/map_lattice_edge_names.test.js",
     "web/webclient-app/tests/world/map_lattice_name_fit.test.js",
     "web/webclient-app/tests/world/map_lattice_support.js",
     "world/ai/tests/test_npc_dialogue_prompts.py",

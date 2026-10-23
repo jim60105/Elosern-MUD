@@ -1,7 +1,7 @@
 """Map legibility acceptance (webclient-map-legibility; retarget D7): the
 island's one 16px chrome step and readable node labels on an ordinary
-neighbourhood, every node and name still reachable on a payload at the model's
-node bound, and the full map's single current-location footprint.
+neighbourhood, and every node and name still reachable on a payload at the
+model's node bound.
 
 Every payload is injected through the store's own ``receive`` path, so the
 checks measure the real client layout.
@@ -126,10 +126,6 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
-    def _open_full_map(self, page):
-        page.evaluate("() => window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay-content"]', timeout=15000)
-
     @covers_requirement(
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology"
     )
@@ -202,8 +198,8 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
     def test_dense_island_keeps_every_node_and_name_reachable(self):
         """At the 64-node bound the island stays a bounded 240px canvas that
         drops no gateway and omits only context that lands off its square,
-        and the full map names every node and reads at the 16px floor or more
-        at every permitted zoom level."""
+        and every in-view name stays the node's title, drawn at the 16px
+        floor or more."""
         panel = _dense_panel()
         in_view = {n["id"]: n["label"] for n in panel["nodes"] if n["visibility"] != "remembered"}
         page = self.logged_in_page((1451, 790))
@@ -229,7 +225,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         self.assertAlmostEqual(island["height"], 240, delta=1)
         # No labelled exit: the context alone sets the (compressed) scale, so
         # every in-view place lands inside the exit ring; each drawn group
-        # keeps its full name, and the full map still names every node.
+        # keeps its full name.
         current = panel["current_node"]
         self.assertIn(current, island["titles"])
         self.assertEqual(set(island["titles"]), set(in_view))
@@ -240,37 +236,13 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         # Cropping retains the global effective-text floor on dense payloads.
         self.assertGreaterEqual(min(island["drawn"]), 16 - 0.01)
 
-        self._open_full_map(page)
-        initial_size = page.evaluate("""() => {
-          const t = document.querySelector('[data-testid="map-overlay"] .local-map__node-label');
-          return parseFloat(getComputedStyle(t).fontSize) * t.getScreenCTM().a;
-        }""")
-        self.assertGreaterEqual(initial_size, 16 - 0.01)
-        names = page.evaluate(
-            """() => Object.fromEntries([...document.querySelectorAll(
-                '[data-testid="map-overlay"] .local-map__node')].map((g) => [g.dataset.node, g.getAttribute('aria-label')]))"""
-        )
-        self.assertEqual(names, in_view)
-        zoom_in = page.locator('[data-testid="map-overlay-zoom-in"]')
-        for _ in range(20):
-            if zoom_in.get_attribute("aria-disabled") == "true":
-                break
-            zoom_in.click()
-        self.assertEqual(zoom_in.get_attribute("aria-disabled"), "true")
-        drawn = page.evaluate(
-            """() => {
-              const svg = document.querySelector('[data-testid="map-overlay"] [data-testid="local-map__lattice"]');
-              const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
-              const label = svg.querySelector('.local-map__node-label');
-              return parseFloat(getComputedStyle(label).fontSize) * scale;
-            }"""
-        )
-        self.assertGreaterEqual(drawn, 16)
-        page.keyboard.press("Escape")
+        # Every permitted name stays readable in the map drawer's text
+        # disclosure (its area tab), not by magnifying the island.
+
 
         # A wilderness exit sharing the current cell's region name draws its
         # marker without a repeated name; the cells beyond it would land off
-        # the island's square and stay whole on the full map.
+        # the island's square.
         vertical = {
             "schema_version": 1, "available": True, "layer": "wilderness",
             "current_node": "wild:vertical:0:0", "title": "Vertical clearance",
@@ -305,82 +277,3 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(suppressed["nodes"], 2)
         page.close()
 
-    @covers_requirement(
-        "webclient-local-map::current-map-location-has-one-unambiguous-footprint",
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
-    )
-    def test_full_map_marks_the_current_place_once(self):
-        """The full map rings the current marker concentrically — no pin —
-        clear of every label, with each incident connector running on past
-        the ring."""
-        for viewport in ((1451, 790), (2560, 1440)):
-            with self.subTest(viewport=viewport):
-                page = self.logged_in_page(viewport)
-                self._island_ready(page, _ordinary_panel())
-                self._open_full_map(page)
-                probe = page.evaluate(
-                    """(boxOf) => {
-                      const box = new Function('return ' + boxOf)();
-                      const svg = document.querySelector('[data-testid="map-overlay"] [data-testid="local-map__lattice"]');
-                      const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
-                      const rings = [...svg.querySelectorAll('.local-map__current-ring')];
-                      const marker = svg.querySelector('[data-testid="local-map__marker--current"]');
-                      const centre = (b) => [(b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2];
-                      const ring = rings[0];
-                      const current = svg.querySelector('[data-node="grid:legible:1:1"]');
-                      const cur = current.transform.baseVal.consolidate().matrix;
-                      // Connectors run centre to centre; each keeps a visible
-                      // segment between the ring's outer edge (radius plus
-                      // the half of its 1.4px hairline) and the neighbour's
-                      // actionable halo (10 units × marker scale 2.2).
-                      const ringOuter = ring.r.baseVal.value + 0.7 / scale;
-                      const edges = [...svg.querySelectorAll('.local-map__edge')].map((e) => {
-                        const x1 = e.x1.baseVal.value, y1 = e.y1.baseVal.value;
-                        const x2 = e.x2.baseVal.value, y2 = e.y2.baseVal.value;
-                        return {
-                          fromCurrent: Math.hypot(x1 - cur.e, y1 - cur.f) < 0.01,
-                          visible: Math.hypot(x2 - x1, y2 - y1) - ringOuter - 10 * 2.2,
-                        };
-                      });
-                      const frame = getComputedStyle(document.querySelector('.map-overlay__viewport'), '::after');
-                      return {
-                        rings: rings.length,
-                        pins: svg.querySelectorAll('.local-map__pin').length,
-                        inCurrentGroup: current.contains(ring),
-                        ringCentre: centre(box(ring)),
-                        markerCentre: centre(box(marker)),
-                        ringBox: box(ring),
-                        ringOuterPx: ringOuter * scale,
-                        framePointer: frame.pointerEvents,
-                        frameImage: frame.backgroundImage,
-                        ringHidden: ring.getAttribute('aria-hidden'),
-                        ringPointer: getComputedStyle(ring).pointerEvents,
-                        labels: [...svg.querySelectorAll('.local-map__node-label')].map(box),
-                        edges,
-                      };
-                    }""",
-                    _BOX,
-                )
-                self.assertEqual(probe["rings"], 1)
-                self.assertEqual(probe["pins"], 0)
-                self.assertTrue(probe["inCurrentGroup"])
-                self.assertAlmostEqual(probe["ringCentre"][0], probe["markerCentre"][0], delta=0.5)
-                self.assertAlmostEqual(probe["ringCentre"][1], probe["markerCentre"][1], delta=0.5)
-                self.assertEqual(probe["ringHidden"], "true")
-                self.assertEqual(probe["ringPointer"], "none")
-                # The ring's outer edge keeps at least 1px from every label box.
-                cx, cy = probe["ringCentre"]
-                for label in probe["labels"]:
-                    dx = max(label["x1"] - cx, 0, cx - label["x2"])
-                    dy = max(label["y1"] - cy, 0, cy - label["y2"])
-                    self.assertGreaterEqual(
-                        (dx * dx + dy * dy) ** 0.5 - probe["ringOuterPx"], 1, f"the ring crowds a label {label}"
-                    )
-                self.assertEqual(len(probe["edges"]), 4)
-                for edge in probe["edges"]:
-                    self.assertTrue(edge["fromCurrent"], edge)
-                    self.assertGreater(edge["visible"], 0, edge)
-                # The frame's corner brackets are pointer-inert decoration.
-                self.assertEqual(probe["framePointer"], "none")
-                self.assertIn("linear-gradient", probe["frameImage"])
-                page.close()

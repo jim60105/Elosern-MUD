@@ -21,6 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_viewport.test.js"
 AREA_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/area_map_view.test.js"
 WORLD_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/world_map_view.test.js"
+DRAWER_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_drawer.test.js"
+POINTER_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_edge_pointers.test.js"
 VITEST_BIN = REPO_ROOT / "node_modules/.bin/vitest"
 
 
@@ -242,3 +244,95 @@ class WorldViewContracts(VitestContractMixin, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MapDrawerContracts(VitestContractMixin, unittest.TestCase):
+    """Runs ``map_drawer.test.js`` once; one method per requirement."""
+
+    SUITE = DRAWER_SUITE
+    SUITE_NAME = "map drawer"
+
+    @covers_requirement(
+        "webclient-map-drawer::the-map-drawer-opens-the-appropriate-scope-and-preserves-session-views"
+    )
+    def test_scope_by_layer_and_session_views(self):
+        # Area in settlements, dungeons and interiors and world in the
+        # wilderness on every opening; each tab keeps its pan, zoom and
+        # selection; the world tab opens at 國 with the tracked commission;
+        # a new epoch retires all memory; one header with ARIA tabs and one
+        # close control inside OverlayHost.
+        self.assert_block_passed("the map drawer opens the appropriate scope and preserves session views")
+
+    @covers_requirement(
+        "webclient-map-drawer::map-requests-follow-explicit-scope-and-committed-moves-only-while-open"
+    )
+    def test_requests_on_open_tab_and_committed_moves(self):
+        # Exactly one map.view {scope} on open and on each tab switch; one
+        # refresh after a committed move once its presentation commits;
+        # nothing for input, a rejected or earlier move or a closed drawer;
+        # the pending slot waits for the lock and drops on close/disconnect.
+        self.assert_block_passed("map requests follow explicit scope and committed moves only while open")
+
+    @covers_requirement(
+        "webclient-map-drawer::floating-map-chrome-avoids-selected-details"
+    )
+    def test_floating_chrome_and_text_mirrors(self):
+        # Pill, commission list and scale bar float over the full map; the
+        # 360 px card opens only on selection with the pill left of it;
+        # every commission is mirrored as text and a pointer shows its
+        # commission when activated.
+        self.assert_block_passed("floating map chrome avoids selected details")
+
+    @covers_requirement(
+        "webclient-map-drawer::map-keyboard-and-pointer-interaction-remains-modal-and-accessible"
+    )
+    def test_modal_keys_escape_order_and_exact_move(self):
+        # Escape closes the legend, then the selection, then the map; the
+        # map keys drive the view and never reach the document behind the
+        # modal; 前往 forwards the exact descriptor with the drawn current
+        # node, and waits while a request is unsettled.
+        self.assert_block_passed("map keyboard and pointer interaction remains modal and accessible")
+
+    @covers_requirement(
+        "webclient-map-drawer::the-old-full-map-lattice-has-no-remaining-consumer"
+    )
+    def test_overlay_lattice_removed(self):
+        # MapOverlay, map_view.js and use-map-view.js are gone, MapLattice
+        # keeps only its island parameters, and the map surface renders the
+        # real area/world views.
+        self.assert_block_passed("the old full-map lattice has no remaining consumer")
+
+    @covers_requirement(
+        "webclient-map-drawer::area-view-memory-resets-on-coordinate-frame-changes"
+    )
+    def test_area_memory_resets_on_frame_change(self):
+        # Memory keyed by map_id and frame key/unit; city to wilderness to
+        # interior and settlement to settlement clear view and selection
+        # synchronously; a republish of the same map keeps them; each new
+        # frame opens on its current node in its own unit.
+        self.assert_block_passed("area view memory resets on coordinate-frame changes")
+
+    @covers_requirement(
+        "webclient-map-drawer::the-drawer-current-marker-makes-one-truthful-position-claim"
+    )
+    def test_one_current_marker(self):
+        # One concentric, inert current ring on the area map and one current
+        # marker with no identity on the world map.
+        self.assert_block_passed("the drawer current marker makes one truthful position claim")
+
+
+class MapEdgePointerContracts(VitestContractMixin, unittest.TestCase):
+    """Runs ``map_edge_pointers.test.js`` once."""
+
+    SUITE = POINTER_SUITE
+    SUITE_NAME = "map edge pointers"
+
+    @covers_requirement(
+        "webclient-map-drawer::floating-map-chrome-avoids-selected-details"
+    )
+    def test_pointer_layout(self):
+        # On-screen commissions draw nothing; pointers sit where the ray
+        # leaves the drawer-aware rectangle, nearest first, at most three
+        # plus ＋n, a pitch apart and whole inside their side, as named
+        # buttons.
+        self.assert_block_passed("floating map chrome avoids selected details")

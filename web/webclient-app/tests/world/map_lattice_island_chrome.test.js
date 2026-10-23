@@ -72,7 +72,7 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
       ],
     };
     wrapper = mount(MapLattice, { props: {
-      localMap: localMapModelFor(payload), canvasSize: 240, colPitch: 40, rowPitch: 40,
+      localMap: localMapModelFor(payload), canvasSize: 240,
     } });
     expect(wrapper.get("svg").attributes("viewBox")).toBe("0 0 240 240");
     const exit = wrapper.get('[data-node="wild:t:0:1"]');

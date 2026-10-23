@@ -46,6 +46,18 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(wrapper.text()).not.toContain("1-4");
   });
 
+  it("lists the map drawer's tab, pan, zoom, recentre, whole-map and Escape keys", () => {
+    wrapper = mount(HelpOverlay);
+    const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());
+    expect(keys("map-tabs")).toEqual(["1", "2"]);
+    expect(keys("map-pan")).toEqual(["↑", "↓", "←", "→"]);
+    expect(keys("map-zoom")).toEqual(["＋", "－"]);
+    expect(keys("map-recentre")).toEqual(["C"]);
+    expect(keys("map-whole")).toEqual(["0"]);
+    expect(keys("map-escape")).toEqual(["Esc"]);
+    expect(rowText("map-escape")).toContain("最後關閉地圖");
+  });
+
   it("lists the exit compass's aim, cycle, move, hold, and escape bindings", () => {
     wrapper = mount(HelpOverlay);
     const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());

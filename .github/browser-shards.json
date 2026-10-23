@@ -351,14 +351,11 @@
       "files_a": [
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_adjacent_traversable_node_submits_explore_move",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_gateway_exit_stub_is_a_named_keyboard_button_moving_once",
-        "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_densely_populated_lattice_scales_down_without_reintroducing_overlap",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_long_remembered_list_never_resizes_the_island",
         "web.tests.browser.test_browser_local_map_lattice.LocalMapBrowserTest.test_metric_projection_keeps_gap_ratio_and_actions",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_pointer_events_blank_canvas_opens_overlay_while_actionable_moves",
         "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_minimap_visible_and_keyboard_usable_at_both_viewports",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_overlay_renders_scale_note_as_neutral_info_entry",
-        "web.tests.browser.test_browser_local_map_interaction.LocalMapBrowserTest.test_full_map_opens_fitted_zooms_pans_and_recentres",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_abandon_requires_confirmation",
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open",
         "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",
@@ -487,10 +484,11 @@
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
         "web.tests.browser.test_browser_combat_choreography.CombatChoreographyBrowserTest",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
-        "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_full_map_marks_the_current_place_once",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step",
         "web.tests.browser.test_map_transport.WorldMapTransportTests.test_representative_world_map_round_trips_intact",
-        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_supported_worst_case_world_map_round_trips_intact"
+        "web.tests.browser.test_map_transport.WorldMapTransportTests.test_supported_worst_case_world_map_round_trips_intact",
+        "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_open_switch_tabs_and_refresh_after_a_committed_move",
+        "web.tests.browser.test_map_drawer.MapDrawerWalkTests.test_escape_unwinds_legend_selection_then_map"
       ]
     },
     {

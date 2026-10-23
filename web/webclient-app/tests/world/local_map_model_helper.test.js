@@ -29,9 +29,8 @@ describe("localMapModelFor — the exact store-side conversion", () => {
     expect(model.available).toBe(true);
     expect(model.reason).toBeUndefined();
     expect(model.currentNode).toBe(LOCAL_MAP_SAMPLE.current_node);
-    expect(model.cols).toBeGreaterThan(0);
-    expect(model.rows).toBeGreaterThan(0);
-    expect(model.nodes.every((n) => Number.isInteger(n.col) && Number.isInteger(n.row))).toBe(true);
+    expect(model.nodes.length).toBeGreaterThan(0);
+    expect(model.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))).toBe(true);
   });
 
   it("preserves the registry-owned reason for the unavailable fixture", () => {

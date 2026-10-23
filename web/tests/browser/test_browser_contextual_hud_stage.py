@@ -580,79 +580,68 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the recession mark clears when the last overlay closes",
         )
 
-        # map trigger (the minimap island's 展開全地圖) -> map overlay; Escape
+        # map trigger (the minimap island's 展開全地圖) -> map drawer; Escape
         # restores focus to that trigger (the opener captured at open time).
         # The island centres the current marker (render-auto-scaled-minimap-
         # island) over the affordance's own centre, so the affordance is
         # activated through its keyboard path.
         page.locator('[data-testid="local-map__expand"]').focus()
         page.keyboard.press("Enter")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        page.wait_for_selector('[data-testid="map-drawer"]', timeout=15000)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "true",
-            "the map overlay recesses the stage",
+            "the map drawer recesses the stage",
         )
 
-        # webclient-full-map-fit-view D5/D3: the open map surface's only view
-        # controls are the four toolbar buttons, each with its accessible
-        # name; the guide row names the gestures; and no text on the surface
-        # reads as a zoom-level or scale figure.
+        # redesign-map-drawer: the map's view controls are one floating pill,
+        # each control named; no text on the surface reads as a zoom
+        # percentage or magnification figure.
+        page.wait_for_selector('[data-testid="map-drawer-pill"]', timeout=20000)
         for test_id, name in (
-            ("map-overlay-zoom-out", "縮小"),
-            ("map-overlay-zoom-in", "放大"),
+            ("map-drawer-zoom-out", "縮小"),
+            ("map-drawer-zoom-in", "放大"),
+            ("map-drawer-recentre", "回到目前位置"),
+            ("map-drawer-legend-toggle", "圖例"),
         ):
             control = page.locator(f'[data-testid="{test_id}"]')
             self.assertEqual(control.count(), 1)
             self.assertEqual(control.get_attribute("aria-label"), name)
-        recentre = page.locator('[data-testid="map-overlay-recentre"]')
-        self.assertEqual(recentre.count(), 1)
-        self.assertEqual(recentre.inner_text(), "置中")
-        legend_toggle = page.locator('[data-testid="map-overlay-legend-toggle"]')
-        self.assertEqual(legend_toggle.count(), 1)
-        self.assertEqual(legend_toggle.get_attribute("aria-label"), "圖例")
-        self.assertIn(
-            "滾輪或 +／− 縮放 ‧ 拖曳平移",
-            page.locator('[data-testid="map-overlay"] .map-overlay__guide').inner_text(),
-        )
+        self.assertEqual(page.locator('[data-testid="map-drawer-whole"]').inner_text(), "全圖")
         import re
 
         scale_figure = re.compile(r"\d+\s*%|×\s*\d")
-        surface_text = page.locator('[data-testid="map-overlay"]').inner_text()
+        surface_text = page.locator('[data-testid="map-drawer"]').inner_text()
         self.assertIsNone(
             scale_figure.search(surface_text),
             f"the map surface shows a zoom/scale figure: {surface_text!r}",
         )
 
-        # Two-Escape precedence (webclient-full-map-fit-view D5): with the
-        # legend popover open, the FIRST Escape closes only the popover and
-        # the overlay stays open; the second closes the overlay.
-        page.locator('[data-testid="map-overlay-legend-toggle"]').click()
-        page.wait_for_selector('[data-testid="map-overlay-legend-popover"]', timeout=15000)
+        # Escape precedence: with the legend open, the FIRST Escape closes
+        # only the legend and the drawer stays open; the second closes it.
+        page.locator('[data-testid="map-drawer-legend-toggle"]').click()
+        page.wait_for_selector('[data-testid="map-drawer-legend"]', state="visible", timeout=15000)
         page.keyboard.press("Escape")
-        page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"map-overlay-legend-popover\"]') === null",
-            timeout=15000,
-        )
+        page.wait_for_selector('[data-testid="map-drawer-legend"]', state="hidden", timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="map-overlay"]').count(), 1,
-            "the first Escape closes only the legend popover, never the overlay",
+            page.locator('[data-testid="map-drawer"]').count(), 1,
+            "the first Escape closes only the legend, never the drawer",
         )
 
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            "() => document.querySelector('[data-testid=\"map-drawer\"]') === null",
             timeout=15000,
         )
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "false",
-            "the recession mark clears after the map overlay closes",
+            "the recession mark clears after the map drawer closes",
         )
         self.assertEqual(
             page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "local-map__expand",
-            "Escape restores focus to the map trigger that opened the overlay",
+            "Escape restores focus to the map trigger that opened the drawer",
         )
 
     @covers_requirement(
@@ -662,8 +651,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """Single full-map affordance contract (webclient-minimap-04-island-single-affordance):
         the island renders exactly one full-map affordance (a full-bleed button
         with 展開全地圖) and no visible button chrome in the header; pressing
-        Enter on the focused affordance opens the overlay; activating an
-        actionable lattice node moves without opening the overlay.
+        Enter on the focused affordance opens the map drawer; activating an
+        actionable lattice node moves without opening it.
         """
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -692,25 +681,32 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             1,
         )
 
-        # Keyboard Enter on the focused affordance opens the map overlay.
+        # Keyboard Enter on the focused affordance opens the map drawer.
         affordances.focus()
         page.keyboard.press("Enter")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
-        # The full-map overlay states no orientation marks and draws no axis cross
-        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__orientation"]').count(), 0)
-        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__axis"]').count(), 0)
+        page.wait_for_selector('[data-testid="map-drawer"]', timeout=15000)
+        # The drawer draws its own views, never the island's orientation
+        # marks or axis cross.
+        self.assertEqual(page.locator('[data-testid="map-drawer"] [data-testid="local-map__orientation"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="map-drawer"] [data-testid="local-map__axis"]').count(), 0)
         page.keyboard.press("Escape")
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            "() => document.querySelector('[data-testid=\"map-drawer\"]') === null",
+            timeout=15000,
+        )
+        # The drawer's map.view settles before the island moves (one
+        # in-flight request at a time).
+        page.wait_for_function(
+            "() => window.__elosernBridge.store.view.dispatch.inFlight === null",
             timeout=15000,
         )
 
-        # Activating an actionable lattice node moves without opening the overlay.
+        # Activating an actionable lattice node moves without opening the drawer.
         actionable = page.locator('[data-testid="local-map__actionable"]')
         self.assertEqual(actionable.count(), 1)
         moves_before = sent_action_count(page, "explore.move")
         actionable.first.click()
-        self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="map-drawer"]').count(), 0)
         self.assertEqual(
             sent_action_count(page, "explore.move"),
             moves_before + 1,

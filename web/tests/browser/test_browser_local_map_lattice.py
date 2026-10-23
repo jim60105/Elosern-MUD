@@ -1,4 +1,4 @@
-"""Local-map browser acceptance: dense/tall lattice scaling within the island height budget and crowded edge-overlay marker-name separation.
+"""Local-map browser acceptance: dense/tall lattice scaling within the island height budget and metric transport into the island.
 """
 
 from __future__ import annotations
@@ -147,7 +147,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure",
         "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face",
     )
     def test_densely_populated_lattice_scales_down_without_reintroducing_overlap(self):
@@ -307,7 +307,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 )
             page.close()
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_long_remembered_list_never_resizes_the_island(self):
         # Task 5.2: adding remembered nodes never resizes the island or its
         # 240x240 canvas, renders no local-map-remembered, and mirrors all entries.
@@ -368,155 +368,22 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
-        "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face",
-    )
-    def test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas(self):
-        """Task 5.1: crowded remembered gateways on overlay edge keep names apart and outside canvas."""
-        page = self.logged_in_page()
-        self._wait_local_map_available(page)
-
-        # 3x3 in-view lattice with current at (1, 1), plus 4 remembered gateways crowding left edge
-        crowded_panel = {
-            "schema_version": 1,
-            "available": True,
-            "layer": "grid",
-            "title": "霧骨渡口",
-            "current_node": "grid:altoria:1:1",
-            "nodes": [
-                {"id": "grid:altoria:0:0", "label": "0,0", "x": 0, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:1:0", "label": "1,0", "x": 1, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:2:0", "label": "2,0", "x": 2, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:0:1", "label": "0,1", "x": 0, "y": 1, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:1:1", "label": "1,1", "x": 1, "y": 1, "visibility": "current", "current": True, "anchor": True, "landmark": True, "gateway": None, "action": None},
-                {"id": "grid:altoria:2:1", "label": "2,1", "x": 2, "y": 1, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:0:2", "label": "0,2", "x": 0, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:1:2", "label": "1,2", "x": 1, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:2:2", "label": "2,2", "x": 2, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "gateway": None, "action": None},
-                {"id": "grid:altoria:-10:-5", "label": "灰鬮荒原駐軍第一要塞前哨營地", "x": -10, "y": -5, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "gateway": None, "action": None},
-                {"id": "grid:altoria:-10:0", "label": "灰鬮荒原駐軍第二要塞前哨營地", "x": -10, "y": 0, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "gateway": None, "action": None},
-                {"id": "grid:altoria:-10:2", "label": "灰鬮荒原駐軍第三要塞前哨營地", "x": -10, "y": 2, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "gateway": None, "action": None},
-                {"id": "grid:altoria:-10:5", "label": "灰鬮荒原駐軍第四要塞前哨營地", "x": -10, "y": 5, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "gateway": None, "action": None},
-            ],
-            "edges": [],
-            "legend": [
-                "你目前所在的位置",
-                "尚未探索的相鄰位置",
-                "已經探索過的相鄰位置",
-                "曾經到過、但不在附近的遠方位置",
-            ],
-        }
-        res = self._inject_panel(page, crowded_panel)
-        self.assertTrue(res.get("accepted"), f"ui_update rejected: {res}")
-
-        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
-        page.wait_for_selector(
-            '[data-testid="map-overlay"] .local-map__edge-marker-name', timeout=15000
-        )
-
-        result = page.evaluate(
-            """() => {
-              const overlay = document.querySelector('[data-testid="map-overlay"]');
-              const svg = overlay.querySelector('svg.local-map__lattice');
-              // webclient-full-map-fit-view: the surface draws through a
-              // fitted viewBox window, so the SVG rect no longer maps the
-              // canvas rect. Map the canvas's own user-unit box (its
-              // width/height attributes) through the live screen CTM —
-              // the same transform every getBoundingClientRect below lives
-              // under — instead of pinning any absolute pixel figure.
-              const ctm = svg.getScreenCTM();
-              const W = Number(svg.getAttribute("width"));
-              const H = Number(svg.getAttribute("height"));
-              // The node core spans the natural 840 × 650 units at the
-              // overlay's declared pitches; the marker gutter is the rest.
-              const gutter = (W - 840) / 2;
-              const canvasRect = {
-                left: ctm.a * gutter + ctm.e,
-                right: ctm.a * (W - gutter) + ctm.e,
-                top: ctm.d * gutter + ctm.f,
-                bottom: ctm.d * (H - gutter) + ctm.f,
-              };
-
-              const nameEls = Array.from(svg.querySelectorAll('.local-map__edge-marker-name'));
-              const names = nameEls.map((el) => {
-                const r = el.getBoundingClientRect();
-                return {
-                  text: el.textContent,
-                  left: r.left,
-                  right: r.right,
-                  top: r.top,
-                  bottom: r.bottom,
-                  width: r.width,
-                  height: r.height,
-                };
-              });
-
-              function separated(a, b) {
-                return (
-                  a.right + 1 <= b.left ||
-                  b.right + 1 <= a.left ||
-                  a.bottom + 1 <= b.top ||
-                  b.bottom + 1 <= a.top
-                );
-              }
-
-              let overlaps = 0;
-              for (let i = 0; i < names.length; i++) {
-                for (let j = i + 1; j < names.length; j++) {
-                  if (!separated(names[i], names[j])) {
-                    overlaps++;
-                  }
-                }
-              }
-
-              let insideCanvasCount = 0;
-              for (const n of names) {
-                if (n.right > canvasRect.left + 1e-3) {
-                  insideCanvasCount++;
-                }
-              }
-
-              return {
-                count: names.length,
-                overlaps,
-                insideCanvasCount,
-                texts: names.map(n => n.text),
-              };
-            }"""
-        )
-
-        self.assertEqual(result["count"], 4)
-        self.assertEqual(result["overlaps"], 0)
-        self.assertEqual(result["insideCanvasCount"], 0)
-        for text in result["texts"]:
-            self.assertIn("…", text)
-            # The overlay draws through the fitted viewBox window, whose
-            # gutter now admits the renderer's own label budget: ten glyphs
-            # (`:label-max="10"`) plus the ellipsis, still truncated, still
-            # outside the canvas (asserted above).
-            self.assertEqual(len(text), 11)
-
-        page.close()
-
-    @covers_requirement(
         "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection"
     )
     @covers_requirement(
-        "webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre"
+        "webclient-local-map::minimap-adjacent-movement-remains-bound-to-authoritative-descriptors"
     )
     def test_metric_projection_keeps_gap_ratio_and_actions(self):
-        """Metric coordinates survive transport; the overlay keeps one uniform
-        scale and the island its exit-driven automatic projection.
+        """Metric coordinates survive transport; the island keeps its
+        exit-driven automatic projection and exact action identity.
 
         Injects the requirement's own frame — (0,0), (100,0), (1000,0),
         (1000,6500) plus a (100,100) diagonal control and an east-remembered
         landmark — and checks the real surfaces: the island centres the
         current node and scales by its two labelled exits (level 200: the
         100 m exit at 50 units, the diagonal on its exact bearing) while the
-        far context it cannot fit is omitted; the full map draws the 100 m
-        and 900 m gaps at exactly 1:9, zooms and recentres without rewriting
-        the payload, and the adjacent node keeps its exact move identity.
+        far context it cannot fit is omitted, and the adjacent node keeps its
+        exact move identity.
         """
         from .browser_helpers import install_outbound_recorder, sent_action_count
 
@@ -626,74 +493,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertIn("東境關隘", mirror_text)
         self.assertIn("東", mirror_text)
 
-        # 4. The full-map overlay opens fitted at one CSS pixel per user unit.
-        # The island centres the current marker (render-auto-scaled-minimap-
-        # island) over the affordance's own centre, so the affordance is
-        # activated through its keyboard path.
-        page.locator('[data-testid="local-map__expand"]').focus()
-        page.keyboard.press("Enter")
-        page.wait_for_selector('[data-testid="map-overlay-content"]', timeout=10000)
-        overlay_scope = '[data-testid="map-overlay-content"]'
-        box = page.evaluate(
-            """(scope) => {
-              const svg = document.querySelector(`${scope} svg.local-map__lattice`);
-              const vb = svg.getAttribute("viewBox").split(/[\\s,]+/).map(Number);
-              return { viewBox: vb, width: svg.getBoundingClientRect().width };
-            }""",
-            overlay_scope,
-        )
-        self.assertAlmostEqual(
-            box["width"] / box["viewBox"][2],
-            1,
-            places=2,
-            msg="the fitted overlay must open at scale 1",
-        )
-
-        overlay = centers(overlay_scope)
-        overlay_unit = overlay["near"]["x"] - overlay["origin"]["x"]
-        self.assertAlmostEqual(
-            overlay["far"]["x"] - overlay["near"]["x"], 9 * overlay_unit, places=3
-        )
-        self.assertAlmostEqual(
-            abs(overlay["diagonal"]["y"] - overlay["origin"]["y"]),
-            overlay["diagonal"]["x"] - overlay["origin"]["x"],
-            places=3,
-        )
-
-        page.locator('[data-testid="map-overlay-zoom-in"]').click()
-        page.wait_for_timeout(150)
-        zoomed = page.evaluate(
-            """(scope) => document
-              .querySelector(`${scope} svg.local-map__lattice`)
-              .getAttribute("viewBox").split(/[\\s,]+/).map(Number)""",
-            overlay_scope,
-        )
-        self.assertLess(zoomed[2], box["viewBox"][2], "zoom-in must narrow the window")
-        # Zoom is a view transform only: every drawn centre keeps its user-unit
-        # position and its gap ratio, so no two centres move independently.
-        zooms = centers(overlay_scope)
-        for key in ("origin", "near", "far", "north", "diagonal"):
-            self.assertEqual(zooms[key], overlay[key], f"{key} moved under zoom")
-        page.locator('[data-testid="map-overlay-recentre"]').click()
-        page.wait_for_timeout(150)
-        self.assertEqual(
-            {
-                node["id"]: (node["x"], node["y"])
-                for node in self._local_map_panel(page)["nodes"]
-            },
-            committed,
-            "zoom/recentre must never rewrite the payload's metric coordinates",
-        )
-
-        # 5. The adjacent node keeps its exact move identity. (Only the
-        #    overlay scale exposes keyboard activation by design.)
-        # The island stays mounted behind the overlay, so scope the node to
-        # the overlay body (both surfaces render the same node id).
-        destination = page.locator(
-            f'{overlay_scope} [data-testid="local-map__node--grid:metric:100:0"]'
-        )
-        self.assertEqual(destination.get_attribute("role"), "button")
-        destination.click()
+        # 4. The adjacent node keeps its exact move identity on the island.
+        #    (The full map is the drawer's area view, whose metric geometry
+        #    is pinned by the drawer and area-view suites.)
+        page.locator(
+            '[data-testid="local-map"] [data-testid="local-map__node--grid:metric:100:0"]'
+        ).click()
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:

@@ -9,6 +9,9 @@
 defineProps({
   // nodeDetail() from lib/area_map_view.js.
   detail: { type: Object, required: true },
+  // The host is still settling the last request: 前往 stays focusable and
+  // says so (aria-disabled), and sends nothing.
+  busy: { type: Boolean, default: false },
 });
 const emit = defineEmits(["move", "centre", "close"]);
 </script>
@@ -46,8 +49,10 @@ const emit = defineEmits(["move", "centre", "close"]);
         type="button"
         class="area-map-detail__go"
         data-testid="area-map-detail__go"
-        @click="emit('move', detail.move)"
-      >前往</button>
+        :aria-disabled="busy ? 'true' : null"
+        :aria-busy="busy ? 'true' : null"
+        @click="!busy && emit('move', detail.move)"
+      >{{ busy ? "地圖更新中…" : "前往" }}</button>
       <button
         v-else
         type="button"
@@ -149,7 +154,15 @@ const emit = defineEmits(["move", "centre", "close"]);
   border: 1px solid var(--seal-500);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(124, 32, 38, 0.35);
 }
-.area-map-detail__go:hover { background: linear-gradient(180deg, var(--seal-500), var(--seal-600)); }
+.area-map-detail__go:hover:not([aria-disabled="true"]) { background: linear-gradient(180deg, var(--seal-500), var(--seal-600)); }
+.area-map-detail__go[aria-disabled="true"] {
+  color: var(--paper-300);
+  background: linear-gradient(180deg, #3a2a28, #2a1f1d);
+  border-color: var(--ink-600);
+  box-shadow: none;
+  cursor: progress;
+  letter-spacing: 0.12em;
+}
 .area-map-detail__centre {
   color: var(--gold-400);
   background: none;

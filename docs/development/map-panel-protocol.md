@@ -239,6 +239,53 @@ the UI scale, and a colliding lower-priority label is hidden, never shrunk.
   once. The first payload, a repeat, a remount, a new `epoch`, and a payload
   in which a lit district went dark all re-baseline silently.
 
+## The map drawer
+
+`web/webclient-app/components/MapDrawer.vue` (redesign-map-drawer, layout
+option A) is the only consumer of both panels. It mounts inside the shared
+`OverlayHost` (which keeps the modal dialog, focus trap, opener restoration
+and final Escape) and draws one header: the 區域 / 世界 tabs (keys `1` /
+`2`), the place caption and the close control. The active view fills the
+body; over it float the commission list (top left), the control pill
+`－ <stop> ＋ │ ⌖ 全圖 │ ?` with the legend popover (top right), the view's
+scale bar (bottom left) and, only while something is selected, the view's
+~360 px detail card on the right, which the pill and the edge pointers step
+around. `MapEdgePointers.vue` (`lib/map_edge_pointers.js`) draws at most
+three off-screen commission pointers, nearest first, and collapses the rest
+into `＋n`; the commission list always mirrors every accepted commission as
+text. A radial (coordinate-free) area and a commission into fog get text
+only, never a pointer.
+
+`composables/use-map-drawer.js` owns the session workflow:
+
+- Opening chooses the scope from the `local_map` layer every time: the
+  world tab in the wilderness, the area tab everywhere else.
+- Each tab keeps its `view` and `selection` for the session. The memory is
+  scoped to the transport generation and presentation epoch; the area half
+  is also keyed by `map_id|frame.key|frame.unit` and resets synchronously
+  when another map or coordinate frame arrives.
+- It sends `map.view {scope}` when the drawer opens, when the tab changes and
+  once after each committed move while open (the move's own success result
+  with its presentation revision committed). It sends nothing on input, on a
+  rejected or earlier move, or while closed. Requests ride the store's single
+  in-flight lock: one pending scope waits for it and is dropped on close, on
+  disconnect or on a new epoch. `前往` waits while a request is unsettled.
+- `前往` forwards the area body's own descriptor and canonical
+  `current_node` through the same `explore.move` seam as the minimap.
+
+An area commission outside the current map opens the world tab with an
+epoch-bound identity-only selection intent. The drawer clears any unrelated
+world selection and resolves that intent against the received world markers,
+then the real world view reveals the selected destination beside its detail
+card. A new response that omits the destination or declares the map
+unavailable retires the intent; an epoch change also retires it. No area
+bearing is converted into invented world coordinates.
+
+Keys inside the drawer: arrows pan, `＋`／`－` jump zoom stops, `C`
+recentres, `0` shows the whole map, `1`／`2` switch tabs. Escape closes an
+open popover, then the selection, then the map. `OverlayHost` stops every
+key at the dialog, so background commands never see them.
+
 ## The world-map frame allowance
 
 `world_map` is the one panel exempt from the generic frame budget

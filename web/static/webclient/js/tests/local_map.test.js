@@ -93,47 +93,29 @@ test("distinguishes current, visible, and remembered states without color alone"
   assert.equal(model.legend.length, 2);
 });
 
-test("in-view nodes occupy distinct lattice cells preserving relative order", () => {
+test("in-view nodes keep their raw payload coordinates and no lattice cell", () => {
+  // The minimap island projects coordinates itself; the model exports no
+  // full-map lattice (cellSize, col/row, cols/rows) any more
+  // (redesign-map-drawer).
   const model = LocalMap.reducePanel(panel());
   const current = model.nodes.find((n) => n.id === "grid:capital_altoria:2:0");
   const visible = model.nodes.find((n) => n.id === "grid:capital_altoria:2:1");
-  assert.equal(current.col, 0);
-  assert.equal(current.row, 0);
-  assert.equal(visible.col, 0);
-  assert.equal(visible.row, 1);
-  assert.equal(model.cols, 1);
-  assert.equal(model.rows, 2);
-  // Distinct coordinates map to distinct cells.
-  const cells = new Set(model.nodes.map((n) => n.col + ":" + n.row));
-  assert.equal(cells.size, model.nodes.length);
+  assert.deepEqual([current.x, current.y], [2, 0]);
+  assert.deepEqual([visible.x, visible.y], [2, 1]);
+  for (const key of ["cols", "rows", "cell"]) assert.equal(key in model, false, key);
+  for (const n of model.nodes) {
+    assert.equal("col" in n, false);
+    assert.equal("row" in n, false);
+  }
+  assert.equal(typeof LocalMap.layoutNodes, "undefined");
 });
 
-test("remembered nodes never appear in nodes and never influence the lattice", () => {
-  const model = LocalMap.reducePanel(panel());
-  assert.equal(
-    model.nodes.some((n) => n.visibility === "remembered"),
-    false
-  );
-  assert.equal(model.remembered.length, 1);
-  assert.equal(model.remembered[0].id, "grid:capital_altoria:0:3");
-  // The lattice is computed only from the in-view nodes.
-  assert.equal(model.cols, 1);
-  assert.equal(model.rows, 2);
-});
-
-test("a distant remembered node leaves the local spacing intact", () => {
+test("remembered nodes never appear in nodes, however distant", () => {
   const model = LocalMap.reducePanel(
     panel({
       nodes: [
         node(),
-        node({
-          id: "grid:capital_altoria:2:1",
-          label: "南大道",
-          x: 2,
-          y: 1,
-          visibility: "visible_visited",
-          current: false,
-        }),
+        node({ id: "grid:capital_altoria:2:1", label: "南大道", x: 2, y: 1, visibility: "visible_visited", current: false }),
         node({
           id: "grid:capital_altoria:50:40",
           label: "遙遠市場",
@@ -146,85 +128,9 @@ test("a distant remembered node leaves the local spacing intact", () => {
       ],
     })
   );
-  const current = model.nodes.find((n) => n.id === "grid:capital_altoria:2:0");
-  const visible = model.nodes.find((n) => n.id === "grid:capital_altoria:2:1");
-  assert.equal(current.col, 0);
-  assert.equal(visible.row, 1);
-  assert.equal(model.rows, 2);
-  assert.equal(model.cols, 1);
-  // The distant remembered node is in the list, not on the canvas.
-  assert.equal(model.remembered.length, 1);
-});
-
-test("a geometrically sparse payload keeps its metric spacing, never a compressed rank", () => {
-  // 20 nodes 100 metres apart per axis: the cell is the smallest in-view
-  // coordinate delta (100), so every node's column is its own 100 m step —
-  // ranks were never equalized and the lattice bounds grew with the span.
-  const nodes = [];
-  for (let i = 0; i < 20; i += 1) {
-    nodes.push(
-      node({
-        id: "room:" + i,
-        label: "room " + i,
-        x: i * 100,
-        y: i * -100,
-        visibility: i === 0 ? "current" : "visible_visited",
-        current: i === 0,
-      })
-    );
-  }
-  const model = LocalMap.reducePanel(panel({ nodes: nodes, edges: [] }));
-  assert.equal(model.cell, 100);
-  assert.equal(model.cols, 20);
-  assert.equal(model.rows, 20);
-  assert.equal(model.nodes.length, 20);
-  const cells = new Set(model.nodes.map((n) => n.col + ":" + n.row));
-  assert.equal(cells.size, 20);
-  // Each node keeps its exact 100 m step: one lattice cell per 100 m, and
-  // larger x => larger col, smaller y => row.
-  nodes.forEach((source, i) => {
-    const placed = model.nodes.find((n) => n.id === source.id);
-    assert.equal(placed.col, i);
-    assert.equal(placed.row, 19 - i);
-    // The payload coordinate itself is never rewritten by the projection.
-    assert.equal(placed.x, source.x);
-    assert.equal(placed.y, source.y);
-  });
-});
-
-test("unequal metric gaps keep their exact ratio in the lattice", () => {
-  // The requirement's own frame: (0,0), (100,0), (1000,0), (1000,6500). A
-  // 100 m gap and a 900 m gap must project to 1 and 9 cells (1:9), never to
-  // an independently equalized pair of adjacent ranks.
-  const nodes = [
-    node({ id: "n0", label: "n0", x: 0, y: 0 }),
-    node({ id: "n1", label: "n1", x: 100, y: 0, visibility: "visible_visited", current: false }),
-    node({ id: "n2", label: "n2", x: 1000, y: 0, visibility: "visible_visited", current: false }),
-    node({ id: "n3", label: "n3", x: 1000, y: 6500, visibility: "visible_visited", current: false }),
-  ];
-  const layout = LocalMap.layoutNodes(nodes);
-  assert.equal(layout.cell, 100);
-  const byId = (id) => layout.nodes.find((n) => n.id === id);
-  assert.equal(byId("n0").col, 0);
-  assert.equal(byId("n1").col, 1);
-  assert.equal(byId("n2").col, 10);
-  assert.equal(byId("n3").col, 10);
-  assert.equal(byId("n3").row, 65);
-  // 100 m : 900 m == 1 : 9 cells, and 6500 m is 65 cells north.
-  assert.equal((byId("n2").col - byId("n1").col) / (byId("n1").col - byId("n0").col), 9);
-  assert.equal(byId("n3").row, 65);
-  assert.equal(layout.cols, 11);
-  assert.equal(layout.rows, 66);
-});
-
-test("a single-node payload yields a 1x1 lattice", () => {
-  const model = LocalMap.reducePanel(
-    panel({ nodes: [node()], edges: [] })
-  );
-  assert.equal(model.cols, 1);
-  assert.equal(model.rows, 1);
-  assert.equal(model.nodes[0].col, 0);
-  assert.equal(model.nodes[0].row, 0);
+  assert.equal(model.nodes.some((n) => n.visibility === "remembered"), false);
+  assert.deepEqual(model.nodes.map((n) => n.id), ["grid:capital_altoria:2:0", "grid:capital_altoria:2:1"]);
+  assert.deepEqual(model.remembered.map((n) => n.id), ["grid:capital_altoria:50:40"]);
 });
 
 test("remembered remote nodes carry no travel action and are focus targets", () => {
@@ -269,8 +175,6 @@ test("an empty or missing panel reduces to an inert model", () => {
   assert.equal(empty.edges.length, 0);
   assert.equal(empty.remembered.length, 0);
   assert.equal(empty.focusTargets.length, 0);
-  assert.equal(empty.cols, 0);
-  assert.equal(empty.rows, 0);
 });
 
 // exitLabelFor (complete-ui-command-echo D3): unique traversable edge label,
@@ -630,19 +534,13 @@ test("edge markers stay silent without coordinates, extent, or candidates", () =
   assert.equal(edgeMarkersFor(inside.nodes, inside.remembered, geo).markers.length, 0);
 });
 
-test("edge markers never assume lattice cells and stay deterministic", () => {
+test("edge markers read raw coordinates and stay deterministic", () => {
   // Sparse metric payload: raw deltas decide octants/edges — (100,1) is due
-  // east, never 45 degrees, and the lattice keeps its honest 100-cell span.
+  // east, never 45 degrees.
   const nodes = [
     { id: "c", label: "c", x: 0, y: 0, visibility: "current", current: true },
     { id: "far", label: "far", x: 100, y: 1, visibility: "visible_visited" },
   ];
-  const projected = LocalMap.layoutNodes(nodes);
-  assert.equal(
-    projected.nodes.find((n) => n.id === "far").col,
-    100,
-    "the metric projection keeps x=100 one hundred columns from x=0"
-  );
   const remembered = [
     // Strictly outside the in-view bbox (x 0..100, y 0..1); a remembered
     // node sharing the in-view cell is extent-interior and never marks.
@@ -989,8 +887,7 @@ test("reducePanel passes node gateway metadata through unchanged", () => {
     })
   );
   assert.deepEqual(
-    model.nodes.map((entry) => [entry.id, entry.col, entry.row]),
-    plain.nodes.map((entry) => [entry.id, entry.col, entry.row])
+    model.nodes.map((entry) => [entry.id, entry.x, entry.y]),
+    plain.nodes.map((entry) => [entry.id, entry.x, entry.y])
   );
-  assert.deepEqual([model.cols, model.rows, model.cell], [plain.cols, plain.rows, plain.cell]);
 });

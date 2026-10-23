@@ -45,6 +45,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WorldMapDetail from "./WorldMapDetail.vue";
 import {
   DETAIL_DRAWER_WIDTH,
+  DRAG_THRESHOLD_PX,
   centreOn,
   nearestStop,
   nextStop,
@@ -106,7 +107,8 @@ const props = defineProps({
 const emit = defineEmits(["update:view", "update:selected", "select"]);
 
 const FALLBACK_FRAME = Object.freeze({ width: 960, height: 600 });
-const DRAG_THRESHOLD_PX = 4;
+// The smallest measured box the opening fit (96 px margins) can use.
+const MIN_FRAME_PX = 240;
 
 let instanceCounter = 0;
 const uid = `world-map-${(instanceCounter += 1)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -663,14 +665,16 @@ function panBy(dxPx, dyPx) {
   commitView(panByPixels(view.value, frame.value, dxPx, dyPx));
 }
 
-defineExpose({ zoomIn, zoomOut, recentre, showWhole, panBy, stops, stopLabel, detail, view });
+defineExpose({ zoomIn, zoomOut, recentre, showWhole, panBy, stops, stopLabel, detail, view, frame, detailShown });
 
 // ── frame measurement ───────────────────────────────────────────────────
 
 let observer = null;
 function applyFrame(width, height) {
   uiScale.value = readUiScale();
-  if (!(width > 0) || !(height > 0)) return;
+  // A host still laying out (a 0x0 or sliver box while the drawer mounts)
+  // is not a frame to fit in: keep the provisional one until it is real.
+  if (!(width >= MIN_FRAME_PX) || !(height >= MIN_FRAME_PX)) return;
   const changed = width !== frame.value.width || height !== frame.value.height;
   frame.value = Object.freeze({ width, height });
   const first = !measured.value;

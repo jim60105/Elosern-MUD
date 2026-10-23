@@ -315,7 +315,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             )
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure"
     )
     @covers_requirement(
         "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"

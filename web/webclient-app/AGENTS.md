@@ -87,7 +87,7 @@ prototypes; the real app differs too much for a prototype to be useful).
   while pages remain (leftover pages flush to the log).
 - A motion layer covers scene/mode transitions, typewriter, and beat-by-beat combat
   choreography; structured combat beats in the server protocol are accepted.
-- Minimap has no legend and a thin frame, the full map fits the view, the full log
+- Minimap has no legend and a thin frame, the full map is the map drawer, the full log
   opens scrolled to the bottom, the dock has a fixed height, and redundant head
   cards, 美術展示, and quick-word chips are removed.
 - Minimap island labels are placed by `lib/island_labels.js` in navigation
@@ -104,6 +104,19 @@ prototypes; the real app differs too much for a prototype to be useful).
   copy of the previous drawing at `full`
   (`composables/use-island-dissolve.js`) and switches at once at
   `reduced`/`off`.
+
+- The full map is `MapDrawer.vue` inside the shared `OverlayHost`
+  (`ownHeader`: the drawer draws the one header with the 區域／世界 tabs on
+  keys 1／2). Its body is the real `AreaMapView` or `WorldMapView` over the
+  on-demand `area_map`／`world_map` (`store.view.maps`), with floating
+  chrome: the commission list top left, the control pill top right, the
+  view's scale bar bottom left, and the view's ~360 px detail card only on
+  selection, which the pill and `MapEdgePointers` step around.
+  `composables/use-map-drawer.js` chooses the tab by layer on every opening,
+  keeps per-tab view／selection memory per generation｜epoch (the area half
+  also per `map_id|frame.key|frame.unit`), and sends `map.view` on open, on a
+  tab switch and once per committed move while open — never on input or
+  while closed. Keep the drawer data-free: it requests nothing itself.
 
 ## Styling pitfall
 

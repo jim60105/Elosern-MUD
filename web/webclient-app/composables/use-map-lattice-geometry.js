@@ -1,16 +1,16 @@
 // MapLattice geometry group (improve-webclient-map-overlay-scale): the
-// lattice/graph placement math extracted verbatim from `MapLattice.vue` so
-// the SFC stays a passive renderer. Owns the payload reads, the
-// wilderness label-suppression rule with the crowding-fix pitch derivation it
-// feeds, the model-sourced placement (rank-compressed lattice vs radial
-// graph), the edge-marker gutter/canvas layout, and every drawing position
-// the template consumes (canvas size, node/edge/axis positions, dot-pattern
-// phase, cap-resolved inline style). Pure computeds over explicit props — no
-// watchers, no emit.
+// minimap island's placement math extracted from `MapLattice.vue` so the SFC
+// stays a passive renderer. Owns the payload reads, the wilderness
+// label-suppression rule, the model-sourced placement (the automatic island
+// projection, or the radial graph on coordinate-free layers), the island's
+// rim edge markers, labels and stubs, and every drawing position the
+// template consumes. Pure computeds over explicit props — no watchers, no
+// emit. The full-map overlay's lattice (cell divisor, pitch fit, gutter and
+// fitted view) was removed with the overlay (redesign-map-drawer).
 import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
 import { CELL_EM, charCells, textCells } from "../lib/mono_cells.js";
-import { CANVAS_SIZE, CENTRE, DOT_SPACING, R_MAX, projectIsland } from "../lib/minimap_projection.js";
+import { CANVAS_SIZE, CENTRE, R_MAX, projectIsland } from "../lib/minimap_projection.js";
 import { ASCENT, DESCENT, placeIslandLabels } from "../lib/island_labels.js";
 
 // Every lattice marker's base geometry in pre-scale units, multiplied by
@@ -27,13 +27,9 @@ export const MARKER_LANDMARK_R = 5;
 export const MARKER_DIAMOND_HALF = 9;
 export const HALO_R = 10;
 export const LABEL_BASELINE_HALF = 11;
-// The full map's current-location ring (webclient-map-legibility): a thin
-// seal ring concentric with the current marker, inside that node's own group,
-// so the one place the player stands carries one footprint. Its radius is the
-// current node's reserved footprint on the overlay (it exceeds HALO_R).
+// The compass aim ring's radius (exploration-exit-compass D6): a thin ring
+// concentric with the aimed node's marker, just outside the actionable halo.
 export const MARKER_CURRENT_RING_R = 10.5;
-
-const LABEL_BAND = 14;
 
 // The island's remembered edge-direction diamonds (render-auto-scaled-minimap-
 // island): the fixed square has no gutter outside its 240 units, and the
@@ -65,19 +61,9 @@ export const STUB_RADIUS = R_MAX;
 export const STUB_FOOTPRINT = 9;
 const CONTEXT_FOOTPRINT = 3;
 
-// The label term for two horizontally adjacent drawn labels (see
-// `labelClearancePitch`): half of each centred label box, measured in
-// monospace cells, plus a half-em word gap.
-export function labelPairPitch(labelA, labelB, labelFont) {
-  return ((textCells(labelA) + textCells(labelB)) / 2 * CELL_EM + 0.5) * labelFont;
-}
-
 export function useMapLatticeGeometry(props) {
   const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
   const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
-  const legend = computed(() => (Array.isArray(props.localMap.legend) ? props.localMap.legend : []));
-  const cols = computed(() => props.localMap.cols ?? 0);
-  const rows = computed(() => props.localMap.rows ?? 0);
 
   const nodeById = computed(() => {
     const byId = {};
@@ -118,81 +104,18 @@ export function useMapLatticeGeometry(props) {
     return truncatedLabel(node.label);
   }
 
-  // Effective pitch derivation (design D4, webclient-map-legibility): the
-  // label term clears the labels actually drawn, not a worst case. Every
-  // pair of drawn nodes on one lattice row that BOTH show label text needs
-  // half of each centred label box plus a half-em word gap, so two names read
-  // as two names rather than one run-on phrase:
-  // `(cells(a) + cells(b)) / 2 * CELL_EM * labelFont + labelFont / 2`, the
-  // visible (truncated) label measured in monospace cells (lib/mono_cells.js):
-  // one cell for a code point the bundled monospace face draws narrow, two
-  // for every other code point, whether the face draws it two cells wide or
-  // it falls back to a roughly 1em face. Two maximal labels (`labelMax` wide
-  // glyphs plus the narrow "…") need at least the old worst-case term
-  // `(labelMax + 1) * labelFont + 3`, so the bound never loosens for them.
-  //
-  // Metric projection (project-metric-local-maps): lattice `col`/`row` are
-  // cell units, and a cell is the smallest in-view coordinate delta, not one
-  // payload unit. A same-row pair can therefore sit more than one cell apart,
-  // so the term divides each pair's label need by its own cell separation:
-  // the binding value is the pitch at which the closest drawn pair clears.
-  const labelClearancePitch = computed(() => {
-    const labeled = drawnNodes.value
-      .map((node) => ({ node, label: visibleNodeLabel(node) }))
-      .filter((entry) => entry.label.length > 0);
-    let need = 0;
-    for (let i = 0; i < labeled.length; i++) {
-      for (let j = i + 1; j < labeled.length; j++) {
-        const a = labeled[i];
-        const b = labeled[j];
-        const separation = Math.abs(a.node.col - b.node.col);
-        if (a.node.row === b.node.row && separation > 0) {
-          need = Math.max(
-            need,
-            labelPairPitch(a.label, b.label, props.labelFont) / separation,
-          );
-        }
-      }
-    }
-    return Math.ceil(need);
-  });
-  // Rows increase northward. An upper label must clear the lower marker even
-  // when that lower node suppresses its own label (shared wilderness names).
-  // The baseline reserves 11 * markerScale + 2 + labelFont; allow a quarter
-  // type step below it for the bundled face's descent and three units of gap.
-  // As with the label term, a vertically aligned pair may be more than one
-  // cell apart under the metric projection, so the need is divided by that
-  // pair's own cell separation.
-  const verticalClearancePitch = computed(() => {
-    const need = 2 * LABEL_BASELINE_HALF * props.markerScale + 2 + 1.25 * props.labelFont + 3;
-    let binding = 0;
-    for (const upper of drawnNodes.value) {
-      if (!visibleNodeLabel(upper)) continue;
-      for (const lower of drawnNodes.value) {
-        const separation = upper.row - lower.row;
-        if (upper.col === lower.col && separation > 0) {
-          binding = Math.max(binding, need / separation);
-        }
-      }
-    }
-    return Math.ceil(binding);
-  });
-  // Placement sourcing (map-02 D2): the lattice variant draws the model's
-  // metric `col`/`row` grid (one uniform cell = the smallest in-view
-  // coordinate delta, project-metric-local-maps); the graph variant draws the
-  // model's radial placement (design D1) at `markerScale`, so the D1 geometry
-  // contract's footprints and the drawn footprints stay proportional and the
-  // non-overlap invariant is scale-invariant under the caps. The canvas size
-  // follows the active placement; `overflow: visible` lets the lattice
-  // marker gutter (map-02 D3b) render outside the node canvas without
-  // clipping. A graph payload with no radial placement renders empty (the
-  // variant prop is only ever passed a model that carries one).
+  // Placement sourcing (map-02 D2): the lattice variant draws the island's
+  // automatic projection of the payload's metric coordinates; the graph
+  // variant draws the model's radial placement (design D1) at `markerScale`,
+  // so the D1 geometry contract's footprints and the drawn footprints stay
+  // proportional. A graph payload with no radial placement renders empty
+  // (the variant prop is only ever passed a model that carries one).
   const isGraph = computed(() => props.variant === "graph");
   // The fixed-canvas lattice island consumes the automatic projection
   // (render-auto-scaled-minimap-island): LocalMap passes its hysteresis-held
   // projection; a bare mount projects statelessly (no previous level). The
-  // graph island and the overlay (`canvasSize == null`) never project.
-  const isIsland = computed(() => props.canvasSize != null && !isGraph.value);
+  // graph island never projects.
+  const isIsland = computed(() => !isGraph.value);
   const projection = computed(() => {
     if (!isIsland.value) return null;
     return props.islandProjection ?? projectIsland(props.localMap, null);
@@ -217,194 +140,36 @@ export function useMapLatticeGeometry(props) {
     return byId;
   });
 
-  // Edge direction markers (map-02 D3b): the lattice variant asks the model
-  // for markers with its OWN drawing geometry — the natural node canvas
-  // (before the gutter grows the SVG), the current node's in-canvas position,
-  // the scaled diamond half-extent, and the outward name-box bound at the
-  // overlay scale (the island's canonical reading path stays the remembered
-  // list, so it passes a name-free geometry). The graph variant never marks:
-  // a radial drawing has no canvas edge a bearing could point at.
+  // Edge direction markers (map-02 D3b): the lattice island asks the model
+  // for its remembered markers against its own square (islandEdgeMarkers).
+  // The graph variant never marks: a radial drawing has no canvas edge a
+  // bearing could point at.
   const rememberedList = computed(() =>
     Array.isArray(props.localMap.remembered) ? props.localMap.remembered : [],
   );
-  function latticePos(node) {
-    return {
-      x: node.col * effectiveColPitch.value + effectiveColPitch.value / 2,
-      y: (Math.max(1, rows.value) - 1 - node.row) * effectiveRowPitch.value + effectiveRowPitch.value / 2,
-    };
-  }
-
-  // The overlay's outward name box is declared in whole monospace cells, room
-  // for `labelMax + 1` wide glyphs; the fit budget reads the cell count
-  // directly, and the model receives its width in user units.
-  const outwardNameCells = computed(() =>
-    props.overlayChrome ? (props.labelMax + 1) * 2 : 0,
-  );
-  const outwardNameBox = computed(() => outwardNameCells.value * CELL_EM * props.markerNameFont);
-
+  // The island's drawing box (render-auto-scaled-minimap-island): the
+  // lattice island is one fixed CANVAS_SIZE square in the projection's own
+  // user units; the graph island windows its radial placement through the
+  // same square, centred on the placement. The full-map overlay's pitch-fit,
+  // gutter and fitted-view geometry were removed with the overlay
+  // (redesign-map-drawer).
   const layoutGeometry = computed(() => {
+    const S = Number(props.canvasSize);
     if (isGraph.value) {
-      const L = graphCanvasWidth.value;
-      if (props.canvasSize != null) {
-        const S = Number(props.canvasSize);
-        const vx = L / 2 - S / 2;
-        const vy = L / 2 - S / 2;
-        return {
-          fieldW: S,
-          fieldH: S,
-          marginX: 0,
-          marginY: 0,
-          gutter: 0,
-          canvasWidth: S,
-          canvasHeight: S,
-          viewBoxX: vx,
-          viewBoxY: vy,
-          viewBoxWidth: S,
-          viewBoxHeight: S,
-          viewBox: `${vx} ${vy} ${S} ${S}`,
-          markers: [],
-          colPitch: props.colPitch,
-          rowPitch: props.rowPitch,
-        };
-      }
-      return {
-        fieldW: L,
-        fieldH: graphCanvasHeight.value,
-        marginX: 0,
-        marginY: 0,
-        gutter: 0,
-        canvasWidth: graphCanvasWidth.value,
-        canvasHeight: graphCanvasHeight.value,
-        viewBoxX: 0,
-        viewBoxY: 0,
-        viewBoxWidth: graphCanvasWidth.value,
-        viewBoxHeight: graphCanvasHeight.value,
-        viewBox: `0 0 ${graphCanvasWidth.value} ${graphCanvasHeight.value}`,
-        markers: [],
-        colPitch: props.colPitch,
-        rowPitch: props.rowPitch,
-      };
+      const vx = graphCanvasWidth.value / 2 - S / 2;
+      const vy = graphCanvasWidth.value / 2 - S / 2;
+      return { canvasWidth: S, canvasHeight: S, viewBox: `${vx} ${vy} ${S} ${S}`, markers: [] };
     }
-
     const current = nodes.value.find((node) => node.visibility === "current");
-    const colsVal = Math.max(1, cols.value);
-    const rowsVal = Math.max(1, rows.value);
-    const hasRemembered = rememberedList.value.length > 0 && !!current;
-
-    if (isIsland.value) {
-      // The fixed island (render-auto-scaled-minimap-island): one 240-unit
-      // square in the projection's own user units, current at its centre. No
-      // pitch fit, no gutter growth and no window: the projection already
-      // fits every same-layer exit inside R_MAX, and the remembered
-      // edge-direction markers stand on the square's own rim band.
-      const S = CANVAS_SIZE;
-      return {
-        fieldW: S,
-        fieldH: S,
-        marginX: 0,
-        marginY: 0,
-        gutter: 0,
-        canvasWidth: S,
-        canvasHeight: S,
-        viewBoxX: 0,
-        viewBoxY: 0,
-        viewBoxWidth: S,
-        viewBoxHeight: S,
-        viewBox: `0 0 ${S} ${S}`,
-        markers: islandEdgeMarkers(current),
-        colPitch: DOT_SPACING,
-        rowPitch: DOT_SPACING,
-      };
-    }
-
-    // canvasSize == null (overlay and bare mounts). One uniform physical scale
-    // serves both axes (project-metric-local-maps): the drawn cell is square,
-    // so an eastward and a northward delta of one coordinate cell draw the
-    // same length and every compass bearing stays true. The declared pitches
-    // are minimums; the larger one (and every derived clearance) binds both
-    // axes.
-    const pCol = Math.max(
-      props.colPitch,
-      props.rowPitch,
-      labelClearancePitch.value,
-      verticalClearancePitch.value,
-    );
-    const pRow = pCol;
-    const cW = colsVal * pCol;
-    const cH = rowsVal * pRow;
-
-    if (!hasRemembered) {
-      const fW = cW;
-      const fH = cH + LABEL_BAND;
-      return {
-        fieldW: fW,
-        fieldH: fH,
-        marginX: 0,
-        marginY: 0,
-        gutter: 0,
-        canvasWidth: fW,
-        canvasHeight: fH,
-        viewBoxX: 0,
-        viewBoxY: 0,
-        viewBoxWidth: fW,
-        viewBoxHeight: fH,
-        viewBox: `0 0 ${fW} ${fH}`,
-        markers: [],
-        colPitch: pCol,
-        rowPitch: pRow,
-      };
-    }
-
-    const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
-    const nameWidth = outwardNameBox.value;
-    // As above: the marker name's line box, a fixed 16 units.
-    const nameHeight = props.markerNames ? 16 : 0;
-    let fW = cW;
-    let fH = cH + LABEL_BAND;
-    const curX = current.col * pCol + pCol / 2;
-    const curY = (rowsVal - 1 - current.row) * pRow + pRow / 2;
-
-    const markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
-      canvasWidth: fW,
-      canvasHeight: fH,
-      current: { x: curX, y: curY },
-      markerHalf,
-      nameWidth,
-      nameHeight,
-    });
-
-    const g = markersResult.gutter;
-    const cWidth = fW + 2 * g;
-    const cHeight = fH + 2 * g;
-
-    return {
-      fieldW: fW,
-      fieldH: fH,
-      marginX: 0,
-      marginY: 0,
-      gutter: g,
-      canvasWidth: cWidth,
-      canvasHeight: cHeight,
-      viewBoxX: 0,
-      viewBoxY: 0,
-      viewBoxWidth: cWidth,
-      viewBoxHeight: cHeight,
-      viewBox: `0 0 ${cWidth} ${cHeight}`,
-      markers: markersResult.markers,
-      colPitch: pCol,
-      rowPitch: pRow,
-    };
+    return { canvasWidth: S, canvasHeight: S, viewBox: `0 0 ${S} ${S}`, markers: islandEdgeMarkers(current) };
   });
 
-  const activeEdgeMarkers = computed(() => {
-    if (props.edgeMarkers) return props.edgeMarkers;
-    return {
-      markers: layoutGeometry.value.markers,
-      gutter: layoutGeometry.value.gutter,
-      width: layoutGeometry.value.canvasWidth,
-      height: layoutGeometry.value.canvasHeight,
-    };
-  });
+  const activeEdgeMarkers = computed(() => ({
+    markers: layoutGeometry.value.markers,
+    gutter: 0,
+    width: layoutGeometry.value.canvasWidth,
+    height: layoutGeometry.value.canvasHeight,
+  }));
 
   // The drawn placement follows the model: a graph payload whose nodes the
   // radial placement does not cover renders them not-at-all rather than at a
@@ -417,46 +182,15 @@ export function useMapLatticeGeometry(props) {
   // payload's own; a cross-layer target and off-canvas context have no group.
   const drawnNodes = computed(() => {
     if (radial.value) return nodes.value.filter((node) => radialById.value[node.id]);
-    if (isIsland.value) return nodes.value.filter((node) => projectedById.value.has(String(node.id)));
-    return nodes.value;
+    return nodes.value.filter((node) => projectedById.value.has(String(node.id)));
   });
 
   const graphCanvasWidth = computed(() =>
     radial.value ? Math.max(1, radial.value.width * props.markerScale) : 1,
   );
-  const graphCanvasHeight = computed(() =>
-    radial.value ? Math.max(1, radial.value.height * props.markerScale) : 1,
-  );
-  // Lattice-driven canvas geometry (design D9 + the local-map delta + map-02
-  // D2/D3b): the canvas sizes from the active placement. The lattice adds the
-  // edge-marker gutter (0 without markers) to its natural size; the graph
-  // sizes from the radial placement at the marker scale. `overflow: visible`
-  // already lets the gutter content paint outside the node canvas.
   const canvasWidth = computed(() => layoutGeometry.value.canvasWidth);
   const canvasHeight = computed(() => layoutGeometry.value.canvasHeight);
   const viewBox = computed(() => layoutGeometry.value.viewBox);
-  const viewBoxX = computed(() => layoutGeometry.value.viewBoxX);
-  const viewBoxY = computed(() => layoutGeometry.value.viewBoxY);
-  const effectiveColPitch = computed(() => layoutGeometry.value.colPitch);
-  const effectiveRowPitch = computed(() => layoutGeometry.value.rowPitch);
-  // The crowding fix decouples column pitch and row pitch: the row pitch
-  // clears the marker height, the label line, and a strictly-positive gap
-  // before the next row's marker; the column pitch clears two truncated
-  // labels side by side.
-
-  const dotCx = computed(() => {
-    const { gutter, marginX } = layoutGeometry.value;
-    const originOffsetX = gutter + marginX;
-    const pitch = effectiveColPitch.value;
-    return ((pitch / 2 + originOffsetX) % pitch + pitch) % pitch;
-  });
-
-  const dotCy = computed(() => {
-    const { gutter, marginY } = layoutGeometry.value;
-    const originOffsetY = gutter + marginY;
-    const pitch = effectiveRowPitch.value;
-    return ((pitch / 2 + originOffsetY) % pitch + pitch) % pitch;
-  });
 
   function nodePos(nodeOrId) {
     const node =
@@ -471,16 +205,11 @@ export function useMapLatticeGeometry(props) {
       if (!placed) return null;
       return { x: placed.x * props.markerScale, y: placed.y * props.markerScale };
     }
-    if (isIsland.value) {
-      const placed = projectedById.value.get(String(node.id));
-      // Thousandths of a unit: exact at any drawn scale, and free of
-      // trigonometric noise in the DOM.
-      const round = (v) => Math.round(v * 1000) / 1000;
-      return placed ? { x: round(placed.x), y: round(placed.y) } : null;
-    }
-    const core = latticePos(node);
-    const { gutter, marginX, marginY } = layoutGeometry.value;
-    return { x: core.x + gutter + marginX, y: core.y + gutter + marginY };
+    const placed = projectedById.value.get(String(node.id));
+    // Thousandths of a unit: exact at any drawn scale, and free of
+    // trigonometric noise in the DOM.
+    const round = (v) => Math.round(v * 1000) / 1000;
+    return placed ? { x: round(placed.x), y: round(placed.y) } : null;
   }
 
   // The axis anchor: the CURRENT placement's current-node
@@ -1093,27 +822,13 @@ export function useMapLatticeGeometry(props) {
     }
   }
 
-  // Canvas box: the island passes its fixed reference square (`canvasSize`,
-  // CSS px at the 1451x790 reference), the overlay passes `null` and fills its
-  // body — bound as inline styles so the caller controls the layout variant.
-  // The square's outward box is multiplied once by the desktop chrome factor
+  // Canvas box: the island's fixed reference square (`canvasSize`, CSS px at
+  // the 1451x790 reference), multiplied once by the desktop chrome factor
   // (webclient-proportional-ui-scale); the viewBox and every user-unit
   // coordinate stay as computed, so the drawing only magnifies uniformly.
   const latticeStyle = computed(() => {
-    if (props.canvasSize != null) {
-      const side = `calc(${Number(props.canvasSize)}px * var(--ui-scale, 1))`;
-      return {
-        width: side,
-        height: side,
-      };
-    }
-    if (props.fitView) {
-      return {
-        width: "100%",
-        height: "100%",
-      };
-    }
-    return {};
+    const side = `calc(${Number(props.canvasSize)}px * var(--ui-scale, 1))`;
+    return { width: side, height: side };
   });
 
   return {
@@ -1135,17 +850,9 @@ export function useMapLatticeGeometry(props) {
     canvasWidth,
     canvasHeight,
     viewBox,
-    viewBoxX,
-    viewBoxY,
-    effectiveColPitch,
-    effectiveRowPitch,
-    dotCx,
-    dotCy,
     latticeStyle,
     currentPos,
     activeEdgeMarkers,
-    outwardNameCells,
-    outwardNameBox,
     isGraph,
     truncatedLabel,
     visibleNodeLabel,

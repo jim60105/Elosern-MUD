@@ -34,7 +34,8 @@
 // and node identity stay authoritative; only the drawing is presentation.
 import { computed, shallowRef, watch } from "vue";
 import LocalMap from "../lib/local_map.js";
-import { previousLevelFor, projectIsland, rememberLevel } from "../lib/minimap_projection.js";
+import { CANVAS_SIZE, CENTRE, previousLevelFor, projectIsland, rememberLevel } from "../lib/minimap_projection.js";
+import { ISLAND_MARKER_HALF } from "../composables/use-map-lattice-geometry.js";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -109,20 +110,16 @@ const islandEdgeMarkers = computed(() => {
   if (!current || typeof current.x !== "number" || typeof current.y !== "number") {
     return { markers: [], gutter: 0, width: 0, height: 0 };
   }
-  // `cols`/`rows`/`col`/`row` are the model's metric cell units, so this
-  // preview geometry keeps the same coordinate space as the drawn lattice.
-  const cols = props.localMap.cols ?? 0;
-  const rows = props.localMap.rows ?? 0;
+  // The mirror lists exactly the markers the island draws: the same model
+  // call against the island's own square (use-map-lattice-geometry.js
+  // islandEdgeMarkers), centred on the player.
   return LocalMap.edgeMarkersFor(nodes.value, remembered.value, {
-    canvasWidth: Math.max(1, cols) * 40,
-    canvasHeight: Math.max(1, rows) * 40 + 14,
-    current: {
-      x: (current.col ?? 0) * 40 + 20,
-      y: (Math.max(1, rows) - 1 - (current.row ?? 0)) * 40 + 20,
-    },
-    markerHalf: 9,
+    canvasWidth: CANVAS_SIZE,
+    canvasHeight: CANVAS_SIZE,
+    current: { x: CENTRE, y: CENTRE },
+    markerHalf: ISLAND_MARKER_HALF,
     nameWidth: 0,
-    nameHeight: 16,
+    nameHeight: 0,
   });
 });
 
@@ -245,8 +242,6 @@ function onIslandClick(event) {
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
         :canvas-size="240"
-        :col-pitch="40"
-        :row-pitch="40"
         :label-font="16"
         :marker-name-font="16"
         :show-axis="true"

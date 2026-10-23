@@ -147,7 +147,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "World/QuestDrawer", "World/LoreCodexDrawer",
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
-                "Overlays/MapOverlay", "Overlays/SettingsOverlay",
+                "Overlays/MapDrawer", "Overlays/MapEdgePointers", "Overlays/SettingsOverlay",
                 # The settings overlay's reading preview joined with
                 # webclient-settings-reading-preview.
                 "Overlays/ReadingSample",

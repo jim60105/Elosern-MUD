@@ -71,7 +71,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             # The map chrome joined the floor with webclient-map-legibility;
             # only the drawn SVG map (node labels, marker names) stays outside.
             ("world-localmap--wilderness", ".local-map__detail"),
-            ("overlays-mapoverlay--interior-with-remembered", ".map-overlay__remembered"),
+            ("overlays-mapdrawer--a-area-city-selected", ".map-drawer__pill"),
         )
         for width, height in ACCEPTANCE_VIEWPORT_TUPLE:
             self.page.set_viewport_size({"width": width, "height": height})

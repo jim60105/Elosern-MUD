@@ -6,8 +6,9 @@
 //
 // Consumers: AreaMapView (settlement grids in metres, wilderness cells) and
 // WorldMapView (continent in kilometres). The old overlay math in
-// lib/map_view.js keeps serving MapOverlay until redesign-map-drawer migrates
-// every caller and deletes it; this module does not re-export it.
+// lib/map_view.js and the MapOverlay it served were deleted by
+// redesign-map-drawer; the one rule they still shared (the drag threshold)
+// lives here.
 //
 // Types
 //   view  { cx, cy, span }        centre in map units, span = map units across
@@ -51,6 +52,8 @@
 
 /** Detail drawer width the edge pointers avoid when something is selected. */
 export const DETAIL_DRAWER_WIDTH = 360;
+/** Pointer travel (CSS px) below which a press is a click, not a drag. */
+export const DRAG_THRESHOLD_PX = 4;
 /** Default pixel margin kept between map content/pointers and the frame. */
 export const DEFAULT_MARGIN_PX = 24;
 /** Fixed world stop spans in kilometres (design §6.3). */

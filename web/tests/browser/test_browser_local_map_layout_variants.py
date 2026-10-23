@@ -10,12 +10,12 @@ from .browser_helpers import store_state, wait_for_store_state
 
 
 class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
-    """Map-02 layout variants: data-derived lattice/radial on both surfaces.
+    """Map-02 layout variants: data-derived lattice/radial on the minimap island.
 
     Reuses the dedicated minimap server (seeded at 南門 with 北門, the guild
     hall interior, a wilderness node, and the ``minimap-cave`` instance).
     These journeys prove the resolved layout follows the committed payload's
-    layer on BOTH the island and the full-map overlay, edge markers appear
+    layer on the island (the full map is the drawer's own area/world views), edge markers appear
     only for lattice payloads with remembered places outside the drawn
     extent, the radial graph carries neither orientation marks nor markers,
     no layout control exists anywhere in the map chrome, and no outbound
@@ -55,10 +55,6 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
 
         wait_for_store_state(page, ready, timeout=timeout)
 
-    def _open_overlay(self, page):
-        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
-
     @staticmethod
     def _surface(page, root_selector):
         """(variant, node positions, marker ids) read from one surface's DOM.
@@ -67,7 +63,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         exists only for the lattice variant); node positions are the node
         groups' translate coordinates; marker identities come from the edge
         markers' testid hook, which carries the remembered node id on both
-        surfaces (the accessible name only exists at the overlay scale).
+        surfaces.
         """
         return page.evaluate(
             """(rootSelector) => {
@@ -91,7 +87,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
               return {
                 lattice: !!svg,
                 // The orientation span lives in the island's header row (the
-                // overlay never renders one), so it is looked up under root.
+                // drawing never renders one), so it is looked up under root.
                 orientation: !!root.querySelector('[data-testid="local-map__orientation"]'),
                 nodes,
                 markers,
@@ -185,12 +181,12 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
             panel,
         )
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     @covers_requirement(
         "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention"
     )
     def test_layout_follows_payload_layer_without_any_control(self):
-        # Grid layer (seeded 南門): BOTH surfaces resolve to the lattice —
+        # Grid layer (seeded 南門): the island resolves to the lattice —
         # orientation marks on the island, edge markers for the remembered
         # 北門 outside the drawn extent, and no layout control anywhere.
         page = self.logged_in_page()
@@ -238,20 +234,8 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
             "the current node's own pair is the only coordinate figure",
         )
 
-        # The full-map overlay shares the resolved variant and marker set.
-        self._open_overlay(page)
-        overlay = self._surface(page, '[data-testid="map-overlay"]')
-        self.assertIsNotNone(overlay)
-        self.assertTrue(overlay["lattice"])
-        self.assertEqual(overlay["markers"], expected)
-        # The overlay states no coordinate figure anywhere (island-only).
-        self.assertNotIn(
-            "座標",
-            page.locator('[data-testid="map-overlay"]').inner_text(),
-        )
-
-        # Interior payload (committed without movement): BOTH surfaces
-        # live-swap to the radial graph — no orientation marks, no markers,
+        # Interior payload (committed without movement): the island
+        # live-swaps to the radial graph — no orientation marks, no markers,
         # and every node group's translate equals the model's scaled radial
         # placement.
         result = self._inject_panel(page, self._interior_panel())
@@ -261,35 +245,28 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
             lambda s: (s.get("localMapModel") or {}).get("layoutVariant") == "graph",
             timeout=30000,
         )
-        # Both surfaces must re-render from the swapped payload before the
-        # DOM read below (the store flips first; Vue commits on next tick).
+        # The island must re-render from the swapped payload before the DOM
+        # read below (the store flips first; Vue commits on next tick).
         wait_for_store_state(
             page,
             lambda s: (s.get("localMapModel") or {}).get("layoutVariant") == "graph",
             dom_readiness={
-                "selector": '[data-testid="map-overlay"] [data-testid^="local-map__node--room"]',
+                "selector": '[data-testid="local-map"] [data-testid^="local-map__node--room"]',
                 "predicate": (
                     "() => document.querySelectorAll("
-                    "'[data-testid=\"map-overlay\"] [data-testid^=\"local-map__node--room\"]')"
-                    ".length === 2 && document.querySelectorAll("
                     "'[data-testid=\"local-map\"] [data-testid^=\"local-map__node--room\"]')"
                     ".length === 2"
                 ),
-                "description": "both surfaces re-rendered from the interior payload",
+                "description": "the island re-rendered from the interior payload",
             },
             timeout=30000,
         )
         radial = store_state(page)["localMapModel"]["radial"]
         island = self._surface(page, '[data-testid="local-map"]')
-        overlay = self._surface(page, '[data-testid="map-overlay"]')
-        # The island renders the radial at markerScale 1 (the prop default) and
-        # the overlay at its shipped 2.2 ladder
-        # (MapOverlay.vue :marker-scale="2.2", re-pointed from the draft's 4.83
-        # by the desktop redesign 0522f09); node groups translate by the
-        # scaled placement, and the viewBox spans the same scaled canvas, so
-        # the comparison is exact per surface.
+        # The island renders the radial at markerScale 1 (the prop default):
+        # node groups translate by the placement itself.
         placed = {node["id"]: node for node in radial["nodes"]}
-        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 2.2)):
+        for name, surface, scale in (("island", island, 1.0),):
             self.assertEqual(
                 set(placed), set(surface["nodes"]),
                 f"{name}: the surface draws exactly the radial-placed nodes",
@@ -311,15 +288,15 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         island_detail = page.locator('[data-testid="local-map-detail"]').inner_text()
         self.assertNotIn("座標", island_detail)
 
-        # Absence: neither surface's chrome contains a layout-control element.
-        # Scan BOTH map surfaces' interactive controls (button/input/select/
+        # Absence: the island's chrome contains no layout-control element.
+        # Scan the island's interactive controls (button/input/select/
         # role=button) for any layout/variant wording in text, accessible
         # name, testid, or class — the withdrawn switch must leave no residue
         # under any markup, not just the testid/`.seg` shapes it shipped as.
         controls = page.evaluate(
             """() => {
               const surfaces = document.querySelectorAll(
-                '[data-testid="local-map"], [data-testid="map-overlay"]');
+                '[data-testid="local-map"]');
               const offenders = [];
               for (const surface of surfaces) {
                 for (const el of surface.querySelectorAll(
@@ -349,14 +326,14 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
         page.close()
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     @covers_requirement("webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention")
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
     )
     def test_walked_instance_layer_renders_radial_on_both_surfaces(self):
         # A REAL movement (the seeded 進洞窟 exit) commits an instance payload;
-        # both surfaces must render the radial graph truthfully from the
+        # the island must render the radial graph truthfully from the
         # committed data — no orientation marks, no edge markers, node
         # positions equal to the model's scaled radial placement.
         page = self.logged_in_page()
@@ -371,24 +348,18 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
             lambda s: (s.get("localMapModel") or {}).get("layoutVariant") == "graph",
             timeout=30000,
         )
-        self._open_overlay(page)
         model = store_state(page)["localMapModel"]
         self.assertEqual(model["layoutVariant"], "graph")
         island = self._surface(page, '[data-testid="local-map"]')
-        overlay = self._surface(page, '[data-testid="map-overlay"]')
-        for name, surface in (("island", island), ("overlay", overlay)):
+        for name, surface in (("island", island),):
             self.assertTrue(surface["lattice"], f"{name}: the canvas is mounted")
             self.assertFalse(
                 surface["orientation"], f"{name}: the coordinate-free layer omits orientation marks"
             )
             self.assertEqual(surface["markers"], [], f"{name}: the graph variant never marks")
-        # The island renders the radial at markerScale 1 (the prop default) and
-        # the overlay at its shipped 2.2 ladder
-        # (MapOverlay.vue :marker-scale="2.2", re-pointed from the draft's 4.83
-        # by the desktop redesign 0522f09); the viewBox spans the same
-        # scaled canvas, so the translate comparison is exact per surface.
+        # The island renders the radial at markerScale 1 (the prop default).
         placed = {node["id"]: node for node in model["radial"]["nodes"]}
-        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 2.2)):
+        for name, surface, scale in (("island", island, 1.0),):
             self.assertEqual(
                 set(placed), set(surface["nodes"]),
                 f"{name}: the surface draws exactly the radial-placed nodes",
