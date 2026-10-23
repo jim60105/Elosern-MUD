@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Terrain and political control follow authored geography
-Terrain, nominal claims and effective control SHALL remain distinct. The deep forest's southern edge SHALL meander around Y1920, cover about one fifth of land, leave the summit ridge's northern limit unchanged, and retain ordinary forest travel speed without a new movement block. Every land cell SHALL have nominal Grandia east of the ridge, Altoria west and south of the border river, or Valhalla west and north. Region keys SHALL remain stable; coordinate-sensitive claims SHALL cover both sides of mountain and forest regions. Displayed national borders SHALL derive from the ridge and river and SHALL be omitted inside deep forest. Effective-rule demographic targets SHALL remain unchanged.
+Terrain, nominal claims and effective control SHALL remain distinct. The deep forest's southern edge SHALL meander around Y1920 and keep ordinary forest travel speed. Every land cell SHALL have nominal Grandia east of the ridge, Altoria west and south of the border river, or Valhalla west and north, with stable region keys. Displayed borders SHALL derive from the ridge and river and be omitted inside deep forest; effective-rule demographic targets SHALL remain unchanged.
 
 #### Scenario: Anchor relationships
 - **WHEN** the amended geography is evaluated
