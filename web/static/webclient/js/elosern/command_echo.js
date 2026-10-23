@@ -150,6 +150,9 @@
     // the producer that dispatches it.
     "party.transfer",
     "party.view_member",
+    // `map.view` is a pure read of the on-demand map panel with no typed
+    // equivalent: opening or refreshing the map drawer echoes nothing.
+    "map.view",
   ];
 
   function isSilentPresentationControl(actionId) {
