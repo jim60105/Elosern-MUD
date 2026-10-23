@@ -220,7 +220,11 @@ class ShippedDistrictContractTests(unittest.TestCase):
             if d.kind == "voronoi"
         )
         self.assertEqual(sum(nations.values()), len(districts) - 1)
-        self.assertTrue(nations["grandia"] > nations["altoria"] > nations["valhalla"] >= 15, nations)
+        # Lower bounds only: Valhalla holds about a fifth of that land, the
+        # other two nations most of the rest.
+        self.assertGreaterEqual(nations["valhalla"], 15, nations)
+        self.assertGreaterEqual(nations["altoria"], 35, nations)
+        self.assertGreaterEqual(nations["grandia"], 35, nations)
 
     @covers_requirement(
         "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"

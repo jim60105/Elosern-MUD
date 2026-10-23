@@ -451,8 +451,8 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "bluebell_meadows", "藍鈴草原", "藍鈴石井",
         "wild:elosern:606:685", "voronoi",
     ),
-    "broken_blade_scarp": MapDistrict(
-        "broken_blade_scarp", "斷崖高原", "斷劍崖",
+    "rift_scarp_plateau": MapDistrict(
+        "rift_scarp_plateau", "斷崖高原", "裂岩斷崖",
         "wild:elosern:1326:586", "voronoi",
     ),
     "gullcry_hills": MapDistrict(
@@ -475,8 +475,8 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "anvil_vale", "鐵砧谷地", "巨鐵砧岩",
         "wild:elosern:518:503", "voronoi",
     ),
-    "south_pass_foothills": MapDistrict(
-        "south_pass_foothills", "南隘山麓", "南隘古道碑",
+    "south_pass_west_slopes": MapDistrict(
+        "south_pass_west_slopes", "南隘西麓", "南隘古道碑",
         "wild:elosern:1314:414", "voronoi",
     ),
     "estuary_flats": MapDistrict(
@@ -542,7 +542,7 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "wild:elosern:1782:1809", "voronoi",
     ),
     "north_pass_east_slopes": MapDistrict(
-        "north_pass_east_slopes", "北隘東麓", "北隘哨塔",
+        "north_pass_east_slopes", "北隘東麓", "北隘風蝕岩",
         "wild:elosern:1486:1784", "voronoi",
     ),
     "sunken_bell_lake": MapDistrict(
@@ -566,7 +566,7 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "wild:elosern:2286:1581", "voronoi",
     ),
     "spruce_foothills": MapDistrict(
-        "spruce_foothills", "雲杉山麓", "雲杉瀑布",
+        "spruce_foothills", "雲杉山麓", "雲杉石階",
         "wild:elosern:1487:1564", "voronoi",
     ),
     "harvest_north_plain": MapDistrict(
@@ -613,8 +613,8 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "rose_plain", "玫瑰平原", "玫瑰石園",
         "wild:elosern:2124:1196", "voronoi",
     ),
-    "sea_altar_downs": MapDistrict(
-        "sea_altar_downs", "潮風丘地", "海神祭壇",
+    "tide_wind_downs": MapDistrict(
+        "tide_wind_downs", "潮風丘地", "海神祭壇",
         "wild:elosern:2460:1163", "voronoi",
     ),
     "gargoyle_plateau": MapDistrict(
@@ -657,8 +657,8 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "horse_plain", "駿馬原野", "奔馬石雕",
         "wild:elosern:1687:864", "voronoi",
     ),
-    "dune_coast": MapDistrict(
-        "dune_coast", "金沙丘原", "沙中古塔",
+    "golden_dune_downs": MapDistrict(
+        "golden_dune_downs", "金沙丘原", "沙中古塔",
         "wild:elosern:2402:797", "voronoi",
     ),
     "flax_plain": MapDistrict(
@@ -722,7 +722,7 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "wild:elosern:1850:320", "voronoi",
     ),
     "imperial_delta": MapDistrict(
-        "imperial_delta", "帝河三角洲", "河口哨塔",
+        "imperial_delta", "帝河三角洲", "三角洲古碑",
         "wild:elosern:2007:303", "voronoi",
     ),
     "sea_serpent_slopes": MapDistrict(
@@ -800,7 +800,7 @@ MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
         "wild:elosern:240:1583", "voronoi",
     ),
     "grizzly_vale": MapDistrict(
-        "grizzly_vale", "灰熊谷", "灰熊瀑布",
+        "grizzly_vale", "灰熊谷", "灰熊洞穴",
         "wild:elosern:896:1489", "voronoi",
     ),
     "giant_rockfall_slopes": MapDistrict(
