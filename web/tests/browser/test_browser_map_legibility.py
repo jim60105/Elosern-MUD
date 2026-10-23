@@ -262,17 +262,21 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         suppressed = page.evaluate("""() => {
           const svg = document.querySelector('[data-testid="local-map"] .local-map__lattice');
           const exit = svg.querySelector('[data-node="wild:vertical:0:1"]');
-          const label = exit.querySelector('.local-map__node-label');
           const here = svg.querySelector('[data-node="wild:vertical:0:0"] .local-map__node-label');
           return {
             marker: !!exit.querySelector('.local-map__marker'),
-            text: [...label.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim(),
+            label: !!exit.querySelector('.local-map__node-label'),
+            title: exit.querySelector('title') ? exit.querySelector('title').textContent.trim() : null,
             size: parseFloat(getComputedStyle(here).fontSize) * here.getScreenCTM().a,
             nodes: svg.querySelectorAll('.local-map__node').length,
           };
         }""")
         self.assertTrue(suppressed["marker"])
-        self.assertEqual(suppressed["text"], "")
+        # redesign-map-drawer's fits-or-omitted placement: a repeated region
+        # name draws no label block at all and keeps its full accessible name
+        # (the same pin as the Vitest island suites).
+        self.assertFalse(suppressed["label"], "a repeated region name draws no label text")
+        self.assertEqual(suppressed["title"], "共用地區")
         self.assertGreaterEqual(suppressed["size"], 16 - 0.01)
         self.assertEqual(suppressed["nodes"], 2)
         page.close()
