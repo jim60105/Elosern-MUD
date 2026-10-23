@@ -18,9 +18,9 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import RejectReason
-from world.rules.tests._combat_session_helpers import resolve_combat_action
-from world.rules.combat import Battlefield
+from world.rules.action import ActionResolver, RejectReason
+from world.rules.combat import Battlefield, combat_provenance
+from world.rules.tests._combat_session_helpers import engagement_provenance
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
 from world.rules.combat_session.records import read_session
@@ -79,8 +79,10 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
         skill = SKILL_REGISTRY[action.skill_key]
         before_mp = crocodile.traits.mp.current
         before_sp = crocodile.traits.sp.current
-        with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = resolve_combat_action(action)
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
+            result = ActionResolver.resolve(action)
         self.assertEqual(result.outcome, "success")
         self.assertLess(player.traits.hp.current, 10000)
         self.assertLess(player.traits.mp.current, 100)
@@ -96,8 +98,10 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
         depleted_sp = crocodile.traits.sp.current
         fallback = _enemy_policy(crocodile, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
-        with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            self.assertEqual(resolve_combat_action(fallback).outcome, "success")
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
+            self.assertEqual(ActionResolver.resolve(fallback).outcome, "success")
         reloaded = Monster.objects.get(pk=crocodile.pk)
         self.assertEqual(reloaded.species_key, crocodile.species_key)
         self.assertEqual(reloaded.variant_key, crocodile.variant_key)
@@ -120,7 +124,8 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
         practice_before = dict(reloaded.db.skill_proficiency or {})
         player_hp = player.traits.hp.current
         player.traits.hp.current = 0
-        late = resolve_combat_action(strike)
+        with combat_provenance(engagement_provenance().at_slot(0)):
+            late = ActionResolver.resolve(strike)
         self.assertEqual(late.outcome, "rejected")
         self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(

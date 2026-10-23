@@ -18,11 +18,15 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import ActionRequest, RejectReason
-from world.rules.tests._combat_session_helpers import resolve_combat_action
+from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.tests._combat_session_helpers import engagement_provenance
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat import (
+    Battlefield,
+    BattlefieldActionContext,
+    combat_provenance,
+)
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
@@ -98,8 +102,10 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         request = _enemy_policy(crab, field, record)
         self.assertEqual(request.skill_key, SKILL_KEY)
         self.assertEqual(request.targets, [player])
-        with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = resolve_combat_action(request)
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=1
+        ), combat_provenance(engagement_provenance().at_slot(0)):
+            result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             (crab.traits.mp.current, crab.traits.sp.current),
@@ -124,8 +130,10 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
             crab.traits.sp.current = crab.traits.sp.max
             ally_before = (ally.traits.hp.current, ally.traits.mp.current)
             paid_before = (crab.traits.mp.current, crab.traits.sp.current)
-            with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                refreshed = resolve_combat_action(ActionRequest(
+            with patch(
+                "world.rules.combat.damage.roll_d100", return_value=80
+            ), combat_provenance(engagement_provenance().at_slot(0)):
+                refreshed = ActionResolver.resolve(ActionRequest(
                     crab, SKILL_KEY, [ally], BattlefieldActionContext(field),
                 ))
             self.assertEqual(refreshed.outcome, "success")
@@ -155,8 +163,10 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         # selection boundary, so the paid axis stays real evidence.
         fallback = _enemy_policy(reloaded, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
-        with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            self.assertEqual(resolve_combat_action(fallback).outcome, "success")
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
+            self.assertEqual(ActionResolver.resolve(fallback).outcome, "success")
         self.assertEqual(reloaded.traits.mp.current, 0)
         self.assertEqual(reloaded.traits.sp.current, depleted_sp)
         clock.advance(duration, AdvanceSource.COMMAND, (reloaded,))
@@ -174,7 +184,8 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         practice_before = dict(reloaded.db.skill_proficiency or {})
         player_hp = player.traits.hp.current
         player.traits.hp.current = 0
-        late = resolve_combat_action(strike)
+        with combat_provenance(engagement_provenance().at_slot(0)):
+            late = ActionResolver.resolve(strike)
         self.assertEqual(late.outcome, "rejected")
         self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(
