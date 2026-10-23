@@ -206,6 +206,39 @@ current, quest_markers}`, in continent kilometres with north-positive `y`.
 Either panel may instead be the common unavailable form
 `{schema_version, available: false, reason}`.
 
+The world client renderer is `web/webclient-app/components/WorldMapView.vue`
+(render-world-map-view), backed by `web/webclient-app/lib/world_map_view.js`.
+It draws only the validated body, in these layers from bottom to top: sea,
+land, lit terrain (wash, terrain tints, rivers, ridge and roads of lit
+districts), unlit hatching, district borders, national borders, coastline,
+trail, approximate-commission circles, places and landmarks, commission
+markers, current position, labels, and chrome. World-unit geometry sits
+inside one transform with non-scaling strokes, so panning and zooming never
+rebuild a path. Labels are screen-space text of at least 16 CSS px times
+the UI scale, and a colliding lower-priority label is hidden, never shrunk.
+
+- An unlit district is drawn from its outline only, as hatching with a
+  dotted border and the label `未探明`. No landmark, place, nation or name is
+  drawn, hit-tested or read out for it.
+- Level of detail is inclusive. Nation names show at spans of 400 km and
+  wider (大陸 and 國). Lit district and place names show up to 1,000 km, and
+  `未探明` up to 450 km. The trail is a line until the 近郊 view (spans up to
+  about 89 km). There it becomes cells of the payload's own
+  `resolution_km`, so a downsampled history never implies 1 km precision.
+- An approximate commission is a dashed 36 km circle on its supplied 50 km
+  grid point, labelled `大致方位`, with no centre pin. Exact commissions are
+  pins.
+- Selecting a district, place or commission emits its key
+  (`district:<id>`, `place:<id>` or `quest:<id>`) and a text reading. A lit
+  district lists every nation its `nations` ids resolve to, so the deep
+  forest lists both. Keyboard focus stays in a list of real buttons.
+- Discovery is session view memory only. A district that was unlit in the
+  previous payload and is lit in the next, observed while the view is
+  mounted, spreads its ink from its landmark for `--motion-district-reveal`
+  (600 ms, 0 ms at reduced or off motion). It announces `已探明：<district>`
+  once. The first payload, a repeat, a remount, a new `epoch`, and a payload
+  in which a lit district went dark all re-baseline silently.
+
 ## The world-map frame allowance
 
 `world_map` is the one panel exempt from the generic frame budget
