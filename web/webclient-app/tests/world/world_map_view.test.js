@@ -4,7 +4,8 @@
 // that each block ran and passed. Fixtures are the synthetic bodies in
 // stories/fixtures/world_map.js, validated by the wire validator first.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import WorldMapView from "../../components/WorldMapView.vue";
 import {
@@ -64,7 +65,6 @@ const viewAt = (span, centre = PLAYER) => ({ signature: SIGNATURE, cx: centre.x,
 const labelsOf = (w) => w.findAll('[data-testid="world-map__label"]');
 const kindsOf = (w) => new Set(labelsOf(w).map((l) => l.attributes("data-kind")));
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function pick(w, key) {
   const el = w.find(`[data-pick="${key}"]`);
@@ -349,27 +349,46 @@ describe("newly lit districts animate accessibly from their landmark", () => {
 
   it("an unlit-to-lit transition spreads 600 ms of ink from the landmark and announces once", async () => {
     document.documentElement.style.setProperty("--motion-district-reveal", "600ms");
-    const w = mountMap(worldBase(), { view: viewAt(420, { x: 1220, y: 1340 }) });
-    const lit = newLight();
-    await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
-    await tick();
-    const ink = w.findAll('[data-testid="world-map__ink"]');
-    expect(ink).toHaveLength(1);
-    expect(ink[0].attributes("data-district")).toBe(lit.id);
-    expect(ink[0].attributes("data-reveal-ms")).toBe("600");
-    expect(Number(ink[0].attributes("cx"))).toBe(lit.landmark.x);
-    expect(Number(ink[0].attributes("cy"))).toBe(lit.landmark.y);
-    expect(w.find(`.world-map__lit[data-district="${lit.id}"]`).attributes("mask")).toContain("-reveal-");
-    expect(discovery(w)).toBe(`已探明：${lit.name}`);
-    // A republish of the same knowledge mid-spread adds nothing.
-    await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
-    await tick();
-    expect(w.findAll('[data-testid="world-map__ink"]')).toHaveLength(1);
-    await sleep(750);
-    expect(w.find('[data-testid="world-map__ink"]').exists()).toBe(false);
-    expect(w.find(`.world-map__lit[data-district="${lit.id}"]`).attributes("mask")).toBeUndefined();
-    // Rendering emitted no knowledge, only view bookkeeping.
-    expect(Object.keys(w.emitted()).filter((name) => !["update:view"].includes(name) && !name.startsWith("pointer"))).toEqual([]);
+    // The spread is an animation clock, so the test owns that clock: the
+    // frames and `performance.now()` are faked and every assertion is about
+    // the token's own 600 ms, never about how fast the runner got to run the
+    // test (a starved real clock let the spread expire before the first
+    // assertion).
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"],
+    });
+    try {
+      const w = mountMap(worldBase(), { view: viewAt(420, { x: 1220, y: 1340 }) });
+      const lit = newLight();
+      await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
+      await nextTick();
+      const ink = w.findAll('[data-testid="world-map__ink"]');
+      expect(ink).toHaveLength(1);
+      expect(ink[0].attributes("data-district")).toBe(lit.id);
+      expect(ink[0].attributes("data-reveal-ms")).toBe("600");
+      expect(Number(ink[0].attributes("cx"))).toBe(lit.landmark.x);
+      expect(Number(ink[0].attributes("cy"))).toBe(lit.landmark.y);
+      expect(w.find(`.world-map__lit[data-district="${lit.id}"]`).attributes("mask")).toContain("-reveal-");
+      expect(discovery(w)).toBe(`已探明：${lit.name}`);
+      // A republish of the same knowledge mid-spread adds nothing.
+      await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
+      await nextTick();
+      expect(w.findAll('[data-testid="world-map__ink"]')).toHaveLength(1);
+      // Halfway through the advertised spread the ink still stands, so the
+      // 600 ms figure is what the frames honour.
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      expect(w.findAll('[data-testid="world-map__ink"]')).toHaveLength(1);
+      // 750 ms past the start the ink and the reveal mask are gone.
+      vi.advanceTimersByTime(450);
+      await nextTick();
+      expect(w.find('[data-testid="world-map__ink"]').exists()).toBe(false);
+      expect(w.find(`.world-map__lit[data-district="${lit.id}"]`).attributes("mask")).toBeUndefined();
+      // Rendering emitted no knowledge, only view bookkeeping.
+      expect(Object.keys(w.emitted()).filter((name) => !["update:view"].includes(name) && !name.startsWith("pointer"))).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reduced or off motion lights the district instantly and still announces", async () => {
