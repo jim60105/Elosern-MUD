@@ -28,3 +28,7 @@ Opening or switching active scope SHALL request map.view for that scope; committ
 #### Scenario: Freshness requires the requested map publication and settled action
 - **WHEN** an opening request receives its action result before the matching committed map publication, its publication before the result, a partial multipart transfer, a failure or an unavailable map body
 - **THEN** only the successfully settled request with a completely adopted available world body establishes the baseline; arbitrary revision changes, cached-body clones and partial transfers cannot qualify it, and no polling or retry queue is introduced
+
+#### Scenario: A committed move is observed while opening readiness is pending
+- **WHEN** a movement commits before opening readiness and its active-scope refresh follows the opening response in either supported action-result/body order
+- **THEN** the opening response establishes a silent baseline; an unlit baseline followed by the movement refresh's eligible newly lit district reveals once without remounting, while a discovery already included in the first fresh baseline remains silent; normal dispatcher admission and single-refresh behavior remain unchanged
