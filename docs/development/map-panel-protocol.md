@@ -145,6 +145,20 @@ re-serializes to measure. If a transfer is lost, the next action carries a
 stale base revision. The server answers it with a snapshot, which keeps the
 last complete maps.
 
+The part rejection reasons are expected under replay and reordering, so they
+are not fatal. A transport consumer must not treat `duplicate_part`,
+`finished_transfer`, `superseded_transfer`, `conflicting_part`,
+`invalid_body` or `not_newer` on a part frame as a protocol error or as a
+resync trigger.
+
+The server builds and checks every frame of a parts delivery before it sends
+anything or consumes a revision, so an encoding failure never leaves a
+half-published update.
+
+A retained map is not invalidated when the player moves. The request owner
+(`map.view` and the drawer) re-requests the active scope after each committed
+move.
+
 This codec covers map panels only. It is not a general streaming API.
 
 ## Bounds ownership

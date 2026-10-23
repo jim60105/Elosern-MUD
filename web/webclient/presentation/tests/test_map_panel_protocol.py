@@ -131,8 +131,10 @@ class MapSchemaParityTests(unittest.TestCase):
             ("trail resolution 2", "world_map", variant(world, lambda v: v.update(trail={"resolution_km": 2, "rows": []}))),
             ("unknown place kind", "world_map", variant(world, lambda v: v["visited_places"][0].update(kind="dungeon"))),
         ]
-        for name, _, payload_text in accept[4:]:
-            self.assertNotEqual(payload_text, text(world) if "approximate" in name else text(grid), name)
+        # Guard: each spelling really reached the wire text.
+        self.assertIn('"x":650.0,', accept[4][2])
+        for (_, _, payload_text), spelling in zip(accept[5:], ("3.0", "-0.0", "1e2", "1E1"), strict=True):
+            self.assertIn(f'"x":{spelling},', payload_text)
         cases = [(name, panel, body, True) for name, panel, body in accept] + [
             (name, panel, body, False) for name, panel, body in reject
         ]
@@ -204,6 +206,42 @@ class MapSchemaParityTests(unittest.TestCase):
 
 
 class MapPartCodecTests(unittest.TestCase):
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    def test_part_header_parity_on_identical_text(self):
+        part = encode_map_parts("area_map", _copy("wild"), transfer_id="T" * 22)[0]
+        compact = json.dumps(part, separators=(",", ":"))
+        count = part["part"]["count"]
+        cases = [
+            ("valid", compact, True),
+            ("integral count", compact.replace(f'"count":{count}', f'"count":{count}.0'), True),
+            ("exponent index", compact.replace('"index":0', '"index":0e0'), True),
+            ("negative zero index", compact.replace('"index":0', '"index":-0.0'), True),
+            ("fractional count", compact.replace(f'"count":{count}', f'"count":{count}.5'), False),
+            ("boolean schema", compact.replace('"schema_version":1', '"schema_version":true'), False),
+        ]
+        for name, payload_text, _ in cases[1:]:
+            self.assertNotEqual(payload_text, compact, name)
+        script = """
+const fs = require('node:fs');
+const P = require('./web/static/webclient/js/elosern/protocol.js');
+const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
+process.stdout.write(JSON.stringify(cases.map((text) => {
+  try { P.validateMapPart('area_map', JSON.parse(text)); return true; } catch (_) { return false; }
+})));
+"""
+        js = json.loads(_node(script, json.dumps([text for _, text, _ in cases])))
+        for (name, payload_text, expected), js_accepts in zip(cases, js, strict=True):
+            with self.subTest(case=name):
+                try:
+                    validate_map_part("area_map", json.loads(payload_text))
+                    py_accepts = True
+                except ProtocolValidationError:
+                    py_accepts = False
+                self.assertEqual(py_accepts, expected)
+                self.assertEqual(js_accepts, expected)
+
     @covers_requirement(
         "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
     )
@@ -460,6 +498,39 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         )
         log_debug.assert_called_once()
         self.assertEqual(log_debug.call_args.kwargs["context"]["parts"], len(frames))
+
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    def test_two_maps_travel_as_two_transfers_checked_before_sending(self):
+        session = _Session()
+        registry = _registry(_dense_grid, [])
+        registry.register(
+            PresenterSpec("world_map", 1, ("map_unavailable", "地圖"), lambda ctx: _copy("world"), on_demand=True)
+        )
+        coordinator = _coordinator(session, registry)
+        coordinator.full_snapshot(_context())
+        coordinator._publish_presentation(_context(), {"area_map", "world_map"})
+        frames = [frame for _, frame in session.frames()[1:]]
+        by_revision: dict[int, list] = {}
+        for frame in frames:
+            (name, part), = frame["panels"].items()
+            by_revision.setdefault(frame["revision"], []).append((name, part))
+        self.assertEqual(len(by_revision), 2)
+        decoded = {}
+        for rows in by_revision.values():
+            names = {name for name, _ in rows}
+            self.assertEqual(len(names), 1)
+            name = names.pop()
+            decoded[name] = decode_map_parts(name, [part for _, part in rows])
+        self.assertEqual(decoded["world_map"], validate_world_map(_copy("world")))
+        # A frame that cannot be encoded aborts before anything is sent.
+        before = (len(session.sent), coordinator.revision)
+        with mock.patch(
+            "web.webclient.presentation.map_parts.encode_map_parts", side_effect=MapPanelError("boom")
+        ), self.assertRaises(MapPanelError):
+            coordinator._publish_presentation(_context(), {"status", "area_map"})
+        self.assertEqual((len(session.sent), coordinator.revision), before)
 
     @covers_requirement(
         "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"

@@ -186,7 +186,7 @@ class PresentationCoordinator:
         candidate = envelope(self._revision + 1, panels)
         try:
             check_envelope(candidate)
-        except JSONSafetyError:  # observability: ignore R2: an oversized map update is the designed trigger for bounded part delivery below
+        except JSONSafetyError:  # observability: ignore R2: an over-bound map update is the designed trigger for bounded part delivery below
             pass
         else:
             self._next_revision()
@@ -195,27 +195,34 @@ class PresentationCoordinator:
 
         from web.webclient.presentation.map_parts import encode_map_parts
 
+        # Build and check every frame before anything is sent or any revision
+        # is consumed, so a failure never leaves a half-published update.
         eager = {name: value for name, value in panels.items() if name not in map_names}
-        last = None
+        planned: list[tuple[str | None, list[dict[str, Any]]]] = []
         if eager:
-            last = envelope(self._next_revision(), eager)
-            self._send(UPDATE_MESSAGE, last)
+            planned.append((None, [eager]))
         for name in sorted(map_names):
-            parts = encode_map_parts(name, panels[name])
+            planned.append((name, [{name: part} for part in encode_map_parts(name, panels[name])]))
+        base = self._revision
+        for offset, (_, bodies) in enumerate(planned, start=1):
+            for body in bodies:
+                check_envelope(envelope(base + offset, body))
+        last = None
+        for name, bodies in planned:
             revision = self._next_revision()
-            frames = [envelope(revision, {name: part}) for part in parts]
-            for frame in frames:
-                check_envelope(frame)
-            for frame in frames:
-                self._send(UPDATE_MESSAGE, frame)
+            for body in bodies:
+                self._send(UPDATE_MESSAGE, envelope(revision, body))
+            if name is None:
+                last = envelope(revision, eager)
+                continue
             log_debug(
                 "map_panel_transfer_sent",
                 context={
                     "surface": "presentation",
                     "panel": name,
                     "revision": revision,
-                    "parts": len(parts),
-                    "bytes": parts[0]["part"]["byte_length"],
+                    "parts": len(bodies),
+                    "bytes": bodies[0][name]["part"]["byte_length"],
                 },
             )
             last = envelope(revision, {name: panels[name]})

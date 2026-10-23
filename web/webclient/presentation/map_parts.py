@@ -32,6 +32,7 @@ from web.webclient.presentation.map_panels import (
     MAP_MAX_BYTES,
     MAP_PANEL_SCHEMAS,
     MapPanelError,
+    _int,
     validate_map_panel,
 )
 from web.webclient.presentation.protocol import (
@@ -93,9 +94,9 @@ def encode_map_parts(panel: str, payload: Any, *, transfer_id: str | None = None
 
 
 def _part_int(value: Any, name: str, minimum: int, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-        raise MapPanelError(f"{name} must be an integer within {minimum}..{maximum}")
-    return value
+    # Same integral-number normalization as the schema validators: the
+    # browser decodes 2.0 / 2e0 to the integer 2, so both sides agree.
+    return _int(value, name, minimum, maximum)
 
 
 def validate_map_part(panel: str, value: Any) -> tuple[dict[str, Any], bytes]:
@@ -104,7 +105,7 @@ def validate_map_part(panel: str, value: Any) -> tuple[dict[str, Any], bytes]:
         raise MapPanelError(f"{panel!r} is not an on-demand map panel")
     if not isinstance(value, dict) or set(value) != {"schema_version", "available", "part"}:
         raise MapPanelError("a map part must hold exactly schema_version, available and part")
-    if isinstance(value["schema_version"], bool) or value["schema_version"] != MAP_PART_SCHEMA_VERSION:
+    if _part_int(value["schema_version"], "schema_version", 1, 1) != MAP_PART_SCHEMA_VERSION:
         raise MapPanelError("unsupported map part schema_version")
     if value["available"] is not True:
         raise MapPanelError("a map part must be available")
