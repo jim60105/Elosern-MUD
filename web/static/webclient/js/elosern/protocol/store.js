@@ -5,6 +5,8 @@
 var C = require("./constants.js");
 var core = require("./core.js");
 var envelope = require("./envelope.js");
+var mapPanels = require("./panels/map_panels.js");
+var mapParts = require("./map_parts.js");
 
 var canonicalJson = core.canonicalJson;
 var checkEnvelope = core.checkEnvelope;
@@ -24,6 +26,11 @@ var mode = null;
 var layoutVersion = null;
 var serverTime = null;
 var panels = {};
+// On-demand map read models (define-map-panel-protocol): kept apart from the
+// eager panels, retained across same-epoch snapshots and cleared with the
+// epoch. Bounded part transfers assemble invisibly beside them.
+var maps = {};
+var assembler = mapParts.createMapAssembler();
 var retired = createRetiredEpochSet();
 var mutationsLocked = true;
 var protocolError = null;
@@ -36,6 +43,10 @@ function cloneState() {
   Object.keys(panels).forEach(function (name) {
     panelCopy[name] = JSON.parse(canonicalJson(panels[name]));
   });
+  var mapCopy = {};
+  Object.keys(maps).forEach(function (name) {
+    mapCopy[name] = JSON.parse(canonicalJson(maps[name]));
+  });
   return {
     generation: generation,
     phase: phase,
@@ -45,6 +56,7 @@ function cloneState() {
     layoutVersion: layoutVersion,
     serverTime: serverTime === null ? null : JSON.parse(canonicalJson(serverTime)),
     panels: panelCopy,
+    maps: mapCopy,
     mutationsLocked: mutationsLocked,
     protocolError: protocolError === null ? null : JSON.parse(canonicalJson(protocolError)),
     lastActionResult: lastActionResult === null ? null : JSON.parse(canonicalJson(lastActionResult)),
@@ -76,10 +88,15 @@ function commitPresentation(meta, isSnapshot) {
     panels = {};
   }
   // An update replaces only the named panels, each completely, and never
-  // merges nested fields.
+  // merges nested fields. Map panels land in their separate on-demand slot;
+  // a snapshot never names them, so same-epoch maps survive it.
   Object.keys(meta.panels).forEach(function (name) {
-    panels[name] = JSON.parse(canonicalJson(meta.panels[name]));
+    var target = Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name) ? maps : panels;
+    target[name] = JSON.parse(canonicalJson(meta.panels[name]));
   });
+  // An unfinished transfer at or below the committed revision can never be
+  // adopted any more; free it now.
+  assembler.pruneThrough(meta.revision);
   phase = "active";
   // A reload-required (incompatible) protocol error keeps the graphical
   // controls locked even while ordinary presentations keep committing;
@@ -91,6 +108,11 @@ function commitPresentation(meta, isSnapshot) {
 
 return {
   getState: cloneState,
+
+  // Diagnostics for the bounded assembly (tests and debugging only).
+  mapAssemblyStats: function () {
+    return { live: assembler.liveCount(), bytes: assembler.bufferedBytes() };
+  },
 
   subscribe: function (listener) {
     if (typeof listener !== "function") {
@@ -134,6 +156,8 @@ return {
     layoutVersion = null;
     serverTime = null;
     panels = {};
+    maps = {};
+    assembler.clear();
     phase = "awaiting_initial_snapshot";
     mutationsLocked = true;
     protocolError = null;
@@ -188,6 +212,9 @@ return {
         if (phase === "detached" && meta.epoch === activeEpoch) {
           return { accepted: false, reason: "different_epoch" };
         }
+        // Establishing a sequence starts from an empty on-demand store.
+        maps = {};
+        assembler.clear();
         commitPresentation(meta, true);
         return { accepted: true, established: true, revision: meta.revision };
       }
@@ -198,6 +225,26 @@ return {
       }
       if (meta.revision <= revision) {
         return { accepted: false, reason: "not_newer" };
+      }
+      if (meta.part) {
+        // One bounded map part: nothing (metadata included) is adopted until
+        // the whole transfer decoded and validated.
+        var outcome = assembler.offer(
+          meta.part.panel,
+          meta.part.header,
+          meta.part.bytes,
+          meta.revision,
+          canonicalJson([meta.revision, meta.mode, meta.layoutVersion, meta.serverTime])
+        );
+        if (outcome.status === "partial") {
+          return { accepted: true, partial: true, revision: meta.revision };
+        }
+        if (outcome.status !== "complete") {
+          return { accepted: false, reason: outcome.reason, detail: outcome.detail };
+        }
+        var logicalPanels = {};
+        logicalPanels[outcome.panel] = outcome.logical;
+        meta.panels = logicalPanels;
       }
       commitPresentation(meta, messageName === "ui_snapshot");
       return { accepted: true, revision: meta.revision };
@@ -241,6 +288,8 @@ return {
       // only a fresh-epoch snapshot re-establishes active state.
       phase = "detached";
       panels = {};
+      maps = {};
+      assembler.clear();
       mutationsLocked = true;
     }
     if (
