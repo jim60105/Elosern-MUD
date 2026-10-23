@@ -80,8 +80,8 @@ has exactly one landmark and six fields: `key`, `district_name_zh`,
 - `region` districts take every cell of one terrain region. The northern deep
   forest is the only one: its single landmark, 古樹之心 at `(1250, 2420)`, lies
   about 500 km beyond the forest edge and covers both nominal claims.
-- `voronoi` districts seed the walking-distance partition (computed by a later
-  change). Two Voronoi landmarks are never closer than
+- `voronoi` districts seed the walking-distance partition (see
+  [District partition](#district-partition)). Two Voronoi landmarks are never closer than
   `MIN_VORONOI_SPACING_KM` (100 km, below the roughly 200 km district target).
   The registry ships a small seed set with at least one seed in each nation
   outside the forest; the landmark-authoring change expands it to 110–130.
@@ -107,6 +107,64 @@ record read through `parse_knowledge`. Nearby cells never light a district;
 `record_arrival` stays the only writer and no discovery attribute, name or
 geometry is added to knowledge. The first-arrival `已探明` narrative belongs to
 the world-map panel change.
+
+## District partition
+
+`tools/map_district_partition.py` computes which district owns every land
+cell offline (world-map drawer design §4.2) and writes the frozen,
+version-controlled result to `world/maps/data/district_partition.json`.
+The runtime only reads that file through `world/maps/district_partition.py`
+(`district_at((x, y))`, `district_outlines()`); it never imports the generator
+or recomputes ownership.
+
+Regenerate after any change to the district registry, the terrain model
+(mainland, ridge, passes, waterways, fords, forest edge, nominal claims),
+anchor footprints, gateways or the settlement routes to a grid landmark:
+
+```sh
+uv run --locked python -m tools.map_district_partition          # rewrite the file
+uv run --locked python -m tools.map_district_partition --check  # exit 1 when stale
+```
+
+Commit the regenerated file with the change that caused it. The data-contract
+test `world.maps.tests.test_map_district_partition` regenerates it from the
+shipped inputs and fails on any byte difference, so stale data is never
+adopted at runtime. Run `validate_map_districts` (or
+`world.lore.tests.test_map_district_content`) first: the 100 km
+`MIN_VORONOI_SPACING_KM` spacing, reachability and region-membership rules
+belong to the registry validator, not the partitioner.
+
+Datum and units:
+
+- Ownership is exact per one-kilometre cell (`(x, y)`, 0..2699). Walking
+  distance runs on 5 km tiles (540 × 540): each tile's walkable cells split
+  into fragments by nominal nation and legal steps, and fragments of adjacent
+  tiles join at cost 1 (cardinal tile step) or √2 (diagonal tile step) only
+  where a legal one-kilometre step crosses between them.
+- A legal step joins walkable, non-region cells of the same nominal nation; a
+  diagonal step also needs both orthogonal cells legal. Sea, the ridge,
+  rivers, footprints and region land block propagation, and national borders
+  stay closed even at passes and fords.
+- The deep forest region district is reserved first, across both claims.
+  Every other walkable cell takes the nearest Voronoi landmark; equal
+  distances go to the smaller district key, then the earlier tile/cell in
+  row-major order. A grid landmark starts from the routed same-nation gateway
+  approach cells of its settlement, and owns its containing footprint plus any
+  pocket that footprint encloses. Generation fails, naming a cell, when a
+  walkable component has no landmark.
+- Ridge, river and other blocked land display the nearest same-nation owner
+  (squared centre distance, then key, then cell); sea has no owner.
+- Outlines are metres in the east/north frame (`1000 * x` per cell edge).
+  Boundary pieces are shared between neighbours and smoothed once (edge
+  midpoints, then a 500 m Douglas-Peucker), so no gap or overlap appears;
+  pieces along a national border keep their exact cell-edge geometry, and
+  junctions stay exact. Outer rings run counter-clockwise, holes clockwise.
+
+The file stores tile ownership as row runs (`-1` marks a tile whose land has
+several owners), exact 25-cell runs for those tiles, the outlines and a
+SHA-256 fingerprint of the algorithm version, districts and input rasters.
+Lookup checks the mainland polygon first, then the exception tile, then the
+tile run.
 
 ## Declarations
 
@@ -173,6 +231,15 @@ Map districts run under the Evennia test runner (`<env>` holds
 uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
   world.lore.tests.test_map_districts world.lore.tests.test_map_district_content \
   world.rules.tests.test_map_district_lighting
+```
+
+The district partition's synthetic mechanics run as a plain unit test and its
+production recomputation under the Evennia runner:
+
+```sh
+uv run --locked python -m unittest tests.test_map_district_partition
+uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+  world.maps.tests.test_map_district_partition
 ```
 
 The assertions behind `continental-geography` live in those data-contract test

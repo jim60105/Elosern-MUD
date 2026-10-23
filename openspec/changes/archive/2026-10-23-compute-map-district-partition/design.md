@@ -30,6 +30,12 @@ Miniature tests independently pin a tile split by national border, coast, thin r
 
 Raster edge validation costs more offline but preserves one-cell barriers. The initial small registry is valid input; the next authoring slice adds the final content and regenerates using this exact tool.
 
+## Implementation notes
+
+- A walkable pocket enclosed on all eight sides by a claimed grid-landmark footprint (Altoria's footprint mask encloses two such cells) is nobody's walking ground. It is assigned to the footprint's district along with the footprint instead of failing as an unseeded component. Every other unseeded component still fails generation with its coordinates.
+- Region-district ownership is stored in the same tile/exception layers as Voronoi ownership, so the runtime lookup is polygon land, then exception tile, then tile run, with the frozen file as its only ownership source.
+- Under the corner rule, fragment connectivity equals four-connectivity of same-nation domain cells; region, footprint, blocked and other-nation cells count as blocked sides.
+
 ## Implementation verification contract
 
 Implementation MUST run the smallest affected Evennia label, Node file, Vitest file, or managed browser class, never broad suites or CI shard commands locally. Every local test command must stay below ten minutes. Use `uv run --locked --env-file=<path> evennia test --settings test_settings.py --keepdb <focused.label>`, with `MUD_TEST_SETTINGS=1` in that env file. Pure tool tests use a focused `uv run --locked python -m unittest <module>`; client units use a single-file runner.
