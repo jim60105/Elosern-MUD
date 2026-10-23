@@ -73,12 +73,6 @@ from .test_local_map._support import (
 ROOT = Path(__file__).resolve().parents[4]
 NODE_TEST = "web/static/webclient/js/tests/protocol_area_map.test.js"
 
-AREA = "webclient-area-map::"
-REVEAL = AREA + "area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
-REQUEST = AREA + "map-view-requests-publish-the-requested-area-without-changing-gameplay"
-WILD = AREA + "wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
-MARKERS = AREA + "area-commission-markers-distinguish-same-map-identity-from-elsewhere"
-DISPATCH = "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
 
 
 def _render(actor):
@@ -132,7 +126,9 @@ class FogOfWarTests(unittest.TestCase):
         [("t_a", "t_b"), ("t_b", "t_c"), ("t_c", "t_d"), ("t_d", "t_e"), ("t_e", "t_f"), ("t_c", "t_x"), ("t_x", "t_y")]
     )
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_whole_visited_graph_and_one_step_frontier(self):
         # Visited far beyond two hops from the current node.
         known, visited, edges = fog_of_war(self.GRAPH, {"t_a", "t_b", "t_c", "t_d", "t_e"}, "t_a")
@@ -142,7 +138,9 @@ class FogOfWarTests(unittest.TestCase):
         self.assertIn(("t_c", "t_x"), edges)
         self.assertIn(("t_e", "t_f"), edges)
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_seen_to_seen_roads_are_never_emitted(self):
         graph = _undirected([("t_a", "t_b"), ("t_a", "t_c"), ("t_b", "t_c")])
         known, _, edges = fog_of_war(graph, set(), "t_a")
@@ -161,7 +159,9 @@ class FogOfWarTests(unittest.TestCase):
 
 
 class BearingTests(unittest.TestCase):
-    @covers_requirement(MARKERS)
+    @covers_requirement(
+        "webclient-area-map::area-commission-markers-distinguish-same-map-identity-from-elsewhere"
+    )
     def test_bearing_is_clockwise_from_north_and_wraps_after_rounding(self):
         self.assertEqual(bearing_and_distance((10, 10), (10, 20), 1), (0.0, 10.0))
         self.assertEqual(bearing_and_distance((10, 10), (20, 10), 1), (90.0, 10.0))
@@ -225,7 +225,9 @@ class GridAreaTests(EvenniaTestCase):
                     queue.append((other, depth + 1))
         self.fail(f"no {hops}-hop path in the shipped settlement graph")
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_whole_visited_graph_beyond_the_minimap_window(self):
         plaza = _t_grid_id(*_T_PLAZA_XYZ[:2])
         path = self._path(plaza, 3)
@@ -257,7 +259,9 @@ class GridAreaTests(EvenniaTestCase):
                 self.assertIn(b, self.adjacency[a])
         self.assertTrue(_js_accepts(payload))
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_moves_exist_only_on_current_adjacent_exits(self):
         plaza = _t_grid_id(*_T_PLAZA_XYZ[:2])
         path = self._path(plaza, 2)
@@ -275,7 +279,9 @@ class GridAreaTests(EvenniaTestCase):
                 self.assertEqual(node["action"]["destination"], node["id"])
                 self.assertIn(node["action"]["exit_ref"], exit_refs)
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_gate_rooms_carry_the_minimap_gateway_metadata(self):
         gate = _t_grid_id(*SOUTH_GATE_XYZ[:2])
         self._goto(gate)
@@ -288,7 +294,9 @@ class GridAreaTests(EvenniaTestCase):
         ordinary = [node for node_id, node in nodes.items() if node_id != gate and node["gateway"] is None]
         self.assertTrue(ordinary)
 
-    @covers_requirement(REQUEST)
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
     def test_reading_the_map_changes_no_gameplay_state(self):
         self._goto(_t_grid_id(*_T_PLAZA_XYZ[:2]))
         clock = get_world_clock()
@@ -298,7 +306,9 @@ class GridAreaTests(EvenniaTestCase):
         after = (self.char.location, parse_knowledge(self.char), get_world_clock().tick, self.char.attributes.get("quest_log"))
         self.assertEqual(before, after)
 
-    @covers_requirement(MARKERS)
+    @covers_requirement(
+        "webclient-area-map::area-commission-markers-distinguish-same-map-identity-from-elsewhere"
+    )
     def test_markers_name_same_map_nodes_and_bear_elsewhere(self):
         plaza = _t_grid_id(*_T_PLAZA_XYZ[:2])
         self._goto(plaza)
@@ -354,7 +364,9 @@ class RoomGraphAreaTests(EvenniaTestCase):
     def _id(self, name):
         return encode_room(int(self.rooms[name].id))
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_interior_fog_stops_at_the_frontier_without_coordinates(self):
         self._visit("a", "b")
         payload = _render(self.char)
@@ -377,7 +389,9 @@ class RoomGraphAreaTests(EvenniaTestCase):
         self.assertEqual(actionable[self._id("c")]["exit_ref"], str(int(self.exits[("b", "c")].id)))
         self.assertTrue(_js_accepts(payload))
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_identity_is_independent_of_position_and_knowledge(self):
         self._visit("a")
         first = _render(self.char)["map_id"]
@@ -395,7 +409,9 @@ class RoomGraphAreaTests(EvenniaTestCase):
         self.assertEqual(node["visibility"], "seen")
         self.assertIsNone(node["action"])
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_exits_out_of_the_family_are_gateways_never_traversed(self):
         street = GridRoom.objects.first()
         if street is None:
@@ -415,7 +431,9 @@ class RoomGraphAreaTests(EvenniaTestCase):
         self.assertEqual(payload["map_id"], f"room:{min(int(room.id) for room in self.rooms.values())}")
         self.assertTrue(_js_accepts(payload))
 
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_instance_graph_is_coordinate_free_and_returns_through_a_gateway(self):
         from world.maps.instance import spawn_instance_room
 
@@ -482,7 +500,9 @@ class WildernessAreaTests(EvenniaTest):
         self.assertTrue(enter_wilderness(self.char1, coordinates=coordinates, name=name))
         record_arrival(self.char1)
 
-    @covers_requirement(WILD)
+    @covers_requirement(
+        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+    )
     def test_window_is_bounded_clipped_and_flags_visits(self):
         ex, ey = EAST_APPROACH
         start = (ex + 9, ey)
@@ -518,7 +538,9 @@ class WildernessAreaTests(EvenniaTest):
         self.assertEqual(payload["cell_km"], km)
         self.assertTrue(_js_accepts(payload))
 
-    @covers_requirement(WILD)
+    @covers_requirement(
+        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+    )
     def test_only_legal_immediate_steps_are_actionable(self):
         ex, ey = EAST_APPROACH
         start = (ex + 9, ey)
@@ -533,8 +555,12 @@ class WildernessAreaTests(EvenniaTest):
             _edge_set(payload), {frozenset((_t_wild_id(*start), node_id)) for node_id in legal}
         )
 
-    @covers_requirement(WILD)
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+    )
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_gateway_step_replaces_its_cell_with_the_gate_room(self):
         self._at_wild(EAST_APPROACH)
         payload = _render(self.char1)
@@ -612,7 +638,9 @@ class MapViewDispatchTests(EvenniaTestCase):
             "payload": payload,
         }
 
-    @covers_requirement(DISPATCH)
+    @covers_requirement(
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+    )
     def test_map_view_is_an_exact_allowlisted_read(self):
         spec = build_production_action_registry().spec("map.view")
         self.assertEqual(spec.affected_panels, ("area_map",))
@@ -621,8 +649,12 @@ class MapViewDispatchTests(EvenniaTestCase):
             with self.subTest(payload=bad), self.assertRaises(ProtocolValidationError):
                 spec.validate_payload(bad)
 
-    @covers_requirement(REQUEST)
-    @covers_requirement(DISPATCH)
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
+    @covers_requirement(
+        "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
+    )
     def test_map_view_publishes_only_the_area_map(self):
         before_location = self.char.location
         before_knowledge = parse_knowledge(self.char)
@@ -641,7 +673,9 @@ class MapViewDispatchTests(EvenniaTestCase):
         self.assertIs(self.char.location, before_location)
         self.assertEqual(parse_knowledge(self.char), before_knowledge)
 
-    @covers_requirement(REQUEST)
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
     def test_rejected_scope_never_runs_the_presenter(self):
         handle_ui_action(
             self.session, self.char, self._envelope("map.view", {"scope": "world"}),
@@ -651,7 +685,9 @@ class MapViewDispatchTests(EvenniaTestCase):
         result = self.session.frames("ui_action_result")[-1]
         self.assertEqual(result["code"], "malformed_payload")
 
-    @covers_requirement(REQUEST)
+    @covers_requirement(
+        "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"
+    )
     def test_movement_and_refresh_never_compute_or_push_a_map(self):
         exit_obj = self.rooms[0].exits[0]
         handle_ui_action(
@@ -744,7 +780,9 @@ def _largest_grid_body(labels: int = 16) -> dict:
 
 
 class AreaBoundsTests(unittest.TestCase):
-    @covers_requirement(REVEAL)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_largest_supported_graph_fits_and_travels_in_parts(self):
         body = validate_area_map(_largest_grid_body())
         size = json_byte_size(body)
@@ -761,8 +799,12 @@ class AreaBoundsTests(unittest.TestCase):
 
 
 class AreaMapNodeEvidenceTests(unittest.TestCase):
-    @covers_requirement(REVEAL)
-    @covers_requirement(WILD)
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
+    @covers_requirement(
+        "webclient-area-map::wilderness-area-maps-cover-a-fifteen-cell-neighbourhood"
+    )
     def test_browser_area_map_validator_suite_passes(self):
         result = subprocess.run(
             ["node", "--test", NODE_TEST], cwd=ROOT, capture_output=True, text=True, timeout=300
