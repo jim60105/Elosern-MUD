@@ -224,6 +224,53 @@ const questNodeIds = computed(
     ),
 );
 
+// Screen directions (radians) of the roads leaving each drawn node, so the
+// commission pin can sit in the clearest diagonal instead of on a road.
+const roadAngles = computed(() => {
+  const out = new Map();
+  if (isWild.value) return out;
+  const byId = new Map(projected.value.map((entry) => [entry.node.id, entry.p]));
+  const add = (from, to) => {
+    const a = byId.get(from);
+    const b = byId.get(to);
+    if (!a || !b || (a.x === b.x && a.y === b.y)) return;
+    if (!out.has(from)) out.set(from, []);
+    out.get(from).push(Math.atan2(b.y - a.y, b.x - a.x));
+  };
+  for (const edge of props.area.edges) {
+    add(edge.source, edge.destination);
+    add(edge.destination, edge.source);
+  }
+  return out;
+});
+
+const QUEST_PIN_OFFSET = 12;
+const QUEST_DIAGONALS = [
+  [1, -1],
+  [-1, -1],
+  [1, 1],
+  [-1, 1],
+];
+
+function questOffset(id, distance) {
+  const angles = roadAngles.value.get(id) ?? [];
+  let best = QUEST_DIAGONALS[0];
+  let bestClearance = -1;
+  for (const [sx, sy] of QUEST_DIAGONALS) {
+    const theta = Math.atan2(sy, sx);
+    let clearance = Math.PI;
+    for (const angle of angles) {
+      const diff = Math.abs(((theta - angle + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+      clearance = Math.min(clearance, diff);
+    }
+    if (clearance > bestClearance + 1e-6) {
+      bestClearance = clearance;
+      best = [sx, sy];
+    }
+  }
+  return { dx: best[0] * distance, dy: best[1] * distance };
+}
+
 const nodeDraws = computed(() =>
   projected.value
     .map((entry) => {
@@ -239,6 +286,7 @@ const nodeDraws = computed(() =>
         selected: node.id === selectedId.value,
         name: nodeAccessibleName(props.area, node),
         rank: paintRank(node),
+        questAt: !isWild.value && questNodeIds.value.has(node.id) ? questOffset(node.id, QUEST_PIN_OFFSET) : null,
         cell: null,
       };
       if (isWild.value) {
@@ -330,6 +378,11 @@ const labelDraws = computed(() => {
   const obstacles = projected.value
     .filter((entry) => !isWild.value || entry.node.id === props.area.current_node || leadsToOf(entry.node))
     .map((entry) => ({ id: entry.node.id, x: entry.p.x, y: entry.p.y }));
+  // Commission pins are obstacles too, so no name is drawn over its pin.
+  for (const draw of nodeDraws.value) {
+    if (!draw.questAt) continue;
+    obstacles.push({ id: `quest:${draw.id}`, x: draw.x + draw.questAt.dx, y: draw.y + draw.questAt.dy });
+  }
   const placedLabels = placeLabels(candidates, (entry) => project(view.value, frame.value, entry), labelFrame, {
     fontPx: fontPx.value,
     measure: measureText,
@@ -707,7 +760,9 @@ onBeforeUnmount(() => {
               </template>
               <path v-else-if="node.gate" class="area-map__gate" d="M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z" />
               <circle v-else class="area-map__dot-node" r="5.5" />
-              <path v-if="node.quest" class="area-map__quest" d="M0 -10 L6 -2.5 L0 4.5 L-6 -2.5 Z" transform="translate(12 -12)" />
+              <g v-if="node.questAt" :transform="`translate(${node.questAt.dx} ${node.questAt.dy})`">
+                <path class="area-map__quest" d="M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z" />
+              </g>
             </g>
           </g>
         </g>
@@ -828,7 +883,20 @@ onBeforeUnmount(() => {
   stroke-dasharray: 3 3;
 }
 .area-map__selected-ring { fill: none; stroke: var(--gold-300); stroke-width: 2.6; }
-.area-map__here-glow { fill: rgba(165, 44, 49, 0.22); stroke: none; }
+.area-map__here-glow {
+  fill: rgba(165, 44, 49, 0.22);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: area-map-here-breathe 2.8s ease-in-out infinite;
+}
+@keyframes area-map-here-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .area-map__here-glow { animation: none; }
+}
 .area-map__here-ring { fill: none; stroke: var(--paper-50); stroke-width: 2; }
 .area-map__here-dot { fill: var(--seal-deep); stroke: #fff2e6; stroke-width: 1.5; }
 .area-map__gate { fill: #3a342a; stroke: var(--gold-400); stroke-width: 2; stroke-linejoin: round; }

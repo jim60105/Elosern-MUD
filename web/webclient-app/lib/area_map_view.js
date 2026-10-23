@@ -151,6 +151,17 @@ function nearbyBounds(area, placed) {
   return { minX: here.x - rx, minY: here.y - ry, maxX: here.x + rx, maxY: here.y + ry };
 }
 
+// Bounds centred on `here` that reach every placed node.
+function centredBounds(here, placed) {
+  let rx = 0;
+  let ry = 0;
+  for (const entry of placed) {
+    rx = Math.max(rx, Math.abs(entry.x - here.x));
+    ry = Math.max(ry, Math.abs(entry.y - here.y));
+  }
+  return { minX: here.x - rx, minY: here.y - ry, maxX: here.x + rx, maxY: here.y + ry };
+}
+
 // ── zoom stops and the opening view ─────────────────────────────────────
 
 /** The layer's named zoom stops for this frame, widest first. */
@@ -161,7 +172,10 @@ export function areaStops(area, placed, frame) {
   if (area.layer === "wilderness") {
     return wildernessStops(frame);
   }
-  const whole = fitBounds(boundsOf(placed), frame, { marginPx: OPENING_MARGIN_PX, minSpan: RADIAL_MIN_SPAN }).span;
+  // The widest radial stop is the graph seen from the current room, so the
+  // centred opening never needs to exceed the zoom limits.
+  const here = currentPlaced(area, placed);
+  const whole = fitBounds(centredBounds(here, placed), frame, { marginPx: OPENING_MARGIN_PX, minSpan: RADIAL_MIN_SPAN }).span;
   const near = Math.min(
     whole,
     fitBounds(nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX, minSpan: RADIAL_MIN_SPAN }).span,
@@ -181,7 +195,14 @@ export function areaStops(area, placed, frame) {
 export function openingView(area, placed, frame, stops = areaStops(area, placed, frame)) {
   const here = currentPlaced(area, placed);
   const nearest = stops[stops.length - 1].span;
-  const floor = area.layer === "grid" ? Math.min(nearest, MIN_NEARBY_SPAN_M) : nearest;
+  let floor = area.layer === "grid" ? Math.min(nearest, MIN_NEARBY_SPAN_M) : nearest;
+  if (isRadialLayer(area)) {
+    // Radial units carry no distance, so zooming in past the room graph buys
+    // no detail: the opening still centres on the current room and fits its
+    // neighbours, but widens until every room of the small graph is in view
+    // rather than leaving roads running off the frame.
+    floor = Math.max(floor, fitBounds(centredBounds(here, placed), frame, { marginPx: OPENING_MARGIN_PX }).span);
+  }
   const fitted = fitBounds(nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX, minSpan: floor });
   const limits = spanLimits(stops);
   const span = Math.min(limits.max, Math.max(limits.min, fitted.span));
@@ -422,7 +443,19 @@ export function placeLabels(candidates, project2d, frame, {
   segments = [],
 } = {}) {
   const lineHeight = Math.round(fontPx * 1.3);
+  // A rendered line's glyph box spans about 1.19 em above the baseline and
+  // 0.31 em below it (CJK faces), so boxes match what the browser paints.
+  const ascent = Math.round(fontPx * 1.19);
+  const glyphHeight = Math.round(fontPx * 1.5);
   const gap = Math.round(fontPx * 0.45);
+  // Breathing room kept between two drawn labels.
+  const spacing = Math.round(fontPx * 0.2);
+  const padded = (box) => ({
+    left: box.left - spacing,
+    right: box.right + spacing,
+    top: box.top - spacing,
+    bottom: box.bottom + spacing,
+  });
   const markers = obstacles.map((p) => ({
     left: p.x - markerRadius,
     right: p.x + markerRadius,
@@ -435,7 +468,7 @@ export function placeLabels(candidates, project2d, frame, {
   for (const entry of candidates) {
     const p = project2d(entry);
     const width = Math.max(...entry.lines.map((line) => measure(line, fontPx))) + 4;
-    const height = entry.lines.length * lineHeight;
+    const height = (entry.lines.length - 1) * lineHeight + glyphHeight;
     const options = [
       { anchor: "middle", left: p.x - width / 2, top: p.y - markerRadius - gap - height },
       { anchor: "middle", left: p.x - width / 2, top: p.y + markerRadius + gap },
@@ -448,14 +481,17 @@ export function placeLabels(candidates, project2d, frame, {
     ];
     const must = entry.priority <= 1;
     let chosen = null;
-    for (const avoidRoads of [true, false]) {
+    // Passes: clear of roads, then across roads, then (for the selected and
+    // current names only) across other markers, never across another label.
+    const passes = must ? [[true, true], [false, true], [false, false]] : [[true, true], [false, true]];
+    for (const [avoidRoads, avoidMarkers] of passes) {
       for (const option of options) {
         const box = { left: option.left, top: option.top, right: option.left + width, bottom: option.top + height };
         const inside = box.left >= 0 && box.top >= 0 && box.right <= frame.width && box.bottom <= frame.height;
         if (!inside) continue;
         const blocked =
-          placedBoxes.some((other) => overlaps(box, other)) ||
-          markers.some((marker) => marker.id !== entry.node.id && overlaps(box, marker)) ||
+          placedBoxes.some((other) => overlaps(padded(box), other)) ||
+          (avoidMarkers && markers.some((marker) => marker.id !== entry.node.id && overlaps(box, marker))) ||
           (avoidRoads && segments.some((seg) => segmentHitsBox(seg, box)));
         if (!blocked) {
           chosen = { ...option, box };
@@ -478,7 +514,7 @@ export function placeLabels(candidates, project2d, frame, {
       lines: entry.lines,
       anchor: chosen.anchor,
       x,
-      y: chosen.top + fontPx,
+      y: chosen.top + ascent,
       lineHeight,
       box: chosen.box,
       priority: entry.priority,
