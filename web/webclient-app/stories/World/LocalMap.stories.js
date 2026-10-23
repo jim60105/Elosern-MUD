@@ -9,6 +9,11 @@ import {
   LOCAL_MAP_TALL_LATTICE_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+  LOCAL_MAP_CIARAN_PLAZA_SAMPLE,
+  LOCAL_MAP_EXTREME_RATIO_SAMPLE,
+  LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
   localMapModelFor,
 } from "../fixtures.js";
 
@@ -29,9 +34,12 @@ import {
 // degenerate 1-cell lattice (no col/row/cols/rows), which is a contract
 // violation, not a style choice.
 
+// The island is a fixed 240-unit canvas inside its padded card, so the story
+// frame is a column sized to that card (as the right anchor sizes it in the
+// client) rather than a narrower fixed width that would clip the card.
 const renderMap = (args) => ({
   render: () =>
-    h("div", { style: "width: 230px;" }, [h(LocalMap, args)]),
+    h("div", { style: "display: flex; flex-direction: column; width: max-content;" }, [h(LocalMap, args)]),
 });
 
 export default {
@@ -142,14 +150,120 @@ export const EdgeMarkers = {
 };
 export const FocusedRemembered = EdgeMarkers;
 
-// Tall-lattice window (design §11): the 2-col × 64-row fixture's square
-// drawing would have to shrink to about 0.08 to fit the island's fixed 240px
-// canvas, below the island's 0.75 legibility floor. The island instead shows a
-// 240 / 0.75 window centred on the current node, clipped to the square, and
-// the full-map overlay remains the surface for the whole street.
+// Tall lattice (render-auto-scaled-minimap-island): the 2-col × 64-row
+// unit-coordinate fixture no longer needs a window. Its two exits stand at
+// one metre, closer than the exit ring allows at the finest level, so the
+// island compresses: both exits at the shared radius, the two nearest
+// context places as dots, everything farther omitted from the island and
+// kept whole on the full map.
 export const TallLatticeScaled = {
   render: renderMap,
   args: {
     localMap: localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE),
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Metric islands (render-auto-scaled-minimap-island). Each story renders a
+// payload view of authored metric coordinates and its play function measures
+// the rendered exit markers: every same-layer exit is drawn, lies inside the
+// canvas, and no two exit markers overlap.
+// ---------------------------------------------------------------------------
+
+function boxesOverlap(a, b) {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+// The same-layer exits of a payload: the far ends of the current node's
+// labelled edges whose id shares the current node's map key.
+function sameLayerExitIds(payload) {
+  const mapKey = (id) => id.split(":").slice(0, 2).join(":");
+  const current = payload.current_node;
+  return payload.edges
+    .filter((edge) => edge.label && edge.source === current && mapKey(edge.destination) === mapKey(current))
+    .map((edge) => edge.destination);
+}
+
+function assertExitsDrawn(payload, story) {
+  return async ({ canvasElement }) => {
+    const svg = canvasElement.querySelector('[data-testid="local-map__lattice"]');
+    if (!svg) throw new Error(`${story}: lattice canvas missing`);
+    const canvas = svg.getBoundingClientRect();
+    const boxes = sameLayerExitIds(payload).map((id) => {
+      const group = canvasElement.querySelector(`[data-node="${CSS.escape(id)}"]`);
+      const marker = group?.querySelector(".local-map__marker");
+      if (!marker) throw new Error(`${story}: exit ${id} has no drawn marker`);
+      const box = marker.getBoundingClientRect();
+      const inside =
+        box.left >= canvas.left - 0.5 &&
+        box.right <= canvas.right + 0.5 &&
+        box.top >= canvas.top - 0.5 &&
+        box.bottom <= canvas.bottom + 0.5;
+      if (!inside) throw new Error(`${story}: exit ${id} marker leaves the canvas`);
+      return { id, box };
+    });
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        if (boxesOverlap(boxes[i].box, boxes[j].box)) {
+          throw new Error(`${story}: exit markers ${boxes[i].id} and ${boxes[j].id} overlap`);
+        }
+      }
+    }
+  };
+}
+
+// 中央廣場: four exits 850–1,090 m away select the 1500 m level (uniform,
+// `格距 300 m`), the two-hop streets that land on the canvas stay as quiet
+// context dots, and only the four routes are drawn.
+export const MetricAltoriaPlaza = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE) },
+  play: assertExitsDrawn(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE, "MetricAltoriaPlaza"),
+};
+
+// 村中廣場: a hamlet a few hundred metres across, drawn at a much finer level
+// than the capital with the same exit ring.
+export const MetricCiaranPlaza = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_CIARAN_PLAZA_SAMPLE) },
+  play: assertExitsDrawn(LOCAL_MAP_CIARAN_PLAZA_SAMPLE, "MetricCiaranPlaza"),
+};
+
+// Wilderness 3x3: eight neighbours at 1 km and 1.414 km (level 2000, radii 50
+// and 70.7); the shared region name is stated once.
+export const MetricWilderness = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_METRIC_SAMPLE) },
+  play: assertExitsDrawn(LOCAL_MAP_WILDERNESS_METRIC_SAMPLE, "MetricWilderness"),
+};
+
+// 南門 (gate room): the street exit 900 m north is drawn; the gate's
+// cross-layer wilderness target is never drawn as a node (its exit stub is
+// the gateway presentation's, label-minimap-exits-and-gateways).
+export const MetricAltoriaSouthGate = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE) },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE, "MetricAltoriaSouthGate")(context);
+    if (context.canvasElement.querySelector('[data-node^="wild:"]')) {
+      throw new Error("MetricAltoriaSouthGate: the cross-layer gate target must not draw as a node");
+    }
+  },
+};
+
+// An 80 m exit beside a 1.2 km one: compressed mode, labelled distance rings
+// instead of dots, and the `距離壓縮` caption.
+export const MetricExtremeRatio = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_EXTREME_RATIO_SAMPLE) },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_EXTREME_RATIO_SAMPLE, "MetricExtremeRatio")(context);
+    const { canvasElement } = context;
+    if (!canvasElement.querySelector('[data-testid="local-map__rings"]')) {
+      throw new Error("MetricExtremeRatio: compressed mode must draw distance rings");
+    }
+    if (canvasElement.querySelector('[data-testid="local-map__dot-field"]')) {
+      throw new Error("MetricExtremeRatio: compressed mode must not draw the dot field");
+    }
   },
 };
