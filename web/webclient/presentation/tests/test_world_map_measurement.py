@@ -18,8 +18,6 @@ from web.webclient.presentation import map_panels
 from web.webclient.presentation.map_panels import check_world_map_envelope, validate_world_map
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES
 
-TRANSPORT_REQUIREMENT = "webclient-oob-protocol::continental-map-transport-is-measured-end-to-end"
-
 
 def _frame(body: dict) -> dict:
     return {
@@ -42,7 +40,7 @@ class WorldMapMeasurementTests(unittest.TestCase):
         cls.representative = world_map_payload.representative_payload()
         cls.worst = world_map_payload.worst_payload()
 
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_measured_payloads_are_valid_and_canonical(self):
         for name, body in (("representative", self.representative), ("worst", self.worst)):
             with self.subTest(case=name):
@@ -52,7 +50,7 @@ class WorldMapMeasurementTests(unittest.TestCase):
                 self.assertEqual(world_map_payload.canonical_bytes(validated), world_map_payload.canonical_bytes(body))
                 self.assertEqual(check_world_map_envelope(_frame(body)), validated)
 
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_real_continental_data_exceeds_one_frame_and_fits_the_bound(self):
         representative = len(world_map_payload.canonical_bytes(self.representative))
         worst = len(world_map_payload.canonical_bytes(self.worst))
@@ -62,7 +60,7 @@ class WorldMapMeasurementTests(unittest.TestCase):
         # worst case for the presenter's terrain washes and roads.
         self.assertLessEqual(worst * 5 // 4, map_panels.WORLD_MAX_BYTES)
 
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_worst_case_lights_every_district_and_fills_every_cap(self):
         districts = self.worst["districts"]
         self.assertEqual(len(districts), len(world_map_payload.district_keys()))

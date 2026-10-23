@@ -44,8 +44,6 @@ ROOT = Path(__file__).resolve().parents[4]
 FIXTURES = "./web/static/webclient/js/tests/map_panel_fixtures.js"
 NODE_TEST = "web/static/webclient/js/tests/protocol_world_map_transport.test.js"
 
-OOB_REQUIREMENT = "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
-TRANSPORT_REQUIREMENT = "webclient-oob-protocol::continental-map-transport-is-measured-end-to-end"
 
 SERVER_TIME = {
     "year": 1, "season_index": 0, "season_label": "春",
@@ -138,8 +136,8 @@ def _server_accepts(frame: dict) -> bool:
 class WorldMapFrameParityTests(unittest.TestCase):
     """Both validators decide identically on the same frames."""
 
-    @covers_requirement(OOB_REQUIREMENT)
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_world_map_allowance_parity(self):
         large = _copy("large")
         self.assertGreater(json_byte_size(large), MAX_CANONICAL_JSON_BYTES)
@@ -174,7 +172,7 @@ class WorldMapFrameParityTests(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertFalse(browser)
 
-    @covers_requirement(OOB_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     def test_allowance_predicate_and_frame_ceiling(self):
         big = _copy("large")
         self.assertTrue(carries_intact_world_map(_frame({"world_map": big})))
@@ -206,8 +204,8 @@ def _world_registry(world_body, *, dialogue=False, area=None):
 
 
 class WorldMapCoordinatorTests(unittest.TestCase):
-    @covers_requirement(OOB_REQUIREMENT)
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_a_large_world_map_ships_as_one_intact_frame(self):
         session = _Session()
         coordinator = _coordinator(session, _world_registry(lambda: _copy("large")))
@@ -225,7 +223,7 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         self.assertEqual(log_debug.call_args.args[0], "world_map_frame_sent")
         self.assertEqual(log_debug.call_args.kwargs["context"]["bytes"], json_byte_size(frame["panels"]["world_map"]))
 
-    @covers_requirement(OOB_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     def test_a_dialogue_companion_rides_in_the_same_frame(self):
         session = _Session()
         coordinator = _coordinator(session, _world_registry(lambda: _copy("large"), dialogue=True), mode="dialogue")
@@ -234,7 +232,7 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         (_, frame), = session.frames()[1:]
         self.assertEqual(set(frame["panels"]), {"world_map", "dialogue"})
 
-    @covers_requirement(OOB_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     def test_an_oversized_companion_aborts_before_anything_is_sent(self):
         session = _Session()
         registry = _world_registry(lambda: _copy("large"))
@@ -249,8 +247,8 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         self.assertEqual(coordinator.revision, before)
         self.assertEqual(len(session.frames()), 1)
 
-    @covers_requirement(OOB_REQUIREMENT)
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_a_dense_area_map_uses_parts_while_the_world_map_stays_intact(self):
         session = _Session()
         coordinator = _coordinator(session, _world_registry(lambda: _copy("large"), area=_dense_grid))
@@ -269,7 +267,7 @@ class WorldMapCoordinatorTests(unittest.TestCase):
         )
         self.assertEqual(world[0]["panels"]["world_map"], validate_world_map(_copy("large")))
 
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_an_over_bound_world_map_degrades_to_unavailable(self):
         session = _Session()
         coordinator = _coordinator(session, _world_registry(lambda: _copy("over")))
@@ -285,8 +283,8 @@ class WorldMapCoordinatorTests(unittest.TestCase):
 class WorldMapBrowserStoreEvidenceTests(unittest.TestCase):
     """Executed evidence: the production browser store's world-map frame suite."""
 
-    @covers_requirement(OOB_REQUIREMENT)
-    @covers_requirement(TRANSPORT_REQUIREMENT)
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    @covers_requirement("webclient-oob-protocol::continental-map-transport-is-measured-end-to-end")
     def test_browser_world_map_transport_suite_passes(self):
         result = subprocess.run(
             ["node", "--test", "--test-reporter=tap", NODE_TEST], capture_output=True, text=True, cwd=ROOT
