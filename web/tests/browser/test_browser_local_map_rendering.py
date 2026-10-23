@@ -179,11 +179,20 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         mirror = page.locator('[data-testid="local-map-edge-markers-mirror"]')
         self.assertEqual(mirror.count(), 1)
 
-        # Exactly one tab stop on the island
+        # Remembered markers and their mirror add no tab stop: the island's
+        # tab order is its full-map affordance plus one native move button
+        # per actionable cross-layer gateway stub
+        # (label-minimap-exits-and-gateways), whichever room the fixture's
+        # home is.
         tab_stops = page.evaluate(
             "() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"
         )
-        self.assertEqual(tab_stops, 1)
+        stub_buttons = page.locator('[data-testid="local-map"] .local-map__stub-button').count()
+        self.assertEqual(tab_stops, 1 + stub_buttons)
+        self.assertEqual(
+            page.locator('.local-map [data-testid^="local-map__edge-marker--"][tabindex]').count(),
+            0,
+        )
 
         # On the graph variant (interior), the remembered list is present
         interior_payload = {
@@ -269,6 +278,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
     )
+    @covers_requirement("webclient-local-map::island-gateways-expose-labelled-accessible-exit-ring-controls")
     def test_gate_room_renders_its_own_approach_cell_and_no_footprint(self):
         # Deterministic start: re-pin at the fixture's home room, then stand
         # on the remembered gateway's own grid room — the boot mode's
@@ -323,15 +333,43 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(grid_layer_wild, [gate["id"]])
         # DOM truth follows the payload. The island never draws a cross-layer
-        # target as a node (render-auto-scaled-minimap-island; its exit stub
-        # is the gateway presentation's), while the full map draws the gate
-        # node with its own hook.
+        # target as a node (render-auto-scaled-minimap-island); it draws the
+        # gate as one exit-ring stub labelled with the far side, whose native
+        # button carries the travel name (label-minimap-exits-and-gateways),
+        # and the gate room itself wears the gate arch. The full map draws the
+        # gate node with its own hook.
         self.assertEqual(
             page.locator(
                 f'[data-testid="local-map"] [data-testid="local-map__node--{gate["id"]}"]'
             ).count(),
             0,
         )
+        current = next(node for node in panel["nodes"] if node["id"] == panel["current_node"])
+        self.assertIsNotNone(current["gateway"], "the gate room names its far side")
+        leads_to = current["gateway"]["leads_to"]
+        island = page.locator('[data-testid="local-map"]')
+        self.assertEqual(island.locator(".local-map__stub").count(), 1)
+        self.assertEqual(
+            island.locator(".local-map__stub-label").text_content().strip(),
+            f"通往 {leads_to}",
+        )
+        self.assertEqual(
+            island.locator(".local-map__stub-button").get_attribute("aria-label"),
+            f"往 {leads_to} 移動",
+        )
+        self.assertEqual(
+            island.locator(
+                f'[data-node="{panel["current_node"]}"] [data-testid="local-map__gate-glyph"]'
+            ).count(),
+            1,
+        )
+        stub_box = island.locator(".local-map__stub-arrow").bounding_box()
+        canvas_box = island.locator('[data-testid="local-map__lattice"]').bounding_box()
+        self.assertIsNotNone(stub_box)
+        self.assertGreaterEqual(stub_box["x"], canvas_box["x"] - 0.5)
+        self.assertGreaterEqual(stub_box["y"], canvas_box["y"] - 0.5)
+        self.assertLessEqual(stub_box["x"] + stub_box["width"], canvas_box["x"] + canvas_box["width"] + 0.5)
+        self.assertLessEqual(stub_box["y"] + stub_box["height"], canvas_box["y"] + canvas_box["height"] + 0.5)
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
         gate_node = page.locator(

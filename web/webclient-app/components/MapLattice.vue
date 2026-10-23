@@ -876,7 +876,10 @@ defineExpose({
   <!-- An actionable stub's control: a native button over its arrow and
        label (the island svg is role="img", whose children are presentational,
        so the control is the svg's sibling). Enter, Space and pointer all
-       reach the one click handler; the click never also opens the map. -->
+       reach the one click handler; the click never also opens the map.
+       Space stops at the button so the shell's document key routing (which
+       claims Space for paging and multi-select and prevents its default)
+       never sees it, leaving the platform's own Space activation intact. -->
   <template v-if="isIsland">
     <button
       v-for="stub in islandStubs.filter((s) => s.actionable)"
@@ -888,6 +891,7 @@ defineExpose({
       :title="`往 ${stub.leadsTo} 移動`"
       :style="stubButtonStyle(stub)"
       @click.stop="onStubActivate(stub)"
+      @keydown.space.stop
     ></button>
   </template>
   </div>

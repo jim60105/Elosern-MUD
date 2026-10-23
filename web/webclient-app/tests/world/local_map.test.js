@@ -893,6 +893,23 @@ describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)
     expect(stops).toEqual(["local-map__expand", "local-map__stub-button--0"]);
   });
 
+  it("keeps Space on the stub button away from the shell's document key routing", async () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    const seen = [];
+    const listener = (event) => seen.push(event.key);
+    document.addEventListener("keydown", listener);
+    try {
+      const button = w.get(".local-map__stub-button");
+      await button.trigger("keydown", { key: " " });
+      await button.trigger("keydown", { key: "Enter" });
+      // Space stops at the button (the platform activates it on keyup);
+      // Enter still bubbles, where the bridge already leaves buttons alone.
+      expect(seen).toEqual(["Enter"]);
+    } finally {
+      document.removeEventListener("keydown", listener);
+    }
+  });
+
   it("keeps a locked gateway visible and inert", async () => {
     const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE);
     const stub = w.get(".local-map__stub");

@@ -409,6 +409,8 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
         "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection",
+        "webclient-local-map::island-gateways-expose-labelled-accessible-exit-ring-controls",
+        "webclient-local-map::the-map-surfaces-state-a-place-name-only-where-it-adds-information",
     )
     def test_local_map_island_vitest_evidence_passes(self):
         # The island cutover (render-auto-scaled-minimap-island) in LocalMap:
@@ -419,7 +421,26 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         # bearings when context alone sets a compressed scale, the hysteresis
         # level kept on one map and reset on another map or layer, and the
         # 格距 / 距離壓縮 caption beside the unchanged coordinate readout.
+        # label-minimap-exits-and-gateways: the gate arch with its 通往 line,
+        # cross-layer targets as exit-ring stubs whose native button is named
+        # 往 <leads_to> 移動 and moves exactly once without opening the map,
+        # locked stubs visible and inert, the wilderness return without city
+        # streets, the duplicate-region suppression kept, and the crowded
+        # crossroads with every exit labelled and remembered names whole.
         self._run_single_vitest_file("web/webclient-app/tests/world/local_map.test.js", "local map island")
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
+    )
+    def test_island_label_placement_vitest_evidence_passes(self):
+        # The pure island label placement (lib/island_labels.js,
+        # label-minimap-exits-and-gateways): eight candidates in exit, current,
+        # context priority (gateway stubs first), outward and route-avoiding
+        # orders, never-dropped exits with truncation and leader lines, the
+        # current label's classic fallback, omitted context labels, and every
+        # label of a dense exit ring inside the square.
+        self._run_single_vitest_file("web/webclient-app/tests/world/island_labels.test.js", "island label placement")
 
     @covers_requirement(
         "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",

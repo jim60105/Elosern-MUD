@@ -406,7 +406,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                         return style.display !== 'none' && style.visibility !== 'hidden';
                     }).length;
                 }""")
-                self.assertEqual(tab_stops, 1, f"the island must expose exactly one tab stop at {viewport}")
+                # The full-map affordance plus one native move button per
+                # actionable cross-layer gateway stub
+                # (label-minimap-exits-and-gateways); decoration adds none.
+                stub_buttons = page.locator('[data-testid="local-map"] .local-map__stub-button').count()
+                self.assertEqual(
+                    tab_stops,
+                    1 + stub_buttons,
+                    f"the island must expose its affordance and stub buttons only at {viewport}",
+                )
 
                 island_box = page.locator('[data-testid="local-map"]').bounding_box()
                 self.assertIsNotNone(island_box)
@@ -599,7 +607,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(edge_mirror_layout["position"], "absolute")
         self.assertEqual(edge_mirror_layout["overflow"], "hidden")
-        self.assertEqual(edge_mirror_layout["tabStopsCount"], 1)
+        self.assertEqual(
+            edge_mirror_layout["tabStopsCount"],
+            1 + page.locator('[data-testid="local-map"] .local-map__stub-button').count(),
+        )
         self.assertFalse(edge_mirror_layout["mirrorHasTabindex"])
 
         # 2. Inject graph payload with remembered rooms and test remembered mirror
