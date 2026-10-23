@@ -2284,8 +2284,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
 - **THEN** the place card's heading slides in from the left and fades in while the previous heading fades out, and a world-time-only change does not animate
 
 #### Scenario: A new current node pans the minimap
-- **WHEN** a new current map node commits, and when the previous current node is absent from the new placement
-- **THEN** the minimap pans: the drawing starts where the previous current node stood on screen and eases to its committed placement, and the current-node marker travels the step from the node the player left to the new current node, so a move reads even when the drawing itself does not shift; an absent previous node shows the new placement at once; and the full-map surface does not pan
+- **WHEN** a new current node commits on a coordinate-bearing island
+- **THEN** unchanged projection level/mode uses the existing pan with dots moving with the ground; changed level/mode uses a short crossfade only at effective full motion and switches immediately at reduced/off. An absent previous node retains the existing immediate no-shared-frame behavior, coordinate-free graph pan is unchanged, and the full-map surface does not pan.
 
 #### Scenario: A new response clears the message window
 - **WHEN** a new response commits
@@ -2300,8 +2300,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
 - **THEN** it fades in while rising 12px into its bottom-anchored resting position (entering from 12px below it, so it reads as rising out of the band's edge), and fades out while sinking 12px back toward the band when it hides
 
 #### Scenario: Reduced and off compress every transition
-- **WHEN** any transition above plays at `reduced`, and at `off`
-- **THEN** at `reduced` it plays as an opacity fade of at most 150ms with no slide, no pan, and no marker travel, and the dim changes instantly; at `off` it renders its final state in the commit's frame
+- **WHEN** a transition above plays at reduced or off
+- **THEN** the existing reduced opacity limit of 150ms with no slide/pan/marker travel and immediate dim remains; coordinate-bearing island scale or mode changes switch immediately even at reduced. At off every transition renders its final state in the commit frame; coordinate-free graph behavior remains unchanged.
 
 #### Scenario: A new scene crossfades once decoded
 - **WHEN** a different logical scene commits while its preferred image is delayed
@@ -2314,11 +2314,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
   time-only change swaps the time line with no transition
 
 #### Scenario: The minimap pans to the new node
-- **WHEN** the effective level is `full` and a move commits a current node adjacent to the previous one
-- **THEN** the minimap's drawing starts offset so the previous current node sits where it stood, and it
-  eases to the committed placement over the base duration while the current-node marker travels from
-  the node the player left, and the nodes' visibility states, accessible names, and click targets
-  already describe the new placement
+- **WHEN** effective motion is full and an adjacent move commits with unchanged coordinate-bearing island level and mode
+- **THEN** the drawing starts offset to preserve the previous current node screen position and eases over the existing base duration, including the world-anchored dots; the current marker travels the existing step and committed visibility, names and click targets already describe the new placement. A changed level or mode instead uses the approved short crossfade, with no equal-scale FLIP.
 
 #### Scenario: The message window clears between responses
 - **WHEN** the effective level is `full`, page 1 of a response is on screen, and the player acts
