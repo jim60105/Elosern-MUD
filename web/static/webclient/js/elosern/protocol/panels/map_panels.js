@@ -5,9 +5,10 @@
 // every constant, vocabulary and rule below must stay equal to the server
 // validator; a bidirectional Python/Node parity test pins them.
 //
-// The numeric ceilings are finite provisional values. publish-area-map-panel
-// measures and owns the area numbers; transport-world-map-panel measures and
-// owns the world numbers. Unrelated panels keep their own budgets.
+// The area ceilings are the values publish-area-map-panel measured and owns
+// (docs/development/map-panel-protocol.md). The world ceilings stay finite
+// provisional values until transport-world-map-panel measures them.
+// Unrelated panels keep their own budgets.
 
 var core = require("../core.js");
 
@@ -37,10 +38,10 @@ var MAP_COORD_MAX = 10000000;
 var MAP_MAX_LIST_ITEMS = 8192;
 var MAP_PANEL_DEPTH = 2;
 
-var AREA_MAX_NODES = 1024;
-var AREA_MAX_EDGES = 4096;
+var AREA_MAX_NODES = 512;
+var AREA_MAX_EDGES = 2048;
 var AREA_MAX_QUEST_MARKERS = 32;
-var AREA_MAX_BYTES = 524288;
+var AREA_MAX_BYTES = 393216;
 var WILDERNESS_WINDOW = 15;
 var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
 var AREA_MAX_CELL_KM = 1000;
