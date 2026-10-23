@@ -312,26 +312,29 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 dot_field = page.locator('[data-testid="local-map__dot-field"]')
                 self.assertEqual(dot_field.count(), 1, "coordinate dot field must exist")
                 self.assertTrue(dot_field.is_visible())
-                dot_fill = dot_field.get_attribute("fill") or ""
-                self.assertTrue(
-                    dot_fill.startswith("url(#map-lattice-grid-"),
-                    f"dot field fill must reference grid pattern, got {dot_fill}"
-                )
 
-                # Task 3.1 re-derived (retarget D7): the island's square is 240
-                # user units and its declared pitch is 40, so the canvas can
-                # never span more than 240 / 40 = 6 coordinate cells; the
-                # 16-unit labels' clearance term (a four-glyph pair needs
-                # ~65 units) can widen the drawn pitch, so it spans at least
-                # 240 / (5 × 16) = 3.
-                pattern_width = float(page.locator("defs pattern").first.get_attribute("width"))
-                canvas_user_width = float(page.locator('[data-testid="local-map__lattice"]').get_attribute("width"))
-                cells_across = canvas_user_width / pattern_width
-                self.assertGreaterEqual(
-                    cells_across, 240.0 / (5 * 16), f"cells across {cells_across} must be >= 3"
+                # render-auto-scaled-minimap-island: the island's uniform mode
+                # draws a bounded list of world-anchored dots 20 user units
+                # apart (one per M / 5 metres), never a pattern, and states
+                # that spacing beside the coordinate readout.
+                dots = page.evaluate(
+                    """() => {
+                      const field = document.querySelector('[data-testid="local-map__dot-field"]');
+                      const xs = [...new Set(Array.from(field.querySelectorAll('circle'),
+                        (c) => Number(c.getAttribute('cx'))))].sort((a, b) => a - b);
+                      return {
+                        count: field.querySelectorAll('circle').length,
+                        step: xs[1] - xs[0],
+                        pattern: !!document.querySelector('[data-testid="local-map"] defs pattern'),
+                      };
+                    }"""
                 )
-                self.assertLessEqual(
-                    cells_across, 240.0 / 40.0, f"cells across {cells_across} must be <= 6"
+                self.assertFalse(dots["pattern"], "the island draws no pattern dot field")
+                self.assertAlmostEqual(dots["step"], 20.0, places=3)
+                self.assertLess(dots["count"], 1000, "the dot list stays bounded")
+                self.assertRegex(
+                    page.locator('[data-testid="local-map__scale"]').inner_text().strip(),
+                    r"^格距 \d+ (?:m|km)$",
                 )
 
                 # Task 3.2: Contrast gate (band from spec: >= 1.15 everywhere, >= 1.35 inner field, <= connector edge)
@@ -348,7 +351,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 fog_ink_rgb = _hex_to_rgb(tokens["mapCanvasLo"])
 
                 # Read mounted SVG paint attributes from the DOM:
-                dot_circle = page.locator("defs pattern circle").first
+                dot_circle = page.locator('[data-testid="local-map__dot-field"] circle').first
                 dot_fill_opacity = float(dot_circle.get_attribute("fill-opacity") or 0.85)
                 axis_el = page.locator('[data-testid="local-map__axis"]')
                 self.assertEqual(axis_el.count(), 1, "axis cross must exist")

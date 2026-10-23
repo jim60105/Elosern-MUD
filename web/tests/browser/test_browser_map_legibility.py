@@ -115,11 +115,14 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
     """Map chrome, labels and the current footprint on the shared server."""
 
     def _island_ready(self, page, panel):
+        # The island draws its automatic projection (render-auto-scaled-
+        # minimap-island): current, every same-layer exit and the context
+        # that lands on the square, so readiness is the current node's group.
         _inject_snapshot(page, {"local_map": panel}, mode="exploration")
         _wait_mode(page, "exploration")
         page.wait_for_function(
-            "(n) => document.querySelectorAll('[data-testid=\"local-map\"] .local-map__node').length === n",
-            arg=sum(1 for n in panel["nodes"] if n["visibility"] != "remembered"),
+            "(id) => !!document.querySelector(`[data-testid=\"local-map\"] [data-node=\"${id}\"]`)",
+            arg=panel["current_node"],
             timeout=15000,
         )
 
@@ -145,7 +148,9 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                       const svg = island.querySelector('[data-testid="local-map__lattice"]');
                       const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
                       const px = (el) => parseFloat(getComputedStyle(el).fontSize);
-                      const nodes = [...svg.querySelectorAll('.local-map__node')].map((g) => ({
+                      const nodes = [...svg.querySelectorAll('.local-map__node')]
+                        .filter((g) => !g.classList.contains('local-map__node--context'))
+                        .map((g) => ({
                         id: g.dataset.node,
                         marker: box(g.querySelector('.local-map__marker')),
                         label: box(g.querySelector('.local-map__node-label')),
@@ -157,6 +162,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                         orientation: px(island.querySelector('[data-testid="local-map__orientation"]')),
                         readout: px(island.querySelector('[data-testid="local-map-detail"]')),
                         rings: island.querySelectorAll('.local-map__current-ring').length,
+                        context: svg.querySelectorAll('.local-map__node--context').length,
                         nodes,
                       };
                     }""",
@@ -167,7 +173,10 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                 self.assertAlmostEqual(probe["orientation"], chrome_step, delta=0.5)
                 self.assertAlmostEqual(probe["readout"], chrome_step, delta=0.5)
                 self.assertAlmostEqual(probe["scale"], ui_scale(viewport), places=3)
-                self.assertEqual(len(probe["nodes"]), 9)
+                # The current square and its four exits draw markers and
+                # labels; the four diagonal two-hop rooms are context dots.
+                self.assertEqual(len(probe["nodes"]), 5)
+                self.assertEqual(probe["context"], 4)
                 self.assertEqual(probe["rings"], 0, "the island draws no ornament beyond its current marker")
 
                 def apart(a, b):
@@ -192,8 +201,9 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
     )
     def test_dense_island_keeps_every_node_and_name_reachable(self):
         """At the 64-node bound the island stays a bounded 240px canvas that
-        drops no node or gateway, and the full map names every node and reads
-        at the 16px floor or more at every permitted zoom level."""
+        drops no gateway and omits only context that lands off its square,
+        and the full map names every node and reads at the 16px floor or more
+        at every permitted zoom level."""
         panel = _dense_panel()
         in_view = {n["id"]: n["label"] for n in panel["nodes"] if n["visibility"] != "remembered"}
         page = self.logged_in_page((1451, 790))
@@ -207,7 +217,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                 width: r.width,
                 height: r.height,
                 titles: Object.fromEntries([...svg.querySelectorAll('.local-map__node')].map(
-                  (g) => [g.dataset.node, g.querySelector('.local-map__node-label title').textContent])),
+                  (g) => [g.dataset.node, g.querySelector('title').textContent])),
                 markers: svg.querySelectorAll('.local-map__edge-marker').length,
                 drawn: [...svg.querySelectorAll('.local-map__node-label')].map((t) =>
                   parseFloat(getComputedStyle(t).fontSize) * r.width / svg.viewBox.baseVal.width),
@@ -217,7 +227,14 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         )
         self.assertAlmostEqual(island["width"], 240, delta=1)
         self.assertAlmostEqual(island["height"], 240, delta=1)
-        self.assertEqual(island["titles"], in_view)
+        # No labelled exit: the context alone sets the (compressed) scale, so
+        # every in-view place lands inside the exit ring; each drawn group
+        # keeps its full name, and the full map still names every node.
+        current = panel["current_node"]
+        self.assertIn(current, island["titles"])
+        self.assertEqual(set(island["titles"]), set(in_view))
+        for node_id, title in island["titles"].items():
+            self.assertEqual(title, in_view[node_id])
         self.assertEqual(island["markers"], 16)
         self.assertEqual(island["mirror"], 16)
         # Cropping retains the global effective-text floor on dense payloads.
@@ -251,31 +268,41 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(drawn, 16)
         page.keyboard.press("Escape")
 
-        # The lower marker still needs clearance when its wilderness name is
-        # suppressed. A vertical fixture isolates the formerly missing term.
+        # A wilderness exit sharing the current cell's region name draws its
+        # marker without a repeated name; the cells beyond it would land off
+        # the island's square and stay whole on the full map.
         vertical = {
             "schema_version": 1, "available": True, "layer": "wilderness",
-            "current_node": "wild:vertical:0", "title": "Vertical clearance",
+            "current_node": "wild:vertical:0:0", "title": "Vertical clearance",
             "nodes": [
-                {"id": f"wild:vertical:{y}", "label": "北岸鐘樓" if y == 2 else "共用地區",
+                {"id": f"wild:vertical:0:{y}", "label": "北岸鐘樓" if y == 2 else "共用地區",
                  "x": 0, "y": y, "visibility": "current" if y == 0 else "visible_visited",
                  "current": y == 0, "anchor": False, "landmark": False, "gateway": None, "action": None}
                 for y in range(8)
             ],
-            "edges": [], "legend": [],
+            "edges": [
+                {"source": "wild:vertical:0:0", "destination": "wild:vertical:0:1",
+                 "label": "n", "known": True, "traversable": False},
+            ],
+            "legend": [],
         }
         self._island_ready(page, vertical)
-        clearance = page.evaluate("""() => {
+        suppressed = page.evaluate("""() => {
           const svg = document.querySelector('[data-testid="local-map"] .local-map__lattice');
-          const upper = svg.querySelector('[data-node="wild:vertical:2"] .local-map__node-label');
-          const lower = svg.querySelector('[data-node="wild:vertical:1"] .local-map__marker');
-          return {gap: lower.getBoundingClientRect().top - upper.getBoundingClientRect().bottom,
-            size: parseFloat(getComputedStyle(upper).fontSize) * upper.getScreenCTM().a,
-            nodes: svg.querySelectorAll('.local-map__node').length};
+          const exit = svg.querySelector('[data-node="wild:vertical:0:1"]');
+          const label = exit.querySelector('.local-map__node-label');
+          const here = svg.querySelector('[data-node="wild:vertical:0:0"] .local-map__node-label');
+          return {
+            marker: !!exit.querySelector('.local-map__marker'),
+            text: [...label.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim(),
+            size: parseFloat(getComputedStyle(here).fontSize) * here.getScreenCTM().a,
+            nodes: svg.querySelectorAll('.local-map__node').length,
+          };
         }""")
-        self.assertGreaterEqual(clearance["gap"], 3)
-        self.assertGreaterEqual(clearance["size"], 16 - 0.01)
-        self.assertEqual(clearance["nodes"], 8)
+        self.assertTrue(suppressed["marker"])
+        self.assertEqual(suppressed["text"], "")
+        self.assertGreaterEqual(suppressed["size"], 16 - 0.01)
+        self.assertEqual(suppressed["nodes"], 2)
         page.close()
 
     @covers_requirement(

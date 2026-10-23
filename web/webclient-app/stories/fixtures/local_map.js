@@ -601,3 +601,388 @@ export function localMapAround({ layer, current, neighbours = [] }) {
     legend: [],
   };
 }
+
+// ---------------------------------------------------------------------------
+// Metric island fixtures (render-auto-scaled-minimap-island; approved design
+// docs/superpowers/specs/2026-10-22-minimap-auto-scale-design.md §8). The
+// unit-coordinate samples above stay for the overlay and the coordinate-free
+// stories; these reproduce what the settlement payloads actually carry since
+// the metric cutover: integer-metre street coordinates and one-kilometre
+// wilderness cells, so the island's automatic projection is exercised on the
+// distances that used to push every exit off the canvas.
+//
+// The corpora are the authored coordinate tables of the world-map-scale design
+// (docs/superpowers/specs/2026-10-21-world-map-scale-design.md §8 Altoria, 21
+// nodes; §9 Ciaran, 10 nodes) with their authored roads (one entry per
+// undirected road, the octant the first endpoint's exit faces). They are story
+// data, not a request to reveal unseen nodes: each story renders a bounded
+// payload view built the way the grid presenter builds one
+// (web/webclient/presentation/local_map/grid.py): the current node, every node
+// within two road hops, one star edge from the current node to each of them —
+// the authored octant on a one-hop edge, an empty label on a two-hop one — and
+// a move action on the one-hop nodes only.
+// ---------------------------------------------------------------------------
+
+const OPPOSITE_OCTANT = { n: "s", ne: "sw", e: "w", se: "nw", s: "n", sw: "ne", w: "e", nw: "se" };
+
+// [key, label, x, y, anchor]
+export const ALTORIA_METRIC_CORPUS = Object.freeze({
+  map: "capital_altoria",
+  nodes: [
+    ["south_gate", "南門", 3050, 150, false],
+    ["quay", "碼頭埠", 1250, 760, false],
+    ["riverbank_road", "河岸道", 2150, 920, false],
+    ["south_avenue", "南大道", 3140, 1050, false],
+    ["inn_lane", "客棧巷", 3970, 1120, false],
+    ["bath_forecourt", "浴場前", 4830, 970, false],
+    ["old_wall_ruins", "舊城牆遺跡", 2350, 1900, false],
+    ["north_avenue", "大道北段", 3350, 1980, false],
+    ["craft_alley", "工匠巷", 1300, 2600, false],
+    ["market_street", "市場街", 2420, 2700, false],
+    ["central_plaza", "中央廣場", 3500, 2850, true],
+    ["guild_forecourt", "公會前", 4380, 3000, false],
+    ["east_market", "東市", 5380, 2850, false],
+    ["east_gate", "東門", 6500, 3010, false],
+    ["training_ground", "校場外", 2300, 3820, false],
+    ["holy_steps", "聖階", 3480, 3700, false],
+    ["great_temple", "大神殿前", 4560, 3920, false],
+    ["noble_quarter", "貴族區前", 3500, 4850, false],
+    ["upper_gate", "上城門", 4690, 5010, false],
+    ["academy", "學院前", 5650, 5200, false],
+    ["palace_forecourt", "王宮前庭", 4500, 6350, false],
+  ],
+  roads: [
+    ["south_gate", "south_avenue", "n"],
+    ["south_avenue", "north_avenue", "n"],
+    ["north_avenue", "central_plaza", "n"],
+    ["south_avenue", "riverbank_road", "w"],
+    ["south_avenue", "inn_lane", "e"],
+    ["riverbank_road", "quay", "w"],
+    ["riverbank_road", "old_wall_ruins", "n"],
+    ["old_wall_ruins", "market_street", "n"],
+    ["old_wall_ruins", "north_avenue", "e"],
+    ["inn_lane", "bath_forecourt", "e"],
+    ["market_street", "craft_alley", "w"],
+    ["craft_alley", "training_ground", "ne"],
+    ["market_street", "central_plaza", "e"],
+    ["central_plaza", "holy_steps", "n"],
+    ["central_plaza", "guild_forecourt", "e"],
+    ["holy_steps", "training_ground", "w"],
+    ["holy_steps", "noble_quarter", "n"],
+    ["holy_steps", "great_temple", "e"],
+    ["guild_forecourt", "great_temple", "n"],
+    ["guild_forecourt", "east_market", "e"],
+    ["great_temple", "upper_gate", "n"],
+    ["great_temple", "east_market", "se"],
+    ["noble_quarter", "upper_gate", "e"],
+    ["upper_gate", "palace_forecourt", "n"],
+    ["upper_gate", "academy", "e"],
+    ["east_market", "east_gate", "e"],
+  ],
+});
+
+export const CIARAN_METRIC_CORPUS = Object.freeze({
+  map: "village_ciaran",
+  nodes: [
+    ["hidden_path", "隱密小徑", 35, 270, false],
+    ["village_plaza", "村中廣場", 220, 305, true],
+    ["stream_path", "溪畔小徑", 245, 135, false],
+    ["stream_bend", "溪畔下游", 430, 85, false],
+    ["training_clearing", "練刀場", 405, 335, false],
+    ["herb_garden", "藥草園", 590, 300, false],
+    ["old_tree_north", "村北古樹下", 200, 465, false],
+    ["elder_tree", "長老古樹下", 165, 650, false],
+    ["weaving_slope", "織房坡", 390, 495, false],
+    ["silver_leaf_slope", "銀葉坡", 440, 665, false],
+  ],
+  roads: [
+    ["hidden_path", "village_plaza", "e"],
+    ["stream_path", "village_plaza", "n"],
+    ["stream_path", "stream_bend", "e"],
+    ["village_plaza", "old_tree_north", "n"],
+    ["village_plaza", "training_clearing", "e"],
+    ["old_tree_north", "elder_tree", "n"],
+    ["old_tree_north", "weaving_slope", "e"],
+    ["elder_tree", "silver_leaf_slope", "e"],
+    ["training_clearing", "herb_garden", "e"],
+  ],
+});
+
+const METRIC_LEGEND = Object.freeze([
+  "你目前所在的位置",
+  "尚未探索的相鄰位置",
+  "已經探索過的相鄰位置",
+]);
+
+// A bounded payload view of one corpus around `current`: every node within
+// `hops` road hops, visited keys drawn as visited, one-hop nodes actionable.
+// `gateways` maps a key to its `gateway` metadata; `extraNodes`/`extraEdges`
+// append presenter-authored nodes (a gate's cross-layer target).
+export function metricViewAround(corpus, current, options = {}) {
+  const { hops = 2, visited = [], gateways = {}, extraNodes = [], extraEdges = [] } = options;
+  const byKey = new Map(corpus.nodes.map((row) => [row[0], row]));
+  const idOf = (key) => {
+    const [, , x, y] = byKey.get(key);
+    return `grid:${corpus.map}:${x}:${y}`;
+  };
+  const links = new Map();
+  for (const [a, b, dir] of corpus.roads) {
+    if (!links.has(a)) links.set(a, []);
+    if (!links.has(b)) links.set(b, []);
+    links.get(a).push([b, dir]);
+    links.get(b).push([a, OPPOSITE_OCTANT[dir]]);
+  }
+  const depth = new Map([[current, 0]]);
+  let frontier = [current];
+  for (let step = 1; step <= hops; step += 1) {
+    const next = [];
+    for (const key of frontier) {
+      for (const [other] of links.get(key) || []) {
+        if (!depth.has(other)) {
+          depth.set(other, step);
+          next.push(other);
+        }
+      }
+    }
+    frontier = next;
+  }
+  const oneHop = new Map((links.get(current) || []).map(([other, dir]) => [other, dir]));
+  const currentId = idOf(current);
+  const nodes = [];
+  const edges = [];
+  for (const [key, label, x, y, anchor] of corpus.nodes) {
+    if (!depth.has(key)) continue;
+    const id = idOf(key);
+    const isCurrent = key === current;
+    const isExit = oneHop.has(key);
+    nodes.push({
+      id,
+      label,
+      x,
+      y,
+      visibility: isCurrent ? "current" : visited.includes(key) ? "visible_visited" : "visible_unvisited",
+      current: isCurrent,
+      anchor,
+      landmark: anchor,
+      gateway: gateways[key] ?? null,
+      action: isExit ? { kind: "move", exit_ref: `e_${current}_${key}`, destination: id } : null,
+    });
+    if (!isCurrent) {
+      edges.push({
+        source: currentId,
+        destination: id,
+        label: isExit ? oneHop.get(key) : "",
+        known: visited.includes(key),
+        traversable: isExit,
+      });
+    }
+  }
+  // The current node leads the node list, as the presenter emits it.
+  nodes.sort((a, b) => Number(b.current) - Number(a.current));
+  const title = byKey.get(current)[1];
+  return {
+    schema_version: 1,
+    available: true,
+    layer: "grid",
+    current_node: currentId,
+    title: `${title}街道圖`,
+    nodes: [...nodes, ...extraNodes],
+    edges: [...edges, ...extraEdges],
+    legend: [...METRIC_LEGEND],
+  };
+}
+
+// Altoria's central plaza: four exits about 850–1,090 m away (design §3.6
+// worked example, level 1500), a ring of two-hop streets, and the south
+// gate the player once stood on, remembered as a gateway named for the
+// region it opens onto (an edge-direction marker on the island's rim).
+export const LOCAL_MAP_ALTORIA_PLAZA_SAMPLE = metricViewAround(ALTORIA_METRIC_CORPUS, "central_plaza", {
+  visited: ["north_avenue", "south_avenue", "market_street"],
+  extraNodes: [
+    {
+      id: "grid:capital_altoria:3050:150",
+      label: "西部丘陵與谷地",
+      x: 3050,
+      y: 150,
+      visibility: "remembered",
+      current: false,
+      anchor: false,
+      landmark: true,
+      gateway: { leads_to: "西部丘陵與谷地" },
+      action: null,
+    },
+  ],
+});
+
+// Ciaran's village plaza: a ten-node hamlet whose exits are 150–200 m apart.
+export const LOCAL_MAP_CIARAN_PLAZA_SAMPLE = metricViewAround(CIARAN_METRIC_CORPUS, "village_plaza", {
+  visited: ["hidden_path"],
+});
+
+// Altoria's south gate (the city side of the gateway pair): one street exit
+// 900 m north, two-hop streets around it, and the registered gate's
+// cross-layer wilderness target at its renderer-local slot — one lattice
+// divisor (70 m) south of the gate, the presenter's `_free_slot`. The island
+// never draws that target as a node; its exit-stub descriptor waits for the
+// gateway presentation (label-minimap-exits-and-gateways).
+const SOUTH_GATE_WILD_TARGET = "wild:elosern:860:1076";
+export const LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE = metricViewAround(ALTORIA_METRIC_CORPUS, "south_gate", {
+  visited: ["south_avenue"],
+  gateways: { south_gate: { leads_to: "西部丘陵與谷地" } },
+  extraNodes: [
+    {
+      id: SOUTH_GATE_WILD_TARGET,
+      label: "西部丘陵與谷地",
+      x: 3050,
+      y: 80,
+      visibility: "visible_unvisited",
+      current: false,
+      anchor: false,
+      landmark: false,
+      gateway: null,
+      action: { kind: "move", exit_ref: "e_south_gate_wild", destination: SOUTH_GATE_WILD_TARGET },
+    },
+  ],
+  extraEdges: [
+    {
+      source: "grid:capital_altoria:3050:150",
+      destination: SOUTH_GATE_WILD_TARGET,
+      label: "s",
+      known: false,
+      traversable: true,
+    },
+  ],
+});
+
+// A wilderness 3x3 neighbourhood: eight one-kilometre neighbours (1 km and
+// 1.414 km, design §3.6: level 2000, radii 50 and 70.7). Cells sharing the
+// current cell's region name keep the shared-name label suppression.
+const WILD_DIRECTIONS = [
+  ["n", 0, 1],
+  ["ne", 1, 1],
+  ["e", 1, 0],
+  ["se", 1, -1],
+  ["s", 0, -1],
+  ["sw", -1, -1],
+  ["w", -1, 0],
+  ["nw", -1, 1],
+];
+const WILD_CENTRE = [858, 1071];
+const WILD_REGION = "西部丘陵與谷地";
+const WILD_NEIGHBOUR_REGION = { ne: "中央山脈", e: "中央山脈", se: "中央山脈" };
+export const LOCAL_MAP_WILDERNESS_METRIC_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "wilderness",
+  current_node: `wild:elosern:${WILD_CENTRE[0]}:${WILD_CENTRE[1]}`,
+  title: WILD_REGION,
+  nodes: [
+    {
+      id: `wild:elosern:${WILD_CENTRE[0]}:${WILD_CENTRE[1]}`,
+      label: WILD_REGION,
+      x: WILD_CENTRE[0],
+      y: WILD_CENTRE[1],
+      visibility: "current",
+      current: true,
+      anchor: false,
+      landmark: false,
+      gateway: null,
+      action: null,
+    },
+    ...WILD_DIRECTIONS.map(([dir, dx, dy]) => {
+      const x = WILD_CENTRE[0] + dx;
+      const y = WILD_CENTRE[1] + dy;
+      const id = `wild:elosern:${x}:${y}`;
+      return {
+        id,
+        label: WILD_NEIGHBOUR_REGION[dir] ?? WILD_REGION,
+        x,
+        y,
+        visibility: dir === "s" || dir === "sw" ? "visible_visited" : "visible_unvisited",
+        current: false,
+        anchor: false,
+        landmark: false,
+        gateway: null,
+        action: { kind: "move", exit_ref: `e_wild_${dir}`, destination: id },
+      };
+    }),
+  ],
+  edges: WILD_DIRECTIONS.map(([dir, dx, dy]) => ({
+    source: `wild:elosern:${WILD_CENTRE[0]}:${WILD_CENTRE[1]}`,
+    destination: `wild:elosern:${WILD_CENTRE[0] + dx}:${WILD_CENTRE[1] + dy}`,
+    label: dir,
+    known: dir === "s" || dir === "sw",
+    traversable: true,
+  })),
+  legend: [...METRIC_LEGEND, "每格約一公里"],
+};
+
+// An extreme distance ratio: a doorstep exit 80 m east beside a 1.2 km road
+// north-west (design §3.6: compressed mode), plus a blocked exit and two
+// two-hop places at either end of the range.
+export const LOCAL_MAP_EXTREME_RATIO_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: "grid:frontier_post:2000:2000",
+  title: "邊境驛站街道圖",
+  nodes: [
+    ["grid:frontier_post:2000:2000", "邊境驛站", 2000, 2000, "current", null],
+    ["grid:frontier_post:2080:2000", "馬廄", 2080, 2000, "visible_visited", "e"],
+    ["grid:frontier_post:1150:2850", "瞭望塔", 1150, 2850, "visible_unvisited", "nw"],
+    ["grid:frontier_post:2000:1700", "舊哨所", 2000, 1700, "visible_unvisited", "s"],
+    ["grid:frontier_post:2120:2010", "鐵匠鋪", 2120, 2010, "visible_unvisited", ""],
+    ["grid:frontier_post:600:3400", "北嶺關", 600, 3400, "visible_unvisited", ""],
+  ].map(([id, label, x, y, visibility, exit]) => ({
+    id,
+    label,
+    x,
+    y,
+    visibility,
+    current: visibility === "current",
+    anchor: visibility === "current",
+    landmark: visibility === "current",
+    gateway: null,
+    // 舊哨所's road is barred (a locked exit is still an exit).
+    action: exit && id !== "grid:frontier_post:2000:1700" ? { kind: "move", exit_ref: `e_post_${exit}`, destination: id } : null,
+  })),
+  edges: [
+    ["grid:frontier_post:2080:2000", "e", true],
+    ["grid:frontier_post:1150:2850", "nw", true],
+    ["grid:frontier_post:2000:1700", "s", false],
+    ["grid:frontier_post:2120:2010", "", false],
+    ["grid:frontier_post:600:3400", "", false],
+  ].map(([destination, label, traversable]) => ({
+    source: "grid:frontier_post:2000:2000",
+    destination,
+    label,
+    known: destination === "grid:frontier_post:2080:2000",
+    traversable,
+  })),
+  legend: [...METRIC_LEGEND],
+};
+
+// The central plaza with three remembered gateways on three rim sides, one
+// with the presenter's disambiguated long form: every name is drawn whole on
+// the island (beside its diamond or wrapped onto an inward row), never
+// shortened.
+const rememberedGate = (x, y, label, leadsTo) => ({
+  id: `grid:capital_altoria:${x}:${y}`,
+  label,
+  x,
+  y,
+  visibility: "remembered",
+  current: false,
+  anchor: false,
+  landmark: true,
+  gateway: { leads_to: leadsTo },
+  action: null,
+});
+export const LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE = metricViewAround(ALTORIA_METRIC_CORPUS, "central_plaza", {
+  visited: ["north_avenue", "south_avenue", "market_street"],
+  extraNodes: [
+    rememberedGate(3050, 150, "西部丘陵與谷地（南門）", "西部丘陵與谷地"),
+    rememberedGate(6500, 3010, "東部大平原", "東部大平原"),
+    rememberedGate(4500, 6350, "西部丘陵與谷地（北門）", "西部丘陵與谷地"),
+  ],
+});

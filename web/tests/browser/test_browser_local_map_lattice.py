@@ -506,15 +506,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         "webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre"
     )
     def test_metric_projection_keeps_gap_ratio_and_actions(self):
-        """Metric coordinates survive transport and project at one uniform scale.
+        """Metric coordinates survive transport; the overlay keeps one uniform
+        scale and the island its exit-driven automatic projection.
 
         Injects the requirement's own frame — (0,0), (100,0), (1000,0),
         (1000,6500) plus a (100,100) diagonal control and an east-remembered
-        landmark — and checks the real island and full-map surfaces: the
-        100 m and 900 m gaps draw at exactly 1:9 on both axes, east and north
-        steps draw equal, remembered markers keep their bearing, the fitted
-        overlay zooms and recentres without rewriting the payload, and the
-        adjacent node keeps its exact move identity.
+        landmark — and checks the real surfaces: the island centres the
+        current node and scales by its two labelled exits (level 200: the
+        100 m exit at 50 units, the diagonal on its exact bearing) while the
+        far context it cannot fit is omitted; the full map draws the 100 m
+        and 900 m gaps at exactly 1:9, zooms and recentres without rewriting
+        the payload, and the adjacent node keeps its exact move identity.
         """
         from .browser_helpers import install_outbound_recorder, sent_action_count
 
@@ -597,27 +599,24 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 scope,
             )
 
-        # 2. The island draws the metric gaps at one uniform scale.
+        # 2. The island projects by its labelled exits (render-auto-scaled-
+        #    minimap-island): current centred, 100 m east at 50 units (level
+        #    200), the 141 m diagonal on its exact 45-degree bearing, and the
+        #    1 km / 6.5 km places it cannot fit omitted from the island only.
         island = centers('[data-testid="local-map"]')
-        unit = island["near"]["x"] - island["origin"]["x"]
-        self.assertGreater(unit, 0)
+        self.assertEqual(island["origin"], {"x": 120, "y": 120})
+        self.assertAlmostEqual(island["near"]["x"] - island["origin"]["x"], 50, places=3)
+        self.assertAlmostEqual(island["near"]["y"], island["origin"]["y"], places=3)
         self.assertAlmostEqual(
-            island["far"]["x"] - island["near"]["x"],
-            9 * unit,
-            places=3,
-            msg="the 900 m gap must draw nine times the 100 m gap",
-        )
-        self.assertAlmostEqual(
-            island["far"]["y"] - island["north"]["y"],
-            65 * unit,
-            places=3,
-            msg="6500 m north must draw 65 cells on the same scale",
-        )
-        self.assertAlmostEqual(
-            abs(island["diagonal"]["y"] - island["origin"]["y"]),
+            island["origin"]["y"] - island["diagonal"]["y"],
             island["diagonal"]["x"] - island["origin"]["x"],
             places=3,
-            msg="one cell east and one cell north must draw equal lengths",
+            msg="the diagonal exit keeps its exact bearing",
+        )
+        self.assertIsNone(island["far"])
+        self.assertIsNone(island["north"])
+        self.assertEqual(
+            page.locator('[data-testid="local-map__scale"]').inner_text().strip(), "格距 40 m"
         )
 
         # 3. A remembered place keeps its physical bearing on the island.
@@ -628,7 +627,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertIn("東", mirror_text)
 
         # 4. The full-map overlay opens fitted at one CSS pixel per user unit.
-        page.locator('[data-testid="local-map__expand"]').click()
+        # The island centres the current marker (render-auto-scaled-minimap-
+        # island) over the affordance's own centre, so the affordance is
+        # activated through its keyboard path.
+        page.locator('[data-testid="local-map__expand"]').focus()
+        page.keyboard.press("Enter")
         page.wait_for_selector('[data-testid="map-overlay-content"]', timeout=10000)
         overlay_scope = '[data-testid="map-overlay-content"]'
         box = page.evaluate(

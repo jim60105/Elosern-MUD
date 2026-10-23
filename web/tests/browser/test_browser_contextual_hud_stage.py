@@ -582,7 +582,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         # map trigger (the minimap island's 展開全地圖) -> map overlay; Escape
         # restores focus to that trigger (the opener captured at open time).
-        page.locator('[data-testid="local-map__expand"]').click()
+        # The island centres the current marker (render-auto-scaled-minimap-
+        # island) over the affordance's own centre, so the affordance is
+        # activated through its keyboard path.
+        page.locator('[data-testid="local-map__expand"]').focus()
+        page.keyboard.press("Enter")
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
         self.assertEqual(
             stage.get_attribute("data-menu-open"),

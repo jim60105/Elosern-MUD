@@ -322,8 +322,21 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             node["id"] for node in panel["nodes"] if node["id"].startswith("wild:")
         ]
         self.assertEqual(grid_layer_wild, [gate["id"]])
-        # DOM truth follows the payload: the gate node carries its own hook.
-        gate_node = page.locator(f'[data-testid="local-map__node--{gate["id"]}"]')
+        # DOM truth follows the payload. The island never draws a cross-layer
+        # target as a node (render-auto-scaled-minimap-island; its exit stub
+        # is the gateway presentation's), while the full map draws the gate
+        # node with its own hook.
+        self.assertEqual(
+            page.locator(
+                f'[data-testid="local-map"] [data-testid="local-map__node--{gate["id"]}"]'
+            ).count(),
+            0,
+        )
+        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        gate_node = page.locator(
+            f'[data-testid="map-overlay"] [data-testid="local-map__node--{gate["id"]}"]'
+        )
         self.assertEqual(gate_node.count(), 1)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")

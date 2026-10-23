@@ -20,13 +20,19 @@
 // - The readout states only `座標 x,y` on coordinate-bearing layers
 //   (grid/wilderness); nothing on coordinate-free layers.
 //
-// The island draws the model's metric lattice (`project-metric-local-maps`):
-// payload `x`/`y` are integer metres (or wilderness cells), the model projects
-// them onto one uniform cell — the smallest in-view coordinate delta — and
-// this component draws that cell at its declared pitch. Server coordinates and
-// node identity stay authoritative; only the drawing is presentation.
-import { computed } from "vue";
+// The island's automatic scale (render-auto-scaled-minimap-island; design
+// docs/superpowers/specs/2026-10-22-minimap-auto-scale-design.md §3, §5,
+// §6.4): on the coordinate-bearing layers (grid/wilderness) this component
+// projects the model with `projectIsland` — current node centred in the
+// 240-unit square, every same-layer exit inside the exit ring, uniform or
+// compressed — and holds the chosen level as presentation state for the
+// projection's hysteresis. The level is kept per current-node map key, so a
+// move on one map keeps it and another map, the wilderness or a
+// coordinate-free layer resets it; it is never persisted. Server coordinates
+// and node identity stay authoritative; only the drawing is presentation.
+import { computed, shallowRef, watch } from "vue";
 import LocalMap from "../lib/local_map.js";
+import { previousLevelFor, projectIsland, rememberLevel } from "../lib/minimap_projection.js";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -60,6 +66,36 @@ const showsOrientation = computed(
 const isGraph = computed(
   () => (props.localMap.layoutVariant || "lattice") === "graph",
 );
+
+// The island projection and its hysteresis memory ({ mapKey, level }). The
+// memory is plain component state: it follows the committed payloads in
+// order and is dropped whenever the island leaves the coordinate-bearing
+// lattice, so a returning visit selects its level afresh.
+const islandProjection = shallowRef(null);
+let levelMemory = null;
+watch(
+  () => props.localMap,
+  (map) => {
+    const metric =
+      map?.available === true &&
+      (map.layoutVariant || "lattice") === "lattice" &&
+      (map.layer === "grid" || map.layer === "wilderness");
+    if (!metric) {
+      islandProjection.value = null;
+      levelMemory = null;
+      return;
+    }
+    const projection = projectIsland(map, previousLevelFor(levelMemory, map.currentNode));
+    levelMemory = rememberLevel(map.currentNode, projection);
+    islandProjection.value = projection;
+  },
+  { immediate: true },
+);
+
+// The scale caption (design §5): `格距 <spacing>` in uniform mode,
+// `距離壓縮` in compressed mode, beside — never inside — the coordinate
+// readout. Coordinate-free layers state none.
+const scaleCaption = computed(() => islandProjection.value?.scaleLabel ?? "");
 
 const OCTANT_WORDS = ["北", "東北", "東", "東南", "南", "西南", "西", "西北"];
 
@@ -216,6 +252,7 @@ function onIslandClick(event) {
         :pan-on-move="true"
         :motion-level="motionLevel"
         :aimed-node="aimedNode"
+        :island-projection="islandProjection"
         @move="(p) => emit('move', p)"
       />
 
@@ -254,13 +291,26 @@ function onIslandClick(event) {
            and the island's plain-text body click target. On coordinate-free
            layers (interior/instance) there is no coordinate figure, so the
            readout states nothing and paints no box (the --empty modifier). -->
-      <p
-        class="local-map__detail"
-        :class="{ 'local-map__detail--empty': detail === '' }"
-        data-testid="local-map-detail"
-      >
-        {{ detail }}
-      </p>
+      <!-- The island footer (render-auto-scaled-minimap-island): the scale
+           caption leads, the unchanged current-coordinate readout trails. Two
+           separate elements at the same chrome step, so a scale figure never
+           reads as part of the position statement. -->
+      <div class="local-map__footer">
+        <p
+          v-if="scaleCaption"
+          class="local-map__scale"
+          data-testid="local-map__scale"
+        >
+          {{ scaleCaption }}
+        </p>
+        <p
+          class="local-map__detail"
+          :class="{ 'local-map__detail--empty': detail === '' }"
+          data-testid="local-map-detail"
+        >
+          {{ detail }}
+        </p>
+      </div>
     </template>
   </aside>
 </template>
@@ -418,9 +468,39 @@ function onIslandClick(event) {
    with no border, background fill, or padded box. No draft hex value and no
    draft-canvas pixel literal are hardcoded. The line states the current
    node's two payload integers only; nothing for a hovered or selected node. */
+/* The footer row: caption at the start, readout at the end, one baseline. A
+   single centred readout keeps the row's centre (coordinate-free layers state
+   no caption). */
+.local-map__footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding-top: var(--sp-1);
+  padding-inline: calc(4px * var(--ui-scale));
+}
+
+.local-map__footer:has(.local-map__scale) {
+  justify-content: space-between;
+}
+
+/* The scale caption: the readout's chrome step and face in the muted gold of
+   the map's own furniture (the canvas corner brackets' family, above 6:1 on
+   --panel), so it reads as the drawing's key and stays apart from the
+   paper-toned position readout beside it. */
+.local-map__scale {
+  margin: 0;
+  flex: none;
+  white-space: nowrap;
+  color: var(--gold-500);
+  font-family: var(--f-mono);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
 .local-map__detail {
   margin: 0;
-  padding-top: var(--sp-1);
   color: var(--paper-500);
   font-family: var(--f-mono);
   /* The island's one chrome step (webclient-map-legibility): title,
@@ -473,9 +553,9 @@ function onIslandClick(event) {
     var(--corner) bottom right / calc(10px * var(--ui-scale)) 1px no-repeat,
     var(--corner) bottom right / 1px calc(10px * var(--ui-scale)) no-repeat,
     var(--ink-860);
-  /* A drawing larger than the legibility floor is windowed around the
-     current node (ISLAND_MIN_SCALE); clip it to the fixed square so the
-     rest of the street never paints over the stage. */
+  /* The projection keeps every exit inside the square; the world-anchored
+     dot field's pan margin and any clamped label stay clipped to it, so
+     nothing paints over the stage. */
   overflow: hidden;
 }
 

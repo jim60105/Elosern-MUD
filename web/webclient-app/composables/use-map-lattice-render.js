@@ -182,6 +182,8 @@ export function useMapLatticeRender(props, emit, geometry) {
   function markerOutset() {
     return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
   }
+  // The island's rim markers (render-auto-scaled-minimap-island) draw their
+  // whole names from the geometry's rim layout (`marker.rimName`), not here.
   function markerNameX(marker) {
     if (props.overlayChrome) {
       if (marker.side === "left") return -markerOutset();

@@ -370,16 +370,12 @@ describe("LocalMap (B4 world family)", () => {
     expect(svg.exists()).toBe(true);
     expect(svg.attributes("width")).toBe("240");
     expect(svg.attributes("height")).toBe("240");
-    // Below the island's legibility floor the 2574-unit square is shown
-    // through a 240 window centred on the current node, not shrunk to
-    // a hairline (design §11).
-    const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(240, 6);
-    expect(vb[3]).toBeCloseTo(240, 6);
+    // No window over a minimum-pitch lattice (render-auto-scaled-minimap-
+    // island): the island is the projection's own 240-unit square with the
+    // current node at its centre.
+    expect(svg.attributes("viewBox")).toBe("0 0 240 240");
     const current = w.get('[data-visibility="current"]');
-    const [cx, cy] = current.attributes("transform").match(/-?[\d.]+/g).map(Number);
-    expect(cx).toBeCloseTo(vb[0] + vb[2] / 2, 6);
-    expect(cy).toBeCloseTo(vb[1] + vb[3] / 2, 6);
+    expect(current.attributes("transform")).toBe("translate(120, 120)");
     const style = svg.attributes("style") ?? "";
     expect(style).toContain("width: calc(240px * var(--ui-scale, 1))");
     expect(style).toContain("height: calc(240px * var(--ui-scale, 1))");
@@ -408,8 +404,13 @@ describe("LocalMap (B4 world family)", () => {
     expect(style).toContain("height: calc(240px * var(--ui-scale, 1))");
     expect(Number(svg.attributes("width"))).toBe(240);
     expect(Number(svg.attributes("height"))).toBe(240);
-    const pattern = w.find("defs pattern");
-    expect(Number(pattern.attributes("width"))).toBe(60);
+    // A lone room has no distance to scale by: the default level (100 m per
+    // 100 units) draws world-anchored dots 20 units apart, never a pattern.
+    expect(w.find("defs pattern").exists()).toBe(false);
+    const dots = w.findAll('[data-testid="local-map__dot-field"] circle');
+    expect(dots.length).toBeGreaterThan(0);
+    const xs = [...new Set(dots.map((dot) => Number(dot.attributes("cx"))))].sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBeCloseTo(20, 6);
   });
 
   it("keeps the header on one row: an elastic title, fixed marks, and no trailing control", () => {
@@ -470,61 +471,48 @@ describe("LocalMap (B4 world family)", () => {
     const svg = w.find("svg.local-map__lattice");
     expect(Number(svg.attributes("width"))).toBe(240);
     expect(Number(svg.attributes("height"))).toBe(240);
-    const vb = svg.attributes("viewBox").split(" ").map(Number);
-    // The 2022.91-unit square exceeds the legibility floor, so the island
-    // shows a 240 window clamped inside the drawing.
-    expect(vb[2]).toBeCloseTo(240, 6);
-    expect(vb[0]).toBeGreaterThanOrEqual(0);
-    expect(vb[1]).toBeGreaterThanOrEqual(0);
-    expect(vb[0] + vb[2]).toBeLessThanOrEqual(2022.911688 + 1e-6);
-    expect(vb[1] + vb[3]).toBeLessThanOrEqual(2022.911688 + 1e-6);
+    // The fixed square holds every remembered marker on its rim band.
+    expect(svg.attributes("viewBox")).toBe("0 0 240 240");
+    for (const marker of w.findAll('[data-testid^="local-map__edge-marker--"]')) {
+      const [mx, my] = marker.attributes("transform").match(/-?[\d.]+/g).map(Number);
+      expect(mx).toBeGreaterThanOrEqual(0);
+      expect(mx).toBeLessThanOrEqual(240);
+      expect(my).toBeGreaterThanOrEqual(0);
+      expect(my).toBeLessThanOrEqual(240);
+    }
     expect(w.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(16);
   });
 
-  it("keeps adjacent node markers and labels non-intersecting at natural geometry", () => {
+  it("projects the geometry-stress room onto the island's exit ring", () => {
+    // render-auto-scaled-minimap-island: the unit-coordinate stress room's
+    // two labelled exits stand one metre away — closer than the exit ring
+    // allows at the finest level — so the island compresses them to the
+    // shared radius 66 at their exact bearings; the unlinked neighbour is
+    // context, a dot without a label or a route.
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
+    const centre = (id) =>
+      w.get(`[data-testid="local-map__node--${id}"]`).attributes("transform");
+    expect(centre("grid:altoria:1:1")).toBe("translate(120, 120)");
+    expect(centre("grid:altoria:2:1")).toBe("translate(186, 120)");
+    expect(centre("grid:altoria:1:2")).toBe("translate(120, 54)");
+    expect(centre("grid:altoria:0:1")).toBe("translate(54, 120)");
+    const context = w.get('[data-testid="local-map__node--grid:altoria:0:1"]');
+    expect(context.classes()).toContain("local-map__node--context");
+    expect(context.find(".local-map__marker").exists()).toBe(false);
+    expect(context.find(".local-map__node-label").exists()).toBe(false);
+    expect(context.find("title").text()).toBe("旅館公會");
+    // Only the two labelled routes from the current node are drawn.
+    expect(w.findAll(".local-map__edge")).toHaveLength(2);
+    expect(w.get('[data-testid="local-map__edge--0"]').attributes("x2")).toBe("186");
+    expect(w.get('[data-testid="local-map__edge--1"]').attributes("y2")).toBe("54");
+    expect(w.get('[data-testid="local-map__scale"]').text()).toBe("距離壓縮");
 
-    // With canvasSize 240 the label term binds: the adjacent 霧骨渡口 (8 cells)
-    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 16 → 88,
-    // above the 60-unit fill cap. Three columns and two rows of 88 need a
-    // 264-unit square — wider than the island's 240px canvas, so the drawing
-    // is scaled to 240/264 — at margins 0 (x) and 37 (y, with the 14-unit
-    // label band).
-    const P = 88;
-    const col = (c) => c * P + P / 2;
-    const row = (r) => (1 - r) * P + P / 2 + 37;
-    const centers = {
-      "grid:altoria:1:1": { x: col(1), y: row(0) },
-      "grid:altoria:2:1": { x: col(2), y: row(0) },
-      "grid:altoria:1:2": { x: col(1), y: row(1) },
-      "grid:altoria:0:1": { x: col(0), y: row(0) },
-    };
-    expect(centers["grid:altoria:1:1"]).toEqual({ x: 132, y: 169 });
-    for (const [id, center] of Object.entries(centers)) {
-      const node = w.get(`[data-testid="local-map__node--${id}"]`);
-      expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
-    }
-
-    // Label baseline at labelFont 16: 11 + 2 + 16 = 29 units
-    for (const id of Object.keys(centers)) {
-      const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
-      expect(label.attributes("y")).toBe("29");
-    }
-
-    // Current seal half-extent 9; visited/unvisited dots 5.5.
-    const half = { "grid:altoria:1:1": 9, "grid:altoria:2:1": 5.5, "grid:altoria:1:2": 5.5, "grid:altoria:0:1": 5.5 };
-    const markerBoxes = {};
-    for (const [id, c] of Object.entries(centers)) {
-      markerBoxes[id] = { x1: c.x - half[id], y1: c.y - half[id], x2: c.x + half[id], y2: c.y + half[id] };
-    }
-
-    // Label boxes: the drawn (truncated) label measured in monospace cells at
-    // font 16, ascent 15.2 and descent 7.2 around the baseline y = 29.
-    const labelBoxes = {};
-    for (const [id, c] of Object.entries(centers)) {
-      // The drawn text only: the element also holds the full name's <title>.
+    // Every drawn label stays inside the square (its box at the 16-unit step
+    // in monospace cells, shifted by its own x offset).
+    for (const id of ["grid:altoria:1:1", "grid:altoria:2:1", "grid:altoria:1:2"]) {
+      const [cx, cy] = centre(id).match(/-?[\d.]+/g).map(Number);
       const el = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`).element;
       const text = Array.from(el.childNodes)
         .filter((n) => n.nodeType === Node.TEXT_NODE)
@@ -532,51 +520,13 @@ describe("LocalMap (B4 world family)", () => {
         .join("")
         .trim();
       const width = textCells(text) * CELL_EM * 16;
-      labelBoxes[id] = { x1: c.x - width / 2, y1: c.y + 13.8, x2: c.x + width / 2, y2: c.y + 36.2 };
+      const x = cx + Number(el.getAttribute("x") ?? 0);
+      const y = cy + Number(el.getAttribute("y"));
+      expect(x - width / 2).toBeGreaterThanOrEqual(0);
+      expect(x + width / 2).toBeLessThanOrEqual(240);
+      expect(y + 4).toBeLessThanOrEqual(240);
+      expect(y - 16).toBeGreaterThanOrEqual(0);
     }
-
-    function separated(a, b) {
-      return (
-        a.x2 + 2 <= b.x1 ||
-        b.x2 + 2 <= a.x1 ||
-        a.y2 + 2 <= b.y1 ||
-        b.y2 + 2 <= a.y1
-      );
-    }
-    function everyPair(boxes) {
-      const ids = Object.keys(boxes);
-      for (let i = 0; i < ids.length; i += 1) {
-        for (let j = i + 1; j < ids.length; j += 1) {
-          expect(
-            separated(boxes[ids[i]], boxes[ids[j]]),
-            `${ids[i]} vs ${ids[j]} must keep a ≥2px gap`,
-          ).toBe(true);
-        }
-      }
-      for (const id of Object.keys(boxes)) {
-        for (const labelId of Object.keys(labelBoxes)) {
-          expect(
-            separated(markerBoxes[id], labelBoxes[labelId]),
-            `marker ${id} vs label ${labelId} must keep a ≥2px gap`,
-          ).toBe(true);
-        }
-      }
-    }
-    everyPair(markerBoxes);
-    everyPair(labelBoxes);
-
-    const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(e0.attributes("x1")).toBe("132");
-    expect(e0.attributes("y1")).toBe("169");
-    expect(e0.attributes("x2")).toBe("220");
-    expect(e0.attributes("y2")).toBe("169");
-    expect(P - 9 - 5.5).toBeGreaterThan(0);
-    const e1 = w.get('[data-testid="local-map__edge--1"]');
-    expect(e1.attributes("x1")).toBe("132");
-    expect(e1.attributes("y1")).toBe("169");
-    expect(e1.attributes("x2")).toBe("132");
-    expect(e1.attributes("y2")).toBe("81");
-    expect(P - 9 - 5.5).toBeGreaterThan(0);
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {
@@ -587,7 +537,7 @@ describe("LocalMap (B4 world family)", () => {
     expect(svg.attributes("height")).toBe("240");
     expect(
       w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
-    ).toBe("translate(120, 113)");
+    ).toBe("translate(120, 120)");
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
   });
 
@@ -704,10 +654,14 @@ function nodeCenter(wrapper, id) {
   return { x: match[0], y: match[1] };
 }
 
-  it("projects unequal metric gaps at one uniform scale and keeps the wire coordinates", () => {
+  it("projects the island at the exit-driven uniform level and keeps the wire coordinates", () => {
+    // render-auto-scaled-minimap-island: the island scales by its one-hop
+    // exits (100 m east, 141 m north-east → level 200, radii 50 and 70.7),
+    // keeps exact bearings, omits the far context that would land off the
+    // square, and draws only the two labelled routes from the current node.
+    // The overlay keeps the model's 1:9 lattice (map_overlay and browser
+    // evidence).
     const model = localMapModelFor(METRIC_PAYLOAD);
-    // One cell per 100 m on BOTH axes; the 100 m gap is 1 cell and the 900 m
-    // gap is 9, so the drawn ratio is exactly 1:9 rather than equalized ranks.
     expect(model.cell).toBe(100);
     expect(model.cols).toBe(11);
     expect(model.rows).toBe(66);
@@ -715,26 +669,28 @@ function nodeCenter(wrapper, id) {
 
     const origin = nodeCenter(wrapper, "grid:metric:0:0");
     const near = nodeCenter(wrapper, "grid:metric:100:0");
-    const far = nodeCenter(wrapper, "grid:metric:1000:0");
-    const north = nodeCenter(wrapper, "grid:metric:1000:6500");
     const diagonal = nodeCenter(wrapper, "grid:metric:100:100");
-
-    expect(far.x - near.x).toBeCloseTo(9 * (near.x - origin.x), 6);
-    expect(near.x - origin.x).toBeGreaterThan(0);
-    // 6500 m north is 65 cells on the same uniform scale.
-    expect(far.y - north.y).toBeCloseTo(65 * (near.x - origin.x), 6);
-    // One cell east and one cell north draw equal lengths: the cell is square,
-    // so a diagonal neighbour keeps its 45-degree bearing.
-    expect(Math.abs(diagonal.y - origin.y)).toBeCloseTo(diagonal.x - origin.x, 6);
+    expect(origin).toEqual({ x: 120, y: 120 });
+    expect(near.x - origin.x).toBeCloseTo(50, 6);
+    expect(near.y).toBeCloseTo(120, 6);
+    expect(diagonal.x - origin.x).toBeCloseTo(50, 6);
+    expect(origin.y - diagonal.y).toBeCloseTo(50, 6);
+    expect(wrapper.find('[data-testid="local-map__node--grid:metric:1000:0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="local-map__node--grid:metric:1000:6500"]').exists()).toBe(false);
+    expect(wrapper.findAll(".local-map__edge").map((edge) => edge.attributes("data-testid"))).toEqual([
+      "local-map__edge--0",
+      "local-map__edge--3",
+    ]);
+    expect(wrapper.get('[data-testid="local-map__scale"]').text()).toBe("格距 40 m");
     // The projection never rewrites the payload's metric coordinates.
     const placed = model.nodes.find((node) => node.id === "grid:metric:1000:6500");
     expect([placed.x, placed.y]).toEqual([1000, 6500]);
   });
 
-  it("keeps fractional metric extents finite with one scale on both axes", () => {
-    // (250,350) is 2.5 cells east and 3.5 cells north of the origin at the
-    // 100 m cell, so the model exports fractional counts; the island must
-    // still project every centre affinely with one physical scale per axis.
+  it("keeps exact bearings and distance order when context alone sets a compressed scale", () => {
+    // No labelled exit: the context places choose the scale. 100 m beside
+    // 430 m puts the nearest inside the exit ring's floor, so the island
+    // compresses — still monotonic, still on the true bearings.
     const fractional = {
       ...METRIC_PAYLOAD,
       current_node: "grid:metric:0:0",
@@ -746,22 +702,19 @@ function nodeCenter(wrapper, id) {
       ],
       edges: [],
     };
-    const model = localMapModelFor(fractional);
-    expect(model.cell).toBe(100);
-    expect(model.cols).toBe(3.5);
-    expect(model.rows).toBe(4.5);
-    wrapper = mount(LocalMap, { props: { localMap: model } });
+    wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(fractional) } });
     const origin = nodeCenter(wrapper, "grid:metric:0:0");
     const east = nodeCenter(wrapper, "grid:metric:100:0");
     const north = nodeCenter(wrapper, "grid:metric:0:100");
     const far = nodeCenter(wrapper, "grid:metric:250:350");
-    for (const point of [origin, east, north, far]) {
-      expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
-    }
-    const unit = east.x - origin.x;
-    expect(Math.abs(north.y - origin.y)).toBeCloseTo(unit, 6);
-    expect(far.x - origin.x).toBeCloseTo(2.5 * unit, 6);
-    expect(Math.abs(far.y - origin.y)).toBeCloseTo(3.5 * unit, 6);
+    expect(east.y).toBeCloseTo(origin.y, 6);
+    expect(north.x).toBeCloseTo(origin.x, 6);
+    expect(east.x - origin.x).toBeCloseTo(origin.y - north.y, 6);
+    const farRadius = Math.hypot(far.x - origin.x, far.y - origin.y);
+    expect(farRadius).toBeGreaterThan(east.x - origin.x);
+    expect((far.x - origin.x) / (origin.y - far.y)).toBeCloseTo(250 / 350, 3);
+    expect(wrapper.find('[data-testid="local-map__rings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="local-map__dot-field"]').exists()).toBe(false);
   });
 
   it("keeps adjacent-node action identity while projecting metric geometry", async () => {
@@ -774,5 +727,80 @@ function nodeCenter(wrapper, id) {
     expect(wrapper.emitted("move")).toEqual([
       [{ exit_ref: "e", destination: "grid:metric:100:0" }],
     ]);
+  });
+});
+
+// render-auto-scaled-minimap-island: LocalMap holds the projection level as
+// presentation state keyed by the current node's map, and states the scale
+// beside (never inside) the coordinate readout.
+describe("LocalMap island scale state (render-auto-scaled-minimap-island)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  function street(map, [cx, cy], exits) {
+    const currentId = `grid:${map}:${cx}:${cy}`;
+    return localMapModelFor({
+      schema_version: 1,
+      available: true,
+      layer: "grid",
+      current_node: currentId,
+      title: "測試街道圖",
+      nodes: [
+        { id: currentId, label: "此處", x: cx, y: cy, visibility: "current", current: true, anchor: false, landmark: false, gateway: null, action: null },
+        ...exits.map(([x, y], i) => ({
+          id: `grid:${map}:${x}:${y}`, label: `出口${i}`, x, y, visibility: "visible_unvisited", current: false, anchor: false, landmark: false, gateway: null,
+          action: { kind: "move", exit_ref: `e${i}`, destination: `grid:${map}:${x}:${y}` },
+        })),
+      ],
+      edges: exits.map(([x, y]) => ({ source: currentId, destination: `grid:${map}:${x}:${y}`, label: "n", known: false, traversable: true })),
+      legend: [],
+    });
+  }
+
+  const caption = (w) => w.get('[data-testid="local-map__scale"]').text();
+
+  it("keeps the previous level on one map and resets it on another map or layer", async () => {
+    // 1100 m selects level 1500 (格距 300 m).
+    wrapper = mount(LocalMap, { props: { localMap: street("hyst", [0, 0], [[0, 1100]]) } });
+    expect(caption(wrapper)).toBe("格距 300 m");
+    // An 850 m exit alone would select 1000 (格距 200 m); one step coarser
+    // still fits, so a move on the same map keeps 1500.
+    await wrapper.setProps({ localMap: street("hyst", [0, 1100], [[0, 1950]]) });
+    expect(caption(wrapper)).toBe("格距 300 m");
+    // The same geometry on another map selects afresh.
+    await wrapper.setProps({ localMap: street("other", [0, 1100], [[0, 1950]]) });
+    expect(caption(wrapper)).toBe("格距 200 m");
+    // Leaving the coordinate-bearing lattice drops the memory and the caption.
+    await wrapper.setProps({ localMap: street("hyst", [0, 0], [[0, 1100]]) });
+    await wrapper.setProps({ localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE) });
+    expect(wrapper.find('[data-testid="local-map__scale"]').exists()).toBe(false);
+    await wrapper.setProps({ localMap: street("hyst", [0, 1100], [[0, 1950]]) });
+    expect(caption(wrapper)).toBe("格距 200 m");
+  });
+
+  it("states the scale as its own element beside the unchanged readout", () => {
+    wrapper = mount(LocalMap, { props: { localMap: street("hyst", [3500, 2850], [[3500, 3700]]) } });
+    const scale = wrapper.get('[data-testid="local-map__scale"]');
+    const readout = wrapper.get('[data-testid="local-map-detail"]');
+    expect(readout.text()).toBe("座標 3500,2850");
+    expect(scale.element.contains(readout.element)).toBe(false);
+    expect(readout.element.contains(scale.element)).toBe(false);
+    expect(scale.text()).toMatch(/^格距 \d+ (?:m|km)$/);
+    // The island's only distance figure is that caption.
+    const text = wrapper.text().replace(scale.text(), "");
+    expect(text).not.toMatch(/\d+\s*(?:m|km)\b/);
+  });
+
+  it("states compression by text and no caption on coordinate-free layers", () => {
+    wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
+    expect(caption(wrapper)).toBe("距離壓縮");
+    wrapper.unmount();
+    wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(LOCAL_MAP_INSTANCE_SAMPLE) } });
+    expect(wrapper.find('[data-testid="local-map__scale"]').exists()).toBe(false);
   });
 });
