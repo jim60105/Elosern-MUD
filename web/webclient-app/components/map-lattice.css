@@ -313,10 +313,15 @@
    Fading an opaque copy (rather than cross-fading two half-transparent
    layers) keeps every pixel the two frames share perfectly still, so the
    centred current marker, the axis cross and the frame never dip or flicker
-   while the ground, routes and names re-scale underneath. The balanced
-   `--ease-crossfade` curve spends the middle of `--motion-base` (the pan's
-   own beat) on the blend instead of snapping early or lingering late. The
-   host sits over the drawing and under the stub buttons, and is never a hit
+   while the ground, routes and names re-scale underneath. The fade takes
+   the pan's own beat (`--motion-base`) on the decelerating `--ease-enter`
+   curve: the old frame lets go at once, so the new names are the legible
+   ones within the first third (measured in the browser: 56% of the old
+   frame left at 50ms, 31% at 100ms, 16% at 150ms, 4% at 220ms), and the
+   soft tail lets the old ground settle away instead of cutting. A balanced
+   in-out curve held both frames at half strength mid-way (doubled names);
+   `--ease-standard` dropped below 6% by 150ms and read as a cut. The host
+   sits over the drawing and under the stub buttons, and is never a hit
    target. */
 .local-map__leaving-host {
   position: absolute;
@@ -330,7 +335,7 @@
   inset: 0;
   pointer-events: none;
   will-change: opacity;
-  animation: map-lattice-dissolve var(--motion-base) var(--ease-crossfade) forwards;
+  animation: map-lattice-dissolve var(--motion-base) var(--ease-enter) forwards;
 }
 
 @keyframes map-lattice-dissolve {

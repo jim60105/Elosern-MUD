@@ -244,10 +244,6 @@
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-enter: cubic-bezier(0, 0, 0.2, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
-  /* A balanced in-out curve for an opaque dissolve (the minimap island's
-     scale-change crossfade): slow off the mark, slow into rest, so the blend
-     reads as one even exchange rather than a snap or a lingering ghost. */
-  --ease-crossfade: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- cinematic stage (H1 contextual HUD) ----
      Per-mode stage gradients, the inset vignette, and the open-surface
