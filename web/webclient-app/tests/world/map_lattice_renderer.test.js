@@ -6,6 +6,11 @@ import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+  LOCAL_MAP_CIARAN_PLAZA_SAMPLE,
+  LOCAL_MAP_EXTREME_RATIO_SAMPLE,
+  LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
 import {
@@ -345,5 +350,158 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     };
     const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true, localMap: noCurrent });
     expect(w.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
+  });
+});
+
+// render-auto-scaled-minimap-island: the fixed-canvas lattice island draws
+// the automatic projection; the overlay and graph variants never project.
+describe("MapLattice island projection (render-auto-scaled-minimap-island)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  const ISLAND = { canvasSize: 240, colPitch: 40, rowPitch: 40, showAxis: true, fogVignette: true, markerNames: true };
+
+  function centreOf(w, id) {
+    const [x, y] = w
+      .get(`[data-node="${id}"]`)
+      .attributes("transform")
+      .match(/-?[\d.]+/g)
+      .map(Number);
+    return { x, y };
+  }
+
+  it("draws current at the centre, every same-layer exit inside the exit ring and only exit routes", () => {
+    const payload = LOCAL_MAP_ALTORIA_PLAZA_SAMPLE;
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
+    const current = payload.current_node;
+    expect(centreOf(wrapper, current)).toEqual({ x: 120, y: 120 });
+    const exits = payload.edges.filter((edge) => edge.label).map((edge) => edge.destination);
+    expect(exits).toHaveLength(4);
+    for (const id of exits) {
+      const { x, y } = centreOf(wrapper, id);
+      const radius = Math.hypot(x - 120, y - 120);
+      expect(radius).toBeGreaterThanOrEqual(36 - 1e-6);
+      expect(radius).toBeLessThanOrEqual(88 + 1e-6);
+      expect(wrapper.get(`[data-node="${id}"]`).find(".local-map__marker").exists()).toBe(true);
+    }
+    // Exactly one drawn route per exit, each from the current node's centre.
+    const lines = wrapper.findAll(".local-map__edge");
+    expect(lines).toHaveLength(exits.length);
+    for (const line of lines) {
+      expect([line.attributes("x1"), line.attributes("y1")]).toEqual(["120", "120"]);
+    }
+    // Two-hop context: a dot inside the square or no group at all.
+    const context = payload.nodes.filter(
+      (node) => node.id !== current && !exits.includes(node.id) && node.visibility !== "remembered",
+    );
+    let drawnContext = 0;
+    for (const node of context) {
+      const group = wrapper.find(`[data-node="${node.id}"]`);
+      if (!group.exists()) continue;
+      drawnContext += 1;
+      const { x, y } = centreOf(wrapper, node.id);
+      expect(x >= 0 && x <= 240 && y >= 0 && y <= 240).toBe(true);
+      expect(group.find(".local-map__context-dot").exists()).toBe(true);
+      expect(group.find(".local-map__marker").exists()).toBe(false);
+      expect(group.find(".local-map__node-label").exists()).toBe(false);
+    }
+    expect(drawnContext).toBeGreaterThan(0);
+    expect(drawnContext).toBeLessThan(context.length);
+  });
+
+  it("never draws a cross-layer gate target as a node", () => {
+    wrapper = mount(MapLattice, {
+      props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE), ...ISLAND },
+    });
+    expect(wrapper.find('[data-node^="wild:"]').exists()).toBe(false);
+    // Its route is not drawn either; the street exit's route is.
+    expect(wrapper.findAll(".local-map__edge")).toHaveLength(1);
+  });
+
+  it("a context dot carries no activation", async () => {
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE), ...ISLAND } });
+    const dot = wrapper.find(".local-map__node--context");
+    expect(dot.exists()).toBe(true);
+    expect(dot.attributes("tabindex")).toBeUndefined();
+    expect(dot.attributes("role")).toBeUndefined();
+    await dot.trigger("click");
+    await dot.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("select")).toBeUndefined();
+    expect(wrapper.emitted("move")).toBeUndefined();
+  });
+
+  it("compressed mode replaces the dot field with labelled distance rings", () => {
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_EXTREME_RATIO_SAMPLE), ...ISLAND } });
+    expect(wrapper.find('[data-testid="local-map__dot-field"]').exists()).toBe(false);
+    const rings = wrapper.get('[data-testid="local-map__rings"]');
+    expect(rings.attributes("aria-hidden")).toBe("true");
+    expect(rings.classes()).not.toContain("local-map__marker");
+    const circles = rings.findAll("circle.local-map__ring");
+    const labels = rings.findAll("text.local-map__ring-label");
+    expect(circles.length).toBeGreaterThan(0);
+    expect(labels).toHaveLength(circles.length);
+    for (const label of labels) {
+      expect(label.text()).toMatch(/^\d+ (?:m|km)$/);
+      expect(label.attributes("style")).toContain("font-size: 16px");
+    }
+    // Radii ascend with the stated distance (the mapping is monotonic).
+    const radii = circles.map((c) => Number(c.attributes("r")));
+    expect([...radii].sort((a, b) => a - b)).toEqual(radii);
+    // The labels share the diagonal farthest from every drawn exit: the
+    // exits stand east, north-west and south, so the label bearing is
+    // north-east or south-west — never on an exit's own diagonal.
+    const [lx, ly] = [Number(labels[0].attributes("x")), Number(labels[0].attributes("y"))];
+    expect(Math.sign(lx - 120)).toBe(-Math.sign(ly - 120));
+    expect(lx).toBeGreaterThan(120);
+  });
+
+  it("uniform mode draws the dot field inside a pan group and no rings", () => {
+    wrapper = mount(MapLattice, {
+      props: { localMap: localMapModelFor(LOCAL_MAP_CIARAN_PLAZA_SAMPLE), ...ISLAND, panOnMove: true },
+    });
+    expect(wrapper.find('[data-testid="local-map__rings"]').exists()).toBe(false);
+    const field = wrapper.get('[data-testid="map-lattice__pan--field"]');
+    expect(field.classes()).toContain("map-lattice__pan");
+    expect(field.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);
+  });
+
+  it("holds the overlay and graph variants off the projection", () => {
+    const overlay = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE), ...OVERLAY_PROPS } });
+    // The overlay keeps the model's complete lattice: every in-view node,
+    // its pattern dot field and every payload edge.
+    const inView = LOCAL_MAP_ALTORIA_PLAZA_SAMPLE.nodes.filter((node) => node.visibility !== "remembered");
+    expect(overlay.findAll(".local-map__node")).toHaveLength(inView.length);
+    expect(overlay.find("defs pattern").exists()).toBe(true);
+    expect(overlay.find(".local-map__node--context").exists()).toBe(false);
+    expect(overlay.findAll(".local-map__edge")).toHaveLength(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE.edges.length);
+    overlay.unmount();
+  });
+
+  it("keeps every island label inside the square", () => {
+    for (const payload of [LOCAL_MAP_WILDERNESS_METRIC_SAMPLE, LOCAL_MAP_ALTORIA_PLAZA_SAMPLE, LOCAL_MAP_EXTREME_RATIO_SAMPLE]) {
+      const w = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
+      for (const group of w.findAll(".local-map__node")) {
+        const label = group.find(".local-map__node-label");
+        if (!label.exists()) continue;
+        const text = Array.from(label.element.childNodes)
+          .filter((n) => n.nodeType === Node.TEXT_NODE)
+          .map((n) => n.textContent)
+          .join("")
+          .trim();
+        const [cx, cy] = group.attributes("transform").match(/-?[\d.]+/g).map(Number);
+        const width = textCells(text) * CELL_EM * 16;
+        const x = cx + Number(label.attributes("x") ?? 0);
+        const y = cy + Number(label.attributes("y"));
+        expect(x - width / 2).toBeGreaterThanOrEqual(-1e-6);
+        expect(x + width / 2).toBeLessThanOrEqual(240 + 1e-6);
+        expect(y + 4).toBeLessThanOrEqual(240);
+      }
+      w.unmount();
+    }
   });
 });

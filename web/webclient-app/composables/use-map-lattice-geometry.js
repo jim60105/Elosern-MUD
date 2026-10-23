@@ -10,6 +10,7 @@
 import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
 import { CELL_EM, textCells } from "../lib/mono_cells.js";
+import { CANVAS_SIZE, CENTRE, DOT_SPACING, projectIsland } from "../lib/minimap_projection.js";
 
 // Every lattice marker's base geometry in pre-scale units, multiplied by
 // the `markerScale` prop so all states scale uniformly (draft ladder,
@@ -33,38 +34,31 @@ export const MARKER_CURRENT_RING_R = 10.5;
 
 const LABEL_BAND = 14;
 
+// The island's remembered edge-direction diamonds (render-auto-scaled-minimap-
+// island): the fixed square has no gutter outside its 240 units, and the
+// projection's exit ring reaches R_MAX + HALO_R = 98 units from the centre, so
+// the diamonds stand on the square's rim band, one diamond half-extent
+// smaller than the overlay's, at the point where the true bearing leaves the
+// square. Their names stay on the assistive mirror (LocalMap owns it).
+export const ISLAND_MARKER_HALF = 7;
+const ISLAND_MARKER_REACH = Math.SQRT2 * ISLAND_MARKER_HALF;
+const ISLAND_MARKER_INSET = ISLAND_MARKER_REACH + 1.5;
+const ISLAND_MARKER_GAP = 2 * ISLAND_MARKER_REACH + 1;
+// The world-anchored dot field covers the square plus the farthest FLIP pan
+// travel (an exit at R_MAX re-centring, plus two dot steps of phase), so the
+// sliding ground never shows a bare edge mid-glide.
+const ISLAND_DOT_MARGIN = 140;
+// Ring labels sit on one diagonal (the axis cross owns the cardinals): the
+// one farthest in bearing from every drawn exit.
+const RING_LABEL_BEARINGS = [45, 315, 135, 225];
+// Canvas inset every island label keeps from the square's edge.
+const ISLAND_LABEL_INSET = 3;
+
 // The label term for two horizontally adjacent drawn labels (see
 // `labelClearancePitch`): half of each centred label box, measured in
 // monospace cells, plus a half-em word gap.
 export function labelPairPitch(labelA, labelB, labelFont) {
   return ((textCells(labelA) + textCells(labelB)) / 2 * CELL_EM + 0.5) * labelFont;
-}
-
-// The island's legibility floor (design §11: "keeps the current node centred
-// when the box exceeds the minimap"): a square drawing that would have to be
-// scaled below this factor to fit the fixed canvas is instead shown through a
-// window of side `canvasSize / ISLAND_MIN_SCALE` centred on the current node
-// and clamped to the drawing, so a long street never collapses into a
-// hairline. The full-map overlay remains the surface for the whole drawing.
-export const ISLAND_MIN_SCALE = 1;
-
-function islandWindow(S, canvasSize, cur) {
-  const V = Math.min(S, canvasSize / ISLAND_MIN_SCALE);
-  if (V >= S || !cur) return { x: 0, y: 0, side: S };
-  const clamp = (v) => Math.min(Math.max(v, 0), S - V);
-  return { x: clamp(cur.x - V / 2), y: clamp(cur.y - V / 2), side: V };
-}
-
-function windowed(geometry, S, canvasSize, cur) {
-  const win = islandWindow(S, canvasSize, cur);
-  return {
-    ...geometry,
-    viewBoxX: win.x,
-    viewBoxY: win.y,
-    viewBoxWidth: win.side,
-    viewBoxHeight: win.side,
-    viewBox: `${win.x} ${win.y} ${win.side} ${win.side}`,
-  };
 }
 
 export function useMapLatticeGeometry(props) {
@@ -183,6 +177,24 @@ export function useMapLatticeGeometry(props) {
   // clipping. A graph payload with no radial placement renders empty (the
   // variant prop is only ever passed a model that carries one).
   const isGraph = computed(() => props.variant === "graph");
+  // The fixed-canvas lattice island consumes the automatic projection
+  // (render-auto-scaled-minimap-island): LocalMap passes its hysteresis-held
+  // projection; a bare mount projects statelessly (no previous level). The
+  // graph island and the overlay (`canvasSize == null`) never project.
+  const isIsland = computed(() => props.canvasSize != null && !isGraph.value);
+  const projection = computed(() => {
+    if (!isIsland.value) return null;
+    return props.islandProjection ?? projectIsland(props.localMap, null);
+  });
+  const projectedById = computed(() => {
+    const byId = new Map();
+    for (const placed of projection.value ? projection.value.nodes : []) byId.set(String(placed.id), placed);
+    return byId;
+  });
+  function nodeTier(node) {
+    if (!isIsland.value || !node) return null;
+    return projectedById.value.get(String(node.id))?.tier ?? null;
+  }
   const radial = computed(() =>
     isGraph.value && props.localMap.radial && Array.isArray(props.localMap.radial.nodes)
       ? props.localMap.radial
@@ -268,110 +280,19 @@ export function useMapLatticeGeometry(props) {
     const rowsVal = Math.max(1, rows.value);
     const hasRemembered = rememberedList.value.length > 0 && !!current;
 
-    if (props.canvasSize != null) {
-      const canvasSize = Number(props.canvasSize);
-      const pMin = Math.max(props.colPitch, props.rowPitch, labelClearancePitch.value, verticalClearancePitch.value);
-      const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
-      const nameWidth = outwardNameBox.value;
-      // The marker name's line box the gutter must clear (a fixed 16 units,
-      // not the declared type step): it is what produces the reported
-      // wilderness shape's 44.456-unit gutter (local-map spec).
-      const nameHeight = props.markerNames ? 16 : 0;
-
-      if (!hasRemembered) {
-        const avail = canvasSize - 16;
-        const pFit = Math.floor(Math.min(avail / colsVal, (avail - LABEL_BAND) / rowsVal));
-        const p = Math.max(pMin, Math.min(pFit, Math.floor(1.5 * props.colPitch)));
-        const cW = colsVal * p;
-        const cH = rowsVal * p;
-        const reqSide = Math.max(cW, cH + LABEL_BAND);
-        const S = Math.max(canvasSize, reqSide);
-        const fW = S;
-        const fH = S;
-        const mX = (fW - cW) / 2;
-        const mY = (fH - (cH + LABEL_BAND)) / 2;
-        const cur = current
-          ? {
-              x: current.col * p + p / 2 + mX,
-              y: (rowsVal - 1 - current.row) * p + p / 2 + mY,
-            }
-          : null;
-        return windowed({
-          fieldW: fW,
-          fieldH: fH,
-          marginX: mX,
-          marginY: mY,
-          gutter: 0,
-          canvasWidth: S,
-          canvasHeight: S,
-          viewBoxX: 0,
-          viewBoxY: 0,
-          viewBoxWidth: S,
-          viewBoxHeight: S,
-          viewBox: `0 0 ${S} ${S}`,
-          markers: [],
-          colPitch: p,
-          rowPitch: p,
-        }, S, canvasSize, cur);
-      }
-
-      let g = 0;
-      let p = pMin;
-      let cW = colsVal * p;
-      let cH = rowsVal * p;
-      let S = canvasSize;
-      let fW = S;
-      let fH = S;
-      let mX = 0;
-      let mY = 0;
-      let markersResult = null;
-
-      for (let iter = 0; iter < 5; iter++) {
-        const insetOrGutter = g > 0 ? g : 8;
-        const avail = canvasSize - 2 * insetOrGutter;
-        const pFit = Math.floor(Math.min(avail / colsVal, (avail - LABEL_BAND) / rowsVal));
-        p = Math.max(pMin, Math.min(pFit, Math.floor(1.5 * props.colPitch)));
-        cW = colsVal * p;
-        cH = rowsVal * p;
-        const reqSide = Math.max(cW + 2 * g, cH + LABEL_BAND + 2 * g);
-        S = Math.max(canvasSize, reqSide);
-        fW = S - 2 * g;
-        fH = S - 2 * g;
-        mX = (fW - cW) / 2;
-        mY = (fH - (cH + LABEL_BAND)) / 2;
-
-        const curX = current.col * p + p / 2 + mX;
-        const curY = (rowsVal - 1 - current.row) * p + p / 2 + mY;
-
-        markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
-          canvasWidth: fW,
-          canvasHeight: fH,
-          current: { x: curX, y: curY },
-          markerHalf,
-          nameWidth,
-          nameHeight,
-        });
-
-        const newG = markersResult.gutter;
-        if (newG === g && iter > 0) {
-          break;
-        }
-        g = newG;
-      }
-
-      const reqSide = Math.max(cW + 2 * g, cH + LABEL_BAND + 2 * g);
-      S = Math.max(canvasSize, reqSide);
-      fW = S - 2 * g;
-      fH = S - 2 * g;
-      mX = (fW - cW) / 2;
-      mY = (fH - (cH + LABEL_BAND)) / 2;
-
-      return windowed({
-        fieldW: fW,
-        fieldH: fH,
-        marginX: mX,
-        marginY: mY,
-        gutter: g,
+    if (isIsland.value) {
+      // The fixed island (render-auto-scaled-minimap-island): one 240-unit
+      // square in the projection's own user units, current at its centre. No
+      // pitch fit, no gutter growth and no window: the projection already
+      // fits every same-layer exit inside R_MAX, and the remembered
+      // edge-direction markers stand on the square's own rim band.
+      const S = CANVAS_SIZE;
+      return {
+        fieldW: S,
+        fieldH: S,
+        marginX: 0,
+        marginY: 0,
+        gutter: 0,
         canvasWidth: S,
         canvasHeight: S,
         viewBoxX: 0,
@@ -379,13 +300,10 @@ export function useMapLatticeGeometry(props) {
         viewBoxWidth: S,
         viewBoxHeight: S,
         viewBox: `0 0 ${S} ${S}`,
-        markers: markersResult ? markersResult.markers : [],
-        colPitch: p,
-        rowPitch: p,
-      }, S, canvasSize, {
-        x: current.col * p + p / 2 + mX + g,
-        y: (rowsVal - 1 - current.row) * p + p / 2 + mY + g,
-      });
+        markers: islandEdgeMarkers(current),
+        colPitch: DOT_SPACING,
+        rowPitch: DOT_SPACING,
+      };
     }
 
     // canvasSize == null (overlay and bare mounts). One uniform physical scale
@@ -481,11 +399,16 @@ export function useMapLatticeGeometry(props) {
   // radial placement does not cover renders them not-at-all rather than at a
   // fabricated position (the shared omission contract of an absent edge
   // endpoint).
-  const drawnNodes = computed(() =>
-    radial.value
-      ? nodes.value.filter((node) => radialById.value[node.id])
-      : nodes.value,
-  );
+  //
+  // The island draws only what its projection placed (current, every
+  // same-layer exit, context that lands on the canvas), joined back to the
+  // original node models so full names, visibility and actions stay the
+  // payload's own; a cross-layer target and off-canvas context have no group.
+  const drawnNodes = computed(() => {
+    if (radial.value) return nodes.value.filter((node) => radialById.value[node.id]);
+    if (isIsland.value) return nodes.value.filter((node) => projectedById.value.has(String(node.id)));
+    return nodes.value;
+  });
 
   const graphCanvasWidth = computed(() =>
     radial.value ? Math.max(1, radial.value.width * props.markerScale) : 1,
@@ -537,6 +460,13 @@ export function useMapLatticeGeometry(props) {
       if (!placed) return null;
       return { x: placed.x * props.markerScale, y: placed.y * props.markerScale };
     }
+    if (isIsland.value) {
+      const placed = projectedById.value.get(String(node.id));
+      // Thousandths of a unit: exact at any drawn scale, and free of
+      // trigonometric noise in the DOM.
+      const round = (v) => Math.round(v * 1000) / 1000;
+      return placed ? { x: round(placed.x), y: round(placed.y) } : null;
+    }
     const core = latticePos(node);
     const { gutter, marginX, marginY } = layoutGeometry.value;
     return { x: core.x + gutter + marginX, y: core.y + gutter + marginY };
@@ -552,12 +482,25 @@ export function useMapLatticeGeometry(props) {
 
   // Edges are drawn between the centers of their endpoints; an edge whose
   // endpoint is not in the payload is omitted from the drawn layer.
+  //
+  // The island draws routes only: an edge with a non-empty label joining the
+  // current node to a drawn exit (a locked exit included). The presenter's
+  // empty-label star edges to two-hop context never draw, so no line suggests
+  // a road that does not exist.
+  function islandRoute(edge) {
+    const source = nodeById.value[edge.source];
+    const destination = nodeById.value[edge.destination];
+    if (typeof edge.label !== "string" || edge.label.length === 0) return false;
+    const tiers = [nodeTier(source), nodeTier(destination)];
+    return tiers.includes("current") && tiers.includes("exit");
+  }
   const edgeGeoms = computed(() =>
     edges.value
       .map((edge, i) => {
         const s = nodeById.value[edge.source];
         const d = nodeById.value[edge.destination];
         if (!s || !d) return null;
+        if (isIsland.value && !islandRoute(edge)) return null;
         const sp = nodePos(s);
         const dp = nodePos(d);
         if (!sp || !dp) return null;
@@ -571,6 +514,150 @@ export function useMapLatticeGeometry(props) {
       })
       .filter(Boolean),
   );
+
+  // ---- the island's scale-true background (design §5) ----
+
+  // Uniform mode: dots `spacing` units apart on every integer world multiple of
+  // the projection's dot step, so they belong to the ground and slide with it
+  // under the pan. A bounded list (the square plus the pan margin), never one
+  // dot per metre.
+  const islandDots = computed(() => {
+    const grid = projection.value?.grid;
+    if (!grid || grid.kind !== "dots" || !(grid.spacing > 0)) return [];
+    const step = grid.spacing;
+    const from = -ISLAND_DOT_MARGIN;
+    const to = CANVAS_SIZE + ISLAND_DOT_MARGIN;
+    const first = (offset) => offset + Math.ceil((from - offset) / step) * step;
+    const xs = [];
+    const ys = [];
+    for (let x = first(grid.offsetX); x <= to + 1e-9; x += step) xs.push(x);
+    for (let y = first(grid.offsetY); y <= to + 1e-9; y += step) ys.push(y);
+    const dots = [];
+    for (const y of ys) for (const x of xs) dots.push({ x, y });
+    return dots;
+  });
+
+  // Compressed mode: concentric distance rings at the projection's radii,
+  // each labelled where no exit stands. The labels share the diagonal whose
+  // bearing is farthest from every drawn exit (the axis cross owns the
+  // cardinals); ties keep the first candidate, north-east.
+  const islandRings = computed(() => {
+    const grid = projection.value?.grid;
+    if (!grid || grid.kind !== "rings") return [];
+    const exits = (projection.value.nodes || []).filter((placed) => placed.tier === "exit");
+    const exitBearings = exits.map(
+      (placed) => ((Math.atan2(placed.x - CENTRE, CENTRE - placed.y) * 180) / Math.PI + 360) % 360,
+    );
+    const clearance = (bearing) =>
+      exitBearings.reduce((least, other) => {
+        const d = Math.abs(((bearing - other + 540) % 360) - 180);
+        return Math.min(least, d);
+      }, 360);
+    let labelBearing = RING_LABEL_BEARINGS[0];
+    for (const candidate of RING_LABEL_BEARINGS) {
+      if (clearance(candidate) > clearance(labelBearing) + 1e-9) labelBearing = candidate;
+    }
+    const rad = (labelBearing * Math.PI) / 180;
+    return grid.rings.map((ring) => ({
+      ...ring,
+      labelX: CENTRE + ring.radius * Math.sin(rad),
+      labelY: CENTRE - ring.radius * Math.cos(rad),
+    }));
+  });
+
+  const scaleLabel = computed(() => projection.value?.scaleLabel ?? "");
+  const exitStubs = computed(() => projection.value?.exitStubs ?? []);
+
+  // Remembered edge-direction markers on the island rim: the marker set and
+  // its bearings come from the shared model (`edgeMarkersFor`, eligibility
+  // and octants unchanged); each diamond stands where its true bearing leaves
+  // the rim square, and neighbours on one side are pushed apart to a clear
+  // gap. Each keeps its visible name inside the rim band: beside the diamond
+  // on the top and bottom sides, as a glyph column below it on the left and
+  // right sides; `span` is the free run up to the next marker or the square's
+  // edge, which the shared fit-to-span and ambiguity rules then honour.
+  function islandEdgeMarkers(current) {
+    if (!current || rememberedList.value.length === 0) return [];
+    const result = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
+      canvasWidth: CANVAS_SIZE,
+      canvasHeight: CANVAS_SIZE,
+      current: { x: CENTRE, y: CENTRE },
+      markerHalf: ISLAND_MARKER_HALF,
+      nameWidth: 0,
+      nameHeight: 0,
+    });
+    const half = CENTRE - ISLAND_MARKER_INSET;
+    const lo = ISLAND_MARKER_INSET;
+    const hi = CANVAS_SIZE - ISLAND_MARKER_INSET;
+    const placed = result.markers.map((marker) => {
+      const sx = marker.dx;
+      const sy = -marker.dy;
+      const t = half / Math.max(Math.abs(sx), Math.abs(sy));
+      return { ...marker, x: CENTRE + sx * t, y: CENTRE + sy * t, span: 0, half: ISLAND_MARKER_HALF, rim: true };
+    });
+    for (const side of ["top", "bottom", "left", "right"]) {
+      const horizontal = side === "top" || side === "bottom";
+      const axis = horizontal ? "x" : "y";
+      const group = placed.filter((marker) => marker.side === side).sort((a, b) => a[axis] - b[axis]);
+      if (group.length > 1 && (group.length - 1) * ISLAND_MARKER_GAP > hi - lo) {
+        // More markers than the side holds at the clear gap (the 64-node
+        // bound allows it): spread them evenly along the whole side, in
+        // bearing order, rather than piling them on its end.
+        group.forEach((marker, i) => {
+          marker[axis] = lo + ((hi - lo) * i) / (group.length - 1);
+        });
+        continue;
+      }
+      for (let i = 1; i < group.length; i += 1) {
+        group[i][axis] = Math.max(group[i][axis], group[i - 1][axis] + ISLAND_MARKER_GAP);
+      }
+      if (group.length > 0 && group[group.length - 1][axis] > hi) {
+        group[group.length - 1][axis] = hi;
+        for (let i = group.length - 2; i >= 0; i -= 1) {
+          group[i][axis] = Math.min(group[i][axis], group[i + 1][axis] - ISLAND_MARKER_GAP);
+        }
+      }
+      for (const marker of group) marker[axis] = Math.min(Math.max(marker[axis], lo), hi);
+    }
+    const sides = new Set(placed.map((marker) => marker.side));
+    for (const side of ["top", "bottom", "left", "right"]) {
+      const horizontal = side === "top" || side === "bottom";
+      const axis = horizontal ? "x" : "y";
+      // A name runs toward +x (beside) or +y (below); the far corner is held
+      // back by a marker's own inset when the adjacent side carries markers.
+      const corner = horizontal ? "right" : side === "left" || side === "right" ? "bottom" : null;
+      const end = CANVAS_SIZE - ISLAND_LABEL_INSET - (sides.has(corner) ? 2 * ISLAND_MARKER_INSET : 0);
+      const group = placed.filter((marker) => marker.side === side).sort((a, b) => a[axis] - b[axis]);
+      group.forEach((marker, i) => {
+        const start = marker[axis] + ISLAND_MARKER_REACH + (horizontal ? 3 : 2);
+        const limit = i + 1 < group.length ? group[i + 1][axis] - ISLAND_MARKER_REACH - 2 : end;
+        marker.span = Math.max(0, limit - start);
+      });
+    }
+    return placed;
+  }
+
+  // Island label offset (x, y) relative to its node: the shared below-marker
+  // baseline, kept inside the square — shifted along x when the centred label
+  // would leave a side, lifted above the marker when the baseline would leave
+  // the bottom. One small, replaceable rule; collision placement belongs to
+  // the label change (label-minimap-exits-and-gateways).
+  function islandLabelOffset(node, text, baseline) {
+    const pos = nodePos(node);
+    if (!isIsland.value || !pos) return { dx: 0, y: baseline };
+    const width = textCells(text) * CELL_EM * props.labelFont;
+    const left = pos.x - width / 2;
+    const clampedLeft = Math.min(
+      Math.max(left, ISLAND_LABEL_INSET),
+      Math.max(ISLAND_LABEL_INSET, CANVAS_SIZE - ISLAND_LABEL_INSET - width),
+    );
+    const descent = 0.25 * props.labelFont;
+    const y =
+      pos.y + baseline + descent > CANVAS_SIZE - ISLAND_LABEL_INSET
+        ? -(LABEL_BASELINE_HALF * props.markerScale + 2 + descent)
+        : baseline;
+    return { dx: clampedLeft - left, y };
+  }
 
   // Canvas box: the island passes its fixed reference square (`canvasSize`,
   // CSS px at the 1451x790 reference), the overlay passes `null` and fills its
@@ -596,6 +683,14 @@ export function useMapLatticeGeometry(props) {
   });
 
   return {
+    isIsland,
+    projection,
+    nodeTier,
+    islandDots,
+    islandRings,
+    scaleLabel,
+    exitStubs,
+    islandLabelOffset,
     edges,
     drawnNodes,
     edgeGeoms,

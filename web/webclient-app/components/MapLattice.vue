@@ -112,6 +112,11 @@ const props = defineProps({
   // The node the exit compass aims (exploration-exit-compass design D6): it
   // gains a highlight class and a decorative ring; null draws nothing.
   aimedNode: { type: String, default: null },
+  // The island's automatic projection (render-auto-scaled-minimap-island):
+  // LocalMap passes the projection it holds with its hysteresis level. Only
+  // the fixed-canvas lattice island reads it; null makes a bare island mount
+  // project statelessly, and the overlay and graph variants ignore it.
+  islandProjection: { type: Object, default: null },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -137,7 +142,27 @@ const {
   isGraph,
   visibleNodeLabel,
   nodePos,
+  isIsland,
+  nodeTier,
+  islandDots,
+  islandRings,
+  islandLabelOffset,
 } = geometry;
+
+// The island's context tier (two-hop places) draws as a small background dot
+// with no visible label and no activation.
+function isContext(node) {
+  return nodeTier(node) === "context";
+}
+
+function nodeLabelOffset(node) {
+  return islandLabelOffset(node, visibleNodeLabel(node), labelY());
+}
+
+function onNodeActivate(node) {
+  if (isContext(node)) return;
+  activateNode(node);
+}
 
 const {
   fittedEdgeMarkers,
@@ -319,7 +344,7 @@ defineExpose({
   <svg
     ref="svgEl"
     class="local-map__lattice"
-    :class="{ 'local-map__lattice--canvas': overlayChrome }"
+    :class="{ 'local-map__lattice--canvas': overlayChrome, 'local-map__lattice--island': isIsland }"
     :width="canvasSize ?? canvasWidth"
     :height="canvasSize ?? canvasHeight"
     :viewBox="fitView ? mapViewBox : viewBox"
@@ -331,6 +356,7 @@ defineExpose({
   >
     <defs>
       <pattern
+        v-if="!isIsland"
         :id="patternId"
         :width="effectiveColPitch"
         :height="effectiveRowPitch"
@@ -357,8 +383,58 @@ defineExpose({
         <stop offset="1" stop-color="var(--map-canvas-lo)" stop-opacity="0.50" />
       </radialGradient>
     </defs>
+    <!-- The island's scale-true background (design §5): in uniform mode a
+         bounded list of world-anchored dots inside a pan group, so the ground
+         slides with the drawing; in compressed mode labelled distance rings
+         centred on the player, outside the pan (shape and text, not colour,
+         state the compression). Pure decoration: pointer-inert, aria-hidden,
+         no marker/label classes, token colours. -->
+    <g
+      v-if="isIsland && islandDots.length"
+      :class="{ 'map-lattice__pan': panOnMove }"
+      data-testid="map-lattice__pan--field"
+    >
+      <g class="local-map__dot-field" data-testid="local-map__dot-field" aria-hidden="true">
+        <circle
+          v-for="(dot, i) in islandDots"
+          :key="i"
+          class="local-map__dot"
+          :cx="dot.x"
+          :cy="dot.y"
+          :r="1.15 * markerScale"
+          fill="var(--ink-edge)"
+          fill-opacity="0.85"
+        />
+      </g>
+    </g>
+    <g
+      v-if="isIsland && islandRings.length"
+      class="local-map__rings"
+      data-testid="local-map__rings"
+      aria-hidden="true"
+    >
+      <circle
+        v-for="ring in islandRings"
+        :key="`ring-${ring.distance}`"
+        class="local-map__ring"
+        :data-distance="ring.distance"
+        :cx="120"
+        :cy="120"
+        :r="ring.radius"
+      />
+      <text
+        v-for="ring in islandRings"
+        :key="`ring-label-${ring.distance}`"
+        class="local-map__ring-label"
+        :style="{ fontSize: `${labelFont}px` }"
+        :x="ring.labelX"
+        :y="ring.labelY"
+        dy="0.35em"
+        text-anchor="middle"
+      >{{ ring.label }}</text>
+    </g>
     <rect
-      v-if="!isGraph"
+      v-if="!isGraph && !isIsland"
       class="local-map__dot-field"
       data-testid="local-map__dot-field"
       x="0"
@@ -428,10 +504,10 @@ defineExpose({
       <title>{{ marker.name }}</title>
       <rect
         class="local-map__edge-marker-diamond"
-        :x="-MARKER_DIAMOND_HALF * markerScale"
-        :y="-MARKER_DIAMOND_HALF * markerScale"
-        :width="MARKER_DIAMOND_HALF * 2 * markerScale"
-        :height="MARKER_DIAMOND_HALF * 2 * markerScale"
+        :x="-(marker.half ?? MARKER_DIAMOND_HALF * markerScale)"
+        :y="-(marker.half ?? MARKER_DIAMOND_HALF * markerScale)"
+        :width="(marker.half ?? MARKER_DIAMOND_HALF * markerScale) * 2"
+        :height="(marker.half ?? MARKER_DIAMOND_HALF * markerScale) * 2"
         transform="rotate(45)"
       />
       <circle
@@ -478,7 +554,7 @@ defineExpose({
       v-for="node in drawnNodes"
       :key="node.id"
       class="local-map__node"
-      :class="[`local-map__node--${node.visibility}`, { 'local-map__node--aimed': aimedNode !== null && String(node.id) === String(aimedNode) }]"
+      :class="[`local-map__node--${node.visibility}`, { 'local-map__node--context': isContext(node) }, { 'local-map__node--aimed': aimedNode !== null && String(node.id) === String(aimedNode) }]"
       :data-testid="`local-map__node--${node.id}`"
       :data-node="node.id"
       :data-node-id="node.id"
@@ -487,11 +563,24 @@ defineExpose({
       :tabindex="overlayChrome && node.action?.kind === 'move' ? 0 : null"
       :aria-label="overlayChrome ? node.label : null"
       :transform="`translate(${nodePos(node).x}, ${nodePos(node).y})`"
-      @click="activateNode(node)"
-      @keydown.enter.prevent="activateNode(node)"
-      @keydown.space.prevent="activateNode(node)"
+      @click="onNodeActivate(node)"
+      @keydown.enter.prevent="onNodeActivate(node)"
+      @keydown.space.prevent="onNodeActivate(node)"
       @mouseenter="emit('hover', node)"
     >
+      <!-- An island context node (two-hop place): one small background dot,
+           its full name only as the group's title; no marker class, label,
+           halo or activation. -->
+      <template v-if="isContext(node)">
+        <title>{{ node.label }}</title>
+        <circle
+          class="local-map__context-dot"
+          data-testid="local-map__context-dot"
+          :r="2.4 * markerScale"
+          aria-hidden="true"
+        />
+      </template>
+      <template v-else>
       <!-- The draft marker ladder (webclient-map-01-draft-chrome D2): the
            current node is the large seal-stroked circle; visited is a small
            ink-filled circle; unvisited is a small hollow circle (keeps the
@@ -572,11 +661,13 @@ defineExpose({
         class="local-map__node-label"
         :class="`local-map__node-label--${labelTier(node)}`"
         :style="{ fontSize: `${labelFont}px` }"
-        :y="labelY()"
+        :x="isIsland ? nodeLabelOffset(node).dx : null"
+        :y="isIsland ? nodeLabelOffset(node).y : labelY()"
         text-anchor="middle"
       >
         <title>{{ node.label }}</title>{{ visibleNodeLabel(node) }}
       </text>
+      </template>
     </g>
     </g>
   </svg>

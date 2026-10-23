@@ -29,6 +29,48 @@
   pointer-events: none;
 }
 
+/* The island's compressed-mode distance rings (render-auto-scaled-minimap-
+   island): fine dashed circles in the field ink, quieter than a connector,
+   so the change from dots to rings reads by shape and text, never colour. */
+.local-map__rings {
+  pointer-events: none;
+}
+
+.local-map__ring {
+  fill: none;
+  stroke: var(--ink-edge);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  stroke-opacity: 0.9;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Ring distance labels: the field's quiet paper tier on a ground-coloured
+   halo, so the figure stays legible where it crosses a dot or the axis. */
+.local-map__ring-label {
+  font-family: var(--f-mono);
+  font-size: 16px;
+  fill: var(--paper-500);
+  stroke: var(--ink-860);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  letter-spacing: 0;
+}
+
+/* An island context node: a small, quiet background dot (two-hop place) —
+   larger than a field dot so it reads as a place, far quieter than any exit
+   marker. Pointer-inert: it carries no activation. */
+.local-map__node--context {
+  cursor: default;
+  pointer-events: none;
+}
+
+.local-map__context-dot {
+  fill: var(--map-label-far);
+  fill-opacity: 0.7;
+}
+
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
    cells) or renders as the fixed square canvasSize or fitted view. */
 .local-map__lattice {
@@ -86,6 +128,15 @@
   /* Decorative label: must never intercept pointer events intended for the
      node's actionable circle (the label sits in the cell below its node). */
   pointer-events: none;
+}
+
+/* On the island a name may cross its own route, the axis or the dot field:
+   a ground-coloured halo under each glyph keeps it legible without a box. */
+.local-map__lattice--island .local-map__node-label {
+  stroke: var(--ink-860);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 
 /* Draft label tiers (D3 tokens): current brightest, landmark gold,

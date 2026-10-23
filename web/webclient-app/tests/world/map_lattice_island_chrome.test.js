@@ -54,31 +54,36 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
     expect(w.emitted("move")).toBeUndefined();
   });
 
-  it("clears an upper label above an unlabeled wilderness node without shrinking text", () => {
+  it("keeps the shared-region label suppression on the projected wilderness island", () => {
+    // render-auto-scaled-minimap-island: one-kilometre wilderness cells are
+    // projected (one exit north at 1 km → level 1500, radius 66.667), the exit
+    // sharing the current cell's region name draws no label text, and the
+    // two-hop cells that would land off the square are omitted.
     const payload = {
-      layer: "wilderness", available: true, current_node: "c", edges: [],
+      layer: "wilderness", available: true, current_node: "wild:t:0:0",
+      edges: [{ source: "wild:t:0:0", destination: "wild:t:0:1", label: "n", known: true, traversable: true }],
       nodes: [
-        { id: "c", x: 0, y: 0, label: "共用地區", visibility: "current" },
-        { id: "below", x: 0, y: 1, label: "共用地區", visibility: "visible_visited" },
-        { id: "above", x: 0, y: 2, label: "北岸鐘樓", visibility: "visible_visited" },
+        { id: "wild:t:0:0", x: 0, y: 0, label: "共用地區", visibility: "current" },
+        { id: "wild:t:0:1", x: 0, y: 1, label: "共用地區", visibility: "visible_visited" },
+        { id: "wild:t:0:2", x: 0, y: 2, label: "北岸鐘樓", visibility: "visible_visited" },
         ...Array.from({ length: 5 }, (_, i) => ({
-          id: `north${i}`, x: 0, y: i + 3, label: "共用地區", visibility: "visible_visited",
+          id: `wild:t:0:${i + 3}`, x: 0, y: i + 3, label: "共用地區", visibility: "visible_visited",
         })),
       ],
     };
     wrapper = mount(MapLattice, { props: {
       localMap: localMapModelFor(payload), canvasSize: 240, colPitch: 40, rowPitch: 40,
     } });
-    const pitch = Number(wrapper.get("defs pattern").attributes("height"));
-    expect(pitch).toBeGreaterThanOrEqual(47);
-    expect(wrapper.get("defs pattern").attributes("width")).toBe(String(pitch));
-    const below = wrapper.get('[data-node="below"] text');
-    expect([...below.element.childNodes].filter((node) => node.nodeType === 3)
+    expect(wrapper.get("svg").attributes("viewBox")).toBe("0 0 240 240");
+    const exit = wrapper.get('[data-node="wild:t:0:1"]');
+    expect(exit.attributes("transform")).toBe("translate(120, 53.333)");
+    const text = exit.get("text");
+    expect([...text.element.childNodes].filter((node) => node.nodeType === 3)
       .map((node) => node.textContent).join("").trim()).toBe("");
-    const viewBox = wrapper.get("svg").attributes("viewBox").split(" ").map(Number);
-    expect(viewBox[2]).toBe(240);
-    expect(viewBox[3]).toBe(240);
-    expect(wrapper.findAll(".local-map__node")).toHaveLength(8);
+    expect(text.attributes("style")).toContain("font-size: 16px");
+    // 2 km north and beyond would land above the square: omitted context.
+    expect(wrapper.find('[data-node="wild:t:0:2"]').exists()).toBe(false);
+    expect(wrapper.findAll(".local-map__node")).toHaveLength(2);
   });
 });
 

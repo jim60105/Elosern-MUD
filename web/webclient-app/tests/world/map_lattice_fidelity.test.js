@@ -7,6 +7,8 @@ import {
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_SINGLE_NODE_SAMPLE,
   LOCAL_MAP_TALL_LATTICE_SAMPLE,
+  LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+  LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
 import {
@@ -40,9 +42,13 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
   };
 
   describe("Wave 1: Coordinate-Field Layers", () => {
-    it("Task 1.1: renders coordinate dot field registered to node centers with pitch tile", () => {
+    it("Task 1.1: renders the island's world-anchored dot field at the projection's spacing", () => {
+      // render-auto-scaled-minimap-island: the island's uniform mode draws a
+      // bounded list of dots 20 units apart, one on every integer world
+      // multiple of the level's dot step (level 2000 on the 3x3 wilderness →
+      // 400 m), so they belong to the ground rather than to the current node.
       const w = mountLattice({
-        localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
+        localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_METRIC_SAMPLE),
         ...ISLAND_PROPS,
       });
       const dotField = w.find('[data-testid="local-map__dot-field"]');
@@ -50,39 +56,29 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(dotField.attributes("aria-hidden")).toBe("true");
       expect(dotField.classes()).not.toContain("local-map__marker");
       expect(dotField.classes()).not.toContain("local-map__node-label");
+      expect(w.find("defs pattern").exists()).toBe(false);
 
-      const pattern = w.find("defs pattern");
-      expect(pattern.exists()).toBe(true);
-      const pitchW = Number(pattern.attributes("width"));
-      const pitchH = Number(pattern.attributes("height"));
-      // The reported wilderness shape's 240px square grows the drawn pitch to
-      // 45 (its gutter reserves 44.456 units a side), and the dot field is
-      // registered to that drawn pitch, not to the declared 40 units.
-      expect(pitchW).toBeGreaterThanOrEqual(47);
-      expect(pitchH).toBe(pitchW);
+      const circles = dotField.findAll("circle");
+      expect(circles.length).toBeGreaterThan(144);
+      expect(circles.length).toBeLessThan(1000);
+      const first = circles[0];
+      expect(first.attributes("r")).toBe("1.15");
+      expect(first.attributes("fill")).toBe("var(--ink-edge)");
+      expect(first.attributes("fill-opacity")).toBe("0.85");
 
-      const circle = pattern.find("circle");
-      expect(circle.exists()).toBe(true);
-      expect(circle.attributes("r")).toBe("1.15");
-      expect(circle.attributes("fill")).toBe("var(--ink-edge)");
-      expect(circle.attributes("fill-opacity")).toBe("0.85");
-
-      const cx = Number(circle.attributes("cx"));
-      const cy = Number(circle.attributes("cy"));
-
-      const nodeEls = w.findAll('[data-testid^="local-map__node--"]');
-      expect(nodeEls.length).toBeGreaterThan(0);
-      for (const nodeEl of nodeEls) {
-        const transform = nodeEl.attributes("transform");
-        const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
-        expect(match).not.toBeNull();
-        const nx = Number(match[1]);
-        const ny = Number(match[2]);
-        const remX = ((nx - cx) % pitchW + pitchW) % pitchW;
-        const remY = ((ny - cy) % pitchH + pitchH) % pitchH;
-        expect(Math.min(remX, pitchW - remX)).toBeCloseTo(0, 4);
-        expect(Math.min(remY, pitchH - remY)).toBeCloseTo(0, 4);
+      // Current world position in metres (one-kilometre wilderness cells).
+      const [cxCell, cyCell] = [858, 1071];
+      const metres = 400;
+      for (const circle of circles) {
+        const x = Number(circle.attributes("cx"));
+        const y = Number(circle.attributes("cy"));
+        const worldX = cxCell * 1000 + ((x - 120) * metres) / 20;
+        const worldY = cyCell * 1000 - ((y - 120) * metres) / 20;
+        expect(Math.abs(worldX / metres - Math.round(worldX / metres))).toBeLessThan(1e-6);
+        expect(Math.abs(worldY / metres - Math.round(worldY / metres))).toBeLessThan(1e-6);
       }
+      // The field rides a pan group, so the minimap pan slides it.
+      expect(w.find('[data-testid="map-lattice__pan--field"]').element.contains(dotField.element)).toBe(true);
     });
 
     it("Task 1.1: renders dot field on overlay scale as well", () => {
@@ -207,7 +203,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
 
     it("Task 1.4: layers have pointer-events none and preserve relative paint order", () => {
       const w = mountLattice({
-        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
+        localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE),
         ...ISLAND_PROPS,
       });
       const svg = w.get("svg.local-map__lattice");
@@ -237,7 +233,9 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       };
       const w = mount(MultiMount, {
         props: {
-          p1: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), ...ISLAND_PROPS },
+          // Two pattern-drawing (non-island) mounts: the island draws its dot
+          // list instead of a pattern, but still owns a fog gradient.
+          p1: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), colPitch: 40, rowPitch: 40, fogVignette: true },
           p2: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), colPitch: 280, rowPitch: 212, fogVignette: true },
         },
       });
@@ -373,77 +371,30 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
     });
 
     it("Task 2.3: verifies all 6 rows of Design D5 Table and scale <= 1 invariant", () => {
-      // 1. 3x3 core with no gateways: pitch 60 (the 1.5x cap) and scale 1
+      // render-auto-scaled-minimap-island: every lattice island — a 3x3
+      // core, a single node, the reported wilderness shape with gateways and
+      // the 2x64 street — is the projection's fixed 240-unit square at scale 1
+      // with the current node at its centre; no pitch, window or crop.
       const noGatewaysPayload = {
         ...UNIFORM_WILDERNESS_PAYLOAD,
         nodes: UNIFORM_WILDERNESS_PAYLOAD.nodes.filter((n) => n.visibility !== "remembered"),
       };
-      const wNoGateways = mountLattice({
-        localMap: localMapModelFor(noGatewaysPayload),
-        ...ISLAND_PROPS,
-      });
-      const svg1 = wNoGateways.get("svg.local-map__lattice");
-      expect(Number(svg1.attributes("width"))).toBe(240);
-      expect(Number(svg1.attributes("height"))).toBe(240);
-      expect(svg1.attributes("viewBox")).toBe("0 0 240 240");
-      expect(svg1.attributes("style")).toContain("width: calc(240px * var(--ui-scale, 1))");
-      expect(svg1.attributes("style")).toContain("height: calc(240px * var(--ui-scale, 1))");
-      const pattern1 = wNoGateways.find("defs pattern");
-      expect(Number(pattern1.attributes("width"))).toBe(60);
-      expect(Number(pattern1.attributes("height"))).toBe(60);
-
-      // 2. Single node: pitch 60 (1.5x cap) and scale 1
-      const wSingle = mountLattice({
-        localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE),
-        ...ISLAND_PROPS,
-      });
-      const svg2 = wSingle.get("svg.local-map__lattice");
-      expect(Number(svg2.attributes("width"))).toBe(240);
-      expect(Number(svg2.attributes("height"))).toBe(240);
-      expect(svg2.attributes("viewBox")).toBe("0 0 240 240");
-      expect(svg2.attributes("style")).toContain("width: calc(240px * var(--ui-scale, 1))");
-      expect(svg2.attributes("style")).toContain("height: calc(240px * var(--ui-scale, 1))");
-      const pattern2 = wSingle.find("defs pattern");
-      expect(Number(pattern2.attributes("width"))).toBe(60);
-      expect(Number(pattern2.attributes("height"))).toBe(60);
-
-      // 3. Reported wilderness shape with gateways: the 240px square's roomier
-      // inset box grows the pitch to 45 (the gutter reserves 44.456 units a
-      // side), so the drawing needs 237.91 units, fits the 240px square at
-      // scale 1, and every drawn node label reads at exactly 16.00 CSS px.
-      const wWild = mountLattice({
-        localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
-        ...ISLAND_PROPS,
-      });
-      const svg3 = wWild.get("svg.local-map__lattice");
-      expect(Number(svg3.attributes("width"))).toBe(240);
-      expect(Number(svg3.attributes("height"))).toBe(240);
-      const pattern3 = wWild.find("defs pattern");
-      expect(Number(pattern3.attributes("width"))).toBeGreaterThanOrEqual(47);
-      expect(pattern3.attributes("height")).toBe(pattern3.attributes("width"));
-      const vbParts = svg3.attributes("viewBox").split(" ").map(Number);
-      expect(vbParts[2]).toBeCloseTo(240, 1);
-      expect(vbParts[3]).toBeCloseTo(240, 1);
-      const scale3 = 240 / vbParts[2];
-      expect(scale3).toBeCloseTo(1, 3);
-      expect(scale3 * 16).toBeCloseTo(16, 1);
-      expect(scale3 * 16).toBeGreaterThanOrEqual(16);
-
-      // 4. 2x64 lattice: the 2574-unit square would draw at 0.0808, below
-      // the island's legibility floor, so it is windowed at scale 1
-      // around the current node instead (design §11).
-      const wTall = mountLattice({
-        localMap: localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE),
-        ...ISLAND_PROPS,
-      });
-      const svg4 = wTall.get("svg.local-map__lattice");
-      expect(Number(svg4.attributes("width"))).toBe(240);
-      expect(Number(svg4.attributes("height"))).toBe(240);
-      const vbTall = svg4.attributes("viewBox").split(" ").map(Number);
-      expect(vbTall[2]).toBeCloseTo(240, 6);
-      expect(vbTall[3]).toBeCloseTo(240, 6);
-      const scale4 = 240 / vbTall[2];
-      expect(scale4).toBeCloseTo(1, 6);
+      for (const payload of [
+        noGatewaysPayload,
+        LOCAL_MAP_SINGLE_NODE_SAMPLE,
+        UNIFORM_WILDERNESS_PAYLOAD,
+        LOCAL_MAP_TALL_LATTICE_SAMPLE,
+      ]) {
+        const wIsland = mountLattice({ localMap: localMapModelFor(payload), ...ISLAND_PROPS });
+        const svgIsland = wIsland.get("svg.local-map__lattice");
+        expect(Number(svgIsland.attributes("width"))).toBe(240);
+        expect(Number(svgIsland.attributes("height"))).toBe(240);
+        expect(svgIsland.attributes("viewBox")).toBe("0 0 240 240");
+        expect(svgIsland.attributes("style")).toContain("width: calc(240px * var(--ui-scale, 1))");
+        expect(svgIsland.attributes("style")).toContain("height: calc(240px * var(--ui-scale, 1))");
+        expect(wIsland.get('[data-visibility="current"]').attributes("transform")).toBe("translate(120, 120)");
+        wIsland.unmount();
+      }
 
       // 5. Graph cases:
       // a. One-ring interior: a 260-unit radial canvas (R0 80 + label bottom 26
@@ -555,7 +506,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       });
       const svg = w.get("svg.local-map__lattice");
       // The canvas renders at its reference 240 CSS px; the viewBox side is the
-      // drawing's own square, so the ratio is the uniform scale.
+      // island's fixed 240-unit square, so the ratio is the uniform scale.
       const canvas = Number(svg.attributes("width"));
       expect(canvas).toBe(240);
       const scale = canvas / Number(svg.attributes("viewBox").split(" ")[2]);

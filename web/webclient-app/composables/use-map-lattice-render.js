@@ -182,7 +182,17 @@ export function useMapLatticeRender(props, emit, geometry) {
   function markerOutset() {
     return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
   }
+  // The island's rim markers (render-auto-scaled-minimap-island) keep their
+  // names inside the square: beside the diamond on the top/bottom sides
+  // (start-anchored, vertically centred on it), as a glyph column below it on
+  // the left/right sides.
+  function rimReach(marker) {
+    return Math.SQRT2 * marker.half;
+  }
   function markerNameX(marker) {
+    if (marker.rim) {
+      return marker.side === "top" || marker.side === "bottom" ? rimReach(marker) + 3 : 0;
+    }
     if (props.overlayChrome) {
       if (marker.side === "left") return -markerOutset();
       if (marker.side === "right") return markerOutset();
@@ -194,6 +204,10 @@ export function useMapLatticeRender(props, emit, geometry) {
     return marker.side === "left" ? -bandCenter : bandCenter;
   }
   function markerNameY(marker) {
+    if (marker.rim) {
+      if (marker.side === "top" || marker.side === "bottom") return props.markerNameFont * 0.36;
+      return rimReach(marker) + 2 + props.markerNameFont * 0.8;
+    }
     if (props.overlayChrome) {
       if (marker.side === "top") return -(markerOutset() + MARKER_NAME_ASCENT);
       if (marker.side === "bottom") return markerOutset() + MARKER_NAME_ASCENT;
@@ -213,6 +227,7 @@ export function useMapLatticeRender(props, emit, geometry) {
     return -((k - 1) * props.markerNameFont) / 2 + props.markerNameFont * 0.36;
   }
   function markerNameAnchor(marker) {
+    if (marker.rim) return marker.side === "top" || marker.side === "bottom" ? "start" : "middle";
     if (props.overlayChrome) {
       if (marker.side === "left") return "end";
       if (marker.side === "right") return "start";

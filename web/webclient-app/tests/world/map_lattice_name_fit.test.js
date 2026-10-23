@@ -77,47 +77,39 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         markerNames: true,
       },
     });
+    // render-auto-scaled-minimap-island: the island is the projection's
+    // fixed 240-unit square, so its lone side markers stand on the rim band
+    // (inset by the 7-unit diamond's reach plus 1.5) and stack their names as
+    // a glyph column below the diamond, inside the square. The column's span
+    // runs from the diamond's lower tip (+2) to 3 units above the bottom edge.
     const svg = wrapper.get("svg.local-map__lattice");
-    const svgWidth = Number(svg.attributes("width"));
-    const svgHeight = Number(svg.attributes("height"));
-
-    // Core lattice: the label term clears the drawn 3-glyph labels ("0,0") —
-    // ((3 + 3) / 2 × CELL_EM + 0.5) × 16 = 37 < 40 — so the declared 40-unit
-    // pitch is the floor and the 240px square's roomier inset box grows the
-    // drawn pitch to 45.
-    // Gutter for the island with nameHeight 16 -> namePad 18 -> gutter:
-    // 2 * sqrt(2) * 9 + 1 + 18 ≈ 44.4558, so the drawn field is
-    // 240 − 2 × 44.4558 = 151.088 units a side.
-    const expectedGutter = 2 * Math.SQRT2 * 9 + 1 + 18;
-    expect(svgWidth).toBe(240);
-    expect(svgHeight).toBe(240);
-    const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(240, 5);
-    expect(vb[3]).toBeCloseTo(240, 5);
-    const westSpan = wrapper.vm.fittedEdgeMarkers.find((m) => m.id === "r:west").span;
-    // 47-unit rows plus the 14-unit label band; cropping does not reduce it.
-    expect(westSpan).toBe(155);
+    expect(Number(svg.attributes("width"))).toBe(240);
+    expect(svg.attributes("viewBox")).toBe("0 0 240 240");
+    const reach = Math.SQRT2 * 7;
+    const inset = reach + 1.5;
+    const span = 240 - 3 - (120 + reach + 2);
+    const west = wrapper.vm.fittedEdgeMarkers.find((m) => m.id === "r:west");
+    expect(west.x).toBeCloseTo(inset, 6);
+    expect(west.y).toBeCloseTo(120, 6);
+    expect(west.span).toBeCloseTo(span, 6);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
-    // Span on the left edge: 151.088. The island stacks left names one glyph
-    // per line, so budget = floor(151.088 / 16) = 9 steps; the kept （南門）
-    // qualifier (4 steps) plus "…" leaves 4 steps of head: 西部丘陵.
-    expect(westText.text()).toBe("西部丘陵…（南門）");
+    // floor(105.1 / 16) = 6 steps: the kept （南門） qualifier (4) plus "…"
+    // leaves one head glyph.
+    expect(westText.text()).toBe("西…（南門）");
     const tspans = westText.findAll("tspan");
-    expect(tspans).toHaveLength(9);
-    const reach = Math.SQRT2 * 9;
-    const expectedX = -(reach + 9);
+    expect(tspans).toHaveLength(6);
     tspans.forEach((tspan, i) => {
-      expect(Number(tspan.attributes("x"))).toBeCloseTo(expectedX, 3);
+      expect(Number(tspan.attributes("x"))).toBeCloseTo(0, 6);
       expect(tspan.attributes("dy")).toBe(i === 0 ? "0" : "16");
     });
+    expect(Number(westText.attributes("y"))).toBeCloseTo(reach + 2 + 16 * 0.8, 6);
 
     const eastMarker = wrapper.get('[data-testid="local-map__edge-marker--r:east"]');
     const eastText = eastMarker.get("text.local-map__edge-marker-name--island");
     expect(eastText.text()).toBe("聖潔王都");
-    const eastTspans = eastText.findAll("tspan");
-    expect(eastTspans).toHaveLength(4);
+    expect(eastText.findAll("tspan")).toHaveLength(4);
   });
 
   it("Task 3.2: binds markerNameFont inline on overlay marker name and rule declares no font-size", () => {
@@ -240,9 +232,10 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
       },
     });
     const islandLeftText = wIslandLeft.get('[data-testid="local-map__edge-marker--r:west_long"] text');
-    // Span 151.088, budget 9 steps: the 14-glyph name keeps its head and tail
-    expect(islandLeftText.text()).toBe("灰…關隘道前哨站營");
-    expect(Array.from(islandLeftText.text())).toHaveLength(9);
+    // The rim column's span 105.1, budget 6 steps: the 14-glyph name keeps
+    // its head and tail.
+    expect(islandLeftText.text()).toBe("灰…前哨站營");
+    expect(Array.from(islandLeftText.text())).toHaveLength(6);
   });
 
   it("Task 4.4: anti-ambiguity pass covers overlay when differing 14-glyph labels collide on budget 11", () => {
