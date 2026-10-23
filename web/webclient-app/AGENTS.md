@@ -98,6 +98,12 @@ prototypes; the real app differs too much for a prototype to be useful).
   cross-layer gate target is an exit-ring stub whose native button is named
   `往 <leads_to> 移動` (Space is stopped at the button so the shell's key
   routing cannot swallow it).
+- Island motion is scale-aware (`lib/map_pan.js` `islandMotion`): an
+  unchanged projection mode and level pans the drawing with its
+  world-anchored dot field; a changed one never pans. It dissolves an inert
+  copy of the previous drawing at `full`
+  (`composables/use-island-dissolve.js`) and switches at once at
+  `reduced`/`off`.
 
 ## Styling pitfall
 
