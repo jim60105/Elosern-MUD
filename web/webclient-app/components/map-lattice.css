@@ -398,3 +398,10 @@
   outline: 2px solid var(--gold-400);
   outline-offset: 1px;
 }
+
+/* The one native control now spans two separate regions: a keyboard user must
+   see the label's part of it too, not only the arrow's. */
+.local-map__stub-button:focus-visible .local-map__stub-hit {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 1px;
+}

@@ -485,7 +485,12 @@ defineExpose({ viewRef });
         @update:view="(view) => (memory.world.view = view)"
         @update:selected="(key) => (memory.world.selected = key)"
       />
-      <div v-else class="map-drawer__state" data-testid="map-drawer-state">
+      <div
+        v-else
+        class="map-drawer__state"
+        :data-state="unavailableText ? 'unavailable' : 'loading'"
+        data-testid="map-drawer-state"
+      >
         <span class="map-drawer__state-seal" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
             <path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2ZM9 3v16M15 5v16" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
@@ -493,6 +498,11 @@ defineExpose({ viewRef });
         </span>
         <p v-if="unavailableText" class="map-drawer__state-text" data-testid="map-drawer-unavailable">{{ unavailableText }}</p>
         <p v-else class="map-drawer__state-text" data-testid="map-drawer-loading" aria-live="polite">正在展開地圖…</p>
+        <!-- Loading is a shape, not a colour: a gold rule keeps filling while
+             the opening's fresh body settles. Unavailable carries no rule. -->
+        <span v-if="!unavailableText" class="map-drawer__state-progress" aria-hidden="true">
+          <i></i>
+        </span>
       </div>
 
       <MapEdgePointers
@@ -718,6 +728,45 @@ defineExpose({ viewRef });
   font-family: var(--f-serif);
   font-size: var(--text-base);
   letter-spacing: 0.12em;
+}
+/* The two states differ by shape as well as wording: a live rule for the
+   opening still settling, a dashed muted seal for a stated unavailability. */
+.map-drawer__state[data-state="unavailable"] .map-drawer__state-seal {
+  color: var(--paper-500);
+  border-style: dashed;
+  background: none;
+}
+.map-drawer__state-progress {
+  position: relative;
+  display: block;
+  width: calc(96px * var(--ui-scale));
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: rgba(228, 200, 142, 0.18);
+}
+.map-drawer__state-progress i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--gold-400);
+  animation: map-drawer-state-sweep var(--motion-pending) ease-in-out infinite;
+}
+/* Reduced and off motion keep the rule as a static, partial fill that still
+   reads as "not finished" without moving. */
+@media (prefers-reduced-motion: reduce) {
+  .map-drawer__state-progress i { animation: none; }
+}
+:root[data-motion="reduced"] .map-drawer__state-progress i,
+:root[data-motion="off"] .map-drawer__state-progress i {
+  left: 0;
+  animation: none;
+}
+@keyframes map-drawer-state-sweep {
+  from { left: -40%; }
+  to { left: 100%; }
 }
 
 /* ── floating glass (chip, pill, popovers) ───────────────────────────── */

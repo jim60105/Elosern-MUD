@@ -57,6 +57,25 @@ export const FullLattice = {
   args: {
     localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
   },
+  // Two one-metre exits compress: the background is the distance-ring form
+  // and its one-metre candidate is a truthful labelled ring at the unchanged
+  // 66-unit equal-distance radius (design D4).
+  play: async ({ canvasElement }) => {
+    const ring = canvasElement.querySelector('.local-map__ring[data-distance="1"]');
+    if (!ring) {
+      throw new Error("FullLattice: the one-metre ring is missing");
+    }
+    if (Number(ring.getAttribute("r")) !== 66) {
+      throw new Error(`FullLattice: the one-metre ring is at ${ring.getAttribute("r")}`);
+    }
+    const labels = [...canvasElement.querySelectorAll(".local-map__ring-label")].map((el) => el.textContent.trim());
+    if (!labels.includes("1 m")) {
+      throw new Error(`FullLattice: the ring labels read ${labels.join(", ")}`);
+    }
+    if (canvasElement.querySelector('[data-testid="local-map__dot-field"]')) {
+      throw new Error("FullLattice: a compressed projection draws no dot field");
+    }
+  },
 };
 
 // An ordinary town neighbourhood (webclient-map-legibility): nine distinct
@@ -288,6 +307,19 @@ function assertStubActivates(recorder, expected, story) {
       throw new Error(`${story}: stub emitted ${JSON.stringify(move)}`);
     }
     if (recorder.opens.length !== 0) throw new Error(`${story}: stub activation also opened the full map`);
+    // The label own region is a separate child of the same single native
+    // button, and it activates the same original action (design D1).
+    const label = button.querySelector(".local-map__stub-hit");
+    if (!label) throw new Error(`${story}: the stub label must own a separate hit region`);
+    recorder.moves.length = 0;
+    label.click();
+    if (recorder.moves.length !== 1) {
+      throw new Error(`${story}: the label region emitted ${recorder.moves.length} moves`);
+    }
+    const [labelled] = recorder.moves;
+    if (labelled.exit_ref !== expected.exit_ref || labelled.destination !== expected.destination) {
+      throw new Error(`${story}: the label region emitted ${JSON.stringify(labelled)}`);
+    }
   };
 }
 
