@@ -64,6 +64,42 @@ export function fromScreen(frame, point) {
   };
 }
 
+// ---- scale-aware island motion (animate-minimap-scale-transitions) ----
+//
+// The FLIP pan assumes the drawing keeps its scale across the move (approved
+// minimap auto-scale design §6.5). The island projection states its scale as
+// a mode ("uniform" | "compressed") and a ladder level; `scaleKey` folds the
+// two into one comparable value, and `null` when there is no island
+// projection (the overlay, the radial graph, a coordinate-free layer).
+export function scaleKey(projection) {
+  if (!projection || typeof projection.mode !== "string" || !finite(projection.level)) {
+    return null;
+  }
+  return `${projection.mode}:${projection.level}`;
+}
+
+// What a committed change of the current node and/or the island scale plays:
+// - "crossfade": the scale or mode changed at the effective `full` level —
+//   a short dissolve from the previous drawing, never an equal-scale pan;
+// - "switch": the scale or mode changed at `reduced`/`off` — the new
+//   projection at once, and no previous frame may remain;
+// - "pan": same scale (or no island scale on either side), a new current
+//   node, and a level that animates travel — the existing FLIP pan;
+// - "none": nothing moved, no previous node (the first commit), or `off`.
+// A scale change is only recognised between two island projections, so the
+// first island after a graph/coordinate-free layer keeps the existing
+// immediate no-shared-frame behaviour.
+export function islandMotion({ previousId, nextId, previousScale, nextScale, motionLevel }) {
+  const scaleChanged = previousScale != null && nextScale != null && previousScale !== nextScale;
+  if (scaleChanged) {
+    return motionLevel === "full" ? "crossfade" : "switch";
+  }
+  if (previousId == null || previousId === nextId) {
+    return "none";
+  }
+  return motionLevel === "off" ? "none" : "pan";
+}
+
 // The translation, in `next`'s user units, that puts the node at
 // `next.pos` back on the screen point where it stood in `prev`. `null` when
 // either frame is missing or degenerate (the node left the placement: a

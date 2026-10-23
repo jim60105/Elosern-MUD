@@ -2,7 +2,7 @@
 // `panOffset` anchors the previous current node on the screen point where it
 // stood, expressed in the new drawing's user units.
 import { describe, expect, it } from "vitest";
-import { fromScreen, panOffset, toScreen } from "../lib/map_pan.js";
+import { fromScreen, islandMotion, panOffset, scaleKey, toScreen } from "../lib/map_pan.js";
 
 // The island's fixed canvas square at the 1451x790 reference
 // (retarget-desktop-viewport-contract D7).
@@ -58,5 +58,65 @@ describe("panOffset", () => {
     const back = fromScreen(frame(null, vb), point);
     expect(back.x).toBeCloseTo(200, 6);
     expect(back.y).toBeCloseTo(100, 6);
+  });
+});
+
+// animate-minimap-scale-transitions (approved minimap auto-scale design §6.5):
+// the FLIP pan assumes one scale before and after; a changed island mode or
+// level crossfades at full and switches at once at reduced/off.
+describe("scaleKey", () => {
+  it("folds an island projection's mode and level into one key", () => {
+    expect(scaleKey({ mode: "uniform", level: 1500 })).toBe("uniform:1500");
+    expect(scaleKey({ mode: "compressed", level: 1500 })).toBe("compressed:1500");
+  });
+
+  it("has no key without an island projection", () => {
+    expect(scaleKey(null)).toBeNull();
+    expect(scaleKey(undefined)).toBeNull();
+    expect(scaleKey({ mode: "uniform" })).toBeNull();
+    expect(scaleKey({ mode: "uniform", level: Number.NaN })).toBeNull();
+  });
+});
+
+describe("islandMotion", () => {
+  const step = { previousId: "a", nextId: "b" };
+
+  it("pans an unchanged mode and level at full and reduced, and stays still at off", () => {
+    const same = { ...step, previousScale: "uniform:1500", nextScale: "uniform:1500" };
+    expect(islandMotion({ ...same, motionLevel: "full" })).toBe("pan");
+    // Reduced keeps the existing pan path, whose travel token is 0.
+    expect(islandMotion({ ...same, motionLevel: "reduced" })).toBe("pan");
+    expect(islandMotion({ ...same, motionLevel: "off" })).toBe("none");
+  });
+
+  it("crossfades a changed level or mode only at full and switches at once otherwise", () => {
+    for (const [previousScale, nextScale] of [
+      ["uniform:1500", "uniform:2000"],
+      ["compressed:1500", "uniform:1500"],
+      ["uniform:300", "compressed:300"],
+    ]) {
+      const changed = { ...step, previousScale, nextScale };
+      expect(islandMotion({ ...changed, motionLevel: "full" })).toBe("crossfade");
+      expect(islandMotion({ ...changed, motionLevel: "reduced" })).toBe("switch");
+      expect(islandMotion({ ...changed, motionLevel: "off" })).toBe("switch");
+    }
+  });
+
+  it("compares the scale even when the current node is unchanged", () => {
+    const replacement = { previousId: "a", nextId: "a", previousScale: "uniform:1500", nextScale: "uniform:2000" };
+    expect(islandMotion({ ...replacement, motionLevel: "full" })).toBe("crossfade");
+    expect(islandMotion({ ...replacement, motionLevel: "reduced" })).toBe("switch");
+    expect(islandMotion({ ...replacement, previousScale: "uniform:2000", motionLevel: "full" })).toBe("none");
+  });
+
+  it("keeps the immediate no-shared-frame path without a previous node or island scale", () => {
+    expect(islandMotion({ previousId: null, nextId: "b", previousScale: null, nextScale: "uniform:1500", motionLevel: "full" })).toBe(
+      "none",
+    );
+    // Arriving from a coordinate-free layer: no previous scale, so no crossfade.
+    expect(islandMotion({ ...step, previousScale: null, nextScale: "uniform:1500", motionLevel: "full" })).toBe("pan");
+    // The radial graph and the overlay carry no island scale: their pan is unchanged.
+    expect(islandMotion({ ...step, previousScale: null, nextScale: null, motionLevel: "full" })).toBe("pan");
+    expect(islandMotion({ ...step, previousScale: null, nextScale: null, motionLevel: "off" })).toBe("none");
   });
 });

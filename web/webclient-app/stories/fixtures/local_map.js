@@ -962,6 +962,68 @@ export const LOCAL_MAP_EXTREME_RATIO_SAMPLE = {
   legend: [...METRIC_LEGEND],
 };
 
+// The frontier post's watchtower, one step north-west of the post along its
+// 1.2 km road: the post 1.2 km south-east and the northern pass 780 m
+// north-west fit one uniform level, so stepping here from the compressed
+// post switches the island from compressed to uniform mode
+// (animate-minimap-scale-transitions).
+const FRONTIER = (x, y) => `grid:frontier_post:${x}:${y}`;
+export const LOCAL_MAP_FRONTIER_WATCHTOWER_SAMPLE = {
+  schema_version: 1,
+  available: true,
+  layer: "grid",
+  current_node: FRONTIER(1150, 2850),
+  title: "瞭望塔街道圖",
+  nodes: [
+    [FRONTIER(1150, 2850), "瞭望塔", 1150, 2850, "current", null],
+    [FRONTIER(2000, 2000), "邊境驛站", 2000, 2000, "visible_visited", "se"],
+    [FRONTIER(600, 3400), "北嶺關", 600, 3400, "visible_unvisited", "nw"],
+    [FRONTIER(2080, 2000), "馬廄", 2080, 2000, "visible_visited", ""],
+  ].map(([id, label, x, y, visibility, exit]) => ({
+    id,
+    label,
+    x,
+    y,
+    visibility,
+    current: visibility === "current",
+    anchor: id === FRONTIER(2000, 2000),
+    landmark: id === FRONTIER(2000, 2000),
+    gateway: null,
+    action: exit ? { kind: "move", exit_ref: `e_tower_${exit}`, destination: id } : null,
+  })),
+  edges: [
+    [FRONTIER(2000, 2000), "se", true],
+    [FRONTIER(600, 3400), "nw", true],
+    [FRONTIER(2080, 2000), "", false],
+  ].map(([destination, label, traversable]) => ({
+    source: FRONTIER(1150, 2850),
+    destination,
+    label,
+    known: destination !== FRONTIER(600, 3400),
+    traversable,
+  })),
+  legend: [...METRIC_LEGEND],
+};
+
+// Committed move pairs for the island's scale-aware motion
+// (animate-minimap-scale-transitions; approved design §6.5): each is one
+// adjacent step between two real payload views, as the server commits them.
+// - same scale: 中央廣場 → 大道北段, both at the 1500 m level (格距 300 m);
+// - ladder: 市場街 (1500 m) → 工匠巷, whose 1.2 km exits need the 2000 m level;
+// - compression: the compressed frontier post → its uniform watchtower.
+export const LOCAL_MAP_MOVE_SAME_SCALE = Object.freeze({
+  from: metricViewAround(ALTORIA_METRIC_CORPUS, "central_plaza", { visited: ["north_avenue", "market_street"] }),
+  to: metricViewAround(ALTORIA_METRIC_CORPUS, "north_avenue", { visited: ["central_plaza", "south_avenue"] }),
+});
+export const LOCAL_MAP_MOVE_LADDER = Object.freeze({
+  from: metricViewAround(ALTORIA_METRIC_CORPUS, "market_street", { visited: ["central_plaza"] }),
+  to: metricViewAround(ALTORIA_METRIC_CORPUS, "craft_alley", { visited: ["market_street"] }),
+});
+export const LOCAL_MAP_MOVE_COMPRESSION = Object.freeze({
+  from: LOCAL_MAP_EXTREME_RATIO_SAMPLE,
+  to: LOCAL_MAP_FRONTIER_WATCHTOWER_SAMPLE,
+});
+
 // The central plaza with three remembered gateways on three rim sides, one
 // with the presenter's disambiguated long form: every name is drawn whole on
 // the island (beside its diamond or wrapped onto an inward row), never

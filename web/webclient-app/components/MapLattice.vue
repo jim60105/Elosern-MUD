@@ -25,8 +25,17 @@
 // targets carry the new placement from the commit on. The dot field, the fog, and the gutter's
 // edge-direction markers stay put. Travel is multiplied by `--motion-travel`,
 // so the reduced and off levels show the new placement at once.
+//
+// Scale-aware island motion (animate-minimap-scale-transitions; approved
+// minimap auto-scale design §6.5): the island pans only while its projection
+// keeps one mode and level, and then the world-anchored dot field rides the
+// pan with the routes and nodes. A changed mode or level never pans: at the
+// effective `full` level the previous drawing dissolves into the new one
+// (composables/use-island-dissolve.js), at `reduced` and `off` the new
+// projection shows at once with no previous frame left behind.
 import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
-import { panOffset } from "../lib/map_pan.js";
+import { islandMotion, panOffset, scaleKey } from "../lib/map_pan.js";
+import { useIslandDissolve } from "../composables/use-island-dissolve.js";
 import {
   useMapLatticeGeometry,
   MARKER_CURRENT_R,
@@ -152,6 +161,7 @@ const {
   islandStubs,
   islandLabels,
   isGateway,
+  projection,
 } = geometry;
 
 // The island's context tier (two-hop places) draws as a small background dot
@@ -373,23 +383,55 @@ function setPan(el, dx, dy) {
   el.style.setProperty(`--${axis}-y`, `${dy}px`);
 }
 
-// Before the patch: the previous current node where it stands now.
+// The island projection's scale (mode and level), only on a coordinate-
+// bearing island: the overlay, the radial graph and a coordinate-free layer
+// have none, so they never crossfade.
+const islandScale = computed(() =>
+  isIsland.value && (props.localMap.layer === "grid" || props.localMap.layer === "wilderness")
+    ? scaleKey(projection.value)
+    : null,
+);
+
+const leavingHost = ref(null);
+const dissolve = useIslandDissolve(leavingHost);
+
+// Before the patch: decide what the commit plays (lib/map_pan.js
+// `islandMotion`). A pan records the previous current node where it stands
+// now; a full-motion scale change copies the drawing as it stands; a reduced
+// or off scale change drops every previous frame in this very frame.
 watch(
-  currentNodeId,
-  (_next, prev) => {
+  [currentNodeId, islandScale],
+  ([nextId, nextScale], [prevId, prevScale] = []) => {
     panFrame = null;
     const svg = svgEl.value;
-    if (!props.panOnMove || !svg || props.motionLevel === "off" || prev == null) return;
-    panFrame = { id: prev, frame: readFrame(svg, prev, true) };
+    if (!props.panOnMove || !svg) return;
+    const motion = islandMotion({
+      previousId: prevId,
+      nextId,
+      previousScale: prevScale,
+      nextScale,
+      motionLevel: props.motionLevel,
+    });
+    if (motion === "crossfade") {
+      if (!dissolve.snapshot(svg)) dissolve.clear();
+      return;
+    }
+    if (motion === "switch") {
+      dissolve.clear();
+      return;
+    }
+    if (motion === "pan") panFrame = { id: prevId, frame: readFrame(svg, prevId, true) };
   },
   { flush: "pre" },
 );
 
-// After the patch: start the drawing where the previous node stood on
-// screen, then release it to the committed placement on the base duration.
+// After the patch: a scale change lays the copied drawing over the committed
+// one and dissolves it; a pan starts the drawing where the previous node stood
+// on screen, then releases it to the committed placement on the base duration.
 watch(
-  currentNodeId,
-  (nextId) => {
+  [currentNodeId, islandScale],
+  ([nextId]) => {
+    dissolve.play();
     const recorded = panFrame;
     panFrame = null;
     const svg = svgEl.value;
@@ -426,8 +468,18 @@ watch(
   { flush: "post" },
 );
 
+// Leaving `full` (or the island) mid-dissolve shows the committed drawing at
+// once: no previous frame outlives the level that allowed it.
+watch(
+  () => props.motionLevel !== "full" || !isIsland.value || !props.panOnMove,
+  (stop) => {
+    if (stop) dissolve.clear();
+  },
+);
+
 onBeforeUnmount(() => {
   panFrame = null;
+  dissolve.clear();
 });
 
 defineExpose({
@@ -913,6 +965,19 @@ defineExpose({
       </text>
     </g>
   </svg>
+  <!-- The island's scale-change dissolve (animate-minimap-scale-transitions):
+       a childless host over the drawing and under the stub buttons, into
+       which the script lays inert, aria-hidden copies of the previous
+       drawing while they fade out. Vue renders no children here, so it never
+       patches the copies; each one removes itself when its fade ends. -->
+  <div
+    v-if="isIsland && panOnMove"
+    ref="leavingHost"
+    class="local-map__leaving-host"
+    data-testid="local-map__leaving-host"
+    aria-hidden="true"
+    inert
+  ></div>
   <!-- An actionable stub's control: a native button over its arrow and
        label (the island svg is role="img", whose children are presentational,
        so the control is the svg's sibling). Enter, Space and pointer all
