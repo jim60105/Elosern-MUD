@@ -78,7 +78,8 @@
     "Core/ListDetail",
     "Core/ActionBar",
     "Data/HoldingsStrip",
-    "World/AreaMapView"
+    "World/AreaMapView",
+    "World/WorldMapView"
   ],
   "frozen": true
 }

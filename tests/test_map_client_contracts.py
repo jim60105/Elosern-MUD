@@ -20,6 +20,7 @@ from tools.spec_traceability import covers_requirement
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_viewport.test.js"
 AREA_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/area_map_view.test.js"
+WORLD_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/world_map_view.test.js"
 VITEST_BIN = REPO_ROOT / "node_modules/.bin/vitest"
 
 
@@ -189,6 +190,54 @@ class AreaViewContracts(VitestContractMixin, unittest.TestCase):
         self.assert_block_passed(
             "area selection offers travel only for an authoritative adjacent exit"
         )
+
+
+class WorldViewContracts(VitestContractMixin, unittest.TestCase):
+    """Runs ``world_map_view.test.js`` once; one method per requirement."""
+
+    SUITE = WORLD_VIEW_SUITE
+    SUITE_NAME = "world map view"
+
+    @covers_requirement(
+        "webclient-world-map-view::world-layers-render-in-the-approved-exploration-order"
+    )
+    def test_ordered_layers_and_unlit_privacy(self):
+        # Schema-valid fixtures; the fourteen layers in the approved order;
+        # unlit districts as hatching, a dotted border and 未探明 with no
+        # landmark, terrain, place or undisclosed name; approximate
+        # commissions as a dashed 36 km circle on the supplied 50 km point
+        # labelled 大致方位 with no exact pin; only supplied borders.
+        self.assert_block_passed("world layers render in the approved exploration order")
+
+    @covers_requirement(
+        "webclient-world-map-view::world-map-detail-follows-zoom-thresholds-without-shrinking-text"
+    )
+    def test_inclusive_lod_and_trail_resolution(self):
+        # Inclusive 1000 km and 450 km boundaries, nations at 大陸/國, labels
+        # never below 16px with collisions hidden by priority, and the trail
+        # as a line until 近郊, then cells at the supplied 1 or 5 km
+        # resolution; the dense worst case stays bounded.
+        self.assert_block_passed("world map detail follows zoom thresholds without shrinking text")
+
+    @covers_requirement(
+        "webclient-world-map-view::newly-lit-districts-animate-accessibly-from-their-landmark"
+    )
+    def test_reveal_motion_and_announcement(self):
+        # One 600 ms ink spread centred on the new district's landmark and
+        # one 已探明 announcement per unlit-to-lit transition; none on the
+        # first payload, a repeat, a remount, a new epoch or regressed
+        # knowledge; reduced/off motion lights instantly and still announces.
+        self.assert_block_passed("newly lit districts animate accessibly from their landmark")
+
+    @covers_requirement(
+        "webclient-world-map-view::world-selection-exposes-readable-permitted-detail"
+    )
+    def test_semantic_selection_detail(self):
+        # The lit deep forest lists both nations by id; a single-nation
+        # district lists one; unlit selections stay nameless; commissions and
+        # places mirror supplied text; HTML buttons select and a drag never
+        # does.
+        self.assert_block_passed("world selection exposes readable permitted detail")
 
 
 if __name__ == "__main__":

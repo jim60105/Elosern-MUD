@@ -210,6 +210,10 @@
      picking D4): the lit figure's ring breathes on this loop at `full` and
      stands still (static and brighter) at reduced and off. */
   --motion-target-pulse: 1.2s;
+  /* A newly lit world-map district's ink spread from its landmark
+     (render-world-map-view); the script reads it (`lib/motion_tokens.js`),
+     and `reduced`/`off` resolve it to 0ms, which lights the district at once. */
+  --motion-district-reveal: 600ms;
   --motion-marker-travel: 2px;
   /* The combat beat pause (webclient-combat-beat-queue design D2, AVG stage
      design §10.2): the wait between one beat page and the next. Only the
@@ -943,6 +947,7 @@
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
   --motion-target-pulse: 0ms;
+  --motion-district-reveal: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -973,6 +978,7 @@
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
   --motion-target-pulse: 0ms;
+  --motion-district-reveal: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -1014,6 +1020,7 @@
     --motion-marker-bob: 0ms;
     --motion-playback-sweep: 0ms;
   --motion-target-pulse: 0ms;
+  --motion-district-reveal: 0ms;
     --motion-travel: 0;
     --motion-flash-peak: 0;
   }

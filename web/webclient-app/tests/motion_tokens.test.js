@@ -47,6 +47,8 @@ const LEVEL_TOKENS = [
   "--motion-playback-sweep",
   // The stage target step's focus pulse (webclient-combat-stage-target-picking).
   "--motion-target-pulse",
+  // A newly lit world-map district's ink spread (render-world-map-view).
+  "--motion-district-reveal",
   "--motion-travel",
   "--motion-flash-peak",
 ];
