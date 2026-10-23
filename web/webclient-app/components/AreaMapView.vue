@@ -904,7 +904,7 @@ onBeforeUnmount(() => {
   stroke: none;
   transform-box: fill-box;
   transform-origin: center;
-  animation: area-map-here-breathe 2.8s ease-in-out infinite;
+  animation: area-map-here-breathe var(--motion-pulse) ease-in-out infinite;
 }
 @keyframes area-map-here-breathe {
   0%, 100% { opacity: 0.55; transform: scale(0.86); }
