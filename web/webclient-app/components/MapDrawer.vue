@@ -216,6 +216,30 @@ function onPointerDownCapture(event) {
 
 // ── commissions: select and show ────────────────────────────────────────
 
+// Area commissions can precede the first world response or a refreshed
+// accepted-commission list. Keep only their identity until that body arrives.
+const pendingWorldQuest = ref(null);
+watch(
+  () => [pendingWorldQuest.value, props.world, props.tab, props.epoch],
+  ([intent, world, tab, epoch]) => {
+    if (!intent) return;
+    if (intent.epoch !== epoch) {
+      pendingWorldQuest.value = null;
+      return;
+    }
+    if (tab !== "world") return;
+    if (world?.available === true && world.quest_markers.some((marker) => marker.id === intent.id)) {
+      props.memory.world.selected = `quest:${intent.id}`;
+      pendingWorldQuest.value = null;
+    } else if (world && world !== intent.body) {
+      // A new response without the destination is authoritative. Leave the
+      // selection empty; neither area bearings nor old selections locate it.
+      pendingWorldQuest.value = null;
+    }
+  },
+  { flush: "post" },
+);
+
 function centreAreaNode(nodeId) {
   const state = viewState.value;
   const entry = placeNodes(props.area).find((item) => item.node.id === nodeId);
@@ -228,6 +252,7 @@ function showQuest(questId) {
   closePopovers();
   if (props.tab === "world") {
     // The world view pans a newly selected feature into view itself.
+    pendingWorldQuest.value = null;
     props.memory.world.selected = `quest:${questId}`;
     return;
   }
@@ -240,9 +265,8 @@ function showQuest(questId) {
   }
   // A destination the area tab cannot place (elsewhere or in fog) opens on
   // the world tab, where the server states its permitted precision.
-  if (worldReady.value && props.world.quest_markers.some((marker) => marker.id === questId)) {
-    props.memory.world.selected = `quest:${questId}`;
-  }
+  props.memory.world.selected = null;
+  pendingWorldQuest.value = { id: questId, epoch: props.epoch, body: props.world };
   selectTab("world", { focus: true });
 }
 

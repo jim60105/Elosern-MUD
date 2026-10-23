@@ -14,6 +14,7 @@ import MapDrawer from "../../components/MapDrawer.vue";
 import MapLattice from "../../components/MapLattice.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import { areaMemoryKey, scopeForLayer, useMapDrawer } from "../../composables/use-map-drawer.js";
+import { project, usableRect } from "../../lib/map_viewport.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import { TOWN_IDS, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
 import { QUEST_IDS, worldBase } from "../../stories/fixtures/world_map.js";
@@ -135,7 +136,7 @@ function mountDrawer(props = {}) {
             world: props.world === undefined ? validateWorldMapPanel(worldBase()) : props.world,
             tab: state.tab,
             memory,
-            epoch: "1|epoch-a",
+            epoch: props.epoch ?? "1|epoch-a",
             locationLabel: "灰岩鎮",
             busy: props.busy ?? false,
             "onUpdate:tab": (tab) => {
@@ -518,8 +519,7 @@ describe("floating map chrome avoids selected details", () => {
     expect(w.find('[data-testid="world-map-detail__title"]').text()).toBe("調查帝都古文書");
   });
 
-  it("sends an area commission it cannot place to the world tab", async () => {
-    const { w, memory, state } = mountDrawer();
+  async function activateOutsideCommission(w) {
     await tick();
     await w.find('[data-testid="map-drawer-quests-toggle"]').trigger("click");
     await tick();
@@ -527,8 +527,52 @@ describe("floating map chrome avoids selected details", () => {
     expect(far.text()).toContain("區域外");
     await far.trigger("click");
     await tick();
+  }
+
+  function worldWithOutsideCommission() {
+    const world = worldBase();
+    const marker = world.quest_markers.find((item) => item.id === QUEST_IDS.approximate);
+    world.quest_markers = [{ ...marker, id: "q_story_far", title: "霧谷的失蹤羊群" }];
+    return validateWorldMapPanel(world);
+  }
+
+  it.each(["unloaded", "stale"])("reveals an area commission after an initially %s world response", async (initial) => {
+    const props = reactive({ world: initial === "unloaded" ? null : validateWorldMapPanel(worldBase()) });
+    const { w, memory, state } = mountDrawer(props);
+    memory.world.selected = `quest:${QUEST_IDS.exact}`;
+    await activateOutsideCommission(w);
     expect(state.tab).toBe("world");
-    expect(memory.world.selected).toBeUndefined();
+    expect(memory.world.selected).toBeNull();
+    expect(w.find('[data-testid="world-map-detail"]').exists()).toBe(false);
+    props.world = worldWithOutsideCommission();
+    await tick();
+    expect(memory.world.selected).toBe("quest:q_story_far");
+    expect(w.find('[data-testid="world-map-detail__title"]').text()).toBe("霧谷的失蹤羊群");
+    expect(w.find('[data-testid="world-map__approx"][data-quest="q_story_far"]').exists()).toBe(true);
+    const map = w.findComponent(MapDrawer).vm.viewRef;
+    const point = project(map.view, map.frame, props.world.quest_markers[0]);
+    const rect = usableRect(map.frame, { drawerOpen: true });
+    expect(point.x).toBeGreaterThanOrEqual(rect.left);
+    expect(point.x).toBeLessThanOrEqual(rect.right);
+    expect(point.y).toBeGreaterThanOrEqual(rect.top);
+    expect(point.y).toBeLessThanOrEqual(rect.bottom);
+  });
+
+  it.each(["epoch", "missing", "unavailable"])("retires unresolved commission intent after %s without inventing a position", async (retirement) => {
+    const props = reactive({ world: null, epoch: "epoch-a" });
+    const { w, memory } = mountDrawer(props);
+    await activateOutsideCommission(w);
+    if (retirement === "epoch") props.epoch = "epoch-b";
+    else props.world = retirement === "missing"
+      ? validateWorldMapPanel(worldBase())
+      : { available: false, reason: { code: "unavailable", message: "世界地圖目前無法顯示" } };
+    await tick();
+    expect(memory.world.selected).toBeNull();
+    expect(w.find('[data-testid="world-map-detail"]').exists()).toBe(false);
+    props.world = worldWithOutsideCommission();
+    await tick();
+    expect(memory.world.selected).toBeNull();
+    expect(w.find('[data-testid="world-map-detail"]').exists()).toBe(false);
   });
 });
 

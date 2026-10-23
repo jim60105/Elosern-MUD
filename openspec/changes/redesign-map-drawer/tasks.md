@@ -41,7 +41,7 @@ The parent agent approved this predecessor handoff convention explicitly.
   callback, and compares epoch plus complete area map/frame identity.
   Frame/epoch retirement regressions pass.
 - `pnpm exec vitest run web/webclient-app/tests/world/map_drawer.test.js
-  web/webclient-app/tests/world/map_edge_pointers.test.js`: 50 tests passed.
+  web/webclient-app/tests/world/map_edge_pointers.test.js`: 54 tests passed.
   Includes request commit ordering, rejected/closed paths, keyboard/Escape,
   current markers, removal checks and both required frame-transition paths.
 - `uv run --locked python -m unittest
@@ -105,6 +105,16 @@ The parent agent approved this predecessor handoff convention explicitly.
   The reviewer could inspect current source/specs but could not obtain the
   full Git diff through its tools; this is recorded as a review limitation,
   not a complete-diff approval.
+- The parent's independent review found that area-to-world commission
+  selection was lost before the first world payload or when cached data
+  lacked a newly accepted commission. The drawer now keeps an epoch-bound
+  identity-only intent, clears unrelated world selection, and resolves the
+  intent after the real world view receives its body. Missing/unavailable
+  destinations retire the intent without guessed coordinates; epoch changes
+  retire it too. Integration regressions verify both initially null and
+  stale world data, selected detail and actual projected visibility, plus
+  all three retirement paths. The focused drawer/pointer run passed all
+  54 tests after this correction.
 - Existing map protocol, metric-map, frozen-hook, player command and
   frontend-agent docs were updated. The builder-oriented text `地圖`
   command and its reference entry are intentionally unchanged.

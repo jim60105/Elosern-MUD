@@ -273,6 +273,14 @@ only, never a pointer.
 - `前往` forwards the area body's own descriptor and canonical
   `current_node` through the same `explore.move` seam as the minimap.
 
+An area commission outside the current map opens the world tab with an
+epoch-bound identity-only selection intent. The drawer clears any unrelated
+world selection and resolves that intent against the received world markers,
+then the real world view reveals the selected destination beside its detail
+card. A new response that omits the destination or declares the map
+unavailable retires the intent; an epoch change also retires it. No area
+bearing is converted into invented world coordinates.
+
 Keys inside the drawer: arrows pan, `＋`／`－` jump zoom stops, `C`
 recentres, `0` shows the whole map, `1`／`2` switch tabs. Escape closes an
 open popover, then the selection, then the map. `OverlayHost` stops every
