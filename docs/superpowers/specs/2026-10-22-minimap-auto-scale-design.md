@@ -1,7 +1,7 @@
 # Minimap Auto-Scale Design
 
 Date: 2026-10-22
-Status: Approved design; not implemented.
+Status: Implemented (all five changes in §9; the full-map follow-up below remains open).
 Amends: [World Map Scale and Metric Settlement](2026-10-21-world-map-scale-design.md) §11 for the minimap island only.
 Follow-up: the full-map drawer redesign (whole-area map and world map) is a separate design.
 
@@ -132,6 +132,8 @@ New pure module `web/webclient-app/lib/minimap_projection.js`, with no Vue or DO
 ### 6.5 Transitions
 
 The FLIP pan in `web/webclient-app/lib/map_pan.js` assumes equal scales before and after a move. When the level and mode are unchanged it applies as now, moving the dots as well. When either changes, `full` motion uses a short crossfade, and `reduced`/`off` switch immediately.
+
+Implementation note (animate-minimap-scale-transitions): `scaleKey`/`islandMotion` in `map_pan.js` decide pan, crossfade or switch, including a replacement that keeps the current node. The crossfade (`composables/use-island-dissolve.js`) lays an inert, aria-hidden copy of the previous drawing, opaque canvas included, over the committed one and fades it over `--motion-base` on `--ease-enter`. Pixels both frames share, such as the centred current marker, the axis cross and the frame, therefore stay still. A cross-layer gateway step follows the same decision and never synthesises a shared frame.
 
 ## 7. Accessibility
 

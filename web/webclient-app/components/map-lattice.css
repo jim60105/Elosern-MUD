@@ -306,6 +306,47 @@
   transition: transform var(--motion-base) var(--ease-standard);
 }
 
+/* The island's scale-change dissolve (animate-minimap-scale-transitions;
+   approved minimap auto-scale design §6.5). A changed projection mode or
+   level never pans: the script lays an inert copy of the previous drawing —
+   opaque canvas and all — exactly over the committed one and fades it out.
+   Fading an opaque copy (rather than cross-fading two half-transparent
+   layers) keeps every pixel the two frames share perfectly still, so the
+   centred current marker, the axis cross and the frame never dip or flicker
+   while the ground, routes and names re-scale underneath. The fade takes
+   the pan's own beat (`--motion-base`) on the decelerating `--ease-enter`
+   curve: the old frame lets go at once, so the new names are the legible
+   ones within the first third (measured in the browser: 56% of the old
+   frame left at 50ms, 31% at 100ms, 16% at 150ms, 4% at 220ms), and the
+   soft tail lets the old ground settle away instead of cutting. A balanced
+   in-out curve held both frames at half strength mid-way (doubled names);
+   `--ease-standard` dropped below 6% by 150ms and read as a cut. The host
+   sits over the drawing and under the stub buttons, and is never a hit
+   target. */
+.local-map__leaving-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.local-map__leaving-host > svg.local-map__lattice.local-map__lattice--leaving {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: opacity;
+  animation: map-lattice-dissolve var(--motion-base) var(--ease-enter) forwards;
+}
+
+@keyframes map-lattice-dissolve {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* ---- Island labels, gates and exit stubs (label-minimap-exits-and-gateways) ---- */
 
 /* The island's viewport is a positioned box the size of its square, so the

@@ -1361,11 +1361,20 @@ class SceneTransitionsEvidenceTest(unittest.TestCase):
     """webclient-scene-transitions: the inert rule, the minimap pan offset,
     and the stage transitions driven through the real Vue <Transition> are
     DOM-state contracts jsdom can execute, so the Vitest files are their
-    evidence (the browser file covers computed durations)."""
+    evidence (the browser file covers computed durations).
+    animate-minimap-scale-transitions adds the island's scale-aware motion:
+    map_pan.test.js decides pan / crossfade / switch from the projection's
+    mode and level, and map_lattice_scale_motion.test.js mounts the island
+    to show the dot field panning with the drawing on an equal-scale step,
+    the inert identity-free dissolving copy at full, the immediate switch
+    with no copy or pan through two frames at reduced/off, interrupted and
+    unmounted sequences settling on the latest projection, and the graph
+    and no-shared-frame paths unchanged."""
 
     @covers_requirement(
         "webclient-contextual-hud::location-appearance-and-vitals-changes-transition-at-the-motion-level",
         "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
+        "webclient-local-map::island-movement-uses-scale-aware-effective-motion",
     )
     def test_scene_transitions_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -1377,6 +1386,7 @@ class SceneTransitionsEvidenceTest(unittest.TestCase):
                 str(REPO_ROOT / "web/webclient-app/tests/transition_hooks.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/map_pan.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/scene_transitions.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/map_lattice_scale_motion.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,

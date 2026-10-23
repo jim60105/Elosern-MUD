@@ -1,4 +1,4 @@
-import { h } from "vue";
+import { defineComponent, h, onBeforeUnmount, ref } from "vue";
 import LocalMap from "../../components/LocalMap.vue";
 import {
   LOCAL_MAP_INTERIOR_SAMPLE,
@@ -18,6 +18,9 @@ import {
   LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE,
   LOCAL_MAP_WILDERNESS_RETURN_SAMPLE,
   LOCAL_MAP_CROWDED_LABELS_SAMPLE,
+  LOCAL_MAP_MOVE_SAME_SCALE,
+  LOCAL_MAP_MOVE_LADDER,
+  LOCAL_MAP_MOVE_COMPRESSION,
   localMapModelFor,
 } from "../fixtures.js";
 
@@ -476,4 +479,174 @@ export const MetricCrowdedLabels = {
       throw new Error("MetricCrowdedLabels: the east gate must draw its gate glyph");
     }
   },
+};
+
+// ---------------------------------------------------------------------------
+// Island movement (animate-minimap-scale-transitions; approved design §6.5).
+// Each story commits one real adjacent step between two payload views, the
+// way the store commits a move, at one effective motion level (written to
+// `<html data-motion>` while the story is mounted, so the motion tokens
+// resolve as in the client). The 走一步 / 退一步 chip is story chrome only:
+// it replays the step for visual inspection (退一步 remounts the origin).
+// An unchanged mode and level pans the drawing with its world-anchored dots; a changed mode or level
+// dissolves at `full` and switches at once at `reduced`/`off`. After the
+// motion settles every play re-runs the metric exit-inside/non-overlap
+// assertions on the committed destination.
+// ---------------------------------------------------------------------------
+
+const MovementIsland = defineComponent({
+  name: "MovementIsland",
+  props: {
+    pair: { type: Object, required: true },
+    motionLevel: { type: String, default: "full" },
+  },
+  setup(props) {
+    const root = document.documentElement;
+    const previous = root.dataset.motion;
+    root.dataset.motion = props.motionLevel;
+    onBeforeUnmount(() => {
+      if (previous === undefined) delete root.dataset.motion;
+      else root.dataset.motion = previous;
+    });
+    const step = ref(0);
+    // Stepping back remounts the island on the origin (a fresh hysteresis
+    // memory), so every 走一步 replays exactly the committed step.
+    const mount = ref(0);
+    const models = [localMapModelFor(props.pair.from), localMapModelFor(props.pair.to)];
+    return () =>
+      h("div", { style: "display: flex; flex-direction: column; gap: 8px; width: max-content;" }, [
+        h(
+          "button",
+          {
+            type: "button",
+            "data-testid": "story-move-step",
+            style:
+              "align-self: flex-end; font: inherit; font-size: var(--text-xs); color: var(--paper-300);" +
+              " background: var(--panel); border: var(--line); border-radius: var(--radius-sm); padding: 2px 10px; cursor: pointer;",
+            onClick: () => {
+              if (step.value === 1) mount.value += 1;
+              step.value = 1 - step.value;
+            },
+          },
+          step.value === 0 ? "走一步" : "退一步",
+        ),
+        h(LocalMap, { key: mount.value, localMap: models[step.value], motionLevel: props.motionLevel }),
+      ]);
+  },
+});
+
+const renderMovement = (args) => ({ render: () => h(MovementIsland, args) });
+
+const IDENTITY = new Set(["none", "matrix(1, 0, 0, 1, 0, 0)"]);
+const panTransforms = (canvasElement) =>
+  [...canvasElement.querySelectorAll(".map-lattice__pan")].map((el) => getComputedStyle(el).transform);
+const leavingCopies = (canvasElement) => [...canvasElement.querySelectorAll('[data-testid="local-map__leaving"]')];
+const afterFrames = (n) =>
+  new Promise((resolve) => {
+    const step = (left) => (left === 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+    step(n);
+  });
+async function until(check, story, what, timeout = 3000) {
+  const start = performance.now();
+  while (!check()) {
+    if (performance.now() - start > timeout) throw new Error(`${story}: ${what} never happened`);
+    await afterFrames(1);
+  }
+}
+
+// One step at the story's level: `kind` is "pan" (unchanged mode and level)
+// or "scale" (a changed one).
+function assertMovement(pair, kind, level, story) {
+  return async (context) => {
+    const { canvasElement } = context;
+    const current = () =>
+      canvasElement.querySelector('.local-map__node[data-visibility="current"]')?.getAttribute("data-node");
+    if (current() !== pair.from.current_node) throw new Error(`${story}: not standing on the step's origin`);
+    if (level === "full" && kind === "pan") {
+      canvasElement.querySelector('[data-testid="story-move-step"]').click();
+      await until(() => current() === pair.to.current_node, story, "the move commit");
+      // The same commit starts the pan: every pan group (the dot field
+      // included) is offset, no copy is laid over the drawing.
+      const field = canvasElement.querySelector('[data-testid="map-lattice__pan--field"]');
+      if (!field || IDENTITY.has(getComputedStyle(field).transform)) {
+        throw new Error(`${story}: the dot field must start the pan offset with the drawing`);
+      }
+      const transforms = new Set(panTransforms(canvasElement));
+      if (transforms.size !== 1) throw new Error(`${story}: the pan groups must move as one shape`);
+      if (leavingCopies(canvasElement).length !== 0) throw new Error(`${story}: an equal-scale step must not dissolve`);
+      await until(() => panTransforms(canvasElement).every((t) => IDENTITY.has(t)), story, "the pan settling");
+    } else if (level === "full") {
+      canvasElement.querySelector('[data-testid="story-move-step"]').click();
+      await until(() => current() === pair.to.current_node, story, "the move commit");
+      const copies = leavingCopies(canvasElement);
+      if (copies.length !== 1) throw new Error(`${story}: a scale change must lay one dissolving copy, found ${copies.length}`);
+      const [copy] = copies;
+      // SVG elements have no `inert` property; the HTML host carries the real
+      // inertness and the copy repeats it as an attribute.
+      const hostEl = copy.parentElement;
+      if (!hostEl?.inert || !copy.hasAttribute("inert") || copy.getAttribute("aria-hidden") !== "true" || hostEl.getAttribute("aria-hidden") !== "true") {
+        throw new Error(`${story}: the leaving copy must be inert and hidden`);
+      }
+      if (copy.querySelector("[data-node], [data-testid], button")) throw new Error(`${story}: the copy kept an identity`);
+      if (!panTransforms(canvasElement).every((t) => IDENTITY.has(t))) {
+        throw new Error(`${story}: a scale change must never pan`);
+      }
+      await until(() => leavingCopies(canvasElement).length === 0, story, "the dissolve ending");
+    } else {
+      canvasElement.querySelector('[data-testid="story-move-step"]').click();
+      await until(() => current() === pair.to.current_node, story, "the move commit");
+      await afterFrames(2);
+      if (leavingCopies(canvasElement).length !== 0) throw new Error(`${story}: ${level} must leave no previous frame`);
+      if (!panTransforms(canvasElement).every((t) => IDENTITY.has(t))) {
+        throw new Error(`${story}: ${level} must show the new placement at once`);
+      }
+    }
+    await assertExitsDrawn(pair.to, story)(context);
+  };
+}
+
+// 中央廣場 → 大道北段: both at the 1500 m level (格距 300 m). The ground pans
+// with the drawing, so the dots slide under the player instead of standing
+// still behind the moving routes.
+export const MetricMoveSameScale = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_SAME_SCALE, motionLevel: "full" },
+  play: assertMovement(LOCAL_MAP_MOVE_SAME_SCALE, "pan", "full", "MetricMoveSameScale"),
+};
+
+// The same step at reduced: no travel, the new placement at once.
+export const MetricMoveSameScaleReduced = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_SAME_SCALE, motionLevel: "reduced" },
+  play: assertMovement(LOCAL_MAP_MOVE_SAME_SCALE, "pan", "reduced", "MetricMoveSameScaleReduced"),
+};
+
+// 市場街 → 工匠巷: the 1.2 km exits need the 2000 m level (格距 400 m), a
+// ladder boundary. Full motion dissolves the 300 m frame into the 400 m one.
+export const MetricMoveLadder = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_LADDER, motionLevel: "full" },
+  play: assertMovement(LOCAL_MAP_MOVE_LADDER, "scale", "full", "MetricMoveLadder"),
+};
+
+// The ladder step at reduced: the new scale at once, no dissolve.
+export const MetricMoveLadderReduced = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_LADDER, motionLevel: "reduced" },
+  play: assertMovement(LOCAL_MAP_MOVE_LADDER, "scale", "reduced", "MetricMoveLadderReduced"),
+};
+
+// The compressed frontier post → its uniform watchtower: distance rings give
+// way to the dot field through the dissolve.
+export const MetricMoveCompression = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_COMPRESSION, motionLevel: "full" },
+  play: assertMovement(LOCAL_MAP_MOVE_COMPRESSION, "scale", "full", "MetricMoveCompression"),
+};
+
+// The mode switch with motion off: the final projection in the commit frame.
+export const MetricMoveCompressionOff = {
+  render: renderMovement,
+  args: { pair: LOCAL_MAP_MOVE_COMPRESSION, motionLevel: "off" },
+  play: assertMovement(LOCAL_MAP_MOVE_COMPRESSION, "scale", "off", "MetricMoveCompressionOff"),
 };
