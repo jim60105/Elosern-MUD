@@ -109,7 +109,14 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
             and not s.get("beatHold")
             and not (s.get("dispatch") or {}).get("beatLocked")
-            and s.get("combatProgress") is not None,
+            # A round that finishes the encounter settles it and returns to
+            # exploration, which clears the progress card; its own playback is
+            # still the evidence that the beat settled. The round gate this
+            # helper follows already admits exactly that completion.
+            and (
+                s.get("combatProgress") is not None
+                or s.get("mode") != "combat"
+            ),
             timeout=timeout,
         )
 
