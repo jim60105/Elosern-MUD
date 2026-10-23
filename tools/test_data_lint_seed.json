@@ -419,6 +419,10 @@
     {
       "path": "world/lore/tests/test_registry_index_contract.py",
       "reason": "authored registry index coverage and shipped reference integrity contract"
+    },
+    {
+      "path": "world/lore/tests/test_map_district_content.py",
+      "reason": "shipped map-district landmarks against the authored continent"
     }
   ],
   "seedDebtPaths": [
