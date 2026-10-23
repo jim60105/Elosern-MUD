@@ -49,6 +49,7 @@ from .._combat_session_helpers import (
     SYNTH_GLOW_ELEMENT,
     live_skill_registry,
     SYNTH_SEAM_AREA_SKILL,
+    engagement_base,
     open_synthetic_scope,
     synth_damage_skill,
     synth_innate_overlay,
@@ -190,7 +191,11 @@ class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):
         ) as delegated:
             for round_index in range(1, 4):
                 with self.subTest(round=round_index):
-                    logs = run_round(self._battlefield(), monster_behaviour_policy)
+                    logs = run_round(
+                        self._battlefield(),
+                        monster_behaviour_policy,
+                        decision_scope_base=engagement_base(round_index=round_index),
+                    )
                     companion_logs = [
                         log
                         for log in logs

@@ -12,7 +12,6 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     RejectReason,
@@ -49,7 +48,9 @@ from .._combat_session_helpers import (
     SYNTH_GLOW_ELEMENT,
     live_skill_registry,
     SYNTH_SEAM_AREA_SKILL,
+    engagement_base,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_damage_skill,
     synth_innate_overlay,
     synth_lineage_tree,
@@ -296,6 +297,7 @@ class ProgressionTests(EvenniaTestCase):
             logs = run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
+                decision_scope_base=engagement_base(),
             )
         self.assertTrue(logs)
         self.assertEqual(
@@ -335,6 +337,7 @@ class ProgressionTests(EvenniaTestCase):
             logs = run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
+                decision_scope_base=engagement_base(),
             )
         kinds = [
             entry.kind for log in logs for entry in log.entries
@@ -363,7 +366,7 @@ class ProgressionTests(EvenniaTestCase):
             [monster, monster],
             BattlefieldActionContext(battlefield),
         )
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
         self.assertIsNone(actor.db.skill_proficiency)
@@ -389,6 +392,7 @@ class ProgressionTests(EvenniaTestCase):
             run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
+                decision_scope_base=engagement_base(),
             )
         # Defeat carries no progression award any more; the single growth
         # writer is the practice grant for the resolved skill itself.
