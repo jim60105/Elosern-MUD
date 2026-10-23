@@ -296,13 +296,19 @@ def resolve_record_destination(
 
 
 def resolve_accepted_destinations(
-    quest_source: Any, *, origin_cell: tuple[int, int] | None
+    quest_source: Any,
+    *,
+    origin_cell: tuple[int, int] | None,
+    tracked: set[str] | None = None,
 ) -> tuple[QuestDestination, ...]:
     """Every resolvable accepted destination of ``quest_source``'s quest log.
 
     Each entry is read and validated on its own, so a commission that cannot
     be read or resolved is skipped (and logged) while every other accepted
-    destination remains available. Reading writes nothing.
+    destination remains available. Reading writes nothing. When ``tracked``
+    is a set, the quest IDs of tracked in-progress records from this same
+    read are added to it, so a panel's tracking flags never come from a
+    second, possibly different, read of the log.
     """
     destinations: list[QuestDestination] = []
     entries = getattr(getattr(quest_source, "db", None), "quest_log", None)
@@ -325,6 +331,8 @@ def resolve_accepted_destinations(
             validate_record_runtime(record)
             if record.state is not QuestState.IN_PROGRESS:
                 continue
+            if tracked is not None and record.tracked:
+                tracked.add(record.quest_id)
             definition = definition_for(record)
             destination = resolve_record_destination(
                 record, definition, origin_cell=origin_cell
@@ -371,12 +379,8 @@ def actor_world_cell(actor: Any) -> tuple[int, int] | None:
     return None
 
 
-def accepted_destinations_for(actor: Any) -> tuple[QuestDestination, ...]:
-    """The accepted destinations a map panel shows for ``actor``.
-
-    A possessing puppet reads its owner's quest log (as the objectives panel
-    does); the nearest-hunt origin is the puppet's own position.
-    """
+def _quest_source(actor: Any) -> Any:
+    """The quest-log holder for ``actor``: a possessing puppet's owner."""
     quest_source = actor
     possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
     if possessed_by is not None:
@@ -385,7 +389,27 @@ def accepted_destinations_for(actor: Any) -> tuple[QuestDestination, ...]:
         owner = _resolve_live_object(int(possessed_by))
         if owner is not None:
             quest_source = owner
-    return resolve_accepted_destinations(quest_source, origin_cell=actor_world_cell(actor))
+    return quest_source
+
+
+def accepted_destinations_for(actor: Any) -> tuple[QuestDestination, ...]:
+    """The accepted destinations a map panel shows for ``actor``.
+
+    A possessing puppet reads its owner's quest log (as the objectives panel
+    does); the nearest-hunt origin is the puppet's own position.
+    """
+    return resolve_accepted_destinations(_quest_source(actor), origin_cell=actor_world_cell(actor))
+
+
+def accepted_destinations_with_tracking(
+    actor: Any,
+) -> tuple[tuple[QuestDestination, ...], frozenset[str]]:
+    """``accepted_destinations_for`` plus the tracked quest IDs of the same read."""
+    tracked: set[str] = set()
+    destinations = resolve_accepted_destinations(
+        _quest_source(actor), origin_cell=actor_world_cell(actor), tracked=tracked
+    )
+    return destinations, frozenset(tracked)
 
 
 __all__ = [
@@ -393,6 +417,7 @@ __all__ = [
     "DestinationFamily",
     "QuestDestination",
     "accepted_destinations_for",
+    "accepted_destinations_with_tracking",
     "actor_world_cell",
     "clear_search_memo",
     "nearest_region_cell",
