@@ -426,7 +426,8 @@
         "web.tests.browser.test_browser_inventory_actions.PartyBagTransferJourney.test_give_and_equip_a_companion_then_combat_disables_transfer",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
-        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan"
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_minimap_pan",
+        "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_minimap_scale_change_follows_motion_level"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",

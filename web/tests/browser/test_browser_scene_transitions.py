@@ -130,6 +130,150 @@ def _interior(current: str) -> dict:
     return panel
 
 
+# Ciaran's authored metric streets (metres), the payload view the grid
+# presenter emits around a current node: every node within two road hops,
+# one star edge from the current node to each, the octant on a one-hop edge
+# and an empty label on a two-hop one, and a move action on one-hop nodes.
+_CIARAN = {
+    "village_plaza": ("村中廣場", 220, 305),
+    "hidden_path": ("隱密小徑", 35, 270),
+    "stream_path": ("溪畔小徑", 245, 135),
+    "training_clearing": ("練刀場", 405, 335),
+    "old_tree_north": ("村北古樹下", 200, 465),
+    "elder_tree": ("長老古樹下", 165, 650),
+    "weaving_slope": ("織房坡", 390, 495),
+    "silver_leaf_slope": ("銀葉坡", 440, 665),
+}
+_CIARAN_ROADS = (
+    ("hidden_path", "village_plaza", "e"),
+    ("stream_path", "village_plaza", "n"),
+    ("village_plaza", "old_tree_north", "n"),
+    ("village_plaza", "training_clearing", "e"),
+    ("old_tree_north", "elder_tree", "n"),
+    ("old_tree_north", "weaving_slope", "e"),
+    ("elder_tree", "silver_leaf_slope", "e"),
+)
+_OPPOSITE = {"n": "s", "ne": "sw", "e": "w", "se": "nw", "s": "n", "sw": "ne", "w": "e", "nw": "se"}
+
+
+def _ciaran(current: str) -> dict:
+    """A metric Ciaran street view around `current` (animate-minimap-scale-
+    transitions): 村中廣場 and 村北古樹下 select the 300 m level, while
+    長老古樹下's 185 m and 275 m exits need the 500 m level."""
+
+    def node_id(key: str) -> str:
+        _label, x, y = _CIARAN[key]
+        return f"grid:village_ciaran:{x}:{y}"
+
+    links: dict[str, list[tuple[str, str]]] = {}
+    for a, b, octant in _CIARAN_ROADS:
+        links.setdefault(a, []).append((b, octant))
+        links.setdefault(b, []).append((a, _OPPOSITE[octant]))
+    depth = {current: 0}
+    frontier = [current]
+    for step in (1, 2):
+        nxt = []
+        for key in frontier:
+            for other, _octant in links.get(key, []):
+                if other not in depth:
+                    depth[other] = step
+                    nxt.append(other)
+        frontier = nxt
+    one_hop = dict(links.get(current, []))
+    nodes = []
+    edges = []
+    for key, (label, x, y) in _CIARAN.items():
+        if key not in depth:
+            continue
+        is_current = key == current
+        nodes.append(
+            {
+                "id": node_id(key),
+                "label": label,
+                "x": x,
+                "y": y,
+                "visibility": "current" if is_current else "visible_visited",
+                "current": is_current,
+                "anchor": key == "village_plaza",
+                "landmark": key == "village_plaza",
+                "gateway": None,
+                "action": (
+                    {"kind": "move", "exit_ref": f"e_{current}_{key}", "destination": node_id(key)}
+                    if key in one_hop
+                    else None
+                ),
+            }
+        )
+        if not is_current:
+            edges.append(
+                {
+                    "source": node_id(current),
+                    "destination": node_id(key),
+                    "label": one_hop.get(key, ""),
+                    "known": True,
+                    "traversable": key in one_hop,
+                }
+            )
+    nodes.sort(key=lambda node: not node["current"])
+    panel = valid_local_map_panel()
+    panel.update(
+        {
+            "current_node": node_id(current),
+            "title": f"{_CIARAN[current][0]}街道圖",
+            "nodes": nodes,
+            "edges": edges,
+        }
+    )
+    return panel
+
+
+# Commits one local_map update and reads, in the same frame chain, what the
+# island shows: the dissolving copies (and their inertness) and the largest
+# pan offset of the dot field, over two animation frames.
+_ISLAND_COMMIT = r"""async ([env]) => {
+  const island = document.querySelector('.local-map');
+  const seen = { copies: 0, inert: null, testids: null, controls: null, duration: null, fieldPan: 0 };
+  const read = () => {
+    const copies = island.querySelectorAll('[data-testid="local-map__leaving"]');
+    seen.copies = Math.max(seen.copies, copies.length);
+    if (copies.length && seen.inert === null) {
+      const copy = copies[0];
+      const host = copy.parentElement;
+      seen.inert = host.inert && copy.hasAttribute('inert') && host.getAttribute('aria-hidden') === 'true';
+      seen.testids = copy.querySelectorAll('[data-testid], [data-node]').length;
+      seen.controls = host.querySelectorAll('button, a, [tabindex]').length;
+      seen.duration = getComputedStyle(copy).animationDuration;
+    }
+    const field = island.querySelector('[data-testid="map-lattice__pan--field"]');
+    const m = field && getComputedStyle(field).transform.match(/matrix\(([^)]+)\)/);
+    if (m) {
+      const v = m[1].split(',').map(Number);
+      seen.fieldPan = Math.max(seen.fieldPan, Math.hypot(v[4], v[5]));
+    }
+  };
+  const observer = new MutationObserver(read);
+  observer.observe(island, { subtree: true, childList: true, attributes: true });
+  const s = window.__elosernBridge.store.view;
+  env.presentation_epoch = s.epoch;
+  env.revision = s.revision + 1;
+  const accepted = window.__elosernBridge.store.receive(s.generation, 'ui_update', [env], {}).accepted;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  read();
+  for (let i = 0; i < 2; i += 1) {
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    read();
+  }
+  observer.disconnect();
+  return {
+    accepted,
+    seen,
+    current: island.querySelector('.local-map__node[data-visibility="current"]').dataset.node,
+    scale: island.querySelector('[data-testid="local-map__scale"]').textContent.trim(),
+    remaining: island.querySelectorAll('[data-testid="local-map__leaving"]').length,
+  };
+}"""
+
+
 def _status(hp: int, conditions: list | None = None) -> dict:
     status = valid_status_panel("艾倫‧灰誓", "char-42")
     status["resources"] = {
@@ -389,6 +533,65 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
         page.close()
+
+    @covers_requirement(
+        "webclient-local-map::island-movement-uses-scale-aware-effective-motion",
+        "webclient-contextual-hud::location-appearance-and-vitals-changes-transition-at-the-motion-level",
+        "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
+    )
+    def test_minimap_scale_change_follows_motion_level(self):
+        """On a metric island an equal-scale street step pans the dot field
+        with the drawing; a step across a ladder boundary never pans: at
+        `full` an inert, identity-free copy of the previous drawing dissolves
+        over the base duration and is then gone, at `reduced` the new scale
+        shows at once with no copy through two frames."""
+        for level in ("full", "reduced"):
+            with self.subTest(level=level):
+                page = self._page(None if level == "full" else level)
+                self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), level)
+                inject_update(page, {"local_map": _ciaran("village_plaza")})
+                page.wait_for_selector(
+                    '.local-map [data-node="grid:village_ciaran:220:305"][data-visibility="current"]'
+                )
+                same = page.evaluate(
+                    _ISLAND_COMMIT, [snapshot_envelope("", 0, {"local_map": _ciaran("old_tree_north")})]
+                )
+                self.assertTrue(same["accepted"])
+                self.assertEqual(same["current"], "grid:village_ciaran:200:465")
+                self.assertEqual(same["scale"], "格距 60 m")
+                self.assertEqual(same["seen"]["copies"], 0, same)
+                if level == "full":
+                    self.assertGreater(same["seen"]["fieldPan"], 1, same)
+                else:
+                    self.assertEqual(same["seen"]["fieldPan"], 0, same)
+                page.wait_for_function(
+                    "() => [...document.querySelectorAll('.local-map .map-lattice__pan')].every((g) => {"
+                    " const t = getComputedStyle(g).transform; return t === 'none' || t === 'matrix(1, 0, 0, 1, 0, 0)'; })",
+                    timeout=15000,
+                )
+
+                ladder = page.evaluate(
+                    _ISLAND_COMMIT, [snapshot_envelope("", 0, {"local_map": _ciaran("elder_tree")})]
+                )
+                self.assertTrue(ladder["accepted"])
+                self.assertEqual(ladder["current"], "grid:village_ciaran:165:650")
+                self.assertEqual(ladder["scale"], "格距 100 m")
+                # A scale change never runs the equal-scale FLIP.
+                self.assertEqual(ladder["seen"]["fieldPan"], 0, ladder)
+                if level == "full":
+                    self.assertEqual(ladder["seen"]["copies"], 1, ladder)
+                    self.assertTrue(ladder["seen"]["inert"], ladder)
+                    self.assertEqual(ladder["seen"]["testids"], 0, ladder)
+                    self.assertEqual(ladder["seen"]["controls"], 0, ladder)
+                    self.assertEqual(ladder["seen"]["duration"], "0.3s", ladder)
+                    page.wait_for_function(
+                        "() => !document.querySelector('.local-map [data-testid=\"local-map__leaving\"]')",
+                        timeout=15000,
+                    )
+                else:
+                    self.assertEqual(ladder["seen"]["copies"], 0, ladder)
+                    self.assertEqual(ladder["remaining"], 0, ladder)
+                page.close()
 
     @covers_requirement(
         "webclient-contextual-hud::location-appearance-and-vitals-changes-transition-at-the-motion-level",
