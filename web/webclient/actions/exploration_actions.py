@@ -454,7 +454,8 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
             return _rejected("in_combat", "你仍在戰鬥中，無法移動。")
         return _rejected("move_failed", "移動失敗。")
     message = f"你移動到了{actor.location.key}。"
-    actor.msg(message)
+    # The shared exit settlement publishes the committed movement narrative,
+    # including first-landmark discovery, once for every traversal lineage.
     return _success("moved", message, AFFECTED_FULL)
 
 

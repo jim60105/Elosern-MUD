@@ -46,7 +46,7 @@ var WILDERNESS_WINDOW = 15;
 var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
 var AREA_MAX_CELL_KM = 1000;
 
-var WORLD_MAX_BYTES = 1048576;
+var WORLD_MAX_BYTES = 2097152;
 var WORLD_MAX_POLYGON_POINTS = 8192;
 var WORLD_MAX_POLYLINE_POINTS = 4096;
 var WORLD_MAX_BORDERS = 256;
@@ -62,6 +62,7 @@ var WORLD_APPROXIMATE_GRID_KM = 50;
 var TRAIL_RESOLUTIONS = [1, 5];
 var TRAIL_FRAME_CELLS = 2700;
 var TRAIL_MAX_RUNS = 20000;
+var TRAIL_DOWNSAMPLED_MAX_RUNS = 145800;
 
 var MAP_MAX_BYTES = { area_map: AREA_MAX_BYTES, world_map: WORLD_MAX_BYTES };
 
@@ -637,8 +638,9 @@ function trail(value) {
     totalRuns += runs.length;
     return [rowIndex, runs];
   });
-  if (totalRuns > TRAIL_MAX_RUNS) {
-    fail("trail exceeds " + TRAIL_MAX_RUNS + " runs");
+  var maximumRuns = resolution === 1 ? TRAIL_MAX_RUNS : TRAIL_DOWNSAMPLED_MAX_RUNS;
+  if (totalRuns > maximumRuns) {
+    fail("trail exceeds " + maximumRuns + " runs");
   }
   return { resolution_km: resolution, rows: rows };
 }
@@ -811,6 +813,7 @@ module.exports = {
     TRAIL_RESOLUTIONS: TRAIL_RESOLUTIONS,
     TRAIL_FRAME_CELLS: TRAIL_FRAME_CELLS,
     TRAIL_MAX_RUNS: TRAIL_MAX_RUNS,
+    TRAIL_DOWNSAMPLED_MAX_RUNS: TRAIL_DOWNSAMPLED_MAX_RUNS,
     AREA_LAYERS: AREA_LAYERS,
     AREA_VISIBILITIES: AREA_VISIBILITIES,
     AREA_ACTION_KINDS: AREA_ACTION_KINDS,

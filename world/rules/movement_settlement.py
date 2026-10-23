@@ -132,6 +132,7 @@ def settle_movement(
     wilderness_coordinates: tuple[int, int] | None = None,
     wilderness_source_coordinates: tuple[int, int] | None = None,
     window_seconds: int | None = None,
+    narrate_traversal: bool = False,
 ) -> Any:
     """Run one traversal as an all-or-nothing movement settlement.
 
@@ -166,6 +167,11 @@ def settle_movement(
     falsy result, so the WebClient ``move_failed`` / Telnet error paths report
     failure only after the traverser is truthfully back at the source.
     """
+    if narrate_traversal:
+        from world.rules.map_discovery import visited_before_traversal, traversal_node_id
+
+        before = visited_before_traversal(traversing_object)
+        source_node = traversal_node_id(traversing_object, source_location)
     snapshot = _snapshot_movement_state(
         traversing_object,
         source_location,
@@ -218,6 +224,11 @@ def settle_movement(
 
         if isinstance(traversing_object, PlayerCharacter):
             clear_dialogue_session(traversing_object)
+    if narrate_traversal and not (wilderness_lineage and not result):
+        from world.rules.map_discovery import publish_traversal_narrative
+
+        if traversal_node_id(traversing_object, traversing_object.location) != source_node:
+            publish_traversal_narrative(traversing_object, before)
     return result
 
 

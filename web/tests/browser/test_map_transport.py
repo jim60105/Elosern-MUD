@@ -12,9 +12,9 @@ adopted by the production browser store. Each journey asserts that:
   bytes have the same length and SHA-256 as the server's validated body.
 
 One server boots per class with the shipped catalogs, so the payload is the
-real geography. The world map is published through the superuser ``@py``
-command (see ``world_map_transport_fixture``) because the world presenter and
-the ``map.view`` world scope belong to ``publish-world-map-panel``.
+real geography. The superuser ``@py`` fixture publishes the production assembly
+with a representative or maximal exploration history, without adding those
+synthetic histories to the live character's persistent map knowledge.
 """
 
 from __future__ import annotations

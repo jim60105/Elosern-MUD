@@ -280,6 +280,7 @@ class MovementCostMixin:
                     source_location,
                     destination=target_location,
                     traverse=traverse_stock,
+                    narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
                     ),
@@ -414,6 +415,7 @@ class WildernessGateExit(Exit):
                     source_location,
                     wilderness_coordinates=landing_cell,
                     traverse=gate_traversal,
+                    narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
                     ),
@@ -564,6 +566,7 @@ class WildernessReturnExit(WildernessExit):
                     wilderness_coordinates=wilderness_coordinates,
                     wilderness_source_coordinates=wilderness_source_coordinates,
                     traverse=traverse,
+                    narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
                     ),

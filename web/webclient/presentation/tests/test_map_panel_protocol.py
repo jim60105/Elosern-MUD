@@ -436,11 +436,9 @@ class OnDemandRegistryTests(unittest.TestCase):
     def test_production_registers_only_owned_map_presenters(self):
         from web.webclient.presentation.registry import build_production_registry
 
-        # publish-area-map-panel registers area_map; world_map waits for its
-        # owning change.
         registry = build_production_registry()
-        self.assertEqual(registry.panel_names & set(map_panels.MAP_PANEL_SCHEMAS), {"area_map"})
-        self.assertEqual(registry.on_demand_panel_names, {"area_map"})
+        self.assertEqual(registry.panel_names & set(map_panels.MAP_PANEL_SCHEMAS), {"area_map", "world_map"})
+        self.assertEqual(registry.on_demand_panel_names, {"area_map", "world_map"})
 
 
 class OnDemandCoordinatorTests(unittest.TestCase):

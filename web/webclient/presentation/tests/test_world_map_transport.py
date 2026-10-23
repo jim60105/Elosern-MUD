@@ -190,7 +190,7 @@ class WorldMapFrameParityTests(unittest.TestCase):
         for panels in ([], None):
             self.assertFalse(carries_intact_world_map({**_frame({}), "panels": panels}))
         self.assertEqual(WORLD_MAP_FRAME_MAX_BYTES, MAX_CANONICAL_JSON_BYTES + map_panels.WORLD_MAX_BYTES)
-        self.assertEqual(map_panels.WORLD_MAX_BYTES, 1_048_576)
+        self.assertEqual(map_panels.WORLD_MAX_BYTES, 2_097_152)
         # The generic envelope itself is unchanged: the same large frame fails it.
         with self.assertRaises(ProtocolValidationError):
             check_envelope(_frame({"world_map": big}))

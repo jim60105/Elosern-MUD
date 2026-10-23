@@ -7,17 +7,16 @@ renders and publishes only the requested panel (bounded parts when it is
 large). The drawer re-requests its active scope after each committed move;
 movement itself never pushes a map.
 
-This change admits only ``{"scope": "area"}``. The ``world`` scope is added
-to the same exact union by its owning change (publish-world-map-panel).
+The exact scope union selects either the area or continental knowledge view.
 """
 
 from typing import Any
 
-from web.webclient.presentation.map_panels import AREA_MAP_PANEL
+from web.webclient.presentation.map_panels import AREA_MAP_PANEL, WORLD_MAP_PANEL
 from web.webclient.presentation.protocol import ProtocolValidationError
 
 #: The exact scopes this action admits, and the panel each one publishes.
-MAP_VIEW_SCOPES: dict[str, str] = {"area": AREA_MAP_PANEL}
+MAP_VIEW_SCOPES: dict[str, str] = {"area": AREA_MAP_PANEL, "world": WORLD_MAP_PANEL}
 
 #: Every panel ``map.view`` may publish (the dispatcher's affected-panel set).
 MAP_VIEW_PANELS: tuple[str, ...] = tuple(MAP_VIEW_SCOPES.values())
