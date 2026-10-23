@@ -434,6 +434,29 @@ class RoomGraphAreaTests(EvenniaTestCase):
     @covers_requirement(
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
     )
+    def test_shared_gateway_keeps_the_current_rooms_move_action(self):
+        self._visit("a", "b")
+        street = GridRoom.objects.first()
+        if street is None:
+            sync_grid()
+            street = GridRoom.objects.first()
+        # The non-current room's exit has the lower dbref and therefore
+        # introduces the shared gateway node first.
+        create_object(Exit, key="往街", location=self.rooms["a"], destination=street)
+        current_exit = create_object(
+            Exit, key="往街", location=self.rooms["b"], destination=street
+        )
+        payload = _render(self.char)
+        door = _by_id(payload)[encode_room(int(street.id))]
+        self.assertEqual(door["visibility"], "seen")
+        self.assertIsNotNone(door["action"], "the current room's door must stay actionable")
+        self.assertEqual(door["action"]["exit_ref"], str(int(current_exit.id)))
+        self.assertEqual(door["action"]["destination"], encode_room(int(street.id)))
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
     def test_instance_graph_is_coordinate_free_and_returns_through_a_gateway(self):
         from world.maps.instance import spawn_instance_room
 
@@ -464,6 +487,90 @@ class RoomGraphAreaTests(EvenniaTestCase):
             with self.assertRaises(PanelUnavailableError):
                 _render(self.char)
         self.assertEqual(log.call_args.args[0], "area_map_over_bound")
+
+    @covers_requirement(
+        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
+    )
+    def test_byte_overflow_uses_the_declared_bound_path(self):
+        self._visit("a", "b")
+        with mock.patch.object(area_map_module, "AREA_MAX_BYTES", 64), mock.patch.object(
+            area_map_module, "log_warn"
+        ) as log:
+            with self.assertRaises(PanelUnavailableError):
+                _render(self.char)
+        self.assertEqual(log.call_args.args[0], "area_map_over_bound")
+        self.assertGreater(log.call_args.kwargs["context"]["bytes"], 64)
+
+    @covers_requirement(
+        "webclient-area-map::area-commission-markers-distinguish-same-map-identity-from-elsewhere"
+    )
+    def test_bound_commission_marks_a_fogged_instance_room_without_adding_it(self):
+        from typeclasses.rooms import InstanceRoom
+        from world.quests.definitions import (
+            DestinationKind,
+            ObjectiveKind,
+            QuestDefinition,
+            QuestObjective,
+            QuestStage,
+            QuestType,
+            RoomLocator,
+        )
+        from world.quests.runtime import QuestRecord, QuestState, to_storage
+
+        entrance = create_object(InstanceRoom, key="合成地城入口")
+        middle = create_object(InstanceRoom, key="合成地城走廊")
+        deep = create_object(InstanceRoom, key="合成地城深處")
+        for room in (entrance, middle, deep):
+            room.db.origin_room = self.rooms["a"]
+        create_object(Exit, key="深入", location=entrance, destination=middle)
+        create_object(Exit, key="更深", location=middle, destination=deep)
+        self.char.location = entrance
+        record_arrival(self.char)
+
+        definition = QuestDefinition(
+            key="t_bound_dungeon",
+            display_name="合成地城委託",
+            quest_type=QuestType.EXPLORE,
+            rank="F",
+            stages=(
+                QuestStage(
+                    index=0,
+                    objective=QuestObjective(
+                        kind=ObjectiveKind.REACH,
+                        destination=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                    ),
+                ),
+            ),
+        )
+        record = QuestRecord(
+            quest_id="q_bound_dungeon",
+            definition_key=definition.key,
+            issuer_key="npc:test_commission",
+            state=QuestState.IN_PROGRESS,
+            stage_index=0,
+            stage_progress=0,
+            deadline_tick=None,
+            accepted_tick=0,
+            stage_room_id=int(deep.id),
+            objective_target_ids=(),
+            protected_entity_ids=(),
+            failure_reason=None,
+        )
+        self.char.db.quest_log = [to_storage(record)]
+        with mock.patch.dict(
+            "world.quests.definitions.QUEST_DEFINITION_REGISTRY",
+            {definition.key: definition},
+        ):
+            payload = _render(self.char)
+        marker = next(marker for marker in payload["quest_markers"] if marker["id"] == record.quest_id)
+        # The marker keeps the canonical bound-room identity even though the
+        # room is beyond the known frontier.
+        self.assertEqual(
+            marker["destination"],
+            {"kind": "node", "node_id": encode_room(int(deep.id))},
+        )
+        self.assertNotIn(encode_room(int(deep.id)), _by_id(payload))
+        self.assertTrue(_js_accepts(payload))
 
     def test_markers_without_a_known_position_are_omitted(self):
         self._visit("a")
@@ -658,6 +765,8 @@ class MapViewDispatchTests(EvenniaTestCase):
     def test_map_view_publishes_only_the_area_map(self):
         before_location = self.char.location
         before_knowledge = parse_knowledge(self.char)
+        before_clock = get_world_clock().tick
+        before_quest_log = self.char.attributes.get("quest_log")
         handle_ui_action(
             self.session, self.char, self._envelope("map.view", {"scope": "area"}),
             build_production_action_registry(), self.registry,
@@ -672,6 +781,8 @@ class MapViewDispatchTests(EvenniaTestCase):
         self.assertEqual(result["presentation_revision"], updates[0]["revision"])
         self.assertIs(self.char.location, before_location)
         self.assertEqual(parse_knowledge(self.char), before_knowledge)
+        self.assertEqual(get_world_clock().tick, before_clock)
+        self.assertEqual(self.char.attributes.get("quest_log"), before_quest_log)
 
     @covers_requirement(
         "webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay"

@@ -11,9 +11,9 @@ destination carries two separate facts:
   (``grid:<map>:<x>:<y>`` or ``wild:elosern:<x>:<y>``) an area map marks when
   the destination lies on the map being viewed.
 
-Supported families: ANCHOR locators, GRID locators, regional species hunts
-(the legal cell of the target terrain region nearest the player) and authored
-monster sites. Every other objective (bound instances, tier hunts, acquire,
+Supported families: ANCHOR locators, GRID locators, bound instances, regional
+species hunts (the legal cell of the target terrain region nearest the player)
+and authored monster sites. Every other objective (tier hunts, acquire,
 deliver, rendezvous escorts) and every destination whose canonical source is
 missing resolves to nothing: no node or coordinate is ever invented.
 
@@ -46,7 +46,7 @@ from world.quests.runtime import (
     from_storage,
     validate_record_runtime,
 )
-from world.rules.map_knowledge import NodeIDError, encode_grid, encode_wild
+from world.rules.map_knowledge import NodeIDError, encode_grid, encode_room, encode_wild
 
 
 class DestinationFamily(StrEnum):
@@ -54,6 +54,7 @@ class DestinationFamily(StrEnum):
 
     ANCHOR = "anchor"
     GRID = "grid"
+    BOUND_INSTANCE = "bound_instance"
     SPECIES_HUNT = "species_hunt"
     MONSTER_SITE = "monster_site"
 
@@ -62,7 +63,9 @@ class DestinationFamily(StrEnum):
 class QuestDestination:
     """One accepted commission's resolved destination (server-internal).
 
-    ``world_cell`` is always present. ``map_key``/``node_id`` name the
+    ``world_cell`` is present when the destination has a continental position.
+    A bound instance can have none (its origin room is gone or has no world
+    cell), so the field is optional. ``map_key``/``node_id`` name the
     canonical local node when one exists; an ANCHOR whose anchor has no built
     settlement node keeps only its world cell.
     """
@@ -70,7 +73,7 @@ class QuestDestination:
     quest_id: str
     definition_key: str
     family: DestinationFamily
-    world_cell: tuple[int, int]
+    world_cell: tuple[int, int] | None
     map_key: str | None
     node_id: str | None
 
@@ -201,6 +204,58 @@ def _wild_node(cell: tuple[int, int]) -> str | None:
         return None
 
 
+def _room_world_cell(room: Any) -> tuple[int, int] | None:
+    """The continental cell a room is reached from, or ``None`` when unknown."""
+    from typeclasses.rooms import GridRoom, InstanceRoom, TerrainRoom
+
+    if isinstance(room, InstanceRoom):
+        room = getattr(room, "origin_room", None)
+        if room is None or isinstance(room, InstanceRoom):
+            return None
+    if isinstance(room, TerrainRoom):
+        coordinates = getattr(room, "coordinates", None)
+        if coordinates is None:
+            return None
+        return (int(coordinates[0]), int(coordinates[1]))
+    if isinstance(room, GridRoom):
+        xyz = getattr(room, "xyz", None)
+        if not xyz or len(xyz) != 3:
+            return None
+        return _settlement_anchor_cell(str(xyz[2]))
+    return None
+
+
+def _bound_instance_destination(record) -> QuestDestination | None:
+    """Resolve the accepted record's canonical bound ``InstanceRoom`` identity.
+
+    The room dbref is the persisted stage binding; a missing or non-instance
+    room resolves to nothing rather than inventing an identity. The origin
+    world cell is only used for a bearing when the destination is not on the
+    displayed instance map.
+    """
+    room_id = record.stage_room_id
+    if isinstance(room_id, bool) or not isinstance(room_id, int) or room_id <= 0:
+        return None
+    from evennia.objects.models import ObjectDB
+    from typeclasses.rooms import InstanceRoom
+
+    room = ObjectDB.objects.filter(id=room_id).first()
+    if room is None or not isinstance(room, InstanceRoom):
+        return None
+    try:
+        node_id = encode_room(int(room.pk))
+    except NodeIDError:  # observability: ignore R2: an impossible dbref cannot be a markable node
+        return None
+    return QuestDestination(
+        record.quest_id,
+        record.definition_key,
+        DestinationFamily.BOUND_INSTANCE,
+        _room_world_cell(room),
+        None,
+        node_id,
+    )
+
+
 def _resolve_locator(record, definition, locator) -> QuestDestination | None:
     if locator is None:
         return None
@@ -238,7 +293,9 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
             map_key if node_id is not None else None,
             node_id,
         )
-    # BOUND_INSTANCE (and anything else) carries no static map position.
+    if locator.kind is DestinationKind.BOUND_INSTANCE:
+        return _bound_instance_destination(record)
+    # Anything else carries no static map position.
     return None
 
 
@@ -359,24 +416,7 @@ def actor_world_cell(actor: Any) -> tuple[int, int] | None:
     location = getattr(actor, "location", None)
     if location is None:
         return None
-    from typeclasses.rooms import GridRoom, InstanceRoom, TerrainRoom
-
-    if isinstance(location, InstanceRoom):
-        location = getattr(location, "origin_room", None)
-        if location is None or isinstance(location, InstanceRoom):
-            return None
-
-    if isinstance(location, TerrainRoom):
-        coordinates = getattr(location, "coordinates", None)
-        if coordinates is None:
-            return None
-        return (int(coordinates[0]), int(coordinates[1]))
-    if isinstance(location, GridRoom):
-        xyz = getattr(location, "xyz", None)
-        if not xyz or len(xyz) != 3:
-            return None
-        return _settlement_anchor_cell(str(xyz[2]))
-    return None
+    return _room_world_cell(location)
 
 
 def _quest_source(actor: Any) -> Any:

@@ -62,15 +62,18 @@ helpers.
 
 Quest markers come from `map_quest_destinations`, with tracking flags taken
 from the same quest-log read. A marker carries the node identity when the
-destination is on this settlement, or inside the presented wilderness window.
-That identity may point into fog, but no fogged node is added to `nodes`.
+destination is on this settlement, inside the presented wilderness window, or
+inside the displayed instance/interior room component (including an accepted
+commission's bound `InstanceRoom` beyond the known frontier). That identity may
+point into fog, but no fogged node, label or exit is added to `nodes`.
 Otherwise the marker carries a bearing (clockwise from north) and a distance
 in kilometres from the player's world cell, rounded to 0.1. A marker is
 omitted when the player's world cell is unknown, as in an ordinary interior.
 Tracked markers come first, up to 32.
 
-A graph above the area ceilings becomes the `map_unavailable` panel. The
-publisher logs `area_map_over_bound` and never truncates the graph.
+A graph above the area node/edge ceilings, or a schema-valid body above the
+logical byte ceiling, becomes the `map_unavailable` panel. The publisher logs
+`area_map_over_bound` and never truncates the graph.
 
 ## Logical wire forms (schema version 1)
 

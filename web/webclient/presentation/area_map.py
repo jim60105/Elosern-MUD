@@ -46,6 +46,7 @@ from web.webclient.presentation.local_map.grid import (
 from web.webclient.presentation.map_panels import (
     AREA_FRAME_UNITS,
     AREA_MAP_SCHEMA_VERSION,
+    AREA_MAX_BYTES,
     AREA_MAX_EDGES,
     AREA_MAX_NODES,
     AREA_MAX_QUEST_MARKERS,
@@ -54,6 +55,7 @@ from web.webclient.presentation.map_panels import (
     WILDERNESS_WINDOW,
     validate_area_map,
 )
+from web.webclient.presentation.protocol import json_byte_size
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.observability import log_warn
 from world.rules.map_knowledge import KnowledgeError, encode_grid, encode_room, encode_wild, parse_knowledge
@@ -125,6 +127,23 @@ def _check_bounds(layer: str, map_id: str, nodes: int, edges: int) -> None:
         log_warn(
             "area_map_over_bound",
             context={"layer": layer, "map": map_id, "nodes": nodes, "edges": edges},
+        )
+        raise _OverBound
+
+
+def _check_payload_size(layer: str, map_id: str, payload: dict[str, Any]) -> None:
+    """Apply the logical byte ceiling before the schema validator sees the body.
+
+    The count checks happen before a payload exists; this second check keeps
+    a count-compliant graph with long labels on the same declared over-bound
+    path instead of letting ``validate_area_map`` surface a generic internal
+    presenter error.
+    """
+    size = json_byte_size(payload)
+    if size > AREA_MAX_BYTES:
+        log_warn(
+            "area_map_over_bound",
+            context={"layer": layer, "map": map_id, "bytes": size},
         )
         raise _OverBound
 
@@ -351,9 +370,18 @@ def _room_graph_area(actor: Any, location: Any, visit_ids: set[str], *, is_insta
                     "label": destination.key,
                     "visibility": "seen",
                     "gateway": {"leads_to": destination.key},
-                    "action": actions.get(gateway_id) if source_id == current_id else None,
+                    # The action comes from the current room's own exits, not
+                    # from whichever visited room introduced this gateway.
+                    # Enrich an existing node below so exit dbref order can
+                    # never hide a currently traversable door.
+                    "action": actions.get(gateway_id),
                 }
             )
+        else:
+            # A later exit from the current room to a shared gateway must
+            # still publish its move action.
+            node = next(node for node in nodes if node["id"] == gateway_id)
+            node["action"] = actions.get(gateway_id)
         pair = (source_id, gateway_id)
         if pair not in edge_pairs and (gateway_id, source_id) not in edge_pairs:
             edge_pairs.append(pair)
@@ -369,6 +397,10 @@ def _room_graph_area(actor: Any, location: Any, visit_ids: set[str], *, is_insta
         "title": f"{location.key}{suffix}"[:MAP_MAX_TITLE],
         "nodes": nodes,
         "edges": [{"source": a, "destination": b} for a, b in edge_pairs],
+        # Internal: every room in this component, known or fogged, lets a
+        # commission marker keep its canonical identity without adding the
+        # target to ``nodes``.
+        "map_node_ids": set(room_ids),
     }
 
 
@@ -527,7 +559,13 @@ def bearing_and_distance(origin: tuple[int, int], target: tuple[int, int], km_pe
     return bearing, distance
 
 
-def _quest_markers(actor: Any, layer: str, map_id: str, presented: set[str]) -> list[dict[str, Any]]:
+def _quest_markers(
+    actor: Any,
+    layer: str,
+    map_id: str,
+    presented: set[str],
+    map_node_ids: set[str],
+) -> list[dict[str, Any]]:
     from web.webclient.presentation.map_quest_destinations import (
         accepted_destinations_with_tracking,
         actor_world_cell,
@@ -545,10 +583,11 @@ def _quest_markers(actor: Any, layer: str, map_id: str, presented: set[str]) -> 
         on_map = destination.node_id is not None and (
             (layer == "grid" and destination.map_key == map_id)
             or (layer == "wilderness" and destination.node_id in presented)
+            or (layer in ("instance", "interior") and destination.node_id in map_node_ids)
         )
         if on_map:
             target: dict[str, Any] = {"kind": "node", "node_id": destination.node_id}
-        elif origin is None:
+        elif origin is None or destination.world_cell is None:
             continue  # no known position: never invent a bearing
         else:
             bearing, distance = bearing_and_distance(
@@ -606,6 +645,7 @@ def area_map_presenter(context: PresentationContext) -> dict[str, Any]:
         raise PanelUnavailableError from error
 
     presented = {node["id"] for node in body["nodes"]}
+    map_node_ids = body.pop("map_node_ids", set())
     payload = {
         "schema_version": AREA_MAP_SCHEMA_VERSION,
         "available": True,
@@ -616,11 +656,17 @@ def area_map_presenter(context: PresentationContext) -> dict[str, Any]:
         "title": body["title"],
         "nodes": body["nodes"],
         "edges": body["edges"],
-        "quest_markers": _quest_markers(actor, body["layer"], body["map_id"], presented),
+        "quest_markers": _quest_markers(
+            actor, body["layer"], body["map_id"], presented, map_node_ids
+        ),
     }
     if body["layer"] == "wilderness":
         payload["district_name"] = body["district_name"]
         payload["cell_km"] = body["cell_km"]
+    try:
+        _check_payload_size(body["layer"], body["map_id"], payload)
+    except _OverBound as error:  # observability: ignore R2: the byte violation was logged as area_map_over_bound before raising
+        raise PanelUnavailableError from error
     # Validated here as well as in the coordinator: the presenter's own tests
     # exercise the exact schema, and the coordinator still guards every
     # registered map body before it reaches the wire.
