@@ -41,6 +41,8 @@ var itemHoldings = require("./protocol/panels/item_holdings.js");
 var exotic = require("./protocol/panels/exotic.js");
 var combat_beats = require("./protocol/panels/combat_beats.js");
 var skill_use = require("./protocol/panels/skill_use.js");
+var map_panels = require("./protocol/panels/map_panels.js");
+var map_parts = require("./protocol/map_parts.js");
 
 (function (root, factory) {
   "use strict";
@@ -315,6 +317,20 @@ var skill_use = require("./protocol/panels/skill_use.js");
     SKILL_USE_SCHEMA_VERSION: skill_use.SKILL_USE_SCHEMA_VERSION,
     SKILL_USE_MAX_CHOICES: skill_use.SKILL_USE_MAX_CHOICES,
     validatePanel: env.validatePanel,
+    // On-demand map panels (define-map-panel-protocol).
+    AREA_MAP_SCHEMA_VERSION: map_panels.AREA_MAP_SCHEMA_VERSION,
+    WORLD_MAP_SCHEMA_VERSION: map_panels.WORLD_MAP_SCHEMA_VERSION,
+    MAP_PANEL_SCHEMAS: Object.assign({}, map_panels.MAP_PANEL_SCHEMAS),
+    MAP_MAX_BYTES: Object.assign({}, map_panels.MAP_MAX_BYTES),
+    MAP_CONSTANTS: map_panels.MAP_CONSTANTS,
+    MAP_PART_SCHEMA_VERSION: map_parts.MAP_PART_SCHEMA_VERSION,
+    MAP_PART_RAW_BYTES: map_parts.MAP_PART_RAW_BYTES,
+    MAP_PART_CHUNK_CHARS: map_parts.MAP_PART_CHUNK_CHARS,
+    validateAreaMapPanel: map_panels.validateAreaMapPanel,
+    validateWorldMapPanel: map_panels.validateWorldMapPanel,
+    validateMapPanel: map_panels.validateMapPanel,
+    validateMapPart: map_parts.validateMapPart,
+    maxMapParts: map_parts.maxParts,
     // The only accepted client->server synchronization body.
     syncEnvelope: function () {
       return { protocol_version: C.PROTOCOL_VERSION };
