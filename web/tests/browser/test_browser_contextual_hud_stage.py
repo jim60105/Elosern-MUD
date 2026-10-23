@@ -12,10 +12,12 @@ from .browser_helpers import (
     install_outbound_recorder,
     open_dialogue_choices,
     inject_snapshot,
+    inject_update,
     open_command_line,
     outbound_messages,
     sent_action_count,
     store_state,
+    valid_area_map_panel,
     valid_character_panel,
     valid_lore_codex_panel,
     valid_local_map_panel,
@@ -536,8 +538,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """
         page = self.logged_in_page()
         stage = page.locator('[data-testid="elosern-stage"]')
+        # The fixture server publishes no minimap, so the island arrives in a
+        # synthesized snapshot and the drawer's area body in a partial update
+        # (an eager snapshot may not carry the on-demand area_map). These
+        # snapshots carry revisions past the server's, so the drawer's own
+        # `map.view` comes back stale; the committed bodies are what the
+        # trigger, exclusion and focus contracts read.
         _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+        inject_update(page, {"area_map": valid_area_map_panel()})
         _wait_mode(page, "exploration")
+        page.wait_for_selector('[data-testid="local-map__expand"]', state="attached", timeout=15000)
 
         # Each of the three triggers opens exactly its own overlay.
         # settings trigger -> settings overlay.

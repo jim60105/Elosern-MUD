@@ -1211,6 +1211,57 @@ def valid_local_map_panel(**overrides) -> dict:
     return panel
 
 
+def valid_area_map_panel(**overrides) -> dict:
+    """A schema-valid available grid ``area_map`` panel for journey injection.
+
+    Mirrors the exact body the on-demand presenter emits
+    (``web.webclient.presentation.map_panels.validate_area_map``): one map's
+    own cells with the current one exactly once, edges between presented
+    nodes, and no quest markers. Journeys inject it with :func:`inject_update`
+    (an eager snapshot may not carry an on-demand panel) when a surface needs
+    the drawer's area body without a live ``map.view`` round trip.
+    """
+    map_id = "synth_harbour"
+    panel = {
+        "schema_version": 1,
+        "available": True,
+        "layer": "grid",
+        "map_id": map_id,
+        "frame": {"key": map_id, "unit": "m"},
+        "current_node": f"grid:{map_id}:2:0",
+        "title": "南門街道圖",
+        "nodes": [
+            {
+                "id": f"grid:{map_id}:2:0",
+                "label": "南門",
+                "x": 2,
+                "y": 0,
+                "visibility": "current",
+                "gateway": None,
+                "action": None,
+            },
+            {
+                "id": f"grid:{map_id}:2:1",
+                "label": "南大道",
+                "x": 2,
+                "y": 1,
+                "visibility": "visited",
+                "gateway": None,
+                "action": None,
+            },
+        ],
+        "edges": [
+            {
+                "source": f"grid:{map_id}:2:0",
+                "destination": f"grid:{map_id}:2:1",
+            }
+        ],
+        "quest_markers": [],
+    }
+    panel.update(overrides)
+    return panel
+
+
 # The scene's own generated source-layer rank, mirroring
 # ``world.art.descriptors.SCENE_RANK_GENERATED`` on the fixture side.
 _SCENE_RANK_GENERATED = 20
