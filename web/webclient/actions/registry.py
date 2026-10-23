@@ -95,8 +95,8 @@ def build_production_action_registry() -> ActionRegistry:
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
-    two party adapters (``party.transfer``, ``party.view_member``), and the
-    ``options.dismiss`` action. Each action binds one exact payload validator
+    two party adapters (``party.transfer``, ``party.view_member``), the
+    ``options.dismiss`` action, and the read-only ``map.view`` request. Each action binds one exact payload validator
     and one narrow deterministic adapter; no action routes through the text
     parser.
     """
@@ -788,4 +788,20 @@ def build_production_action_registry() -> ActionRegistry:
         registry.register(ActionSpec(action_id, validator, adapter, ()))
     from web.webclient.actions.dream_actions import register_actions
     register_actions(registry)
+    from web.webclient.actions.map_actions import (
+        MAP_VIEW_PANELS,
+        map_view_adapter,
+        validate_map_view_payload,
+    )
+
+    # The one read-only map request: it publishes only the requested
+    # on-demand map panel (publish-area-map-panel).
+    registry.register(
+        ActionSpec(
+            action_id="map.view",
+            validate_payload=validate_map_view_payload,
+            adapter=map_view_adapter,
+            affected_panels=MAP_VIEW_PANELS,
+        )
+    )
     return registry

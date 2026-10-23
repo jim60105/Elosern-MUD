@@ -10,9 +10,9 @@ the canonical node-ID grammar only (no registry or database lookup), exactly
 as the mirrored JavaScript validator in
 ``web/static/webclient/js/elosern/protocol/panels/map_panels.js`` does.
 
-Bounds ownership: the numeric ceilings below are finite provisional values.
-``publish-area-map-panel`` measures real area graphs and the 225-cell
-wilderness window and owns the area numbers; ``transport-world-map-panel``
+Bounds ownership: ``publish-area-map-panel`` measured real area graphs and
+the 225-cell wilderness window and owns the area numbers below;
+``transport-world-map-panel``
 measures the continental payload and owns the world numbers. Each change
 edits the constants here and in the JavaScript mirror together (a
 bidirectional parity test pins them). Unrelated panels, including
@@ -68,11 +68,16 @@ MAP_MAX_LIST_ITEMS = 8_192
 #: Envelope depth of a panel value (envelope -> panels -> panel).
 MAP_PANEL_DEPTH = 2
 
-# area_map bounds (provisional; publish-area-map-panel measures and owns them).
-AREA_MAX_NODES = 1_024
-AREA_MAX_EDGES = 4_096
+# area_map bounds, measured by publish-area-map-panel (see
+# docs/development/map-panel-protocol.md): the largest settlement graph is 21
+# nodes / 26 roads (about 5 KB fully explored) and the wilderness window is at
+# most 225 cells. The ceilings leave room for much larger settlements and
+# room graphs: 512 nodes (2.3x the window), four roads per node, and a byte
+# cap that holds that graph with 32-character labels and full markers.
+AREA_MAX_NODES = 512
+AREA_MAX_EDGES = 2_048
 AREA_MAX_QUEST_MARKERS = 32
-AREA_MAX_BYTES = 524_288
+AREA_MAX_BYTES = 393_216
 WILDERNESS_WINDOW = 15
 WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW
 AREA_MAX_CELL_KM = 1_000

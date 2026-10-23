@@ -15,6 +15,7 @@ from evennia.objects.models import ObjectDB
 from evennia.scripts.models import ScriptDB
 from evennia.typeclasses.attributes import Attribute
 from evennia.typeclasses.tags import Tag
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
@@ -24,6 +25,7 @@ from web.webclient.presentation.map_quest_destinations import (
     DestinationFamily,
     QuestDestination,
     accepted_destinations_for,
+    accepted_destinations_with_tracking,
     actor_world_cell,
     clear_search_memo,
     nearest_region_cell,
@@ -42,6 +44,7 @@ from world.quests.definitions import (
 )
 from world.quests.runtime import QuestRecord, QuestState, to_storage
 from world.quests.tests._fixtures import TEST_ISSUER_KEY, RegistryIsolationMixin
+from world.rules.map_knowledge import encode_room
 
 # --- Synthetic geography -------------------------------------------------------
 
@@ -415,6 +418,42 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(self._snapshot(), before)
         self.assertEqual(by_quest["q_hunt"].node_id, "wild:elosern:40:3")
         self.assertEqual(by_quest["q_grid"].node_id, "grid:town_map:35:60")
+
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
+    def test_bound_instance_keeps_its_canonical_room_identity(self):
+        room = create_object(InstanceRoom, key="合成地城")
+        room.db.origin_room = self.room1
+        destination = resolve_record_destination(
+            _record("bound", stage_room_id=int(room.id)),
+            _DEFINITIONS["map_dest_bound"],
+            origin_cell=(0, 0),
+        )
+        self.assertEqual(destination.family, DestinationFamily.BOUND_INSTANCE)
+        self.assertEqual(destination.node_id, encode_room(int(room.id)))
+        self.assertIsNone(destination.map_key)
+        # A plain Room origin has no continental cell; the marker may still
+        # carry the room identity and must not invent a bearing.
+        self.assertIsNone(destination.world_cell)
+
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
+    def test_bound_instance_without_a_live_instance_room_is_not_fabricated(self):
+        missing = resolve_record_destination(
+            _record("bound", stage_room_id=999_999),
+            _DEFINITIONS["map_dest_bound"],
+            origin_cell=(0, 0),
+        )
+        self.assertIsNone(missing)
+        self.assertIsNone(_resolve("bound"))
+
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
+    def test_tracking_ids_come_from_the_same_quest_log_read(self):
+        self.char1.db.quest_log = [
+            to_storage(_record("grid", tracked=True)),
+            to_storage(_record("site")),
+        ]
+        destinations, tracked = accepted_destinations_with_tracking(self.char1)
+        self.assertEqual(tracked, frozenset({"q_grid"}))
+        self.assertEqual({d.quest_id for d in destinations}, {"q_grid", "q_site"})
 
     def test_actor_world_cell_follows_the_room_layer(self):
         terrain = mock.MagicMock(spec=TerrainRoom, coordinates=(12, 34))

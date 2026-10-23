@@ -375,8 +375,8 @@ def _registry(map_body, calls, *, dialogue=False):
         calls.append(ctx)
         return map_body()
 
-    # Test-only on-demand presenter with schema-valid geometry: production
-    # registers no map presenter until its owning change.
+    # Test-only on-demand presenter with schema-valid synthetic geometry, so
+    # the codec tests stay independent of the production area presenter.
     registry.register(
         PresenterSpec(
             name="area_map",
@@ -433,11 +433,14 @@ class OnDemandRegistryTests(unittest.TestCase):
         self.assertEqual(registry.on_demand_panel_names, {"world_map"})
         self.assertEqual(registry.eager_panel_names, frozenset())
 
-    def test_production_registers_no_map_presenter(self):
+    def test_production_registers_only_owned_map_presenters(self):
         from web.webclient.presentation.registry import build_production_registry
 
-        names = build_production_registry().panel_names
-        self.assertFalse(names & set(map_panels.MAP_PANEL_SCHEMAS))
+        # publish-area-map-panel registers area_map; world_map waits for its
+        # owning change.
+        registry = build_production_registry()
+        self.assertEqual(registry.panel_names & set(map_panels.MAP_PANEL_SCHEMAS), {"area_map"})
+        self.assertEqual(registry.on_demand_panel_names, {"area_map"})
 
 
 class OnDemandCoordinatorTests(unittest.TestCase):

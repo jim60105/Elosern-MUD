@@ -213,6 +213,17 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // map.view is a pure read of the on-demand map panel with no typed
+      // equivalent (publish-area-map-panel).
+      id: "EXPECTED SILENCE: map.view area map request",
+      ids: ["map.view"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("map.view", { scope: "area" });
+      },
+    },
+    {
       id: "EXPECTED SILENCE: party.transfer item hand-over",
       ids: ["party.transfer"],
       silence: true,

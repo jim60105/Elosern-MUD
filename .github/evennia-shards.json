@@ -357,6 +357,7 @@
         "web.webclient.presentation.tests.test_local_map",
         "web.webclient.presentation.tests.test_map_quest_destinations",
         "web.webclient.presentation.tests.test_map_panel_protocol",
+        "web.webclient.presentation.tests.test_area_map",
         "web.webclient.presentation.tests.test_party_inventory_panel",
         "web.webclient.presentation.tests.test_party_member_panel",
         "web.webclient.presentation.tests.test_party_panel",

@@ -695,6 +695,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "options.dismiss": null,
   "party.transfer": null,
   "party.view_member": null,
+  "map.view": null,
   "gallery.subject.select": null,
   "gallery.generate": null,
   "gallery.default.set": null,

@@ -257,6 +257,7 @@ records resolve, from their current stage's objective:
 | --- | --- | --- | --- |
 | ANCHOR locator | `ANCHOR_GEOGRAPHY_REGISTRY` | the anchor's cell | the built entrance node from `ANCHOR_PLACEMENT_REGISTRY`, when it exists in the settlement graph |
 | GRID locator | the placement whose `zcoord` is the locator's map | the settlement's anchor cell | the locator's own `grid:<map>:<x>:<y>` node, when it exists in the settlement graph |
+| BOUND_INSTANCE locator | the accepted record's `stage_room_id` | the bound room's origin-room cell, when one resolves | the canonical `room:<dbref>` identity, when the bound room is a live `InstanceRoom` |
 | Species hunt | the objective's `region_key` | the legal cell of that region nearest the player | `wild:elosern:<x>:<y>` |
 | Monster site | `MONSTER_SITE_REGISTRY` | the site's authored cell | `wild:elosern:<x>:<y>` |
 

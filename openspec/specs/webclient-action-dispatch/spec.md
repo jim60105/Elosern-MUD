@@ -68,7 +68,7 @@ The action registry SHALL bind each stable action ID to one exact payload valida
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, `gallery.stage.update`,
 `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, `gallery.official.geometry.clear`,
 `letters.list`, `letters.collect`, `letters.read`, `letters.send`, `dream.say`,
-`dream.draft`, `dream.confirm`, `dream.awaken`, `party.transfer`, and `party.view_member`, each with its own exact
+`dream.draft`, `dream.confirm`, `dream.awaken`, `party.transfer`, `party.view_member`, and `map.view`, each with its own exact
 validator and deterministic adapter
 
 #### Scenario: Test proof action remains isolated
@@ -85,6 +85,12 @@ validator and deterministic adapter
 
 - **WHEN** the production registry is built
 - **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the four combat adapters `combat.actor_choices`, `combat.command`, `combat.exit_prompt`, and `combat.exit_confirm`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`, the party transfer adapter `party.transfer`, and the party viewed-member selection adapter `party.view_member`
+- **AND** the one map adapter `map.view` is registered with its own exact scope validator and read-only presenter adapter; this is the only addition to the preceding roster
+
+#### Scenario: Map requests are allowlisted reads
+
+- **WHEN** map.view is registered for area scope
+- **THEN** it has its own exact validator and read-only adapter, and publishes only the requested on-demand map without entering the text command parser
 
 #### Scenario: Skill preview and cast bypass the text parser
 
