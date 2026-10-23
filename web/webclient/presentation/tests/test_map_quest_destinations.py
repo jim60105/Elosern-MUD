@@ -8,11 +8,13 @@ construction or from a brute-force oracle over the same synthetic region.
 
 import random
 import unittest
-from copy import deepcopy
 from types import SimpleNamespace
 from unittest import mock
 
 from evennia.objects.models import ObjectDB
+from evennia.scripts.models import ScriptDB
+from evennia.typeclasses.attributes import Attribute
+from evennia.typeclasses.tags import Tag
 from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
@@ -357,12 +359,15 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
         QUEST_DEFINITION_REGISTRY.update(_DEFINITIONS)
 
     def _snapshot(self):
+        """Every object, script, attribute and tag row plus object locations."""
         return {
-            "attributes": deepcopy(
-                sorted((a.key, repr(a.value)) for a in self.char1.attributes.all())
+            "attributes": sorted(
+                (a.id, a.db_key, a.db_category, repr(a.value))
+                for a in Attribute.objects.all()
             ),
-            "objects": ObjectDB.objects.count(),
-            "rooms": [(room.id, room.db_location_id) for room in ObjectDB.objects.order_by("id")],
+            "tags": sorted(Tag.objects.values_list("id", "db_key", "db_category")),
+            "scripts": sorted(ScriptDB.objects.values_list("id", "db_key")),
+            "objects": sorted(ObjectDB.objects.values_list("id", "db_location_id")),
         }
 
     @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
@@ -405,7 +410,9 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
             location=mock.MagicMock(spec=TerrainRoom, coordinates=(10, 4)),
             db=SimpleNamespace(possessed_by=self.char2.id),
         )
+        before = self._snapshot()
         by_quest = {d.quest_id: d for d in accepted_destinations_for(puppet)}
+        self.assertEqual(self._snapshot(), before)
         self.assertEqual(by_quest["q_hunt"].node_id, "wild:elosern:40:3")
         self.assertEqual(by_quest["q_grid"].node_id, "grid:town_map:35:60")
 
