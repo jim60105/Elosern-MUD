@@ -501,10 +501,14 @@ export function placeLabels(candidates, project2d, frame, {
       if (chosen) break;
     }
     if (!chosen && must) {
-      const option = options[0];
-      const left = Math.min(Math.max(0, option.left), Math.max(0, frame.width - width));
-      const top = Math.min(Math.max(0, option.top), Math.max(0, frame.height - height));
-      chosen = { anchor: "middle", left, top, box: { left, top, right: left + width, bottom: top + height } };
+      // Last resort: clamp each spot inside the frame and take the first that
+      // clears every placed label; only when none does, the spot above.
+      const clamped = options.map((option) => {
+        const left = Math.min(Math.max(0, option.left), Math.max(0, frame.width - width));
+        const top = Math.min(Math.max(0, option.top), Math.max(0, frame.height - height));
+        return { anchor: "middle", left, top, box: { left, top, right: left + width, bottom: top + height } };
+      });
+      chosen = clamped.find((option) => !placedBoxes.some((other) => overlaps(padded(option.box), other))) ?? clamped[0];
     }
     if (!chosen) continue;
     placedBoxes.push(chosen.box);

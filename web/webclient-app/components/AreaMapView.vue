@@ -188,7 +188,11 @@ watch(signature, () => {
   localView.value = null;
   focusedId.value = null;
   adoptOrOpen();
-  setSelected(null);
+  // A host restoring this tab's own selection keeps it; anything else clears.
+  const kept = props.selected && placedById.value.has(props.selected) ? props.selected : null;
+  if (kept) localSelected.value = kept;
+  else setSelected(null);
+  moveSent = false;
 });
 
 // A republished body that no longer holds the selection drops it.
@@ -550,11 +554,23 @@ function onRootKeydown(event) {
 
 // ── travel and detail actions ───────────────────────────────────────────
 
+// One 前往 per published body: a double click or key repeat sends nothing
+// more until the server republishes the area.
+let moveSent = false;
+watch(
+  () => props.area,
+  () => {
+    moveSent = false;
+  },
+);
+
 function onDetailMove(action) {
+  if (moveSent) return;
   const node = placedById.value.get(selectedId.value)?.node;
   const current = travelAction(props.area, node, adjacent.value);
   // Only the selected node's live descriptor travels; a stale card sends nothing.
   if (!current || current !== action) return;
+  moveSent = true;
   emit("move", {
     exit_ref: current.exit_ref,
     destination: current.destination,

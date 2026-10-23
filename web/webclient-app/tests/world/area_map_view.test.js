@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import AreaMapView from "../../components/AreaMapView.vue";
+import { placeLabels } from "../../lib/area_map_view.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import {
   ABSENT_DUNGEON_ROOMS,
@@ -229,6 +230,22 @@ describe("area rendering uses truthful geometry and server fog", () => {
     expect(w.findAll('[data-testid="area-map__label"]').some((l) => l.attributes("data-label-for") === hidden.id)).toBe(true);
   });
 
+  it("the selected and current names never overlap, even in a cramped frame", () => {
+    const entry = (id, x, priority) => ({ node: { id }, x, y: 30, priority, lines: [`${id}名稱`] });
+    // A 60 x 60 frame where no regular spot fits either 52 px name, so both
+    // must-place names reach the clamped last resort.
+    const out = placeLabels(
+      [entry("甲", 10, 0), entry("乙", 40, 1)],
+      (e) => ({ x: e.x, y: e.y }),
+      { width: 60, height: 60 },
+      { measure: (text, px) => text.length * px },
+    );
+    expect(out.map((l) => l.id)).toEqual(["甲", "乙"]);
+    const [a, b] = out.map((l) => l.box);
+    const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    expect(overlap).toBe(false);
+  });
+
   it("a new map resets the view and selection; a matching view is adopted", async () => {
     const w = mountMap(townArea());
     await select(w, TOWN_IDS.east);
@@ -243,6 +260,13 @@ describe("area rendering uses truthful geometry and server fog", () => {
     const reset = w.emitted("update:view").at(-1)[0];
     expect(reset.signature).toBe("instance|instance:41|none");
     expect(w.find('[data-testid="area-map-detail"]').exists()).toBe(false);
+  });
+
+  it("a host restoring a tab's selection on a new map keeps it", async () => {
+    const w = mountMap(townArea(), { selected: TOWN_IDS.east });
+    await w.setProps({ area: validateAreaMapPanel(dungeonArea()), selected: DUNGEON_IDS.well });
+    expect(w.find('[data-testid="area-map-detail__title"]').text()).toBe("乾涸的井室");
+    expect(w.emitted("update:selected")).toBeUndefined();
   });
 
   it("wheel zoom stays inside the layer's zoom limits", async () => {
@@ -343,6 +367,21 @@ describe("area selection offers travel only for an authoritative adjacent exit",
     expect(wild.emitted("move")).toEqual([[{ exit_ref: "e_wild_ne", destination: WILD_GATE_ID, current_node: "wild:elosern:100:200" }]]);
     await select(wild, "wild:elosern:104:204");
     expect(wild.find('[data-testid="area-map-detail__go"]').exists()).toBe(false);
+  });
+
+  it("a repeated 前往 sends once until the area is republished", async () => {
+    const w = mountMap(townArea());
+    await select(w, TOWN_IDS.east);
+    const go = w.find('[data-testid="area-map-detail__go"]');
+    await go.trigger("click");
+    await go.trigger("click");
+    expect(w.emitted("move")).toHaveLength(1);
+    // A fresh body (the server's republish) re-arms travel.
+    await w.setProps({ area: validateAreaMapPanel(townArea()) });
+    await select(w, TOWN_IDS.west);
+    await w.find('[data-testid="area-map-detail__go"]').trigger("click");
+    expect(w.emitted("move")).toHaveLength(2);
+    expect(w.emitted("move")[1][0]).toEqual({ exit_ref: "e_square_w", destination: TOWN_IDS.west, current_node: TOWN_IDS.square });
   });
 
   it("a drag pans without selecting, and an empty click clears the selection", async () => {
