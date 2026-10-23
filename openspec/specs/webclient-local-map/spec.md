@@ -20,7 +20,7 @@ The production presentation registry SHALL register panel name `local_map` at sc
 
 #### Scenario: Payload field composition is exact
 - **WHEN** an available payload is serialized
-- **THEN** `layer` SHALL be one of `grid`, `wilderness`, `instance`, or `interior`; `current_node` SHALL be a canonical node ID; `title` SHALL be a bounded localized map title; each node contains exactly `id`, `label`, `x`, `y`, `visibility`, `current`, `anchor`, `landmark`, and nullable `action`; each edge contains exactly `source`, `destination`, `label`, `known`, and `traversable`; and `legend` SHALL be a bounded list of text label entries
+- **THEN** `layer` SHALL be one of `grid`, `wilderness`, `instance`, or `interior`; `current_node` SHALL be a canonical node ID; `title` SHALL be a bounded localized map title; each node contains exactly `id`, `label`, `x`, `y`, `visibility`, `current`, `anchor`, `landmark`, nullable `action`, and required `gateway`; each edge contains exactly `source`, `destination`, `label`, `known`, and `traversable`; and `legend` SHALL be a bounded list of text label entries
 
 #### Scenario: The presenter leaks no live references
 - **WHEN** the presenter emits any payload
@@ -119,6 +119,18 @@ The production presentation registry SHALL register panel name `local_map` at sc
 #### Scenario: Presenter failure remains isolated
 - **WHEN** the `local_map` presenter raises while status and narrative remain healthy
 - **THEN** only `local_map` becomes correlated unavailable and normal text output remains usable
+
+#### Scenario: Every node carries exact gateway metadata
+- **WHEN** any available v1 local-map node is serialized, including an instance/interior or ordinary node
+- **THEN** it carries `gateway`, which is null except for registered gateway nodes; a non-null value contains exactly `leads_to`, a non-empty string bounded by the existing 256-code-point node-string limit; schema_version remains 1 and no legacy omission or alias is accepted.
+
+#### Scenario: Registered gate metadata names its far side
+- **WHEN** a grid room hosting a registered gateway or a wilderness payload adjacent grid gateway is emitted
+- **THEN** the grid room carries the far-side wilderness region name and the wilderness-adjacent grid gateway carries the settlement name; existing coordinates, node identity, actions, visibility and registry-based gateway resolution remain unchanged.
+
+#### Scenario: Both validators reject malformed gateway values
+- **WHEN** a node omits gateway, uses a scalar/array, has missing or extra gateway fields, or has empty, whitespace-only, non-string or over-bound leads_to
+- **THEN** both validators reject the available panel under their exact-field checks; null and a bounded non-empty leads_to object pass, and the normalized browser model preserves gateway unchanged.
 
 ### Requirement: Visibility states are current, visible_unvisited, visible_visited, and remembered
 Every node in the version-1 payload SHALL carry exactly one `visibility` value. `current` SHALL mark the player's current node. `visible_unvisited` SHALL mark a node inside the current field of view (visual range for grid, legal adjacency for wilderness, a currently visible one-hop Exit for instance/interior) that has not been entered. `visible_visited` SHALL mark a node inside the current field of view that was previously entered.
@@ -941,8 +953,6 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD or full-map viewport
 - **THEN** one uniform physical scale preserves unequal center gaps and compass bearings; panning/zooming never moves centers independently. Labels/markers retain readable screen-space sizes using offsets, clipping or optional label disclosure without changing topology/actions. Decorative dots use a bounded screen-space density and never allocate one dot per meter; coordinate-free graphs retain their graph layout. Payload coordinates remain unchanged.
 
-
-
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
 The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity.
 
@@ -1313,6 +1323,7 @@ The minimap island's title, orientation marks and readout SHALL render at the sh
 #### Scenario: Dense knowledge stays available
 - **WHEN** a payload at the model's 64-node bound — 48 in-view nodes and 16 remembered gateways — renders on the island and then in the full-map overlay
 - **THEN** the island stays a 240 × 240 CSS px canvas retaining every in-view node with its full label as its text alternative and every remembered gateway; its drawn labels are at least 16 CSS px, and the overlay makes every full name reachable at 16 CSS px or more at every permitted zoom level
+
 ### Requirement: Current map location has one unambiguous footprint
 On the full-map overlay the current-location decoration SHALL be a ring concentric with the true current marker, drawn inside the current node's own group at 10.5 units × the marker scale with a hairline seal-toned stroke that does not scale with the drawing, so it can never read as another location.
 
@@ -1369,6 +1380,7 @@ For representable grid and anchor rooms with fixed canonical inputs, changing on
 - **THEN** the refreshed payload is identical to the immediately preceding payload for the same canonical inputs and remains available to the existing widget
 - **AND** player location, clock and knowledge remain unchanged by look and presentation
 - **AND** the adjacent-node movement descriptors remain usable under the existing `explore.move` action contract
+
 ### Requirement: Metric coordinates survive authoritative transport and uniform projection
 Local-map transport SHALL accept physical settlement coordinates and the wilderness frame. Rendering SHALL preserve relative metric spacing under one uniform viewport scale, with pan and zoom; row/column rank compression SHALL be removed. Server coordinates and node/action identity SHALL remain authoritative.
 
@@ -1387,4 +1399,3 @@ Local-map transport SHALL accept physical settlement coordinates and the wildern
 #### Scenario: Coordinate-free interiors
 - **WHEN** an interior graph with no physical coordinates is shown
 - **THEN** its existing graph semantics remain without invented meter positions.
-
