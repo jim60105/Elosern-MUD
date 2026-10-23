@@ -1,9 +1,9 @@
 # Minimap Auto-Scale Design
 
 Date: 2026-10-22
-Status: Implemented (all five changes in §9). Corrective follow-up `fix-map-design-integration-gaps` is pending acceptance evidence.
+Status: Implemented (all five changes in §9). Corrective follow-up `fix-map-design-integration-gaps` is merged; complete evidence verification remains with CI.
 Amends: [World Map Scale and Metric Settlement](2026-10-21-world-map-scale-design.md) §11 for the minimap island only.
-Follow-up: the separate full-map drawer design and its thirteen changes are integrated. Remaining integration corrections are tracked in [fix-map-design-integration-gaps](../../../openspec/changes/fix-map-design-integration-gaps/design.md).
+Follow-up: the separate full-map drawer design and its thirteen changes are integrated. The integration corrections are recorded in [fix-map-design-integration-gaps](../../../openspec/changes/archive/2026-10-24-fix-map-design-integration-gaps/design.md).
 
 ## 1. Problem
 
