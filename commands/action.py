@@ -273,16 +273,19 @@ class CmdCast(Command):
         # (or at nothing) is refused before any resource, roll, session, or
         # clock access; everything else keeps the settlement route. Only the
         # trusted context selection below stays with the command.
+        # A battlefield context carries one encounter's identity, and only a
+        # durable session owns one. This route is reached only when no session
+        # owns the caller, so a lingering or restored battlefield context is
+        # stale: settling against it would ask the resolver to identify an
+        # occurrence nothing owns, where the skill's own out-of-combat gate is
+        # the answer.
         active_context = self.caller.ndb.action_context
-        if active_context is not None:
-            context = active_context
-        else:
-            context = RoomActionContext(self.caller.location, {})
-        if (
-            skill_key == FLEE_SKILL_KEY
-            and isinstance(context, BattlefieldActionContext)
+        if active_context is None or isinstance(
+            active_context, BattlefieldActionContext
         ):
-            context = BattlefieldActionContext(context.battlefield)
+            context = RoomActionContext(self.caller.location, {})
+        else:
+            context = active_context
         outcome = cast_in_field(
             self.caller,
             skill_key,

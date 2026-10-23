@@ -143,7 +143,14 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertTrue(message.strip())
             self.assertNotEqual(message, "繼續戰鬥。")
 
-    def test_flee_uses_active_battlefield_context(self):
+    def test_flee_without_a_session_rejects_out_of_combat(self):
+        """A battlefield context no session owns never becomes an occurrence.
+
+        Only a durable session carries an encounter identity, so this route
+        settles as an ordinary out-of-combat cast: ``flee`` disengages a live
+        encounter, so it reports its own out-of-combat rejection and the
+        battlefield is untouched.
+        """
         self.char1.race = "t_duskmari"
         self.char2.race = "t_duskmari"
         for entity in (self.char1, self.char2):
@@ -157,15 +164,12 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             {self.char1.key: self.char1, self.char2.key: self.char2},
         )
         self.char1.ndb.action_context = BattlefieldActionContext(field)
-        with patch(
-            "world.rules.disengage.roll_d100", return_value=100
-        ), patch(
-            "commands.action.render_plain_text", return_value="RENDERED"
-        ) as rendered:
-            output = self.call(CmdCast(), "flee")
-        rendered.assert_called_once()
-        self.assertTrue(output.startswith("RENDERED"))
-        self.assertIn(self.char1.key, field.fled)
+        output = self.call(CmdCast(), "flee")
+        self.assertIn(
+            rejection_message(RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT),
+            output,
+        )
+        self.assertNotIn(self.char1.key, field.fled)
 
 
 class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):
