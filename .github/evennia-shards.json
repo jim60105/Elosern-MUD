@@ -142,6 +142,7 @@
         "world.rules.tests.test_lineage_query",
         "world.rules.tests.test_lore_deterministic_reveals",
         "world.rules.tests.test_lore_knowledge",
+        "world.rules.tests.test_map_district_lighting",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",
         "world.rules.tests.test_church_lamb_seal",
