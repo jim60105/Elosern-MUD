@@ -9,13 +9,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, h, nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive, ref } from "vue";
 import MapDrawer from "../../components/MapDrawer.vue";
 import MapLattice from "../../components/MapLattice.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import { areaMemoryKey, scopeForLayer, useMapDrawer } from "../../composables/use-map-drawer.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
-import { TOWN_IDS, dungeonArea, interiorArea, townArea, wildernessArea } from "../../stories/fixtures/area_map.js";
+import { TOWN_IDS, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
 import { QUEST_IDS, worldBase } from "../../stories/fixtures/world_map.js";
 
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
@@ -268,6 +268,71 @@ describe("the map drawer opens the appropriate scope and preserves session views
     expect(document.activeElement).toBe(tabs[0].element);
     await w.find('[data-testid="overlay-host-close"]').trigger("click");
     expect(closed).toBe(1);
+  });
+
+  it("brings the player back into view after a move on the same map, keeping the zoom", async () => {
+    const memory = blankMemory();
+    const area = ref(validateAreaMapPanel(townArea()));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const w = mount(
+      defineComponent({
+        setup: () => () => h(MapDrawer, { area: area.value, world: null, tab: "area", memory }),
+      }),
+      { attachTo: host },
+    );
+    wrappers.push(w);
+    await tick();
+    // A view parked far west of the town, at 400 m across.
+    memory.area.view = Object.freeze({ signature: "grid|story_town|m", cx: -2000, cy: 300, span: 400 });
+    await tick();
+    area.value = validateAreaMapPanel(townFromEastArea());
+    await tick();
+    await tick();
+    expect(memory.area.view.span).toBe(400);
+    expect(Math.abs(memory.area.view.cx - 520)).toBeLessThan(400);
+  });
+
+  it.each(["frame", "epoch"])("discards queued follow work after %s retirement", async (retirement) => {
+    const memory = blankMemory();
+    const area = ref(validateAreaMapPanel(townArea()));
+    const epoch = ref("epoch-a");
+    const w = mount(defineComponent({
+      setup: () => () => h(MapDrawer, { area: area.value, world: null, tab: "area", memory, epoch: epoch.value }),
+    }));
+    wrappers.push(w);
+    await tick();
+    memory.area.view = Object.freeze({ signature: "grid|story_town|m", cx: -2000, cy: 300, span: 400 });
+    await tick();
+    area.value = validateAreaMapPanel(townFromEastArea());
+    // Retire a movement and its coordinate frame within the same publication.
+    if (retirement === "frame") area.value = validateAreaMapPanel(interiorArea());
+    else {
+      epoch.value = "epoch-b";
+      area.value = null;
+    }
+    memory.area.view = undefined;
+    await tick();
+    if (retirement === "frame") {
+      expect(memory.area.view.signature).toBe("interior|room:120|none");
+      expect(Math.abs(memory.area.view.cx)).toBeLessThan(400);
+    } else expect(memory.area.view).toBeUndefined();
+  });
+
+  it("opens with focus on the selected tab even when it is not the first", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const w = mount(OverlayHost, {
+      props: { overlay: "map", ownHeader: true },
+      slots: {
+        default: () =>
+          h(MapDrawer, { area: null, world: validateWorldMapPanel(worldBase()), tab: "world", memory: blankMemory() }),
+      },
+      attachTo: host,
+    });
+    wrappers.push(w);
+    await tick();
+    expect(document.activeElement).toBe(w.find('[data-testid="map-drawer-tab--world"]').element);
   });
 });
 

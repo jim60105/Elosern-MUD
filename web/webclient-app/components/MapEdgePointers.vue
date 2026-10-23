@@ -82,14 +82,14 @@ function place(entry) {
   max-width: calc(280px * var(--ui-scale));
   min-height: calc(36px * var(--ui-scale));
   padding: calc(4px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale));
-  color: #ffe2dc;
+  color: var(--paper-100);
   font-family: var(--f-sans);
   font-size: var(--text-xs);
   line-height: 1.15;
   text-align: left;
   white-space: nowrap;
-  background: linear-gradient(180deg, rgba(42, 18, 18, 0.94), rgba(22, 11, 11, 0.94));
-  border: 1px solid rgba(207, 68, 68, 0.62);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--seal-700) 36%, var(--ink-950)), var(--ink-950));
+  border: 1px solid color-mix(in srgb, var(--seal-400) 62%, transparent);
   border-radius: var(--radius-pill);
   box-shadow: 0 calc(6px * var(--ui-scale)) calc(18px * var(--ui-scale)) rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 220, 210, 0.08);
   pointer-events: auto;

@@ -25,7 +25,7 @@ const TARGETS = [
 const render = (args) => ({
   setup() {
     const rect = usableRect(FRAME, { drawerOpen: args.drawerOpen, insets: { top: 54, right: 0, bottom: 0, left: 0 }, marginPx: 18 });
-    const layout = layoutEdgePointers(args.targets, rect);
+    const layout = layoutEdgePointers(args.targets, rect, { pitch: 52, halfWidth: 140, halfHeight: 24 });
     return () =>
       h(
         "div",

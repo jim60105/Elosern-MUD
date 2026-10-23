@@ -81,7 +81,9 @@ export function layoutEdgePointers(
     const side = clamp.side;
     const axis = axisOf(side);
     const [lo, hi] = spanOf(rect, side, halfWidth, halfHeight);
-    const v = freeSpot(clamp[axis], taken[side], lo, hi, pitch);
+    // Top/bottom chips stack along their width, not their two-line height.
+    const spacing = Math.max(pitch, 2 * (axis === "x" ? halfWidth : halfHeight) + 8);
+    const v = freeSpot(clamp[axis], taken[side], lo, hi, spacing);
     taken[side].push(v);
     return axis === "x" ? { x: v, y: clamp.y } : { x: clamp.x, y: v };
   }

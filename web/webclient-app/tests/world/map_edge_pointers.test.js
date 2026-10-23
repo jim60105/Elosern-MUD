@@ -93,6 +93,16 @@ describe("floating map chrome avoids selected details", () => {
     expect(north.x).toBe(RECT.right - 130);
   });
 
+  it("spaces top-edge chips by their width rather than the vertical pitch", () => {
+    const { pointers } = layoutEdgePointers(
+      [target("near", 500, -4000, 1), target("far", 510, -4000, 2)],
+      RECT,
+      { halfWidth: 140, halfHeight: 24 },
+    );
+    expect(pointers.every((p) => p.side === "top")).toBe(true);
+    expect(Math.abs(pointers[0].x - pointers[1].x)).toBeGreaterThanOrEqual(288);
+  });
+
   it("projects a compass bearing north-up", () => {
     const p = farPointAlongBearing({ x: 10, y: 20 }, 90, 100);
     expect(p.x).toBeCloseTo(110);

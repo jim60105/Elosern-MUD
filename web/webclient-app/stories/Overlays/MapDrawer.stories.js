@@ -154,6 +154,15 @@ function assertPointers(root, story) {
     }
     if (detail && box.right > detail.left + 0.5) fail(story, `pointer ${p.dataset.quest} runs under the detail card`);
   }
+  const boxes = pointers.map((p) => p.getBoundingClientRect());
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i], b = boxes[j];
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+        fail(story, `commission pointers ${i} and ${j} overlap`);
+      }
+    }
+  }
   return pointers;
 }
 

@@ -25,12 +25,12 @@
 // `map.view` and owns the per-tab session memory passed in as `memory`; this
 // component writes only that memory's view/selection fields and emits the
 // adjacent 前往 descriptor with the drawn body's canonical current node.
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, nextTick, onMounted, ref, useId, watch } from "vue";
 import AreaMapView from "./AreaMapView.vue";
 import WorldMapView from "./WorldMapView.vue";
 import DrawerHeader from "./DrawerHeader.vue";
 import MapEdgePointers from "./MapEdgePointers.vue";
-import { DETAIL_DRAWER_WIDTH, centreOn, usableRect } from "../lib/map_viewport.js";
+import { DETAIL_DRAWER_WIDTH, centreOn, project, usableRect } from "../lib/map_viewport.js";
 import { placeNodes, viewSignature } from "../lib/area_map_view.js";
 import { WORLD_SIGNATURE } from "../lib/world_map_view.js";
 import { layoutEdgePointers } from "../lib/map_edge_pointers.js";
@@ -136,7 +136,7 @@ const pointerLayout = computed(() => {
     props.tab === "world"
       ? worldPointerTargets(props.world, state.view, state.frame)
       : areaPointerTargets(props.area, state.view, state.frame);
-  return layoutEdgePointers(targets, rect, { pitch: 44 * s, halfWidth: 130 * s, halfHeight: 20 * s });
+  return layoutEdgePointers(targets, rect, { pitch: 52 * s, halfWidth: 140 * s, halfHeight: 24 * s });
 });
 
 function readUiScale() {
@@ -326,11 +326,62 @@ function onAreaMove(payload) {
   emit("move", { ...payload, label: destination?.label ?? null });
 }
 
+// The player walked out of the shown part of the map (a committed move on
+// the same map): bring the current position back into the usable area,
+// keeping the zoom. A new map or frame opens on its own fit instead.
+function followCurrent(scope, point) {
+  const state = viewState.value;
+  if (!state?.view || !state.frame || !point || props.tab !== scope) return;
+  const s = readUiScale();
+  const rect = usableRect(state.frame, {
+    drawerOpen: state.detailShown,
+    drawerWidth: DETAIL_DRAWER_WIDTH,
+    marginPx: 48 * s,
+    insets: { top: 54 * s, right: 0, bottom: 60 * s, left: 0 },
+  });
+  const p = project(state.view, state.frame, point);
+  if (p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom) return;
+  const next = centreOn(state.view, state.frame, point, rect);
+  if (scope === "area") props.memory.area.view = Object.freeze({ signature: viewSignature(props.area), ...next });
+  else props.memory.world.view = Object.freeze({ signature: WORLD_SIGNATURE, ...next });
+}
+
+watch(
+  () => [props.epoch, areaReady.value ? `${props.area.map_id}|${viewSignature(props.area)}` : null, props.area?.current_node],
+  ([epoch, frame, current], [previousEpoch, previousFrame, previousCurrent]) => {
+    if (!frame || frame !== previousFrame || epoch !== previousEpoch || current === previousCurrent) return;
+    const entry = placeNodes(props.area).find((item) => item.node.id === current);
+    followCurrent("area", entry);
+  },
+  // The child's controlled view is ready after render. Keeping this work in
+  // the render flush avoids carrying old coordinates into a later frame.
+  { flush: "post" },
+);
+
+watch(
+  () => [props.epoch, worldReady.value ? `${props.world.current.x},${props.world.current.y}` : null],
+  ([epoch, point], [previousEpoch, previousPoint]) => {
+    if (!point || !previousPoint || epoch !== previousEpoch || point === previousPoint) return;
+    followCurrent("world", props.world.current);
+  },
+  { flush: "post" },
+);
+
 // A new body or tab closes the popovers so they never describe another map.
 watch(
   () => [props.tab, activeBody.value],
   () => closePopovers(),
 );
+
+// The host's focus trap enters at its first button, which may be the
+// inactive tab; the dialog opens with focus on the selected one instead.
+onMounted(() => {
+  nextTick(() => {
+    const active = tabButtons[props.tab];
+    const focused = typeof document !== "undefined" ? document.activeElement : null;
+    if (active && (!focused || focused === document.body || Object.values(tabButtons).includes(focused))) active.focus();
+  });
+});
 
 defineExpose({ viewRef });
 </script>
@@ -611,7 +662,7 @@ defineExpose({ viewRef });
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(90% 80% at 40% 30%, #1d1b17, #0e0d0b);
+  background: radial-gradient(90% 80% at 40% 30%, var(--ink-800), var(--ink-950));
 }
 
 .map-drawer__state {
@@ -685,7 +736,7 @@ defineExpose({ viewRef });
   text-align: center;
   border-left: 1px solid var(--ink-700);
 }
-.map-drawer__chip-tracked { color: #ffd9d4; letter-spacing: 0.06em; }
+.map-drawer__chip-tracked { color: var(--paper-100); letter-spacing: 0.06em; }
 .map-drawer__chip-caret { width: calc(12px * var(--ui-scale)); height: calc(12px * var(--ui-scale)); transition: transform var(--motion-fast) ease; }
 .map-drawer__chip-caret path { fill: none; stroke: var(--paper-400); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .map-drawer__chip[aria-expanded="true"] .map-drawer__chip-caret { transform: rotate(180deg); }
