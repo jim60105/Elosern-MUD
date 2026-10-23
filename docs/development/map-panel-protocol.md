@@ -160,6 +160,21 @@ with the bearing in `[0, 360)` and the distance at least 0. A node destination
 need not be a presented node, since a marker into an unknown branch carries
 only its identity.
 
+The client renderer is `web/webclient-app/components/AreaMapView.vue`
+(render-area-map-view), backed by `web/webclient-app/lib/area_map_view.js`.
+It draws only the validated body. `grid` nodes are projected from their
+metres at one uniform scale. `instance` and `interior` rooms reuse the
+minimap's radial placement and are labelled `示意圖 · 不依實際距離`.
+`wilderness` nodes become cells, using each cell-centre kilometre divided by
+`cell_km`. Metric views draw a dot field on round world multiples. Its
+`格距` caption and the scale bar use one formatter, so they always state the
+same distance.
+
+A quest marker is pinned only when its `node_id` is a presented node, and
+bearing markers are never pinned. `前往` appears only when a node's `action`
+leads to that same node and the node is one edge from `current_node`. It
+emits `{exit_ref, destination, current_node}` and never derives a route.
+
 ### `world_map`
 
 `{schema_version, available: true, common, districts, trail, visited_places,
