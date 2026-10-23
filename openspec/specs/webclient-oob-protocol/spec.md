@@ -5,7 +5,7 @@ Versioned WebSocket OOB envelopes, epoch/revision ordering, authenticated synchr
 ## Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's existing command/args/kwargs transport triple. Protocol version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types, and non-finite numbers.
+The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types and non-finite numbers. Map part frames keep per-frame bounds; reassembled area_map uses finite schema bounds.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
@@ -25,18 +25,18 @@ The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSO
 
 #### Scenario: Global structural bounds reject oversized envelopes
 - **WHEN** a message is canonical UTF-8 JSON over 65,536 bytes, nests deeper than 8, holds an object with more than 64 fields, a list with more than 128 items, a generic string over 2,048 Unicode code points, or an integer outside `-9,007,199,254,740,991..9,007,199,254,740,991` (the full JavaScript-safe range)
-- **THEN** every envelope validator rejects the message before dispatch or adoption
+- **THEN** every wire-frame validator rejects it before dispatch/adoption; reassembled logical area_map data instead uses its finite measured panel bounds, while retaining exact-field/scalar safety
 
 #### Scenario: Field-specific limits stay within global bounds
 - **WHEN** a registered field defines a field-specific limit
-- **THEN** that limit SHALL be equal to or smaller than the applicable global bound
+- **THEN** that limit SHALL be equal to or smaller than the applicable enclosing bound; reassembled logical area_map uses its declared schema-specific bounds and all unrelated payloads retain generic bounds
 
 ### Requirement: Full snapshots and updates have registered replacement semantics
-A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included update panel SHALL completely replace the prior value; the protocol SHALL NOT use JSON Patch or merge unknown nested state.
+A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand map bodies SHALL be omitted from eager snapshots, kept separately within an epoch, and cleared on a new epoch. No JSON Patch is used.
 
 #### Scenario: Full synchronization replaces the complete store
 - **WHEN** the browser accepts a valid `ui_snapshot`
-- **THEN** it atomically replaces every prior panel and the prior mode, layout version, and server-time display with the snapshot values
+- **THEN** it atomically replaces every eager panel and the prior mode, layout version and server-time display, preserves separate on-demand maps in the same epoch, and clears all maps on a new epoch
 
 #### Scenario: A panel update is a full replacement
 - **WHEN** the browser accepts a newer `ui_update` containing the `status` panel

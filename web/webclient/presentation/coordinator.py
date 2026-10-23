@@ -12,14 +12,18 @@ mutation helper: calendar data comes only from the read-only
 ``world.rules.clock.read_world_clock`` accessor.
 """
 
+import secrets
 from typing import Any, Callable
 
-from world.observability import log_warn
+from world.observability import log_debug, log_error, log_warn
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_SAFE_INTEGER,
     PROTOCOL_VERSION,
+    JSONSafetyError,
+    ProtocolValidationError,
+    check_envelope,
     new_presentation_epoch,
 )
 from web.webclient.presentation.registry import PresentationRegistry
@@ -129,6 +133,101 @@ class PresentationCoordinator:
             "server_time": self.server_time(),
         }
 
+    def _checked_map_body(self, name: str, payload: Any) -> dict[str, Any]:
+        """Validate one map body, degrading a malformed one to unavailable.
+
+        The registry isolates presenter exceptions; a presenter that returns a
+        body violating the fixed map schema is isolated the same way here, so
+        no invalid map ever reaches the wire.
+        """
+        from web.webclient.presentation.map_panels import validate_map_panel
+
+        try:
+            return validate_map_panel(name, payload)
+        except ProtocolValidationError as error:
+            correlation_id = secrets.token_hex(16)
+            log_error(
+                "map_panel_invalid",
+                context={"surface": "presentation", "panel": name, "correlation_id": correlation_id},
+                exc=error,
+            )
+            return self.registry.build_unavailable(name, internal=True, correlation_id=correlation_id)
+
+    def _publish_with_maps(
+        self, context: PresentationContext, panels: dict[str, Any], map_names: list[str]
+    ) -> dict[str, Any]:
+        """Deliver an update naming on-demand map panels, in parts if needed.
+
+        One frame is used when the whole update satisfies the generic frame
+        bounds. Otherwise the eager companions (including an auto-added
+        dialogue panel) ship first as an ordinary update, then each map body
+        travels as one bounded transfer at its own revision. All frames are
+        sent synchronously from one context, so the mode cannot change between
+        them; the returned envelope is the logical form of the last revision.
+        """
+        panels = {
+            name: self._checked_map_body(name, value) if name in map_names else value
+            for name, value in panels.items()
+        }
+        mode = self._mode_provider(context)
+        server_time = self.server_time()
+
+        def envelope(revision: int, body: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "presentation_epoch": self._epoch,
+                "revision": revision,
+                "mode": mode,
+                "panels": body,
+                "layout_version": LAYOUT_VERSION,
+                "server_time": server_time,
+            }
+
+        candidate = envelope(self._revision + 1, panels)
+        try:
+            check_envelope(candidate)
+        except JSONSafetyError:  # observability: ignore R2: an over-bound map update is the designed trigger for bounded part delivery below
+            pass
+        else:
+            self._next_revision()
+            self._send(UPDATE_MESSAGE, candidate)
+            return candidate
+
+        from web.webclient.presentation.map_parts import encode_map_parts
+
+        # Build and check every frame before anything is sent or any revision
+        # is consumed, so a failure never leaves a half-published update.
+        eager = {name: value for name, value in panels.items() if name not in map_names}
+        planned: list[tuple[str | None, list[dict[str, Any]]]] = []
+        if eager:
+            planned.append((None, [eager]))
+        for name in sorted(map_names):
+            planned.append((name, [{name: part} for part in encode_map_parts(name, panels[name])]))
+        base = self._revision
+        for offset, (_, bodies) in enumerate(planned, start=1):
+            for body in bodies:
+                check_envelope(envelope(base + offset, body))
+        last = None
+        for name, bodies in planned:
+            revision = self._next_revision()
+            for body in bodies:
+                self._send(UPDATE_MESSAGE, envelope(revision, body))
+            if name is None:
+                last = envelope(revision, eager)
+                continue
+            log_debug(
+                "map_panel_transfer_sent",
+                context={
+                    "surface": "presentation",
+                    "panel": name,
+                    "revision": revision,
+                    "parts": len(bodies),
+                    "bytes": bodies[0][name]["part"]["byte_length"],
+                },
+            )
+            last = envelope(revision, {name: panels[name]})
+        return last
+
     def _send(self, message_name: str, envelope: dict[str, Any]) -> None:
         """Deliver one exact envelope as the only positional transport arg."""
         self.session.msg(**{message_name: ((envelope,), {})})
@@ -160,14 +259,18 @@ class PresentationCoordinator:
         return "exploration"
 
     def _render_all(self, context: PresentationContext) -> dict[str, Any]:
-        """Render every registered panel, isolating each presenter failure."""
+        """Render every eager panel, isolating each presenter failure.
+
+        On-demand map panels are never rendered here: an eager snapshot omits
+        their bodies, and the browser retains same-epoch maps separately.
+        """
         return {
             panel_name: self.registry.render(panel_name, context)
-            for panel_name in sorted(self.registry.panel_names)
+            for panel_name in sorted(self.registry.eager_panel_names)
         }
 
     def full_snapshot(self, context: PresentationContext) -> dict[str, Any]:
-        """Build and send a full snapshot containing every registered panel."""
+        """Build and send a full snapshot containing every eager panel."""
         envelope = self._build_presentation(context, self._render_all(context))
         self._send(SNAPSHOT_MESSAGE, envelope)
         return envelope
@@ -207,6 +310,9 @@ class PresentationCoordinator:
                 **panels,
                 DIALOGUE_PANEL: self.registry.render(DIALOGUE_PANEL, context),
             }
+        map_names = sorted(set(panels) & self.registry.on_demand_panel_names)
+        if map_names:
+            return self._publish_with_maps(context, panels, map_names)
         envelope = self._build_presentation(context, panels)
         self._send(UPDATE_MESSAGE, envelope)
         return envelope

@@ -74,6 +74,9 @@ var exotic = require("./panels/exotic.js");
 var combatBeats = require("./panels/combat_beats.js");
 var dream = require("./panels/dream.js");
 var skillUse = require("./panels/skill_use.js");
+var mapPanels = require("./panels/map_panels.js");
+var mapParts = require("./map_parts.js");
+var MAP_PANEL_SCHEMAS = mapPanels.MAP_PANEL_SCHEMAS;
 
 var PANEL_VALIDATORS = {
   art: art.validateArtPanel,
@@ -132,7 +135,12 @@ function validatePanel(name, schemaVersion, payload) {
   return validator(payload);
 }
 
-function validatePanels(value, knownPanels, nonempty) {
+// On-demand map panels (define-map-panel-protocol) are accepted only by a
+// ui_update (`allowMaps`): an eager snapshot never carries their bodies. A
+// map value is either its logical form (available or the common unavailable
+// form) or one bounded part, and a part frame carries nothing else. The
+// returned `part` is {panel, header, bytes} for the store's assembler.
+function validatePanels(value, knownPanels, nonempty, allowMaps) {
   if (!isPlainObject(value)) {
     throw new Error("panels must be a JSON object");
   }
@@ -143,18 +151,34 @@ function validatePanels(value, knownPanels, nonempty) {
     throw new Error("panels exceeds the maximum of " + MAX_PANEL_COUNT + " panels");
   }
   var normalized = {};
+  var part = null;
   var names = Object.keys(value);
   for (var i = 0; i < names.length; i++) {
     var name = validatePanelName(names[i]);
+    if (Object.prototype.hasOwnProperty.call(MAP_PANEL_SCHEMAS, name)) {
+      if (!allowMaps) {
+        throw new Error("an eager snapshot never carries the on-demand panel " + name);
+      }
+      if (mapParts.isMapPart(value[name])) {
+        if (names.length !== 1) {
+          throw new Error("a map part frame carries exactly one panel");
+        }
+        var decoded = mapParts.validateMapPart(name, value[name]);
+        part = { panel: name, header: decoded.header, bytes: decoded.bytes };
+        continue;
+      }
+      normalized[name] = mapPanels.validateMapPanel(name, value[name]);
+      continue;
+    }
     if (!Object.prototype.hasOwnProperty.call(knownPanels, name)) {
       throw new Error("panels contains unknown panel name " + name);
     }
     normalized[name] = validatePanel(name, knownPanels[name], value[name]);
   }
-  return normalized;
+  return { panels: normalized, part: part };
 }
 
-function validateCommonMetadata(payload, name, knownPanels, panelsNonempty) {
+function validateCommonMetadata(payload, name, knownPanels, panelsNonempty, allowMaps) {
   requireExactFields(
     payload,
     name,
@@ -171,25 +195,29 @@ function validateCommonMetadata(payload, name, knownPanels, panelsNonempty) {
     throw new Error("mode must be one of " + MODES.join(","));
   }
   var layoutVersion = requireInt(payload.layout_version, "layout_version", 1, MAX_LAYOUT_VERSION);
-  var panels = validatePanels(payload.panels, knownPanels, panelsNonempty);
+  var checked = validatePanels(payload.panels, knownPanels, panelsNonempty, allowMaps);
   var serverTime = validateServerTime(payload.server_time);
-  return {
+  var meta = {
     protocolVersion: PROTOCOL_VERSION,
     epoch: epoch,
     revision: revision,
     mode: payload.mode,
-    panels: panels,
+    panels: checked.panels,
     layoutVersion: layoutVersion,
     serverTime: serverTime,
   };
+  if (checked.part !== null) {
+    meta.part = checked.part;
+  }
+  return meta;
 }
 
 function validateSnapshot(payload) {
-  return validateCommonMetadata(payload, "ui_snapshot", PANEL_ALLOWLIST, true);
+  return validateCommonMetadata(payload, "ui_snapshot", PANEL_ALLOWLIST, true, false);
 }
 
 function validateUpdate(payload) {
-  return validateCommonMetadata(payload, "ui_update", PANEL_ALLOWLIST, true);
+  return validateCommonMetadata(payload, "ui_update", PANEL_ALLOWLIST, true, true);
 }
 
 function validateActionResult(payload) {

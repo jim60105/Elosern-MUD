@@ -40,6 +40,11 @@ still resolves against the provider frame; widening one never widens the
 other. Non-integer, non-finite, boolean and numeric-string coordinates remain
 rejected, so the renderer never receives invented geometry.
 
+The on-demand `area_map` and `world_map` drawer panels reuse the same
+coordinate envelope but have their own schemas, frames and bounds. See
+[map-panel-protocol.md](map-panel-protocol.md). The `local_map` minimap keeps
+its existing 65,536-byte budget.
+
 ## Projection
 
 `layoutNodes` is a uniform metric projection, not a rank compression:

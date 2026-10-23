@@ -40,12 +40,17 @@ class PresenterSpec:
         presenter: A callable receiving a :class:`PresentationContext` and
             returning a JSON-safe available payload (including
             ``available: True``).
+        on_demand: ``True`` for an on-demand map panel (``area_map`` or
+            ``world_map``). Such a presenter never runs for an eager snapshot
+            or refresh; it publishes only when a caller names it explicitly,
+            and its body may travel as bounded parts.
     """
 
     name: str
     schema_version: int
     unavailable_reason: tuple[str, str]
     presenter: Callable[[PresentationContext], dict[str, Any]]
+    on_demand: bool = False
 
 
 class PanelUnavailableError(RuntimeError):
@@ -88,12 +93,33 @@ class PresentationRegistry:
         if not isinstance(spec.schema_version, int) or spec.schema_version < 1:
             raise ProtocolValidationError("schema_version must be a positive integer")
         _validate_identifier(spec.unavailable_reason[0], "unavailable reason code")
+        from web.webclient.presentation.map_panels import MAP_PANEL_SCHEMAS
+
+        is_map = panel_name in MAP_PANEL_SCHEMAS
+        if spec.on_demand is not is_map:
+            raise ProtocolValidationError(
+                f"panel {panel_name!r}: only the map panels register on demand, and they must"
+            )
+        if is_map and spec.schema_version != MAP_PANEL_SCHEMAS[panel_name]:
+            raise ProtocolValidationError(
+                f"map panel {panel_name!r} must register schema_version {MAP_PANEL_SCHEMAS[panel_name]}"
+            )
         self._specs[panel_name] = spec
 
     @property
     def panel_names(self) -> frozenset[str]:
         """Return the immutable set of registered stable panel names."""
         return frozenset(self._specs)
+
+    @property
+    def eager_panel_names(self) -> frozenset[str]:
+        """Panels rendered into every full snapshot."""
+        return frozenset(name for name, spec in self._specs.items() if not spec.on_demand)
+
+    @property
+    def on_demand_panel_names(self) -> frozenset[str]:
+        """Map panels published only when explicitly requested."""
+        return frozenset(name for name, spec in self._specs.items() if spec.on_demand)
 
     def spec(self, panel_name: str) -> PresenterSpec:
         """Return the registered spec for ``panel_name`` or raise."""
