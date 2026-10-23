@@ -183,7 +183,14 @@ return {
     if (messageName === "ui_snapshot" || messageName === "ui_update") {
       var meta;
       try {
-        checkEnvelope(payload);
+        // An intact world map rides a ui_update under its own scoped frame
+        // allowance (transport-world-map-panel); everything else, parts
+        // included, keeps the generic envelope bounds.
+        if (messageName === "ui_update" && mapPanels.carriesIntactWorldMap(payload)) {
+          mapPanels.checkWorldMapEnvelope(payload);
+        } else {
+          checkEnvelope(payload);
+        }
         meta =
           messageName === "ui_snapshot"
             ? validateSnapshot(payload)

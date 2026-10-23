@@ -505,7 +505,7 @@ class OnDemandCoordinatorTests(unittest.TestCase):
     @covers_requirement(
         "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
     )
-    def test_two_maps_travel_as_two_transfers_checked_before_sending(self):
+    def test_two_maps_publish_at_two_revisions_checked_before_sending(self):
         session = _Session()
         registry = _registry(_dense_grid, [])
         registry.register(
@@ -525,7 +525,14 @@ class OnDemandCoordinatorTests(unittest.TestCase):
             names = {name for name, _ in rows}
             self.assertEqual(len(names), 1)
             name = names.pop()
-            decoded[name] = decode_map_parts(name, [part for _, part in rows])
+            if name == "world_map":
+                # transport-world-map-panel: a world map that fits its scoped
+                # frame allowance travels as one intact frame, never as parts.
+                (_, body), = rows
+                self.assertNotIn("part", body)
+                decoded[name] = body
+            else:
+                decoded[name] = decode_map_parts(name, [part for _, part in rows])
         self.assertEqual(decoded["world_map"], validate_world_map(_copy("world")))
         # A frame that cannot be encoded aborts before anything is sent.
         before = (len(session.sent), coordinator.revision)

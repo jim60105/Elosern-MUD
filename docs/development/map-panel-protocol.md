@@ -142,15 +142,54 @@ current, quest_markers}`, in continent kilometres with north-positive `y`.
 Either panel may instead be the common unavailable form
 `{schema_version, available: false, reason}`.
 
+## The world-map frame allowance
+
+`world_map` is the one panel exempt from the generic frame budget
+(transport-world-map-panel). A `ui_update` whose `panels` object holds an
+intact `world_map` object (one without `part`) is checked in two pieces:
+
+- The rest of the envelope, with the world map replaced by `null`, passes the
+  unchanged generic check. Metadata and every sibling panel keep the
+  65,536-byte, 320-item, depth and string bounds. That includes `local_map`,
+  `area_map` and the dialogue companion.
+- The world map passes the generic scalar rules, its exact schema and its
+  logical ceiling of 1,048,576 canonical bytes.
+
+An intact world-map frame is therefore at most 65,536 + 1,048,576 canonical
+bytes. Snapshots, part frames and every other panel take the generic check
+only. Both languages use the same routing predicate
+(`carries_intact_world_map` / `carriesIntactWorldMap`) and the same check
+(`check_world_map_envelope` / `checkWorldMapEnvelope`). The browser copies
+the envelope into plain data properties before the generic walk, so a
+JSON-parsed `"__proto__"` sibling cannot hide from it. The browser measures
+the world map once, by canonically re-serializing the decoded body. The
+server measures the validated body. The two counts can differ slightly for
+some float spellings: Python writes `1250.0` where JavaScript writes `1250`,
+and `1e-05` where JavaScript writes `0.00001`. Publishers emit integral
+values as integers, and `tools/world_map_payload.py` does so, which keeps the
+two counts equal for the measured payloads. The ceiling check is therefore not byte-exact across
+languages, by design; the ceiling's headroom is far larger than any such
+difference.
+
+The coordinator publishes a world map as one intact frame whenever the whole
+update fits the generic bounds or the allowance. If a companion pushes the
+update outside the allowance, the companions ship first and the world map
+follows alone at its own revision, still intact. A world map above its
+ceiling never reaches the wire: it becomes the `map_unavailable` panel and
+logs `map_panel_invalid`. Each intact world-map frame logs the debug event
+`world_map_frame_sent` with its canonical byte count.
+
 ## Bounded parts
 
 A map update that satisfies the generic frame bounds (65,536 canonical bytes,
-320-item lists, depth 12, 2,048-code-point strings) ships as one ordinary
-`ui_update`. Otherwise:
+320-item lists, depth 12, 2,048-code-point strings), or the world-map
+allowance above, ships as one ordinary `ui_update`. Otherwise:
 
 1. Any eager companion panels in the same update, including the dialogue
    panel added in dialogue mode, ship first as an ordinary update.
-2. Each map body travels as one transfer at its own new revision. Every part
+2. Each `area_map` body travels as one transfer at its own new revision. (A
+   validated `world_map` always fits its allowance alone, so it ships as one
+   intact frame at its own revision instead.) Every part
    is a `ui_update` with identical metadata whose `panels` hold only
    `{<map>: {schema_version: 1, available: true, part: {transfer_id, index,
    count, byte_length, chunk}}}`.
@@ -213,7 +252,7 @@ All numeric ceilings are finite and mirrored in both validators:
 | Panel | Ceilings | Owner of the measured values |
 | --- | --- | --- |
 | `area_map` | 512 nodes, 2,048 edges, 32 markers, 393,216 logical bytes (measured) | `publish-area-map-panel` |
-| `world_map` | 2,097,152 logical bytes plus the per-collection limits in `map_panels.py` | `transport-world-map-panel` measures the continental payload and the socket path |
+| `world_map` | 1,048,576 logical bytes (measured) plus the per-collection limits in `map_panels.py` | `transport-world-map-panel` |
 
 The owning change replaces the constants in both files together and records
 the measurements here.
@@ -231,3 +270,61 @@ the measurements here.
 - The ceilings leave about 24 times the largest settlement and twice the
   wilderness window for future settlements and builder interiors. Every unrelated panel keeps its generic budget. That
 includes `local_map` and its 65,536-byte envelope.
+
+`world_map` measurements (transport-world-map-panel). There is no world
+presenter yet, so `tools/world_map_payload.py` assembles the logical body
+from the frozen generated geography the presenter will read. That geography
+is the 120 district outlines of the frozen partition (14,311 points, at most
+954 per ring), the mainland boundary, the derived national borders, the
+waterways and summit ridge clipped per district, the anchors and the
+harbours. The player knowledge is synthetic. Run
+`uv run --locked python -m tools.world_map_payload` to reproduce the table.
+
+| Case | Canonical bytes |
+| --- | --- |
+| Common layer only | 1,267 |
+| Every district unlit (outlines only) | 193,979 |
+| Representative: the 12 districts nearest the Altoria start lit, a walked trail, 2 hidden places, 3 markers | 227,866 |
+| Supported worst case: every district lit, a 1 km trail at the 20,000-run cap, every hidden place, 64 markers with full-length titles and IDs | 659,391 |
+
+The worst case breaks down into 186,701 bytes of outlines, 228,893 of terrain
+washes, 180,253 of trail and 33,568 of markers. On the socket the portal
+writes `json.dumps` with `ensure_ascii=True`, so each CJK code point costs
+six bytes. The representative frame is about 264 KB on the wire and the
+worst-case frame about 795 KB.
+
+Two figures are estimates, not bounds. No terrain-wash geometry is authored
+yet, so each lit district carries its outline once per terrain region it
+contains. There is no continental road network yet, so `roads` is empty. The
+1 MiB ceiling keeps about 1.6 times the worst case, which leaves room for
+both. `publish-world-map-panel` re-measures its real output against the
+ceiling and amends it if the real terrain or roads need more.
+
+Transport limits on the delivery path:
+
+- Server to portal (AMP): Twisted caps one AMP value at 65,535 bytes.
+  Evennia's `Compressed` argument splits the pickled message into chunks of
+  that size and compresses each one with zlib at level 9. JSON compresses
+  far below the cap.
+- Portal to browser (WebSocket): autobahn 20.12.3 `WebSocketServerFactory`
+  defaults to `maxFramePayloadSize = 0`, `maxMessagePayloadSize = 0` and
+  `autoFragmentSize = 0`, which means no limit and one frame per message.
+  Evennia's portal factory overrides none of them.
+- The repository ships no reverse proxy (`compose.yaml` publishes port 4002
+  directly). A deployment that adds one must allow messages of at least the
+  frame bound above.
+
+Decision: the world map travels intact, and parts are not used for it. The
+managed browser class
+`web.tests.browser.test_map_transport.WorldMapTransportTests` publishes the
+representative and the worst-case payload through the live coordinator,
+Evennia's AMP, the portal and the WebSocket. For each payload it asserts
+three things:
+
+- exactly one `ui_update` WebSocket frame carried the world map, with no
+  `part`, and that frame was larger than 65,536 bytes;
+- the production browser store adopted it into `state.maps`;
+- the canonical UTF-8 bytes of the adopted map have the same length and
+  SHA-256 as the server's validated body.
+
+The part codec stays available, unchanged, for `area_map`.

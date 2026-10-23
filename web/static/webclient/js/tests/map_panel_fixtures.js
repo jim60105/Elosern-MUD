@@ -183,6 +183,63 @@ function worldMap(overrides) {
   );
 }
 
+// A counter-clockwise ring of `points` vertices (closed) around (cx, cy).
+function ring(cx, cy, radius, points) {
+  const out = [];
+  for (let index = 0; index < points; index++) {
+    const angle = (2 * Math.PI * index) / points;
+    out.push([
+      Math.round((cx + radius * Math.cos(angle)) * 10) / 10,
+      Math.round((cy + radius * Math.sin(angle)) * 10) / 10,
+    ]);
+  }
+  out.push(out[0].slice());
+  return out;
+}
+
+// A synthetic schema-valid world_map of at least `minBytes` canonical bytes
+// (transport-world-map-panel): the small fixture plus unlit districts whose
+// dense synthetic outlines push the body past one generic 64 KB frame. The
+// result is deterministic for a given `minBytes`.
+function largeWorldMap(minBytes, overrides) {
+  const body = worldMap();
+  // Each pushed district adds its own canonical size plus one comma.
+  for (let index = 0, bytes = core.jsonByteSize(body); bytes < minBytes; index++) {
+    const district = {
+      id: "t_far_" + index,
+      lit: false,
+      outline: [ring(500 + (index % 8) * 60, 500 + Math.floor(index / 8) * 60, 25, 600)],
+    };
+    body.districts.push(district);
+    bytes += core.jsonByteSize(district) + 1;
+  }
+  return Object.assign(body, overrides || {});
+}
+
+// A synthetic world_map of exactly `target` canonical bytes: a large map
+// below the target, then visited places whose ASCII names close the gap.
+function worldMapOfBytes(target) {
+  const body = largeWorldMap(target - 20000);
+  const place = (index, length) => ({
+    id: "t_pad_" + index, name: "p".repeat(length), kind: "hidden", x: 1, y: 2,
+  });
+  // A row of name length L adds overhead + L bytes (its comma included).
+  for (let index = 0; ; index++) {
+    const gap = target - core.jsonByteSize(body);
+    const overhead = core.jsonByteSize(place(index, 1));
+    if (gap - overhead <= 256) {
+      body.visited_places.push(place(index, gap - overhead));
+      break;
+    }
+    // Leave room for one more complete row after this one.
+    body.visited_places.push(place(index, Math.min(256, gap - 2 * overhead - 8)));
+  }
+  if (core.jsonByteSize(body) !== target) {
+    throw new Error("worldMapOfBytes missed its target");
+  }
+  return body;
+}
+
 // Split a logical body into exact part wire values (mirror of the Python
 // encoder: canonical JSON, fixed 1536-byte slices, padded base64).
 function encodeParts(body, transferId) {
@@ -206,4 +263,17 @@ function encodeParts(body, transferId) {
   return parts;
 }
 
-module.exports = { MAP, gridNode, gridArea, interiorArea, wildernessArea, worldMap, square, hole, encodeParts };
+module.exports = {
+  MAP,
+  gridNode,
+  gridArea,
+  interiorArea,
+  wildernessArea,
+  worldMap,
+  largeWorldMap,
+  worldMapOfBytes,
+  ring,
+  square,
+  hole,
+  encodeParts,
+};
