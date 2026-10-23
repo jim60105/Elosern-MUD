@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Full snapshots and updates have registered replacement semantics
-A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand area_map/world_map bodies SHALL be omitted from eager snapshots and retained separately within the same epoch; explicit map delivery replaces their complete read models. New transport/puppet epochs SHALL clear both stores. No JSON Patch or unknown nested-state merge is allowed.
+A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand map bodies SHALL be omitted from eager snapshots, kept separately within an epoch, and cleared on a new epoch. No JSON Patch is used.
 
 #### Scenario: Full synchronization replaces the complete store
 - **WHEN** the browser accepts a valid `ui_snapshot`
@@ -34,7 +34,7 @@ A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentatio
 - **THEN** it SHALL contain exactly `year`, `season_index`, `season_label`, `day_in_season`, `hour`, `minute`, and `second`, bounded respectively to the safe non-negative integer range, `0..3`, 1..32 Unicode code points, `1..90`, `0..23`, `0..59`, and `0..59`
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's existing command/args/kwargs transport triple. Protocol version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types and non-finite numbers. Registered map part frames SHALL retain existing per-frame bounds; reassembled logical area_map collections/bytes SHALL use finite schema-specific bounds, without relaxing any unrelated panel budget.
+The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types and non-finite numbers. Map part frames keep per-frame bounds; reassembled area_map uses finite schema bounds.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
