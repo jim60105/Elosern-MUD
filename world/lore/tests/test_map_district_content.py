@@ -3,19 +3,31 @@
 The registry's districts and landmarks are shipped content, so this module
 names them: the production registry validates against the live terrain,
 settlement graphs and gateways; the deep forest is the single region district
-with its heart near the north coast; every landmark is spelt exactly as the
-map-knowledge writer records it; and the walkable-component index the
+with its heart near the north coast; the full authored roster stays within
+its 110-130 range with one-to-one identities, declared spacing, resolvable
+and reachable landmarks and no landmark on a hidden place (without echoing
+every name); every landmark is spelt exactly as the map-knowledge writer
+records it; and the walkable-component index the
 reachability rule reads agrees with the shared wilderness validity rule.
 Mechanism rules are covered with synthetic fixtures in ``test_map_districts``.
 """
 
 import dataclasses
+import math
+import re
 import unittest
+from collections import Counter
 
 from tools.spec_traceability import covers_requirement
-from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY, world_position_m
+from world.lore.anchors import (
+    ANCHOR_GEOGRAPHY_REGISTRY,
+    ANCHOR_REGISTRY,
+    AnchorKind,
+    world_position_m,
+)
 from world.lore.map_districts import (
     MAP_DISTRICT_REGISTRY,
+    MIN_VORONOI_SPACING_KM,
     MapDistrict,
     MapDistrictError,
     cell_of_position,
@@ -175,6 +187,93 @@ class ShippedDistrictContractTests(unittest.TestCase):
         self.assertEqual(
             components.component((wall[0] - 3, 1200)), components.component((wall[0] + 3, 1200))
         )
+
+    def _continental_position(self, district):
+        parts = decode_node(district.landmark_node)
+        if parts["prefix"] == "wild":
+            return cell_center_m((parts["x"], parts["y"]))
+        return self.terrain.grid_site(parts["z_map_key"], (parts["x"], parts["y"])).position_m
+
+    @covers_requirement(
+        "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"
+    )
+    def test_roster_is_complete_and_one_to_one(self):
+        districts = list(MAP_DISTRICT_REGISTRY.values())
+        self.assertTrue(110 <= len(districts) <= 130, len(districts))
+        # One landmark per district, and no node, district name or landmark
+        # name shared between two districts.
+        for field in ("key", "landmark_node", "district_name_zh", "landmark_name_zh"):
+            values = [getattr(district, field) for district in districts]
+            self.assertEqual(len(set(values)), len(values), field)
+        for district in districts:
+            with self.subTest(district=district.key):
+                self.assertNotEqual(district.district_name_zh, district.landmark_name_zh)
+                for name in (district.district_name_zh, district.landmark_name_zh):
+                    # Authored lore, never a Latin-letter or numbered placeholder.
+                    self.assertIsNone(re.search(r"[0-9A-Za-z０-９Ａ-Ｚａ-ｚ]", name), name)
+                    self.assertIsNone(re.search(r"第?[一二三四五六七八九十]+[號号区區]$", name), name)
+        # The deep forest stays the one region district; every nominal nation
+        # carries Voronoi seeds roughly in proportion to its walkable land.
+        nations = Counter(
+            nominal_nation_for_coordinates(*cell_of_position(self._continental_position(d)))
+            for d in districts
+            if d.kind == "voronoi"
+        )
+        self.assertEqual(sum(nations.values()), len(districts) - 1)
+        self.assertTrue(nations["grandia"] > nations["altoria"] > nations["valhalla"] >= 15, nations)
+
+    @covers_requirement(
+        "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"
+    )
+    def test_every_pair_of_voronoi_landmarks_keeps_the_declared_spacing(self):
+        positions = [
+            (district.key, self._continental_position(district))
+            for district in MAP_DISTRICT_REGISTRY.values()
+            if district.kind == "voronoi"
+        ]
+        minimum_m = MIN_VORONOI_SPACING_KM * 1000
+        closest = min(
+            (math.dist(a, b), first, second)
+            for index, (first, a) in enumerate(positions)
+            for second, b in positions[index + 1 :]
+        )
+        self.assertGreaterEqual(closest[0], minimum_m, closest)
+
+    @covers_requirement(
+        "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"
+    )
+    def test_every_landmark_resolves_and_is_reachable_on_the_live_continent(self):
+        components = walkable_components()
+        gateway = {
+            components.component(entry.approach_cell(gate))
+            for entry in WILDERNESS_ENTRY_REGISTRY.values()
+            for gate in entry.gates
+        }
+        for district in MAP_DISTRICT_REGISTRY.values():
+            parts = decode_node(district.landmark_node)
+            with self.subTest(district=district.key):
+                if parts["prefix"] == "grid":
+                    site = self.terrain.grid_site(parts["z_map_key"], (parts["x"], parts["y"]))
+                    self.assertIsNotNone(site)
+                    self.assertTrue(site.reachable)
+                    continue
+                cell = (parts["x"], parts["y"])
+                self.assertTrue(is_valid_wilderness_cell(cell))
+                self.assertIn(components.component(cell), gateway)
+
+    def test_no_landmark_marks_a_hidden_place(self):
+        # Elven villages and dungeons appear only after a visit, so no
+        # landmark (whose name a lit district shows) sits on their cell.
+        hidden = {
+            ANCHOR_GEOGRAPHY_REGISTRY[key].cell
+            for key, anchor in ANCHOR_REGISTRY.items()
+            if anchor.kind in (AnchorKind.ELVEN_VILLAGE, AnchorKind.DUNGEON)
+        }
+        self.assertTrue(hidden)
+        for district in MAP_DISTRICT_REGISTRY.values():
+            with self.subTest(district=district.key):
+                position = self._continental_position(district)
+                self.assertNotIn(cell_of_position(position), hidden)
 
     def test_registry_entries_are_frozen(self):
         district = next(iter(MAP_DISTRICT_REGISTRY.values()))
