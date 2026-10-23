@@ -34,8 +34,6 @@ from tools.map_district_partition import (
 from tools.spec_traceability import covers_requirement
 from world.maps.district_partition import decode_partition
 
-_PARTITION = "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-_FROZEN = "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
 
 _NATIONS = ("a", "b")
 _REGIONS = ("forest", "plain")
@@ -89,7 +87,9 @@ def _segments(rings):
 
 
 class BarrierPropagationTests(unittest.TestCase):
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_national_border_splits_a_tile_and_stays_closed_at_a_ford(self):
         # A border river (blocked A cells) with a ford gap at x=7 separates
         # nation a (south) from nation b (north). The ford lets travellers
@@ -116,7 +116,9 @@ class BarrierPropagationTests(unittest.TestCase):
         partition = compute_partition(_input(rows, _seed("south", 1, 1), _seed("north", 8, 8)))
         self.assertEqual(_owners(partition, rows), ["n" * 10] * 5 + ["s" * 10] * 5)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_same_nation_ford_and_pass_stay_open(self):
         # The same river inside one nation: its ford joins both banks, so a
         # single southern seed reaches the northern bank and no component is
@@ -138,7 +140,9 @@ class BarrierPropagationTests(unittest.TestCase):
         self.assertTrue(partition.domain[4, 7])
         self.assertFalse(partition.domain[4, 0])
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_diagonal_wall_rejects_corner_cutting(self):
         # A one-cell anti-diagonal ridge (x + y == 9) is 8-connected but its
         # far side touches the near side diagonally on every step. Beta sits
@@ -160,7 +164,9 @@ class BarrierPropagationTests(unittest.TestCase):
         # (6, 4) fall into two fragments.
         self.assertNotEqual(partition.fragment[3, 5], partition.fragment[4, 6])
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_equal_distance_goes_to_the_smaller_key(self):
         # Three tile columns in one row band: the middle tile is one coarse
         # step from both seeds, so the smaller key takes it on either side.
@@ -172,7 +178,9 @@ class BarrierPropagationTests(unittest.TestCase):
                 self.assertEqual(partition.owner_at((2, 7)), west)
                 self.assertEqual(partition.owner_at((12, 7)), east)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_blocked_inland_cell_takes_the_nearest_same_nation_owner(self):
         # A 3 by 3 blocked block of nation a (x 4..6) borders nation b at
         # x=7. Its eastern cell (6, 5) is one kilometre from b ground, but it
@@ -194,7 +202,9 @@ class BarrierPropagationTests(unittest.TestCase):
 
 
 class RegionAndLandmarkTests(unittest.TestCase):
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_region_district_takes_its_region_across_nations_first(self):
         # The forest band (f = nation a, g = nation b) crosses the border
         # and a mid-tile edge. Its single district owns all of it, even the
@@ -223,7 +233,9 @@ class RegionAndLandmarkTests(unittest.TestCase):
             compute_partition(_input(rows, forest, _seed("west", 0, 9), _seed("east", 9, 0)))
         self.assertIn("west: landmark (0, 9) lies in region land", caught.exception.problems)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_grid_landmark_in_a_footprint_injects_at_its_routed_approach(self):
         # A settlement footprint (blocked A ring x 3..7, y 3..7) encloses a
         # walkable courtyard (5, 5). The landmark cell (4, 4) is inside the
@@ -259,7 +271,9 @@ class RegionAndLandmarkTests(unittest.TestCase):
         self.assertEqual(partition.owner_at((1, 5)), "west")
         self.assertEqual(partition.owner_at((14, 14)), "far")
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_footprint_conflicts_and_border_mismatch_fail(self):
         rows = ["a" * 5 + "b" * 5] * 10
         rows = [row[:4] + "AB" + row[6:] if 3 <= i <= 4 else row for i, row in enumerate(rows)]
@@ -305,7 +319,9 @@ class FrozenEncodingTests(unittest.TestCase):
     def _input(self):
         return _input(self._ROWS, _seed("west", 0, 0), _seed("east", 9, 9))
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_regeneration_is_byte_identical_and_line_oriented(self):
         first, second = generate(self._input()), generate(self._input())
         self.assertEqual(first, second)
@@ -314,7 +330,9 @@ class FrozenEncodingTests(unittest.TestCase):
         self.assertEqual(serialize(document), first)
         self.assertNotIn(".", json.dumps(document["outlines"]))  # integer metres only
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_runs_decode_to_the_exact_ownership_with_sea_distinguished(self):
         inp = self._input()
         partition = compute_partition(inp)
@@ -330,7 +348,9 @@ class FrozenEncodingTests(unittest.TestCase):
                 self.assertEqual(decoded.district_at((x, y)), partition.owner_at((x, y)), (x, y))
         self.assertIsNone(decoded.district_at((10, 0)))
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_changed_inputs_change_the_artifact(self):
         baseline = generate(self._input())
         moved = _input(self._ROWS, _seed("west", 0, 0), _seed("east", 9, 0))
@@ -374,7 +394,9 @@ class OutlineTests(unittest.TestCase):
                 on_frame = all(p[0] in (0, edge_m) or p[1] in (0, edge_m) for p in (start, end))
                 self.assertTrue(on_frame or (end, start) in others, (key, start, end))
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_neighbours_share_smoothed_pieces_and_junctions_stay_exact(self):
         rows = [
             "xxxxxxxyyy",
@@ -396,7 +418,9 @@ class OutlineTests(unittest.TestCase):
         self.assertNotIn((4000, 6000), points)
         self.assertIn((3000, 5000), points)  # the x/y/z junction is exact
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_national_enclave_keeps_exact_geometry_and_a_matching_hole(self):
         rows = ["pppppp", "pqqqpp", "pqqqpp", "pppppp", "pppppp", "pppppp"]
         nations = ["aaaaaa", "abbbaa", "abbbaa", "aaaaaa", "aaaaaa", "aaaaaa"]
@@ -409,7 +433,9 @@ class OutlineTests(unittest.TestCase):
         self.assertEqual(sorted(hole), sorted(outlines["q"][0]))
         self.assertSharedBoundaries(outlines, 6)
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_checkerboard_vertex_splits_diagonal_cells(self):
         rows = ["rs", "sr"]
         outlines = self._outlines(rows)

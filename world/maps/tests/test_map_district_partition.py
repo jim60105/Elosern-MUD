@@ -27,8 +27,6 @@ from tools.spec_traceability import covers_requirement
 from world.lore.map_districts import MAP_DISTRICT_REGISTRY
 from world.maps import district_partition
 
-_PARTITION = "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
-_FROZEN = "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
 _REGENERATE = "uv run --locked python -m tools.map_district_partition"
 
 
@@ -41,7 +39,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         cls.text = generator.serialize(generator.encode(cls.partition, cls.inp))
         cls.committed = generator.DATA_PATH.read_text(encoding="utf-8")
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_committed_partition_matches_a_fresh_recomputation(self):
         self.assertEqual(
             self.text,
@@ -50,7 +50,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         )
         self.assertEqual(generator.DATA_PATH, district_partition.DATA_PATH)
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_a_registry_change_without_regeneration_is_a_mismatch(self):
         dropped = next(d for d in self.inp.districts if d.key == "eastern_pasture")
         changed = replace(self.inp, districts=tuple(d for d in self.inp.districts if d is not dropped))
@@ -58,7 +60,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         self.assertNotEqual(regenerated, self.committed)
         self.assertNotIn('"eastern_pasture"', regenerated)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_every_land_cell_has_exactly_one_owner_and_sea_none(self):
         owner, land = self.partition.owner, self.inp.land
         self.assertTrue(np.all(owner[land] > 0))
@@ -73,7 +77,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         for x, y in cells:
             self.assertEqual(frozen.district_at((x, y)), self.partition.owner_at((x, y)), (x, y))
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_forest_is_exactly_its_region_and_voronoi_districts_never_straddle_a_border(self):
         owner, inp = self.partition.owner, self.inp
         forest = self.partition.keys.index("north_deep_forest") + 1
@@ -88,7 +94,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
                 nations = np.unique(inp.nation[owner == code])
                 self.assertEqual(nations.size, 1)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_voronoi_ground_is_reached_from_its_own_sources_without_crossing(self):
         owner, fragment = self.partition.owner, self.partition.fragment
         domain = self.partition.domain
@@ -108,7 +116,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
                     ring = ndimage.binary_dilation(pocket, structure=np.ones((3, 3), bool)) & ~pocket
                     self.assertFalse(np.any(self.partition.domain[ring]), key)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_every_landmark_lies_in_its_own_district(self):
         by_key = {seed.key: seed for seed in self.inp.districts}
         self.assertEqual(set(by_key), set(MAP_DISTRICT_REGISTRY))
@@ -122,7 +132,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         for cell in royal.footprint:
             self.assertEqual(district_partition.district_at(cell), "royal_river_valley", cell)
 
-    @covers_requirement(_PARTITION)
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
     def test_outlines_cover_every_district_with_integer_metre_rings(self):
         document = json.loads(self.committed)
         self.assertEqual(sorted(document["outlines"]), sorted(MAP_DISTRICT_REGISTRY))
@@ -134,7 +146,9 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
                     self.assertGreaterEqual(len(ring), 6)
                     self.assertTrue(all(isinstance(v, int) and 0 <= v <= 2_700_000 for v in ring))
 
-    @covers_requirement(_FROZEN)
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
     def test_runtime_lookup_never_loads_the_generator(self):
         root = Path(district_partition.__file__).resolve().parents[2]
         probe = (
