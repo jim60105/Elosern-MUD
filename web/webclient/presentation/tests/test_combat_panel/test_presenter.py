@@ -577,6 +577,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "party_inventory",
                     "item_holdings",
                     "party_member",
+                    # The map drawer's on-demand panels (redesign-map-
+                    # drawer): registered presenters that never run for an
+                    # eager snapshot.
+                    "area_map",
+                    "world_map",
                 }
             ),
         )
