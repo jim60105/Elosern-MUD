@@ -246,6 +246,48 @@ The earlier two-entry `ANCHOR_PLACEMENT_REGISTRY` continues to describe exactly
 the anchors with a built grid map; all nine geographic cells live in
 `ANCHOR_GEOGRAPHY_REGISTRY` instead.
 
+## Quest destinations on the map
+
+`web/webclient/presentation/map_quest_destinations.py` is the one shared,
+read-only interpretation of where an accepted commission points, used by the
+area and world map panels (world-map drawer design §5.4). Only in-progress
+records resolve, from their current stage's objective:
+
+| Family | Source | `world_cell` | Local identity (`map_key`, `node_id`) |
+| --- | --- | --- | --- |
+| ANCHOR locator | `ANCHOR_GEOGRAPHY_REGISTRY` | the anchor's cell | the built entrance node from `ANCHOR_PLACEMENT_REGISTRY`, when it exists in the settlement graph |
+| GRID locator | the placement whose `zcoord` is the locator's map | the settlement's anchor cell | the locator's own `grid:<map>:<x>:<y>` node, when it exists in the settlement graph |
+| Species hunt | the objective's `region_key` | the legal cell of that region nearest the player | `wild:elosern:<x>:<y>` |
+| Monster site | `MONSTER_SITE_REGISTRY` | the site's authored cell | `wild:elosern:<x>:<y>` |
+
+ANCHOR and GRID world positions intentionally use the settlement's anchor cell
+instead of applying an arbitrary local offset, while the area map marks the
+actual node. When the settlement exists but the named node does not, the world
+cell is kept and the local identity is absent.
+
+The nearest hunt cell is the cell of the target region, inside the region's
+`REGION_SEARCH_BOXES` window, that passes `is_valid_wilderness_cell` and has the
+smallest squared Euclidean cell distance to the player; ties go to the smaller
+`x`, then the smaller `y`. The search visits 16-cell tiles in order of their
+lower-bound distance and remembers which tiles hold no cell of the region
+under the production classifier, so repeated map views do not rescan the
+frame. The player's cell is their wilderness cell, their settlement's anchor
+cell, or the anchor cell of the room an instance was entered from; elsewhere
+it is unknown and a hunt resolves to nothing.
+
+Bound instances, tier hunts, acquire, deliver and rendezvous objectives, and
+any destination whose canonical source is missing, produce no node and no
+coordinate. Each quest-log entry is read and validated on its own, which is a
+deliberate read-only exception to the strict `read_records` reader: an
+unreadable commission is skipped with a `map_quest_destination_unresolved`
+warning and the other destinations stay usable. Resolution never writes
+quests, knowledge, rooms or the clock and never spawns anything.
+
+The resolved positions are server-internal. This module serializes nothing;
+the world map panel owns precision filtering (exact coordinates only for lit
+districts, otherwise 50 km rounding), and out-of-area area markers use a
+bearing and distance.
+
 ## Verification
 
 ```sh
@@ -278,3 +320,11 @@ uv run --locked --env-file=<env> evennia test --settings test_settings.py --keep
 
 The assertions behind `continental-geography` live in those data-contract test
 modules; see `openspec/specs/continental-geography/spec.md`.
+
+Quest destination resolution runs under the Evennia runner with synthetic
+geography and quests only:
+
+```sh
+uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+  web.webclient.presentation.tests.test_map_quest_destinations
+```
