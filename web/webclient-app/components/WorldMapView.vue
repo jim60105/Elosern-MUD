@@ -452,6 +452,8 @@ const labelDraws = computed(() => {
     ...placeDraws.value.map((draw) => box(draw.key, draw.p, 8 * s)),
     ...landmarkDraws.value.map((draw) => box(draw.key, draw.p, 9 * s)),
     ...questDraws.value.map((draw) => box(draw.key, draw.p, 11 * s)),
+    // An approximate circle is kept clear of every other name.
+    ...approxDraws.value.map((draw) => box(draw.key, draw.p, draw.r * 0.8)),
   ];
   const approxRadius = new Map(approxDraws.value.map((draw) => [draw.key, draw.r]));
   const radius = (candidate) => {

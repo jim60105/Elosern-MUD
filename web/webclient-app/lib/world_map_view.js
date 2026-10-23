@@ -650,7 +650,14 @@ export function placeWorldLabels(candidates, project, frame, {
     const above = centred(p.y - r - gap - height);
     const below = centred(p.y + r + gap);
     const options = {
-      nation: [centred(p.y - r - gap * 2 - height), centred(p.y + r + gap * 2), right, left],
+      nation: [
+        centred(p.y - r - gap * 2 - height),
+        centred(p.y + r + gap * 2),
+        right,
+        left,
+        centred(p.y - r - gap * 2 - height * 2.2),
+        centred(p.y + r + gap * 2 + height * 1.2),
+      ],
       district: [below, above, right, left],
       place: [right, left, above, below],
       unlit: [centred(p.y - height / 2), centred(p.y + gap), centred(p.y - height - gap)],
