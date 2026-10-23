@@ -224,6 +224,37 @@ describe("world map detail follows zoom thresholds without shrinking text", () =
     expect(placed.length).toBeLessThan(candidates.length);
   });
 
+  it("a host echoing a cloned view keeps the opening re-fit", async () => {
+    let resize = null;
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(cb) {
+        resize = cb;
+      }
+      observe() {}
+      disconnect() {}
+    };
+    try {
+      const w = mountMap(worldBase());
+      const opening = w.emitted("update:view").at(-1)[0];
+      // The host stores and echoes a serialised copy of the opening view.
+      await w.setProps({ view: JSON.parse(JSON.stringify(opening)) });
+      const before = w.emitted("update:view").length;
+      // The real frame is measured afterwards: the opening view re-fits.
+      resize([{ contentRect: { width: 1500, height: 800 } }]);
+      await w.vm.$nextTick();
+      expect(w.emitted("update:view").length).toBe(before + 1);
+      const refit = w.emitted("update:view").at(-1)[0];
+      // A view the player moved to is adopted and stops the re-fit.
+      await w.setProps({ view: { ...refit, cx: refit.cx + 50 } });
+      resize([{ contentRect: { width: 1400, height: 760 } }]);
+      await w.vm.$nextTick();
+      expect(w.emitted("update:view").length).toBe(before + 1);
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
+
   it("the trail is a line until 近郊, then cells at the supplied resolution", async () => {
     const w = mountMap(worldBase(), { view: viewAt(800) });
     const trail = () => w.find('[data-testid="world-map__trail"]');
@@ -326,6 +357,15 @@ describe("newly lit districts animate accessibly from their landmark", () => {
       expect(w.find(`.world-map__lit[data-district="${lit.id}"]`).attributes("mask")).toBeUndefined();
       expect(discovery(w)).toBe(`已探明：${lit.name}`);
     }
+  });
+
+  it("a re-baseline in the same tick drops a queued announcement", async () => {
+    document.documentElement.style.setProperty("--motion-district-reveal", "0ms");
+    const w = mountMap(worldBase(), { epoch: "e1" });
+    await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
+    await w.setProps({ epoch: "e2" });
+    await tick();
+    expect(discovery(w)).toBe("");
   });
 
   it("a new epoch or someone else's knowledge re-baselines silently", async () => {

@@ -290,8 +290,20 @@ export function trailLinePath(trail, gridKm = trail.resolution_km) {
 
 // ── features ────────────────────────────────────────────────────────────
 
+// Validated payloads are immutable per object: memoise per-payload
+// derivations so a pan never re-walks every outline or place list.
+const anchorCache = new WeakMap();
+const placesCache = new WeakMap();
+
 /** Area-weighted centroid of the largest counter-clockwise ring. */
 export function outlineAnchor(rings) {
+  if (anchorCache.has(rings)) return anchorCache.get(rings);
+  const anchor = computeAnchor(rings);
+  anchorCache.set(rings, anchor);
+  return anchor;
+}
+
+function computeAnchor(rings) {
   let best = null;
   let bestArea = 0;
   for (const ring of rings) {
@@ -324,6 +336,7 @@ export function outlineBounds(rings) {
  * per id. `district` is the lit district that lists it, if any.
  */
 export function placesOf(world) {
+  if (placesCache.has(world)) return placesCache.get(world);
   const out = new Map();
   const visited = new Set(world.visited_places.map((place) => place.id));
   for (const district of world.districts) {
@@ -335,7 +348,9 @@ export function placesOf(world) {
   for (const place of world.visited_places) {
     if (!out.has(place.id)) out.set(place.id, { ...place, district: null, visited: true });
   }
-  return [...out.values()];
+  const rows = Object.freeze([...out.values()].map((row) => Object.freeze(row)));
+  placesCache.set(world, rows);
+  return rows;
 }
 
 export function districtById(world, id) {
@@ -519,7 +534,7 @@ export function featureKeys(world) {
   const quests = [...world.quest_markers]
     .sort((a, b) => Number(b.tracked) - Number(a.tracked) || dist(a) - dist(b))
     .map((marker) => `quest:${marker.id}`);
-  const places = placesOf(world)
+  const places = [...placesOf(world)]
     .sort((a, b) => dist(a) - dist(b))
     .map((place) => `place:${place.id}`);
   const lit = world.districts

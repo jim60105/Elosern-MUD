@@ -148,7 +148,11 @@ else openView();
 watch(
   () => props.view,
   (next) => {
-    if (validView(next) && next !== localView.value) {
+    // Compare by value: a host that clones or serialises its echo of our own
+    // emit must not cancel the post-measure opening re-fit.
+    const current = localView.value;
+    const same = !!current && next && next.cx === current.cx && next.cy === current.cy && next.span === current.span;
+    if (validView(next) && !same) {
       localView.value = next;
       viewIsOpening = false;
     }
@@ -230,16 +234,21 @@ function tickReveal() {
 }
 
 function stopReveal() {
+  announceToken += 1;
   if (frameHandle !== null) cancelFrame(frameHandle);
   frameHandle = null;
   revealing.value = [];
 }
 
+// Bumped by every re-baseline, so a queued announcement from before it
+// never lands afterwards.
+let announceToken = 0;
 function announce(text) {
   // Re-set so an identical announcement is still read.
   discoveryText.value = "";
+  const token = announceToken;
   queueMicrotask(() => {
-    discoveryText.value = text;
+    if (token === announceToken) discoveryText.value = text;
   });
 }
 
