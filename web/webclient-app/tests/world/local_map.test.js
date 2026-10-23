@@ -744,6 +744,23 @@ describe("LocalMap island scale state (render-auto-scaled-minimap-island)", () =
 
   const caption = (w) => w.get('[data-testid="local-map__scale"]').text();
 
+  it.each([true, false])("clears painted gateway feet in the real island (mixed %s)", (mixed) => {
+    const model = street("t_gate", [0, 0], [[-120, 800], [120, 800], [800, 0]]);
+    model.nodes[1].gateway = { leads_to: "Test gate" };
+    if (!mixed) model.nodes[2].gateway = { leads_to: "Other gate" };
+    wrapper = mount(LocalMap, { props: { localMap: model } });
+    const nodeCenter = (w, id) => {
+      const [x, y] = w.get(`[data-node="${id}"]`).attributes("transform").match(/-?[\d.]+/g).map(Number);
+      return { x, y };
+    };
+    const a = nodeCenter(wrapper, "grid:t_gate:-120:800");
+    const b = nodeCenter(wrapper, "grid:t_gate:120:800");
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual((mixed ? Math.hypot(15, 10) + 0.8 + 11 : 2 * (Math.hypot(15, 10) + 0.8)) - 0.002);
+    expect(nodeCenter(wrapper, "grid:t_gate:0:0")).toEqual({ x: 120, y: 120 });
+    expect(nodeCenter(wrapper, "grid:t_gate:800:0")).toEqual({ x: 200, y: 120 });
+    expect(wrapper.findAll(".local-map__gate-glyph")).toHaveLength(mixed ? 1 : 2);
+  });
+
   it("keeps the previous level on one map and resets it on another map or layer", async () => {
     // 1100 m selects level 1500 (格距 300 m).
     wrapper = mount(LocalMap, { props: { localMap: street("hyst", [0, 0], [[0, 1100]]) } });
@@ -898,16 +915,13 @@ describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)
     expect(held.defaultPrevented).toBe(true);
   });
 
-  it("sizes the stub button to its arrow and adjacent label only", () => {
+  it("keeps unleadered stub labels separate from the compact arrow button", () => {
     const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
     const style = w.get(".local-map__stub-button").attributes("style");
     const pct = (key) => Number(style.match(new RegExp(`${key}: ([\\d.]+)%`))[1]) * 2.4;
-    // The 通往 label sits beside the arrow, so one compact box covers both:
-    // its width is the label's monospace measure plus padding, no more.
-    const labelWidth = textCells("通往 西部丘陵與谷地") * CELL_EM * 16;
-    expect(pct("width")).toBeLessThanOrEqual(labelWidth + 4 + 1e-6);
-    expect(pct("height")).toBeLessThanOrEqual(2 * 9 + 3 + 16.8 + 4 + 1e-6);
-    expect(w.find(".local-map__stub-hit").exists()).toBe(false);
+    expect(pct("width")).toBeCloseTo(22, 6);
+    expect(pct("height")).toBeCloseTo(22, 6);
+    expect(w.find(".local-map__stub-hit").exists()).toBe(true);
   });
 
   it("gives a leadered stub label its own hit area instead of a spanning button", () => {

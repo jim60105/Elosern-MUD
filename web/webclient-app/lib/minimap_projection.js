@@ -9,8 +9,8 @@
 // browser local-map model's in-view `nodes` and `edges` (the reduced model of
 // web/static/webclient/js/elosern/local_map.js; `col`/`row`/`cell` are
 // ignored, so the overlay lattice is untouched) onto the 240-unit island
-// square with the current node at its centre (`options.footprint` overrides
-// the exit marker footprint used for overlap spreading). It returns
+// square with the current node at its centre (`options.footprint` replaces
+// the pairwise painted footprints used for overlap spreading). It returns
 //
 //   { mode, level, nodes, exitStubs, grid, scaleLabel }
 //
@@ -80,10 +80,10 @@
 //   coarser level must not put the nearest exit inside R_MIN, which would
 //   contradict the compression rule. Context-only inputs follow the same
 //   policy, so context can select compression when there are no exits.
-// - Overlap: positive-distance exits whose marker centres are closer than
-//   the footprint are grouped (single link over every pair) and each group
-//   of n is spread symmetrically about its circular mean bearing at the
-//   separation that clears the footprint at the group's smallest radius,
+// - Overlap: positive-distance exits whose painted footprints touch are
+//   grouped (single link over every pair) and each group of n is spread
+//   symmetrically about its circular mean bearing at the separation that
+//   clears the narrowest overlapping pair at the pair's smaller radius,
 //   capped so no member moves more than MAX_SPREAD_DEG from the mean.
 //   Members keep their signed order around the mean (a group straddling
 //   north stays in order). A group whose bearings cancel out has no mean, and
@@ -100,6 +100,7 @@
 //   those nearest it; each ring clears every other by RING_MIN_GAP units, at
 //   most MAX_RINGS of them, returned in ascending distance.
 import LocalMap from "./local_map.js";
+import { paintedMarkerFootprint } from "./map_marker_geometry.js";
 
 export const CANVAS_SIZE = 240;
 export const CENTRE = CANVAS_SIZE / 2;
@@ -111,9 +112,6 @@ export const LEVELS = Object.freeze([
 export const DEFAULT_LEVEL = 100;
 export const EQUAL_RADIUS = 0.75 * R_MAX;
 export const MAX_SPREAD_DEG = 20;
-// One exit marker's footprint diameter: twice the actionable halo radius
-// (HALO_R in composables/use-map-lattice-geometry.js), the largest exit mark.
-export const EXIT_FOOTPRINT = 20;
 // Uniform dots stand 20 units apart: one dot per M / 5 metres.
 export const DOT_SPACING = 20;
 // Wilderness cells are one kilometre (the provider's fixed coordinate frame).
@@ -238,12 +236,13 @@ export function radialMapper(mode, level, candidates) {
 }
 
 // Spreads overlapping exits (each { bearing, radius, order }) in place.
-export function spreadExits(exits, footprint = EXIT_FOOTPRINT) {
+export function spreadExits(exits, footprint = null) {
   if (exits.length < 2) return exits;
+  const clearance = (a, b) => footprint ?? (paintedMarkerFootprint(a.node) + paintedMarkerFootprint(b.node));
   const overlaps = (a, b) => {
     const pa = screen(a.radius, a.bearing);
     const pb = screen(b.radius, b.bearing);
-    return Math.hypot(pa.x - pb.x, pa.y - pb.y) < footprint - EPSILON;
+    return Math.hypot(pa.x - pb.x, pa.y - pb.y) < clearance(a, b) - EPSILON;
   };
   // Single-link groups over every overlapping pair (union-find; exits are
   // few), so a nearer or farther exit between two overlapping ones in
@@ -267,12 +266,18 @@ export function spreadExits(exits, footprint = EXIT_FOOTPRINT) {
     const mean = circularMean(group.map((exit) => exit.bearing));
     // A group wrapping the whole circle has no defined mean: leave it.
     if (mean === null) continue;
-    const radius = Math.min(...group.map((exit) => exit.radius));
-    let sep = (2 * Math.asin(Math.min(1, footprint / (2 * Math.max(radius, EPSILON)))) * 180) / Math.PI;
-    if (((n - 1) / 2) * sep > MAX_SPREAD_DEG) sep = (2 * MAX_SPREAD_DEG) / (n - 1);
     const ordered = [...group].sort(
       (a, b) => angleDelta(a.bearing, mean) - angleDelta(b.bearing, mean) || a.order - b.order,
     );
+    let sep = 0;
+    for (let i = 0; i < n; i += 1) {
+      for (let j = i + 1; j < n; j += 1) {
+        const radius = Math.max(EPSILON, Math.min(ordered[i].radius, ordered[j].radius));
+        const angle = (2 * Math.asin(Math.min(1, clearance(ordered[i], ordered[j]) / (2 * radius))) * 180) / Math.PI;
+        sep = Math.max(sep, angle / (j - i));
+      }
+    }
+    sep = Math.min(sep, (2 * MAX_SPREAD_DEG) / (n - 1));
     // A chained group already spanning the spread would only be squeezed
     // together: leave it at its exact bearings.
     const span = angleDelta(ordered[n - 1].bearing, mean) - angleDelta(ordered[0].bearing, mean);
@@ -298,9 +303,21 @@ function dotGrid(level, current, factor) {
 // only when it clears every chosen ring by RING_MIN_GAP units.
 function ringGrid(mapper, dMin, dMax) {
   const options = [];
-  for (let decade = 10; decade <= RING_MAX_DISTANCE; decade *= 10) {
+  if (!(Number.isFinite(dMin) && dMin > 0 && Number.isFinite(dMax) && dMax >= dMin)) {
+    return { kind: "rings", rings: [] };
+  }
+  // IEEE-754 positives have a bounded decade range. Iterating only the
+  // decades that hold dMin..dMax keeps the work logarithmic in distance: each
+  // decade's mantissas also cross a little beyond either end of the span.
+  const first = Math.max(-323, Math.min(6, Math.floor(Math.log10(dMin))));
+  const last = Math.min(6, Math.ceil(Math.log10(Math.min(dMax, RING_MAX_DISTANCE))));
+  const seen = new Set();
+  for (let exponent = first; exponent <= last; exponent += 1) {
+    const decade = 10 ** exponent;
     for (const mantissa of RING_MANTISSAS) {
       const distance = mantissa * decade;
+      if (!Number.isFinite(distance) || distance <= 0 || distance > RING_MAX_DISTANCE || seen.has(distance)) continue;
+      seen.add(distance);
       const radius = mapper(distance);
       if (Number.isFinite(radius) && radius >= RING_MIN_RADIUS && radius <= CENTRE) {
         options.push({ distance, radius });
@@ -396,7 +413,7 @@ export function projectIsland(model, previousLevel = null, options = {}) {
   // Zero-distance exits keep their even spacing; only real bearings spread.
   spreadExits(
     exits.filter((entry) => entry.distance > 0),
-    options && Number.isFinite(options.footprint) ? options.footprint : EXIT_FOOTPRINT,
+    options && Number.isFinite(options.footprint) ? options.footprint : null,
   );
 
   const out = [{ id: current.id, x: CENTRE, y: CENTRE, tier: "current", gateway: current.gateway ?? null }];

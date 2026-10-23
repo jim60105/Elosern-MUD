@@ -112,6 +112,34 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     return { x, y };
   }
 
+  it("fallback projection clears the actual gate feet and stroke", () => {
+    const payload = structuredClone(LOCAL_MAP_SAMPLE);
+    payload.layer = "grid";
+    payload.current_node = "grid:t_gate:0:0";
+    payload.nodes = [[0, 0], [-120, 800], [120, 800]].map(([x, y], i) => ({
+      id: `grid:t_gate:${x}:${y}`, x, y, label: `Gate ${i}`, visibility: i ? "visible_unvisited" : "current",
+      current: i === 0, anchor: false, landmark: false,
+      gateway: i ? { leads_to: "Synthetic gate" } : null,
+      action: i ? { kind: "move", exit_ref: `${i}`, destination: `grid:t_gate:${x}:${y}` } : null,
+    }));
+    payload.edges = payload.nodes.slice(1).map((n) => ({ source: payload.current_node, destination: n.id, label: "n", known: true, traversable: true }));
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
+    const a = centreOf(wrapper, payload.nodes[1].id);
+    const b = centreOf(wrapper, payload.nodes[2].id);
+    expect(b.x - a.x).toBeGreaterThan(31.6);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (Math.hypot(15, 10) + 0.8) - 0.002);
+    expect(wrapper.findAll(".local-map__gate-glyph")).toHaveLength(2);
+    expect(wrapper.get(".local-map__gate-glyph").attributes("d")).toContain("H 15");
+    expect(wrapper.get(".local-map__gate-glyph").attributes("stroke-width")).toBe("1.6");
+  });
+
+  it("draws the retained unit-distance background as a labelled 1 m ring", () => {
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE), ...ISLAND } });
+    const ring = wrapper.get('.local-map__ring[data-distance="1"]');
+    expect(Number(ring.attributes("r"))).toBe(66);
+    expect(wrapper.findAll(".local-map__ring-label").some((el) => el.text() === "1 m")).toBe(true);
+  });
+
   it("draws current at the centre, every same-layer exit inside the exit ring and only exit routes", () => {
     const payload = LOCAL_MAP_ALTORIA_PLAZA_SAMPLE;
     wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });

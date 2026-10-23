@@ -12,20 +12,9 @@ import LocalMap from "../lib/local_map.js";
 import { CELL_EM, charCells, textCells } from "../lib/mono_cells.js";
 import { CANVAS_SIZE, CENTRE, R_MAX, projectIsland } from "../lib/minimap_projection.js";
 import { ASCENT, DESCENT, placeIslandLabels } from "../lib/island_labels.js";
+import { HALO_R, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
 
-// Every lattice marker's base geometry in pre-scale units, multiplied by
-// the `markerScale` prop so all states scale uniformly (draft ladder,
-// webclient-map-01-draft-chrome D2): the current seal circle r=8 (visual
-// half-extent 9 with the 2px stroke), the visited/unvisited dots r=4.5
-// (+0.5 stroke → 5), the gold landmark ring r=5, the rotated remembered
-// diamond half-extent 9, and the actionable halo r=10. Every footprint is
-// strictly smaller than the pre-draft 26px square / r=12 circles, so the
-// crowding fix's pitch guarantee carries over unchanged.
-export const MARKER_CURRENT_R = 8;
-export const MARKER_DOT_R = 4.5;
-export const MARKER_LANDMARK_R = 5;
 export const MARKER_DIAMOND_HALF = 9;
-export const HALO_R = 10;
 export const LABEL_BASELINE_HALF = 11;
 // The compass aim ring's radius (exploration-exit-compass D6): a thin ring
 // concentric with the aimed node's marker, just outside the actionable halo.
@@ -51,10 +40,6 @@ const ISLAND_DOT_MARGIN = 140;
 const RING_LABEL_BEARINGS = [45, 315, 135, 225];
 // Canvas inset every island label keeps from the square's edge.
 const ISLAND_LABEL_INSET = 3;
-// The island's gate glyph (label-minimap-exits-and-gateways): an arch framing
-// a gateway node's own marker, so its reserved footprint grows to the arch.
-export const GATE_ARCH_R = 12;
-export const GATE_FOOTPRINT = GATE_ARCH_R + 2;
 // A gateway exit stub: an arrowhead on the exit ring (R_MAX) pointing along
 // the cross-layer target's bearing, with this reserved radius.
 export const STUB_RADIUS = R_MAX;
@@ -332,10 +317,7 @@ export function useMapLatticeGeometry(props) {
   // its landmark ring.
   function nodeFootprint(node) {
     if (nodeTier(node) === "context") return CONTEXT_FOOTPRINT;
-    if (isGateway(node)) return GATE_FOOTPRINT;
-    if (node.action) return HALO_R;
-    if (node.visibility === "current") return MARKER_CURRENT_R + 1;
-    return Math.max(MARKER_DOT_R + 0.5, node.landmark ? MARKER_LANDMARK_R + 0.5 : 0);
+    return paintedMarkerFootprint(node);
   }
 
   // The projection's cross-layer exit stubs, each at its target bearing on

@@ -9,7 +9,6 @@ import {
   CENTRE,
   DEFAULT_LEVEL,
   EQUAL_RADIUS,
-  EXIT_FOOTPRINT,
   LEVELS,
   MAX_SPREAD_DEG,
   R_MAX,
@@ -21,7 +20,7 @@ import {
   rememberLevel,
   selectScale,
 } from "../lib/minimap_projection.js";
-import { HALO_R } from "../composables/use-map-lattice-geometry.js";
+import { HALO_R, GATE_FOOTPRINT, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
 
 const Z = "testmap";
 
@@ -96,7 +95,10 @@ describe("constants", () => {
   });
 
   it("measures the exit footprint from the existing marker geometry", () => {
-    expect(EXIT_FOOTPRINT).toBe(2 * HALO_R);
+    expect(paintedMarkerFootprint({ action: move("exit") })).toBe(HALO_R + 1);
+    // The gate glyph's farthest painted point is the outer corner of a foot
+    // stroke: 15 units of reach and 10 units of drop, each plus the 0.8 cap.
+    expect(GATE_FOOTPRINT).toBeGreaterThanOrEqual(Math.hypot(15.8, 10.8) - 1e-9);
   });
 
   it("adjacent ladder levels differ by at most 1.67x", () => {
@@ -108,7 +110,9 @@ describe("constants", () => {
   it("the module imports nothing from Vue and touches no DOM global", () => {
     const source = readFileSync(resolve(process.cwd(), "web/webclient-app/lib/minimap_projection.js"), "utf8");
     const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
-    expect(imports).toEqual(["./local_map.js"]);
+    expect(imports).toEqual(["./local_map.js", "./map_marker_geometry.js"]);
+    const geometry = readFileSync(resolve(process.cwd(), "web/webclient-app/lib/map_marker_geometry.js"), "utf-8");
+    expect(geometry).not.toMatch(/\b(document|window|globalThis|requestAnimationFrame|vue)\b/);
     expect(source).not.toMatch(/\b(document|window|globalThis|requestAnimationFrame)\b/);
   });
 });
@@ -412,6 +416,27 @@ describe("sparse and coincident inputs", () => {
 });
 
 describe("overlap spreading", () => {
+  it.each([true, false])("clears painted gate feet and mixed exits (second gateway %s)", (secondGate) => {
+    const gateway = { leads_to: "Synthetic wilderness" };
+    const model = gridModel(0, 0, [[-120, 800, { gateway }], [120, 800, { gateway: secondGate ? gateway : null }], [800, 0]]);
+    const before = structuredClone(model);
+    const projection = projectIsland(model);
+    expect(projection.level).toBe(1000);
+    const a = byId(projection, gridId(-120, 800));
+    const b = byId(projection, gridId(120, 800));
+    const clearance = GATE_FOOTPRINT + (secondGate ? GATE_FOOTPRINT : HALO_R + 1);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(clearance - 1e-8);
+    // The specified pair shares a horizontal baseline: both painted gate
+    // feet (15-unit reach plus 0.8 stroke cap) must have a positive gap.
+    if (secondGate) expect(b.x - 15.8 - (a.x + 15.8)).toBeGreaterThan(0);
+    expect(radiusOf(a)).toBeCloseTo(Math.hypot(120, 800) / 10, 9);
+    expect(radiusOf(b)).toBeCloseTo(radiusOf(a), 9);
+    expect(byId(projection, model.currentNode)).toMatchObject({ x: 120, y: 120 });
+    expect(bearingOf(byId(projection, gridId(800, 0)))).toBe(90);
+    expect(model).toEqual(before);
+    expect(projectIsland(model)).toEqual(projection);
+  });
+
   it("spreads coincident-bearing exits symmetrically about their mean within ±20°", () => {
     const model = gridModel(3000, 3000, [[0, 800], [0, 820], [800, 0]]);
     const projection = projectIsland(model, null);
@@ -423,7 +448,7 @@ describe("overlap spreading", () => {
     expect(ba + bb).toBeCloseTo(0, 6);
     expect(Math.abs(ba)).toBeLessThanOrEqual(MAX_SPREAD_DEG + 1e-9);
     expect(Math.abs(ba)).toBeGreaterThan(0);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(EXIT_FOOTPRINT - 1e-6);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) - 1e-6);
     // Radii and the unaffected exit's bearing stay exact.
     expect(radiusOf(a)).toBeCloseTo(80, 9);
     expect(radiusOf(b)).toBeCloseTo(82, 9);
@@ -456,7 +481,7 @@ describe("overlap spreading", () => {
   });
 
   it("accepts an explicit footprint", () => {
-    // About 25 units apart: clear of the default 20, inside a 30 footprint.
+    // About 25 units apart: clear of the default 22, inside a 30 footprint.
     const model = gridModel(3000, 3000, [[0, 800], [250, 800]]);
     expect(bearingOf(byId(projectIsland(model, null), gridId(3000, 3800)))).toBeCloseTo(0, 9);
     const wide = projectIsland(model, null, { footprint: 30 });
@@ -473,7 +498,7 @@ describe("overlap spreading", () => {
     const a = byId(projection, gridId(3069, 3394));
     const b = byId(projection, gridId(3153, 3785));
     const c = byId(projection, gridId(3083, 3391));
-    expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(EXIT_FOOTPRINT - 1e-6);
+    expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) - 1e-6);
     expect(bearingOf(b)).toBeCloseTo((Math.atan2(153, 785) * 180) / Math.PI, 9);
   });
 
@@ -593,6 +618,25 @@ describe("gateway stubs", () => {
 });
 
 describe("background", () => {
+  it("retains a truthful one-metre ring and bounded degenerate geometry", () => {
+    const one = projectIsland(gridModel(0, 0, [[0, 1], [1, 0]]));
+    expect(one.mode).toBe("compressed");
+    expect(one.grid.rings).toContainEqual({ distance: 1, radius: 66, label: "1 m" });
+    for (const offsets of [[[0, 0]], [[0, 0], [0, 1]], [[0, 1e-9], [1e6, 0]]]) {
+      const result = projectIsland(gridModel(0, 0, offsets));
+      expect(allFinite(result)).toBe(true);
+      const rings = result.grid.rings ?? [];
+      expect(rings.length).toBeLessThanOrEqual(4);
+      rings.forEach((r) => {
+        expect(r.distance).toBeGreaterThan(0);
+        expect(Number.isFinite(r.radius)).toBe(true);
+        expect(r.radius).toBeGreaterThanOrEqual(18);
+        expect(r.radius).toBeLessThanOrEqual(120);
+      });
+      for (let i = 1; i < rings.length; i += 1) expect(rings[i].radius - rings[i - 1].radius).toBeGreaterThanOrEqual(16);
+    }
+  });
+
   it("uniform dots are anchored to integer world multiples of M/5", () => {
     const at = (x, y) => projectIsland(gridModel(x, y, [[0, 850], [0, -1000]]), null);
     const a = at(3000, 3000);

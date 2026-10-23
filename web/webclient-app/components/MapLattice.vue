@@ -36,15 +36,12 @@ import { islandMotion, panOffset, scaleKey } from "../lib/map_pan.js";
 import { useIslandDissolve } from "../composables/use-island-dissolve.js";
 import {
   useMapLatticeGeometry,
-  MARKER_CURRENT_R,
-  MARKER_DOT_R,
-  MARKER_LANDMARK_R,
   MARKER_DIAMOND_HALF,
   MARKER_CURRENT_RING_R,
-  HALO_R,
-  GATE_ARCH_R,
   STUB_FOOTPRINT,
 } from "../composables/use-map-lattice-geometry.js";
+import { MARKER_CURRENT_R, MARKER_DOT_R, MARKER_LANDMARK_R, HALO_R,
+  GATE_ARCH_R, GATE_FOOT_REACH, GATE_STROKE } from "../lib/map_marker_geometry.js";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
 import { CANVAS_SIZE } from "../lib/minimap_projection.js";
 
@@ -175,10 +172,8 @@ function stubLabel(stub) {
   return islandLabels.value.get(`stub:${stub.index}`) ?? null;
 }
 
-// A gateway exit stub's hit boxes in user units: the native button covers
-// its arrow and, while the label sits beside it, the label too. A label set
-// far out on a leader line keeps its own hit box (a child of the button), so
-// the button never spans the unrelated markers between them.
+// Arrow and label always own disjoint compact regions. The native button
+// never spans the unrelated street markers between them.
 function stubHitBoxes(stub) {
   const label = stubLabel(stub);
   const arrow = {
@@ -187,17 +182,7 @@ function stubHitBoxes(stub) {
     x1: stub.x + STUB_FOOTPRINT,
     y1: stub.y + STUB_FOOTPRINT,
   };
-  if (!label) return { button: arrow, label: null };
-  if (label.leader) return { button: arrow, label: label.box };
-  return {
-    button: {
-      x0: Math.min(arrow.x0, label.box.x0),
-      y0: Math.min(arrow.y0, label.box.y0),
-      x1: Math.max(arrow.x1, label.box.x1),
-      y1: Math.max(arrow.y1, label.box.y1),
-    },
-    label: null,
-  };
+  return { button: arrow, label: label?.box ?? null };
 }
 
 // The button's box in percent of the square, padded and clamped inside it.
@@ -216,7 +201,7 @@ function stubButtonStyle(stub) {
   };
 }
 
-// A leadered label's own hit box, relative to (and in units of) the button.
+// The label's own hit box, relative to (and in units of) the button.
 function stubLabelHitStyle(stub) {
   const { button, label } = stubHitBoxes(stub);
   if (!label) return null;
@@ -730,7 +715,8 @@ onBeforeUnmount(() => {
         v-if="isGateway(node)"
         class="local-map__gate-glyph"
         data-testid="local-map__gate-glyph"
-        :d="`M ${-GATE_ARCH_R} ${GATE_ARCH_R - 2} V -1 A ${GATE_ARCH_R} ${GATE_ARCH_R} 0 0 1 ${GATE_ARCH_R} -1 V ${GATE_ARCH_R - 2} M ${-GATE_ARCH_R - 3} ${GATE_ARCH_R - 2} H ${-GATE_ARCH_R + 3} M ${GATE_ARCH_R - 3} ${GATE_ARCH_R - 2} H ${GATE_ARCH_R + 3}`"
+        :stroke-width="GATE_STROKE"
+        :d="`M ${-GATE_ARCH_R} ${GATE_ARCH_R - 2} V -1 A ${GATE_ARCH_R} ${GATE_ARCH_R} 0 0 1 ${GATE_ARCH_R} -1 V ${GATE_ARCH_R - 2} M ${-GATE_ARCH_R - GATE_FOOT_REACH} ${GATE_ARCH_R - 2} H ${-GATE_ARCH_R + GATE_FOOT_REACH} M ${GATE_ARCH_R - GATE_FOOT_REACH} ${GATE_ARCH_R - 2} H ${GATE_ARCH_R + GATE_FOOT_REACH}`"
         aria-hidden="true"
       />
       <template v-if="isIsland">
