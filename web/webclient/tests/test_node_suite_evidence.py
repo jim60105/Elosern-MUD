@@ -10,6 +10,7 @@ main-spec requirement to a substantively matching, executed evidence record.
 """
 
 from pathlib import Path
+import os
 import subprocess
 import unittest
 
@@ -17,6 +18,13 @@ from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_GLOB = REPO_ROOT / "web/static/webclient/js/tests" / "*.test.js"
+
+# The two evidence helpers below read Vitest's own summary lines ("Test Files
+# 1 passed (1)", "Tests N passed (N)"). Vitest enables colour as soon as `CI`
+# exists in the environment (tinyrainbow's rule), which every GitHub runner
+# sets, and the counts then carry ANSI escapes no plain-text regex matches.
+# NO_COLOR is the runner-independent way to ask for the plain form.
+_VITEST_ENV = {**os.environ, "NO_COLOR": "1"}
 
 
 class NodeSuiteEvidenceTest(unittest.TestCase):
@@ -372,6 +380,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=300,
+            env=_VITEST_ENV,
         )
         self.assertEqual(
             result.returncode,
@@ -394,6 +403,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=300,
+            env=_VITEST_ENV,
         )
         self.assertEqual(
             result.returncode,
