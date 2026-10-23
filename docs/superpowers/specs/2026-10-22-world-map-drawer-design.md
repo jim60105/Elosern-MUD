@@ -1,7 +1,7 @@
 # World Map Drawer Design
 
 Date: 2026-10-22
-Status: Approved design; not implemented.
+Status: Implemented (all thirteen changes in §9). Corrective follow-up [fix-map-design-integration-gaps](../../../openspec/changes/fix-map-design-integration-gaps/design.md) is pending acceptance evidence.
 Depends on: [Minimap Auto-Scale](2026-10-22-minimap-auto-scale-design.md) for the `gateway` node field.
 Amends: [World Map Scale and Metric Settlement](2026-10-21-world-map-scale-design.md) §6 (terrain and political geography).
 Prototype: `docs/design/world-map/` (Storybook `Design/WorldMap`, layout option A).

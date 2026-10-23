@@ -4,7 +4,7 @@ All checkboxes describe future apply work and remain unchecked in this proposal.
 
 ## 1. Record pending corrective status during apply
 
-- [ ] 1.1 Update `docs/superpowers/specs/2026-10-22-world-map-drawer-design.md` status to acknowledge the thirteen integrated original changes and name `fix-map-design-integration-gaps` as pending. Update the minimap parent's obsolete full-map follow-up and link the same pending correction while preserving its five-change history. Do not mark the corrective work complete or rewrite archived evidence.
+- [x] 1.1 Update `docs/superpowers/specs/2026-10-22-world-map-drawer-design.md` status to acknowledge the thirteen integrated original changes and name `fix-map-design-integration-gaps` as pending. Update the minimap parent's obsolete full-map follow-up and link the same pending correction while preserving its five-change history. Do not mark the corrective work complete or rewrite archived evidence.
 
 ## 2. Canonical read-only interior and instance origins (F2, F6)
 
