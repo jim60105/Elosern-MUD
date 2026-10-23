@@ -4,6 +4,7 @@ import MapLattice from "../../components/MapLattice.vue";
 import LocalMapModel from "../../lib/local_map.js";
 import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
+  LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
   LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
@@ -503,5 +504,49 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
       }
       w.unmount();
     }
+  });
+});
+
+describe("MapLattice island rim markers (render-auto-scaled-minimap-island)", () => {
+  it("keeps two remembered diamonds either side of a diagonal apart at the corner", () => {
+    const node = (id, x, y, visibility) => ({
+      id, label: id, x, y, visibility, current: visibility === "current", anchor: false, landmark: false, gateway: null, action: null,
+    });
+    const payload = {
+      schema_version: 1, available: true, layer: "grid", current_node: "grid:rim:0:0", title: "rim",
+      nodes: [
+        node("grid:rim:0:0", 0, 0, "current"),
+        node("grid:rim:100:0", 100, 0, "visible_unvisited"),
+        // Bearings about 44° and 46°: one leaves through the top, one
+        // through the right side, both next to the north-east corner.
+        node("grid:rim:9657:10000", 9657, 10000, "remembered"),
+        node("grid:rim:10000:9657", 10000, 9657, "remembered"),
+      ],
+      edges: [{ source: "grid:rim:0:0", destination: "grid:rim:100:0", label: "e", known: true, traversable: true }],
+      legend: [],
+    };
+    const w = mount(MapLattice, { props: { localMap: localMapModelFor(payload), canvasSize: 240, markerNames: true } });
+    const markers = w.vm.fittedEdgeMarkers;
+    expect(markers).toHaveLength(2);
+    expect(new Set(markers.map((m) => m.side)).size).toBe(2);
+    const [a, b] = markers;
+    // Rotated diamonds (half 7) clear once their L1 distance exceeds 2·reach.
+    expect(Math.abs(a.x - b.x) + Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(2 * Math.SQRT2 * 7);
+    for (const m of markers) {
+      expect(m.x).toBeGreaterThanOrEqual(0);
+      expect(m.x).toBeLessThanOrEqual(240);
+      expect(m.y).toBeGreaterThanOrEqual(0);
+      expect(m.y).toBeLessThanOrEqual(240);
+    }
+    w.unmount();
+  });
+
+  it("draws no distance background for a coordinate-free payload forced onto the lattice island", () => {
+    const w = mount(MapLattice, {
+      props: { localMap: localMapModelFor(LOCAL_MAP_INSTANCE_SAMPLE), variant: "lattice", canvasSize: 240 },
+    });
+    expect(w.find('[data-testid="local-map__rings"]').exists()).toBe(false);
+    expect(w.find('[data-testid="local-map__dot-field"]').exists()).toBe(false);
+    w.unmount();
   });
 });

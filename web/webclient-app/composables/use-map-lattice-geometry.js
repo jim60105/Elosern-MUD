@@ -521,7 +521,12 @@ export function useMapLatticeGeometry(props) {
   // the projection's dot step, so they belong to the ground and slide with it
   // under the pan. A bounded list (the square plus the pan margin), never one
   // dot per metre.
+  // The background states a distance mapping, so it exists only on the
+  // coordinate-bearing layers (grid metres, wilderness kilometre cells); a
+  // forced lattice mount of a coordinate-free payload keeps a bare canvas.
+  const metricLayer = computed(() => props.localMap.layer === "grid" || props.localMap.layer === "wilderness");
   const islandDots = computed(() => {
+    if (!metricLayer.value) return [];
     const grid = projection.value?.grid;
     if (!grid || grid.kind !== "dots" || !(grid.spacing > 0)) return [];
     const step = grid.spacing;
@@ -542,6 +547,7 @@ export function useMapLatticeGeometry(props) {
   // bearing is farthest from every drawn exit (the axis cross owns the
   // cardinals); ties keep the first candidate, north-east.
   const islandRings = computed(() => {
+    if (!metricLayer.value) return [];
     const grid = projection.value?.grid;
     if (!grid || grid.kind !== "rings") return [];
     const exits = (projection.value.nodes || []).filter((placed) => placed.tier === "exit");
@@ -618,6 +624,18 @@ export function useMapLatticeGeometry(props) {
         }
       }
       for (const marker of group) marker[axis] = Math.min(Math.max(marker[axis], lo), hi);
+    }
+    // Corners: a top/bottom marker and a left/right marker can both crowd
+    // one corner (bearings either side of a diagonal); the top/bottom one
+    // steps back along its side until the diamonds clear.
+    for (const across of placed.filter((m) => m.side === "top" || m.side === "bottom")) {
+      for (const along of placed.filter((m) => m.side === "left" || m.side === "right")) {
+        const dx = across.x - along.x;
+        const dy = across.y - along.y;
+        if (Math.abs(dx) + Math.abs(dy) >= ISLAND_MARKER_GAP) continue;
+        const away = across.x < CENTRE ? 1 : -1;
+        across.x = along.x + away * (ISLAND_MARKER_GAP - Math.abs(dy));
+      }
     }
     const sides = new Set(placed.map((marker) => marker.side));
     for (const side of ["top", "bottom", "left", "right"]) {
