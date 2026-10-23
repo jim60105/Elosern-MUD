@@ -204,14 +204,37 @@ def _wild_node(cell: tuple[int, int]) -> str | None:
         return None
 
 
-def _room_world_cell(room: Any) -> tuple[int, int] | None:
-    """The continental cell a room is reached from, or ``None`` when unknown."""
-    from typeclasses.rooms import GridRoom, InstanceRoom, TerrainRoom
+def enclosing_anchor_cell(room: Any) -> tuple[int, int] | None:
+    """Read the unique registered enclosing anchor of a coordinate-free room."""
+    from typeclasses.rooms import Room
+    from world.lore.settlements.places import PLACE_REGISTRY
+
+    if not isinstance(room, Room):
+        return None
+    tags = set(room.tags.all())
+    anchors = {place.settlement_key for key, place in PLACE_REGISTRY.items() if key in tags}
+    if len(anchors) != 1:
+        return None
+    geography = ANCHOR_GEOGRAPHY_REGISTRY.get(next(iter(anchors)))
+    return None if geography is None else tuple(geography.cell)
+
+
+def instance_origin(room: Any) -> Any:
+    """Unwrap one instance origin without creating a persistent Attribute."""
+    from typeclasses.rooms import InstanceRoom
 
     if isinstance(room, InstanceRoom):
-        room = getattr(room, "origin_room", None)
-        if room is None or isinstance(room, InstanceRoom):
+        room = room.attributes.get("origin_room")
+        if isinstance(room, InstanceRoom):
             return None
+    return room
+
+
+def _room_world_cell(room: Any) -> tuple[int, int] | None:
+    """The continental cell a room is reached from, or ``None`` when unknown."""
+    from typeclasses.rooms import GridRoom, TerrainRoom
+
+    room = instance_origin(room)
     if isinstance(room, TerrainRoom):
         coordinates = getattr(room, "coordinates", None)
         if coordinates is None:
@@ -222,7 +245,7 @@ def _room_world_cell(room: Any) -> tuple[int, int] | None:
         if not xyz or len(xyz) != 3:
             return None
         return _settlement_anchor_cell(str(xyz[2]))
-    return None
+    return enclosing_anchor_cell(room)
 
 
 def _bound_instance_destination(record) -> QuestDestination | None:
@@ -411,7 +434,8 @@ def actor_world_cell(actor: Any) -> tuple[int, int] | None:
 
     A wilderness room gives its own cell and a settlement grid room its
     settlement's anchor cell. An instance room has no coordinates of its own
-    and uses the room it was entered from; other interiors resolve to nothing.
+    and uses the room it was entered from. Registered ordinary interiors use
+    their unique enclosing anchor; unknown interiors resolve to nothing.
     """
     location = getattr(actor, "location", None)
     if location is None:

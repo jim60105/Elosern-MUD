@@ -54,25 +54,18 @@ def world_node_point(node_id):
 
 def current_point(actor):
     """Resolve an interior's canonical enclosing place, never invent axes."""
-    from typeclasses.rooms import InstanceRoom, GridRoom, Room, TerrainRoom
+    from typeclasses.rooms import GridRoom, TerrainRoom
     from world.rules.map_knowledge import _derive_node_id
-    from world.lore.anchors import ANCHOR_GEOGRAPHY_REGISTRY
-    from world.lore.settlements.places import PLACE_REGISTRY
+    from .map_quest_destinations import enclosing_anchor_cell, instance_origin
 
-    location = getattr(actor, "location", None)
-    if isinstance(location, InstanceRoom):
-        location = location.attributes.get("origin_room")
+    location = instance_origin(getattr(actor, "location", None))
     if isinstance(location, (GridRoom, TerrainRoom)):
         node_id = _derive_node_id(location)
         return world_node_point(node_id) if node_id is not None else None
-    if isinstance(location, Room):
-        tags = set(location.tags.all())
-        anchors = {place.settlement_key for key, place in PLACE_REGISTRY.items() if key in tags}
-        if len(anchors) == 1:
-            geography = ANCHOR_GEOGRAPHY_REGISTRY.get(next(iter(anchors)))
-            if geography is not None:
-                x, y = geography.cell
-                return x + .5, y + .5
+    cell = enclosing_anchor_cell(location)
+    if cell is not None:
+        x, y = cell
+        return x + .5, y + .5
     return None
 
 

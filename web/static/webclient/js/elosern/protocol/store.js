@@ -30,6 +30,7 @@ var panels = {};
 // eager panels, retained across same-epoch snapshots and cleared with the
 // epoch. Bounded part transfers assemble invisibly beside them.
 var maps = {};
+var mapPublications = {};
 var assembler = mapParts.createMapAssembler();
 var retired = createRetiredEpochSet();
 var mutationsLocked = true;
@@ -57,6 +58,7 @@ function cloneState() {
     serverTime: serverTime === null ? null : JSON.parse(canonicalJson(serverTime)),
     panels: panelCopy,
     maps: mapCopy,
+    mapPublications: Object.assign({}, mapPublications),
     mutationsLocked: mutationsLocked,
     protocolError: protocolError === null ? null : JSON.parse(canonicalJson(protocolError)),
     lastActionResult: lastActionResult === null ? null : JSON.parse(canonicalJson(lastActionResult)),
@@ -93,6 +95,7 @@ function commitPresentation(meta, isSnapshot) {
   Object.keys(meta.panels).forEach(function (name) {
     var target = Object.prototype.hasOwnProperty.call(mapPanels.MAP_PANEL_SCHEMAS, name) ? maps : panels;
     target[name] = JSON.parse(canonicalJson(meta.panels[name]));
+    if (target === maps) mapPublications[name] = meta.revision;
   });
   // An unfinished transfer at or below the committed revision can never be
   // adopted any more; free it now.
@@ -157,6 +160,7 @@ return {
     serverTime = null;
     panels = {};
     maps = {};
+    mapPublications = {};
     assembler.clear();
     phase = "awaiting_initial_snapshot";
     mutationsLocked = true;
@@ -221,6 +225,7 @@ return {
         }
         // Establishing a sequence starts from an empty on-demand store.
         maps = {};
+        mapPublications = {};
         assembler.clear();
         commitPresentation(meta, true);
         return { accepted: true, established: true, revision: meta.revision };
@@ -296,6 +301,7 @@ return {
       phase = "detached";
       panels = {};
       maps = {};
+      mapPublications = {};
       assembler.clear();
       mutationsLocked = true;
     }

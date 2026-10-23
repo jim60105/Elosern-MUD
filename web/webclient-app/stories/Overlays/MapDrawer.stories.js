@@ -49,6 +49,9 @@ const render = (args) => ({
                 tab: state.tab,
                 memory,
                 epoch: "story|1",
+                // The live host gates the world view on the current opening's
+                // fresh baseline; stories that supply a body directly opt in.
+                worldBaselineReady: args.worldBaselineReady !== false,
                 locationLabel: args.locationLabel ?? "灰岩鎮",
                 busy: args.busy ?? false,
                 "onUpdate:tab": (tab) => {
@@ -424,5 +427,31 @@ export const Loading = {
   play: async ({ canvasElement }) => {
     await frames(2);
     if (!$(canvasElement, "map-drawer-loading")) fail("Loading", "the loading state shows");
+  },
+};
+
+// The live host's opening gate (design D5): a retained available world body
+// is on hand, but this opening's fresh baseline has not qualified yet, so the
+// world tab holds the loading boundary instead of presenting stale knowledge
+// (or claiming it is unavailable).
+export const WorldAwaitingBaseline = {
+  render,
+  args: {
+    tab: "world",
+    area: townArea(),
+    world: worldBase(),
+    span: 200,
+    centre: nearestLit().landmark,
+    worldBaselineReady: false,
+  },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    if (!$(canvasElement, "map-drawer-loading")) fail("WorldAwaitingBaseline", "the loading state shows");
+    if ($(canvasElement, "map-drawer-unavailable")) fail("WorldAwaitingBaseline", "a retained body is not unavailable");
+    if (canvasElement.querySelector('[data-testid="world-map"]')) {
+      fail("WorldAwaitingBaseline", "the retained body must not render before its baseline");
+    }
+    if ($(canvasElement, "map-drawer-pill")) fail("WorldAwaitingBaseline", "no view chrome before the baseline");
   },
 };

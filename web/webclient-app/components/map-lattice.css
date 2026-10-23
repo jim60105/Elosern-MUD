@@ -330,7 +330,6 @@
 .local-map__gate-glyph {
   fill: none;
   stroke: var(--gold-400);
-  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
@@ -384,7 +383,7 @@
   cursor: pointer;
 }
 
-/* A leadered stub label's own hit area, inside its button's hit target. */
+/* Each stub label has its own hit area without spanning the intervening gap. */
 .local-map__stub-hit {
   position: absolute;
   border-radius: var(--radius-sm);
@@ -396,6 +395,13 @@
 }
 
 .local-map__stub-button:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 1px;
+}
+
+/* The one native control now spans two separate regions: a keyboard user must
+   see the label's part of it too, not only the arrow's. */
+.local-map__stub-button:focus-visible .local-map__stub-hit {
   outline: 2px solid var(--gold-400);
   outline-offset: 1px;
 }

@@ -125,7 +125,7 @@ class WorldMapPrivacyTests(TestCase):
         actor=NS(location=room)
         with patch("world.lore.settlements.places.PLACE_REGISTRY",{
                 "t_interior":NS(settlement_key="t_anchor")}), \
-             patch("world.lore.anchors.ANCHOR_GEOGRAPHY_REGISTRY",{
+             patch("web.webclient.presentation.map_quest_destinations.ANCHOR_GEOGRAPHY_REGISTRY",{
                 "t_anchor":NS(cell=(123,456))}):
             self.assertEqual(panel.geometry.current_point(actor),(123.5,456.5))
             instance=Mock(spec=InstanceRoom)
@@ -135,6 +135,35 @@ class WorldMapPrivacyTests(TestCase):
             self.assertIsNone(panel.geometry.current_point(actor))
             with self.assertRaises(panel.PanelUnavailableError):
                 panel.world_map_presenter(NS(actor=actor))
+
+    @covers_requirement("webclient-world-map::unknown-world-commission-destinations-are-rounded-before-serialization")
+    def test_registered_service_hunt_reaches_world_presenter_with_privacy(self):
+        from typeclasses.rooms import Room, InstanceRoom
+        from web.webclient.presentation.tests.test_map_quest_destinations import (
+            _patch_geography, _record, _DEFINITIONS,
+        )
+        from world.quests.runtime import to_storage
+
+        _patch_geography(self)
+        room = Mock(spec=Room)
+        room.tags.all.return_value = ["t_service"]
+        instance = Mock(spec=InstanceRoom)
+        instance.attributes.get.return_value = room
+        log = [to_storage(_record(name)) for name in ("hunt", "grid", "site")]
+        with fixtures(), \
+             patch("world.lore.settlements.places.PLACE_REGISTRY", {"t_service": NS(settlement_key="town")}), \
+             patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", _DEFINITIONS), \
+             patch("world.maps.district_partition.district_at", return_value=SECRET):
+            for location in (room, instance):
+                actor = NS(location=location, db=NS(possessed_by=None, quest_log=log),
+                           attributes=NS(get=lambda key, **kwargs: log if key == "quest_log" else None))
+                body = panel.world_map_presenter(NS(actor=actor))
+                self.assertEqual(body["current"], dict(x=300.5, y=400.5))
+                markers = {row["id"]: row for row in body["quest_markers"]}
+                self.assertEqual(set(markers), {"q_hunt", "q_grid", "q_site"})
+                self.assertEqual((markers["q_hunt"]["x"], markers["q_hunt"]["y"]), (50, 0))
+                self.assertTrue(all(m["approximate"] for m in markers.values()))
+                self.assertNotIn(SECRET, json.dumps(body))
 
     def test_anchor_classification_keeps_villages_and_dungeons_visit_only(self):
         from world.lore.anchors import AnchorKind
