@@ -41,8 +41,6 @@ from world.quests.definitions import (
 from world.quests.runtime import QuestRecord, QuestState, to_storage
 from world.quests.tests._fixtures import TEST_ISSUER_KEY, RegistryIsolationMixin
 
-REQUIREMENT = "map-quest-destinations::accepted-commission-destinations-resolve-on-the-server"
-
 # --- Synthetic geography -------------------------------------------------------
 
 #: Two synthetic settlements: ``town`` is built on map ``town_map`` (whose
@@ -198,7 +196,7 @@ class NearestRegionCellTests(unittest.TestCase):
             block=block,
         )
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_nearest_cell_is_the_closest_legal_region_cell(self):
         # Straight west of the square: the nearest column is x=40.
         self.assertEqual(self._nearest((10, 7)), (40, 7))
@@ -210,7 +208,7 @@ class NearestRegionCellTests(unittest.TestCase):
         # Inside the region the origin itself is nearest.
         self.assertEqual(self._nearest((45, 5)), (45, 5))
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_equal_distance_ties_take_the_smaller_x_then_y_across_tiles(self):
         # Two one-cell regions at distance 3 from (5, 5), in different tiles.
         region = {(5, 8), (8, 5)}
@@ -229,13 +227,13 @@ class NearestRegionCellTests(unittest.TestCase):
             self._nearest((9, 5), classify=classify, bounds=(0, 15, 0, 15)), (9, 2)
         )
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_no_legal_region_cell_resolves_to_nothing(self):
         self.assertIsNone(self._nearest((0, 0), is_legal=lambda cell: False))
         self.assertIsNone(self._nearest((0, 0), classify=lambda x, y: "moor"))
         self.assertIsNone(self._nearest((0, 0), bounds=(5, 4, 0, 0)))
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_search_matches_a_brute_force_oracle(self):
         rng = random.Random(4242)
         cells = {(rng.randrange(0, 60), rng.randrange(0, 60)) for _ in range(40)}
@@ -263,7 +261,7 @@ class NearestRegionCellTests(unittest.TestCase):
                     expected,
                 )
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_repeated_reads_are_stable_and_follow_the_origin(self):
         first = self._nearest((10, 7))
         self.assertEqual([self._nearest((10, 7)) for _ in range(3)], [first] * 3)
@@ -290,7 +288,7 @@ class ResolveRecordDestinationTests(unittest.TestCase):
         super().setUp()
         _patch_geography(self)
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_locator_families_use_their_canonical_source(self):
         self.assertEqual(
             _resolve("anchor"),
@@ -325,14 +323,14 @@ class ResolveRecordDestinationTests(unittest.TestCase):
             ),
         )
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_settlement_anchor_cells_survive_a_missing_local_node(self):
         unbuilt = _resolve("anchor_unbuilt")
         self.assertEqual((unbuilt.world_cell, unbuilt.map_key, unbuilt.node_id), ((700, 50), None, None))
         grid = _resolve("grid_unbuilt_node")
         self.assertEqual((grid.world_cell, grid.map_key, grid.node_id), ((300, 400), None, None))
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_unlocatable_destinations_are_not_fabricated(self):
         for name in (
             "anchor_unknown", "grid_unknown_map", "bound", "hunt_unknown_region",
@@ -367,7 +365,7 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
             "rooms": [(room.id, room.db_location_id) for room in ObjectDB.objects.order_by("id")],
         }
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_grid_keeps_local_identity_and_unsupported_entries_add_no_marker(self):
         self.char1.db.quest_log = [
             to_storage(_record("bound")),
@@ -400,7 +398,7 @@ class AcceptedDestinationsConsumerTests(RegistryIsolationMixin, EvenniaTest):
         # Resolution is read-only: no quest, knowledge, room or object write.
         self.assertEqual(self._snapshot(), before)
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_possessed_puppet_reads_its_owner_log_from_its_own_position(self):
         self.char2.db.quest_log = [to_storage(_record("hunt")), to_storage(_record("grid"))]
         puppet = SimpleNamespace(
