@@ -524,6 +524,23 @@ defineExpose({
           :y="markerNameY(marker)"
           :text-anchor="markerNameAnchor(marker)"
         >{{ marker.visibleName }}</text>
+        <!-- The island's rim markers (render-auto-scaled-minimap-island):
+             the whole name, never shortened, laid out inside the square by
+             the geometry's rim layout — beside the diamond in the band, or
+             wrapped onto inward rows (columns on the left/right sides). -->
+        <text
+          v-else-if="marker.rim && marker.visibleName"
+          class="local-map__edge-marker-name--island"
+          :style="{ fontSize: `${markerNameFont}px` }"
+          :text-anchor="marker.rimName?.horizontal ? 'start' : 'middle'"
+        >
+          <tspan
+            v-for="(line, i) in marker.rimName?.lines ?? []"
+            :key="i"
+            :x="line.x"
+            :y="line.y"
+          >{{ line.text }}</tspan>
+        </text>
         <text
           v-else-if="marker.visibleName && (marker.side === 'top' || marker.side === 'bottom')"
           class="local-map__edge-marker-name--island"

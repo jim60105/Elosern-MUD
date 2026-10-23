@@ -10,6 +10,7 @@ import {
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
   LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+  LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE,
   LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
   LOCAL_MAP_CIARAN_PLAZA_SAMPLE,
   LOCAL_MAP_EXTREME_RATIO_SAMPLE,
@@ -264,6 +265,42 @@ export const MetricExtremeRatio = {
     }
     if (canvasElement.querySelector('[data-testid="local-map__dot-field"]')) {
       throw new Error("MetricExtremeRatio: compressed mode must not draw the dot field");
+    }
+  },
+};
+
+// Remembered gateways on the rim: smaller diamonds on the square's edge band,
+// each name whole — beside its diamond when it fits there, else wrapped onto
+// the next free inward row — inside the square and clear of every other name.
+export const MetricRememberedGateways = {
+  render: renderMap,
+  args: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE) },
+  play: async (context) => {
+    await assertExitsDrawn(LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE, "MetricRememberedGateways")(context);
+    const svg = context.canvasElement.querySelector('[data-testid="local-map__lattice"]');
+    const canvas = svg.getBoundingClientRect();
+    const remembered = LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE.nodes.filter((n) => n.visibility === "remembered");
+    const boxes = [];
+    for (const node of remembered) {
+      const marker = context.canvasElement.querySelector(`[data-testid="local-map__edge-marker--${CSS.escape(node.id)}"]`);
+      const text = marker?.querySelector(".local-map__edge-marker-name--island");
+      if (!text || text.textContent.replace(/\s+/g, "") !== node.label) {
+        throw new Error(`MetricRememberedGateways: ${node.id} must show its whole name`);
+      }
+      for (const tspan of text.querySelectorAll("tspan")) {
+        const box = tspan.getBoundingClientRect();
+        if (box.left < canvas.left - 0.5 || box.right > canvas.right + 0.5 || box.top < canvas.top - 0.5 || box.bottom > canvas.bottom + 0.5) {
+          throw new Error(`MetricRememberedGateways: ${node.id} name leaves the canvas`);
+        }
+        boxes.push({ id: node.id, box });
+      }
+    }
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        if (boxes[i].id !== boxes[j].id && boxesOverlap(boxes[i].box, boxes[j].box)) {
+          throw new Error(`MetricRememberedGateways: names of ${boxes[i].id} and ${boxes[j].id} overlap`);
+        }
+      }
     }
   },
 };

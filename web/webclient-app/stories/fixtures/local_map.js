@@ -961,3 +961,28 @@ export const LOCAL_MAP_EXTREME_RATIO_SAMPLE = {
   })),
   legend: [...METRIC_LEGEND],
 };
+
+// The central plaza with three remembered gateways on three rim sides, one
+// with the presenter's disambiguated long form: every name is drawn whole on
+// the island (beside its diamond or wrapped onto an inward row), never
+// shortened.
+const rememberedGate = (x, y, label, leadsTo) => ({
+  id: `grid:capital_altoria:${x}:${y}`,
+  label,
+  x,
+  y,
+  visibility: "remembered",
+  current: false,
+  anchor: false,
+  landmark: true,
+  gateway: { leads_to: leadsTo },
+  action: null,
+});
+export const LOCAL_MAP_ALTORIA_PLAZA_GATES_SAMPLE = metricViewAround(ALTORIA_METRIC_CORPUS, "central_plaza", {
+  visited: ["north_avenue", "south_avenue", "market_street"],
+  extraNodes: [
+    rememberedGate(3050, 150, "西部丘陵與谷地（南門）", "西部丘陵與谷地"),
+    rememberedGate(6500, 3010, "東部大平原", "東部大平原"),
+    rememberedGate(4500, 6350, "西部丘陵與谷地（北門）", "西部丘陵與谷地"),
+  ],
+});
