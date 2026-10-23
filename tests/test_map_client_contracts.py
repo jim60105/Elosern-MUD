@@ -19,6 +19,7 @@ from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_viewport.test.js"
+AREA_VIEW_SUITE = REPO_ROOT / "web/webclient-app/tests/world/area_map_view.test.js"
 VITEST_BIN = REPO_ROOT / "node_modules/.bin/vitest"
 
 
@@ -71,17 +72,20 @@ def run_vitest_json(suite: Path) -> tuple[subprocess.CompletedProcess, dict]:
     return result, report
 
 
-class ViewportContracts(unittest.TestCase):
-    """Runs ``map_viewport.test.js`` once; one method per requirement."""
+class VitestContractMixin:
+    """Runs ``SUITE`` once per class; each method checks one describe block."""
 
+    SUITE: Path
+    SUITE_NAME: str
     result: subprocess.CompletedProcess
     report: dict
 
     @classmethod
     def setUpClass(cls):
-        if not VIEWPORT_SUITE.is_file():
-            raise AssertionError(f"missing Vitest file {VIEWPORT_SUITE}")
-        cls.result, cls.report = run_vitest_json(VIEWPORT_SUITE)
+        super().setUpClass()
+        if not cls.SUITE.is_file():
+            raise AssertionError(f"missing Vitest file {cls.SUITE}")
+        cls.result, cls.report = run_vitest_json(cls.SUITE)
 
     def assert_run_green(self):
         failing = [
@@ -93,13 +97,15 @@ class ViewportContracts(unittest.TestCase):
             if case.get("status") == "failed"
         ]
         output = "\n\n".join(failing) or (self.result.stdout + self.result.stderr)
-        self.assertEqual(self.result.returncode, 0, "map viewport Vitest failed:\n" + output)
+        self.assertEqual(
+            self.result.returncode, 0, f"{self.SUITE_NAME} Vitest failed:\n" + output
+        )
         self.assertTrue(self.report, "Vitest wrote no JSON report:\n" + output)
         files = self.report.get("testResults", [])
         self.assertEqual(
             [Path(entry["name"]).resolve() for entry in files],
-            [VIEWPORT_SUITE.resolve()],
-            "exactly the viewport file must run",
+            [self.SUITE.resolve()],
+            f"exactly the {self.SUITE_NAME} file must run",
         )
         self.assertEqual(self.report.get("numFailedTests"), 0)
         self.assertGreater(self.report.get("numPassedTests", 0), 0)
@@ -118,6 +124,13 @@ class ViewportContracts(unittest.TestCase):
             all(status == "passed" for status in statuses.values()),
             f"describe {describe!r} has non-passing tests: {statuses}",
         )
+
+
+class ViewportContracts(VitestContractMixin, unittest.TestCase):
+    """Runs ``map_viewport.test.js`` once; one method per requirement."""
+
+    SUITE = VIEWPORT_SUITE
+    SUITE_NAME = "map viewport"
 
     @covers_requirement(
         "webclient-map-viewport::map-navigation-preserves-uniform-geometry-and-the-zoom-anchor"
@@ -145,6 +158,37 @@ class ViewportContracts(unittest.TestCase):
         # Pointers clamp left of the open 360 px drawer and recompute when it
         # closes; the same usable rectangle governs every edge.
         self.assert_block_passed("offscreen geometry avoids the selected detail drawer")
+
+
+class AreaViewContracts(VitestContractMixin, unittest.TestCase):
+    """Runs ``area_map_view.test.js`` once; one method per requirement."""
+
+    SUITE = AREA_VIEW_SUITE
+    SUITE_NAME = "area map view"
+
+    @covers_requirement(
+        "webclient-area-map-view::area-rendering-uses-truthful-geometry-and-server-fog"
+    )
+    def test_truthful_geometry_and_server_fog(self):
+        # Schema-valid fixtures; unequal metre gaps proportional under pan and
+        # zoom; dot step, dot caption and scale bar stating one distance; the
+        # 15 x 15 wilderness window in cells with its district and cell_km
+        # scale; radial rooms with no distance claims; an absent dungeon
+        # branch (and a commission into it) leaving no node, road or text;
+        # whole names with lower-priority labels hidden; new-map resets.
+        self.assert_block_passed("area rendering uses truthful geometry and server fog")
+
+    @covers_requirement(
+        "webclient-area-map-view::area-selection-offers-travel-only-for-an-authoritative-adjacent-exit"
+    )
+    def test_adjacent_only_travel(self):
+        # Pointer and keyboard selection reach 前往 only on a current-adjacent
+        # node whose descriptor leads to it, emitting exactly
+        # {exit_ref, destination, current_node} once; remote, current and
+        # mismatched-descriptor nodes submit nothing; a drag never selects.
+        self.assert_block_passed(
+            "area selection offers travel only for an authoritative adjacent exit"
+        )
 
 
 if __name__ == "__main__":

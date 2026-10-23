@@ -170,6 +170,8 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/ListDetail",
                 "Core/ActionBar",
                 "Data/HoldingsStrip",
+                # The area tab renderer of the world-map drawer (render-area-map-view).
+                "World/AreaMapView",
                 "Overlays/ObjectiveTracker",
                 # The client-local action-feedback toast queue joined the
                 # frozen set when add-action-feedback-toasts refroze the

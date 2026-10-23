@@ -172,6 +172,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ListDetail",
     "Core/ActionBar",
     "Data/HoldingsStrip",
+    # The area tab renderer of the world-map drawer (render-area-map-view).
+    "World/AreaMapView",
     "Core/CompanionLineup",
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
@@ -270,6 +272,8 @@ WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/GuildRankCard",
     "World/QuestList",
     "World/QuestDetail",
+    # The world-map drawer's area tab (render-area-map-view).
+    "World/AreaMapView",
 )
 
 
