@@ -86,6 +86,13 @@
   overflow: visible;
 }
 
+/* The fixed island square clips its own drawing on every mount (LocalMap
+   repeats this for its card): the world-anchored dot field extends past the
+   square by the pan margin, and nothing of it may paint outside. */
+.local-map__lattice--island {
+  overflow: hidden;
+}
+
 /* The island's edge-marker name. Its type size is the surface's own declared
    `markerNameFont` step, bound as an inline style (the same policy the node
    label follows) because the SAME number drives the along-edge fit budget and
