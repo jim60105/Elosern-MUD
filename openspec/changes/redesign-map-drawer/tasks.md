@@ -41,7 +41,7 @@ The parent agent approved this predecessor handoff convention explicitly.
   callback, and compares epoch plus complete area map/frame identity.
   Frame/epoch retirement regressions pass.
 - `pnpm exec vitest run web/webclient-app/tests/world/map_drawer.test.js
-  web/webclient-app/tests/world/map_edge_pointers.test.js`: 48 tests passed.
+  web/webclient-app/tests/world/map_edge_pointers.test.js`: 50 tests passed.
   Includes request commit ordering, rejected/closed paths, keyboard/Escape,
   current markers, removal checks and both required frame-transition paths.
 - `uv run --locked python -m unittest
@@ -94,6 +94,17 @@ The parent agent approved this predecessor handoff convention explicitly.
   its historical seed baseline remains unchanged.
 - `openspec validate redesign-map-drawer --strict`: passed. No production
   logging path changed. No broad test suite or CI evidence verification ran.
+- Postimplementation review found two blocking pointer-capacity defects:
+  occupied-endpoint fallback on a full edge, and missing cross-edge corner
+  collision accounting. Both are fixed by conservative shared rectangles,
+  nearest-free-edge placement and accessible overflow folding that reserves
+  a real spot for ＋n. The review's exact saturated-top and adjacent-corner
+  reproductions are now focused passing tests. Relevant real Storybook
+  plays were repeated with no console errors, including overflow-chip
+  collision and drawer-avoidance assertions, and captures inspected.
+  The reviewer could inspect current source/specs but could not obtain the
+  full Git diff through its tools; this is recorded as a review limitation,
+  not a complete-diff approval.
 - Existing map protocol, metric-map, frozen-hook, player command and
   frontend-agent docs were updated. The builder-oriented text `地圖`
   command and its reference entry are intentionally unchanged.

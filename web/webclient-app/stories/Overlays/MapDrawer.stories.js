@@ -147,14 +147,16 @@ function assertPointers(root, story) {
   if (pointers.length > 3) fail(story, `${pointers.length} pointers drawn`);
   const stage = $(root, "map-drawer-stage").getBoundingClientRect();
   const detail = root.querySelector(".area-map__detail, .world-map__detail")?.getBoundingClientRect();
-  for (const p of pointers) {
+  const more = $(root, "map-edge-pointer-more");
+  const chips = more ? [...pointers, more] : pointers;
+  for (const p of chips) {
     const box = p.getBoundingClientRect();
     if (box.left < stage.left - 0.5 || box.right > stage.right + 0.5 || box.top < stage.top - 0.5 || box.bottom > stage.bottom + 0.5) {
       fail(story, `pointer ${p.dataset.quest} leaves the stage`);
     }
     if (detail && box.right > detail.left + 0.5) fail(story, `pointer ${p.dataset.quest} runs under the detail card`);
   }
-  const boxes = pointers.map((p) => p.getBoundingClientRect());
+  const boxes = chips.map((p) => p.getBoundingClientRect());
   for (let i = 0; i < boxes.length; i += 1) {
     for (let j = i + 1; j < boxes.length; j += 1) {
       const a = boxes[i], b = boxes[j];

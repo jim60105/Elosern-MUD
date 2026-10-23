@@ -109,6 +109,30 @@ describe("floating map chrome avoids selected details", () => {
     expect(p.y).toBeCloseTo(20);
   });
 
+  it.each([
+    ["a full top edge", [target("a", 400, -1000, 1), target("b", 400, -1000, 2), target("c", 400, -1000, 3)]],
+    ["adjacent corners", [target("a", -500, -1000, 1), target("b", -1000, -600, 2)]],
+  ])("never overlaps chips at %s, folding any unplaceable targets into the list", (_name, targets) => {
+    const rect = { left: 0, right: 800, top: 0, bottom: 500 };
+    const { pointers, more } = layoutEdgePointers(targets, rect, { pitch: 52, halfWidth: 140, halfHeight: 24 });
+    expect([...pointers.map((p) => p.id), ...(more?.ids ?? [])].sort()).toEqual(targets.map((t) => t.id).sort());
+    const boxes = [...pointers.map((p) => [p, 280]), ...(more ? [[more, 80]] : [])].map(([p, width]) => {
+      const left = p.side === "left" ? p.x : p.side === "right" ? p.x - width : p.x - width / 2;
+      const top = p.side === "top" ? p.y : p.side === "bottom" ? p.y - 48 : p.y - 24;
+      return { left, right: left + width, top, bottom: top + 48 };
+    });
+    for (const [i, a] of boxes.entries()) {
+      expect(a.left).toBeGreaterThanOrEqual(rect.left);
+      expect(a.right).toBeLessThanOrEqual(rect.right);
+      expect(a.top).toBeGreaterThanOrEqual(rect.top);
+      expect(a.bottom).toBeLessThanOrEqual(rect.bottom);
+      for (const b of boxes.slice(i + 1)) {
+        expect(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top).toBe(true);
+      }
+    }
+    if (_name === "a full top edge") expect(more?.count).toBeGreaterThan(0);
+  });
+
   it("renders named pointer buttons and a ＋n chip that opens the list", async () => {
     const { pointers, more } = layoutEdgePointers(
       [target("a", 3000, 300, 1), target("b", -3000, 300, 2), target("c", 500, 3000, 3), target("d", 500, -3000, 4)],

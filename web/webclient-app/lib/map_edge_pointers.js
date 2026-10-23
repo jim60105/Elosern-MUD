@@ -6,13 +6,13 @@
 // A target is `{ id, title, sub, x, y, distance }` in frame pixels (its
 // projected position, usually far outside the frame) with its map distance
 // from the player. Targets inside the usable rectangle draw no pointer. The
-// rest are ordered nearest first; the three nearest are shown on the
+// rest are ordered nearest first; at most three are shown on the
 // rectangle's edge where the ray from its centre leaves it (map_viewport.js
 // clampToRect, so the pointers avoid the open detail drawer whenever the host
 // passes a drawer-aware rectangle), and any further ones collapse into one
-// `＋n` chip. Pointers on one side never overlap: in distance order each one
-// keeps the spot nearest its true crossing that is a full pitch away from
-// those already placed, staying inside the side's span.
+// `＋n` chip. In distance order each pointer keeps the nearest free spot on
+// its edge. Conservative chip bounds prevent collisions across corners too;
+// a full edge folds excess targets into the list and reserves its ＋n chip.
 
 import { clampToRect } from "./map_viewport.js";
 
@@ -40,21 +40,6 @@ function spanOf(rect, side, halfWidth, halfHeight) {
   return [lo + half, hi - half];
 }
 
-// The free coordinate nearest `want` on [lo, hi] at least `pitch` from every
-// taken coordinate; when the side is full the nearest end is used.
-function freeSpot(want, taken, lo, hi, pitch) {
-  const clear = (v) => taken.every((t) => Math.abs(t - v) >= pitch - 1e-9);
-  const inSpan = (v) => v >= lo - 1e-9 && v <= hi + 1e-9;
-  const start = Math.min(hi, Math.max(lo, want));
-  if (clear(start)) return start;
-  const candidates = taken
-    .flatMap((t) => [t - pitch, t + pitch])
-    .filter((v) => inSpan(v) && clear(v))
-    .sort((a, b) => Math.abs(a - start) - Math.abs(b - start));
-  if (candidates.length) return candidates[0];
-  return Math.abs(start - lo) <= Math.abs(hi - start) ? lo : hi;
-}
-
 /**
  * Lays out the visible pointers and the overflow chip. `halfWidth` and
  * `halfHeight` are half a pointer's extent: a top/bottom pointer is centred
@@ -73,22 +58,82 @@ export function layoutEdgePointers(
     .map((t) => ({ target: t, clamp: clampToRect(rect, { x: t.x, y: t.y }) }))
     .filter((entry) => !entry.clamp.inside)
     .sort((a, b) => a.target.distance - b.target.distance || String(a.target.id).localeCompare(String(b.target.id)));
-  const shown = outside.slice(0, max);
-  const hidden = outside.slice(max);
-  const taken = { top: [], right: [], bottom: [], left: [] };
+  const placed = [];
+  const hidden = [];
+  const gap = 8;
 
-  function place(clamp) {
+  function place(clamp, width = halfWidth) {
     const side = clamp.side;
     const axis = axisOf(side);
-    const [lo, hi] = spanOf(rect, side, halfWidth, halfHeight);
-    // Top/bottom chips stack along their width, not their two-line height.
-    const spacing = Math.max(pitch, 2 * (axis === "x" ? halfWidth : halfHeight) + 8);
-    const v = freeSpot(clamp[axis], taken[side], lo, hi, spacing);
-    taken[side].push(v);
-    return axis === "x" ? { x: v, y: clamp.y } : { x: clamp.x, y: v };
+    if (2 * width > rect.right - rect.left || 2 * halfHeight > rect.bottom - rect.top) return null;
+    const half = axis === "x" ? width : halfHeight;
+    const [lo, hi] = spanOf(rect, side, width, halfHeight);
+    const start = Math.min(hi, Math.max(lo, clamp[axis]));
+    function bounds(v) {
+      const x = axis === "x" ? v : clamp.x;
+      const y = axis === "y" ? v : clamp.y;
+      const left = side === "left" ? x : side === "right" ? x - 2 * width : x - width;
+      const top = side === "top" ? y : side === "bottom" ? y - 2 * halfHeight : y - halfHeight;
+      return { x, y, left, right: left + 2 * width, top, bottom: top + 2 * halfHeight };
+    }
+    // Include the free-interval boundaries of every previously painted chip,
+    // including chips on adjacent edges. Width/height are conservative DOM
+    // bounds, so corner collisions cannot hide behind per-side accounting.
+    const candidates = [start, lo, hi];
+    for (const item of placed) {
+      const box = item.box;
+      candidates.push(
+        (axis === "x" ? box.left : box.top) - half - gap,
+        (axis === "x" ? box.right : box.bottom) + half + gap,
+      );
+      if (item.clamp.side === side) {
+        const spacing = Math.max(pitch, half + (axis === "x" ? item.width : halfHeight) + gap);
+        candidates.push(box[axis] - spacing, box[axis] + spacing);
+      }
+    }
+    candidates.sort((a, b) => Math.abs(a - start) - Math.abs(b - start));
+    for (const v of candidates) {
+      if (v < lo - 1e-9 || v > hi + 1e-9) continue;
+      const box = bounds(v);
+      const clear = placed.every((item) => {
+        if (item.clamp.side === side) {
+          const spacing = Math.max(pitch, half + (axis === "x" ? item.width : halfHeight) + gap);
+          if (Math.abs(item.box[axis] - v) < spacing - 1e-9) return false;
+        }
+        const other = item.box;
+        return box.right + gap <= other.left || other.right + gap <= box.left ||
+          box.bottom + gap <= other.top || other.bottom + gap <= box.top;
+      });
+      if (clear) return box;
+    }
+    return null;
   }
 
-  const pointers = shown.map(({ target, clamp }) =>
+  for (const entry of outside) {
+    const box = placed.length < max ? place(entry.clamp) : null;
+    if (box) placed.push({ ...entry, box, width: halfWidth });
+    else hidden.push(entry);
+  }
+  let more = null;
+  if (hidden.length) {
+    // Reserve a real spot for ＋n. If necessary, fold the farthest painted
+    // pointer into the list rather than letting either button overlap.
+    let box;
+    while (!(box = place(hidden[0].clamp, Math.min(halfWidth, 40))) && placed.length) {
+      hidden.unshift(placed.pop());
+    }
+    if (box) {
+      more = Object.freeze({
+        count: hidden.length,
+        ids: Object.freeze(hidden.map((entry) => entry.target.id)),
+        side: hidden[0].clamp.side,
+        angle: hidden[0].clamp.angle,
+        x: box.x,
+        y: box.y,
+      });
+    }
+  }
+  const pointers = placed.map(({ target, clamp, box }) =>
     Object.freeze({
       id: target.id,
       title: target.title,
@@ -96,19 +141,9 @@ export function layoutEdgePointers(
       distance: target.distance,
       side: clamp.side,
       angle: clamp.angle,
-      ...place(clamp),
+      x: box.x,
+      y: box.y,
     }),
   );
-  let more = null;
-  if (hidden.length) {
-    const first = hidden[0].clamp;
-    more = Object.freeze({
-      count: hidden.length,
-      ids: Object.freeze(hidden.map((entry) => entry.target.id)),
-      side: first.side,
-      angle: first.angle,
-      ...place(first),
-    });
-  }
   return Object.freeze({ pointers: Object.freeze(pointers), more });
 }
