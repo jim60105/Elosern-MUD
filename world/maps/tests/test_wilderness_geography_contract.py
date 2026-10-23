@@ -333,6 +333,10 @@ class BorderRiverContractTests(unittest.TestCase):
         self.assertEqual(mouth[1], 1290)
         self.assertTrue(is_land_cell(mouth))
         self.assertFalse(is_land_cell((mouth[0] - 1, mouth[1])))
+        # Outside the river's span the end rows continue: the source row runs
+        # east to the ridge as the claim line, the mouth row west to the sea.
+        self.assertEqual(border_river_row(source[0] + 50), source[1])
+        self.assertEqual(border_river_row(mouth[0] - 50), mouth[1])
         for bend in ((1100, 1350), (900, 1380), (650, 1310), (400, 1340)):
             self.assertLessEqual(abs(border_river_row(bend[0]) - bend[1]), 10, bend)
         # One water cell per column, exactly the classifier's river row, every
@@ -506,7 +510,7 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         for x, y in _land_sample():
             land += 1
             forest += region_for_coordinates(x, y) == "north_deep_forest"
-        self.assertLessEqual(abs(forest / land - 0.20), 0.02)
+        self.assertLessEqual(abs(forest / land - 0.20), 0.02, round(forest / land, 4))
 
     @covers_requirement("wilderness-terrain::terrain-and-political-control-follow-authored-geography")
     def test_anchor_relationships_to_the_forest_edge(self):
@@ -527,6 +531,17 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
         # any nation's administration: its anchor identity keeps no nation.
         from world.lore.anchors import ANCHOR_REGISTRY
 
+        # Altoria stays southwest in the hills and river valleys; Ciaran is on
+        # the range's western flank and Fionnen on its eastern flank.
+        altoria = ANCHOR_GEOGRAPHY_REGISTRY["capital_altoria"].cell
+        self.assertEqual(region_for_coordinates(*altoria), "western_hills_valleys")
+        self.assertEqual(nominal_nation_for_coordinates(*altoria), "altoria")
+        ciaran = ANCHOR_GEOGRAPHY_REGISTRY["village_ciaran"].cell
+        fionnen = ANCHOR_GEOGRAPHY_REGISTRY["village_fionnen"].cell
+        self.assertLess(ciaran[0], _ridge_center_x(ciaran[1]))
+        self.assertGreater(fionnen[0], _ridge_center_x(fionnen[1]))
+        self.assertEqual(nominal_nation_for_coordinates(*ciaran), "altoria")
+        self.assertEqual(nominal_nation_for_coordinates(*fionnen), "grandia")
         eolas = ANCHOR_GEOGRAPHY_REGISTRY["village_eolas"].cell
         self.assertEqual(nominal_nation_for_coordinates(*eolas), "grandia")
         self.assertIsNone(ANCHOR_REGISTRY["village_eolas"].nation_key)
@@ -577,8 +592,11 @@ class ForestEdgeAndClaimContractTests(unittest.TestCase):
             )
             seen_by_region.setdefault(region, set()).add(nation)
         total = sum(counts.values())
+        # Deliberate geometry pins: moving a ridge, river or edge vertex
+        # changes these measured shares.
         for nation, share in (("grandia", 0.43), ("altoria", 0.30), ("valhalla", 0.27)):
-            self.assertLessEqual(abs(counts[nation] / total - share), 0.015, nation)
+            measured = counts[nation] / total
+            self.assertLessEqual(abs(measured - share), 0.015, (nation, round(measured, 4)))
         for key, region in WILDERNESS_REGION_REGISTRY.items():
             self.assertEqual(seen_by_region[key], set(region.nominal_nation_keys), key)
             if region.nation_key is not None:
