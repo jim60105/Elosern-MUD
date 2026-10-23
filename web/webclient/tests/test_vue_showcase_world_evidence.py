@@ -67,7 +67,10 @@ WORLD_FAMILY_KEYS = (
 
 # The exact showcase story registration for the world + services family: the
 # built Storybook index.json entry ids for every story exported by this
-# change (title "World/<Component>", deterministic story names).
+# change (title "World/<Component>", deterministic story names). The three
+# `world-maplattice--overlay-scale-*` ids retired with the full-map overlay
+# (redesign-map-drawer): MapOverlay.vue and its overlay variant are gone, so
+# only the island variants remain to register.
 WORLD_FAMILY_STORY_IDS = {
     "world-localmap--full-lattice",
     "world-localmap--minimal",
@@ -75,9 +78,6 @@ WORLD_FAMILY_STORY_IDS = {
     "world-maplattice--island-scale-sample",
     "world-maplattice--island-scale-wilderness",
     "world-maplattice--island-scale-minimal",
-    "world-maplattice--overlay-scale-sample",
-    "world-maplattice--overlay-scale-wilderness",
-    "world-maplattice--overlay-scale-minimal",
     "world-lorecodexdrawer--populated-codex",
     "world-lorecodexdrawer--category-selected",
     "world-lorecodexdrawer--entry-selected",
