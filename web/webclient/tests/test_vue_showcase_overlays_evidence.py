@@ -273,6 +273,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ListDetail",
     "Core/ActionBar",
     "Data/HoldingsStrip",
+    # The area tab renderer of the world-map drawer (render-area-map-view).
+    "World/AreaMapView",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the

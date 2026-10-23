@@ -77,7 +77,8 @@
     "Core/MemberRail",
     "Core/ListDetail",
     "Core/ActionBar",
-    "Data/HoldingsStrip"
+    "Data/HoldingsStrip",
+    "World/AreaMapView"
   ],
   "frozen": true
 }
