@@ -44,6 +44,15 @@ PLAZA_ROOM = "選項測試廣場"
 
 EXPECTED_READY_LABELS = ("查看四周", "前往南門", "我們聊聊好嗎？", "試試身手")
 
+#: Readiness budget for this class's store-state gates. The class shares one
+#: ManagedServer across ten journeys, so the first plaza suggestions
+#: generation pays the cold process's imports and the scripted generation
+#: delay while a sibling process competes for the runner's CPU; later
+#: journeys hit the service's warm generation cache. 30s is not a safe bound
+#: for the cold path (the same budget the harness already grants its shell
+#: wait), and it is a harness budget, never a correctness threshold.
+READY_DEADLINE_MS = 60000
+
 
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
@@ -89,7 +98,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         panel = store_state(page)["panels"].get("context_actions")
         return panel.get("suggestions") if panel else None
 
-    def _wait_suggestions(self, page, status, timeout=30000):
+    def _wait_suggestions(self, page, status, timeout=READY_DEADLINE_MS):
         def _status_reached(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
             return suggestions is not None and suggestions.get("status") == status
@@ -114,7 +123,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         open_suggestions_card(page)
         page.wait_for_timeout(60)
 
-    def _wait_section(self, page, timeout=30000):
+    def _wait_section(self, page, timeout=READY_DEADLINE_MS):
         def _section_shown(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
             return suggestions is not None and suggestions.get("status") in ("generating", "ready", "degraded")
@@ -134,7 +143,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             timeout=timeout,
         )
 
-    def _wait_section_gone(self, page, timeout=30000):
+    def _wait_section_gone(self, page, timeout=READY_DEADLINE_MS):
         def _section_hidden(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
             return suggestions is None or suggestions.get("status") == "unavailable"
@@ -153,7 +162,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             timeout=timeout,
         )
 
-    def _wait_generating_line(self, page, timeout=30000):
+    def _wait_generating_line(self, page, timeout=READY_DEADLINE_MS):
         def _generating(state):
             suggestions = (state.get("panels") or {}).get("context_actions", {}).get("suggestions")
             return suggestions is not None and suggestions.get("status") == "generating"
@@ -304,10 +313,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
     def test_suggestions_only_update_rerenders_section_without_dock_rebuild(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The class run shares one ManagedServer across 10 tests; the plaza
-        # suggestions "ready" generation can exceed the default 30s deadline
-        # under load, so use a bounded, longer deadline.
-        self._wait_suggestions(page, "ready", timeout=60000)
+        self._wait_suggestions(page, "ready")
         self._wait_section(page)
         self._dismiss(page)
         self._wait_suggestions(page, "unavailable")
@@ -327,7 +333,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(captured, "the suggestions card must be open")
         depth = page.evaluate("window.__elosernBridge.router.depth()")
 
-        self._wait_suggestions(page, "ready", timeout=60000)
+        self._wait_suggestions(page, "ready")
         stable = page.evaluate(
             """(selector) => {
                 const menu = document.querySelector(selector);
