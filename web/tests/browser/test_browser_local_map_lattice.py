@@ -164,16 +164,22 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_local_map_available(page)
-                result = self._inject_panel(page, self._tall_lattice_payload())
+                payload = self._tall_lattice_payload()
+                result = self._inject_panel(page, payload)
                 self.assertTrue(result["accepted"], f"ui_update rejected: {result}")
+                # The committed model carries the payload's own in-view nodes
+                # at their raw coordinates (the lattice cell left with the
+                # full-map overlay), so the gate is the node count plus the
+                # payload's own current node.
                 wait_for_store_state(
                     page,
-                    lambda s: (s.get("localMapModel") or {}).get("rows") == 64,
+                    lambda s: len((s.get("localMapModel") or {}).get("nodes") or []) == 64,
                     timeout=30000,
                 )
                 wait_for_store_state(
                     page,
-                    lambda s: (s.get("localMapModel") or {}).get("cols") == 2,
+                    lambda s: (s.get("localMapModel") or {}).get("currentNode")
+                    == payload["current_node"],
                     timeout=30000,
                 )
 
@@ -323,7 +329,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self._inject_panel(page, self._tall_lattice_payload(rows=48, remembered_count=0))
                 wait_for_store_state(
                     page,
-                    lambda s: (s.get("localMapModel") or {}).get("rows") == 48,
+                    lambda s: len((s.get("localMapModel") or {}).get("nodes") or []) == 48,
                     timeout=30000,
                 )
                 base_island_box = page.locator('[data-testid="local-map"]').bounding_box()
@@ -335,7 +341,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self.assertTrue(result["accepted"], f"ui_update rejected: {result}")
                 wait_for_store_state(
                     page,
-                    lambda s: (s.get("localMapModel") or {}).get("rows") == 48,
+                    # Remembered far nodes stay out of the in-view model.
+                    lambda s: len((s.get("localMapModel") or {}).get("nodes") or []) == 48,
                     timeout=30000,
                 )
 
@@ -496,8 +503,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         # 4. The adjacent node keeps its exact move identity on the island.
         #    (The full map is the drawer's area view, whose metric geometry
         #    is pinned by the drawer and area-view suites.)
+        #    The group's box spans its marker and its placed label, and the
+        #    topmost paint over the marker is the node's own activation halo
+        #    (the label is pointer-inert), so the journey clicks that halo —
+        #    the element a real pointer lands on, inside the same activating
+        #    group.
         page.locator(
-            '[data-testid="local-map"] [data-testid="local-map__node--grid:metric:100:0"]'
+            '[data-testid="local-map"] [data-testid="local-map__node--grid:metric:100:0"] .local-map__actionable'
         ).click()
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
