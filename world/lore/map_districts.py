@@ -326,6 +326,11 @@ def validate_map_districts(
         raise MapDistrictError(tuple(problems))
 
 
+#: The authored roster: the deep forest region district plus 119 Voronoi
+#: districts of roughly 200 km, grouped by nominal nation and listed north to
+#: south. Placement and naming rationale live in
+#: docs/development/continental-geography.md; after any change, regenerate the
+#: frozen partition with ``uv run --locked python -m tools.map_district_partition``.
 MAP_DISTRICT_REGISTRY: dict[str, MapDistrict] = {
     # The single region district: the whole northern deep forest, across the
     # Valhalla and Grandia nominal claims, lit only at its heart near the
