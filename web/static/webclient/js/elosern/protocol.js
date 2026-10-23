@@ -329,6 +329,9 @@ var map_parts = require("./protocol/map_parts.js");
     validateAreaMapPanel: map_panels.validateAreaMapPanel,
     validateWorldMapPanel: map_panels.validateWorldMapPanel,
     validateMapPanel: map_panels.validateMapPanel,
+    WORLD_MAP_FRAME_MAX_BYTES: map_panels.WORLD_MAP_FRAME_MAX_BYTES,
+    carriesIntactWorldMap: map_panels.carriesIntactWorldMap,
+    checkWorldMapEnvelope: map_panels.checkWorldMapEnvelope,
     validateMapPart: map_parts.validateMapPart,
     maxMapParts: map_parts.maxParts,
     // The only accepted client->server synchronization body.

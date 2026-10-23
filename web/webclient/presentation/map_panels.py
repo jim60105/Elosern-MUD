@@ -26,9 +26,11 @@ import re
 from typing import Any
 
 from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES,
     MAX_DEPTH,
     MAX_SAFE_INTEGER,
     ProtocolValidationError,
+    check_envelope,
     check_json_safety,
     json_byte_size,
 )
@@ -82,8 +84,14 @@ WILDERNESS_WINDOW = 15
 WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW
 AREA_MAX_CELL_KM = 1_000
 
-# world_map bounds (provisional; transport-world-map-panel measures and owns them).
-WORLD_MAX_BYTES = 2_097_152
+# world_map bounds, measured by transport-world-map-panel from the shipped
+# geography (``uv run --locked python -m tools.world_map_payload``; see
+# docs/development/map-panel-protocol.md): every district unlit is about
+# 194 KB, an early exploration about 228 KB and the supported worst case
+# (everything lit, the 20,000-run trail, 64 full markers) about 659 KB. The
+# 1 MiB ceiling leaves room for the terrain washes and continental roads the
+# world presenter will add; that change re-measures against it.
+WORLD_MAX_BYTES = 1_048_576
 WORLD_MAX_POLYGON_POINTS = 8_192
 WORLD_MAX_POLYLINE_POINTS = 4_096
 WORLD_MAX_BORDERS = 256
@@ -661,6 +669,48 @@ def validate_world_map(payload: Any) -> dict[str, Any]:
     }
     _check_logical_body(result, WORLD_MAP_PANEL)
     return result
+
+
+#: The largest intact ``ui_update`` frame carrying a world map: the generic
+#: frame budget for everything else plus the world map's logical ceiling.
+WORLD_MAP_FRAME_MAX_BYTES = MAX_CANONICAL_JSON_BYTES + WORLD_MAX_BYTES
+
+
+def carries_intact_world_map(envelope: Any) -> bool:
+    """Whether a frame claims the scoped world-map allowance.
+
+    True only for an envelope object whose ``panels`` object holds a
+    ``world_map`` object that is not a bounded part. Every other frame
+    (snapshots, parts, other panels) takes the generic envelope check. The
+    browser uses the same predicate (``carriesIntactWorldMap``).
+    """
+    if not isinstance(envelope, dict):
+        return False
+    panels = envelope.get("panels")
+    if not isinstance(panels, dict):
+        return False
+    body = panels.get(WORLD_MAP_PANEL)
+    return isinstance(body, dict) and "part" not in body
+
+
+def check_world_map_envelope(envelope: Any) -> dict[str, Any]:
+    """Check one intact ``ui_update`` frame under the world-map allowance.
+
+    The world map is the only value exempt from the generic frame budget.
+    The rest of the envelope, with the world map replaced by ``null``, passes
+    the unchanged generic check: metadata and every sibling panel (including
+    ``local_map`` and ``area_map``) keep the 65,536-byte, 320-item, depth and
+    string bounds. The world map itself must pass its exact schema, the
+    generic scalar rules and its logical byte ceiling. Returns the validated
+    world-map body; raises :class:`ProtocolValidationError` otherwise.
+    """
+    if not carries_intact_world_map(envelope):
+        raise MapPanelError("the world-map allowance needs an intact world_map panel")
+    panels = dict(envelope["panels"])
+    body = panels[WORLD_MAP_PANEL]
+    panels[WORLD_MAP_PANEL] = None
+    check_envelope({**envelope, "panels": panels})
+    return validate_map_panel(WORLD_MAP_PANEL, body)
 
 
 _VALIDATORS = {AREA_MAP_PANEL: validate_area_map, WORLD_MAP_PANEL: validate_world_map}

@@ -5,10 +5,10 @@
 // every constant, vocabulary and rule below must stay equal to the server
 // validator; a bidirectional Python/Node parity test pins them.
 //
-// The area ceilings are the values publish-area-map-panel measured and owns
-// (docs/development/map-panel-protocol.md). The world ceilings stay finite
-// provisional values until transport-world-map-panel measures them.
-// Unrelated panels keep their own budgets.
+// The area ceilings are the values publish-area-map-panel measured and owns;
+// the world ceilings are the values transport-world-map-panel measured and
+// owns (docs/development/map-panel-protocol.md). Unrelated panels keep their
+// own budgets.
 
 var core = require("../core.js");
 
@@ -46,7 +46,7 @@ var WILDERNESS_WINDOW = 15;
 var WILDERNESS_MAX_NODES = WILDERNESS_WINDOW * WILDERNESS_WINDOW;
 var AREA_MAX_CELL_KM = 1000;
 
-var WORLD_MAX_BYTES = 2097152;
+var WORLD_MAX_BYTES = 1048576;
 var WORLD_MAX_POLYGON_POINTS = 8192;
 var WORLD_MAX_POLYLINE_POINTS = 4096;
 var WORLD_MAX_BORDERS = 256;
@@ -697,6 +697,55 @@ function validateWorldMapPanel(payload) {
 
 var VALIDATORS = { area_map: validateAreaMapPanel, world_map: validateWorldMapPanel };
 
+// The scoped world-map frame allowance (transport-world-map-panel), mirror of
+// map_panels.carries_intact_world_map / check_world_map_envelope.
+var WORLD_MAP_FRAME_MAX_BYTES = require("../constants.js").MAX_CANONICAL_JSON_BYTES + WORLD_MAX_BYTES;
+
+// Whether a frame claims the allowance: an envelope object whose panels
+// object owns a world_map object that is not a bounded part.
+function carriesIntactWorldMap(envelope) {
+  if (!isPlainObject(envelope) || !has(envelope, "panels") || !isPlainObject(envelope.panels)) {
+    return false;
+  }
+  if (!has(envelope.panels, "world_map")) {
+    return false;
+  }
+  var body = envelope.panels.world_map;
+  return isPlainObject(body) && !has(body, "part");
+}
+
+// Copy own enumerable keys as data properties. Object.assign would run the
+// __proto__ setter for a JSON-parsed "__proto__" key and hide that value from
+// the generic walk.
+function ownCopy(value) {
+  var copy = {};
+  Object.keys(value).forEach(function (key) {
+    Object.defineProperty(copy, key, { value: value[key], enumerable: true, writable: true, configurable: true });
+  });
+  return copy;
+}
+
+// The world map is the only value exempt from the generic frame budget: the
+// rest of the envelope, with the world map replaced by null, passes the
+// unchanged generic check (siblings such as local_map and area_map keep the
+// 65,536-byte frame), and the world map passes the generic scalar rules and
+// its logical byte ceiling. The exact schema runs later in validateUpdate.
+function checkWorldMapEnvelope(envelope) {
+  if (!carriesIntactWorldMap(envelope)) {
+    fail("the world-map allowance needs an intact world_map panel");
+  }
+  var panels = ownCopy(envelope.panels);
+  var body = panels.world_map;
+  panels.world_map = null;
+  var remainder = ownCopy(envelope);
+  remainder.panels = panels;
+  core.checkEnvelope(remainder);
+  checkMapSafety(body, MAP_PANEL_DEPTH);
+  if (core.jsonByteSize(body) > WORLD_MAX_BYTES) {
+    fail("world_map exceeds " + WORLD_MAX_BYTES + " canonical bytes");
+  }
+}
+
 // One logical map panel: its available form or the common unavailable form.
 function validateMapPanel(name, payload) {
   if (!has(MAP_PANEL_SCHEMAS, name)) {
@@ -770,7 +819,10 @@ module.exports = {
     PLACE_KINDS: PLACE_KINDS,
     MAP_NODE_ID_RE: MAP_NODE_ID_RE.source,
   },
+  WORLD_MAP_FRAME_MAX_BYTES: WORLD_MAP_FRAME_MAX_BYTES,
   checkMapSafety: checkMapSafety,
+  carriesIntactWorldMap: carriesIntactWorldMap,
+  checkWorldMapEnvelope: checkWorldMapEnvelope,
   validateAreaMapPanel: validateAreaMapPanel,
   validateWorldMapPanel: validateWorldMapPanel,
   validateMapPanel: validateMapPanel,

@@ -24,7 +24,13 @@ from web.webclient.presentation.protocol import (
     JSONSafetyError,
     ProtocolValidationError,
     check_envelope,
+    json_byte_size,
     new_presentation_epoch,
+)
+from web.webclient.presentation.map_panels import (
+    WORLD_MAP_PANEL,
+    carries_intact_world_map,
+    check_world_map_envelope,
 )
 from web.webclient.presentation.registry import PresentationRegistry
 
@@ -184,36 +190,47 @@ class PresentationCoordinator:
             }
 
         candidate = envelope(self._revision + 1, panels)
-        try:
-            check_envelope(candidate)
-        except JSONSafetyError:  # observability: ignore R2: an over-bound map update is the designed trigger for bounded part delivery below
-            pass
-        else:
+        if self._fits_one_frame(candidate):
             self._next_revision()
             self._send(UPDATE_MESSAGE, candidate)
+            self._log_intact_world_map(candidate)
             return candidate
 
         from web.webclient.presentation.map_parts import encode_map_parts
 
         # Build and check every frame before anything is sent or any revision
-        # is consumed, so a failure never leaves a half-published update.
+        # is consumed, so a failure never leaves a half-published update. A
+        # world map that fits the scoped world-map allowance on its own still
+        # travels as one intact frame (transport-world-map-panel); any other
+        # oversized map is a bounded part transfer.
         eager = {name: value for name, value in panels.items() if name not in map_names}
-        planned: list[tuple[str | None, list[dict[str, Any]]]] = []
+        planned: list[tuple[str | None, list[dict[str, Any]], bool]] = []
         if eager:
-            planned.append((None, [eager]))
-        for name in sorted(map_names):
-            planned.append((name, [{name: part} for part in encode_map_parts(name, panels[name])]))
+            planned.append((None, [eager], False))
         base = self._revision
-        for offset, (_, bodies) in enumerate(planned, start=1):
+        for name in sorted(map_names):
+            single = {name: panels[name]}
+            if name == WORLD_MAP_PANEL and self._fits_one_frame(envelope(base + len(planned) + 1, single)):
+                planned.append((name, [single], False))
+            else:
+                planned.append((name, [{name: part} for part in encode_map_parts(name, panels[name])], True))
+        for offset, (name, bodies, parts) in enumerate(planned, start=1):
             for body in bodies:
-                check_envelope(envelope(base + offset, body))
+                if parts or name is None:
+                    check_envelope(envelope(base + offset, body))
+                else:
+                    check_world_map_envelope(envelope(base + offset, body))
         last = None
-        for name, bodies in planned:
+        for name, bodies, parts in planned:
             revision = self._next_revision()
             for body in bodies:
                 self._send(UPDATE_MESSAGE, envelope(revision, body))
             if name is None:
                 last = envelope(revision, eager)
+                continue
+            last = envelope(revision, {name: panels[name]})
+            if not parts:
+                self._log_intact_world_map(last)
                 continue
             log_debug(
                 "map_panel_transfer_sent",
@@ -225,8 +242,44 @@ class PresentationCoordinator:
                     "bytes": bodies[0][name]["part"]["byte_length"],
                 },
             )
-            last = envelope(revision, {name: panels[name]})
         return last
+
+    @staticmethod
+    def _fits_one_frame(candidate: dict[str, Any]) -> bool:
+        """Whether one update frame may carry ``candidate`` intact.
+
+        A frame fits when it passes the generic envelope bounds, or when it
+        carries an intact world map and passes the scoped world-map allowance
+        (everything else generic, the world map within its own ceiling).
+        """
+        try:
+            check_envelope(candidate)
+            return True
+        except JSONSafetyError:  # observability: ignore R2: an over-bound map update is the designed trigger for the scoped world-map check or bounded part delivery
+            pass
+        if not carries_intact_world_map(candidate):
+            return False
+        try:
+            check_world_map_envelope(candidate)
+            return True
+        except ProtocolValidationError:  # observability: ignore R2: a frame outside the world-map allowance falls back to separate companion and part frames
+            return False
+
+    @staticmethod
+    def _log_intact_world_map(frame: dict[str, Any]) -> None:
+        """Debug trace of an intact world-map frame and its canonical size."""
+        body = frame["panels"].get(WORLD_MAP_PANEL)
+        if not isinstance(body, dict) or "part" in body:
+            return
+        log_debug(
+            "world_map_frame_sent",
+            context={
+                "surface": "presentation",
+                "panel": WORLD_MAP_PANEL,
+                "revision": frame["revision"],
+                "bytes": json_byte_size(body),
+            },
+        )
 
     def _send(self, message_name: str, envelope: dict[str, Any]) -> None:
         """Deliver one exact envelope as the only positional transport arg."""
