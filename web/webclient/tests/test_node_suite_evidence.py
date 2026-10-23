@@ -385,6 +385,57 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertRegex(result.stdout, r"Tests\s+\d+ passed \(\d+\)")
         self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
 
+    def _run_single_vitest_file(self, relative: str, label: str) -> None:
+        suite = REPO_ROOT / relative
+        self.assertTrue(suite.is_file(), f"missing Vitest file {suite}")
+        result = subprocess.run(
+            ["npx", "--no-install", "vitest", "run", str(suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"{label} Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        # Exactly the one file ran, every case passed, none skipped or todo.
+        self.assertRegex(result.stdout, r"Test Files\s+1 passed \(1\)")
+        self.assertRegex(result.stdout, r"Tests\s+\d+ passed \(\d+\)")
+        self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
+        "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection",
+    )
+    def test_local_map_island_vitest_evidence_passes(self):
+        # The island cutover (render-auto-scaled-minimap-island) in LocalMap:
+        # current centred in the fixed 240-unit square, the stress room's
+        # exits on the compressed ring with its unlinked neighbour as a
+        # label-free context dot, only labelled routes, the exit-driven
+        # uniform level on the metric frame with far context omitted, exact
+        # bearings when context alone sets a compressed scale, the hysteresis
+        # level kept on one map and reset on another map or layer, and the
+        # 格距 / 距離壓縮 caption beside the unchanged coordinate readout.
+        self._run_single_vitest_file("web/webclient-app/tests/world/local_map.test.js", "local map island")
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
+    )
+    def test_map_lattice_island_renderer_vitest_evidence_passes(self):
+        # The shared renderer's island branch: every same-layer exit of the
+        # metric plaza inside the exit ring with one route each, context as
+        # in-square dots without activation, no cross-layer gate node,
+        # compressed rings with 16-unit labels on the clear diagonal, the
+        # uniform dot field inside a pan group, labels kept inside the
+        # square, and the overlay held off the projection.
+        self._run_single_vitest_file(
+            "web/webclient-app/tests/world/map_lattice_renderer.test.js", "map lattice renderer"
+        )
+
     @covers_requirement(
         "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
     )
