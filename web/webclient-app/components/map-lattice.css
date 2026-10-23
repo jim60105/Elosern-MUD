@@ -389,7 +389,14 @@
   cursor: pointer;
 }
 
-.local-map__stub-button:hover {
+/* A leadered stub label's own hit area, inside its button's hit target. */
+.local-map__stub-hit {
+  position: absolute;
+  border-radius: var(--radius-sm);
+}
+
+.local-map__stub-button:hover,
+.local-map__stub-button:hover .local-map__stub-hit {
   background: var(--gold-glow);
 }
 

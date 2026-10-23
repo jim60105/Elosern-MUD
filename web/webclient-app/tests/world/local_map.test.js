@@ -910,6 +910,72 @@ describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)
     }
   });
 
+  it("ignores a held Enter's repeated activations on the stub button", () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    const button = w.get(".local-map__stub-button").element;
+    const first = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    const held = new KeyboardEvent("keydown", { key: "Enter", repeat: true, bubbles: true, cancelable: true });
+    button.dispatchEvent(first);
+    button.dispatchEvent(held);
+    expect(first.defaultPrevented).toBe(false);
+    expect(held.defaultPrevented).toBe(true);
+  });
+
+  it("sizes the stub button to its arrow and adjacent label only", () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    const style = w.get(".local-map__stub-button").attributes("style");
+    const pct = (key) => Number(style.match(new RegExp(`${key}: ([\\d.]+)%`))[1]) * 2.4;
+    // The 通往 label sits beside the arrow, so one compact box covers both:
+    // its width is the label's monospace measure plus padding, no more.
+    const labelWidth = textCells("通往 西部丘陵與谷地") * CELL_EM * 16;
+    expect(pct("width")).toBeLessThanOrEqual(labelWidth + 4 + 1e-6);
+    expect(pct("height")).toBeLessThanOrEqual(2 * 9 + 3 + 16.8 + 4 + 1e-6);
+    expect(w.find(".local-map__stub-hit").exists()).toBe(false);
+  });
+
+  it("gives a leadered stub label its own hit area instead of a spanning button", () => {
+    // The east gate as the shipped capital presents it: the street exit
+    // west, the gate's far side east on the rim, and the remembered south
+    // gate's name whole on the right edge, so the stub's label is pushed out
+    // onto a leader line.
+    const node = (id, label, x, y, visibility, extra = {}) => ({
+      id, label, x, y, visibility, current: visibility === "current", anchor: false, landmark: false,
+      gateway: null, action: null, ...extra,
+    });
+    const payload = {
+      schema_version: 1, available: true, layer: "grid", current_node: "grid:cap:6500:3010", title: "東門街道圖",
+      nodes: [
+        node("grid:cap:6500:3010", "東門", 6500, 3010, "current", { gateway: { leads_to: "荊棘荒林" } }),
+        node("grid:cap:5380:2850", "東市", 5380, 2850, "visible_unvisited", {
+          action: { kind: "move", exit_ref: "76", destination: "grid:cap:5380:2850" },
+        }),
+        node("grid:cap:4380:3000", "公會前", 4380, 3000, "visible_unvisited"),
+        node("grid:cap:4560:3920", "大神殿前", 4560, 3920, "visible_unvisited"),
+        node("wild:elosern:503:501", "荊棘荒林", 6510, 3010, "visible_visited", {
+          action: { kind: "move", exit_ref: "105", destination: "wild:elosern:503:501" },
+        }),
+        node("grid:cap:3050:150", "荊棘荒林", 3050, 150, "remembered", { landmark: true, gateway: { leads_to: "荊棘荒林" } }),
+      ],
+      edges: [
+        { source: "grid:cap:6500:3010", destination: "grid:cap:5380:2850", label: "w", known: false, traversable: true },
+        { source: "grid:cap:6500:3010", destination: "grid:cap:4380:3000", label: "", known: false, traversable: false },
+        { source: "grid:cap:6500:3010", destination: "grid:cap:4560:3920", label: "", known: false, traversable: false },
+        { source: "grid:cap:6500:3010", destination: "wild:elosern:503:501", label: "e", known: true, traversable: true },
+      ],
+      legend: [],
+    };
+    const w = mountPayload(payload);
+    const stub = w.get(".local-map__stub");
+    expect(stub.find(".local-map__leader").exists()).toBe(true);
+    const style = w.get(".local-map__stub-button").attributes("style");
+    const pct = (key) => Number(style.match(new RegExp(`${key}: ([\\d.]+)%`))[1]) * 2.4;
+    // The button is the arrow's own box (2 × 9 plus padding), and the far
+    // label carries its own hit area inside it.
+    expect(pct("width")).toBeCloseTo(2 * 9 + 4, 6);
+    expect(pct("height")).toBeCloseTo(2 * 9 + 4, 6);
+    expect(w.find(".local-map__stub-button .local-map__stub-hit").exists()).toBe(true);
+  });
+
   it("keeps a locked gateway visible and inert", async () => {
     const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE);
     const stub = w.get(".local-map__stub");

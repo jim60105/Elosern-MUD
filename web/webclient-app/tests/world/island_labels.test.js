@@ -177,4 +177,22 @@ describe("island label candidates", () => {
       expect(p.box.y1).toBeLessThanOrEqual(237 + 1e-6);
     }
   });
+
+  it("still draws an exit label when the whole square is taken", () => {
+    // Every spot is reserved: the exit keeps its truncated block at the
+    // least-overlap spot with a leader line rather than disappearing.
+    const placed = placeIslandLabels({
+      requests: [
+        request("ex", "exit", 120, 120, "舊城牆遺跡", { fallbackLines: [line("舊城牆遺…")] }),
+        request("ctx", "context", 60, 60, "後巷"),
+      ],
+      obstacles: [{ x0: 0, y0: 0, x1: 240, y1: 240, owner: "wall" }],
+    });
+    expect(placed.has("ctx")).toBe(false);
+    const label = placed.get("ex");
+    expect(label.lines[0].text).toBe("舊城牆遺…");
+    expect(label.truncated).toBe(true);
+    expect(label.box.x0).toBeGreaterThanOrEqual(3 - 1e-6);
+    expect(label.box.x1).toBeLessThanOrEqual(237 + 1e-6);
+  });
 });

@@ -189,29 +189,69 @@ function stubLabel(stub) {
   return islandLabels.value.get(`stub:${stub.index}`) ?? null;
 }
 
-// A gateway exit stub's hit box in percent of the 240-unit square: its arrow
-// and its placed label, padded, so the native button covers what it names.
-function stubButtonStyle(stub) {
+// A gateway exit stub's hit boxes in user units: the native button covers
+// its arrow and, while the label sits beside it, the label too. A label set
+// far out on a leader line keeps its own hit box (a child of the button), so
+// the button never spans the unrelated markers between them.
+function stubHitBoxes(stub) {
   const label = stubLabel(stub);
-  let x0 = stub.x - STUB_FOOTPRINT;
-  let y0 = stub.y - STUB_FOOTPRINT;
-  let x1 = stub.x + STUB_FOOTPRINT;
-  let y1 = stub.y + STUB_FOOTPRINT;
-  if (label) {
-    x0 = Math.min(x0, label.box.x0);
-    y0 = Math.min(y0, label.box.y0);
-    x1 = Math.max(x1, label.box.x1);
-    y1 = Math.max(y1, label.box.y1);
-  }
+  const arrow = {
+    x0: stub.x - STUB_FOOTPRINT,
+    y0: stub.y - STUB_FOOTPRINT,
+    x1: stub.x + STUB_FOOTPRINT,
+    y1: stub.y + STUB_FOOTPRINT,
+  };
+  if (!label) return { button: arrow, label: null };
+  if (label.leader) return { button: arrow, label: label.box };
+  return {
+    button: {
+      x0: Math.min(arrow.x0, label.box.x0),
+      y0: Math.min(arrow.y0, label.box.y0),
+      x1: Math.max(arrow.x1, label.box.x1),
+      y1: Math.max(arrow.y1, label.box.y1),
+    },
+    label: null,
+  };
+}
+
+// The button's box in percent of the square, padded and clamped inside it.
+function stubButtonStyle(stub) {
+  const { button } = stubHitBoxes(stub);
   const pad = 2;
   const size = canvasWidth.value || 240;
   const pct = (v) => `${(v / size) * 100}%`;
+  const x0 = Math.max(0, button.x0 - pad);
+  const y0 = Math.max(0, button.y0 - pad);
   return {
-    left: pct(Math.max(0, x0 - pad)),
-    top: pct(Math.max(0, y0 - pad)),
-    width: pct(Math.min(size, x1 + pad) - Math.max(0, x0 - pad)),
-    height: pct(Math.min(size, y1 + pad) - Math.max(0, y0 - pad)),
+    left: pct(x0),
+    top: pct(y0),
+    width: pct(Math.min(size, button.x1 + pad) - x0),
+    height: pct(Math.min(size, button.y1 + pad) - y0),
   };
+}
+
+// A leadered label's own hit box, relative to (and in units of) the button.
+function stubLabelHitStyle(stub) {
+  const { button, label } = stubHitBoxes(stub);
+  if (!label) return null;
+  const pad = 2;
+  const bx0 = Math.max(0, button.x0 - pad);
+  const by0 = Math.max(0, button.y0 - pad);
+  const bw = Math.min(canvasWidth.value || 240, button.x1 + pad) - bx0;
+  const bh = Math.min(canvasWidth.value || 240, button.y1 + pad) - by0;
+  const pctX = (v) => `${(v / bw) * 100}%`;
+  const pctY = (v) => `${(v / bh) * 100}%`;
+  return {
+    left: pctX(label.x0 - pad - bx0),
+    top: pctY(label.y0 - pad - by0),
+    width: pctX(label.x1 - label.x0 + 2 * pad),
+    height: pctY(label.y1 - label.y0 + 2 * pad),
+  };
+}
+
+// A held Enter repeats the platform's click; only the first press moves.
+function onStubKeydown(event) {
+  if (event.key === "Enter" && event.repeat) event.preventDefault();
 }
 
 // A stub activates its own target's move action, exactly once, and never
@@ -892,7 +932,15 @@ defineExpose({
       :style="stubButtonStyle(stub)"
       @click.stop="onStubActivate(stub)"
       @keydown.space.stop
-    ></button>
+      @keydown="onStubKeydown"
+    >
+      <span
+        v-if="stubLabelHitStyle(stub)"
+        class="local-map__stub-hit"
+        :style="stubLabelHitStyle(stub)"
+        aria-hidden="true"
+      ></span>
+    </button>
   </template>
   </div>
 </template>
