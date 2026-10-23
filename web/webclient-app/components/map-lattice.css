@@ -2,21 +2,6 @@
   display: contents;
 }
 
-.local-map__viewport--fit {
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  cursor: grab;
-  touch-action: none;
-}
-
-.local-map__viewport--fit--dragging {
-  cursor: grabbing;
-}
-
 .local-map__dot-field {
   pointer-events: none;
 }
@@ -71,12 +56,10 @@
   fill-opacity: 0.7;
 }
 
-/* The lattice canvas sizes from the model's exported lattice (cols × rows
-   cells) or renders as the fixed square canvasSize or fitted view. */
+/* The island canvas renders as the fixed square `canvasSize`. */
 .local-map__lattice {
   display: block;
-  /* `align-self: center` centres the natural-size canvas whenever the surface
-     is wider than it; a fitted canvas fills the surface instead. */
+  /* `align-self: center` centres the square in a wider surface. */
   align-self: center;
   width: auto;
   height: auto;
@@ -96,23 +79,13 @@
 /* The island's edge-marker name. Its type size is the surface's own declared
    `markerNameFont` step, bound as an inline style (the same policy the node
    label follows) because the SAME number drives the along-edge fit budget and
-   the stacked-column line step in script: a CSS-only size could drift away
-   from the geometry that reserves the name's room. The step is 16 units —
-   the shared legibility floor (retarget-desktop-viewport-contract D7) — for
-   both surfaces, so a name never renders below 16 CSS px at the reference
-   scale. */
+   the rim layout in script: a CSS-only size could drift away from the
+   geometry that reserves the name's room. The step is 16 units — the shared
+   legibility floor (retarget-desktop-viewport-contract D7) — so a name never
+   renders below 16 CSS px at the reference scale. */
 .local-map__edge-marker-name--island {
   font-family: var(--f-mono);
   fill: var(--paper-500);
-}
-
-/* The draft mapcanvas framing (webclient-map-01-draft-chrome D4): the
-   overlay surface paints the dark radial-gradient terrain and the rounded
-   ink frame as pure CSS — no fabricated terrain geometry. */
-.local-map__lattice--canvas {
-  background: radial-gradient(70% 60% at 40% 30%, var(--map-canvas-hi), var(--map-canvas-lo));
-  border: 1px solid var(--ink-600);
-  border-radius: var(--radius);
 }
 
 .local-map__node {
@@ -127,8 +100,8 @@
 
 .local-map__node-label {
   font-family: var(--f-mono);
-  /* The reference step the surface declares (the island and the overlay both
-     pass 16, MapLattice's default is 16): a user unit is a drawn CSS px at
+  /* The reference step the surface declares (the island passes 16, MapLattice's
+     default is 16): a user unit is a drawn CSS px at
      scale 1, so this base never dips below the 16px floor. The live value is
      bound inline from `labelFont`. */
   font-size: 16px;
@@ -205,20 +178,6 @@
   stroke-width: 2;
 }
 
-/* The current-location ring (webclient-map-legibility): one thin seal ring
-   concentric with the current marker, a hairline at any `markerScale`
-   (`non-scaling-stroke`). It replaces the teardrop pin that floated above the
-   marker over the connectors and read as a second place. Decoration only:
-   non-interactive, unlabelled. */
-.local-map__current-ring {
-  fill: none;
-  stroke: var(--seal-light);
-  stroke-width: 1.4;
-  stroke-opacity: 0.8;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
 /* The exit compass's aimed destination (exploration-exit-compass D6): a
    gold ring around the node and a brighter label, so the minimap confirms
    the aim. */
@@ -234,7 +193,7 @@
 }
 
 /* Edge direction markers (map-02 D3b): a non-interactive decoration layer
-   in the gutter. The diamond reuses the remembered-node fill so the off-
+   on the island's rim. The diamond reuses the remembered-node fill so the off-
    canvas place reads with the same state identity; the landmark ring and
    the monospace name follow the node-label precedent (glyphs
    never scale with markerScale). */
@@ -250,11 +209,6 @@
   fill: none;
   stroke: var(--gold-500);
   stroke-width: 1;
-}
-
-.local-map__edge-marker-name {
-  font-family: var(--f-mono);
-  fill: var(--paper-500);
 }
 
 /* Edges form a non-interactive connector layer: they never intercept the

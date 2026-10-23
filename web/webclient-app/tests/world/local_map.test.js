@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
-import MapOverlay from "../../components/MapOverlay.vue";
 import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
@@ -363,13 +362,12 @@ describe("LocalMap (B4 world family)", () => {
   // populated lattice size up to the model's 64×64 bound.
   // ---------------------------------------------------------------------
 
-  it("sizes the 2-col × 64-row lattice canvas from the model's exported lattice", () => {
+  it("draws a 2-wide × 64-tall street on the island's fixed square", () => {
     // The shared helper mirrors the store's localMapModel construction
     // (stores/elosern.js): the reduced model plus the payload's `available`
     // flag and reason.
     const model = localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE);
-    expect(model.cols).toBe(2);
-    expect(model.rows).toBe(64);
+    expect(model.nodes).toHaveLength(64);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
     expect(svg.exists()).toBe(true);
@@ -466,10 +464,8 @@ describe("LocalMap (B4 world family)", () => {
     expect(detail.classes()).toContain("local-map__detail--empty");
   });
 
-  it("keeps the 48-row lattice + 16 remembered nodes within the 64-node bound", () => {
+  it("keeps a 48-node street + 16 remembered nodes within the 64-node bound", () => {
     const model = localMapModelFor(LOCAL_MAP_TALL_REMEMBERED_SAMPLE);
-    expect(model.rows).toBe(48);
-    expect(model.cols).toBe(2);
     expect(model.nodes).toHaveLength(48);
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
@@ -544,27 +540,13 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
   });
 
-  it("MapOverlay renders the shared LocalMap and forwards the move intent", async () => {
-    const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
-    const overlay = mount(MapOverlay, {
-      props: { localMap: model },
-    });
-    expect(overlay.find('[data-testid="local-map__lattice"]').exists()).toBe(true);
-    await overlay.get('[data-testid="local-map__node--grid:altoria:2:1"]').trigger("click");
-    expect(overlay.emitted("move")).toHaveLength(1);
-    expect(overlay.emitted("move")[0][0]).toEqual({
-      exit_ref: "e_altoria_1_1_e",
-      destination: "grid:altoria:2:1",
-    });
-    overlay.unmount();
-  });
-
   it("Task 2.5: declares island geometry on MapLattice mount and renders node labels at its 16-unit step", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     const lattice = w.findComponent({ name: "MapLattice" });
     expect(lattice.exists()).toBe(true);
-    expect(lattice.props("colPitch")).toBe(40);
-    expect(lattice.props("rowPitch")).toBe(40);
+    // The overlay pitch props were removed with the full-map overlay.
+    expect(lattice.props("colPitch")).toBeUndefined();
+    expect(lattice.props("rowPitch")).toBeUndefined();
     expect(lattice.props("labelFont")).toBe(16);
     expect(lattice.props("canvasSize")).toBe(240);
     expect(lattice.props("showAxis")).toBe(true);
@@ -662,12 +644,7 @@ function nodeCenter(wrapper, id) {
     // exits (100 m east, 141 m north-east → level 200, radii 50 and 70.7),
     // keeps exact bearings, omits the far context that would land off the
     // square, and draws only the two labelled routes from the current node.
-    // The overlay keeps the model's 1:9 lattice (map_overlay and browser
-    // evidence).
     const model = localMapModelFor(METRIC_PAYLOAD);
-    expect(model.cell).toBe(100);
-    expect(model.cols).toBe(11);
-    expect(model.rows).toBe(66);
     wrapper = mount(LocalMap, { props: { localMap: model } });
 
     const origin = nodeCenter(wrapper, "grid:metric:0:0");

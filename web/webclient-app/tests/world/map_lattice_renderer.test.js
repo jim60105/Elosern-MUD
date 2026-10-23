@@ -5,6 +5,7 @@ import LocalMapModel from "../../lib/local_map.js";
 import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_INSTANCE_SAMPLE,
+  LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
   LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
@@ -15,7 +16,6 @@ import {
   localMapModelFor,
 } from "../../stories/fixtures.js";
 import {
-  OVERLAY_PROPS,
   mountLattice as mountLatticeShared,
 } from "./map_lattice_support.js";
 
@@ -42,15 +42,11 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
   it("renders identical node/edge/legend content at the island's default scale", () => {
     const w = mountLattice();
-    // The grid fixture's in-view lattice: 3 cols × 1 row. The 16-unit labels
-    // raise the declared 58-unit column pitch to 65 — ((8 + 4) / 2 × CELL_EM
-    // + 0.5) × 16 = 65 — and the remembered fixture node (5, 5) sits outside
-    // the in-view extent, so the island grows an edge-marker gutter around the
-    // natural 195×58 canvas (map-02 D3b; the model's name-free gutter for this
-    // fixture is 26.4558…).
+    // A bare mount is the island's fixed 240-unit square; the remembered
+    // fixture node (5, 5) outside the in-view extent stands on its rim.
     const svg = w.find("svg.local-map__lattice");
-    expect(Number(svg.attributes("width"))).toBeCloseTo(247.91168824543144, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(131.91168824543144, 6);
+    expect(Number(svg.attributes("width"))).toBe(240);
+    expect(Number(svg.attributes("height"))).toBe(240);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     // The payload lists 3 edges, but the third one ends at the remembered
     // node (grid:altoria:5:5), whose endpoint is not on the canvas — the
@@ -62,186 +58,6 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
     expect(edgeMarker.attributes("aria-hidden")).toBe("true");
     expect(edgeMarker.find("text").exists()).toBe(false);
-  });
-
-  it("renders identical node/edge/legend content at the overlay's larger scale", () => {
-    const w = mountLattice(OVERLAY_PROPS);
-    const svg = w.find("svg.local-map__lattice");
-    // The natural canvas is 3 × 280px wide, 1 × 280px row pitch + 14px
-    // label band (one uniform pitch on both axes); the edge-marker gutter (model value 271.6480… at the
-    // overlay's name-bearing geometry, whose outward name box is 22
-    // monospace cells at 16) grows it on every side (map-02 D3b).
-    const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 16 + 2;
-    expect(Number(svg.attributes("width"))).toBeCloseTo(840 + 2 * expectedGutter, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(294 + 2 * expectedGutter, 6);
-    expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
-    expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
-    // webclient-full-map-fit-view D6: an overlay-scale mount without
-    // fitView draws at the canvas's natural size — no inline style at all
-    // (the legend moved to the overlay's popover, so none renders here).
-    expect(svg.element.style.cssText).toBe("");
-    // At the overlay's scale the marker carries its place name and an
-    // accessible name (the overlay has no remembered list).
-    const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
-    expect(edgeMarker.attributes("aria-hidden")).toBeUndefined();
-    expect(edgeMarker.attributes("aria-label")).toBe("舊街區");
-    expect(edgeMarker.find("text").text()).toBe("舊街區");
-  });
-
-  // webclient-full-map-fit-view D1/D4: with fitView the SVG fills its
-  // clipped viewport and its viewBox is the view window. Before any layout
-  // (jsdom measures no viewport box) the view is null and the window is the
-  // whole canvas, which under `meet` is also a fitted rendering.
-  it("fitView fills its viewport and windows the whole canvas before layout", () => {
-    const w = mountLattice({ ...OVERLAY_PROPS, fitView: true });
-    const svg = w.get("svg.local-map__lattice");
-    expect(svg.element.style.width).toBe("100%");
-    expect(svg.element.style.height).toBe("100%");
-    const W = Number(svg.attributes("width"));
-    const H = Number(svg.attributes("height"));
-    expect(svg.attributes("viewBox")).toBe(`0 0 ${W} ${H}`);
-    expect(w.get(".local-map__viewport").classes()).toContain("local-map__viewport--fit");
-  });
-
-  // webclient-full-map-fit-view D3: a primary-button drag past the
-  // threshold pans the view and its trailing click is suppressed, so a
-  // drag that ends on a node never submits that node's move. A press that
-  // stays within the threshold is an ordinary click and still moves.
-  it("a drag past the threshold never emits move", async () => {
-    const w = mountLattice({ ...OVERLAY_PROPS, fitView: true });
-    const node = w.get('[data-testid="local-map__node--grid:altoria:2:2"]');
-    await node.trigger("pointerdown", { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
-    await node.trigger("pointermove", { pointerId: 1, clientX: 112, clientY: 100 });
-    await node.trigger("pointerup", { pointerId: 1, clientX: 112, clientY: 100 });
-    await node.trigger("click");
-    expect(w.emitted("move")).toBeUndefined();
-
-    await node.trigger("pointerdown", { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
-    await node.trigger("pointermove", { pointerId: 2, clientX: 102, clientY: 100 });
-    await node.trigger("pointerup", { pointerId: 2, clientX: 102, clientY: 100 });
-    await node.trigger("click");
-    expect(w.emitted("move")).toHaveLength(1);
-  });
-
-  it("keeps node markers and labels non-intersecting at the overlay's scale", () => {
-    const w = mountLattice(OVERLAY_PROPS);
-
-    // Node centers from the model's col/row + the overlay's one uniform
-    // pitch (280 on both axes, rows=1): centers are col*280+140 and
-    // (1-1-row)*280+140, shifted by the edge-marker gutter the model
-    // computes for this exact geometry (map-02 D3b — the renderer and the
-    // test derive the gutter from the same model call, pinning their
-    // composition; relative node geometry is gutter-invariant).
-    const gutter = LocalMapModel.edgeMarkersFor(
-      LOCAL_MAP_SAMPLE.nodes.filter((n) => n.visibility !== "remembered"),
-      LOCAL_MAP_SAMPLE.nodes.filter((n) => n.visibility === "remembered"),
-      {
-        canvasWidth: 3 * 280,
-        canvasHeight: 280 + 14,
-        current: { x: 420, y: 140 },
-        markerHalf: 9 * 4.83,
-        nameWidth: 22 * CELL_EM * 16,
-        nameHeight: 16,
-      },
-    ).gutter;
-    const centers = {
-      "grid:altoria:1:2": { x: 420 + gutter, y: 140 + gutter },
-      "grid:altoria:2:2": { x: 700 + gutter, y: 140 + gutter },
-      "grid:altoria:0:2": { x: 140 + gutter, y: 140 + gutter },
-    };
-    for (const [id, center] of Object.entries(centers)) {
-      const node = w.get(`[data-testid="local-map__node--${id}"]`);
-      expect(node.attributes("transform")).toBe(
-        `translate(${String(center.x)}, ${String(center.y)})`,
-      );
-    }
-
-    // Marker footprints in pre-scale units at markerScale 4.83 (draft
-    // ladder, webclient-map-01-draft-chrome D2): the current seal circle
-    // r=8 with a 2px stroke → half-extent 8×4.83+1; the unvisited hollow
-    // dot r=4.5 + stroke 2 → 4.5×4.83+1; the visited ink dot r=4.5 +
-    // stroke 1 → 4.5×4.83+0.5. The gold landmark ring and the actionable
-    // halo are same-node decorations, not markers — excluded here (they sit
-    // within the same footprint as their node's marker).
-    const CURRENT_HALF = 8 * 4.83 + 1;
-    const UNVISITED_HALF = 4.5 * 4.83 + 1;
-    const VISITED_HALF = 4.5 * 4.83 + 0.5;
-    const markerBoxes = {
-      "grid:altoria:1:2": { x1: centers["grid:altoria:1:2"].x - CURRENT_HALF, y1: centers["grid:altoria:1:2"].y - CURRENT_HALF, x2: centers["grid:altoria:1:2"].x + CURRENT_HALF, y2: centers["grid:altoria:1:2"].y + CURRENT_HALF },
-      "grid:altoria:2:2": { x1: centers["grid:altoria:2:2"].x - UNVISITED_HALF, y1: centers["grid:altoria:2:2"].y - UNVISITED_HALF, x2: centers["grid:altoria:2:2"].x + UNVISITED_HALF, y2: centers["grid:altoria:2:2"].y + UNVISITED_HALF },
-      "grid:altoria:0:2": { x1: centers["grid:altoria:0:2"].x - VISITED_HALF, y1: centers["grid:altoria:0:2"].y - VISITED_HALF, x2: centers["grid:altoria:0:2"].x + VISITED_HALF, y2: centers["grid:altoria:0:2"].y + VISITED_HALF },
-    };
-    // Node labels: baseline at the scaled offset (11×4.83 + 2 + 16 ≈ 71.1px
-    // below the node origin); the 16px monospace line box is modelled as
-    // 15.27px above and 4.36px below the baseline (the old 11px model's
-    // 10.5 / 3 scaled by 16/11). The drawn label is measured in monospace
-    // cells of CELL_EM × 16 (a wide glyph is two cells, the truncation "…"
-    // one).
-    const LABEL_ASCENT = (10.5 * 16) / 11;
-    const LABEL_DESCENT = (3 * 16) / 11;
-    const labelY = 11 * 4.83 + 2 + 16;
-    function labelBox(id) {
-      const center = centers[id];
-      const node = w.get(`[data-testid="local-map__node--${id}"]`);
-      // The drawn text only: the element also holds the full name's <title>.
-      const textEl = node.find(".local-map__node-label").element;
-      const label = Array.from(textEl.childNodes)
-        .filter((n) => n.nodeType === Node.TEXT_NODE)
-        .map((n) => n.textContent)
-        .join("")
-        .trim();
-      const width = textCells(label) * CELL_EM * 16;
-      return {
-        x1: center.x - width / 2,
-        y1: center.y + labelY - LABEL_ASCENT,
-        x2: center.x + width / 2,
-        y2: center.y + labelY + LABEL_DESCENT,
-      };
-    }
-    const labelBoxes = {
-      "grid:altoria:1:2": labelBox("grid:altoria:1:2"),
-      "grid:altoria:2:2": labelBox("grid:altoria:2:2"),
-      "grid:altoria:0:2": labelBox("grid:altoria:0:2"),
-    };
-
-    function separated(a, b) {
-      return (
-        a.x2 + 2 <= b.x1 ||
-        b.x2 + 2 <= a.x1 ||
-        a.y2 + 2 <= b.y1 ||
-        b.y2 + 2 <= a.y1
-      );
-    }
-    function checkAll(boxes) {
-      const ids = Object.keys(boxes);
-      for (let i = 0; i < ids.length; i += 1) {
-        for (let j = i + 1; j < ids.length; j += 1) {
-          expect(
-            separated(boxes[ids[i]], boxes[ids[j]]),
-            `${ids[i]} vs ${ids[j]} must keep a ≥2px gap at the overlay's scale`,
-          ).toBe(true);
-        }
-      }
-      for (const id of Object.keys(boxes)) {
-        for (const labelId of Object.keys(labelBoxes)) {
-          expect(
-            separated(markerBoxes[id], labelBoxes[labelId]),
-            `marker ${id} vs label ${labelId} must keep a ≥2px gap`,
-          ).toBe(true);
-        }
-      }
-    }
-    checkAll(markerBoxes);
-
-    // Connector edges stay visible: the center-to-center span (280px
-    // horizontal) minus the two scaled marker footprints (current 9×4.83,
-    // unvisited 5.5×4.83) leaves a positive visible segment.
-    const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(Number(e0.attributes("x1"))).toBeCloseTo(420 + gutter, 6);
-    expect(Number(e0.attributes("y1"))).toBeCloseTo(140 + gutter, 6);
-    expect(Number(e0.attributes("x2"))).toBeCloseTo(700 + gutter, 6);
-    expect(Number(e0.attributes("y2"))).toBeCloseTo(140 + gutter, 6);
-    expect(280 - (8 + 1) * 4.83 - (4.5 + 1) * 4.83).toBeGreaterThan(0);
   });
 
   it("emits select on every node activation and move only for an exact move action", async () => {
@@ -272,90 +88,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(w.emitted("leave")).toHaveLength(1);
   });
 
-  it("renders the wilderness fixture content at both scales", () => {
-    const island = mount(MapLattice, {
-      props: { localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) },
-    });
-    const overlay = mount(MapLattice, {
-      props: { localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE), ...OVERLAY_PROPS },
-    });
-    const islandNodes = island.findAll('[data-testid^="local-map__node--"]');
-    const overlayNodes = overlay.findAll('[data-testid^="local-map__node--"]');
-    expect(islandNodes.length).toBe(overlayNodes.length);
-    expect(island.findAll('[data-testid^="local-map__edge--"]').length).toBe(
-      overlay.findAll('[data-testid^="local-map__edge--"]').length,
-    );
-  });
-
-  // ---------------------------------------------------------------------
-  // webclient-map-01-draft-chrome: the overlay chrome (design D4) — the
-  // mapcanvas framing class and the current-location ring — plus the shared draft
-  // adornments (gold landmark ring, dot-chip legend).
-  // ---------------------------------------------------------------------
-
-  it("paints the mapcanvas framing only under overlayChrome", () => {
-    const island = mountLattice();
-    expect(island.get("svg.local-map__lattice").classes()).not.toContain("local-map__lattice--canvas");
-    island.unmount();
-    const overlay = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
-    expect(overlay.get("svg.local-map__lattice").classes()).toContain("local-map__lattice--canvas");
-  });
-
-  it("rings the current marker only under overlayChrome, inside the current node's own group", () => {
-    const island = mountLattice();
-    expect(island.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
-    island.unmount();
-
-    const overlay = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
-    const rings = overlay.findAll('[data-testid="local-map__current-ring"]');
-    expect(rings).toHaveLength(1);
-    // One footprint (webclient-map-legibility): the ring is a child of the
-    // current node's group, so it shares the marker's translate and centre and
-    // cannot float over a connector as the teardrop pin did.
-    const currentGroup = overlay.get('[data-testid="local-map__node--grid:altoria:1:2"]');
-    expect(currentGroup.find('[data-testid="local-map__current-ring"]').exists()).toBe(true);
-    const ring = rings[0];
-    expect(ring.attributes("cx")).toBeUndefined();
-    expect(ring.attributes("cy")).toBeUndefined();
-    expect(Number(ring.attributes("r"))).toBeCloseTo(10.5 * 4.83, 6);
-    // Wider than the marker, narrower than the label's top at this scale.
-    const marker = currentGroup.get('[data-testid="local-map__marker--current"]');
-    expect(Number(ring.attributes("r"))).toBeGreaterThan(Number(marker.attributes("r")));
-    // A decoration of the marker, not a marker: the geometry audit pairs only
-    // `.local-map__marker` boxes, and it never announces.
-    expect(ring.classes()).not.toContain("local-map__marker");
-    expect(ring.attributes("aria-hidden")).toBe("true");
-    expect(overlay.find(".local-map__pin").exists()).toBe(false);
-  });
-
-  it("keeps the ring a non-interactive hairline at any marker scale", () => {
-    const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
-    let rule = null;
-    for (const sheet of document.styleSheets) {
-      for (const candidate of sheet.cssRules) {
-        if (candidate.selectorText?.includes(".local-map__current-ring")) rule = candidate.cssText;
-      }
-    }
-    expect(rule, "the ring rule is in the component's injected style sheet").toContain(
-      "vector-effect: non-scaling-stroke",
-    );
-    expect(rule).toContain("pointer-events: none");
-    w.unmount();
-  });
-
-  it("renders no ring when the payload carries no current node", () => {
-    const model = localMapModelFor(LOCAL_MAP_SAMPLE);
-    const noCurrent = {
-      ...model,
-      nodes: model.nodes.map((n) => (n.visibility === "current" ? { ...n, visibility: "visible_visited" } : n)),
-    };
-    const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true, localMap: noCurrent });
-    expect(w.findAll('[data-testid="local-map__current-ring"]')).toHaveLength(0);
-  });
 });
 
 // render-auto-scaled-minimap-island: the fixed-canvas lattice island draws
-// the automatic projection; the overlay and graph variants never project.
+// the automatic projection; the graph variant never projects.
 describe("MapLattice island projection (render-auto-scaled-minimap-island)", () => {
   let wrapper;
 
@@ -365,7 +101,7 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     document.body.innerHTML = "";
   });
 
-  const ISLAND = { canvasSize: 240, colPitch: 40, rowPitch: 40, showAxis: true, fogVignette: true, markerNames: true };
+  const ISLAND = { canvasSize: 240, showAxis: true, fogVignette: true, markerNames: true };
 
   function centreOf(w, id) {
     const [x, y] = w
@@ -484,16 +220,16 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     expect(field.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);
   });
 
-  it("holds the overlay and graph variants off the projection", () => {
-    const overlay = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE), ...OVERLAY_PROPS } });
-    // The overlay keeps the model's complete lattice: every in-view node,
-    // its pattern dot field and every payload edge.
-    const inView = LOCAL_MAP_ALTORIA_PLAZA_SAMPLE.nodes.filter((node) => node.visibility !== "remembered");
-    expect(overlay.findAll(".local-map__node")).toHaveLength(inView.length);
-    expect(overlay.find("defs pattern").exists()).toBe(true);
-    expect(overlay.find(".local-map__node--context").exists()).toBe(false);
-    expect(overlay.findAll(".local-map__edge")).toHaveLength(LOCAL_MAP_ALTORIA_PLAZA_SAMPLE.edges.length);
-    overlay.unmount();
+  it("holds the graph variant off the projection", () => {
+    const model = localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE);
+    const graph = mount(MapLattice, { props: { localMap: model, variant: "graph" } });
+    // The radial graph draws every placed room at its radial position: no
+    // context tier, no world-anchored dot field and no distance rings.
+    expect(graph.findAll(".local-map__node")).toHaveLength(model.radial.nodes.length);
+    expect(graph.find(".local-map__node--context").exists()).toBe(false);
+    expect(graph.find('[data-testid="local-map__dot-field"]').exists()).toBe(false);
+    expect(graph.find('[data-testid="local-map__rings"]').exists()).toBe(false);
+    graph.unmount();
   });
 
   it("keeps every island label inside the square", () => {

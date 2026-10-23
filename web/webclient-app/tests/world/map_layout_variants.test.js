@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapLattice from "../../components/MapLattice.vue";
-import MapOverlay from "../../components/MapOverlay.vue";
 import LocalMapModel from "../../lib/local_map.js";
 import {
   LOCAL_MAP_INTERIOR_SAMPLE,
@@ -16,7 +15,7 @@ import {
 // Layout variants (webclient-map-02-layout-variants task 7.1): the surfaces
 // resolve their drawing convention from the committed payload's layer through
 // the model's `layoutVariant` — grid/wilderness payloads draw the rank-
-// compressed lattice (plus the edge direction markers for remembered places
+// projected island (plus the edge direction markers for remembered places
 // strictly outside the in-view extent), instance/interior payloads draw the
 // model's radial placement. Nothing else may select the layout: there is no
 // control of any kind on either surface.
@@ -34,15 +33,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
     wrapper = mount(MapLattice, { props });
     return wrapper;
   }
-
-  const OVERLAY_PROPS = {
-    colPitch: 280,
-    rowPitch: 212,
-    labelMax: 10,
-    markerScale: 4.83,
-    overlayChrome: true,
-    markerNames: true,
-  };
 
   it("draws the same committed content in both layouts (model-selected)", () => {
     // The lattice payload: every in-view node, its legend, and its actions
@@ -63,26 +53,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(w2.findAll('[data-testid^="local-map__edge--"]')).toHaveLength(graph.edges.length);
     // The interior payload's actionable node keeps its halo and move action.
     expect(w2.findAll('[data-testid="local-map__actionable"]')).toHaveLength(1);
-  });
-
-  it("rings exactly the current marker in both layouts", () => {
-    for (const sample of [LOCAL_MAP_SAMPLE, LOCAL_MAP_INTERIOR_SAMPLE]) {
-      const model = localMapModelFor(sample);
-      const w = mountLattice({
-        localMap: model,
-        variant: model.layoutVariant,
-        overlayChrome: true,
-        ...(model.layoutVariant === "graph" ? {} : OVERLAY_PROPS),
-      });
-      const rings = w.findAll('[data-testid="local-map__current-ring"]');
-      expect(rings, model.layer).toHaveLength(1);
-      // The ring lives in the current node's own group: one position claim.
-      const current = model.nodes.find((node) => node.visibility === "current");
-      const group = w.get(`[data-testid="local-map__node--${current.id}"]`);
-      expect(group.find('[data-testid="local-map__current-ring"]').exists(), model.layer).toBe(true);
-      w.unmount();
-      wrapper = null;
-    }
   });
 
   it("live-swaps an interior payload replacement to the radial layout", async () => {
@@ -175,7 +145,7 @@ describe("map layout variants (B4 world family, map-02)", () => {
     expect(wrapper.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(0);
   });
 
-  it("exposes marker names only at the overlay scale (island keeps the mirror canonical)", () => {
+  it("keeps the island's edge markers decorative (the mirror stays canonical)", () => {
     const model = localMapModelFor(LOCAL_MAP_SAMPLE);
     // Island scale (no overlay chrome): the marker is aria-hidden, name-free.
     const island = mountLattice({ localMap: model, variant: "lattice" });
@@ -188,24 +158,16 @@ describe("map layout variants (B4 world family, map-02)", () => {
     ).toBe(false, "MapLattice alone has no mirror — LocalMap owns it");
     island.unmount();
     wrapper = null;
-    // Overlay scale: visible name + accessible name on the decoration.
-    const overlay = mountLattice({ localMap: model, variant: "lattice", ...OVERLAY_PROPS });
-    const overlayMarker = overlay.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
-    expect(overlayMarker.attributes("aria-label")).toBe("舊街區");
-    expect(overlayMarker.find("text").text()).toBe("舊街區");
   });
 
-  it("renders no layout control of any kind on either surface", () => {
-    // The withdrawn switch design must leave no residue: neither the island
-    // nor the overlay chrome may contain a segmented control, button, menu
-    // item, or testid suggesting a layout toggle.
+  it("renders no layout control of any kind on the island", () => {
+    // The withdrawn switch design must leave no residue: the island may not
+    // contain a segmented control, button, menu item, or testid suggesting a
+    // layout toggle.
     const island = mount(LocalMap, {
       props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
     });
-    const overlay = mount(MapOverlay, {
-      props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
-    });
-    for (const [name, w] of [["island", island], ["overlay", overlay]]) {
+    for (const [name, w] of [["island", island]]) {
       const controls = w
         .findAll("button, [role='button'], [role='radio'], [role='tab'], .seg")
         .filter((el) => {

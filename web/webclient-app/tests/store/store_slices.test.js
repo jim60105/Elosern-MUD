@@ -169,11 +169,10 @@ describe("store view slices", () => {
     const model = store.view.localMapModel;
     expect(model).not.toEqual(null);
     // The model is the preserved LocalMap render model over the committed
-    // panel: the bounded layout lattice for the in-view field, the edge and
+    // panel: the in-view field at its payload coordinates, the edge and
     // legend lists, and the remembered remote nodes.
     expect(model.nodes.length).toBe(3);
-    expect(model.cols).toBe(2);
-    expect(model.rows).toBe(2);
+    expect(model.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))).toBe(true);
     expect(model.currentNode).toBe("room:42");
     expect(model.title).toBe("石板廣場");
     expect(model.edges.length).toBe(2);

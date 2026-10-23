@@ -6,12 +6,8 @@
 // geometry group's edge-marker set and name-box bound explicitly; emits are
 // passed through from the SFC.
 import { computed } from "vue";
-import { LABEL_BASELINE_HALF, MARKER_DIAMOND_HALF } from "./use-map-lattice-geometry.js";
+import { LABEL_BASELINE_HALF } from "./use-map-lattice-geometry.js";
 import { CELL_EM, charCells } from "../lib/mono_cells.js";
-
-// One line step per glyph: the island's left/right names stack one glyph per
-// line, so each glyph costs one type step however wide it draws.
-const oneStep = () => 1;
 
 function measureOf(chars, measure) {
   let total = 0;
@@ -58,7 +54,7 @@ export function fitMarkerName(label, budget, measure = charCells) {
 }
 
 export function useMapLatticeRender(props, emit, geometry) {
-  const { activeEdgeMarkers, outwardNameCells } = geometry;
+  const { activeEdgeMarkers } = geometry;
 
   const fittedEdgeMarkers = computed(() => {
     const markers = activeEdgeMarkers.value.markers || [];
@@ -70,22 +66,14 @@ export function useMapLatticeRender(props, emit, geometry) {
       }));
     }
 
+    // The island's rim markers carry an unbounded span (their names are laid
+    // out whole by the geometry's rim layout); a bounded span is budgeted in
+    // whole monospace cells (the epsilon keeps an exact fit from flooring
+    // one cell short).
     const fittedList = markers.map((m) => {
       const span = m.span || 0;
-      const sideways = m.side === "left" || m.side === "right";
-      // The island stacks left/right names one glyph per line, so their
-      // budget is in type steps; every other name is one horizontal line
-      // budgeted in whole monospace cells (the epsilon keeps an exact fit
-      // from flooring one cell short).
-      const stacked = sideways && !props.overlayChrome;
-      const drawsOutward = outwardNameCells.value > 0 && sideways;
-      const budget = stacked
-        ? Math.floor(span / props.markerNameFont)
-        : Math.min(
-            Math.floor(span / (CELL_EM * props.markerNameFont) + 1e-9),
-            drawsOutward ? outwardNameCells.value : Infinity,
-          );
-      const fitted = fitMarkerName(m.name, budget, stacked ? oneStep : charCells);
+      const budget = Math.floor(span / (CELL_EM * props.markerNameFont) + 1e-9);
+      const fitted = fitMarkerName(m.name, budget, charCells);
       return {
         ...m,
         visibleName: fitted,
@@ -171,66 +159,11 @@ export function useMapLatticeRender(props, emit, geometry) {
     }
   }
 
-  // Edge-marker name placement (map-02 D4 wording): the name box is drawn
-  // OUTWARD from the diamond's outer tip — never toward the canvas. The
-  // name's monospace glyph line does not scale with the markers (same policy
-  // as the node labels), so the offset is the scaled rotated-diamond axial
-  // reach plus the 2-unit model margin and one ascent to the baseline at the
-  // surface's declared 16-unit name step (retarget-desktop-viewport-contract
-  // D7; the old 11 was that step's 11px ascent).
-  const MARKER_NAME_ASCENT = 16;
-  function markerOutset() {
-    return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
-  }
-  // The island's rim markers (render-auto-scaled-minimap-island) draw their
-  // whole names from the geometry's rim layout (`marker.rimName`), not here.
-  function markerNameX(marker) {
-    if (props.overlayChrome) {
-      if (marker.side === "left") return -markerOutset();
-      if (marker.side === "right") return markerOutset();
-      return 0;
-    }
-    if (marker.side === "top" || marker.side === "bottom") return 0;
-    const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
-    const bandCenter = reach + 9;
-    return marker.side === "left" ? -bandCenter : bandCenter;
-  }
-  function markerNameY(marker) {
-    if (props.overlayChrome) {
-      if (marker.side === "top") return -(markerOutset() + MARKER_NAME_ASCENT);
-      if (marker.side === "bottom") return markerOutset() + MARKER_NAME_ASCENT;
-      return 4;
-    }
-    const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
-    // The name sits in the band, clear of the diamond's axial reach by the same
-    // 4-unit gap on either horizontal edge: above the marker on `top` (the
-    // baseline, so the ascent grows outward), below it on `bottom` (one type
-    // step past the gap, so the whole line clears the diamond).
-    if (marker.side === "top") return -(reach + 4);
-    if (marker.side === "bottom") return reach + 4 + props.markerNameFont;
-    // Vertical edges stack one glyph per line, so the column is centred on the
-    // marker by lifting it half its own height and dropping the first baseline
-    // by roughly half a glyph's ascent.
-    const k = marker.glyphs?.length || 1;
-    return -((k - 1) * props.markerNameFont) / 2 + props.markerNameFont * 0.36;
-  }
-  function markerNameAnchor(marker) {
-    if (props.overlayChrome) {
-      if (marker.side === "left") return "end";
-      if (marker.side === "right") return "start";
-      return "middle";
-    }
-    return "middle";
-  }
-
   return {
     fittedEdgeMarkers,
     labelY,
     labelTier,
     edgeClass,
     activateNode,
-    markerNameX,
-    markerNameY,
-    markerNameAnchor,
   };
 }

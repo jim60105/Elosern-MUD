@@ -1,13 +1,11 @@
 <script setup>
-// MapLattice (webclient-full-map-fit-view design D1): the shared `local_map`
-// lattice renderer. Extracted from `LocalMap.vue` so the minimap island
-// (`LocalMap.vue`) and the full-map overlay (`MapOverlay.vue`) share one
-// node/marker/edge/label rendering logic, parameterized by scale
-// props rather than the island's fixed constants. The full-map overlay
-// declares a fitted view (`fitView: true`); the island keeps its
-// selection state and detail line; this component owns only the stateless
-// lattice rendering and emits `select`/`hover`/`leave`/`move` so each
-// caller drives its own chrome.
+// MapLattice: the minimap island's `local_map` renderer, extracted from
+// `LocalMap.vue`. It owns only the stateless island drawing (the automatic
+// projection on coordinate-bearing layers, the radial graph on
+// coordinate-free ones) and emits `select`/`hover`/`leave`/`move` so the
+// island drives its own chrome. The full map is the map drawer's area and
+// world views (redesign-map-drawer); the old full-map overlay branch of this
+// renderer (its fitted view, pitch fit and overlay chrome) was removed.
 //
 // The geometry and presentation math lives in the sibling composables
 // (use-map-lattice-geometry.js / use-map-lattice-render.js); every binding
@@ -21,7 +19,7 @@
 // placement (a FLIP offset; `lib/map_pan.js`). Only the drawing's two pan
 // groups move — edges and axis; the node groups — as one rigid shape,
 // and they carry the `.map-lattice__pan` transform only with `panOnMove`, so
-// the full map's drawing has no CSS transform at all. Nodes, names, and click
+// a bare mount's drawing has no CSS transform at all. Nodes, names, and click
 // targets carry the new placement from the commit on. The dot field, the fog, and the gutter's
 // edge-direction markers stay put. Travel is multiplied by `--motion-travel`,
 // so the reduced and off levels show the new placement at once.
@@ -48,28 +46,18 @@ import {
   STUB_FOOTPRINT,
 } from "../composables/use-map-lattice-geometry.js";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
-import { useMapView } from "../composables/use-map-view.js";
+import { CANVAS_SIZE } from "../lib/minimap_projection.js";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (the available form or the
   // registry-owned unavailable form).
   localMap: { type: Object, required: true },
-  // Lattice geometry. The defaults are the minimap's post-crowding-fix
-  // values; the full-map overlay passes a larger set sized to the overlay
-  // body's available width (900px host cap minus 52px of padding ≈ 848px).
-  // Both are declared minimums and the drawn lattice cell is square: the
-  // larger of the two binds both axes, because a coordinate-bearing map is
-  // projected at one uniform physical scale (project-metric-local-maps).
-  colPitch: { type: Number, default: 58 },
-  rowPitch: { type: Number, default: 44 },
+  // Glyphs a radial (graph) island label shows before its ellipsis.
   labelMax: { type: Number, default: 4 },
   // Uniform multiplier over every lattice marker's base geometry, so all
   // visibility states scale together and inherit the crowding fix's
   // non-collision spacing at any scale.
   markerScale: { type: Number, default: 1 },
-  // Fitted view (webclient-full-map-fit-view design D1): when set, the SVG fills
-  // a clipped viewport box and its viewBox becomes a window over the unchanged drawing.
-  fitView: { type: Boolean, default: false },
   // Type size for node labels (SVG user units). Defaults to 16 for bare
   // mounts; the island and the overlay both pass 16 — the shared legibility
   // floor (retarget-desktop-viewport-contract D7), so a drawn node label never
@@ -90,21 +78,15 @@ const props = defineProps({
   // glyph, so a divisor that disagreed with the drawn size would either
   // overflow the marker's slot or truncate names that had room to spare.
   markerNameFont: { type: Number, default: 16 },
-  // Fixed square canvas size (CSS px, design D1): when set, the canvas
-  // renders as a fixed square of exactly this size and its viewBox side is at
-  // least this size so scale never exceeds 1.
-  canvasSize: { type: Number, default: null },
+  // The island's fixed square (CSS px at the reference scale, multiplied by
+  // the chrome factor); the viewBox is the same square in user units.
+  canvasSize: { type: Number, default: CANVAS_SIZE },
   // Knowledge-edge vignette (island-only opt-in): radial gradient wash.
   fogVignette: { type: Boolean, default: false },
   // Axis cross (island-only opt-in): drawn through current node.
   showAxis: { type: Boolean, default: false },
-  // Draft overlay chrome (webclient-map-01-draft-chrome design D4): the
-  // full-map surface paints its canvas in the `mapcanvas` treatment and
-  // rings the current marker (webclient-map-legibility). Off on the minimap
-  // island; only the overlay passes it.
-  overlayChrome: { type: Boolean, default: false },
+  // Draw the island's remembered edge-marker names (whole, on the rim).
   markerNames: { type: Boolean, default: false },
-  edgeMarkers: { type: Object, default: null },
   // Layout variant (webclient-map-02-layout-variants D2/D3): "lattice" draws
   // the model's metric grid placement, "graph" draws the model's
   // radial (D1) placement. Both surfaces pass `model.layoutVariant` — the
@@ -112,8 +94,7 @@ const props = defineProps({
   // it changes coordinate sourcing ONLY: markers, edges, labels, legend,
   // activation, focus, and accessible names stay the shared wave-1 renderer.
   variant: { type: String, default: "lattice" },
-  // Pan the drawing from the previous current node on a move (the minimap
-  // island only; the full-map overlay owns its own view and never pans).
+  // Pan the drawing from the previous current node on a move.
   panOnMove: { type: Boolean, default: false },
   // The EFFECTIVE motion level (`store.view.motionLevel`,
   // webclient-scene-transitions D1): at `off` the transition has no CSS
@@ -133,7 +114,6 @@ const props = defineProps({
 const emit = defineEmits(["select", "hover", "leave", "move"]);
 
 const uid = useId();
-const patternId = computed(() => `map-lattice-grid-${uid}`);
 const fogId = computed(() => `map-lattice-fog-${uid}`);
 
 const geometry = useMapLatticeGeometry(props);
@@ -144,10 +124,6 @@ const {
   canvasWidth,
   canvasHeight,
   viewBox,
-  effectiveColPitch,
-  effectiveRowPitch,
-  dotCx,
-  dotCy,
   latticeStyle,
   currentPos,
   isGraph,
@@ -289,51 +265,11 @@ function onNodeActivate(node) {
   activateNode(node);
 }
 
-const {
-  fittedEdgeMarkers,
-  labelY,
-  labelTier,
-  edgeClass,
-  activateNode,
-  markerNameX,
-  markerNameY,
-  markerNameAnchor,
-} = useMapLatticeRender(props, emit, geometry);
+const { fittedEdgeMarkers, labelY, labelTier, edgeClass, activateNode } = useMapLatticeRender(props, emit, geometry);
 
-const viewportEl = ref(null);
 const currentNodeId = computed(
   () => props.localMap.nodes?.find((n) => n.visibility === "current")?.id,
 );
-
-const mapView = useMapView({
-  enabled: computed(() => props.fitView),
-  canvasWidth,
-  canvasHeight,
-  currentPos,
-  nodePos,
-  currentNodeId,
-  viewportEl,
-  markerScale: computed(() => props.markerScale),
-  labelFont: computed(() => props.labelFont),
-});
-
-const {
-  viewBox: mapViewBox,
-  canZoomIn,
-  canZoomOut,
-  canRecentre,
-  isDragging,
-  zoomIn,
-  zoomOut,
-  recentre,
-  onWheel,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  onClickCapture,
-  onFocusIn,
-} = mapView;
 
 // ---- the minimap pan (design D3) ----
 
@@ -387,8 +323,8 @@ function setPan(el, dx, dy) {
 }
 
 // The island projection's scale (mode and level), only on a coordinate-
-// bearing island: the overlay, the radial graph and a coordinate-free layer
-// have none, so they never crossfade.
+// bearing island: the radial graph and a coordinate-free layer have none,
+// so they never crossfade.
 const islandScale = computed(() =>
   isIsland.value && (props.localMap.layer === "grid" || props.localMap.layer === "wilderness")
     ? scaleKey(projection.value)
@@ -507,65 +443,28 @@ onBeforeUnmount(() => {
   panFrame = null;
   dissolve.clear();
 });
-
-defineExpose({
-  zoomIn,
-  zoomOut,
-  recentre,
-  canZoomIn,
-  canZoomOut,
-  canRecentre,
-});
 </script>
 
 <template>
   <div
-    ref="viewportEl"
     class="local-map__viewport"
-    :class="{
-      'local-map__viewport--fit': fitView,
-      'local-map__viewport--fit--dragging': fitView && isDragging,
-      'local-map__viewport--island': isIsland,
-    }"
+    :class="{ 'local-map__viewport--island': isIsland }"
     :style="isIsland ? latticeStyle : null"
-    @wheel="onWheel"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerCancel"
-    @click.capture="onClickCapture"
-    @focusin="onFocusIn"
   >
   <svg
     ref="svgEl"
     class="local-map__lattice"
-    :class="{ 'local-map__lattice--canvas': overlayChrome, 'local-map__lattice--island': isIsland }"
-    :width="canvasSize ?? canvasWidth"
-    :height="canvasSize ?? canvasHeight"
-    :viewBox="fitView ? mapViewBox : viewBox"
+    :class="{ 'local-map__lattice--island': isIsland }"
+    :width="canvasSize"
+    :height="canvasSize"
+    :viewBox="viewBox"
     :style="latticeStyle"
-    :role="overlayChrome ? 'group' : 'img'"
-    :aria-label="overlayChrome ? '區域地圖' : '區域地圖縮圖'"
+    role="img"
+    aria-label="區域地圖縮圖"
     data-testid="local-map__lattice"
     @mouseleave="emit('leave')"
   >
     <defs>
-      <pattern
-        v-if="!isIsland"
-        :id="patternId"
-        :width="effectiveColPitch"
-        :height="effectiveRowPitch"
-        patternUnits="userSpaceOnUse"
-      >
-        <circle
-          :cx="dotCx"
-          :cy="dotCy"
-          :r="1.15 * markerScale"
-          class="local-map__dot"
-          fill="var(--ink-edge)"
-          fill-opacity="0.85"
-        />
-      </pattern>
       <radialGradient
         :id="fogId"
         gradientUnits="userSpaceOnUse"
@@ -629,17 +528,6 @@ defineExpose({
       >{{ ring.label }}</text>
     </g>
     <rect
-      v-if="!isGraph && !isIsland"
-      class="local-map__dot-field"
-      data-testid="local-map__dot-field"
-      x="0"
-      y="0"
-      :width="canvasWidth"
-      :height="canvasHeight"
-      :fill="`url(#${patternId})`"
-      aria-hidden="true"
-    />
-    <rect
       v-if="fogVignette && !isGraph"
       class="local-map__vignette"
       data-testid="local-map__vignette"
@@ -692,9 +580,7 @@ defineExpose({
       class="local-map__edge-marker"
       :data-testid="`local-map__edge-marker--${marker.id}`"
       :transform="`translate(${marker.x}, ${marker.y})`"
-      :role="overlayChrome ? 'img' : null"
-      :aria-label="overlayChrome ? marker.name : null"
-      :aria-hidden="overlayChrome ? null : 'true'"
+      aria-hidden="true"
     >
       <title>{{ marker.name }}</title>
       <rect
@@ -710,21 +596,13 @@ defineExpose({
         class="local-map__edge-marker-landmark"
         :r="MARKER_LANDMARK_R * markerScale"
       />
+      <!-- The island's rim markers (render-auto-scaled-minimap-island):
+           the whole name, never shortened, laid out inside the square by
+           the geometry's rim layout — beside the diamond in the band, or
+           wrapped onto inward rows (columns on the left/right sides). -->
       <template v-if="markerNames">
         <text
-          v-if="overlayChrome && marker.visibleName"
-          class="local-map__edge-marker-name"
-          :style="{ fontSize: `${markerNameFont}px` }"
-          :x="markerNameX(marker)"
-          :y="markerNameY(marker)"
-          :text-anchor="markerNameAnchor(marker)"
-        >{{ marker.visibleName }}</text>
-        <!-- The island's rim markers (render-auto-scaled-minimap-island):
-             the whole name, never shortened, laid out inside the square by
-             the geometry's rim layout — beside the diamond in the band, or
-             wrapped onto inward rows (columns on the left/right sides). -->
-        <text
-          v-else-if="marker.rim && marker.visibleName"
+          v-if="marker.rim && marker.visibleName"
           class="local-map__edge-marker-name--island"
           :style="{ fontSize: `${markerNameFont}px` }"
           :text-anchor="marker.rimName?.horizontal ? 'start' : 'middle'"
@@ -735,29 +613,6 @@ defineExpose({
             :x="line.x"
             :y="line.y"
           >{{ line.text }}</tspan>
-        </text>
-        <text
-          v-else-if="marker.visibleName && (marker.side === 'top' || marker.side === 'bottom')"
-          class="local-map__edge-marker-name--island"
-          :style="{ fontSize: `${markerNameFont}px` }"
-          :x="markerNameX(marker)"
-          :y="markerNameY(marker)"
-          :text-anchor="markerNameAnchor(marker)"
-        >{{ marker.visibleName }}</text>
-        <text
-          v-else-if="marker.visibleName && (marker.side === 'left' || marker.side === 'right')"
-          class="local-map__edge-marker-name--island"
-          :style="{ fontSize: `${markerNameFont}px` }"
-          :x="markerNameX(marker)"
-          :y="markerNameY(marker)"
-          :text-anchor="markerNameAnchor(marker)"
-        >
-          <tspan
-            v-for="(glyph, i) in marker.glyphs"
-            :key="i"
-            :x="markerNameX(marker)"
-            :dy="i === 0 ? 0 : markerNameFont"
-          >{{ glyph }}</tspan>
         </text>
       </template>
     </g>
@@ -771,9 +626,6 @@ defineExpose({
       :data-node="node.id"
       :data-node-id="node.id"
       :data-visibility="node.visibility"
-      :role="overlayChrome && node.action?.kind === 'move' ? 'button' : null"
-      :tabindex="overlayChrome && node.action?.kind === 'move' ? 0 : null"
-      :aria-label="overlayChrome ? node.label : null"
       :transform="`translate(${nodePos(node).x}, ${nodePos(node).y})`"
       @click="onNodeActivate(node)"
       @keydown.enter.prevent="onNodeActivate(node)"
@@ -813,19 +665,6 @@ defineExpose({
            ink-filled circle; unvisited is a small hollow circle (keeps the
            未探索 rule); remembered keeps the rotated diamond. Shape/size
            distinguish the states without colour. -->
-      <!-- The current-location ring (webclient-map-legibility): the full
-           map's one ornament of the player's place, concentric with the real
-           marker inside the node's own group, so it can never read as a second
-           location or float over a connector. Decoration only: not a
-           `local-map__marker` (the geometry audit pairs marker boxes), no
-           label, no activation. -->
-      <circle
-        v-if="overlayChrome && node.visibility === 'current'"
-        class="local-map__current-ring"
-        data-testid="local-map__current-ring"
-        :r="MARKER_CURRENT_RING_R * markerScale"
-        aria-hidden="true"
-      />
       <!-- The compass aim ring (exploration-exit-compass D6): decoration
            only, outside the `local-map__marker` class the geometry audit
            pairs, so it never reads as a second location. -->

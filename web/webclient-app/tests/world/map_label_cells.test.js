@@ -1,31 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { labelPairPitch } from "../../composables/use-map-lattice-geometry.js";
 import { fitMarkerName } from "../../composables/use-map-lattice-render.js";
-import { CELL_EM, textCells } from "../../lib/mono_cells.js";
-
-// Label term in monospace cells (webclient-map-label-cell-budget D2).
-// Expected values derive from the manifest-fed CELL_EM, never a release pin.
-const pairUnits = (cells, font) => Math.ceil(cells * CELL_EM * font + font / 2);
-describe("labelPairPitch", () => {
-  it("clears two truncated island labels of four wide glyphs by the cell formula", () => {
-    expect(Math.ceil(labelPairPitch("霧骨渡口…", "霧骨渡口…", 12))).toBe(pairUnits(9, 12));
-  });
-
-  it("clears two truncated overlay labels of ten wide glyphs by the cell formula", () => {
-    const label = "霧骨渡口灰鬮荒原南關…";
-    expect(Math.ceil(labelPairPitch(label, label, 14))).toBe(pairUnits(21, 14));
-  });
-
-  it("asks only for the room narrow labels occupy", () => {
-    expect(Math.ceil(labelPairPitch("Gates", "Hills", 12))).toBe(pairUnits(5, 12));
-  });
-
-  it("never drops below the former worst-case term for maximal wide labels", () => {
-    for (const [label, font, max] of [["霧骨渡口…", 12, 4], ["霧骨渡口灰鬮荒原南關…", 14, 10]]) {
-      expect(labelPairPitch(label, label, font)).toBeGreaterThanOrEqual((max + 1) * font + 3);
-    }
-  });
-});
+import { textCells } from "../../lib/mono_cells.js";
 
 // Edge-marker name fit in cells (webclient-map-label-cell-budget D3).
 describe("fitMarkerName", () => {
@@ -76,7 +51,7 @@ describe("fitMarkerName", () => {
     expect(fitMarkerName("西部丘陵與谷地（南門）", 8, oneStep)).toBe("西部丘…（南門）");
   });
 
-  it("holds eleven wide glyphs in the overlay's 22-cell outward box and truncates twelve", () => {
+  it("holds eleven wide glyphs in a 22-cell budget and truncates twelve", () => {
     expect(fitMarkerName("灰鬮荒原第一南關隘道前", 22)).toBe("灰鬮荒原第一南關隘道前");
     const twelve = fitMarkerName("灰鬮荒原第一南關隘道前哨", 22);
     expect(twelve).toBe("灰…原第一南關隘道前哨");

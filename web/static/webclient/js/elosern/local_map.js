@@ -8,19 +8,16 @@
  * travel action). Unknown nodes never appear because the server already
  * validated the panel; this module only adds a small bounded layout pass.
  *
- * Layout is a metric lattice computed over the current field of view only:
- * `current`, `visible_unvisited`, and `visible_visited` nodes occupy
- * `col = (x - minX) / cell`, `row = (y - minY) / cell`, and the model exports
- * the lattice's column and row counts plus `cell`, the lattice cell's size in
- * payload coordinate units. `cell` is the smallest positive coordinate delta
- * in the in-view set, applied to BOTH axes, so the placement preserves every
- * gap's exact ratio and every compass bearing; no axis is ever compressed
- * independently. `remembered` remote nodes are kept out of the coordinate
- * canvas entirely (their payload coordinates describe places outside the
- * current view and must not distort the local spacing); they surface as a
- * bounded, order-preserved list.
+ * In-view nodes (`current`, `visible_unvisited`, `visible_visited`) keep
+ * their raw payload coordinates; the minimap island projects them itself
+ * (lib/minimap_projection.js), and the full map is the map drawer's own
+ * `area_map` / `world_map` views. The old full-map lattice cell (`cellSize`,
+ * col/row cell units) was removed with the full-map overlay
+ * (redesign-map-drawer). `remembered` remote nodes are kept out of the
+ * in-view set (their payload coordinates describe places outside the current
+ * view); they surface as a bounded, order-preserved list.
  *
- * Alongside the lattice, the model exports a radial (graph) placement
+ * The model also exports a radial (graph) placement
  * (`radial`) and the data-derived `layoutVariant` resolver
  * (`variantForLayer`, design D3): coordinate-bearing layers resolve to
  * `"lattice"`, everything else to `"graph"`. `edgeMarkersFor` computes the
@@ -28,11 +25,7 @@
  * drawn extent, from RAW payload coordinates against an explicitly passed
  * surface geometry (design D3b).
  *
- * A schema-valid but geometrically sparse payload therefore yields a large
- * cell count rather than compressed ranks: the renderer keeps one uniform
- * physical scale and reaches the far part of the drawing through its viewport
- * (the island's current-centred window, the full map's fitted pan and zoom).
- * Direction markers read RAW payload coordinates, never lattice cells.
+ * Direction markers read RAW payload coordinates.
  *
  * No `document` or `window` access at load time; Node tests exercise the
  * model directly. All server strings are passed through unchanged as display
@@ -111,73 +104,6 @@
     });
     return targets;
   }
-
-  // The lattice cell's size in payload coordinate units: the smallest positive
-  // pairwise delta of the in-view coordinates, on either axis. One divisor
-  // serves both axes, so col/row are an exact uniform projection of the
-  // payload's metric coordinates. A single node (or one with zero span) has no
-  // delta to observe, so the cell is one coordinate unit.
-  function cellSize(nodes) {
-    var smallest = 0;
-    ["x", "y"].forEach(function (axis) {
-      var values = [];
-      nodes.forEach(function (node) {
-        var value = node[axis];
-        if (typeof value === "number" && isFinite(value)) {
-          values.push(value);
-        }
-      });
-      values.sort(function (a, b) {
-        return a - b;
-      });
-      for (var i = 1; i < values.length; i += 1) {
-        var delta = values[i] - values[i - 1];
-        if (delta > 0 && (smallest === 0 || delta < smallest)) {
-          smallest = delta;
-        }
-      }
-    });
-    return smallest === 0 ? 1 : smallest;
-  }
-
-  // Deterministic metric layout pass: place only in-view nodes on the lattice.
-  // Returns { nodes, cols, rows, cell } in cell units.
-  function layoutNodes(nodes) {
-    var minX = Infinity;
-    var maxX = -Infinity;
-    var minY = Infinity;
-    var maxY = -Infinity;
-    nodes.forEach(function (node) {
-      if (node.x < minX) {
-        minX = node.x;
-      }
-      if (node.x > maxX) {
-        maxX = node.x;
-      }
-      if (node.y < minY) {
-        minY = node.y;
-      }
-      if (node.y > maxY) {
-        maxY = node.y;
-      }
-    });
-    if (nodes.length === 0) {
-      return { nodes: [], cols: 0, rows: 0, cell: 1 };
-    }
-    var cell = cellSize(nodes);
-    return {
-      nodes: nodes.map(function (node) {
-        return Object.assign({}, node, {
-          col: (node.x - minX) / cell,
-          row: (node.y - minY) / cell,
-        });
-      }),
-      cols: (maxX - minX) / cell + 1,
-      rows: (maxY - minY) / cell + 1,
-      cell: cell,
-    };
-  }
-
 
   // ---------------------------------------------------------------------------
   // Radial (graph) placement — design D1.
@@ -384,9 +310,8 @@
   // ---------------------------------------------------------------------------
   // Edge direction markers — design D3b.
   //
-  // The bearing is computed from RAW payload coordinates, never from the
-  // lattice's compressed col/row ranks: rank compression preserves order,
-  // not ratios, and (100,1) must not render as 45 degrees. +y = north;
+  // The bearing is computed from RAW payload coordinates, so (100,1) never
+  // renders as 45 degrees. +y = north;
   // bearing theta = ((atan2(dx, dy) deg mod 360) + 360) mod 360, octant
   // k = floor(theta/45 + 0.5) mod 8 over the half-open sector
   // [k*45 - 22.5, k*45 + 22.5), so boundary vectors are deterministic.
@@ -613,17 +538,13 @@
         inView.push(node);
       }
     }
-    var layout = layoutNodes(inView);
     var edges = (panel && panel.edges || []).map(edgeModel);
     var legend = (panel && panel.legend || []).slice();
     var model = {
       layer: panel && panel.layer || null,
       currentNode: panel && panel.current_node || null,
       title: panel && panel.title || "",
-      nodes: layout.nodes,
-      cols: layout.cols,
-      rows: layout.rows,
-      cell: layout.cell,
+      nodes: inView,
       edges: edges,
       legend: legend,
       remembered: remembered,
@@ -678,7 +599,6 @@
     STATE_INDICATORS: Object.assign({}, STATE_INDICATORS),
     reducePanel: reducePanel,
     focusTargets: focusTargets,
-    layoutNodes: layoutNodes,
     exitLabelFor: exitLabelFor,
     layoutRadial: layoutRadial,
     RADIAL_GEOMETRY: Object.assign({}, RADIAL_GEOMETRY),

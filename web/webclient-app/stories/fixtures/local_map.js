@@ -142,7 +142,7 @@ export const LOCAL_MAP_UNAVAILABLE_SAMPLE = {
 // webclient-map-00-story-fidelity design D1): the EXACT store-side conversion
 // — byte-identical to `stores/elosern.js`'s `localMapModel` construction
 // (`{ ...reducePanel(panel), available: panel.available !== false, reason:
-// panel.reason }`). Stories of LocalMap / MapOverlay / MapLattice consume this
+// panel.reason }`). Stories of LocalMap / MapLattice consume this
 // helper's output, never a raw payload: the components' live prop is the
 // reducer-derived model, and story args must reproduce that exact shape. The
 // helper performs the store conversion and nothing else — it never mutates,

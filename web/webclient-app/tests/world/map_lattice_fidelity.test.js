@@ -1,7 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import MapLattice from "../../components/MapLattice.vue";
-import { CELL_EM } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_SAMPLE,
@@ -32,8 +31,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
   }
 
   const ISLAND_PROPS = {
-    colPitch: 40,
-    rowPitch: 40,
     labelFont: 16,
     canvasSize: 240,
     showAxis: true,
@@ -79,25 +76,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       }
       // The field rides a pan group, so the minimap pan slides it.
       expect(w.find('[data-testid="map-lattice__pan--field"]').element.contains(dotField.element)).toBe(true);
-    });
-
-    it("Task 1.1: renders dot field on overlay scale as well", () => {
-      const w = mountLattice({
-        localMap: localMapModelFor(REPORTED_WILDERNESS_PAYLOAD),
-        colPitch: 280,
-        rowPitch: 212,
-        markerScale: 4.83,
-        labelFont: 11,
-        labelMax: 10,
-        overlayChrome: true,
-      });
-      const dotField = w.find('[data-testid="local-map__dot-field"]');
-      expect(dotField.exists()).toBe(true);
-      const pattern = w.find("defs pattern");
-      expect(Number(pattern.attributes("width"))).toBe(280);
-      expect(Number(pattern.attributes("height"))).toBe(280);
-      const circle = pattern.find("circle");
-      expect(Number(circle.attributes("r"))).toBeCloseTo(1.15 * 4.83, 4);
     });
 
     it("Task 1.1 & 1.4: omits dot field, vignette, and axis on graph variant", () => {
@@ -151,8 +129,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       const wOn = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
         showAxis: true,
-        colPitch: 40,
-        rowPitch: 40,
       });
       const axis = wOn.find('[data-testid="local-map__axis"]');
       expect(axis.exists()).toBe(true);
@@ -225,7 +201,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(edgeMarkerIdx).toBeLessThan(nodeIdx);
     });
 
-    it("Rubber Duck Issue 1: distinct instances receive unique pattern and fog IDs", () => {
+    it("Rubber Duck Issue 1: distinct instances receive unique fog IDs", () => {
       const MultiMount = {
         components: { MapLattice },
         props: ["p1", "p2"],
@@ -233,19 +209,13 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       };
       const w = mount(MultiMount, {
         props: {
-          // Two pattern-drawing (non-island) mounts: the island draws its dot
-          // list instead of a pattern, but still owns a fog gradient.
-          p1: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), colPitch: 40, rowPitch: 40, fogVignette: true },
-          p2: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), colPitch: 280, rowPitch: 212, fogVignette: true },
+          // Two island mounts: each draws its dot list (no pattern) and owns
+          // its own fog gradient.
+          p1: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), fogVignette: true },
+          p2: { localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD), fogVignette: true },
         },
       });
-      const patterns = w.findAll("defs pattern");
-      expect(patterns).toHaveLength(2);
-      const id1 = patterns[0].attributes("id");
-      const id2 = patterns[1].attributes("id");
-      expect(id1).toBeDefined();
-      expect(id2).toBeDefined();
-      expect(id1).not.toBe(id2);
+      expect(w.findAll("defs pattern")).toHaveLength(0);
 
       const fogs = w.findAll("defs radialGradient");
       expect(fogs).toHaveLength(2);
@@ -270,108 +240,6 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       const islandLabel = wIsland.get(".local-map__node-label");
       expect(islandLabel.attributes("style")).toContain("font-size: 16px");
       expect(Number.isFinite(Number(islandLabel.get("tspan").attributes("y")))).toBe(true);
-
-      const wOverlay = mountLattice({
-        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
-        colPitch: 280,
-        rowPitch: 212,
-        markerScale: 4.83,
-        labelFont: 16,
-        labelMax: 10,
-      });
-      const overlayLabel = wOverlay.get(".local-map__node-label");
-      expect(overlayLabel.attributes("style")).toContain("font-size: 16px");
-      expect(Number(overlayLabel.attributes("y"))).toBeCloseTo(11 * 4.83 + 2 + 16, 2);
-    });
-
-    it("Task 2.2: derives square pitch 40 on uniform wilderness (repetition suppressed) and clears the drawn adjacent labels", () => {
-      const uniformWildernessPayload = {
-        schema_version: 1,
-        available: true,
-        layer: "wilderness",
-        title: "西部丘陵",
-        current_node: "w:1:1",
-        nodes: [
-          { id: "w:0:0", label: "西部丘陵", x: 0, y: 0, visibility: "visible_visited" },
-          { id: "w:1:0", label: "西部丘陵", x: 1, y: 0, visibility: "visible_visited" },
-          { id: "w:0:1", label: "西部丘陵", x: 0, y: 1, visibility: "visible_visited" },
-          { id: "w:1:1", label: "西部丘陵", x: 1, y: 1, visibility: "current" },
-        ],
-        edges: [],
-      };
-      const wUniform = mountLattice({
-        localMap: localMapModelFor(uniformWildernessPayload),
-        colPitch: 40,
-        rowPitch: 40,
-        labelFont: 16,
-      });
-      const visibleLabels = wUniform.findAll(".local-map__node-label").filter((l) => (l.element.lastChild?.textContent || "").trim() !== "");
-      expect(visibleLabels).toHaveLength(1);
-      const patternUniform = wUniform.find("defs pattern");
-      expect(Number(patternUniform.attributes("width"))).toBeGreaterThanOrEqual(47);
-      expect(patternUniform.attributes("height")).toBe(patternUniform.attributes("width"));
-
-      const distinctAdjacentPayload = {
-        schema_version: 1,
-        available: true,
-        layer: "grid",
-        title: "市街區",
-        current_node: "g:0:0",
-        nodes: [
-          { id: "g:0:0", label: "中央大街", x: 0, y: 0, visibility: "current" },
-          { id: "g:1:0", label: "東側巷道", x: 1, y: 0, visibility: "visible_unvisited" },
-        ],
-        edges: [],
-      };
-      const wDistinct = mountLattice({
-        localMap: localMapModelFor(distinctAdjacentPayload),
-        colPitch: 40,
-        rowPitch: 40,
-        labelFont: 16,
-      });
-      // webclient-map-legibility: the label term clears the labels actually
-      // drawn, measured in monospace cells — two 4-glyph CJK names (8 cells
-      // each) need ceil(((8 + 8) / 2 × CELL_EM + 0.5) × 16) = 83.
-      const patternDistinct = wDistinct.find("defs pattern");
-      expect(Number(patternDistinct.attributes("width"))).toBe(83);
-      expect(Number(patternDistinct.attributes("height"))).toBe(83);
-
-      // A short name beside a long one needs less:
-      // ceil(((4 + 8) / 2 × CELL_EM + 0.5) × 16) = 65.
-      const shortLong = {
-        ...distinctAdjacentPayload,
-        nodes: [
-          { id: "g:0:0", label: "碼頭", x: 0, y: 0, visibility: "current" },
-          { id: "g:1:0", label: "霧骨渡口", x: 1, y: 0, visibility: "visible_unvisited" },
-        ],
-      };
-      const wShortLong = mountLattice({ localMap: localMapModelFor(shortLong), colPitch: 40, rowPitch: 40, labelFont: 16 });
-      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(65);
-
-      // Two truncated names (labelMax 4 wide glyphs + the narrow "…" = 9
-      // cells) are the worst case, never looser than the old
-      // (labelMax + 1) * labelFont + 3 = 83: ceil((9 × CELL_EM + 0.5) × 16) = 93.
-      const longLong = {
-        ...distinctAdjacentPayload,
-        nodes: [
-          { id: "g:0:0", label: "北岸大道東段", x: 0, y: 0, visibility: "current" },
-          { id: "g:1:0", label: "南岸大道西段", x: 1, y: 0, visibility: "visible_unvisited" },
-        ],
-      };
-      const wLongLong = mountLattice({ localMap: localMapModelFor(longLong), colPitch: 40, rowPitch: 40, labelFont: 16 });
-      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(93);
-      expect(93).toBeGreaterThanOrEqual((4 + 1) * 16 + 3);
-
-      const wOverlayDistinct = mountLattice({
-        localMap: localMapModelFor(distinctAdjacentPayload),
-        colPitch: 280,
-        rowPitch: 212,
-        labelFont: 16,
-        labelMax: 10,
-      });
-      const patternOverlay = wOverlayDistinct.find("defs pattern");
-      expect(Number(patternOverlay.attributes("width"))).toBe(280);
-      expect(Number(patternOverlay.attributes("height"))).toBe(280);
     });
 
     it("Task 2.3: verifies all 6 rows of Design D5 Table and scale <= 1 invariant", () => {
@@ -456,44 +324,15 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
     it("Task 2.4: deletes maxUpscale and fieldFill props, bounds scale <= 1 on all fixtures", () => {
       const w = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE),
-        colPitch: 40,
-        rowPitch: 40,
       });
       expect(w.props("maxUpscale")).toBeUndefined();
       expect(w.props("fieldFill")).toBeUndefined();
-      // webclient-full-map-fit-view D6: a bare mount declares neither the
-      // island's square canvas nor the overlay's fitted view, so it draws
-      // at the canvas's natural size — no inline size and no max-width.
-      const style = w.get("svg.local-map__lattice").attributes("style");
-      expect(style).toBeUndefined();
-    });
-
-    it("Task 2.6: overlay geometry is identical to pre-change baseline and gains dot field", () => {
-      const wOverlay = mountLattice({
-        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
-        colPitch: 280,
-        rowPitch: 212,
-        markerScale: 4.83,
-        labelMax: 10,
-        labelFont: 16,
-        markerNameFont: 16,
-        overlayChrome: true,
-        markerNames: true,
-      });
-      // namePad: the outward box of (10 + 1) × 2 monospace cells at the
-      // overlay's 16-unit marker-name step, plus 2.
-      const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + (22 * CELL_EM * 16 + 2);
-      expect(Number(wOverlay.get("svg.local-map__lattice").attributes("width"))).toBeCloseTo(
-        3 * 280 + 2 * expectedGutter,
-        4,
-      );
-      expect(Number(wOverlay.get("svg.local-map__lattice").attributes("height"))).toBeCloseTo(
-        1 * 280 + 14 + 2 * expectedGutter,
-        4,
-      );
-      expect(wOverlay.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);
-      expect(wOverlay.find('[data-testid="local-map__vignette"]').exists()).toBe(false);
-      expect(wOverlay.find('[data-testid="local-map__axis"]').exists()).toBe(false);
+      // A bare mount is the island's fixed square (the overlay's fitted and
+      // natural-size canvases were removed with the overlay): one scale-1
+      // 240-unit square under the chrome factor, never a magnified one.
+      const svg = w.get("svg.local-map__lattice");
+      expect(svg.attributes("viewBox")).toBe("0 0 240 240");
+      expect(svg.attributes("style")).toBe("width: calc(240px * var(--ui-scale, 1)); height: calc(240px * var(--ui-scale, 1));");
     });
 
     it("retarget: the island draws its node labels and marker names at the 16px floor", () => {

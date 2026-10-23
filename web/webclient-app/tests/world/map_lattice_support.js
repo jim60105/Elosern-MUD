@@ -2,8 +2,7 @@
  * Shared fixtures for the split map_lattice.test.js siblings.
  *
  * Not a test file: the vitest gate collects `*.test.js` only, so this module
- * is imported, never collected. The payload literals and the overlay prop set
- * moved verbatim from the original map_lattice.test.js; the shared lattice
+ * is imported, never collected. The payload literals moved verbatim from the original map_lattice.test.js; the shared lattice
  * mount helper existed twice there byte-identically and now lives once here,
  * parameterised with a setter so each sibling keeps its closure-local
  * `wrapper` and `afterEach` unmount exactly as before.
@@ -57,21 +56,6 @@ import { LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
       { id: "r:east", label: "聖潔王都", x: 10, y: 1, visibility: "remembered", landmark: true },
     ],
     edges: [],
-  };
-
-  export const OVERLAY_PROPS = {
-    colPitch: 280,
-    // One uniform physical scale serves both axes (project-metric-local-maps),
-    // so the overlay declares the same 280-unit pitch for columns and rows.
-    rowPitch: 280,
-    labelMax: 10,
-    markerScale: 4.83,
-    overlayChrome: true,
-    markerNames: true,
-    // The full-map overlay's declared steps are the shared 16-unit floor
-    // (retarget-desktop-viewport-contract D7; MapOverlay.vue passes both).
-    labelFont: 16,
-    markerNameFont: 16,
   };
 
 export function mountLattice(setWrapper, props = {}) {

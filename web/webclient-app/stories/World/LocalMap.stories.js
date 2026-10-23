@@ -27,9 +27,9 @@ import {
 // LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
 // minimap renders as the stage's right-anchor island — bounded, the
 // renderer-axis orientation legend on the lattice variant (`grid` /
-// `wilderness` payloads) only, no bearing, no distance, and no full-map
-// control (MapOverlay is H5's). Layout variants (webclient-map-02): the
-// island draws grid/wilderness payloads as the rank-compressed lattice and
+// `wilderness` payloads) only, no bearing, no distance, and one full-map
+// opener (the map drawer). Layout variants (webclient-map-02): the island
+// draws grid/wilderness payloads through its automatic projection and
 // instance/interior payloads as the model's radial placement — the variant
 // comes from the model itself, so each story below renders its payload's
 // own variant. The stories cover the island chrome across all four layers
@@ -37,9 +37,7 @@ import {
 //
 // Wave 0 (webclient-map-00-story-fidelity): every `localMap` arg binds
 // through the shared `localMapModelFor` helper — the EXACT derived shape
-// `stores/elosern.js` passes in production. Raw payload args rendered a
-// degenerate 1-cell lattice (no col/row/cols/rows), which is a contract
-// violation, not a style choice.
+// `stores/elosern.js` passes in production.
 
 // The island is a fixed 240-unit canvas inside its padded card, so the story
 // frame is a column sized to that card (as the right anchor sizes it in the
