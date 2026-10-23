@@ -83,8 +83,42 @@ has exactly one landmark and six fields: `key`, `district_name_zh`,
 - `voronoi` districts seed the walking-distance partition (see
   [District partition](#district-partition)). Two Voronoi landmarks are never closer than
   `MIN_VORONOI_SPACING_KM` (100 km, below the roughly 200 km district target).
-  The registry ships a small seed set with at least one seed in each nation
-  outside the forest; the landmark-authoring change expands it to 110–130.
+
+### Authored roster
+
+The registry holds 120 districts: the deep forest plus 119 Voronoi districts,
+split in proportion to each nominal nation's walkable land outside the forest
+(Altoria 45, Grandia 53, Valhalla 21). That is about 33,600 km² each, a hex
+roughly 197 km across. The authored Voronoi areas run from about 17,000 to
+44,000 km². Keep the total within 110–130.
+
+- Placement. Seeds sit near the centroids of a relaxed layout computed per
+  nation. The original seeds stay fixed at their authored cells. The
+  Grandia (`(1970, 1280)`) and Valhalla (`(780, 1910)`) capital anchor cells
+  are also fixed, so standing in either capital lights its district. Two
+  landmarks were moved onto features: the imperial east-branch ford
+  `(2300, 526)` and a bank of the capital river. Pass and border-river fords
+  are not landmarks: the border closes the partition there, so a seed on it
+  produces a sliver district along the ridge or river. The coordinates are
+  ordinary authored values; nothing is generated at runtime, and this
+  document does not repeat them.
+- Future grid maps. When the Grandia or Valhalla capital gains a settlement
+  grid map, move its landmark to the matching `grid:` node (its footprint
+  would block the current wilderness cell) and regenerate the partition.
+- Names. Each district and landmark has a distinct, hand-authored Traditional
+  Chinese name in JRPG sword-and-magic vocabulary that fits its terrain:
+  coasts, river reaches, hills and mines for Altoria; plains, orchards,
+  canals and magic-crystal fields for Grandia; highland forest, hunting and
+  totems for Valhalla; and peaks and passes on the range. A landmark is a
+  natural feature, ruin, stone, shrine or similar place. It never names a new
+  city, settlement, quest or NPC, and it never sits on an elven village or
+  dungeon cell, because those stay hidden until visited. As an authoring
+  margin, the roster also keeps every landmark at least 50 km from them.
+- Keys are stable. Changing a landmark's node or adding a district changes
+  ownership, so regenerate and commit the partition (below) in the same
+  change.
+
+### Validation and lighting
 
 `validate_map_districts(registry=None, terrain=None)` is pure and
 database-free and reports every fault with its district key: identity and
