@@ -45,10 +45,6 @@ ROOT = Path(__file__).resolve().parents[4]
 FIXTURES = "./web/static/webclient/js/tests/map_panel_fixtures.js"
 NODE_TEST = "web/static/webclient/js/tests/protocol_map_panels.test.js"
 
-PARITY_REQ = "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
-DELIVERY_REQ = "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
-SNAPSHOT_REQ = "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
-ENVELOPE_REQ = "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
 
 
 def _node(script: str, stdin: str = "") -> str:
@@ -90,7 +86,9 @@ process.stdout.write(JSON.stringify(cases.map(([panel, text]) => {
 class MapSchemaParityTests(unittest.TestCase):
     """Both validators decide identically on the same wire text."""
 
-    @covers_requirement(PARITY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
     def test_bidirectional_schema_parity(self):
         def text(value):
             return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -149,7 +147,9 @@ class MapSchemaParityTests(unittest.TestCase):
                 self.assertEqual(py_accepts, expected)
                 self.assertEqual(js_accepts, expected)
 
-    @covers_requirement(PARITY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
     def test_mirrored_constants_are_equal(self):
         js = json.loads(
             _node(
@@ -176,7 +176,9 @@ class MapSchemaParityTests(unittest.TestCase):
         self.assertEqual(js["chars"], MAX_STRING_CODE_POINTS)
         self.assertEqual(js["parts"], [max_parts("area_map"), max_parts("world_map")])
 
-    @covers_requirement(PARITY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
     def test_canonical_encoders_match_the_node_grammar(self):
         # Publishers own existence checks; the wire grammar accepts exactly
         # the canonical encoder output and nothing looser.
@@ -187,7 +189,9 @@ class MapSchemaParityTests(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(MAP_NODE_ID_RE.fullmatch(bad))
 
-    @covers_requirement(PARITY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
     def test_layer_frames_carry_their_own_units(self):
         grid, interior, wild = (validate_area_map(_copy(k)) for k in ("grid", "interior", "wild"))
         self.assertEqual(grid["frame"], {"key": grid["map_id"], "unit": "m"})
@@ -200,7 +204,9 @@ class MapSchemaParityTests(unittest.TestCase):
 
 
 class MapPartCodecTests(unittest.TestCase):
-    @covers_requirement(DELIVERY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
     def test_round_trip_uses_fixed_bounded_parts(self):
         body = _copy("wild")
         parts = encode_map_parts("area_map", body)
@@ -211,7 +217,9 @@ class MapPartCodecTests(unittest.TestCase):
             self.assertEqual(len(part["part"]["chunk"]), MAX_STRING_CODE_POINTS)
         self.assertEqual(decode_map_parts("area_map", parts), validate_area_map(body))
 
-    @covers_requirement(DELIVERY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
     def test_incomplete_duplicate_or_malformed_transfers_fail(self):
         parts = encode_map_parts("area_map", _copy("wild"))
         for name, broken in (
@@ -237,8 +245,12 @@ class MapPartCodecTests(unittest.TestCase):
         with self.assertRaises(MapPanelError):
             encode_map_parts("area_map", {**_copy("grid"), "secret": 1})
 
-    @covers_requirement(DELIVERY_REQ)
-    @covers_requirement(ENVELOPE_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    @covers_requirement(
+        "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
+    )
     def test_python_parts_are_adopted_by_the_browser_store(self):
         body = _copy("wild")
         parts = encode_map_parts("area_map", body)
@@ -367,7 +379,9 @@ def _dense_grid():
 
 
 class OnDemandRegistryTests(unittest.TestCase):
-    @covers_requirement(SNAPSHOT_REQ)
+    @covers_requirement(
+        "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
     def test_only_map_panels_register_on_demand(self):
         registry = PresentationRegistry("test")
         for spec in (
@@ -389,8 +403,12 @@ class OnDemandRegistryTests(unittest.TestCase):
 
 
 class OnDemandCoordinatorTests(unittest.TestCase):
-    @covers_requirement(DELIVERY_REQ)
-    @covers_requirement(SNAPSHOT_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    @covers_requirement(
+        "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
     def test_eager_publication_never_runs_map_presenters(self):
         calls, session = [], _Session()
         coordinator = _coordinator(session, _registry(lambda: _copy("grid"), calls))
@@ -402,7 +420,9 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         for _, envelope in frames:
             self.assertNotIn("area_map", envelope["panels"])
 
-    @covers_requirement(DELIVERY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
     def test_a_fitting_map_ships_in_one_frame(self):
         calls, session = [], _Session()
         coordinator = _coordinator(session, _registry(lambda: _copy("grid"), calls))
@@ -414,8 +434,12 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         self.assertEqual(frame["panels"]["area_map"], validate_area_map(_copy("grid")))
         self.assertEqual(frame["revision"], revision)
 
-    @covers_requirement(DELIVERY_REQ)
-    @covers_requirement(ENVELOPE_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    @covers_requirement(
+        "webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes"
+    )
     def test_an_oversized_map_travels_as_one_bounded_transfer(self):
         session = _Session()
         coordinator = _coordinator(session, _registry(_dense_grid, []))
@@ -437,7 +461,9 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         log_debug.assert_called_once()
         self.assertEqual(log_debug.call_args.kwargs["context"]["parts"], len(frames))
 
-    @covers_requirement(SNAPSHOT_REQ)
+    @covers_requirement(
+        "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
     def test_dialogue_companion_precedes_the_transfer(self):
         session = _Session()
         coordinator = _coordinator(session, _registry(_dense_grid, [], dialogue=True), mode="dialogue")
@@ -448,7 +474,9 @@ class OnDemandCoordinatorTests(unittest.TestCase):
         self.assertTrue(all(list(frame["panels"]) == ["area_map"] for frame in frames[1:]))
         self.assertGreater(frames[1]["revision"], frames[0]["revision"])
 
-    @covers_requirement(DELIVERY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
     def test_an_invalid_map_body_degrades_to_unavailable(self):
         session = _Session()
         coordinator = _coordinator(session, _registry(lambda: {**_copy("grid"), "secret": 1}, []))
@@ -464,9 +492,15 @@ class OnDemandCoordinatorTests(unittest.TestCase):
 class BrowserStoreEvidenceTests(unittest.TestCase):
     """Executed evidence: the production browser decoder/store Node tests."""
 
-    @covers_requirement(DELIVERY_REQ)
-    @covers_requirement(SNAPSHOT_REQ)
-    @covers_requirement(PARITY_REQ)
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-delivery-replaces-only-complete-epoch-safe-logical-panels"
+    )
+    @covers_requirement(
+        "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
     def test_browser_map_store_suite_passes(self):
         result = subprocess.run(["node", "--test", "--test-reporter=tap", NODE_TEST], capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stdout[-4000:] + result.stderr[-2000:])
