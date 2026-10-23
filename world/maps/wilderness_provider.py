@@ -7,10 +7,16 @@ bounded local work over integer arithmetic plus the ten-vertex mainland
 polygon. Sea, the cliff-walled central ridge and the authored inland waterways
 are impassable on foot; ordinary land outside those features is walkable.
 
-Terrain, political claim and actual control stay separate layers: this module
-returns a terrain region key, and ``world.lore.nations`` owns the nominal
-claims. Nothing here reads the database, a clock, or a random source.
+Terrain, nominal claim and actual control stay separate layers: this module
+returns a terrain region key (``region_for_coordinates``) and, alongside it,
+the coordinate-sensitive nominal claim (``nominal_nation_for_coordinates``)
+plus the national border lines derived from the same ridge and river
+geometry. ``world.lore.nations`` keeps the effective-rule demographic targets.
+Nothing here reads the database, a clock, or a random source.
 """
+
+from dataclasses import dataclass
+from functools import cache
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessMapProvider
 
@@ -49,7 +55,9 @@ _MOUNTAIN_RIDGE_PERIOD = 60
 _MOUNTAIN_RIDGE_STEP = 10
 _RIDGE_MIN_X = 1300
 _RIDGE_MAX_X = 1520
-# The ridge stops at the northern deep forest, whose ground is walkable.
+# The ridge's northern limit. It lies inside the northern deep forest, whose
+# southern edge is the authored line below; north of the limit the forest
+# ground is walkable.
 _RIDGE_NORTH_LIMIT_Y = 2200
 
 # Authored crossings of the summit ridge as inclusive Y windows: the principal
@@ -62,59 +70,80 @@ RIDGE_PASSES: tuple[tuple[int, int], ...] = (
     (1770, 1785),
 )
 
-# Terrain-region thresholds (authoring constraints from design §6): northern
-# deep forest begins broadly at Y 2200, the southern bulk-commerce corridor is
-# the coastal strip, and the northwest highland forest covers Valhalla's
-# highlands. Exact single-region boundaries are authoring discretion.
-_NORTH_FOREST_Y_MIN = 2200
+# Terrain-region thresholds (authoring constraints from design §6): the
+# southern bulk-commerce corridor is the coastal strip. The northern deep
+# forest edge and the western hills / highland forest boundary are authored
+# lines below (world-map drawer design §3), not straight rows.
 _COASTAL_Y_MAX = 500
-_HIGHLAND_Y_MIN = 1700
+
+#: The northern deep forest's southern edge (world-map drawer design §3.2):
+#: an x-monotone meandering line averaging about Y 1920, so the forest covers
+#: about one fifth of the land. A cell is deep forest when its row is at or
+#: north of the edge's row in its column. The forest is narrative wilderness
+#: with ordinary forest travel speed; it adds no movement block, and the summit
+#: ridge keeps its own northern limit (``_RIDGE_NORTH_LIMIT_Y``) inside it.
+NORTH_FOREST_EDGE: tuple[tuple[int, int], ...] = (
+    (0, 1950),
+    (190, 1950),
+    (330, 1900),
+    (480, 1955),
+    (640, 1925),
+    (780, 1920),
+    (900, 1890),
+    (1040, 1945),
+    (1200, 1900),
+    (1330, 1935),
+    (1470, 1890),
+    (1600, 1945),
+    (1760, 1905),
+    (1900, 1950),
+    (2050, 1915),
+    (2180, 1925),
+    (WILDERNESS_MAX_X, 1925),
+)
 
 # Authored inland water networks (design §6): the capital's river runs southwest
 # to the kingdom ports, and the imperial network connects the eastern plain to
 # the southeastern ports. Water is impassable on foot; the declared fords are
 # the ordinary crossings, not a transport mechanic.
+#
+# 界河 (``border_river``, world-map drawer design §3.1) rises in the central
+# range's western foothills at the corridor's first cell (1320, 1410) and
+# meanders west inside Y 1290..1410 to the west coast: (124, 1290) is the last
+# land cell and its western neighbour is sea. Every segment is shallower than
+# 45 degrees with X strictly decreasing, so the rasterizer lays exactly one
+# water cell per column and ``_BORDER_RIVER_ROW`` below is that same cell.
+# It is the Altoria-Valhalla border; west of the corridor it is crossable on
+# foot only at its three fords (the principal one at (830, 1370) on the line
+# between the two capitals). Between its source and the summit ridge lies the
+# mountain corridor, mountain-trail ground that is not river.
 WATERWAY_ROUTES: dict[str, tuple[tuple[int, int], ...]] = {
     "capital_river": ((1150, 1060), (860, 1040), (600, 800), (310, 360)),
     "imperial_river": ((1950, 1260), (1990, 1100), (2070, 700), (2060, 250)),
     "imperial_east_branch": ((2070, 700), (2200, 600), (2390, 460)),
+    "border_river": (
+        (1320, 1410),
+        (1210, 1380),
+        (1100, 1350),
+        (990, 1395),
+        (900, 1380),
+        (830, 1370),
+        (740, 1330),
+        (650, 1310),
+        (530, 1355),
+        (400, 1340),
+        (290, 1300),
+        (170, 1290),
+        (124, 1290),
+    ),
 }
 
 WATERWAY_FORDS: dict[str, tuple[tuple[int, int], ...]] = {
     "capital_river": ((860, 1040), (600, 800), (400, 497)),
     "imperial_river": ((1990, 1100), (2067, 600)),
     "imperial_east_branch": ((2300, 526),),
-}
-
-#: Authored enumeration windows per region, as
-#: ``(x_min, x_max, y_min, y_max)`` inclusive. They are a superset of each
-#: region's cells (the classifier still decides membership) and exist so
-#: sparse-index consumers such as ambient provisioning enumerate only the
-#: relevant band instead of scanning the whole frame. Every region key of
-#: ``WILDERNESS_REGION_REGISTRY`` has a window.
-REGION_SEARCH_BOXES: dict[str, tuple[int, int, int, int]] = {
-    "north_deep_forest": (0, WILDERNESS_MAX_X, _NORTH_FOREST_Y_MIN, WILDERNESS_MAX_Y),
-    "central_mountains": (
-        _MOUNTAIN_RIDGE_BASE_X - 2 * _MOUNTAIN_RIDGE_STEP - _MOUNTAIN_CORRIDOR_HALF_WIDTH,
-        _MOUNTAIN_RIDGE_BASE_X + 2 * _MOUNTAIN_RIDGE_STEP + _MOUNTAIN_CORRIDOR_HALF_WIDTH,
-        0,
-        _NORTH_FOREST_Y_MIN - 1,
-    ),
-    "eastern_plains": (0, WILDERNESS_MAX_X, _COASTAL_Y_MAX + 1, _NORTH_FOREST_Y_MIN - 1),
-    "southeast_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
-    "southwest_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
-    "northwest_highland_forest": (
-        0,
-        WILDERNESS_MAX_X,
-        _HIGHLAND_Y_MIN,
-        _NORTH_FOREST_Y_MIN - 1,
-    ),
-    "western_hills_valleys": (
-        0,
-        WILDERNESS_MAX_X,
-        _COASTAL_Y_MAX + 1,
-        _HIGHLAND_Y_MIN - 1,
-    ),
+    # Upstream, principal (on the Altoria-Valhalla capital line), downstream.
+    "border_river": ((1150, 1363), (830, 1370), (450, 1345)),
 }
 
 # Short registry direction -> the contrib's exit key long form (the stock
@@ -176,6 +205,93 @@ _WATERWAY_CELLS = _rasterize_routes(WATERWAY_ROUTES) - frozenset(
 _FORD_CELLS = frozenset(cell for fords in WATERWAY_FORDS.values() for cell in fords)
 
 
+def _route_row_at(points: tuple[tuple[int, int], ...], x: int) -> int:
+    """The row an x-monotone, shallow route occupies in column ``x``.
+
+    Uses the rasterizer's own integer arithmetic (``_rasterize_segment``), so
+    for a route whose segments all satisfy ``|dx| >= |dy|`` the result is the
+    exact rasterized cell of that column. Outside the route's X span the
+    nearest end vertex's row continues straight (the derived extension that
+    closes a line against the ridge or the frame edge).
+    """
+    for start, end in zip(points, points[1:]):
+        x0, y0 = start
+        x1, y1 = end
+        if min(x0, x1) <= x <= max(x0, x1):
+            steps = abs(x1 - x0)
+            if steps == 0:
+                return y0
+            index = abs(x - x0)
+            return y0 + (y1 - y0) * index // steps
+    west, east = sorted((points[0], points[-1]))
+    return west[1] if x < west[0] else east[1]
+
+
+def _column_table(points: tuple[tuple[int, int], ...]) -> tuple[int, ...]:
+    """``_route_row_at`` precomputed for every frame column (hot-path lookup)."""
+    return tuple(_route_row_at(points, x) for x in range(WILDERNESS_MAX_X + 1))
+
+
+_FOREST_EDGE_ROW = _column_table(NORTH_FOREST_EDGE)
+_BORDER_RIVER_ROW = _column_table(WATERWAY_ROUTES["border_river"])
+
+
+def _clamped_column(x: int) -> int:
+    return min(max(x, 0), WILDERNESS_MAX_X)
+
+
+def forest_edge_row(x: int) -> int:
+    """The northern deep forest's first row in column ``x``."""
+    return _FOREST_EDGE_ROW[_clamped_column(x)]
+
+
+def border_river_row(x: int) -> int:
+    """The border river's row in column ``x`` (or its derived extension).
+
+    East of the source the river's source row continues as the watershed line
+    to the summit ridge; west of the mouth the mouth row continues to sea.
+    """
+    return _BORDER_RIVER_ROW[_clamped_column(x)]
+
+
+_FOREST_EDGE_Y_MIN = min(y for _, y in NORTH_FOREST_EDGE)
+_FOREST_EDGE_Y_MAX = max(y for _, y in NORTH_FOREST_EDGE)
+_BORDER_RIVER_Y_MIN = min(y for _, y in WATERWAY_ROUTES["border_river"])
+_BORDER_RIVER_Y_MAX = max(y for _, y in WATERWAY_ROUTES["border_river"])
+
+#: Authored enumeration windows per region, as
+#: ``(x_min, x_max, y_min, y_max)`` inclusive. They are a superset of each
+#: region's cells (the classifier still decides membership) and exist so
+#: sparse-index consumers such as ambient provisioning enumerate only the
+#: relevant band instead of scanning the whole frame. Every region key of
+#: ``WILDERNESS_REGION_REGISTRY`` has a window; the bands follow the authored
+#: forest edge and border river extents.
+REGION_SEARCH_BOXES: dict[str, tuple[int, int, int, int]] = {
+    "north_deep_forest": (0, WILDERNESS_MAX_X, _FOREST_EDGE_Y_MIN, WILDERNESS_MAX_Y),
+    "central_mountains": (
+        _MOUNTAIN_RIDGE_BASE_X - 2 * _MOUNTAIN_RIDGE_STEP - _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        _MOUNTAIN_RIDGE_BASE_X + 2 * _MOUNTAIN_RIDGE_STEP + _MOUNTAIN_CORRIDOR_HALF_WIDTH,
+        0,
+        _FOREST_EDGE_Y_MAX - 1,
+    ),
+    "eastern_plains": (0, WILDERNESS_MAX_X, _COASTAL_Y_MAX + 1, _FOREST_EDGE_Y_MAX - 1),
+    "southeast_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
+    "southwest_coast": (0, WILDERNESS_MAX_X, 0, _COASTAL_Y_MAX),
+    "northwest_highland_forest": (
+        0,
+        WILDERNESS_MAX_X,
+        _BORDER_RIVER_Y_MIN + 1,
+        _FOREST_EDGE_Y_MAX - 1,
+    ),
+    "western_hills_valleys": (
+        0,
+        WILDERNESS_MAX_X,
+        _COASTAL_Y_MAX + 1,
+        _BORDER_RIVER_Y_MAX,
+    ),
+}
+
+
 def _footprint_union() -> frozenset:
     """Every anchor footprint cell in the live registry (point shapes: none)."""
     registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
@@ -216,7 +332,7 @@ def _ridge_span(y: int) -> tuple[int, int]:
 def is_closed_ridge_cell(coordinates: tuple[int, int]) -> bool:
     """Whether ``(x, y)`` is an impassable summit-ridge/cliff cell.
 
-    The ridge bends through the central corridor north of the deep forest; the
+    The ridge bends through the central corridor up to its northern limit; the
     authored pass windows are open ground, so land crossings require one of
     them.
     """
@@ -280,19 +396,96 @@ def region_for_coordinates(x: int, y: int) -> str:
     bending corridor rather than a rectangular band.
     """
 
-    if y >= _NORTH_FOREST_Y_MIN:
+    if y >= forest_edge_row(x):
         return "north_deep_forest"
     centre = _ridge_center_x(y)
     if abs(x - centre) <= _MOUNTAIN_CORRIDOR_HALF_WIDTH:
         return "central_mountains"
     if x > centre:  # east of the mountains
         return "southeast_coast" if y <= _COASTAL_Y_MAX else "eastern_plains"
-    # x < centre -- west of the mountains
+    # x < centre -- west of the mountains; the border river divides the
+    # western hills and valleys from the northwest highland forest.
     if y <= _COASTAL_Y_MAX:
         return "southwest_coast"
-    if y >= _HIGHLAND_Y_MIN:
+    if y > border_river_row(x):
         return "northwest_highland_forest"
     return "western_hills_valleys"
+
+
+def nominal_nation_for_coordinates(x: int, y: int) -> str:
+    """Return the one nation that nominally claims ``(x, y)``.
+
+    The coordinate-sensitive claim layer (world-map drawer design §3.3): east
+    of the summit ridge is Grandia (the ridge's centre line continues north of
+    its own limit through the deep forest); west of it, the border river
+    divides Altoria (the river row and south) from Valhalla (north). Region
+    keys stay terrain: the mountain and deep-forest regions span several
+    claims, which ``WildernessRegion.nominal_nation_keys`` lists. Nominal
+    claims are not effective rule; the demographic targets in
+    ``world.lore.nations`` are unchanged. Pure integer arithmetic.
+    """
+    if x > _ridge_center_x(y):
+        return "grandia"
+    if y <= border_river_row(x):
+        return "altoria"
+    return "valhalla"
+
+
+@dataclass(frozen=True)
+class NationalBorder:
+    """One displayed national border line in wilderness cell coordinates.
+
+    ``nation_keys`` is the sorted pair the line separates. The lines are
+    derived from the summit ridge and the border river; no political polyline
+    is authored, and no line is drawn inside the northern deep forest.
+    """
+
+    nation_keys: tuple[str, str]
+    points: tuple[tuple[int, int], ...]
+
+
+def _ridge_polyline(y_start: int, y_end: int) -> tuple[tuple[int, int], ...]:
+    """The ridge centre line from ``y_start`` to ``y_end`` (inclusive rows)."""
+    points = [(_ridge_center_x(y_start), y_start)]
+    for y in range(y_start, y_end):
+        here, following = _ridge_center_x(y), _ridge_center_x(y + 1)
+        if here != following:
+            points.extend(((here, y), (following, y + 1)))
+    points.append((_ridge_center_x(y_end), y_end))
+    deduplicated: list[tuple[int, int]] = []
+    for point in points:
+        if not deduplicated or deduplicated[-1] != point:
+            deduplicated.append(point)
+    return tuple(deduplicated)
+
+
+@cache
+def national_borders() -> tuple[NationalBorder, ...]:
+    """The displayed national borders, derived from the ridge and the river.
+
+    * Altoria | Valhalla: the border river from its mouth to its source, then
+      the source row east to the summit ridge (the derived watershed line the
+      claim resolver uses between the source and the ridge).
+    * Altoria | Grandia: the ridge centre line from the southern coast north to
+      the river's source row.
+    * Grandia | Valhalla: the ridge centre line from that row north to the last
+      row south of the deep forest edge; inside the forest no line is drawn.
+    """
+    river = WATERWAY_ROUTES["border_river"]
+    source_x, junction_y = river[0]
+    junction = (_ridge_center_x(junction_y), junction_y)
+    river_line = tuple(reversed(river)) + ((junction,) if junction[0] != source_x else ())
+    ridge_start = next(
+        y for y in range(WILDERNESS_MAX_Y + 1) if is_land_cell((_ridge_center_x(y), y))
+    )
+    ridge_end = junction_y
+    while (ridge_end + 1) < forest_edge_row(_ridge_center_x(ridge_end + 1)):
+        ridge_end += 1
+    return (
+        NationalBorder(("altoria", "valhalla"), river_line),
+        NationalBorder(("altoria", "grandia"), _ridge_polyline(ridge_start, junction_y)),
+        NationalBorder(("grandia", "valhalla"), _ridge_polyline(junction_y, ridge_end)),
+    )
 
 
 def terrain_description(x: int, y: int) -> str:
