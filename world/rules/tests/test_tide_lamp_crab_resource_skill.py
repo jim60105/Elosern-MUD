@@ -18,7 +18,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield, BattlefieldActionContext
@@ -98,7 +99,7 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(request.skill_key, SKILL_KEY)
         self.assertEqual(request.targets, [player])
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             (crab.traits.mp.current, crab.traits.sp.current),
@@ -124,7 +125,7 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
             ally_before = (ally.traits.hp.current, ally.traits.mp.current)
             paid_before = (crab.traits.mp.current, crab.traits.sp.current)
             with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                refreshed = ActionResolver.resolve(ActionRequest(
+                refreshed = resolve_combat_action(ActionRequest(
                     crab, SKILL_KEY, [ally], BattlefieldActionContext(field),
                 ))
             self.assertEqual(refreshed.outcome, "success")
@@ -155,7 +156,7 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         fallback = _enemy_policy(reloaded, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            self.assertEqual(ActionResolver.resolve(fallback).outcome, "success")
+            self.assertEqual(resolve_combat_action(fallback).outcome, "success")
         self.assertEqual(reloaded.traits.mp.current, 0)
         self.assertEqual(reloaded.traits.sp.current, depleted_sp)
         clock.advance(duration, AdvanceSource.COMMAND, (reloaded,))
@@ -173,7 +174,7 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         practice_before = dict(reloaded.db.skill_proficiency or {})
         player_hp = player.traits.hp.current
         player.traits.hp.current = 0
-        late = ActionResolver.resolve(strike)
+        late = resolve_combat_action(strike)
         self.assertEqual(late.outcome, "rejected")
         self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(

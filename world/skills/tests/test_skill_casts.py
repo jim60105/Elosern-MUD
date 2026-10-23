@@ -17,7 +17,8 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SkillKind, TargetSpec
@@ -103,7 +104,7 @@ class SyntheticDamageCastTests(EvenniaTestCase):
         before = self.target.traits.hp.value
         sp_before = self.actor.traits.sp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(self.request)
+            result = resolve_combat_action(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(self.target.traits.hp.value, before)
         self.assertEqual(
@@ -123,7 +124,7 @@ class SyntheticDamageCastTests(EvenniaTestCase):
         self.assertIn(_T_HOLLOW_STANCE.key, self.actor.skills.owned_keys())
         sp_before = self.actor.traits.sp.value
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(self.request)
+            result = resolve_combat_action(self.request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self.actor.traits.sp.value, sp_before - _T_CLEAVE.cost["sp"]
@@ -153,7 +154,7 @@ class SelfBuffCastTests(EvenniaTestCase):
     def test_self_cast_applies_the_buff_to_the_caster(self):
         self._build()
         request = ActionRequest(self.actor, _T_MOSS_VEIL.key, [], self.context)
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         buff_key = _T_MOSS_VEIL.parsed_effects[0].buff_key
         self.assertIn(buff_key, self.actor.buffs.all)
@@ -164,7 +165,7 @@ class SelfBuffCastTests(EvenniaTestCase):
         request = ActionRequest(
             self.actor, _T_MOSS_VEIL.key, [self.other], self.context
         )
-        result = ActionResolver.resolve(request)
+        result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
@@ -192,11 +193,9 @@ class FieldDamageSelectionTests(EvenniaTestCase):
         self._build()
         self.assertTrue(_T_BLAZE_JAB.usable_out_of_combat)
         mp_before = self.actor.traits.mp.value
-        result = ActionResolver.resolve(
-            ActionRequest(
-                self.actor, _T_BLAZE_JAB.key, [self.actor], RoomActionContext(self.room)
-            )
-        )
+        result = resolve_combat_action(ActionRequest(
+            self.actor, _T_BLAZE_JAB.key, [self.actor], RoomActionContext(self.room)
+        ))
         # The flag gate lets the cast through to the damaging-action gate,
         # which rejects before any MP is deducted or effect is staged.
         self.assertEqual(result.outcome, "rejected")
@@ -216,10 +215,8 @@ class FieldDamageSelectionTests(EvenniaTestCase):
             "active": [_T_CLEAVE.key],
             "passive": [],
         }
-        result = ActionResolver.resolve(
-            ActionRequest(
-                self.actor, _T_CLEAVE.key, [self.actor], RoomActionContext(self.room)
-            )
-        )
+        result = resolve_combat_action(ActionRequest(
+            self.actor, _T_CLEAVE.key, [self.actor], RoomActionContext(self.room)
+        ))
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)

@@ -52,7 +52,11 @@ from world.rules.progression import (
     missing_prerequisite,
 )
 from world.rules.traits import restore_gauges_to_full
-from world.rules.tests._combat_session_helpers import _monster, _player
+from world.rules.tests._combat_session_helpers import (
+    _monster,
+    _player,
+    resolve_combat_action,
+)
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.effects import (
     DamageEffect,
@@ -231,7 +235,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         grant_lineage(self.actor, [domain_skill.key])
 
         req = ActionRequest(self.actor, domain_skill.key, "all-allies", ctx)
-        res = ActionResolver.resolve(req)
+        res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
 
         # Both caster and ally receive the buff and read +12 flat agility
@@ -303,7 +307,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         # Cast area knockback
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             req = ActionRequest(self.actor, storm_skill.key, "all-enemies", ctx)
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
 
         # Living enemy target carries displaced marker, out-of-position is True
@@ -347,7 +351,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_before = target1.traits.hp.current
             magic_req = ActionRequest(self.actor, magic_skill.key, [target1], ctx)
-            magic_res = ActionResolver.resolve(magic_req)
+            magic_res = resolve_combat_action(magic_req)
         self.assertEqual(magic_res.outcome, "success")
         self.assertLess(target1.traits.hp.current, hp_before)
 
@@ -385,7 +389,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         initial_mp = self.actor.traits.mp.current
         with patch("world.rules.combat.damage.roll_d100", side_effect=[100, 100]):
             req = ActionRequest(self.actor, flurry_skill.key, [target], ctx)
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # Exactly two rolls and two damage entries recorded
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -414,7 +418,7 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             ctx_ctrl = BattlefieldActionContext(battlefield=bf, event_context={"now": 100})
             req_ctrl = ActionRequest(self.actor, control_skill.key, [target], ctx_ctrl)
-            res_ctrl = ActionResolver.resolve(req_ctrl)
+            res_ctrl = resolve_combat_action(req_ctrl)
         self.assertEqual(res_ctrl.outcome, "success", f"res_ctrl failed: {res_ctrl.reason} {res_ctrl.detail}")
         ctrl_rolls = [e for e in res_ctrl.event_log.entries if e.kind == "roll"]
         self.assertEqual(len(ctrl_rolls), 1)
@@ -465,14 +469,14 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             hp_start = high_def_target.traits.hp.current
             req_exec = ActionRequest(self.actor, exec_skill.key, [high_def_target], ctx)
-            res_exec = ActionResolver.resolve(req_exec)
+            res_exec = resolve_combat_action(req_exec)
             self.assertEqual(res_exec.outcome, "success", f"res_exec: {res_exec.reason} {res_exec.detail}")
             exec_dmg = hp_start - high_def_target.traits.hp.current
 
             restore_gauges_to_full(high_def_target)
             restore_gauges_to_full(self.actor)
             req_norm = ActionRequest(self.actor, normal_skill.key, [high_def_target], ctx)
-            res_norm = ActionResolver.resolve(req_norm)
+            res_norm = resolve_combat_action(req_norm)
             self.assertEqual(res_norm.outcome, "success", f"res_norm: {res_norm.reason} {res_norm.detail}")
             norm_dmg = hp_start - high_def_target.traits.hp.current
 
@@ -516,14 +520,14 @@ class WindSpellBehaviorTests(EvenniaTestCase):
             restore_gauges_to_full(self.actor)
             hp_start = full_hp_target.traits.hp.current
             req_dev = ActionRequest(self.actor, devast_skill.key, [full_hp_target], ctx2)
-            res_dev = ActionResolver.resolve(req_dev)
+            res_dev = resolve_combat_action(req_dev)
             self.assertEqual(res_dev.outcome, "success", f"res_dev: {res_dev.reason} {res_dev.detail}")
             dev_dmg = hp_start - full_hp_target.traits.hp.current
 
             full_hp_target.traits.hp.current = hp_start
             restore_gauges_to_full(self.actor)
             req_non_dev = ActionRequest(self.actor, non_devast_skill.key, [full_hp_target], ctx2)
-            res_non_dev = ActionResolver.resolve(req_non_dev)
+            res_non_dev = resolve_combat_action(req_non_dev)
             self.assertEqual(res_non_dev.outcome, "success", f"res_non_dev: {res_non_dev.reason} {res_non_dev.detail}")
             non_dev_dmg = hp_start - full_hp_target.traits.hp.current
 

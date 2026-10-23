@@ -918,7 +918,8 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
         from typeclasses.exits import Exit, WildernessGateExit
         from typeclasses.rooms import GridRoom, Room, TerrainRoom
         from world.maps.bootstrap import sync_grid, sync_wilderness
-        from world.rules.action import ActionRequest, ActionResolver
+        from world.rules.action import ActionRequest
+        from world.rules.tests._combat_session_helpers import resolve_combat_action
         from world.rules.combat import BattlefieldActionContext
         from world.rules.tests.combat_fixtures import grant_lineage
 
@@ -968,7 +969,7 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(self.protected.traits.hp.current, hp_before)
         self.assertGreater(self.protected.traits.hp.current, 0)

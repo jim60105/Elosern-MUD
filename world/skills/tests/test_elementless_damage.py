@@ -14,7 +14,8 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from world.rules.action import ActionRequest, ActionResolver
+from world.rules.action import ActionRequest
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext, _stored_hp
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE
 from world.rules.tests.combat_fixtures import grant_lineage
@@ -141,7 +142,7 @@ class ElementlessDamageSettlementParityTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=roll):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     @covers_requirement("damage-effect-handlers::damage-element-school-is-the-defined-convention-for-this-prefix")
     def test_elementless_strike_settles_identically_to_element_bearing_twin(self):
@@ -211,7 +212,7 @@ class ElementlessPracticeAccrualParityTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
     def test_affinity_bearing_and_neutral_actors_accrue_the_same_practice(self):

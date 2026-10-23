@@ -16,7 +16,8 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
-from world.rules.action import ActionRequest, ActionResolver, PendingEffect
+from world.rules.action import ActionRequest, PendingEffect
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -193,7 +194,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
             self.assertLess(self.target.traits.hp.current, 200)
@@ -241,7 +242,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self._grant_skill(self.actor, magic_skill.key, SkillKind.ACTIVE)
             req_magic = ActionRequest(self.actor, magic_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res_magic = ActionResolver.resolve(req_magic)
+                res_magic = resolve_combat_action(req_magic)
             self.assertEqual(res_magic.outcome, "success")
             self.assertNotIn("synth_should_never_apply", entity_active_buffs(self.target))
 
@@ -252,7 +253,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             self._grant_skill(self.actor, physical_skill.key, SkillKind.ACTIVE)
             req_miss = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage._to_hit", return_value=(False, -20.0)):
-                res_miss = ActionResolver.resolve(req_miss)
+                res_miss = resolve_combat_action(req_miss)
             self.assertEqual(res_miss.outcome, "success")
             self.assertNotIn("synth_should_never_apply", entity_active_buffs(self.target))
 
@@ -465,7 +466,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
             # Target took damage from strike
@@ -526,7 +527,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
             # Target took strike damage (once).
@@ -596,7 +597,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                 patch("world.rules.action.resolver._step5_effect_resolution", side_effect=failing_step5),
                 patch("world.rules.combat.damage.roll_d100", return_value=100),
             ):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "rejected")
             # Both parties' HP are completely restored
@@ -651,7 +652,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
             expected_instance_key = f"{ignite_buff.key}:{self.target.key}"
@@ -676,7 +677,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                 bf_immune = self._make_battlefield(immune_actor, self.target)
                 req_immune = ActionRequest(immune_actor, physical_skill.key, [self.target], BattlefieldActionContext(bf_immune))
                 with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                    res_imm = ActionResolver.resolve(req_immune)
+                    res_imm = resolve_combat_action(req_immune)
                 self.assertEqual(res_imm.outcome, "success")
                 self.assertNotIn(expected_instance_key, immune_actor.buffs.all)
                 self.assertNotIn(ignite_buff.key, entity_active_buffs(immune_actor))
@@ -901,7 +902,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             bf = self._make_battlefield(self.actor, self.target)
             req = ActionRequest(self.actor, physical_skill.key, [self.target], BattlefieldActionContext(bf))
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
             self.assertEqual(int(self.target.traits.hp.current), 0)

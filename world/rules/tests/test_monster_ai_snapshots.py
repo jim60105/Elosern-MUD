@@ -62,6 +62,7 @@ from ._combat_session_helpers import (
     _monster,
     _player,
     open_synthetic_scope,
+    resolve_combat_action,
     synth_damage_skill,
     synth_innate_overlay,
 )
@@ -1053,9 +1054,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         self.target.traits.hp.base = 0
         self.target.traits.hp.current = 0
         before = self._stored_traits(self.actor)["mp"]["current"]
-        result = ActionResolver.resolve(
-            ActionRequest(self.actor, SEALED_STRIKE.key, [self.target], context)
-        )
+        result = resolve_combat_action(ActionRequest(self.actor, SEALED_STRIKE.key, [self.target], context))
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(self._stored_traits(self.actor)["mp"]["current"], before)
@@ -1077,9 +1076,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         self.assertTrue(verdict.legal, verdict.detail)
         before = self._stored_traits(self.actor)["mp"]["current"]
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(
-                ActionRequest(self.actor, STRIKE.key, [self.target], context)
-            )
+            result = resolve_combat_action(ActionRequest(self.actor, STRIKE.key, [self.target], context))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             self._stored_traits(self.actor)["mp"]["current"], before - 8

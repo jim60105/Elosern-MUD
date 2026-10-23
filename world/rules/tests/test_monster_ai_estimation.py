@@ -34,6 +34,7 @@ from typeclasses.rooms import Room
 
 from world.rules import monster_behaviour as behaviour
 from world.rules.action import ActionRequest, ActionResolver
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat import (
     COMBAT_YAML,
@@ -1304,9 +1305,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
             target.traits.hp.current = 500
             self.monster.traits.mp.current = 20
             with patch("world.rules.combat.damage.roll_d100", return_value=face):
-                result = ActionResolver.resolve(
-                    ActionRequest(self.monster, STRIKE.key, [target], context, scale=1.0)
-                )
+                result = resolve_combat_action(ActionRequest(self.monster, STRIKE.key, [target], context, scale=1.0))
             self.assertEqual(result.outcome, "success", result.detail)
             settled += 500 - self._committed(target, "hp")
         self.assertAlmostEqual(settled / 100, projection.damage, places=4)
@@ -1355,9 +1354,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
                     target.traits.hp.current = 500
                     self.monster.traits.mp.current = 20
                     with patch("world.rules.combat.damage.roll_d100", return_value=face):
-                        result = ActionResolver.resolve(
-                            ActionRequest(self.monster, STRIKE.key, [target], context, scale=1.0)
-                        )
+                        result = resolve_combat_action(ActionRequest(self.monster, STRIKE.key, [target], context, scale=1.0))
                     self.assertEqual(result.outcome, "success", result.detail)
                     settled += 500 - self._committed(target, "hp")
                 # Agreement across every face between estimation and settlement
@@ -1375,9 +1372,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
         context, estimate = self._estimate(target, DRAIN.key)
         self.assertNotIsInstance(estimate, InvalidEstimate)
         with patch("world.rules.combat.damage.roll_d100", return_value=60):
-            result = ActionResolver.resolve(
-                ActionRequest(self.monster, DRAIN.key, [target], context, scale=1.0)
-            )
+            result = resolve_combat_action(ActionRequest(self.monster, DRAIN.key, [target], context, scale=1.0))
         self.assertEqual(result.outcome, "success", result.detail)
         self.assertEqual(self._committed(self.monster, "mp"), 13.0)
         self.assertEqual(self._committed(target, "mp"), 0.0)

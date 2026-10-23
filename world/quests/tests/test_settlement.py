@@ -46,9 +46,9 @@ from world.quests.transitions import (
 from tools.spec_traceability import covers_requirement
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     register_event_effect_planner,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.guild import (
     RewardClaim,
@@ -483,7 +483,7 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def test_defeat_completion_settles_with_the_action(self):
         self.record = accept_auto(

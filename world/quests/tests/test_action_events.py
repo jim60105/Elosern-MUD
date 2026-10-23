@@ -14,11 +14,11 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import InstanceRoom
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     PendingEffect,
     RejectReason,
     register_event_effect_planner,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import grant_lineage
@@ -104,7 +104,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            return ActionResolver.resolve(request)
+            return resolve_combat_action(request)
 
     def test_lethal_damage_emits_single_target_defeated_with_identity(self):
         monster = self._monster("goblin", hp=1)
@@ -125,7 +125,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(
             [entry.kind for entry in result.event_log.entries if entry.kind == "target_defeated"],
@@ -231,7 +231,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
             BattlefieldActionContext(field),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         return record, result
 
     @covers_requirement("action-resolution-pipeline::event-effect-planners-are-registered-deterministic-and-idempotent-by-name")
@@ -260,7 +260,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         SKILL_TIME_OVERRIDES[_T_SKILL] = -1
         try:
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                result = ActionResolver.resolve(request)
+                result = resolve_combat_action(request)
         finally:
             SKILL_TIME_OVERRIDES.pop(_T_SKILL, None)
         self.assertEqual(result.reason, RejectReason.TIME_COST_LOOKUP_FAILED)

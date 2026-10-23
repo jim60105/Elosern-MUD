@@ -19,7 +19,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import ActionResolver, RejectReason
+from world.rules.action import RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield
@@ -113,7 +114,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(request.targets, [player])
         before = (pecker.traits.mp.current, pecker.traits.sp.current)
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertLess(player.traits.hp.current, 10000)
         self.assertEqual(
@@ -144,7 +145,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             refresh_request = _enemy_policy(pecker, field, record)
             self.assertEqual(refresh_request.skill_key, SKILL_KEY)
             with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                self.assertEqual(ActionResolver.resolve(refresh_request).outcome, "success")
+                self.assertEqual(resolve_combat_action(refresh_request).outcome, "success")
             refreshed = _buff_instances(player)
             self.assertEqual(len(refreshed), 1)
             self.assertEqual(refreshed[0].remaining_seconds, duration)
@@ -164,7 +165,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         fallback = _enemy_policy(pecker, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
-            self.assertEqual(ActionResolver.resolve(fallback).outcome, "success")
+            self.assertEqual(resolve_combat_action(fallback).outcome, "success")
         reloaded = Monster.objects.get(pk=pecker.pk)
         self.assertEqual(reloaded.species_key, pecker.species_key)
         self.assertEqual(reloaded.variant_key, pecker.variant_key)
@@ -184,7 +185,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         practice_before = dict(reloaded.db.skill_proficiency or {})
         player_hp = player.traits.hp.current
         player.traits.hp.current = 0
-        late = ActionResolver.resolve(strike)
+        late = resolve_combat_action(strike)
         self.assertEqual(late.outcome, "rejected")
         self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
         self.assertEqual(

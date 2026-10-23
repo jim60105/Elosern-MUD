@@ -357,6 +357,23 @@ def engagement_provenance(
     )
 
 
+def resolve_combat_action(request, *, slot_ordinal: int = 0, **kwargs):
+    """Resolve one action as the committed combat occurrence a test stands for.
+
+    A direct resolver call against a battlefield context is one committed
+    combat occurrence, so it carries the occurrence provenance the combat
+    owner installs around a real action slot in
+    :mod:`world.rules.combat.rounds`. Without it the resolver fails closed
+    rather than inventing an identity, per
+    ``docs/development/combat-deed-provenance.md``.
+    """
+    from world.rules.action import ActionResolver
+    from world.rules.combat import combat_provenance
+
+    with combat_provenance(engagement_provenance().at_slot(slot_ordinal)):
+        return ActionResolver.resolve(request, **kwargs)
+
+
 def complete_party_draft(commander, enemy, admitted):
     """Confirm one basic attack for every actor the party draft still needs.
 
