@@ -32,8 +32,13 @@ from world.maps.wilderness_provider import (
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
     ElosernWildernessMapProvider,
+    _rasterize_routes,
     _ridge_center_x,
+    _route_row_at,
+    border_river_row,
+    forest_edge_row,
     is_valid_wilderness_cell,
+    nominal_nation_for_coordinates,
     region_for_coordinates,
     terrain_description,
 )
@@ -125,7 +130,7 @@ class TerrainModelTests(unittest.TestCase):
         # along its whole length; its both flanks resolve elsewhere. Which
         # region key that is, is authored data (geography contract module).
         corridor = set()
-        for y in (150, 700, 1200, 2100):
+        for y in (150, 700, 1200, 1800):
             centre = _ridge_center_x(y)
             region = region_for_coordinates(centre, y)
             corridor.add(region)
@@ -155,6 +160,13 @@ class TerrainModelTests(unittest.TestCase):
                 _ridge_center_x(y),
                 _ridge_center_x(y) + 100,
             )
+        ] + [
+            # Both sides of the meandering forest edge and the border river,
+            # where the authored lines reach their band extremes.
+            (x, row + offset)
+            for x in range(0, WILDERNESS_MAX_X + 1, 7)
+            for row in (forest_edge_row(x), border_river_row(x))
+            for offset in (-1, 0, 1)
         ]
         for cell in probes:
             region = region_for_coordinates(*cell)
@@ -163,6 +175,52 @@ class TerrainModelTests(unittest.TestCase):
                 x_min <= cell[0] <= x_max and y_min <= cell[1] <= y_max,
                 (region, cell, REGION_SEARCH_BOXES[region]),
             )
+
+    def test_route_rows_follow_the_rasterizer_for_synthetic_routes(self):
+        # Mechanism, independent of shipped geography: for an x-monotone
+        # shallow route (either direction) the per-column row is exactly the
+        # rasterized cell, and outside the span the end rows continue.
+        for route in (
+            ((10, 50), (40, 41), (70, 58), (95, 58)),
+            ((95, 20), (60, 33), (31, 7), (5, 12)),
+        ):
+            cells = _rasterize_routes({"synthetic": route})
+            xs = sorted({x for x, _ in cells})
+            self.assertEqual(xs, list(range(min(xs), max(xs) + 1)))
+            for x, y in cells:
+                self.assertEqual(_route_row_at(route, x), y, (route, x))
+            west, east = sorted((route[0], route[-1]))
+            self.assertEqual(_route_row_at(route, west[0] - 9), west[1])
+            self.assertEqual(_route_row_at(route, east[0] + 9), east[1])
+
+    def test_nominal_claim_is_total_over_the_frame(self):
+        nations = set()
+        for cell in (
+            (0, 0),
+            (WILDERNESS_MAX_X, 0),
+            (0, WILDERNESS_MAX_Y),
+            (WILDERNESS_MAX_X, WILDERNESS_MAX_Y),
+            LAND_A,
+            LAND_B,
+            LAND_C,
+        ):
+            nations.add(nominal_nation_for_coordinates(*cell))
+            self.assertEqual(
+                nominal_nation_for_coordinates(*cell), nominal_nation_for_coordinates(*cell)
+            )
+        # One string key per cell; west of the ridge the side of the border
+        # river decides, east of it the ridge does.
+        self.assertTrue(all(isinstance(nation, str) and nation for nation in nations))
+        x = LAND_A[0]
+        self.assertNotEqual(
+            nominal_nation_for_coordinates(x, border_river_row(x)),
+            nominal_nation_for_coordinates(x, border_river_row(x) + 1),
+        )
+        y = 900
+        self.assertNotEqual(
+            nominal_nation_for_coordinates(_ridge_center_x(y), y),
+            nominal_nation_for_coordinates(_ridge_center_x(y) + 1, y),
+        )
 
     def test_description_always_matches_its_regions_variants(self):
         for cell in (SEA_MARGIN, EAST_APPROACH, LAND_A, LAND_B, LAND_C, FRAME_CORNER):

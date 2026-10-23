@@ -50,6 +50,21 @@ class WildernessRegionRegistryTests(unittest.TestCase):
             if region.nation_key is not None:
                 self.assertIn(region.nation_key, NATION_REGISTRY)
 
+    def test_every_region_lists_its_sorted_nominal_claimants(self):
+        # Shared terrain regions are explicitly multi-nation; a single-nation
+        # region lists exactly its scalar nation_key.
+        for key, region in WILDERNESS_REGION_REGISTRY.items():
+            with self.subTest(region=key):
+                self.assertTrue(region.nominal_nation_keys)
+                self.assertEqual(
+                    region.nominal_nation_keys, tuple(sorted(set(region.nominal_nation_keys)))
+                )
+                self.assertLessEqual(set(region.nominal_nation_keys), set(NATION_REGISTRY))
+                if region.nation_key is None:
+                    self.assertGreater(len(region.nominal_nation_keys), 1)
+                else:
+                    self.assertEqual(region.nominal_nation_keys, (region.nation_key,))
+
     def test_dataclass_is_frozen_and_keyed_by_key_field(self):
         self.assertTrue(WildernessRegion.__dataclass_params__.frozen)
         for key, region in WILDERNESS_REGION_REGISTRY.items():
