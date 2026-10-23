@@ -155,24 +155,31 @@ HARBOR_SITE_REGISTRY: dict[str, HarborSite] = {
 class WildernessRegion:
     """One terrain region covering part of the continent's wilderness.
 
-    ``nation_key`` is ``None`` for neutral/contested territory; otherwise it
-    names a key in ``world.lore.nations.NATION_REGISTRY`` (asserted by a test,
-    not enforced by the dataclass).
+    ``nation_key`` names the single nation that nominally claims the whole
+    region, or is ``None`` when the region straddles a nominal border (the
+    central mountains and the northern deep forest). ``nominal_nation_keys``
+    lists every nation that claims some of the region's cells, sorted; the
+    per-cell claim is ``world.maps.wilderness_provider.
+    nominal_nation_for_coordinates``. Both name keys in
+    ``world.lore.nations.NATION_REGISTRY`` (asserted by a test, not enforced
+    by the dataclass).
     """
 
     key: str
     display_name_zh: str
     nation_key: str | None
     terrain_flavor_zh: tuple[str, ...]
+    nominal_nation_keys: tuple[str, ...] = ()
 
 
 WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
     "central_mountains": WildernessRegion(
-        "central_mountains", "中央山脈", None, (
+        "central_mountains", "中央山脈", None, (  # split by ridge and river
             "陡峭的山壁直插雲霄，寒風中隱約傳來難以辨明來源的歌聲。",
             "林木稀疏的山徑蜿蜒而上，碎石在腳下滑動，四周異常寂靜。",
             "雲霧終年繚繞山腰，據說深處藏著人族從未涉足之地。",
         ),
+        ("altoria", "grandia", "valhalla"),
     ),
     "eastern_plains": WildernessRegion(
         "eastern_plains", "東部大平原", "grandia", (
@@ -180,6 +187,7 @@ WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
             "平整的官道兩側是修剪整齊的果園，牛車緩緩碾過塵土。",
             "肥沃的黑土地上阡陌縱橫，灌溉渠道映著天光。",
         ),
+        ("grandia",),
     ),
     "southeast_coast": WildernessRegion(
         "southeast_coast", "東南海岸", "grandia", (
@@ -187,6 +195,7 @@ WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
             "石砌的碼頭邊堆滿待運的貨箱，海鳥在桅杆間盤旋。",
             "潮水拍打著防波堤，港區小巷瀰漫著海產與香料的氣味。",
         ),
+        ("grandia",),
     ),
     "western_hills_valleys": WildernessRegion(
         "western_hills_valleys", "西部丘陵與谷地", "altoria", (
@@ -194,6 +203,7 @@ WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
             "谷地間河流蜿蜒，兩岸散落著手工業者的作坊與磨坊。",
             "低緩的丘陵覆滿灌木與野花，羊群在坡地上安靜地啃食。",
         ),
+        ("altoria",),
     ),
     "southwest_coast": WildernessRegion(
         "southwest_coast", "西南海岸", "altoria", (
@@ -201,6 +211,7 @@ WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
             "海崖下的漁村炊煙裊裊，曬鹽場在陽光下泛著白光。",
             "商船的旗幟在海風中獵獵作響，岸邊堆滿待售的精工器物。",
         ),
+        ("altoria",),
     ),
     "northwest_highland_forest": WildernessRegion(
         "northwest_highland_forest", "西北高地森林", "valhalla", (
@@ -208,12 +219,14 @@ WILDERNESS_REGION_REGISTRY: dict[str, WildernessRegion] = {
             "起伏的高地覆蓋著濃密的森林，獵人的營火痕跡散落其間。",
             "礦脈裸露的岩壁旁，成群的野獸在林間空地遊蕩。",
         ),
+        ("valhalla",),
     ),
     "north_deep_forest": WildernessRegion(
-        "north_deep_forest", "北部深林", "valhalla", (  # nominal claim only, see below
+        "north_deep_forest", "北部深林", None, (  # west Valhalla, east Grandia
             "巨木遮蔽天日，林間彌漫著潮濕腐葉的氣息，寂靜得令人不安。",
             "糾結的藤蔓封鎖了視野，遠處似乎有什麼龐然大物正在移動。",
             "無人踏足的密林深處，偶爾傳來不知名生物的低吼。",
         ),
+        ("grandia", "valhalla"),
     ),
 }

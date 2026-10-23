@@ -19,11 +19,50 @@ ridge and water are impassable on foot; three authored pass windows
 arithmetic — no frame scan, no room materialization.
 
 `region_for_coordinates` classifies the whole frame into the seven registry
-regions with the authored bending mountain corridor; `terrain_description`
+regions with the authored bending mountain corridor, the meandering northern
+deep forest edge (`NORTH_FOREST_EDGE`, averaging about Y 1920 and covering
+about one fifth of the land) and the border river; `terrain_description`
 stays the pinned `(x * 92821 + y * 68917) % len(variants)` form. Altoria's
 rasterized footprint is a 40 km² irregular mask and Ciaran is a hidden point
 entrance with one authored entry direction, so unrelated directions there stay
 ordinary wilderness steps.
+
+## Border river, forest edge and nominal claims
+
+界河 (`WATERWAY_ROUTES["border_river"]`) rises at the mountain corridor's
+first cell `(1320, 1410)` and meanders west inside Y 1290..1410 to the west
+coast at `(124, 1290)`. Its segments are all shallower than 45 degrees, so the
+existing rasterizer lays exactly one water cell per column and
+`border_river_row(x)` returns that cell. Corner cutting is forbidden for
+diagonal steps, so the one-cell line is a complete barrier; its three fords
+(`WATERWAY_FORDS["border_river"]`: upstream `(1150, 1363)`, principal
+`(830, 1370)` on the line between the Altoria and Valhalla capitals,
+downstream `(450, 1345)`) are the only crossings west of the source. East of
+the source the mountain corridor and the ridge passes still connect the two
+banks over mountain-trail ground.
+
+The river divides `western_hills_valleys` from `northwest_highland_forest`;
+`forest_edge_row(x)` starts `north_deep_forest`. The summit ridge keeps its
+own northern limit at Y 2200 inside the forest, and the forest keeps ordinary
+woodland travel speed. Region keys stay terrain only:
+`nominal_nation_for_coordinates` is the coordinate-sensitive nominal claim
+(Grandia east of the ridge centre line, Altoria west of it on or south of the
+river row, Valhalla north of it; the source row continues east to the ridge).
+The land shares are about Grandia 43 %, Altoria 30 %, Valhalla 27 %; these are
+nominal claims, while `Nation.territory_share` keeps the effective-rule
+targets. `WildernessRegion.nominal_nation_keys` lists every claimant of a
+region, and `nation_key` is `None` for the two shared regions
+(`central_mountains`, `north_deep_forest`). Anchor `nation_key` values are
+lore identity and are not recomputed from cells: 幽月谷村 lies east of the
+ridge in the forest (nominally Grandia) yet stays administratively
+independent.
+
+`national_borders()` derives the displayed national lines from the same
+geometry: the river plus its source row to the ridge (Altoria | Valhalla) and
+the ridge centre line split at that row (Altoria | Grandia,
+Grandia | Valhalla), stopping at the forest edge. No political polyline is
+authored. The layout prototype under `docs/design/world-map/` predates this
+geography and is not runtime data.
 
 ## Declarations
 
