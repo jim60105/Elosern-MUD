@@ -177,6 +177,100 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     timeout=20000,
                 )
 
+    @covers_requirement("webclient-local-map::island-gateways-expose-labelled-accessible-exit-ring-controls")
+    def test_unleadered_stub_gap_preserves_street_pointer_and_native_gateway_actions(self):
+        from .browser_helpers import install_outbound_recorder, outbound_messages, sent_action_count
+
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        for activation in ("street", "arrow", "label", "Enter", " "):
+            with self.subTest(activation=activation):
+                panel = self._stand_on_gate_room(page)
+                current = panel["current_node"]
+                gateway = next(n for n in panel["nodes"] if n["id"].startswith("wild:") and n["action"])
+                street = next(n for n in panel["nodes"] if n["id"] != current
+                              and n["id"].startswith("grid:") and n["action"])
+                # Synthetic display geometry over real committed identities.
+                # The reducer revision and opaque movement descriptors stay
+                # untouched so the real server still authorizes and commits.
+                # The island unmounts and remounts so its per-map level memory
+                # starts empty: these deltas then project at level 1000 rather
+                # than at a coarser level retained from the real panel.
+                page.evaluate("""async ({street, gateway}) => {
+                  const v = window.__elosernBridge.store.view;
+                  const old = v.localMapModel;
+                  if (!old) throw new Error('no committed local map');
+                  const centre = old.nodes.find(n => n.id === old.currentNode);
+                  const nodes = old.nodes.filter(n => [centre.id, street, gateway].includes(n.id))
+                    .map(n => ({...n, x: centre.x + (n.id === street ? 150 : 0),
+                      y: centre.y + (n.id === street ? 850 : n.id === gateway ? 1 : 0)}));
+                  const synthetic = {...old, nodes, edges: old.edges.filter(e =>
+                    [street, gateway].includes(e.destination) || [street, gateway].includes(e.source))};
+                  v.localMapModel = null;
+                  await new Promise((resolve) => requestAnimationFrame(
+                    () => requestAnimationFrame(resolve)));
+                  v.localMapModel = synthetic;
+                }""", {"street": street["id"], "gateway": gateway["id"]})
+                # Level 1000 draws one dot per 200 m: the caption proves the
+                # geometry the scenario's (120, 32) / (135, 35) points assume.
+                page.wait_for_function("""() => {
+                  const scale = document.querySelector('[data-testid="local-map__scale"]');
+                  return !!scale && scale.textContent.trim() === '格距 200 m';
+                }""")
+                # The north stub's arrowhead stands on the exit ring at
+                # (120, 32): one unit north of the current node projects to
+                # bearing 0 at R_MAX.
+                page.wait_for_function("""() => {
+                  const arrow = document.querySelector('.local-map__stub-arrow');
+                  const transform = arrow && arrow.getAttribute('transform');
+                  return typeof transform === 'string'
+                    && transform.startsWith('translate(120, 32)');
+                }""")
+                self.assertEqual(page.locator(".local-map__stub .local-map__leader").count(), 0)
+                button = page.locator(".local-map__stub-button")
+                self.assertEqual(button.get_attribute("aria-label"),
+                                 f"往 {next(n for n in panel['nodes'] if n['id'] == current)['gateway']['leads_to']} 移動")
+                before = sent_action_count(page, "explore.move")
+                if activation == "street":
+                    point = page.locator(f'.local-map__node[data-node="{street["id"]}"]').evaluate("""el => {
+                      const svg = el.ownerSVGElement;
+                      const p = new DOMPoint(135, 35).matrixTransform(svg.getScreenCTM());
+                      const hit = document.elementFromPoint(p.x, p.y);
+                      return {x:p.x,y:p.y,node:hit?.closest('[data-node]')?.dataset.node};
+                    }""")
+                    self.assertEqual(point["node"], street["id"])
+                    page.mouse.click(point["x"], point["y"])
+                elif activation in ("arrow", "label"):
+                    box = (button.locator(".local-map__stub-hit")
+                           if activation == "label" else button).bounding_box()
+                    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+                    hit = page.evaluate("""([x, y]) => {
+                      const el = document.elementFromPoint(x, y);
+                      const node = el && el.closest('[data-node]');
+                      return {
+                        button: !!(el && el.closest('.local-map__stub-button')),
+                        inside: !!(el && el.closest('.local-map__stub-hit')),
+                        node: node ? node.dataset.node : null,
+                      };
+                    }""", [x, y])
+                    self.assertTrue(hit["button"], f"the {activation} point must hit the stub button")
+                    self.assertIsNone(hit["node"], f"the {activation} point must not hit a street marker")
+                    if activation == "label":
+                        self.assertTrue(hit["inside"], "the label point must hit its own region")
+                    page.mouse.click(x, y)
+                else:
+                    button.focus()
+                    page.keyboard.press(activation)
+                target = street if activation == "street" else gateway
+                wait_for_store_state(page, lambda s: s["panels"]["local_map"]["current_node"] == target["id"],
+                                     timeout=20000)
+                self.assertEqual(sent_action_count(page, "explore.move"), before + 1)
+                payload = [args[0]["payload"] for cmd, args, _ in outbound_messages(page)
+                           if cmd == "ui_action" and args[0]["action_id"] == "explore.move"][-1]
+                self.assertEqual(payload, {"exit_ref": target["action"]["exit_ref"], "current_node": current})
+                self.assertEqual(target["action"]["destination"], target["id"])
+                self.assertEqual(page.locator('[data-testid="map-drawer"]').count(), 0)
+
     def test_minimap_visible_and_keyboard_usable_at_both_viewports(self):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
