@@ -295,7 +295,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure"
     )
     def test_local_map_lattice_node_suite_passes(self):
         result = subprocess.run(
@@ -406,7 +406,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure",
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
         "webclient-local-map::metric-coordinates-survive-authoritative-transport-and-uniform-projection",
         "webclient-local-map::island-gateways-expose-labelled-accessible-exit-ring-controls",
@@ -430,7 +430,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self._run_single_vitest_file("web/webclient-app/tests/world/local_map.test.js", "local map island")
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure",
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
     )
     def test_island_label_placement_vitest_evidence_passes(self):
@@ -443,7 +443,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self._run_single_vitest_file("web/webclient-app/tests/world/island_labels.test.js", "island label placement")
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure",
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology",
     )
     def test_map_lattice_island_renderer_vitest_evidence_passes(self):

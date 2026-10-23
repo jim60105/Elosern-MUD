@@ -9,7 +9,7 @@
 //
 // Every row names a binding the code implements (AppShell `/` and ⌨,
 // CommandLine, the exit compass, the presence rail and its cards, the place
-// card's room actions, the 建議 pill and the wait and suggestions cards, the
+// card's room actions, the map drawer, the 建議 pill and the wait and suggestions cards, the
 // dock's keyboard router and digit picks, MessageWindow, FullLogOverlay,
 // DialogueChoices). `keys` are literal key names shown as key
 // caps; `id` is the stable hook for the row.
@@ -105,6 +105,20 @@ export const CONTROLS_REFERENCE = [
         label: "收合指令列",
         detail: "輸入欄有焦點時收合指令列，草稿保留到下次展開。",
       },
+    ],
+  },
+  {
+    // The map drawer (redesign-map-drawer): its keys act while focus is
+    // anywhere inside the open map.
+    id: "map",
+    title: "地圖",
+    entries: [
+      { id: "map-tabs", keys: ["1", "2"], label: "區域／世界", detail: "切換區域地圖與世界地圖；兩邊各自記得平移與縮放。" },
+      { id: "map-pan", keys: ["↑", "↓", "←", "→"], label: "平移", detail: "移動地圖；也可以直接拖曳。" },
+      { id: "map-zoom", keys: ["＋", "－"], label: "縮放", detail: "在預設的比例之間切換；滾輪可連續縮放。" },
+      { id: "map-recentre", keys: ["C"], label: "回到目前位置", detail: "把地圖移回你所在的位置。" },
+      { id: "map-whole", keys: ["0"], label: "全圖", detail: "顯示整張地圖。" },
+      { id: "map-escape", keys: ["Esc"], label: "返回", detail: "依序關閉圖例或委託清單、選取的詳情，最後關閉地圖。" },
     ],
   },
   {

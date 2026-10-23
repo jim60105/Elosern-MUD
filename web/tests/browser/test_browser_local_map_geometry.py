@@ -133,7 +133,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     @covers_requirement(
         "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention",
     )
@@ -473,7 +473,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure"
     )
     @covers_requirement(
         "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention",
@@ -572,7 +572,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure"
     )
     def test_mirrors_are_clipped_non_focusable_and_do_not_change_island_box(self):
         """Both AT mirrors are presentation-free: clipped, non-focusable, and

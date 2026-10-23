@@ -300,25 +300,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "no lattice renders while the local_map panel is unavailable",
         )
 
-        # The map overlay's opening path (the island's 展開全地圖 trigger routes
-        # through the store's overlay slice) still opens the surface.
+        # The map drawer's opening path (the island's 展開全地圖 trigger routes
+        # through the store's overlay slice) still opens the surface; the
+        # drawer draws its own on-demand maps, never the island's lattice.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
-
-        # The map overlay renders ONLY the registry-owned reason (no lattice).
-        overlay_reason = page.locator('[data-testid="map-overlay-unavailable"]')
-        self.assertTrue(
-            overlay_reason.is_visible(),
-            "the map overlay shows the registry-owned reason",
-        )
+        page.wait_for_selector('[data-testid="map-drawer"]', timeout=15000)
         self.assertEqual(
-            overlay_reason.inner_text(),
-            "區域地圖目前無法顯示",
-            "the map overlay shows the exact registry-owned reason message",
-        )
-        self.assertEqual(
-            page.locator('[data-testid="map-overlay-content"]').count(),
+            page.locator('[data-testid="map-drawer"] [data-testid="local-map__lattice"]').count(),
             0,
-            "the map overlay renders only the reason, never a stale lattice",
+            "the map drawer never renders the island lattice",
         )
         page.close()

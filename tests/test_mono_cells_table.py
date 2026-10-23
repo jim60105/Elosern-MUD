@@ -18,7 +18,7 @@ from tools.spec_traceability import covers_requirement
 class MonoCellsTableTest(unittest.TestCase):
     """The committed one-cell table matches its pure generator."""
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::the-shipped-font-manifest-is-the-single-source-of-the-map-cell-measure")
     def test_regeneration_reproduces_the_committed_block(self):
         committed = gen_mono_cells.OUTPUT_PATH.read_text(encoding="utf-8")
         block = gen_mono_cells.render_block(gen_mono_cells.load_codepoints())

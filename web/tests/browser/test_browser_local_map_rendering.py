@@ -55,7 +55,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "(args) => Evennia.msg('text', [args.cmd], {})", {"cmd": command}
         )
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_minimap_renders_and_distinguishes_states_without_color(self):
         page = self.logged_in_page()
         panel = self._wait_local_map_available(page)
@@ -75,12 +75,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             },
             timeout=30000,
         )
-        # slim-minimap-island (amended requirement): the state legend is an
-        # overlay-only presentation — the island mounts no legend element
-        # for any payload, and the shape ladder below is what distinguishes
-        # states on the island without colour. (The overlay is opened at the
-        # END of this test: opening it first would make the island-scoped
-        # node assertions below match both surfaces.)
+        # slim-minimap-island (amended requirement): the island mounts no
+        # legend element for any payload, and the shape ladder below is what
+        # distinguishes states on the island without colour. (The map
+        # drawer, which carries the legend, is opened at the END of this
+        # test.)
         self.assertEqual(
             page.locator('[data-testid="local-map__legend"]').count(), 0,
             "the island mounts no state legend",
@@ -101,17 +100,14 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
         self.assertTrue(current.is_visible())
 
-        # The full-map overlay keeps the payload's legend, chips paired with
-        # their text labels — inside the `?` popover, which opens closed
-        # (webclient-full-map-fit-view D5), so open it first.
+        # The map drawer's legend states every marker in text beside its
+        # glyph, inside the `?` popover, which opens closed.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
-        page.click('[data-testid="map-overlay-legend-toggle"]')
-        page.wait_for_selector('[data-testid="map-overlay-legend-popover"]', timeout=15000)
-        legend_text = page.locator(
-            '[data-testid="map-overlay"] [data-testid="local-map__legend"]'
-        ).inner_text()
-        self.assertIn("你目前所在的位置", legend_text)
+        page.wait_for_selector('[data-testid="map-drawer-legend-toggle"]', timeout=20000)
+        page.click('[data-testid="map-drawer-legend-toggle"]')
+        legend_text = page.locator('[data-testid="map-drawer-legend"]').inner_text()
+        self.assertIn("目前位置", legend_text)
+        self.assertIn("看過，尚未到訪", legend_text)
 
     def _repin_at_home(self, page) -> None:
         """Deterministically pin the shared character back at the fixture's
@@ -139,7 +135,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_remembered_remote_node_presentation_and_accessibility(self):
         page = self.logged_in_page()
         # Deterministic start: earlier journeys may have moved the shared
@@ -249,13 +245,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="local-map-remembered-mirror"] li').count(), 1)
         self.assertEqual(page.locator('[data-testid="local-map-edge-markers-mirror"]').count(), 0)
-        # Open full map and assert map-overlay-remembered lists the room
-        page.locator('[data-testid="local-map__title"]').click()
-        page.wait_for_selector('[data-testid="map-overlay-remembered"]', timeout=15000)
-        self.assertEqual(page.locator('[data-testid="map-overlay-remembered"] li').count(), 1)
-        self.assertIn("地下金庫", page.locator('[data-testid="map-overlay-remembered"]').inner_text())
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_unknown_nodes_never_appear_in_the_dom(self):
         page = self.logged_in_page()
         panel = self._wait_local_map_available(page)
@@ -370,14 +361,16 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(stub_box["y"], canvas_box["y"] - 0.5)
         self.assertLessEqual(stub_box["x"] + stub_box["width"], canvas_box["x"] + canvas_box["width"] + 0.5)
         self.assertLessEqual(stub_box["y"] + stub_box["height"], canvas_box["y"] + canvas_box["height"] + 0.5)
+        # The map drawer's area tab draws the gate room from its own
+        # server-published area_map.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
         gate_node = page.locator(
-            f'[data-testid="map-overlay"] [data-testid="local-map__node--{gate["id"]}"]'
+            f'[data-testid="map-drawer"] [data-testid="area-map__node"][data-node-id="{gate["id"]}"]'
         )
+        gate_node.wait_for(timeout=20000)
         self.assertEqual(gate_node.count(), 1)
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_reconnect_rebuilds_minimap_from_persisted_knowledge(self):
         page = self.logged_in_page()
         self._wait_local_map_available(page)
