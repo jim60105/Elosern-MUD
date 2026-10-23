@@ -25,6 +25,7 @@ import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_
 import {
   FOREST_ID,
   FOREST_LANDMARK,
+  FOREST_NATION_IDS,
   NATIONS,
   PLACE_IDS,
   PLAYER,
@@ -350,9 +351,12 @@ describe("world selection exposes readable permitted detail", () => {
     await pick(w, `district:${FOREST_ID}`);
     const detail = w.emitted("select").at(-1)[0];
     expect(detail).toMatchObject({ key: `district:${FOREST_ID}`, kind: "district", id: FOREST_ID, lit: true, title: "北境深林" });
-    expect(detail.nations).toEqual(["格蘭迪亞帝國", "瓦爾哈拉獸王國"]);
+    // Both nominal claims (Grandia and Valhalla in the scenario), resolved
+    // from the district's nation ids through common.nations.
+    const both = FOREST_NATION_IDS.map((id) => NATIONS.find((n) => n.id === id).name);
+    expect(detail.nations).toEqual(both);
     const chips = w.findAll('[data-testid="world-map-detail__nation"]').map((c) => c.text());
-    expect(chips).toEqual(["格蘭迪亞帝國", "瓦爾哈拉獸王國"]);
+    expect(chips).toEqual(both);
     expect(w.find('[data-testid="world-map-detail"]').text()).toContain("地標：千年古樹");
     expect(w.find('[data-testid="world-map__live"]').text()).toBe("已選取：北境深林");
   });

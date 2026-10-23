@@ -9,8 +9,9 @@
 // that split three nominal nations, a northern forest held as one district
 // claimed by two of them, and a jittered set of landmarks partitioned on a
 // 10 km raster. No production lore, registry, or design-prototype geometry
-// is imported. The nation ids and the two nation names the spec scenario
-// names are the only shared vocabulary.
+// is imported, and every display name is invented; only the three nation
+// ids follow the wire vocabulary the spec scenario names (grandia and
+// valhalla share the forest).
 
 const FRAME_KM = 2700;
 const CELL_KM = 10;
@@ -93,7 +94,10 @@ function zoneAt(x, y) {
   return y <= riverY(x) ? "altoria" : "valhalla";
 }
 
-const ZONE_NATIONS = { altoria: ["altoria"], grandia: ["grandia"], valhalla: ["valhalla"], forest: ["grandia", "valhalla"] };
+/** The two nominal claims the northern forest district lists. */
+export const FOREST_NATION_IDS = Object.freeze(["grandia", "valhalla"]);
+
+const ZONE_NATIONS = { altoria: ["altoria"], grandia: ["grandia"], valhalla: ["valhalla"], forest: [...FOREST_NATION_IDS] };
 
 function regionAt(x, y, zone) {
   if (zone === "forest") return "north_deep_forest";
@@ -103,9 +107,9 @@ function regionAt(x, y, zone) {
 }
 
 export const NATIONS = [
-  { id: "altoria", name: "阿爾托利亞王國", x: 820.5, y: 1050.5 },
-  { id: "grandia", name: "格蘭迪亞帝國", x: 1950.5, y: 1250.5 },
-  { id: "valhalla", name: "瓦爾哈拉獸王國", x: 760.5, y: 1800.5 },
+  { id: "altoria", name: "銀冠王國", x: 820.5, y: 1050.5 },
+  { id: "grandia", name: "金穗帝國", x: 1950.5, y: 1250.5 },
+  { id: "valhalla", name: "霜牙獸王國", x: 760.5, y: 1800.5 },
 ];
 
 // ── landmarks (district seeds) ────────────────────────────────────────────

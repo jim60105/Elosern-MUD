@@ -3,6 +3,8 @@ import WorldMapView from "../../components/WorldMapView.vue";
 import {
   FOREST_ID,
   FOREST_LANDMARK,
+  FOREST_NATION_IDS,
+  NATIONS,
   QUEST_IDS,
   newLight,
   worldBase,
@@ -260,7 +262,8 @@ export const SelectedForest = {
   play: async ({ canvasElement }) => {
     await frames(3);
     const nations = [...canvasElement.querySelectorAll('[data-testid="world-map-detail__nation"]')].map((el) => el.textContent);
-    if (nations.join("、") !== "格蘭迪亞帝國、瓦爾哈拉獸王國") fail("SelectedForest", `both nations listed, got ${nations}`);
+    const both = FOREST_NATION_IDS.map((id) => NATIONS.find((n) => n.id === id).name);
+    if (nations.join("、") !== both.join("、")) fail("SelectedForest", `both nations listed, got ${nations}`);
     if (canvasElement.querySelector('[data-testid="world-map-detail__title"]').textContent !== "北境深林") {
       fail("SelectedForest", "the lit forest reads its supplied name");
     }
