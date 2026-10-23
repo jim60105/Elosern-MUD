@@ -21,7 +21,7 @@ Implementation budget: 8 hours total. Prerequisites are the exact `depends-on` l
 
 ## Verification record
 
-- `uv run --locked python -m unittest tests.test_map_district_partition`: 14 OK (pure, no Django).
+- `uv run --locked python -m unittest tests.test_map_district_partition`: 19 OK (pure, no Django, including a naive cell-level Dijkstra oracle).
 - `evennia test --settings test_settings.py --keepdb world.maps.tests.test_map_district_partition`: 8 OK
   (production regeneration takes about 6 s and is byte-identical to the committed file).
 - `evennia test ... tests.test_evennia_test_optimization_contract`: 9 OK. The new module is owned by the

@@ -17,6 +17,10 @@ The offline partition SHALL reserve all region-district terrain first and partit
 - **WHEN** the entire mainland is partitioned
 - **THEN** all northern deep-forest cells belong to the one region district even across nominal nations, and every remaining land cell has one reachable Voronoi owner
 
+#### Scenario: A settlement footprint owns the pocket it encloses
+- **WHEN** a same-nation walkable pocket is enclosed on all eight sides by the claimed footprint of a grid landmark
+- **THEN** the pocket belongs to that landmark's district with its footprint, while any other unseeded walkable component fails generation with its coordinates
+
 ### Requirement: Frozen partition and outlines reproduce deterministically offline
 The partition and smoothed outlines SHALL be stored as version-controlled frozen data with row run-length encoding of ownership. Recomputing from the same authored geography and registry SHALL reproduce the stored data. Runtime district lookup SHALL read frozen data without running the partitioner.
 
