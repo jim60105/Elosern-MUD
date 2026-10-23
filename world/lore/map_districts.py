@@ -127,6 +127,10 @@ class _ProductionTerrain:
         self.region_keys = frozenset(WILDERNESS_REGION_REGISTRY)
         self._components = walkable_components()
         self._entries = tuple(self._gateway_entries())
+        # Players leave settlements through gateway approaches, so a cell is
+        # reachable when it shares a component with any of them. The shipped
+        # approaches all lie in one component (pinned by
+        # test_map_district_content), so no isolated pocket counts.
         self._reachable_components = frozenset(
             component
             for _, _, approach in self._entries

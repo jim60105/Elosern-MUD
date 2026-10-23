@@ -132,6 +132,50 @@ class ShippedDistrictContractTests(unittest.TestCase):
         self.assertEqual(plaza.position_m, world_position_m("capital_altoria", (3500, 2850)))
         self.assertTrue(plaza.reachable)
 
+    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
+    def test_grid_landmark_reachability_needs_a_routed_gateway(self):
+        from unittest import mock
+
+        from world.lore import wilderness_entry
+
+        plaza = ("capital_altoria", (3500, 2850))
+        self.assertTrue(self.terrain.grid_site(*plaza).reachable)
+        # Without the capital's gates no gateway routes to the plaza: the same
+        # node still resolves, but it is no longer reachable.
+        others = {
+            key: entry
+            for key, entry in WILDERNESS_ENTRY_REGISTRY.items()
+            if all(gate.z_map_key != "capital_altoria" for gate in entry.gates)
+        }
+        with mock.patch.object(wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", others):
+            site = production_terrain().grid_site(*plaza)
+        self.assertIsNotNone(site)
+        self.assertFalse(site.reachable)
+
+    @covers_requirement("map-districts::every-map-district-has-one-canonical-reachable-landmark")
+    def test_wilderness_landmarks_share_the_gateway_component(self):
+        components = walkable_components()
+        gateway = {
+            components.component(entry.approach_cell(gate))
+            for entry in WILDERNESS_ENTRY_REGISTRY.values()
+            for gate in entry.gates
+        }
+        for district in MAP_DISTRICT_REGISTRY.values():
+            parts = decode_node(district.landmark_node)
+            if parts["prefix"] == "wild":
+                with self.subTest(district=district.key):
+                    self.assertIn(components.component((parts["x"], parts["y"])), gateway)
+        # A cell across the summit ridge away from any pass is valid ground of
+        # the same component (joined through the passes), while the ridge wall
+        # cell itself belongs to none.
+        from world.maps.wilderness_provider import _ridge_center_x
+
+        wall = (_ridge_center_x(1200), 1200)
+        self.assertIsNone(components.component(wall))
+        self.assertEqual(
+            components.component((wall[0] - 3, 1200)), components.component((wall[0] + 3, 1200))
+        )
+
     def test_registry_entries_are_frozen(self):
         district = next(iter(MAP_DISTRICT_REGISTRY.values()))
         with self.assertRaises(dataclasses.FrozenInstanceError):
