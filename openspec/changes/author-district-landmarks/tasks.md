@@ -10,8 +10,8 @@ Implementation budget: 8 hours total. Prerequisites are the exact `depends-on` l
 
 ## 2. Focused behavioral verification
 
-- [ ] 2.1 Extend the existing focused registry data-contract class for total range, one-to-one landmark identity, spacing, registered grid membership and real reachability; do not echo every name as a duplicate approval list.
-- [ ] 2.2 Run only `world.lore.tests.test_map_districts` and `world.maps.tests.test_map_district_partition` (or their smallest affected classes), including the complete frozen-data recomputation comparison.
+- [ ] 2.1 Extend the existing focused registry data-contract class (`ShippedDistrictContractTests` in `world.lore.tests.test_map_district_content`) for total range, one-to-one landmark identity, spacing, registered grid membership and real reachability; do not echo every name as a duplicate approval list.
+- [ ] 2.2 Run only `world.lore.tests.test_map_districts`, `world.lore.tests.test_map_district_content` and `world.maps.tests.test_map_district_partition` (or their smallest affected classes), including the complete frozen-data recomputation comparison.
 
 ## 3. Contracts and focused handoff
 
