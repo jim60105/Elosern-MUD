@@ -181,6 +181,9 @@ describe("map navigation preserves uniform geometry and the zoom anchor", () => 
     expect(formatDistance(850)).toBe("850 m");
     expect(formatDistance(1500)).toBe("1.5 km");
     expect(formatDistance(40000)).toBe("40 km");
+    // Rounding happens before the unit switch.
+    expect(formatDistance(999.96)).toBe("1 km");
+    expect(formatDistance(999.94)).toBe("999.9 m");
   });
 
   it("sizes the scale bar from the same uniform scale", () => {
@@ -481,6 +484,13 @@ describe("offscreen geometry avoids the selected detail drawer", () => {
     const clamped = clampToRect(rect, { x: 500, y: 100 });
     expect(clamped).toMatchObject({ x: -30, y: 100, inside: false, side: "right" });
     expect(Number.isFinite(clamped.angle)).toBe(true);
+    // Away from the centre row the remaining (vertical) axis stops the ray:
+    // centre (-30, 100); dy -200 reaches top 24 and dy +400 reaches bottom 176.
+    expect(clampToRect(rect, { x: 500, y: -100 })).toMatchObject({ x: -30, y: 24, side: "top" });
+    expect(clampToRect(rect, { x: 500, y: 500 })).toMatchObject({ x: -30, y: 176, side: "bottom" });
+    // A rectangle collapsed on both axes degrades to its single point.
+    const dot = { left: 5, top: 7, right: 5, bottom: 7 };
+    expect(clampToRect(dot, { x: 50, y: 8 })).toEqual({ x: 5, y: 7, inside: false, side: "right", angle: (Math.atan2(1, 45) * 180) / Math.PI });
   });
 
   it("feeds projected offscreen markers through the drawer-aware clamp", () => {

@@ -159,11 +159,12 @@ export function toMetres(value, unit) {
 
 /** `850 m`, `1.5 km`, `40 km`. */
 export function formatDistance(metres) {
-  requireFinite(metres, "metres");
-  if (Math.abs(metres) >= 1000) {
-    return `${Number((metres / 1000).toFixed(3))} km`;
+  // Round first so a value just under a unit switch shows as the next unit.
+  const rounded = Number(requireFinite(metres, "metres").toFixed(1));
+  if (Math.abs(rounded) >= 1000) {
+    return `${Number((rounded / 1000).toFixed(3))} km`;
   }
-  return `${Number(metres.toFixed(1))} m`;
+  return `${rounded} m`;
 }
 
 /**
@@ -500,13 +501,19 @@ export function clampToRect(rect, point) {
   if (inside) {
     return freeze({ x: point.x, y: point.y, inside: true, side: null, angle });
   }
-  const tx = dx > 0 ? (rect.right - centre.x) / dx : dx < 0 ? (rect.left - centre.x) / dx : Infinity;
-  const ty = dy > 0 ? (rect.bottom - centre.y) / dy : dy < 0 ? (rect.top - centre.y) / dy : Infinity;
+  // A collapsed axis (zero width or height) cannot stop the ray; the other
+  // axis decides, and a fully collapsed rect falls back to a plain clamp.
+  const wide = rect.right > rect.left;
+  const tall = rect.bottom > rect.top;
+  const tx = wide && dx !== 0 ? ((dx > 0 ? rect.right : rect.left) - centre.x) / dx : Infinity;
+  const ty = tall && dy !== 0 ? ((dy > 0 ? rect.bottom : rect.top) - centre.y) / dy : Infinity;
   const t = Math.min(tx, ty);
-  const side = tx <= ty ? (dx > 0 ? "right" : "left") : dy > 0 ? "bottom" : "top";
+  const horizontal = Number.isFinite(t) ? tx <= ty : Math.abs(dx) >= Math.abs(dy);
+  const side = horizontal ? (dx > 0 ? "right" : "left") : dy > 0 ? "bottom" : "top";
+  const reach = Number.isFinite(t) ? { x: centre.x + dx * t, y: centre.y + dy * t } : point;
   return freeze({
-    x: Math.min(rect.right, Math.max(rect.left, centre.x + dx * t)),
-    y: Math.min(rect.bottom, Math.max(rect.top, centre.y + dy * t)),
+    x: Math.min(rect.right, Math.max(rect.left, reach.x)),
+    y: Math.min(rect.bottom, Math.max(rect.top, reach.y)),
     inside: false,
     side,
     angle,
