@@ -53,12 +53,13 @@
 //   bearing from the current node, labelled `通往 <leads_to>` from the
 //   current gate's metadata (city side), else the target's (a wilderness
 //   payload's adjacent city gate), else the target's own server-authored
-//   label. A non-exit cross-map node yields nothing. The map key (`grid:<z>`,
+//   label, else the exit edge's label. A non-exit cross-map node yields nothing. The map key (`grid:<z>`,
 //   `wild:<name>`) rather than the bare prefix decides this, because two
 //   grid z-maps' coordinates are not comparable either. Remembered nodes are
 //   skipped: they keep the existing edge-direction markers.
 // - Scale candidates are the positive exit distances; with no exits, the
-//   positive context distances. With no positive candidate the level is
+//   positive context distances. With no positive candidate (including exits
+//   that all lie at zero distance, even beside context) the level is
 //   DEFAULT_LEVEL in uniform mode.
 // - The ideal level is the smallest ladder value M with d_max * 100 / M <=
 //   R_MAX. With none, the projection is compressed at the coarsest level (so
@@ -79,13 +80,15 @@
 //   coarser level must not put the nearest exit inside R_MIN, which would
 //   contradict the compression rule. Context-only inputs follow the same
 //   policy, so context can select compression when there are no exits.
-// - Overlap: positive-distance exits whose marker centres are closer than the footprint are
-//   grouped (single link, around the circle) and each group of n is spread
-//   symmetrically about its circular mean bearing at the separation that
-//   clears the footprint at the group's smallest radius, capped so no member
-//   moves more than MAX_SPREAD_DEG from the mean. Members keep their signed
-//   order around the mean (a group straddling north stays in order); a group
-//   whose bearings cancel out has no mean and is left as is. One bounded
+// - Overlap: positive-distance exits whose marker centres are closer than
+//   the footprint are grouped (single link over every pair) and each group
+//   of n is spread symmetrically about its circular mean bearing at the
+//   separation that clears the footprint at the group's smallest radius,
+//   capped so no member moves more than MAX_SPREAD_DEG from the mean.
+//   Members keep their signed order around the mean (a group straddling
+//   north stays in order). A group whose bearings cancel out has no mean, and
+//   a chained group already spanning (n - 1) separations would only be
+//   squeezed; both are left at their exact bearings. One bounded
 //   pass: a very large coincident group may still touch within the cap, and a
 //   spread member may approach an exit outside its group. Every other exit
 //   keeps its exact bearing; radii never change.
@@ -184,12 +187,15 @@ function findCurrent(nodes, currentNode) {
   return nodes.find((node) => node && (node.current === true || node.visibility === "current")) || null;
 }
 
+// Exit node id -> the first labelled incident edge's label.
 function exitIdsOf(edges, currentId) {
-  const ids = new Set();
+  const ids = new Map();
   for (const edge of edges) {
     if (!edge || typeof edge.label !== "string" || edge.label.length === 0) continue;
-    if (String(edge.source) === currentId) ids.add(String(edge.destination));
-    else if (String(edge.destination) === currentId) ids.add(String(edge.source));
+    let other = null;
+    if (String(edge.source) === currentId) other = String(edge.destination);
+    else if (String(edge.destination) === currentId) other = String(edge.source);
+    if (other !== null && !ids.has(other)) ids.set(other, edge.label);
   }
   return ids;
 }
@@ -234,23 +240,28 @@ export function radialMapper(mode, level, candidates) {
 // Spreads overlapping exits (each { bearing, radius, order }) in place.
 export function spreadExits(exits, footprint = EXIT_FOOTPRINT) {
   if (exits.length < 2) return exits;
-  const sorted = [...exits].sort((a, b) => a.bearing - b.bearing || a.order - b.order);
   const overlaps = (a, b) => {
     const pa = screen(a.radius, a.bearing);
     const pb = screen(b.radius, b.bearing);
     return Math.hypot(pa.x - pb.x, pa.y - pb.y) < footprint - EPSILON;
   };
-  // Single-link groups along the bearing order, closing the circle.
-  const groups = [[sorted[0]]];
-  for (let i = 1; i < sorted.length; i += 1) {
-    if (overlaps(sorted[i - 1], sorted[i])) groups[groups.length - 1].push(sorted[i]);
-    else groups.push([sorted[i]]);
+  // Single-link groups over every overlapping pair (union-find; exits are
+  // few), so a nearer or farther exit between two overlapping ones in
+  // bearing order cannot split their group.
+  const parent = exits.map((_, i) => i);
+  const root = (i) => (parent[i] === i ? i : (parent[i] = root(parent[i])));
+  for (let i = 0; i < exits.length; i += 1) {
+    for (let j = i + 1; j < exits.length; j += 1) {
+      if (overlaps(exits[i], exits[j])) parent[root(j)] = root(i);
+    }
   }
-  if (groups.length > 1 && overlaps(sorted[sorted.length - 1], sorted[0])) {
-    const last = groups.pop();
-    groups[0] = [...last, ...groups[0]];
-  }
-  for (const group of groups) {
+  const byRoot = new Map();
+  exits.forEach((exit, i) => {
+    const key = root(i);
+    if (!byRoot.has(key)) byRoot.set(key, []);
+    byRoot.get(key).push(exit);
+  });
+  for (const group of byRoot.values()) {
     const n = group.length;
     if (n < 2) continue;
     const mean = circularMean(group.map((exit) => exit.bearing));
@@ -262,6 +273,10 @@ export function spreadExits(exits, footprint = EXIT_FOOTPRINT) {
     const ordered = [...group].sort(
       (a, b) => angleDelta(a.bearing, mean) - angleDelta(b.bearing, mean) || a.order - b.order,
     );
+    // A chained group already spanning the spread would only be squeezed
+    // together: leave it at its exact bearings.
+    const span = angleDelta(ordered[n - 1].bearing, mean) - angleDelta(ordered[0].bearing, mean);
+    if (span >= (n - 1) * sep - EPSILON) continue;
     ordered.forEach((exit, i) => {
       exit.bearing = normalizeDeg(mean + (i - (n - 1) / 2) * sep);
     });
@@ -340,7 +355,8 @@ export function projectIsland(model, previousLevel = null, options = {}) {
         const leadsTo =
           (current.gateway && current.gateway.leads_to) ||
           (node.gateway && node.gateway.leads_to) ||
-          node.label;
+          node.label ||
+          exitIds.get(id);
         exitStubs.push({
           bearing: zero ? 0 : LocalMap.remoteDirection(current, node).theta,
           label: `通往 ${leadsTo}`,

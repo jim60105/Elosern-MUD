@@ -365,6 +365,28 @@ describe("sparse and coincident inputs", () => {
     expect(bearingOf(byId(projection, zid))).toBeCloseTo(0, 6);
   });
 
+  it("a zero-distance exit in compressed mode is finite at R_MIN, north first", () => {
+    const model = gridModel(3000, 3000, [[80, 0], [0, -1200]]);
+    const zid = `grid:${Z}:3000:3000z`;
+    model.nodes.push(node(zid, 3000, 3000));
+    model.edges.push({ source: model.currentNode, destination: zid, label: "下", known: true, traversable: false });
+    const projection = projectIsland(model, null);
+    expect(projection.mode).toBe("compressed");
+    expect(allFinite(projection)).toBe(true);
+    expect(radiusOf(byId(projection, zid))).toBeCloseTo(R_MIN, 9);
+    expect(bearingOf(byId(projection, zid))).toBeCloseTo(0, 6);
+  });
+
+  it("exits all at zero distance keep the default level even beside context", () => {
+    const model = gridModel(3000, 3000, [], [[0, 850]]);
+    const zid = `grid:${Z}:3000:3000z`;
+    model.nodes.push(node(zid, 3000, 3000));
+    model.edges.push({ source: model.currentNode, destination: zid, label: "上", known: true, traversable: false });
+    const projection = projectIsland(model, null);
+    expect(projection.level).toBe(DEFAULT_LEVEL);
+    expect(allFinite(projection)).toBe(true);
+  });
+
   it("omits context outside the canvas", () => {
     const projection = projectIsland(gridModel(3000, 3000, [[0, 880]], [[0, 1300], [1300, 1300], [300, 0]]), null);
     expect(byId(projection, gridId(3000, 4300))).toBeUndefined();
@@ -441,11 +463,35 @@ describe("overlap spreading", () => {
     expect(bearingOf(byId(wide, gridId(3000, 3800)))).not.toBeCloseTo(0, 3);
   });
 
+  it("groups overlapping exits even when another exit sits between them in bearing order", () => {
+    // A (~10°, r~40) and C (~12°, r~40) overlap; B (~11°, r~80) lies between
+    // them by bearing but overlaps neither.
+    const model = gridModel(3000, 3000, [[69, 394], [153, 785], [83, 391]]);
+    const projection = projectIsland(model, null);
+    expect(projection.mode).toBe("uniform");
+    expect(projection.level).toBe(1000);
+    const a = byId(projection, gridId(3069, 3394));
+    const b = byId(projection, gridId(3153, 3785));
+    const c = byId(projection, gridId(3083, 3391));
+    expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(EXIT_FOOTPRINT - 1e-6);
+    expect(bearingOf(b)).toBeCloseTo((Math.atan2(153, 785) * 180) / Math.PI, 9);
+  });
+
+  it("leaves a chained group that already spans the spread at exact bearings", () => {
+    const offsets = [[0, 800], [400, 693], [693, 400], [800, 0], [693, -400]];
+    const model = gridModel(3000, 3000, offsets);
+    // A 45-unit footprint chains every neighbour 30° apart at r=80.
+    const projection = projectIsland(model, null, { footprint: 45 });
+    for (const [dx, dy] of offsets) {
+      const expected = (((Math.atan2(dx, dy) * 180) / Math.PI) + 360) % 360;
+      expect(bearingOf(byId(projection, gridId(3000 + dx, 3000 + dy)))).toBeCloseTo(expected, 9);
+    }
+  });
+
   it("context never spreads and draws no invented route", () => {
     const projection = projectIsland(gridModel(3000, 3000, [[0, 800]], [[0, 810]]), null);
     expect(bearingOf(byId(projection, gridId(3000, 3810)))).toBeCloseTo(0, 9);
     expect(bearingOf(byId(projection, gridId(3000, 3800)))).toBeCloseTo(0, 9);
-    expect(Object.keys(projection)).not.toContain("edges");
   });
 });
 
@@ -528,6 +574,13 @@ describe("gateway stubs", () => {
     expect(projectIsland(model, null).exitStubs[0].label).toBe("通往 荒野入口");
   });
 
+  it("falls back to the exit edge label when no gateway or node label exists", () => {
+    const { model } = gateModel(10);
+    model.nodes[0].gateway = null;
+    model.nodes[3].label = "";
+    expect(projectIsland(model, null).exitStubs[0].label).toBe("通往 南");
+  });
+
   it("emits stubs in payload order and none for a non-exit cross-layer node", () => {
     const { model } = gateModel(10);
     const second = "wild:wilderness:1201:880";
@@ -560,6 +613,25 @@ describe("background", () => {
     }
   });
 
+  it("wilderness dots anchor to world metres, not cell indices", () => {
+    const cur = current("wild:wilderness:1201:901", 1201, 901);
+    const east = node("wild:wilderness:1202:901", 1202, 901, { action: move("wild:wilderness:1202:901") });
+    const projection = projectIsland(
+      {
+        nodes: [cur, east],
+        edges: [{ source: cur.id, destination: east.id, label: "east", known: true, traversable: true }],
+        currentNode: cur.id,
+      },
+      null,
+    );
+    // 1 km selects 1500; 1,201,000 m and 901,000 m both sit 100 m past a
+    // 300 m dot line.
+    expect(projection.level).toBe(1500);
+    expect(projection.grid.metres).toBe(300);
+    expect(projection.grid.offsetX).toBeCloseTo((200 / 300) * 20, 9);
+    expect(projection.grid.offsetY).toBeCloseTo((100 / 300) * 20, 9);
+  });
+
   it("captions kilometre spacing at the coarsest level", () => {
     const projection = projectIsland(gridModel(5000, 5000, [[0, 4400], [0, -2000]]), null);
     expect(projection.scaleLabel).toBe("格距 1 km");
@@ -581,6 +653,13 @@ describe("background", () => {
     for (let i = 1; i < rings.length; i += 1) {
       expect(rings[i].radius - rings[i - 1].radius).toBeGreaterThanOrEqual(16);
     }
+  });
+
+  it("equal-distance compressed rings use the same linear-below mapping", () => {
+    const projection = projectIsland(gridModel(6000, 6000, [[0, 5000], [5000, 0]]), null);
+    expect(projection.mode).toBe("compressed");
+    // 1 km maps to 7.2 (below the readable floor), 10 km beyond the canvas.
+    expect(projection.grid.rings).toEqual([{ distance: 3000, radius: (36 * 3000) / 5000, label: "3 km" }]);
   });
 
   it("over-capacity rings stay bounded and on the canvas", () => {

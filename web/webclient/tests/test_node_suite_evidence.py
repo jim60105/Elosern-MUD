@@ -380,8 +380,10 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         # Exactly the one file ran, and every case in it passed.
         self.assertRegex(result.stdout, r"Test Files\s+1 passed \(1\)")
-        self.assertRegex(result.stdout, r"Tests\s+\d+ passed")
-        self.assertNotIn("failed", result.stdout)
+        # The return code already covers failures; pin that nothing was
+        # skipped or left as a todo.
+        self.assertRegex(result.stdout, r"Tests\s+\d+ passed \(\d+\)")
+        self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
 
     @covers_requirement(
         "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
