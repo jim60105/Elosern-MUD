@@ -20,7 +20,8 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from world.rules.action import ActionRequest, ActionResolver, PendingEffect
+from world.rules.action import ActionRequest, PendingEffect
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     BuffDefinition,
@@ -106,7 +107,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]), patch(
             "world.rules.action.costs.grant_skill_practice_xp"
         ) as mock_practice:
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -139,7 +140,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80, 80]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -162,7 +163,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 1, 80]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -185,7 +186,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1, 1]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         rolls = [e for e in res.event_log.entries if e.kind == "roll"]
@@ -210,7 +211,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         damages = [e for e in res.event_log.entries if e.kind == "damage"]
@@ -250,7 +251,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
             req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
             with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
             self.assertEqual(res.outcome, "success")
             # 24 post-defense * 0.5 = 12 diverted per strike.
             # Strike 1: 12 diverted, remaining cap = 18
@@ -284,7 +285,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         self.assertEqual(_stored_hp(self.target), 0)
@@ -303,7 +304,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         self.assertEqual(_stored_hp(self.target), 1)
@@ -357,7 +358,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
                     ]
                 },
             ):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "rejected")
             # All HP and MP gauges restored

@@ -9,11 +9,11 @@ from typeclasses.characters import PlayerCharacter
 from tools.spec_traceability import covers_requirement
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     DamageHitEvidence,
     PendingEffect,
     RejectReason,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import COMBAT_YAML, Battlefield, BattlefieldActionContext
 from world.rules.tests.combat_fixtures import FakeEntity, grant_lineage
 from world.tests.synthetic_data import (
@@ -122,7 +122,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # damage._to_hit calls roll_d100 twice: first for foe1, second for foe2
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 1]):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # Check event log entries or pending effects: foe1 got damage + drain, foe2 got miss and NO drain
         drain_entries = [
@@ -151,7 +151,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # 1. Hit vector
         with patch("world.rules.combat.damage.roll_d100", return_value=80) as mock_roll:
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_hit = ActionResolver.resolve(req)
+                res_hit = resolve_combat_action(req)
         self.assertEqual(mock_roll.call_count, 1)
         self.assertEqual(res_hit.outcome, "success")
         self.assertTrue(any(e.kind == "gauge_transfer" for e in res_hit.event_log.entries))
@@ -159,7 +159,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # 2. Miss vector
         with patch("world.rules.combat.damage.roll_d100", return_value=1) as mock_roll_miss:
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_miss = ActionResolver.resolve(req)
+                res_miss = resolve_combat_action(req)
         self.assertEqual(mock_roll_miss.call_count, 1)
         self.assertEqual(res_miss.outcome, "success")
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res_miss.event_log.entries))
@@ -201,7 +201,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         hp_before = self.target_a.traits.hp.current
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # The minimum hit, not a miss: the floor is read from the live combat
         # rulebook rather than pinned as a literal.
@@ -242,7 +242,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
                 self.target_a.traits.hp.current = 100
                 with patch("world.rules.combat.damage.roll_d100", side_effect=rolls):
                     with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                        res = ActionResolver.resolve(req)
+                        res = resolve_combat_action(req)
                 if res.outcome != "success":
                     print(f"FAILED {desc}: {res.reason} {res.detail}")
                 self.assertEqual(res.outcome, "success")
@@ -274,7 +274,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_a.traits.hp.current = 100
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 1]):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_a = ActionResolver.resolve(req)
+                res_a = resolve_combat_action(req)
         self.assertEqual(res_a.outcome, "success")
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res_a.event_log.entries))
 
@@ -282,7 +282,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_a.traits.hp.current = 100
         with patch("world.rules.combat.damage.roll_d100", side_effect=[1, 80]):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_b = ActionResolver.resolve(req)
+                res_b = resolve_combat_action(req)
         self.assertEqual(res_b.outcome, "success")
         self.assertTrue(any(e.kind == "gauge_transfer" for e in res_b.event_log.entries))
 
@@ -306,7 +306,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # On hit: buff is applied
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_hit = ActionResolver.resolve(req)
+                res_hit = resolve_combat_action(req)
         self.assertEqual(res_hit.outcome, "success")
         self.assertTrue(any(e.kind == "buff_applied" and e.data.get("buff_key") == "paralysis" for e in res_hit.event_log.entries))
 
@@ -314,7 +314,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_a.traits.hp.current = 100
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_miss = ActionResolver.resolve(req)
+                res_miss = resolve_combat_action(req)
         self.assertEqual(res_miss.outcome, "success")
         self.assertFalse(any(e.kind == "buff_applied" and e.data.get("buff_key") == "paralysis" for e in res_miss.event_log.entries))
 
@@ -336,7 +336,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # Ally/self never received buff because damage only hit enemy (target_a)
         self.assertFalse(any(e.kind == "buff_applied" and e.data.get("buff_key") == "focus" for e in res.event_log.entries))
@@ -399,7 +399,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         actor_hp_before = self.actor.traits.hp.current
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.target_a.traits.mp.current, 0)
         # Actor recovers 3 -> 23, pays 10 -> ends at 13 MP, SP: 20 -> 15
@@ -418,7 +418,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.current = 20
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.target_a.traits.mp.current, 0)
         # Actor recovers 0 -> pays 10 MP -> 10 MP, SP: 20 -> 15
@@ -431,7 +431,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.current = 20
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.actor.traits.mp.current, 90)
         self.assertEqual(self.actor.traits.sp.current, 15)
@@ -443,7 +443,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.current = 20
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual((res.outcome, getattr(res, "reason", None), getattr(res, "detail", None)), ("success", None, None))
         self.assertEqual(self.actor.traits.mp.current, 20)
         self.assertEqual(self.actor.traits.sp.current, 15)
@@ -455,7 +455,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.current = 20
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.target_a.traits.mp.current, 20)
         self.assertEqual(self.actor.traits.mp.current, 10)
@@ -467,7 +467,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_a.traits.mp.current = 20
         with patch("world.rules.combat.damage.roll_d100") as roll_mp:
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_fail_mp = ActionResolver.resolve(req)
+                res_fail_mp = resolve_combat_action(req)
         self.assertEqual(res_fail_mp.outcome, "rejected")
         self.assertEqual(res_fail_mp.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(roll_mp.call_count, 0)
@@ -484,7 +484,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         )
         with patch("world.rules.combat.damage.roll_d100") as roll_sp:
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res_fail_sp = ActionResolver.resolve(req)
+                res_fail_sp = resolve_combat_action(req)
         self.assertEqual(res_fail_sp.outcome, "rejected")
         self.assertEqual(res_fail_sp.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(roll_sp.call_count, 0)
@@ -544,7 +544,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # roll 100 -> critical hit
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # target lost exactly 10 MP
         self.assertEqual(self.target_a.traits.mp.current, 40)
@@ -558,7 +558,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.current = 20
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         self.assertLessEqual(self.target_a.traits.hp.current, 0)
         self.assertEqual(self.target_a.traits.mp.current, 10)
@@ -635,7 +635,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
                 # Swap hit/miss in the next invocation, so stale evidence fails.
                 rolls = [80, 1] if index == 0 else [1, 80]
                 with patch("world.rules.combat.damage.roll_d100", side_effect=rolls):
-                    result = ActionResolver.resolve(ActionRequest(
+                    result = resolve_combat_action(ActionRequest(
                         actor, skill.key, [self.target_a, self.target_b], context,
                     ))
                 self.assertEqual(result.outcome, "success")

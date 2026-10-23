@@ -789,9 +789,9 @@ class CampaignEncounterTests(EvenniaTestCase):
         with patch.object(ActionResolver, "resolve", refuse):
             with harness._recording(encounter, [], [], [], {monster.key}, {}, []):
                 with self.assertRaises(manual_campaign.RefusedMonsterAction) as raised:
-                    ActionResolver.resolve(
-                        SimpleNamespace(actor=monster, skill_key=BASIC_ATTACK_KEY)
-                    )
+                    # The resolver itself is replaced here: this asserts the
+                    # refusal aborts the batch, not an occurrence identity.
+                    ActionResolver.resolve(SimpleNamespace(actor=monster, skill_key=BASIC_ATTACK_KEY))
         self.assertIn(monster.key, str(raised.exception))
         self.assertIn(BASIC_ATTACK_KEY, str(raised.exception))
         self.assertIn("cast_condition_unmet", str(raised.exception))

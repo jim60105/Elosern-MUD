@@ -31,9 +31,9 @@ from world.quests.compile import (
 )
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     PendingEffect,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
@@ -470,7 +470,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             scale=scale,
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=roll):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
             return result
 
     @covers_requirement(
@@ -731,7 +731,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield, nonlethal=True),
         )
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
+            result = resolve_combat_action(request)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(_stored_hp(self.target), 1)
 
@@ -836,7 +836,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
 
         with patch("world.rules.action.resolver._commit", side_effect=RuntimeError("simulated commit crash")):
             with self.assertRaises(RuntimeError):
-                ActionResolver.resolve(request)
+                resolve_combat_action(request)
 
         # Target HP must remain unchanged
         self.assertEqual(_stored_hp(self.target), before_hp)

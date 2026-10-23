@@ -1470,7 +1470,8 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
     @covers_requirement("guild-exam-restrictions::a-and-s-examination-kits-retain-real-lineage-effects")
     def test_real_a_s_kits_seal_unrelated_effects_and_retain_domain(self):
         from unittest.mock import patch
-        from world.rules.action import ActionRequest, ActionResolver
+        from world.rules.action import ActionRequest
+        from world.rules.tests._combat_session_helpers import resolve_combat_action
         from world.rules.combat import Battlefield, BattlefieldActionContext
         from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
         from world.rules.guild_exam_restrictions import activate_exam_restriction, remove_exam_restriction
@@ -1502,7 +1503,7 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
                 )
                 context = BattlefieldActionContext(battlefield, event_context={"simulated": True}, nonlethal=True)
                 with patch("world.rules.combat.damage.roll_d100", return_value=1):
-                    result = ActionResolver.resolve(ActionRequest(host, "true_sword_saint", [target], context))
+                    result = resolve_combat_action(ActionRequest(host, "true_sword_saint", [target], context))
                 self.assertEqual(result.outcome, "success")
                 self.assertEqual(host.skills.effective_value("atk_phys") + evaluate_combat_modifiers(host)["atk_phys"], 48)
             remove_exam_restriction(host, f"authored-{rank}")

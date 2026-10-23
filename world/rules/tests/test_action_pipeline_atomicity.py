@@ -9,13 +9,13 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
     ActionRequest,
-    ActionResolver,
     CommitFailed,
     PendingEffect,
     RejectReason,
     _commit,
     _stored_trait_value,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import practice_claims_for
 from world.rules.tests.combat_fixtures import grant_lineage
@@ -118,7 +118,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         # Roll=1 -> MISS
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
             with patch.dict(_SKILL_MAP, {skill.key: skill}):
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
         self.assertEqual(res.outcome, "success")
         # Rider was skipped
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res.event_log.entries))
@@ -166,7 +166,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
             with patch("world.rules.combat.damage.roll_d100", return_value=80):
                 with patch.dict(_SKILL_MAP, {skill.key: skill}):
                     with self.assertRaises(RuntimeError):
-                        ActionResolver.resolve(req)
+                        resolve_combat_action(req)
 
         # Actor & Target gauges restored to 100
         self.assertEqual(actor.traits.mp.current, 100)

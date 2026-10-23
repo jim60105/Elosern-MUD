@@ -23,7 +23,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 
 from tools.spec_traceability import covers_requirement
-from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.action import ActionRequest, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.buffs import (
     apply_buff,
     cleanse_debuffs,
@@ -137,7 +138,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         with patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False):
             self.caster.db.skills = {"active": [skill.key], "passive": []}
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                return ActionResolver.resolve(req)
+                return resolve_combat_action(req)
 
     @covers_requirement("skill-registry::dark-spell-progression-composes-executable-curse-and-erosion-behavior")
     def test_curse_ladder_weakens_stats_and_fear_locks_actions(self):
@@ -454,7 +455,7 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         for key in ("dark_atk_down", "nonexistent_spell", "old_dev_spell"):
             with self.subTest(key=key):
                 req = ActionRequest(actor=self.caster, skill_key=key, targets=[self.target], context=ctx)
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
                 self.assertEqual(res.outcome, "rejected")
                 self.assertEqual(res.reason, RejectReason.UNKNOWN_SKILL)
 

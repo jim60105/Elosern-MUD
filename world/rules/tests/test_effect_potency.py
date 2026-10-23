@@ -23,6 +23,7 @@ from world.rules.action import (
     RejectReason,
     _EVENT_EFFECT_PLANNERS,
 )
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
@@ -665,7 +666,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         # Verify event log contains two distinct damage amounts:
@@ -706,7 +707,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         damage_entries = [e for e in res.event_log.entries if e.kind == "damage"]
@@ -745,7 +746,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         )
 
         with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         heal_entries = [e for e in res.event_log.entries if e.kind == "heal"]
@@ -792,7 +793,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             patch("world.rules.action.gates.is_freeform_eligible", return_value=True),
             patch("world.rules.action.gates.freeform_scales_for", return_value=(0.5, 1.0)),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         heal_entries = [e for e in res.event_log.entries if e.kind == "heal"]
@@ -827,7 +828,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.caster.traits.mp.current, initial_mp - 25)
@@ -876,7 +877,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
         ):
-            res = ActionResolver.resolve(req)
+            res = resolve_combat_action(req)
 
         self.assertEqual(res.outcome, "rejected")
         self.assertEqual(self.target.traits.hp.current, initial_hp)

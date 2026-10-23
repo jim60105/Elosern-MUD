@@ -19,7 +19,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
 
 from tools.spec_traceability import covers_requirement
-from world.rules.action import ActionRequest, ActionResolver, CommitFailed, RejectReason
+from world.rules.action import ActionRequest, CommitFailed, RejectReason
+from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import can_use_skill, missing_prerequisite, proficiency_cap
 from world.skills.effects import (
@@ -111,7 +112,7 @@ class WaterManaTideBehaviorTests(EvenniaTest):
         with patch.dict(_SKILL_MAP, {skill.key: skill}, clear=False):
             self.actor.db.skills = {"active": [skill.key], "passive": []}
             with patch("world.rules.combat.damage.roll_d100", return_value=100):
-                return ActionResolver.resolve(req)
+                return resolve_combat_action(req)
 
     @covers_requirement("skill-registry::water-spell-progression-composes-executable-mana-tide-behavior")
     def test_mixed_audience_composite_settlement_and_atomic_rollback(self):
@@ -304,6 +305,6 @@ class WaterManaTideBehaviorTests(EvenniaTest):
         for key in retired_keys:
             with self.subTest(cast_key=key):
                 req = ActionRequest(actor=self.actor, skill_key=key, targets=[self.ally], context=ctx)
-                res = ActionResolver.resolve(req)
+                res = resolve_combat_action(req)
                 self.assertEqual(res.outcome, "rejected")
                 self.assertEqual(res.reason, RejectReason.UNKNOWN_SKILL)
