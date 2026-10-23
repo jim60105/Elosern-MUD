@@ -90,7 +90,9 @@ import {
 } from "../lib/world_map_view.js";
 
 const props = defineProps({
-  // A validated world_map v1 body in its available form.
+  // A validated world_map v1 body in its available form. Replace it with a
+  // new object for every publication, never mutate it in place: per-payload
+  // derivations are memoised on its identity.
   world: { type: Object, required: true },
   // Controlled view `{ signature, cx, cy, span }`; undefined = uncontrolled.
   view: { type: Object, default: undefined },
@@ -241,7 +243,8 @@ function stopReveal() {
 }
 
 // Bumped by every re-baseline, so a queued announcement from before it
-// never lands afterwards.
+// never lands afterwards. Defensive: Vue's flush order already runs each
+// payload's announcement before the next re-baseline can be observed.
 let announceToken = 0;
 function announce(text) {
   // Re-set so an identical announcement is still read.
@@ -994,7 +997,7 @@ const litCount = computed(() => litDistricts.value.length);
             :x="label.x"
             :y="label.y"
             :text-anchor="label.anchor"
-            :style="{ fontSize: `${label.fontPx}px` }"
+            :style="{ fontSize: `${label.fontPx}px`, strokeWidth: `${label.fontPx * 0.28}px` }"
           >
             <tspan
               v-for="(line, i) in label.lines"
@@ -1218,7 +1221,7 @@ const litCount = computed(() => litDistricts.value.length);
   letter-spacing: 0.04em;
   paint-order: stroke;
   stroke: #12100c;
-  stroke-width: 4.5px;
+  /* the halo width is set beside the font size, so it scales with the UI */
   stroke-linejoin: round;
   pointer-events: none;
 }

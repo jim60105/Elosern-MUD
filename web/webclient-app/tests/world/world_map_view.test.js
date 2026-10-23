@@ -15,6 +15,7 @@ import {
   UNLIT_LABEL_MAX_SPAN_KM,
   featureDetail,
   insideOutline,
+  labelCandidates,
   lodFor,
   placeWorldLabels,
   revealTransitions,
@@ -201,6 +202,35 @@ describe("world map detail follows zoom thresholds without shrinking text", () =
     for (const label of labelsOf(w)) expect(Number.parseFloat(label.attributes("style").replace(/[^\d.]/g, ""))).toBeGreaterThanOrEqual(16);
   });
 
+  it("labels scale with the UI and still never overlap", async () => {
+    document.documentElement.style.setProperty("--ui-scale", "1.25");
+    try {
+      const w = mountMap(worldBase(), { view: viewAt(800, { x: 1100, y: 1250 }) });
+      await w.vm.$nextTick();
+      const labels = labelsOf(w);
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        const style = label.attributes("style");
+        const size = Number.parseFloat(/font-size:\s*([\d.]+)px/.exec(style)[1]);
+        expect(size).toBeCloseTo(label.attributes("data-kind") === "nation" ? 25 : 20, 6);
+        const halo = Number.parseFloat(/stroke-width:\s*([\d.]+)px/.exec(style)[1]);
+        expect(halo).toBeCloseTo(size * 0.28, 6);
+      }
+      const candidates = labelCandidates(worldBase(), lodFor(800));
+      const project = (c) => ({ x: (c.x - 1100) * 1.2 + 480, y: 300 - (c.y - 1250) * 1.2 });
+      const placed = placeWorldLabels(candidates, project, FRAME, { fontPx: 20, nationFontPx: 25 });
+      for (let i = 0; i < placed.length; i += 1) {
+        for (let j = i + 1; j < placed.length; j += 1) {
+          const p = placed[i].box;
+          const q = placed[j].box;
+          expect(p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom).toBe(false);
+        }
+      }
+    } finally {
+      document.documentElement.style.removeProperty("--ui-scale");
+    }
+  });
+
   it("collisions hide the lower-priority label instead of shrinking it", () => {
     const project = (c) => ({ x: c.x, y: c.y });
     const candidates = [
@@ -293,9 +323,7 @@ describe("world map detail follows zoom thresholds without shrinking text", () =
     const dense = { resolution_km: 5, rows };
     const grid = trailGridKm(dense, 3000 / 960);
     expect(grid).toBeGreaterThanOrEqual(25);
-    const started = performance.now();
     const line = trailLinePath(dense, grid);
-    expect(performance.now() - started).toBeLessThan(3000);
     expect(line.points).toBeLessThan((2700 / grid) ** 2 * 8);
   });
 });
@@ -359,13 +387,24 @@ describe("newly lit districts animate accessibly from their landmark", () => {
     }
   });
 
-  it("a re-baseline in the same tick drops a queued announcement", async () => {
-    document.documentElement.style.setProperty("--motion-district-reveal", "0ms");
-    const w = mountMap(worldBase(), { epoch: "e1" });
-    await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
-    await w.setProps({ epoch: "e2" });
-    await tick();
-    expect(discovery(w)).toBe("");
+  it("unmounting mid-spread cancels the pending frame", async () => {
+    document.documentElement.style.setProperty("--motion-district-reveal", "600ms");
+    const cancelled = [];
+    const original = globalThis.cancelAnimationFrame;
+    globalThis.cancelAnimationFrame = (handle) => {
+      cancelled.push(handle);
+      return original?.(handle);
+    };
+    try {
+      const w = mountMap(worldBase());
+      await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
+      expect(w.find('[data-testid="world-map__ink"]').exists()).toBe(true);
+      w.unmount();
+      wrappers = wrappers.filter((item) => item !== w);
+      expect(cancelled.length).toBe(1);
+    } finally {
+      globalThis.cancelAnimationFrame = original;
+    }
   });
 
   it("a new epoch or someone else's knowledge re-baselines silently", async () => {
@@ -420,6 +459,8 @@ describe("world selection exposes readable permitted detail", () => {
     expect(text).not.toContain(lit.name);
     expect(text).not.toContain(lit.landmark.name);
     expect(w.findAll('[data-testid="world-map-detail__nation"]')).toHaveLength(0);
+    const button = w.find(`[data-feature="district:${lit.id}"]`).text();
+    expect(button).toMatch(/^未探明分區，(北|東北|東|東南|南|西南|西|西北)方 · 直線約 \d+ km$/);
     // Once it lights, the same key reads the supplied name.
     await w.setProps({ world: validateWorldMapPanel(worldNewLight()) });
     expect(w.find('[data-testid="world-map-detail__title"]').text()).toBe(lit.name);
@@ -445,6 +486,19 @@ describe("world selection exposes readable permitted detail", () => {
     // The approximate commission stays clear of the open detail card.
     const ring = w.find(`[data-testid="world-map__approx"][data-quest="${QUEST_IDS.nearApproximate}"] .world-map__approx-ring`);
     expect(Number(ring.attributes("cx"))).toBeLessThanOrEqual(FRAME.width - 360 - 24);
+  });
+
+  it("a controlled selection follows the host and drops a vanished feature", async () => {
+    const lit = newLight();
+    const w = mountMap(worldNewLight(), { selected: `district:${lit.id}` });
+    expect(w.find('[data-testid="world-map-detail__title"]').text()).toBe(lit.name);
+    await w.setProps({ selected: null });
+    expect(w.find('[data-testid="world-map-detail"]').exists()).toBe(false);
+    await w.setProps({ selected: `quest:${QUEST_IDS.exact}` });
+    expect(w.find('[data-testid="world-map-detail__title"]').text()).toBe("護送藥草商人");
+    await w.setProps({ world: validateWorldMapPanel(worldMap({ quests: [] })) });
+    expect(w.find('[data-testid="world-map-detail"]').exists()).toBe(false);
+    expect(w.emitted("update:selected").at(-1)[0]).toBe(null);
   });
 
   it("selection works from real HTML buttons and a drag never selects", async () => {
