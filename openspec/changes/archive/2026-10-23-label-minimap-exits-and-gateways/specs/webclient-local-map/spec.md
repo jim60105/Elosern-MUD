@@ -642,7 +642,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 
 ### Requirement: The map surfaces state a place name only where it adds information
-On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, while retaining its identity and action. On both surfaces a `visible_*` wilderness node whose label repeats the `current` node's label draws no visible text, because the repeat carries no information; every island exit label that does carry visible text follows the never-dropped label-placement contract.
+On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of its region's display name. On both surfaces a `visible_*` wilderness node whose label repeats the `current` node's label draws no visible text.
 
 #### Scenario: The gate approach cell keeps every other field
 - **WHEN** a gate approach cell is relabelled with its entry's anchor display name

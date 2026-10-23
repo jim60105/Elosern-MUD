@@ -243,7 +243,7 @@ Every node in the version-1 payload SHALL carry exactly one `visibility` value. 
   exceeds the shared node bound, and never displaces a current or in-view node
 
 ### Requirement: The map surfaces state a place name only where it adds information
-On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, so the in-view neighbourhood does not repeat one place name across every cell it draws.
+On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of its region's display name. On both surfaces a `visible_*` wilderness node whose label repeats the `current` node's label draws no visible text.
 
 #### Scenario: The gate approach cell keeps every other field
 - **WHEN** a gate approach cell is relabelled with its entry's anchor display name
@@ -355,9 +355,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **AND** node labels SHALL use the draft label-tier tokens (current, landmark-gold, seen, far)
 
 #### Scenario: The marker shape ladder holds at both scales
-- **WHEN** either placement's canvas renders the visibility states
-- **THEN** the `current` node SHALL render as a seal-deep filled circle with a seal-light stroke, strictly larger than the other on-canvas markers; `visible_visited` SHALL render as a small ink-filled circle; `visible_unvisited` SHALL render as a small hollow circle keeping the `未探索` rule; a landmark node SHALL additionally carry the gold landmark treatment
-- **AND** the resulting shape ladder (large stroked circle / small solid circle / small hollow circle / out-of-canvas diamond for `remembered`) SHALL keep the states distinguishable without colour at both the island and the overlay scale, and the new marker footprints SHALL remain within the geometry guarantee so the non-overlap invariant is unaffected
+- **WHEN** either placement renders node visibility states
+- **THEN** the existing current/visited/unvisited/remembered shape ladder stays non-colour-distinguishable; the island additionally draws a gate glyph for a gateway node while keeping current/visibility treatment readable. The overlay and graph glyphs remain unchanged.
 
 #### Scenario: Each surface declares its label type steps
 - **WHEN** a surface draws node labels or marker names
@@ -535,7 +534,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: No node's name depends on the readout
 - **WHEN** the readout's label content is removed
-- **THEN** every drawn node representation retains its full label as its accessible name; context omitted from the island remains reachable on the unchanged full-map surface, and cross-layer targets use the gateway stub's prescribed accessible name when rendered as stubs. Remembered names retain their visible edge-marker or full-map graph-list presentation and untruncated island text alternatives.
+- **THEN** every drawn node representation retains its full label as its accessible name; context omitted from the island remains reachable on the unchanged full-map surface, and an actionable cross-layer gateway stub is named `往 <leads_to> 移動`. Remembered names retain their visible edge-marker or full-map graph-list presentation and untruncated island text alternatives.
 
 #### Scenario: The readout treatment is token-driven, not copied
 - **WHEN** the island renders its readout
@@ -544,8 +543,7 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: The single full-map affordance is an invisible real button
 - **WHEN** the island presents its full-map affordance
-- **THEN** it SHALL present exactly one, carrying no visible button chrome — no labelled control, icon button, or other visible trigger anywhere on the island
-- **AND** the affordance SHALL be a real `<button>` element spanning the island's whole box, transparent and layered beneath the island's visual content so the button element itself contains no focusable descendant, carrying 展開全地圖 as its accessible name
+- **THEN** exactly one full-map affordance remains, with no visible expand-button chrome; cross-layer gateway stubs are separate focusable move buttons. The transparent full-bleed expand button remains beneath content with no focusable descendant and accessible name 展開全地圖.
 
 #### Scenario: Activation runs through the platform's button behaviour
 - **WHEN** the affordance is activated by pointer, by Enter, or by Space
@@ -564,8 +562,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** it SHALL be unchanged: a click on the island's body SHALL open the full-map surface, a click that originates in an interactive descendant — an actionable lattice node or the affordance itself — SHALL run only that descendant's own behaviour, and every activation path SHALL open the full-map surface exactly once
 
 #### Scenario: The island carries no other interactive descendant
-- **WHEN** the island is rendered on any layout variant
-- **THEN** it SHALL carry no other tab stop and no other interactive descendant: neither an edge direction marker, nor a marker name, nor an entry of either text alternative SHALL be focusable or activatable, so the affordance remains the island's single keyboard path on every layout variant
+- **WHEN** the island is rendered
+- **THEN** remembered markers and their text alternatives remain inert and non-focusable; the existing full-map affordance remains, and each cross-layer gateway stub with a move action is an additional focusable button. Instance/interior behavior is unchanged.
 
 #### Scenario: Remembered presentation follows the variant, once per surface
 - **WHEN** remembered nodes are presented on a surface
@@ -600,8 +598,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the text alternative mirrors those markers one-for-one in deterministic order with full names and octant words; it adds no remembered distance, numeric bearing or coordinates. The island scale caption and compressed ring labels are separate permitted distance information.
 
 #### Scenario: The mirror omits nothing, invents nothing, adds no tab stop
-- **WHEN** the surface derives its text alternative
-- **THEN** the mirror SHALL be derived from the same marker set the surface draws, so it can neither omit a drawn marker nor invent one, and SHALL introduce no additional tab stop: the island's tab order SHALL remain exactly its single full-map affordance, and neither the markers nor the mirror SHALL be focusable
+- **WHEN** the surface derives its remembered-marker text alternative
+- **THEN** it derives from the same remembered marker set and adds no tab stop; neither remembered markers nor their mirror become activatable. The island separately retains its full-map affordance and gateway exit-stub buttons.
 
 #### Scenario: Coordinate-free payloads render no edge direction markers
 - **WHEN** a coordinate-free payload renders
@@ -731,15 +729,15 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 
 #### Scenario: A node's name stays reachable without the readout
 - **WHEN** an in-view node's label is truncated on the island's canvas and a remembered node is presented alongside it
-- **THEN** the drawn node retains its full accessible name independently of truncation; an omitted context node or cross-layer target keeps its original full name reachable on the unchanged full-map surface, while a gateway stub uses its prescribed travel accessible name. Remembered nodes retain their visible marker or full-map graph-list names and untruncated island alternatives.
+- **THEN** the drawn node retains its full accessible name independently of truncation; an omitted context node or cross-layer target keeps its original full name reachable on the unchanged full-map surface, while an actionable gateway stub is named `往 <leads_to> 移動`. Remembered nodes retain their visible marker or full-map graph-list names and untruncated island alternatives.
 
 #### Scenario: A screen-reader user can still reach every remembered place
 - **WHEN** a screen-reader user reads the minimap island on a wilderness payload carrying several remembered gateways, none of which is focusable and each of which is drawn inside the map graphic
 - **THEN** the island exposes one text-alternative entry per drawn marker, in a deterministic order, each stating that place's untruncated authored name and its direction as one of the eight octant names, so no remembered place is reachable only by sight
 
 #### Scenario: Replacing the list adds no tab stop and no activation
-- **WHEN** a keyboard user tabs through the island on a payload carrying the maximum number of remembered gateways
-- **THEN** the island still offers exactly one tab stop — its full-map affordance — neither an edge direction marker nor the text alternative is focusable, and activating anything on the island still opens only the full-map surface or submits only a lattice node's own move
+- **WHEN** a keyboard user tabs through an island carrying remembered gateways
+- **THEN** remembered markers and text alternatives add no tab stop or travel action; the full-map affordance and any actionable cross-layer gateway stub retain their own behavior and do not activate each other.
 
 #### Scenario: A coordinate-free layer asserts no orientation and no coordinates
 - **WHEN** the committed payload's layer is coordinate-free
@@ -786,8 +784,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the overlay body shows its guide row, the map canvas in the graph variant with its view controls and legend popover control floating over the canvas's top-right corner, and a visible remembered list outside the canvas and below it with exactly one entry per remembered room in payload order, each pairing the remembered state's non-colour indicator with the room's full name, carrying no tab stop, no role that invites activation, and no travel action, and the body renders no coordinate readout line
 
 #### Scenario: Draft marker ladder reads without colour
-- **WHEN** the island renders a current node, a visited node, an unvisited node, and a landmark node
-- **THEN** the current node is the large seal-stroked circle, the visited node is a smaller solid circle, the unvisited node is a smaller hollow circle, the landmark carries the gold treatment, and no two states share a shape
+- **WHEN** the island renders current, visited, unvisited and gateway nodes
+- **THEN** current retains its larger seal treatment, visited is solid and unvisited hollow; gateway nodes add the gate glyph, room name and `通往 <leads_to>` second line without relying on colour to identify a gateway.
 
 #### Scenario: Map chrome colours resolve to design tokens
 - **WHEN** either map surface renders its chrome
@@ -858,8 +856,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the line states nothing and paints no border or box, and its row keeps its one-line height so the island's size is the same as on a payload whose readout states a figure
 
 #### Scenario: The island offers exactly one full-map affordance, with no visible button
-- **WHEN** an available `local_map` payload renders on the island
-- **THEN** exactly one full-map affordance exists in the island, it is a `<button>` element spanning the island's whole box with 展開全地圖 as its accessible name, no labelled control or icon button is rendered in the island's header or anywhere else in the island, and the island's root element carries no role and no tab stop of its own
+- **WHEN** an available local-map payload renders
+- **THEN** exactly one transparent full-bleed full-map button named 展開全地圖 exists; the root has no role or tab stop and no expand icon or labelled expand control is added. Separate exit-ring gateway buttons remain visible/focusable for their move action.
 
 #### Scenario: A keyboard user opens the full map from the island
 - **WHEN** a keyboard user tabs to the island's full-map affordance and presses Enter, and then repeats the run pressing Space
@@ -930,8 +928,8 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 - **THEN** the overlay keeps its existing uniform lattice projection and view controls; the coordinate-bearing island uses its current-centred automatic uniform/compressed projection, drawing all same-layer exits, drawable context and the remembered edge-direction markers — on the island smaller diamonds on the square's rim band, each name drawn whole inside the square. Payload coordinates and action identity remain unchanged; coordinate-free graphs retain their existing layout.
 
 #### Scenario: The decoration layers stay out of the audit and the accessibility tree
-- **WHEN** the browser geometry audit collects every node-marker box and every node-label box on the island's canvas, and a screen reader reads the island
-- **THEN** the dot field, the vignette, and the axis contribute no box to either collection because they carry neither component class, they intercept no pointer event, they add no tab stop and no accessible name, and the island still exposes exactly one tab stop — its full-map affordance
+- **WHEN** geometry audit and assistive technology inspect island decoration
+- **THEN** dots, rings, vignette and axis add no node-marker/node-label boxes or tab stops and intercept no pointer events; distance text supplies the scale information. Remembered markers remain inert while gateway exit stubs are separate named buttons.
 
 #### Scenario: Reduced motion and the non-colour encoding are unaffected
 - **WHEN** the island renders with the reduced-motion preference active and with the colourblind override on
@@ -960,6 +958,10 @@ The WebClient `local-map` component SHALL render the validated `local_map` panel
 #### Scenario: Metric fixtures exercise actual renderer exits
 - **WHEN** Altoria 21-node, Ciaran 10-node, wilderness 3x3, Altoria south-gate and extreme-ratio fixture stories render
 - **THEN** each metric story verifies every exit representation is inside the canvas and no two exit markers overlap; existing unit-coordinate overlay fixtures and coordinate-free stories keep their existing contracts.
+
+#### Scenario: Labels are assigned in navigation priority
+- **WHEN** island marker labels compete for space
+- **THEN** eight candidate positions per marker are tried in exit, current, context priority; an exit label that fits nowhere remains drawn truncated to labelMax with a leader line, a context label that fits nowhere is omitted, and each full name remains in its accessible name. Gateway second-line labels respect the 16 px floor. Remembered edge-marker names are laid out before node labels and are always drawn whole, never truncated; a duplicate wilderness region label suppressed as information-free is not an exit label dropped for lack of room.
 
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
 The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity.
@@ -1007,7 +1009,7 @@ The WebClient `local-map` component SHALL make a currently traversable adjacent 
   produces for the same payload, since both surfaces share the same lattice-rendering logic
 
 ### Requirement: Wilderness minimap nodes are actionable
-Every traversable adjacent wilderness node in the local map SHALL carry an `explore.move` action
+Every traversable adjacent wilderness node in the local-map payload SHALL carry an `explore.move` action
 descriptor with the canonical destination node, matching the grid/interior layers' behavior. Where a
 direction is a registered gateway step, the node it renders IS the resolved `grid:` gate node — its
 id, label (the gate room's canonical name), landmark flags, and action destination all identify that
@@ -1026,15 +1028,15 @@ gate node, and no geometric `wild:` cell stands in for it.
 - **THEN** the node carries no move action
 
 ### Requirement: The minimap gate nodes match traversal in both directions
-For every gate of every entry in the wilderness entry registry, the minimap SHALL present the gateway as a matched pair of edges on both sides, and the rendered destination SHALL always equal the node carrying it and always equal what `resolve_wilderness_destination` derives from the same registration the traversal code reads.
+For every gate of every entry in the wilderness entry registry, the payload SHALL preserve the matched gateway pair on both sides, the island SHALL represent a cross-layer target by an exit stub instead of a node, and the destination SHALL always equal the node carrying it and always equal what `resolve_wilderness_destination` derives from the same registration the traversal code reads.
 
 #### Scenario: The approach cell renders the gate's grid node
 - **WHEN** the puppet stands at the gate's approach cell
-- **THEN** the gateway direction (`return_direction`) SHALL render the gate's grid node — canonical `grid:` id, gate room label, resolver-derived visibility, and a move descriptor with that id as destination
+- **THEN** the gateway direction (`return_direction`) SHALL emit the gate's grid node — canonical `grid:` id, gate room label, resolver-derived visibility, and a move descriptor with that id as destination
 
 #### Scenario: The gate room renders the approach cell's wild node
 - **WHEN** the puppet stands at the gate room
-- **THEN** the grid layer SHALL render that gate's approach cell's `wild:` node — canonical `wild:` id for the approach cell, the region's display name, knowledge-derived visibility, and a move descriptor whose `exit_ref` is that gate's exit and whose destination is that `wild:` id
+- **THEN** the grid layer SHALL emit that gate's approach cell's `wild:` node — canonical `wild:` id for the approach cell, the region's display name, knowledge-derived visibility, and a move descriptor whose `exit_ref` is that gate's exit and whose destination is that `wild:` id
 
 #### Scenario: A pinning test walks every gateway both ways
 - **WHEN** the pinning test runs
@@ -1462,3 +1464,22 @@ Uniform projection SHALL return dots with 20-unit spacing anchored to integer wo
 #### Scenario: Compressed rings use real distances
 - **WHEN** a compressed projection is generated
 - **THEN** a bounded readable set of positive distances, such as 100 m, 300 m and 1 km when in range, receives radii from the same mapping and distance labels; no uniform dot field is returned.
+
+### Requirement: Island gateways expose labelled accessible exit-ring controls
+The island SHALL draw gateway nodes with a gate glyph, room label and second line `通往 <leads_to>`. A cross-layer target SHALL be represented only by an exit-ring arrow labelled `通往 <leads_to>`, retaining the target's nullable move action; an actionable stub SHALL be a focusable button named `往 <leads_to> 移動`.
+
+#### Scenario: Current city gate offers wilderness travel
+- **WHEN** the current city gate carries its far-side region metadata and a cross-layer target move descriptor
+- **THEN** the region-labelled stub is drawn at that target bearing on the exit ring; pointer, Enter and Space each submit exactly one move using the original exit_ref and current_node, without also opening the map or inventing a destination.
+
+#### Scenario: Wilderness offers city return without city streets
+- **WHEN** a wilderness payload carries an adjacent grid gateway with settlement leads_to metadata
+- **THEN** the island shows the settlement-labelled exit-ring stub, no cross-layer grid node or city streets, and no scale effect from the renderer-local gateway offset; its move arrives at the original grid destination.
+
+#### Scenario: A locked gateway remains navigation information
+- **WHEN** a gateway exit has action null
+- **THEN** its exit representation and far-side label remain visible, but activation submits no move; the gateway field never grants traversal that the server withheld.
+
+#### Scenario: Gateway stories check the full exit set
+- **WHEN** metric south-gate and wilderness-return stories run
+- **THEN** the story checks every same-layer exit marker and cross-layer exit-ring representation inside the canvas with no two exit markers overlapping; its focus and activation assertions preserve exact payload actions.
