@@ -164,6 +164,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.character.location = room
         self.character.db.active_combat = {
             "session_id": "hostile:1:1",
+            "engagement_id": "hostile:1:1:0",
             "mode": "hostile",
             "room_id": int(room.pk),
             "player_ids": [int(self.character.pk)],
