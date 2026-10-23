@@ -362,13 +362,23 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertLessEqual(stub_box["x"] + stub_box["width"], canvas_box["x"] + canvas_box["width"] + 0.5)
         self.assertLessEqual(stub_box["y"] + stub_box["height"], canvas_box["y"] + canvas_box["height"] + 0.5)
         # The map drawer's area tab draws the gate room from its own
-        # server-published area_map.
+        # server-published area_map (redesign-map-drawer): that map is the
+        # grid layer of one map, so it carries the gate room's own cell and
+        # never the cross-layer wilderness approach cell the island shows as
+        # its exit-ring stub.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
-        gate_node = page.locator(
-            f'[data-testid="map-drawer"] [data-testid="area-map__node"][data-node-id="{gate["id"]}"]'
+        room_cell = page.locator(
+            f'[data-testid="map-drawer"] [data-testid="area-map__node"][data-node-id="{gate_room["id"]}"]'
         )
-        gate_node.wait_for(timeout=20000)
-        self.assertEqual(gate_node.count(), 1)
+        room_cell.wait_for(timeout=20000)
+        self.assertEqual(room_cell.count(), 1)
+        self.assertEqual(
+            page.locator(
+                f'[data-testid="map-drawer"] [data-testid="area-map__node"][data-node-id="{gate["id"]}"]'
+            ).count(),
+            0,
+            "the area tab never draws another layer's node",
+        )
 
     @covers_requirement("webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure")
     def test_reconnect_rebuilds_minimap_from_persisted_knowledge(self):
