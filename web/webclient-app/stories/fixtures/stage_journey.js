@@ -91,6 +91,7 @@ export function stageJourneyLocalMap(nodeId) {
       current: cell.id === nodeId,
       anchor: false,
       landmark: cell.id === "grid:altoria:2:1",
+      gateway: null,
       action: null,
     })),
     edges: STREET_EDGES.map(([source, destination, label]) => ({

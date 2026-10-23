@@ -113,6 +113,66 @@ class LocalMapSchemaTests(unittest.TestCase):
             validate_local_map(_valid_panel(nodes=bad_ref))
 
     @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
+    def test_gateway_is_required_and_exactly_null_or_bounded_leads_to(self):
+        # Accepted forms: null, and an exact {leads_to} object at the shared
+        # 256-code-point node-string bound, normalized unchanged.
+        for gateway in (None, {"leads_to": "北境"}, {"leads_to": "字" * MAX_STRING_CODE_POINTS}):
+            with self.subTest(accepted=gateway):
+                normalized = validate_local_map(_valid_panel(nodes=[_valid_node(gateway=gateway)], edges=[]))
+                self.assertEqual(normalized["nodes"][0]["gateway"], gateway)
+                self.assertEqual(set(normalized["nodes"][0]), set(_valid_node()))
+
+        # Omission is rejected: there is no default and no alias.
+        omitted = _valid_node()
+        del omitted["gateway"]
+        with self.assertRaisesRegex(ProtocolValidationError, "gateway|leads_to"):
+            validate_local_map(_valid_panel(nodes=[omitted], edges=[]))
+        aliased = _valid_node()
+        aliased["gateway_leads_to"] = aliased.pop("gateway")
+        with self.assertRaisesRegex(ProtocolValidationError, "gateway|leads_to"):
+            validate_local_map(_valid_panel(nodes=[aliased], edges=[]))
+
+        for malformed in (
+            "北境",
+            0,
+            False,
+            [],
+            [{"leads_to": "北境"}],
+            {},
+            {"leads_to": "北境", "label": "北境"},
+            {"to": "北境"},
+            {"leads_to": ""},
+            {"leads_to": "   "},
+            {"leads_to": None},
+            {"leads_to": 5},
+            {"leads_to": ["北境"]},
+            {"leads_to": "字" * (MAX_STRING_CODE_POINTS + 1)},
+        ):
+            with self.subTest(rejected=malformed):
+                with self.assertRaisesRegex(ProtocolValidationError, "gateway|leads_to"):
+                    validate_local_map(_valid_panel(nodes=[_valid_node(gateway=malformed)], edges=[]))
+
+    def test_builder_dedup_never_loses_gateway_metadata(self):
+        from web.webclient.presentation.local_map import _GraphBuilder
+
+        gateway = {"leads_to": "北境"}
+        # A node first added without metadata is enriched by a later add...
+        builder = _GraphBuilder({})
+        builder.add_node("room:7", "門", 0, 0, visibility="visible_unvisited")
+        builder.add_node("room:7", "門", 0, 0, visibility="visible_unvisited", gateway=gateway)
+        self.assertEqual(builder.nodes[0]["gateway"], gateway)
+        # ...and a later null add never downgrades metadata already carried.
+        builder = _GraphBuilder({})
+        builder.add_node("room:7", "門", 0, 0, visibility="visible_unvisited", gateway=gateway)
+        builder.add_node("room:7", "門", 0, 0, visibility="visible_unvisited")
+        self.assertEqual(len(builder.nodes), 1)
+        self.assertEqual(builder.nodes[0]["gateway"], gateway)
+        # The builder default is null on every emitted node.
+        builder = _GraphBuilder({})
+        builder.add_node("room:8", "廳", 0, 0, visibility="current", current=True)
+        self.assertIsNone(builder.nodes[0]["gateway"])
+
+    @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_every_d10a_bound_is_enforced(self):
         self.assertLessEqual(MAX_NODES, 128)
         self.assertLessEqual(MAX_EDGES, 128)
@@ -333,6 +393,8 @@ class LocalMapSchemaTests(unittest.TestCase):
                     y=1024 if index % 2 else -1024,
                     visibility="remembered" if index else "current",
                     current=(index == 0),
+                    # Realistic gateway metadata on every eighth node.
+                    gateway=({"leads_to": "測試遠方荒原"} if index % 8 == 0 else None),
                     action=(
                         None
                         if index == 0
@@ -391,6 +453,7 @@ class LocalMapSchemaTests(unittest.TestCase):
                     y=COORD_MIN,
                     visibility="remembered" if index else "current",
                     current=(index == 0),
+                    gateway={"leads_to": "字" * MAX_STRING_CODE_POINTS},
                     action=(
                         None
                         if index == 0

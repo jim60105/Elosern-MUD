@@ -18,7 +18,9 @@ import LocalMapModel from "../../lib/local_map.js";
 // The `local_map` v1 lattice: exactly one current node; adjacent nodes
 // marked unvisited/visited, a remembered far node, edges with traversable
 // states, the legend explaining every visibility state, and an actionable
-// adjacent node whose `action` carries the OOB move intent.
+// adjacent node whose `action` carries the OOB move intent. Every node
+// carries the required `gateway` field: null, except the 南門 gate room,
+// whose `{leads_to}` names the wilderness region its gate opens onto.
 export const LOCAL_MAP_SAMPLE = {
   schema_version: 1,
   available: true,
@@ -35,6 +37,7 @@ export const LOCAL_MAP_SAMPLE = {
       current: true,
       anchor: true,
       landmark: true,
+      gateway: null,
       action: null,
     },
     {
@@ -46,6 +49,7 @@ export const LOCAL_MAP_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: { leads_to: "西部丘陵與谷地" },
       action: { kind: "move", exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2" },
     },
     {
@@ -57,6 +61,7 @@ export const LOCAL_MAP_SAMPLE = {
       current: false,
       anchor: true,
       landmark: false,
+      gateway: null,
       action: null,
     },
     {
@@ -68,6 +73,7 @@ export const LOCAL_MAP_SAMPLE = {
       current: false,
       anchor: false,
       landmark: true,
+      gateway: null,
       action: null,
     },
   ],
@@ -102,6 +108,7 @@ export const LOCAL_MAP_MINIMAL_SAMPLE = {
       current: true,
       anchor: true,
       landmark: true,
+      gateway: null,
       action: null,
     },
     {
@@ -113,6 +120,7 @@ export const LOCAL_MAP_MINIMAL_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
   ],
@@ -167,6 +175,7 @@ const TALL_LATTICE_NODES = Array.from({ length: TALL_LATTICE_ROWS }, (_, y) => {
     current: isCurrent,
     anchor: isCurrent,
     landmark: isCurrent,
+    gateway: null,
     action: null,
   };
 });
@@ -206,6 +215,7 @@ const TALL_REMEMBERED_INVIEW_NODES = Array.from({ length: 48 }, (_, y) => {
     current: isCurrent,
     anchor: isCurrent,
     landmark: isCurrent,
+    gateway: null,
     action: null,
   };
 });
@@ -219,6 +229,7 @@ const TALL_REMEMBERED_FAR_NODES = Array.from({ length: 16 }, (_, i) => ({
   current: false,
   anchor: false,
   landmark: true,
+  gateway: null,
   action: null,
 }));
 
@@ -262,6 +273,7 @@ export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
       current: true,
       anchor: true,
       landmark: true,
+      gateway: null,
       action: null,
     },
     {
@@ -273,6 +285,7 @@ export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: { kind: "move", exit_ref: "e_altoria_1_1_e", destination: "grid:altoria:2:1" },
     },
     {
@@ -284,6 +297,7 @@ export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     {
@@ -295,6 +309,7 @@ export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
       current: false,
       anchor: true,
       landmark: false,
+      gateway: null,
       action: null,
     },
   ],
@@ -329,6 +344,7 @@ export const LOCAL_MAP_SINGLE_NODE_SAMPLE = {
       current: true,
       anchor: true,
       landmark: true,
+      gateway: null,
       action: null,
     },
   ],
@@ -354,6 +370,7 @@ export const LOCAL_MAP_WILDERNESS_SAMPLE = {
       current: true,
       anchor: true,
       landmark: true,
+      gateway: null,
       action: null,
     },
     {
@@ -365,6 +382,7 @@ export const LOCAL_MAP_WILDERNESS_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: { kind: "move", exit_ref: "e_plains_3_1_e", destination: "wild:plains:4:1" },
     },
     {
@@ -376,6 +394,7 @@ export const LOCAL_MAP_WILDERNESS_SAMPLE = {
       current: false,
       anchor: false,
       landmark: true,
+      gateway: null,
       action: null,
     },
     {
@@ -387,6 +406,7 @@ export const LOCAL_MAP_WILDERNESS_SAMPLE = {
       current: false,
       anchor: false,
       landmark: true,
+      gateway: null,
       action: null,
     },
   ],
@@ -419,6 +439,7 @@ export const LOCAL_MAP_INSTANCE_SAMPLE = {
       current: true,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     {
@@ -430,6 +451,7 @@ export const LOCAL_MAP_INSTANCE_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     {
@@ -441,6 +463,7 @@ export const LOCAL_MAP_INSTANCE_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: { kind: "move", exit_ref: "e_cave_exit", destination: "room:103" },
     },
   ],
@@ -469,6 +492,7 @@ export const LOCAL_MAP_INTERIOR_SAMPLE = {
       current: true,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: null,
     },
     {
@@ -480,6 +504,7 @@ export const LOCAL_MAP_INTERIOR_SAMPLE = {
       current: false,
       anchor: false,
       landmark: false,
+      gateway: null,
       action: { kind: "move", exit_ref: "e_hall_training", destination: "room:202" },
     },
   ],
@@ -522,6 +547,7 @@ export const LOCAL_MAP_ORDINARY_SAMPLE = {
       current: visibility === "current",
       anchor: visibility === "current",
       landmark: label === "神殿",
+      gateway: null,
       action: adjacent
         ? { kind: "move", exit_ref: `e_altoria_1_1_${x}_${y}`, destination: `grid:altoria:${x}:${y}` }
         : null,
@@ -555,6 +581,7 @@ export function localMapAround({ layer, current, neighbours = [] }) {
     current: isCurrent,
     anchor: isCurrent,
     landmark: false,
+    gateway: null,
     action: null,
   });
   return {

@@ -44,6 +44,7 @@ def _node(x: int, y: int, current: bool = False) -> dict:
         "current": current,
         "anchor": current,
         "landmark": False,
+        "gateway": None,
         "action": None,
     }
 

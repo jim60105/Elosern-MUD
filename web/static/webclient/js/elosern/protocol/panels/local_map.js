@@ -56,11 +56,37 @@ function validateLocalMapAction(value) {
   };
 }
 
+// Required gateway metadata: null, or exactly {leads_to} naming the far side
+// of a registered gateway under the shared node-string bound. Mirrors the
+// Python `_validate_gateway`; there is no omission default.
+function validateLocalMapGateway(value) {
+  if (value === null) {
+    return null;
+  }
+  requireExactFields(value, "gateway", ["leads_to"], []);
+  var leadsTo = requireString(value.leads_to, "gateway.leads_to", LOCAL_MAP_MAX_STRING);
+  if (!leadsTo.trim()) {
+    throw new Error("gateway.leads_to must be non-empty");
+  }
+  return { leads_to: leadsTo };
+}
+
 function validateLocalMapNode(value) {
   requireExactFields(
     value,
     "node",
-    ["id", "label", "x", "y", "visibility", "current", "anchor", "landmark", "action"],
+    [
+      "id",
+      "label",
+      "x",
+      "y",
+      "visibility",
+      "current",
+      "anchor",
+      "landmark",
+      "action",
+      "gateway",
+    ],
     []
   );
   var nodeId = requireNodeId(value.id, "node.id");
@@ -77,6 +103,7 @@ function validateLocalMapNode(value) {
   var anchor = requireBool(value.anchor, "anchor");
   var landmark = requireBool(value.landmark, "landmark");
   var action = validateLocalMapAction(value.action);
+  var gateway = validateLocalMapGateway(value.gateway);
   if (value.visibility === "current" && !current) {
     throw new Error("the current node must carry current=true");
   }
@@ -93,6 +120,7 @@ function validateLocalMapNode(value) {
     anchor: anchor,
     landmark: landmark,
     action: action,
+    gateway: gateway,
   };
 }
 

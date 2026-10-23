@@ -1164,6 +1164,7 @@ def valid_local_map_panel(**overrides) -> dict:
                 "current": True,
                 "anchor": False,
                 "landmark": False,
+                "gateway": None,
                 "action": None,
             },
             {
@@ -1175,6 +1176,7 @@ def valid_local_map_panel(**overrides) -> dict:
                 "current": False,
                 "anchor": False,
                 "landmark": False,
+                "gateway": None,
                 "action": {
                     "kind": "move",
                     "exit_ref": "42",
@@ -1190,6 +1192,7 @@ def valid_local_map_panel(**overrides) -> dict:
                 "current": False,
                 "anchor": False,
                 "landmark": False,
+                "gateway": None,
                 "action": None,
             },
         ],

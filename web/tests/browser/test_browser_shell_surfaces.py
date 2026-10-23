@@ -252,6 +252,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     "current": True,
                     "anchor": True,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 }
             ],

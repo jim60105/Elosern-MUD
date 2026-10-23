@@ -40,14 +40,18 @@ class _GraphBuilder:
         anchor: bool = False,
         landmark: bool = False,
         action: dict[str, Any] | None = None,
+        gateway: dict[str, str] | None = None,
     ) -> None:
         existing = self._by_id.get(node_id)
         if existing is not None:
             # A later exit-derived descriptor may enrich a node first added as
             # an origin/return with a travel action; never downgrade a node
-            # that already carries one.
+            # that already carries one. Gateway metadata follows the same
+            # enrich-only rule so a deduplicated gate never loses it.
             if existing["action"] is None and action is not None:
                 existing["action"] = action
+            if existing["gateway"] is None and gateway is not None:
+                existing["gateway"] = gateway
             return
         node = {
             "id": node_id,
@@ -59,6 +63,7 @@ class _GraphBuilder:
             "anchor": anchor,
             "landmark": landmark,
             "action": action,
+            "gateway": gateway,
         }
         self.nodes.append(node)
         self._by_id[node_id] = node

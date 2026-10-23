@@ -131,6 +131,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
                 "current": True,
                 "anchor": True,
                 "landmark": True,
+                "gateway": None,
                 "action": None,
             },
             {
@@ -142,6 +143,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
                 "current": False,
                 "anchor": False,
                 "landmark": False,
+                "gateway": None,
                 "action": None,
             },
         ]

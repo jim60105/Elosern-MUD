@@ -108,11 +108,38 @@ def _validate_action(value: Any) -> dict[str, Any] | None:
     }
 
 
+def _validate_gateway(value: Any) -> dict[str, str] | None:
+    """Validate a node's required gateway metadata: ``null`` or ``{leads_to}``.
+
+    ``leads_to`` names the far side of a registered gateway (the wilderness
+    region for a grid gate room, the settlement for a wilderness-adjacent grid
+    gate) under the shared node-string bound. There is no omission default.
+    """
+    if value is None:
+        return None
+    _require_exact_fields(value, "gateway", {"leads_to"}, {})
+    leads_to = _require_str(value, "leads_to", maximum=MAX_STRING_CODE_POINTS)
+    if not leads_to.strip():
+        raise ProtocolValidationError("gateway.leads_to must be non-empty")
+    return {"leads_to": leads_to}
+
+
 def _validate_node(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "node",
-        {"id", "label", "x", "y", "visibility", "current", "anchor", "landmark", "action"},
+        {
+            "id",
+            "label",
+            "x",
+            "y",
+            "visibility",
+            "current",
+            "anchor",
+            "landmark",
+            "action",
+            "gateway",
+        },
         {},
     )
     node_id = _require_node_id(value["id"], "node.id")
@@ -128,6 +155,7 @@ def _validate_node(value: Any) -> dict[str, Any]:
     anchor = _require_bool(value, "anchor")
     landmark = _require_bool(value, "landmark")
     action = _validate_action(value["action"])
+    gateway = _validate_gateway(value["gateway"])
     if visibility == "current" and not current:
         raise ProtocolValidationError("the current node must carry current=True")
     if current and visibility != "current":
@@ -142,6 +170,7 @@ def _validate_node(value: Any) -> dict[str, Any]:
         "anchor": anchor,
         "landmark": landmark,
         "action": action,
+        "gateway": gateway,
     }
 
 
@@ -283,6 +312,7 @@ __all__ = [
     "_require_node_id",
     "_validate_action",
     "_validate_edge",
+    "_validate_gateway",
     "_validate_node",
     "validate_local_map",
 ]

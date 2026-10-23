@@ -258,6 +258,7 @@ export function localMapPanel(overrides = undefined) {
           current: true,
           anchor: true,
           landmark: true,
+          gateway: null,
           action: null,
         },
         {
@@ -269,6 +270,7 @@ export function localMapPanel(overrides = undefined) {
           current: false,
           anchor: false,
           landmark: true,
+          gateway: null,
           action: { kind: "move", exit_ref: "east", destination: "room:43" },
         },
         {
@@ -280,6 +282,7 @@ export function localMapPanel(overrides = undefined) {
           current: false,
           anchor: false,
           landmark: false,
+          gateway: null,
           action: null,
         },
       ],

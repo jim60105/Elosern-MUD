@@ -435,6 +435,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                             "current": True,
                             "anchor": False,
                             "landmark": False,
+                            "gateway": None,
                             "action": None,
                         },
                         {
@@ -446,6 +447,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                             "current": False,
                             "anchor": False,
                             "landmark": False,
+                            "gateway": None,
                             "action": None,
                         },
                     ],
@@ -614,6 +616,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": True,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
                 {
@@ -625,6 +628,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     "current": False,
                     "anchor": False,
                     "landmark": False,
+                    "gateway": None,
                     "action": None,
                 },
             ],

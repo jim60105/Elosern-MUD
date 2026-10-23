@@ -101,7 +101,10 @@ export const Unavailable = {
 // interaction contract — halo present on 南門 only; click emits exactly
 // `{exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2"}`; a node
 // without an action emits nothing — is pinned by the Vitest mount tests in
-// `tests/world/local_map.test.js`.
+// `tests/world/local_map.test.js`. 南門 also carries the required node
+// `gateway` metadata (`{leads_to}`), which the model passes through
+// unchanged; until a gate presentation exists the island draws it
+// exactly like any other actionable node.
 export const ActionableNode = {
   render: renderMap,
   args: {

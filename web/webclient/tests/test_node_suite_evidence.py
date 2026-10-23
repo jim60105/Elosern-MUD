@@ -317,6 +317,36 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
+    )
+    def test_local_map_gateway_contract_node_suites_pass(self):
+        # The browser half of the exact node contract: the client validator's
+        # required gateway field (protocol_local_map.test.js) and the model's
+        # unchanged gateway pass-through (local_map.test.js). Each file is
+        # listed explicitly and checked to exist, since node --test silently
+        # ignores a missing path whenever another path resolves.
+        suite = [
+            REPO_ROOT / "web/static/webclient/js/tests/protocol_local_map.test.js",
+            REPO_ROOT / "web/static/webclient/js/tests/local_map.test.js",
+        ]
+        for path in suite:
+            self.assertTrue(path.is_file(), f"missing Node suite {path}")
+        result = subprocess.run(
+            ["node", "--test", *(str(path) for path in suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "local-map gateway contract Node suites failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("requires exact gateway metadata", result.stdout)
+        self.assertIn("passes node gateway metadata through unchanged", result.stdout)
+
+    @covers_requirement(
         "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
     )
     def test_option_cards_node_suite_passes(self):
