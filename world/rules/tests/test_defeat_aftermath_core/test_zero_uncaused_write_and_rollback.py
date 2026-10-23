@@ -290,7 +290,9 @@ class RollbackTests(
         collected: list = []
         fake_tx = MagicMock()
         fake_tx.atomic.return_value = OuterExplodingAtomic()
-        fake_tx.on_commit.side_effect = collected.append
+        # Production registers its boundary callbacks with ``robust=True``, so
+        # the double accepts the keyword instead of forwarding it to list.append.
+        fake_tx.on_commit.side_effect = lambda func, **_kwargs: collected.append(func)
         # The restock boundary (day 1, 06:00 = 108000) sits inside the first
         # attempt's recovery window (107996, 108004].
         self.clock.tick = 107990
