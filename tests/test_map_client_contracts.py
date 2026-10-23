@@ -19,6 +19,7 @@ from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWPORT_SUITE = REPO_ROOT / "web/webclient-app/tests/world/map_viewport.test.js"
+VITEST_BIN = REPO_ROOT / "node_modules/.bin/vitest"
 
 
 def ensure_locked_frontend_install() -> None:
@@ -27,15 +28,21 @@ def ensure_locked_frontend_install() -> None:
     The top-level CI job has Node and pnpm but no prior install step, so this
     module must not depend on another module having installed first.
     """
-    if (REPO_ROOT / "node_modules/.bin/vitest").exists():
+    if VITEST_BIN.exists():
         return
-    result = subprocess.run(
-        ["pnpm", "install", "--frozen-lockfile"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=540,
-    )
+    try:
+        result = subprocess.run(
+            ["pnpm", "install", "--frozen-lockfile"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=540,
+        )
+    except FileNotFoundError as exc:
+        raise AssertionError(
+            "Vitest is not installed and pnpm is not on PATH; install the locked "
+            "frontend toolchain (pnpm install --frozen-lockfile) first"
+        ) from exc
     if result.returncode != 0:
         raise AssertionError(
             "pnpm install --frozen-lockfile failed:\n" + result.stdout + result.stderr
@@ -49,9 +56,7 @@ def run_vitest_json(suite: Path) -> tuple[subprocess.CompletedProcess, dict]:
         report_path = Path(tmp) / "vitest.json"
         result = subprocess.run(
             [
-                "npx",
-                "--no-install",
-                "vitest",
+                str(VITEST_BIN),
                 "run",
                 str(suite),
                 "--reporter=json",
