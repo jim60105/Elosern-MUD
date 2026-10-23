@@ -90,6 +90,14 @@ prototypes; the real app differs too much for a prototype to be useful).
 - Minimap has no legend and a thin frame, the full map fits the view, the full log
   opens scrolled to the bottom, the dock has a fixed height, and redundant head
   cards, 美術展示, and quick-word chips are removed.
+- Minimap island labels are placed by `lib/island_labels.js` in navigation
+  priority (exits, then current, then context): remembered rim names are laid
+  out first and always drawn whole; an exit label is never dropped (truncated
+  with a leader line when crowded); context names appear only where room is
+  left. Gateways wear a gold arch with a `通往 <leads_to>` line, and a
+  cross-layer gate target is an exit-ring stub whose native button is named
+  `往 <leads_to> 移動` (Space is stopped at the button so the shell's key
+  routing cannot swallow it).
 
 ## Styling pitfall
 
