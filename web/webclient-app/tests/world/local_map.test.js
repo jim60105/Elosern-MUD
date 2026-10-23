@@ -16,6 +16,11 @@ import {
   LOCAL_MAP_TALL_REMEMBERED_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE,
+  LOCAL_MAP_CROWDED_LABELS_SAMPLE,
+  LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
+  LOCAL_MAP_WILDERNESS_RETURN_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
 
@@ -489,7 +494,9 @@ describe("LocalMap (B4 world family)", () => {
     // two labelled exits stand one metre away — closer than the exit ring
     // allows at the finest level — so the island compresses them to the
     // shared radius 66 at their exact bearings; the unlinked neighbour is
-    // context, a dot without a label or a route.
+    // context, a dot without a marker or a route whose name is drawn in the
+    // quiet context tier only because a free position remains for it
+    // (label-minimap-exits-and-gateways: fits-or-omitted).
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
     const centre = (id) =>
@@ -501,7 +508,7 @@ describe("LocalMap (B4 world family)", () => {
     const context = w.get('[data-testid="local-map__node--grid:altoria:0:1"]');
     expect(context.classes()).toContain("local-map__node--context");
     expect(context.find(".local-map__marker").exists()).toBe(false);
-    expect(context.find(".local-map__node-label").exists()).toBe(false);
+    expect(context.get(".local-map__node-label").classes()).toContain("local-map__node-label--context");
     expect(context.find("title").text()).toBe("旅館公會");
     // Only the two labelled routes from the current node are drawn.
     expect(w.findAll(".local-map__edge")).toHaveLength(2);
@@ -513,15 +520,11 @@ describe("LocalMap (B4 world family)", () => {
     // in monospace cells, shifted by its own x offset).
     for (const id of ["grid:altoria:1:1", "grid:altoria:2:1", "grid:altoria:1:2"]) {
       const [cx, cy] = centre(id).match(/-?[\d.]+/g).map(Number);
-      const el = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`).element;
-      const text = Array.from(el.childNodes)
-        .filter((n) => n.nodeType === Node.TEXT_NODE)
-        .map((n) => n.textContent)
-        .join("")
-        .trim();
+      const line = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label tspan`).element;
+      const text = line.textContent.trim();
       const width = textCells(text) * CELL_EM * 16;
-      const x = cx + Number(el.getAttribute("x") ?? 0);
-      const y = cy + Number(el.getAttribute("y"));
+      const x = cx + Number(line.getAttribute("x") ?? 0);
+      const y = cy + Number(line.getAttribute("y"));
       expect(x - width / 2).toBeGreaterThanOrEqual(0);
       expect(x + width / 2).toBeLessThanOrEqual(240);
       expect(y + 4).toBeLessThanOrEqual(240);
@@ -802,5 +805,181 @@ describe("LocalMap island scale state (render-auto-scaled-minimap-island)", () =
     wrapper.unmount();
     wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(LOCAL_MAP_INSTANCE_SAMPLE) } });
     expect(wrapper.find('[data-testid="local-map__scale"]').exists()).toBe(false);
+  });
+});
+
+describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  function mountPayload(payload) {
+    wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(payload) }, attachTo: document.body });
+    return wrapper;
+  }
+
+  const translateOf = (el) => {
+    const match = el.closest("[transform]")?.getAttribute("transform")?.match(/translate\(\s*([-\d.e]+)[\s,]+([-\d.e]+)/);
+    return match ? { x: Number(match[1]), y: Number(match[2]) } : { x: 0, y: 0 };
+  };
+
+  // Every drawn island label line as a box in user units (centred text, 16 px
+  // step, monospace cells), joined to the label element it belongs to.
+  function labelBoxes(w) {
+    const boxes = [];
+    for (const text of w.findAll(".local-map__node-label")) {
+      const group = text.element.closest(".local-map__node");
+      const origin = group ? translateOf(group) : { x: 0, y: 0 };
+      for (const tspan of text.findAll("tspan")) {
+        const width = textCells(tspan.text()) * CELL_EM * 16;
+        const x = origin.x + Number(tspan.attributes("x"));
+        const y = origin.y + Number(tspan.attributes("y"));
+        boxes.push({ owner: text.element, x0: x - width / 2, x1: x + width / 2, y0: y - 0.8 * 16, y1: y + 0.25 * 16 });
+      }
+    }
+    return boxes;
+  }
+
+  it("draws the current gate room's arch, room name and 通往 line on the city side", () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    const current = w.get('[data-node="grid:capital_altoria:3050:150"]');
+    expect(current.find('[data-testid="local-map__gate-glyph"]').exists()).toBe(true);
+    expect(current.find(".local-map__marker--current").exists()).toBe(true);
+    const lines = current.findAll(".local-map__node-label tspan").map((t) => t.text());
+    expect(lines).toEqual(["南門", "通往 西部丘陵與谷地"]);
+    expect(current.findAll(".local-map__node-label tspan")[1].classes()).toContain("local-map__via");
+    // The gate glyph is decoration: never a marker or a label the audits pair.
+    const glyph = current.get('[data-testid="local-map__gate-glyph"]');
+    expect(glyph.classes()).not.toContain("local-map__marker");
+    expect(glyph.attributes("aria-hidden")).toBe("true");
+  });
+
+  it("draws the far side as a labelled exit-ring stub, never as a node", () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    expect(w.find('[data-node^="wild:"]').exists()).toBe(false);
+    const stubs = w.findAll(".local-map__stub");
+    expect(stubs).toHaveLength(1);
+    const arrow = stubs[0].get(".local-map__stub-arrow");
+    // South of the gate: bearing 180 on the exit ring (radius 88).
+    expect(arrow.attributes("transform")).toBe("translate(120, 208) rotate(180)");
+    expect(stubs[0].get(".local-map__stub-label").text()).toBe("通往 西部丘陵與谷地");
+    expect(stubs[0].classes()).not.toContain("local-map__stub--locked");
+  });
+
+  it("makes an actionable stub a named native button that moves exactly once", async () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
+    const buttons = w.findAll(".local-map__stub-button");
+    expect(buttons).toHaveLength(1);
+    const button = buttons[0];
+    expect(button.element.tagName).toBe("BUTTON");
+    expect(button.attributes("type")).toBe("button");
+    expect(button.attributes("aria-label")).toBe("往 西部丘陵與谷地 移動");
+    button.element.focus();
+    expect(document.activeElement).toBe(button.element);
+    // The platform turns Enter/Space into the click; no key handler of its
+    // own can add a second submission.
+    await button.trigger("keydown", { key: "Enter" });
+    await button.trigger("keydown", { key: " " });
+    expect(w.emitted("move")).toBeUndefined();
+    await button.trigger("click");
+    expect(w.emitted("move")).toEqual([[{ exit_ref: "e_south_gate_wild", destination: "wild:elosern:860:1076" }]]);
+    expect(w.emitted("open-map")).toBeUndefined();
+    // The island's tab order: the full-map affordance first, then the stub.
+    const stops = w.findAll("button").map((b) => b.attributes("data-testid"));
+    expect(stops).toEqual(["local-map__expand", "local-map__stub-button--0"]);
+  });
+
+  it("keeps a locked gateway visible and inert", async () => {
+    const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_LOCKED_SAMPLE);
+    const stub = w.get(".local-map__stub");
+    expect(stub.classes()).toContain("local-map__stub--locked");
+    expect(stub.get(".local-map__stub-label").text()).toBe("通往 西部丘陵與谷地");
+    expect(w.find(".local-map__stub-button").exists()).toBe(false);
+    expect(stub.attributes("tabindex")).toBeUndefined();
+    await stub.trigger("click");
+    expect(w.emitted("move")).toBeUndefined();
+    // Its route reads blocked by shape (dashed), not colour.
+    expect(stub.get(".local-map__edge").classes()).toContain("local-map__edge--blocked");
+  });
+
+  it("offers the city return from the wilderness without drawing city streets", async () => {
+    const w = mountPayload(LOCAL_MAP_WILDERNESS_RETURN_SAMPLE);
+    expect(w.find('[data-node^="grid:"]').exists()).toBe(false);
+    const button = w.get(".local-map__stub-button");
+    expect(button.attributes("aria-label")).toBe("往 聖潔王都 移動");
+    expect(w.get(".local-map__stub-label").text()).toBe("通往 聖潔王都");
+    await button.trigger("click");
+    expect(w.emitted("move")).toEqual([[{ exit_ref: "e_return_n", destination: "grid:capital_altoria:3050:150" }]]);
+    // The neighbours repeating the current region's name stay unlabelled;
+    // each keeps its full name as the label's title-free accessible name
+    // through its node group and its move action.
+    const repeated = LOCAL_MAP_WILDERNESS_RETURN_SAMPLE.nodes.filter(
+      (n) => n.visibility !== "current" && n.id.startsWith("wild:"),
+    );
+    expect(repeated.length).toBe(7);
+    for (const node of repeated) {
+      const group = w.get(`[data-node="${node.id}"]`);
+      expect(group.find(".local-map__node-label").exists()).toBe(false);
+      expect(group.find(".local-map__actionable").exists()).toBe(true);
+    }
+  });
+
+  it("labels a differing wilderness region but suppresses only the repeated one", () => {
+    const w = mountPayload(LOCAL_MAP_WILDERNESS_METRIC_SAMPLE);
+    const labelled = LOCAL_MAP_WILDERNESS_METRIC_SAMPLE.nodes.filter(
+      (n) => n.visibility !== "current" && n.label !== LOCAL_MAP_WILDERNESS_METRIC_SAMPLE.title,
+    );
+    expect(labelled).toHaveLength(3);
+    for (const node of labelled) {
+      expect(w.get(`[data-node="${node.id}"] .local-map__node-label tspan`).text()).toBe(node.label.slice(0, 4));
+    }
+  });
+
+  it("keeps every crowded exit labelled, clear of markers, with remembered names whole", () => {
+    const w = mountPayload(LOCAL_MAP_CROWDED_LABELS_SAMPLE);
+    const payload = LOCAL_MAP_CROWDED_LABELS_SAMPLE;
+    const exits = payload.edges.filter((e) => e.label).map((e) => e.destination);
+    for (const id of exits) {
+      expect(w.get(`[data-node="${id}"] .local-map__node-label tspan`).text().length).toBeGreaterThan(0);
+    }
+    // The current label found none of its eight spots free: it keeps its
+    // classic truncated place below the marker (design.md), painted last so
+    // no neighbour covers it.
+    const current = w.get(`[data-node="${payload.current_node}"]`);
+    expect(current.get(".local-map__node-label tspan").text()).toBe("交易十字…");
+    expect(Number(current.get(".local-map__node-label tspan").attributes("y"))).toBeCloseTo(9 + 3 + 0.8 * 16, 6);
+    expect(w.findAll(".local-map__node").at(-1).attributes("data-node")).toBe(payload.current_node);
+    // Every other label line stays in the square, clear of every drawn
+    // exit and current marker's footprint; a label pushed out to a leader
+    // line in this deliberately overfull square may at worst cover a quiet
+    // context dot (the least-overlap last resort weighs markers heaviest).
+    const currentLabel = current.get(".local-map__node-label").element;
+    const markers = w.findAll(".local-map__node").map((g) => ({ ...translateOf(g.element), r: g.find(".local-map__gate-glyph").exists() ? 14 : g.classes().includes("local-map__node--context") ? 3 : 9 }));
+    for (const box of labelBoxes(w).filter((b) => b.owner !== currentLabel)) {
+      expect(box.x0).toBeGreaterThanOrEqual(0);
+      expect(box.x1).toBeLessThanOrEqual(240);
+      expect(box.y0).toBeGreaterThanOrEqual(0);
+      expect(box.y1).toBeLessThanOrEqual(240);
+      const leadered = !!box.owner.parentNode.querySelector(":scope > .local-map__leader");
+      for (const m of markers) {
+        if (leadered && m.r === 3) continue;
+        const nx = Math.min(Math.max(m.x, box.x0), box.x1);
+        const ny = Math.min(Math.max(m.y, box.y0), box.y1);
+        expect(Math.hypot(m.x - nx, m.y - ny), `${box.owner.textContent} vs marker ${m.x},${m.y}`).toBeGreaterThanOrEqual(m.r);
+      }
+    }
+    // The east gate is a same-layer gateway: arch plus 通往 line.
+    const east = w.get('[data-node="grid:trade_crossroads:1900:1010"]');
+    expect(east.find('[data-testid="local-map__gate-glyph"]').exists()).toBe(true);
+    expect(east.findAll(".local-map__node-label tspan").map((t) => t.text())[1]).toMatch(/^通往 東部大平/);
+    // Remembered names are drawn whole on the rim, never shortened.
+    for (const node of payload.nodes.filter((n) => n.visibility === "remembered")) {
+      const text = w.get(`[data-testid="local-map__edge-marker--${node.id}"] .local-map__edge-marker-name--island`);
+      expect(text.text().replace(/\s+/g, "")).toBe(node.label);
+    }
   });
 });

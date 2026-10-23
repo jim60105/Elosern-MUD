@@ -10,7 +10,8 @@
 import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
 import { CELL_EM, charCells, textCells } from "../lib/mono_cells.js";
-import { CANVAS_SIZE, CENTRE, DOT_SPACING, projectIsland } from "../lib/minimap_projection.js";
+import { CANVAS_SIZE, CENTRE, DOT_SPACING, R_MAX, projectIsland } from "../lib/minimap_projection.js";
+import { ASCENT, DESCENT, placeIslandLabels } from "../lib/island_labels.js";
 
 // Every lattice marker's base geometry in pre-scale units, multiplied by
 // the `markerScale` prop so all states scale uniformly (draft ladder,
@@ -39,7 +40,8 @@ const LABEL_BAND = 14;
 // projection's exit ring reaches R_MAX + HALO_R = 98 units from the centre, so
 // the diamonds stand on the square's rim band, one diamond half-extent
 // smaller than the overlay's, at the point where the true bearing leaves the
-// square. Their names stay on the assistive mirror (LocalMap owns it).
+// square. Their names are laid out whole on the rim (layoutRimNames) before
+// any node label is placed.
 export const ISLAND_MARKER_HALF = 7;
 const ISLAND_MARKER_REACH = Math.SQRT2 * ISLAND_MARKER_HALF;
 const ISLAND_MARKER_INSET = ISLAND_MARKER_REACH + 1.5;
@@ -53,6 +55,15 @@ const ISLAND_DOT_MARGIN = 140;
 const RING_LABEL_BEARINGS = [45, 315, 135, 225];
 // Canvas inset every island label keeps from the square's edge.
 const ISLAND_LABEL_INSET = 3;
+// The island's gate glyph (label-minimap-exits-and-gateways): an arch framing
+// a gateway node's own marker, so its reserved footprint grows to the arch.
+export const GATE_ARCH_R = 12;
+export const GATE_FOOTPRINT = GATE_ARCH_R + 2;
+// A gateway exit stub: an arrowhead on the exit ring (R_MAX) pointing along
+// the cross-layer target's bearing, with this reserved radius.
+export const STUB_RADIUS = R_MAX;
+export const STUB_FOOTPRINT = 9;
+const CONTEXT_FOOTPRINT = 3;
 
 // The label term for two horizontally adjacent drawn labels (see
 // `labelClearancePitch`): half of each centred label box, measured in
@@ -566,6 +577,7 @@ export function useMapLatticeGeometry(props) {
     const rad = (labelBearing * Math.PI) / 180;
     return grid.rings.map((ring) => ({
       ...ring,
+      labelBearing,
       labelX: CENTRE + ring.radius * Math.sin(rad),
       labelY: CENTRE - ring.radius * Math.cos(rad),
     }));
@@ -573,6 +585,180 @@ export function useMapLatticeGeometry(props) {
 
   const scaleLabel = computed(() => projection.value?.scaleLabel ?? "");
   const exitStubs = computed(() => projection.value?.exitStubs ?? []);
+
+  // ---- gateways and navigation-priority labels (label-minimap-exits-and-gateways) ----
+
+  // The leads_to text a node's gateway metadata names, or "".
+  function leadsToOf(node) {
+    const leads = node?.gateway?.leads_to;
+    return typeof leads === "string" ? leads : "";
+  }
+  // A same-layer gateway node on the island draws the gate arch.
+  function isGateway(node) {
+    return isIsland.value && nodeTier(node) !== "context" && leadsToOf(node) !== "";
+  }
+
+  // The radius a drawn island marker reserves: the gate arch, the actionable
+  // halo, the current seal circle (with its stroke), else the small dot and
+  // its landmark ring.
+  function nodeFootprint(node) {
+    if (nodeTier(node) === "context") return CONTEXT_FOOTPRINT;
+    if (isGateway(node)) return GATE_FOOTPRINT;
+    if (node.action) return HALO_R;
+    if (node.visibility === "current") return MARKER_CURRENT_R + 1;
+    return Math.max(MARKER_DOT_R + 0.5, node.landmark ? MARKER_LANDMARK_R + 0.5 : 0);
+  }
+
+  // The projection's cross-layer exit stubs, each at its target bearing on
+  // the exit ring, with the far side it leads to and the target's own
+  // (nullable) action, untouched.
+  const islandStubs = computed(() =>
+    (projection.value?.exitStubs ?? []).map((stub, index) => {
+      const rad = (stub.bearing * Math.PI) / 180;
+      const leadsTo = String(stub.label ?? "").replace(/^通往 /, "");
+      return {
+        index,
+        key: `${index}:${Math.round(stub.bearing * 1000)}:${stub.label}`,
+        bearing: stub.bearing,
+        label: stub.label,
+        leadsTo,
+        action: stub.action ?? null,
+        actionable: !!stub.action && stub.action.kind === "move",
+        x: Math.round((CENTRE + STUB_RADIUS * Math.sin(rad)) * 1000) / 1000,
+        y: Math.round((CENTRE - STUB_RADIUS * Math.cos(rad)) * 1000) / 1000,
+      };
+    }),
+  );
+
+  // A distance-ring figure's box (centred text, dy 0.35em).
+  function ringLabelBox(ring) {
+    const font = props.labelFont;
+    const width = textCells(ring.label) * CELL_EM * font;
+    const baseline = ring.labelY + 0.35 * font;
+    return {
+      x0: ring.labelX - width / 2,
+      x1: ring.labelX + width / 2,
+      y0: baseline - ASCENT * font,
+      y1: baseline + DESCENT * font,
+    };
+  }
+
+  function truncateTo(text) {
+    const glyphs = Array.from(String(text ?? ""));
+    return glyphs.length > props.labelMax ? glyphs.slice(0, props.labelMax).join("") + "…" : glyphs.join("");
+  }
+
+  // Every island label block, placed in navigation priority around the
+  // reserved marker footprints, the stub arrows, the ring figures and the
+  // remembered rim names (lib/island_labels.js). Keyed by node id, or
+  // `stub:<index>` for an exit stub.
+  const islandLabelLayout = computed(() => {
+    if (!isIsland.value) return { placements: new Map(), obstacles: [] };
+    const requests = [];
+    const obstacles = [];
+    for (const node of drawnNodes.value) {
+      const pos = nodePos(node);
+      if (!pos) continue;
+      const tier = nodeTier(node);
+      const footprint = nodeFootprint(node);
+      obstacles.push({ x: pos.x, y: pos.y, r: footprint, owner: String(node.id) });
+      const name = visibleNodeLabel(node);
+      const lines = [{ text: name, kind: "name" }];
+      const fallbackLines = [{ text: name, kind: "name" }];
+      const leads = isGateway(node) ? leadsToOf(node) : "";
+      if (leads) {
+        lines.push({ text: `通往 ${leads}`, kind: "via" });
+        fallbackLines.push({ text: `通往 ${truncateTo(leads)}`, kind: "via" });
+      }
+      const dx = pos.x - CENTRE;
+      const dy = pos.y - CENTRE;
+      requests.push({
+        id: String(node.id),
+        tier,
+        x: pos.x,
+        y: pos.y,
+        footprint,
+        lines,
+        fallbackLines,
+        outward: Math.hypot(dx, dy) > 1e-6 ? ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360 : null,
+      });
+    }
+    const current = requests.find((request) => request.tier === "current");
+    if (current) {
+      current.avoid = [
+        ...requests.filter((request) => request.tier === "exit" && request.outward !== null).map((request) => request.outward),
+        ...islandStubs.value.map((stub) => stub.bearing),
+      ];
+    }
+    for (const stub of islandStubs.value) {
+      const id = `stub:${stub.index}`;
+      obstacles.push({ x: stub.x, y: stub.y, r: STUB_FOOTPRINT, owner: id });
+      requests.push({
+        id,
+        tier: "exit",
+        rank: 0,
+        x: stub.x,
+        y: stub.y,
+        footprint: STUB_FOOTPRINT,
+        lines: [{ text: stub.label, kind: "via" }],
+        fallbackLines: [{ text: `通往 ${truncateTo(stub.leadsTo)}`, kind: "via" }],
+        outward: stub.bearing,
+      });
+    }
+    for (const marker of layoutGeometry.value.markers || []) {
+      if (!marker.rim) continue;
+      const reach = Math.SQRT2 * (marker.half ?? ISLAND_MARKER_HALF);
+      obstacles.push({ x0: marker.x - reach, x1: marker.x + reach, y0: marker.y - reach, y1: marker.y + reach });
+      for (const box of marker.rimName?.boxes ?? []) obstacles.push(box);
+    }
+    const placements = placeIslandLabels({
+      requests,
+      obstacles,
+      size: CANVAS_SIZE,
+      font: props.labelFont,
+      inset: ISLAND_LABEL_INSET,
+    });
+    return { placements, obstacles };
+  });
+  const islandLabels = computed(() => islandLabelLayout.value.placements);
+
+  // The distance-ring figures are the scale's key, below navigation in
+  // priority: each keeps its ring and moves along it to the first bearing —
+  // its preferred diagonal, the other diagonals, then the eight bearings
+  // between them — whose figure clears every marker, stub, rim name, placed
+  // label and earlier figure; with none, it keeps its preferred spot.
+  const RING_LABEL_FALLBACK_BEARINGS = [22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5];
+  const islandRingLabels = computed(() => {
+    const rings = islandRings.value;
+    if (rings.length === 0) return rings;
+    const { placements, obstacles } = islandLabelLayout.value;
+    const taken = [...obstacles, ...[...placements.values()].map((placed) => placed.box)];
+    const hits = (box) =>
+      taken.some((o) => {
+        if (o.r !== undefined) {
+          const nx = Math.min(Math.max(o.x, box.x0), box.x1);
+          const ny = Math.min(Math.max(o.y, box.y0), box.y1);
+          return Math.hypot(o.x - nx, o.y - ny) < o.r + 2;
+        }
+        return !(box.x1 + 2 <= o.x0 || o.x1 + 2 <= box.x0 || box.y1 + 2 <= o.y0 || o.y1 + 2 <= box.y0);
+      });
+    const inSquare = (box) => box.x0 >= ISLAND_LABEL_INSET && box.y0 >= ISLAND_LABEL_INSET && box.x1 <= CANVAS_SIZE - ISLAND_LABEL_INSET && box.y1 <= CANVAS_SIZE - ISLAND_LABEL_INSET;
+    return rings.map((ring) => {
+      const preferred = ring.labelBearing;
+      const bearings = [preferred, ...RING_LABEL_BEARINGS.filter((b) => b !== preferred), ...RING_LABEL_FALLBACK_BEARINGS];
+      for (const bearing of bearings) {
+        const rad = (bearing * Math.PI) / 180;
+        const candidate = { ...ring, labelX: CENTRE + ring.radius * Math.sin(rad), labelY: CENTRE - ring.radius * Math.cos(rad) };
+        const box = ringLabelBox(candidate);
+        if (inSquare(box) && !hits(box)) {
+          taken.push(box);
+          return candidate;
+        }
+      }
+      taken.push(ringLabelBox(ring));
+      return ring;
+    });
+  });
 
   // Remembered edge-direction markers on the island rim: the marker set and
   // its bearings come from the shared model (`edgeMarkersFor`, eligibility
@@ -666,33 +852,25 @@ export function useMapLatticeGeometry(props) {
       y0: marker.y - ISLAND_MARKER_REACH - 1,
       y1: marker.y + ISLAND_MARKER_REACH + 1,
     }));
-    // The drawn current and exit nodes too: their halo-sized markers and
-    // their labels, so a wrapped name never lands on a place's own name.
+    // The drawn current and exit nodes' reserved footprints (a gate arch
+    // included) and the gateway exit-stub arrows:
+    // the rim names are laid out first (they are always whole), and the node
+    // labels are then placed around them (lib/island_labels.js).
     for (const node of drawnNodes.value) {
       if (nodeTier(node) === "context") continue;
       const pos = nodePos(node);
       if (!pos) continue;
-      taken.push({ x0: pos.x - HALO_R, x1: pos.x + HALO_R, y0: pos.y - HALO_R, y1: pos.y + HALO_R });
-      const text = visibleNodeLabel(node);
-      if (!text) continue;
-      const offset = islandLabelOffset(node, text, LABEL_BASELINE_HALF * props.markerScale + 2 + props.labelFont);
-      const width = textCells(text) * CELL_EM * props.labelFont;
-      const baseline = pos.y + offset.y;
-      taken.push({
-        label: true,
-        x0: pos.x + offset.dx - width / 2,
-        x1: pos.x + offset.dx + width / 2,
-        y0: baseline - 0.8 * props.labelFont,
-        y1: baseline + 0.2 * props.labelFont,
-      });
+      const r = Math.max(HALO_R, nodeFootprint(node));
+      taken.push({ x0: pos.x - r, x1: pos.x + r, y0: pos.y - r, y1: pos.y + r });
     }
-    let respectNodes = true;
+    for (const stub of islandStubs.value) {
+      taken.push({ x0: stub.x - STUB_FOOTPRINT, x1: stub.x + STUB_FOOTPRINT, y0: stub.y - STUB_FOOTPRINT, y1: stub.y + STUB_FOOTPRINT });
+    }
     // A 3-unit clearance on both axes covers the face's real glyph boxes
     // (ascent and side bearings beyond the monospace cell estimate).
     const clear = (box) =>
       taken.every(
         (o) =>
-          (!respectNodes && o.label === true) ||
           box.x1 + 3 <= o.x0 ||
           box.x0 >= o.x1 + 3 ||
           box.y1 + 3 <= o.y0 ||
@@ -867,6 +1045,8 @@ export function useMapLatticeGeometry(props) {
                 // diamond, then the most even line lengths.
                 const score =
                   (boundary === qualifier ? -40 : 0) +
+                  (qualifier >= 0 && rowFirst && cut + k > qualifier ? 60 : 0) +
+                  (qualifier >= 0 && !rowFirst && k > qualifier ? 60 : 0) +
                   (overflow.length < 2 ? 100 : 0) +
                   (head.length < 2 || tail.length < 2 ? 30 : 0) +
                   Math.abs(lengthOf(head) - lengthOf(tail)) / font +
@@ -888,17 +1068,13 @@ export function useMapLatticeGeometry(props) {
           };
           const room = hi - lo;
           let result = throughWrap();
-          // Prefer clearing the drawn places' names too; a crowded rim may
-          // give that up (the label placement change resolves those), never
-          // the clearance between remembered names themselves.
-          for (const [strict, depth] of [[true, 4], [true, 9], [false, 4]]) {
-            respectNodes = strict;
+          // The nearest four inward rows first, then nine.
+          for (const depth of [4, 9]) {
             for (let parts = 1; !result && parts <= Math.min(glyphs.length, 6); parts += 1) {
               result = attempt(Math.max(room / parts, 1), false, depth);
             }
             if (result) break;
           }
-          respectNodes = true;
           placedChunks.push(...(result ?? attempt(1, true)));
         }
         const lines = [];
@@ -912,31 +1088,9 @@ export function useMapLatticeGeometry(props) {
             });
           }
         }
-        marker.rimName = { horizontal, lines };
+        marker.rimName = { horizontal, lines, boxes: placedChunks.map((chunk) => boxOf(chunk.row, chunk.from, chunk.from + lengthOf(chunk.glyphs))) };
       }
     }
-  }
-
-  // Island label offset (x, y) relative to its node: the shared below-marker
-  // baseline, kept inside the square — shifted along x when the centred label
-  // would leave a side, lifted above the marker when the baseline would leave
-  // the bottom. One small, replaceable rule; collision placement belongs to
-  // the label change (label-minimap-exits-and-gateways).
-  function islandLabelOffset(node, text, baseline) {
-    const pos = nodePos(node);
-    if (!isIsland.value || !pos) return { dx: 0, y: baseline };
-    const width = textCells(text) * CELL_EM * props.labelFont;
-    const left = pos.x - width / 2;
-    const clampedLeft = Math.min(
-      Math.max(left, ISLAND_LABEL_INSET),
-      Math.max(ISLAND_LABEL_INSET, CANVAS_SIZE - ISLAND_LABEL_INSET - width),
-    );
-    const descent = 0.25 * props.labelFont;
-    const y =
-      pos.y + baseline + descent > CANVAS_SIZE - ISLAND_LABEL_INSET
-        ? -(LABEL_BASELINE_HALF * props.markerScale + 2 + descent)
-        : baseline;
-    return { dx: clampedLeft - left, y };
   }
 
   // Canvas box: the island passes its fixed reference square (`canvasSize`,
@@ -968,9 +1122,13 @@ export function useMapLatticeGeometry(props) {
     nodeTier,
     islandDots,
     islandRings,
+    islandRingLabels,
     scaleLabel,
     exitStubs,
-    islandLabelOffset,
+    islandStubs,
+    islandLabels,
+    isGateway,
+    leadsToOf,
     edges,
     drawnNodes,
     edgeGeoms,

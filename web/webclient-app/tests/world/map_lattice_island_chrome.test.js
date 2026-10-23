@@ -77,10 +77,11 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
     expect(wrapper.get("svg").attributes("viewBox")).toBe("0 0 240 240");
     const exit = wrapper.get('[data-node="wild:t:0:1"]');
     expect(exit.attributes("transform")).toBe("translate(120, 53.333)");
-    const text = exit.get("text");
-    expect([...text.element.childNodes].filter((node) => node.nodeType === 3)
-      .map((node) => node.textContent).join("").trim()).toBe("");
-    expect(text.attributes("style")).toContain("font-size: 16px");
+    // label-minimap-exits-and-gateways: the information-free repeat draws
+    // no label block at all, and the node keeps its full name as its title.
+    expect(exit.find(".local-map__node-label").exists()).toBe(false);
+    expect(exit.get("title").text()).toBe("共用地區");
+    expect(exit.find(".local-map__marker").exists()).toBe(true);
     // 2 km north and beyond would land above the square: omitted context.
     expect(wrapper.find('[data-node="wild:t:0:2"]').exists()).toBe(false);
     expect(wrapper.findAll(".local-map__node")).toHaveLength(2);

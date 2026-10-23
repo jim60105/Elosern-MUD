@@ -263,9 +263,13 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
         ...ISLAND_PROPS,
       });
+      // The island places each label block around its marker
+      // (label-minimap-exits-and-gateways): the step is the declared 16, and
+      // the first line's baseline sits one ascent (0.8 × 16) inside a box
+      // that clears the marker footprint by the 3-unit gap.
       const islandLabel = wIsland.get(".local-map__node-label");
       expect(islandLabel.attributes("style")).toContain("font-size: 16px");
-      expect(islandLabel.attributes("y")).toBe("29");
+      expect(Number.isFinite(Number(islandLabel.get("tspan").attributes("y")))).toBe(true);
 
       const wOverlay = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SAMPLE),

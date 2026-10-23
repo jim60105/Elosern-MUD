@@ -409,7 +409,9 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
       expect(x >= 0 && x <= 240 && y >= 0 && y <= 240).toBe(true);
       expect(group.find(".local-map__context-dot").exists()).toBe(true);
       expect(group.find(".local-map__marker").exists()).toBe(false);
-      expect(group.find(".local-map__node-label").exists()).toBe(false);
+      // Its name only where a free spot remains, in the quiet context tier.
+      const label = group.find(".local-map__node-label");
+      if (label.exists()) expect(label.classes()).toContain("local-map__node-label--context");
     }
     expect(drawnContext).toBeGreaterThan(0);
     expect(drawnContext).toBeLessThan(context.length);
@@ -420,8 +422,11 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
       props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE), ...ISLAND },
     });
     expect(wrapper.find('[data-node^="wild:"]').exists()).toBe(false);
-    // Its route is not drawn either; the street exit's route is.
-    expect(wrapper.findAll(".local-map__edge")).toHaveLength(1);
+    // The street exit keeps its route; the gate's far side is one exit stub
+    // on the exit ring (label-minimap-exits-and-gateways), whose own route
+    // lives inside the stub group, never in the node layer.
+    expect(wrapper.findAll(".local-map__edge").filter((line) => !line.element.closest(".local-map__stub"))).toHaveLength(1);
+    expect(wrapper.findAll(".local-map__stub")).toHaveLength(1);
   });
 
   it("a context dot carries no activation", async () => {
@@ -453,12 +458,20 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     // Radii ascend with the stated distance (the mapping is monotonic).
     const radii = circles.map((c) => Number(c.attributes("r")));
     expect([...radii].sort((a, b) => a - b)).toEqual(radii);
-    // The labels share the diagonal farthest from every drawn exit: the
-    // exits stand east, north-west and south, so the label bearing is
-    // north-east or south-west — never on an exit's own diagonal.
-    const [lx, ly] = [Number(labels[0].attributes("x")), Number(labels[0].attributes("y"))];
-    expect(Math.sign(lx - 120)).toBe(-Math.sign(ly - 120));
-    expect(lx).toBeGreaterThan(120);
+    // Each figure stays on its own ring, never on an exit's own bearing: the
+    // exits stand east, north-west and south. A figure whose preferred
+    // diagonal is taken by a navigation label moves along its ring
+    // (label-minimap-exits-and-gateways), so the figures no longer stack.
+    labels.forEach((label, i) => {
+      const dx = Number(label.attributes("x")) - 120;
+      const dy = Number(label.attributes("y")) - 120;
+      expect(Math.hypot(dx, dy)).toBeCloseTo(radii[i], 6);
+      const bearing = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+      for (const exit of [90, 315, 180]) {
+        const gap = Math.abs(((bearing - exit + 540) % 360) - 180);
+        expect(gap).toBeGreaterThanOrEqual(20);
+      }
+    });
   });
 
   it("uniform mode draws the dot field inside a pan group and no rings", () => {
@@ -487,20 +500,16 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     for (const payload of [LOCAL_MAP_WILDERNESS_METRIC_SAMPLE, LOCAL_MAP_ALTORIA_PLAZA_SAMPLE, LOCAL_MAP_EXTREME_RATIO_SAMPLE]) {
       const w = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
       for (const group of w.findAll(".local-map__node")) {
-        const label = group.find(".local-map__node-label");
-        if (!label.exists()) continue;
-        const text = Array.from(label.element.childNodes)
-          .filter((n) => n.nodeType === Node.TEXT_NODE)
-          .map((n) => n.textContent)
-          .join("")
-          .trim();
         const [cx, cy] = group.attributes("transform").match(/-?[\d.]+/g).map(Number);
-        const width = textCells(text) * CELL_EM * 16;
-        const x = cx + Number(label.attributes("x") ?? 0);
-        const y = cy + Number(label.attributes("y"));
-        expect(x - width / 2).toBeGreaterThanOrEqual(-1e-6);
-        expect(x + width / 2).toBeLessThanOrEqual(240 + 1e-6);
-        expect(y + 4).toBeLessThanOrEqual(240);
+        for (const line of group.findAll(".local-map__node-label tspan")) {
+          const width = textCells(line.text().trim()) * CELL_EM * 16;
+          const x = cx + Number(line.attributes("x") ?? 0);
+          const y = cy + Number(line.attributes("y"));
+          expect(x - width / 2).toBeGreaterThanOrEqual(-1e-6);
+          expect(x + width / 2).toBeLessThanOrEqual(240 + 1e-6);
+          expect(y + 4).toBeLessThanOrEqual(240);
+          expect(y - 13).toBeGreaterThanOrEqual(0);
+        }
       }
       w.unmount();
     }
