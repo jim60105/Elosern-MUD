@@ -364,6 +364,42 @@ class RoomGraphAreaTests(EvenniaTestCase):
     def _id(self, name):
         return encode_room(int(self.rooms[name].id))
 
+    @covers_requirement("webclient-area-map::area-commission-markers-distinguish-same-map-identity-from-elsewhere")
+    def test_registered_service_and_instance_keep_external_commission_bearings(self):
+        from typeclasses.rooms import InstanceRoom
+        from web.webclient.presentation.tests.test_map_quest_destinations import (
+            _patch_geography, _record, _DEFINITIONS, _GEOGRAPHY,
+        )
+        from world.quests.runtime import to_storage
+
+        _patch_geography(self)
+        self.rooms["a"].tags.add("t_service")
+        instance = create_object(InstanceRoom, key="Synthetic instance")
+        instance.attributes.add("origin_room", self.rooms["a"])
+        self.char.db.quest_log = [to_storage(_record(name)) for name in ("anchor", "grid", "site", "hunt")]
+        with mock.patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", _DEFINITIONS), \
+             mock.patch.dict("world.lore.settlements.places.PLACE_REGISTRY",
+                             {"t_service": SimpleNamespace(settlement_key="service")}, clear=True), \
+             mock.patch.dict(_GEOGRAPHY, {"service": SimpleNamespace(cell=(0, 0))}):
+            for room in (self.rooms["a"], instance):
+                self.char.location = room
+                record_arrival(self.char)
+                before = (self.char.location, parse_knowledge(self.char), get_world_clock().tick,
+                          repr(self.char.attributes.get("quest_log")),
+                          sorted((a.key, repr(a.value)) for a in room.attributes.all()))
+                payload = _render(self.char)
+                markers = {m["id"]: m["destination"] for m in payload["quest_markers"]}
+                self.assertEqual(markers, {
+                    "q_anchor": {"kind": "bearing", "bearing_deg": 36.9, "distance_km": 500.0},
+                    "q_grid": {"kind": "bearing", "bearing_deg": 36.9, "distance_km": 500.0},
+                    "q_site": {"kind": "bearing", "bearing_deg": 42.7, "distance_km": 176.9},
+                    "q_hunt": {"kind": "bearing", "bearing_deg": 90.0, "distance_km": 40.0},
+                })
+                self.assertTrue(all("x" not in n and "y" not in n for n in payload["nodes"]))
+                self.assertEqual(before, (self.char.location, parse_knowledge(self.char), get_world_clock().tick,
+                                 repr(self.char.attributes.get("quest_log")),
+                                 sorted((a.key, repr(a.value)) for a in room.attributes.all())))
+
     @covers_requirement(
         "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
     )
@@ -744,6 +780,48 @@ class MapViewDispatchTests(EvenniaTestCase):
             "action_id": action_id,
             "payload": payload,
         }
+
+    @covers_requirement("webclient-area-map::map-view-requests-publish-the-requested-area-without-changing-gameplay")
+    def test_area_request_with_missing_instance_origin_never_creates_attributes(self):
+        from evennia.typeclasses.attributes import Attribute
+        from typeclasses.rooms import InstanceRoom
+        from web.webclient.presentation.tests.test_map_quest_destinations import (
+            _patch_geography, _record, _DEFINITIONS,
+        )
+        from world.quests.runtime import to_storage
+
+        _patch_geography(self)
+        entrance = create_object(InstanceRoom, key="Synthetic entrance")
+        deep = create_object(InstanceRoom, key="Synthetic destination")
+        create_object(Exit, key="Deeper", location=entrance, destination=deep)
+        self.char.location = entrance
+        record_arrival(self.char)
+        entrance.attributes.remove("origin_room")
+        deep.attributes.remove("origin_room")
+        with mock.patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", _DEFINITIONS):
+            for index, log in enumerate(([], [
+                to_storage(_record("bound", stage_room_id=int(deep.id))),
+                to_storage(_record("anchor")), to_storage(_record("hunt")),
+            ])):
+                self.char.db.quest_log = log
+                self.assertFalse(entrance.attributes.has("origin_room"))
+                self.assertFalse(deep.attributes.has("origin_room"))
+                before = (self.char.location, parse_knowledge(self.char), get_world_clock().tick,
+                          sorted((a.id, a.db_key, repr(a.value)) for a in Attribute.objects.all()))
+                handle_ui_action(self.session, self.char,
+                                 self._envelope("map.view", {"scope": "area"}, f"t_orphan{index}"),
+                                 build_production_action_registry(), self.registry)
+                body = self.session.frames("ui_update")[-1]["panels"]["area_map"]
+                self.assertTrue(body["available"])
+                self.assertEqual(body["current_node"], encode_room(int(entrance.id)))
+                self.assertEqual(body["quest_markers"], [] if not log else [{
+                    "id": "q_bound", "title": _DEFINITIONS["map_dest_bound"].display_name,
+                    "tracked": False, "destination": {"kind": "node", "node_id": encode_room(int(deep.id))},
+                }])
+                self.assertEqual(before, (self.char.location, parse_knowledge(self.char), get_world_clock().tick,
+                                 sorted((a.id, a.db_key, repr(a.value)) for a in Attribute.objects.all())))
+                self.assertFalse(entrance.attributes.has("origin_room"))
+                self.assertFalse(deep.attributes.has("origin_room"))
 
     @covers_requirement(
         "webclient-action-dispatch::action-registries-are-allowlisted-and-duplicate-safe"
