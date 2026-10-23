@@ -80,6 +80,14 @@ test("a world map above its logical ceiling is rejected and the prior map retain
   assert.equal(store.getState().revision, 2);
 });
 
+test("the world ceiling is exact: at the bound adopts, one byte over rejects", () => {
+  const max = Protocol.MAP_MAX_BYTES.world_map;
+  const at = F.worldMapOfBytes(max);
+  const over = F.worldMapOfBytes(max + 1);
+  assert.equal(activeStore().receive(1, "ui_update", [wire(envelope(2, { world_map: at }))], {}).accepted, true);
+  assert.equal(activeStore().receive(1, "ui_update", [wire(envelope(2, { world_map: over }))], {}).accepted, false);
+});
+
 test("siblings keep the generic frame: an oversized companion is rejected", () => {
   const store = activeStore();
   const frame = envelope(2, { world_map: F.worldMap(), status: Object.assign(validStatusPanel(), paddedSibling(70000)) });

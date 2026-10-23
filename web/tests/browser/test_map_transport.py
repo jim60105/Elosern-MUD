@@ -92,7 +92,14 @@ class WorldMapTransportTests(BrowserAcceptanceTest):
         def on_socket(socket) -> None:
             def on_frame(payload) -> None:
                 text = payload if isinstance(payload, str) else payload.decode("utf-8")
-                if '"world_map"' in text:
+                if '"world_map"' not in text:
+                    return
+                try:
+                    name, args, _ = json.loads(text)
+                    panels = args[0]["panels"]
+                except (ValueError, TypeError, KeyError, IndexError):
+                    return
+                if name == "ui_update" and isinstance(panels.get("world_map"), dict):
                     frames.append(text)
 
             socket.on("framereceived", on_frame)

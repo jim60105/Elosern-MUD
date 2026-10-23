@@ -165,11 +165,17 @@ class PresentationCoordinator:
         """Deliver an update naming on-demand map panels, in parts if needed.
 
         One frame is used when the whole update satisfies the generic frame
-        bounds. Otherwise the eager companions (including an auto-added
-        dialogue panel) ship first as an ordinary update, then each map body
-        travels as one bounded transfer at its own revision. All frames are
-        sent synchronously from one context, so the mode cannot change between
+        bounds or the scoped world-map allowance. Otherwise the eager
+        companions (including an auto-added dialogue panel) ship first as an
+        ordinary update, then each map follows at its own revision: a world
+        map as one intact frame (a validated body always fits the allowance
+        alone), an area map as one bounded part transfer. All frames are sent
+        synchronously from one context, so the mode cannot change between
         them; the returned envelope is the logical form of the last revision.
+
+        A world map body is validated by ``_checked_map_body`` and again by
+        each allowance check; the repeated schema walk is accepted for this
+        on-demand, one-request-at-a-time path.
         """
         panels = {
             name: self._checked_map_body(name, value) if name in map_names else value
@@ -199,27 +205,26 @@ class PresentationCoordinator:
         from web.webclient.presentation.map_parts import encode_map_parts
 
         # Build and check every frame before anything is sent or any revision
-        # is consumed, so a failure never leaves a half-published update. A
-        # world map that fits the scoped world-map allowance on its own still
-        # travels as one intact frame (transport-world-map-panel); any other
-        # oversized map is a bounded part transfer.
+        # is consumed, so a failure never leaves a half-published update. The
+        # world map stays one intact frame under its allowance
+        # (transport-world-map-panel); an area map is a bounded part transfer.
         eager = {name: value for name, value in panels.items() if name not in map_names}
         planned: list[tuple[str | None, list[dict[str, Any]], bool]] = []
         if eager:
             planned.append((None, [eager], False))
-        base = self._revision
         for name in sorted(map_names):
-            single = {name: panels[name]}
-            if name == WORLD_MAP_PANEL and self._fits_one_frame(envelope(base + len(planned) + 1, single)):
-                planned.append((name, [single], False))
+            if name == WORLD_MAP_PANEL:
+                planned.append((name, [{name: panels[name]}], False))
             else:
                 planned.append((name, [{name: part} for part in encode_map_parts(name, panels[name])], True))
+        base = self._revision
         for offset, (name, bodies, parts) in enumerate(planned, start=1):
             for body in bodies:
-                if parts or name is None:
-                    check_envelope(envelope(base + offset, body))
+                frame = envelope(base + offset, body)
+                if name == WORLD_MAP_PANEL and carries_intact_world_map(frame):
+                    check_world_map_envelope(frame)
                 else:
-                    check_world_map_envelope(envelope(base + offset, body))
+                    check_envelope(frame)
         last = None
         for name, bodies, parts in planned:
             revision = self._next_revision()
@@ -262,7 +267,7 @@ class PresentationCoordinator:
         try:
             check_world_map_envelope(candidate)
             return True
-        except ProtocolValidationError:  # observability: ignore R2: a frame outside the world-map allowance falls back to separate companion and part frames
+        except ProtocolValidationError:  # observability: ignore R2: a combined frame outside the allowance falls back to separate frames, each re-checked (and raising) before any send
             return False
 
     @staticmethod

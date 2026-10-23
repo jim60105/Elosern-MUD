@@ -216,6 +216,30 @@ function largeWorldMap(minBytes, overrides) {
   return Object.assign(body, overrides || {});
 }
 
+// A synthetic world_map of exactly `target` canonical bytes: a large map
+// below the target, then visited places whose ASCII names close the gap.
+function worldMapOfBytes(target) {
+  const body = largeWorldMap(target - 20000);
+  const place = (index, length) => ({
+    id: "t_pad_" + index, name: "p".repeat(length), kind: "hidden", x: 1, y: 2,
+  });
+  // A row of name length L adds overhead + L bytes (its comma included).
+  for (let index = 0; ; index++) {
+    const gap = target - core.jsonByteSize(body);
+    const overhead = core.jsonByteSize(place(index, 1));
+    if (gap - overhead <= 256) {
+      body.visited_places.push(place(index, gap - overhead));
+      break;
+    }
+    // Leave room for one more complete row after this one.
+    body.visited_places.push(place(index, Math.min(256, gap - 2 * overhead - 8)));
+  }
+  if (core.jsonByteSize(body) !== target) {
+    throw new Error("worldMapOfBytes missed its target");
+  }
+  return body;
+}
+
 // Split a logical body into exact part wire values (mirror of the Python
 // encoder: canonical JSON, fixed 1536-byte slices, padded base64).
 function encodeParts(body, transferId) {
@@ -247,6 +271,7 @@ module.exports = {
   wildernessArea,
   worldMap,
   largeWorldMap,
+  worldMapOfBytes,
   ring,
   square,
   hole,

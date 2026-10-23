@@ -64,7 +64,8 @@ def _fixtures() -> dict:
             f"const F=require('{FIXTURES}');"
             "const S=require('./web/static/webclient/js/tests/protocol_support.js');"
             "process.stdout.write(JSON.stringify({small:F.worldMap(),status:S.validStatusPanel(),"
-            f"large:F.largeWorldMap(200000),over:F.largeWorldMap({over}),grid:F.gridArea()}}));"
+            f"large:F.largeWorldMap(200000),over:F.largeWorldMap({over}),grid:F.gridArea(),"
+            f"at:F.worldMapOfBytes({over - 1}),just_over:F.worldMapOfBytes({over})}}));"
         )
     )
 
@@ -150,6 +151,8 @@ class WorldMapFrameParityTests(unittest.TestCase):
             ("small world map", _frame({"world_map": _copy("small")}), True),
             ("world map with a companion", _frame({"world_map": _copy("large"), "status": _status()}), True),
             ("over-bound world map", _frame({"world_map": _copy("over")}), False),
+            ("world map of exactly the ceiling", _frame({"world_map": _copy("at")}), True),
+            ("world map one byte over the ceiling", _frame({"world_map": _copy("just_over")}), False),
             ("oversized companion", _frame({"world_map": _copy("small"), "status": _padded(_status(), 70_000)}), False),
             ("oversized local_map beside the world map", _frame({"world_map": _copy("small"), "local_map": _padded({"schema_version": 1}, 70_000)}), False),
             ("unsafe integer in a sibling", _frame({"world_map": _copy("large"), "status": {**_status(), "t": 2**60}}), False),
@@ -171,6 +174,11 @@ class WorldMapFrameParityTests(unittest.TestCase):
         for (name, _), browser in zip(field_cases, js[len(cases) :], strict=True):
             with self.subTest(case=name):
                 self.assertFalse(browser)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_the_ceiling_fixtures_sit_exactly_on_the_boundary(self):
+        self.assertEqual(json_byte_size(validate_world_map(_copy("at"))), map_panels.WORLD_MAX_BYTES)
+        self.assertEqual(json_byte_size(_copy("just_over")), map_panels.WORLD_MAX_BYTES + 1)
 
     @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
     def test_allowance_predicate_and_frame_ceiling(self):

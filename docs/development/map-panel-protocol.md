@@ -167,8 +167,9 @@ server measures the validated body. The two counts can differ slightly for
 some float spellings: Python writes `1250.0` where JavaScript writes `1250`,
 and `1e-05` where JavaScript writes `0.00001`. Publishers emit integral
 values as integers, and `tools/world_map_payload.py` does so, which keeps the
-two counts equal for the measured payloads. The ceiling's headroom is far
-larger than any such difference.
+two counts equal for the measured payloads. The ceiling check is therefore not byte-exact across
+languages, by design; the ceiling's headroom is far larger than any such
+difference.
 
 The coordinator publishes a world map as one intact frame whenever the whole
 update fits the generic bounds or the allowance. If a companion pushes the
@@ -187,8 +188,8 @@ allowance above, ships as one ordinary `ui_update`. Otherwise:
 1. Any eager companion panels in the same update, including the dialogue
    panel added in dialogue mode, ship first as an ordinary update.
 2. Each `area_map` body travels as one transfer at its own new revision. (A
-   `world_map` that fits its allowance alone ships as one intact frame at its
-   own revision instead.) Every part
+   validated `world_map` always fits its allowance alone, so it ships as one
+   intact frame at its own revision instead.) Every part
    is a `ui_update` with identical metadata whose `panels` hold only
    `{<map>: {schema_version: 1, available: true, part: {transfer_id, index,
    count, byte_length, chunk}}}`.
