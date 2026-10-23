@@ -170,6 +170,8 @@ def _check_input(inp: PartitionInput) -> list[str]:
         return problems
     if np.any(inp.walkable & ~inp.land):
         problems.append("a walkable cell lies outside land")
+    if len(inp.nation_names) > 255 or len(inp.region_names) > 255:
+        problems.append("more than 255 nations or regions do not fit the uint8 rasters")
     if np.any(inp.land & (inp.nation == 0)):
         problems.append("a land cell has no nominal nation")
     if np.any(inp.land & (inp.region == 0)):
@@ -317,7 +319,8 @@ def _settle_unseeded(inp, cls, fragment, adjacency, fragment_owner, owner, claim
         cells = np.isin(fragment, component)
         border = ndimage.binary_dilation(cells, structure=ring) & ~cells
         codes = set(owner[border].tolist())
-        if bool(np.all(claimed[border])) and len(codes) == 1:
+        nations = set(inp.nation[cells | border].tolist())
+        if bool(np.all(claimed[border])) and len(codes) == 1 and len(nations) == 1:
             rank = codes.pop() - 1
             for index in component:
                 fragment_owner[index] = rank
@@ -564,6 +567,8 @@ def _trace_rings(code: int, outgoing, starts: list[Cell]) -> list[list[Cell]]:
         used.add(first)
         while True:
             ring.append(end)
+            if end == ring[0]:
+                break  # closed; a pinch at the start yields a separate ring
             direction = (end[0] - start[0], end[1] - start[1])
             options = [e for e in outgoing.get((code, end), ()) if (end, e) not in used]
             if not options:

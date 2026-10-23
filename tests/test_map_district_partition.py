@@ -442,3 +442,203 @@ class OutlineTests(unittest.TestCase):
         self.assertEqual(len(outlines["r"]), 2)
         self.assertEqual(len(outlines["s"]), 2)
         self.assertSharedBoundaries(outlines, 2)
+
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_island_against_sea_is_one_counter_clockwise_ring(self):
+        rows = [".....", ".ppp.", ".ppp.", ".ppp.", "....."]
+        outlines = self._outlines(rows)
+        self.assertEqual(len(outlines["p"]), 1)
+        ring = outlines["p"][0]
+        area2 = sum(
+            x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1])
+        )
+        self.assertGreater(area2, 0)
+        # Smoothing cuts the four corners but keeps the coast within a cell.
+        for x, y in ring:
+            self.assertTrue(1000 <= x <= 4000 and 1000 <= y <= 4000, (x, y))
+
+
+def _oracle_owners(inp, seeds):
+    """Owners by a naive cell-level Dijkstra (independent of the generator).
+
+    With one-cell tiles every domain cell is its own fragment, so the
+    generator must agree with this direct search: legal same-nation steps,
+    no corner cutting, cost 1 or sqrt(2) compared exactly as integer pairs,
+    ties to the smaller key. Returns ``None`` when a component is unseeded.
+    """
+    size = inp.size
+    domain = inp.land & inp.walkable
+
+    def legal(a, b):
+        (ax, ay), (bx, by) = a, b
+        if not (0 <= bx < size and 0 <= by < size) or not domain[by, bx]:
+            return False
+        nation = inp.nation[ay, ax]
+        if inp.nation[by, bx] != nation:
+            return False
+        if ax != bx and ay != by:
+            return all(
+                domain[y, x] and inp.nation[y, x] == nation for x, y in ((bx, ay), (ax, by))
+            )
+        return True
+
+    def less(p, q):
+        # Is a1 + b1*sqrt(2) < a2 + b2*sqrt(2)?  Compare da against -db*sqrt(2).
+        da, db = p[0] - q[0], p[1] - q[1]
+        if da <= 0 and db <= 0:
+            return da < 0 or db < 0
+        if da >= 0 and db >= 0:
+            return False
+        if da < 0:  # db > 0: need -da > db*sqrt(2)
+            return da * da > 2 * db * db
+        return 2 * db * db > da * da  # da > 0, db < 0
+
+    keys = sorted(seed.key for seed in seeds)
+    best = {}
+    for seed in seeds:
+        best[seed.landmark_cell] = ((0, 0), keys.index(seed.key))
+    done = {}
+    while True:
+        open_cells = [c for c in best if c not in done]
+        if not open_cells:
+            break
+        current = open_cells[0]
+        for cell in open_cells[1:]:
+            (d, r), (bd, br) = best[cell], best[current]
+            if less(d, bd) or (d == bd and (r, cell[1], cell[0]) < (br, current[1], current[0])):
+                current = cell
+        done[current] = best[current][1]
+        (a, b), rank = best[current]
+        x, y = current
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                nxt = (x + dx, y + dy)
+                if (dx or dy) and nxt not in done and legal(current, nxt):
+                    label = ((a + (dx == 0 or dy == 0), b + (dx != 0 and dy != 0)), rank)
+                    old = best.get(nxt)
+                    if old is None or less(label[0], old[0]) or (label[0] == old[0] and rank < old[1]):
+                        best[nxt] = label
+    if int(domain.sum()) != len(done):
+        return None
+    return {cell: keys[rank] for cell, rank in done.items()}
+
+
+class OracleAgreementTests(unittest.TestCase):
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
+    def test_fragment_dijkstra_matches_a_naive_cell_search_on_unit_tiles(self):
+        import random
+
+        rng = random.Random(20261023)
+        checked = 0
+        for _ in range(12):
+            size = 16
+            rows = [
+                "".join(
+                    ("A" if rng.random() < 0.18 else "a") if x < 10 else ("B" if rng.random() < 0.18 else "b")
+                    for x in range(size)
+                )
+                for _ in range(size)
+            ]
+            base = _input(rows)
+            open_cells = [
+                (x, y) for y in range(size) for x in range(size) if base.walkable[y, x]
+            ]
+            picks = rng.sample(open_cells, 5)
+            seeds = tuple(_seed(f"d{index}", x, y) for index, (x, y) in enumerate(picks))
+            inp = PartitionInput(
+                size, base.land, base.walkable, base.nation, _NATIONS, base.region, _REGIONS,
+                seeds, tile=1,
+            )
+            expected = _oracle_owners(inp, seeds)
+            if expected is None:
+                with self.assertRaises(PartitionError):
+                    compute_partition(inp)
+                continue
+            partition = compute_partition(inp)
+            for cell, key in expected.items():
+                self.assertEqual(partition.owner_at(cell), key, cell)
+            checked += 1
+        self.assertGreater(checked, 0)
+
+
+class FootprintPocketTests(unittest.TestCase):
+    def _rows(self, pocket="a", gap=False):
+        rows = []
+        for index in range(10):
+            y = 9 - index
+            row = ""
+            for x in range(10):
+                in_ring = 2 <= x <= 6 and 2 <= y <= 6
+                if (x, y) == (4, 4):
+                    row += pocket
+                elif gap and (x, y) == (6, 4):
+                    row += "a"
+                elif in_ring and 3 <= x <= 5 and 3 <= y <= 5:
+                    row += "A"
+                elif in_ring and (x in (2, 6) or y in (2, 6)):
+                    row += "A"
+                else:
+                    row += "a"
+            rows.append(row)
+        return rows
+
+    def _town(self, rows):
+        footprint = frozenset(
+            (x, 9 - index)
+            for index, row in enumerate(rows)
+            for x, char in enumerate(row)
+            if char in "AB"
+        )
+        return DistrictSeed("town", "voronoi", (3, 3), approaches=((7, 4),), footprint=footprint)
+
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
+    def test_pocket_enclosed_by_a_claimed_footprint_joins_it(self):
+        rows = self._rows()
+        partition = compute_partition(_input(rows, self._town(rows), _seed("far", 9, 9)))
+        self.assertEqual(partition.owner_at((4, 4)), "town")
+
+    @covers_requirement(
+        "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
+    )
+    def test_pocket_of_another_nation_or_open_to_the_outside_is_not_absorbed(self):
+        rows = self._rows(pocket="b")
+        with self.assertRaises(PartitionError) as caught:
+            compute_partition(_input(rows, self._town(rows), _seed("far", 9, 9)))
+        self.assertIn("unseeded walkable component at cell (4, 4) in nation 'b'", caught.exception.problems[0])
+        # A walkable gap at (6, 4) joins the courtyard row to the outside, so
+        # the pocket is ordinary reachable ground of the nearest seed.
+        rows = self._rows(gap=True)
+        rows = [row[:5] + ("a" if index == 5 else row[5]) + row[6:] for index, row in enumerate(rows)]
+        partition = compute_partition(_input(rows, self._town(rows), _seed("far", 9, 9)))
+        self.assertTrue(partition.domain[4, 4])
+        self.assertIn(partition.owner_at((4, 4)), {"town", "far"})
+
+
+class DecoderValidationTests(unittest.TestCase):
+    @covers_requirement(
+        "map-district-partition::frozen-partition-and-outlines-reproduce-deterministically-offline"
+    )
+    def test_malformed_documents_are_rejected(self):
+        from world.maps.district_partition import DistrictPartitionError
+
+        inp = FrozenEncodingTests()._input()
+        document = encode(compute_partition(inp), inp)
+        mutations = {
+            "mixed marker": lambda d: d["exceptions"][0].__setitem__(2, MIXED),
+            "listed twice": lambda d: d["exceptions"].append(list(d["exceptions"][0])),
+            "malformed ring": lambda d: d["outlines"]["west"][0].append(5),
+            "unsupported partition version": lambda d: d.__setitem__("version", 99),
+        }
+        for rule, mutate in mutations.items():
+            with self.subTest(rule=rule):
+                broken = json.loads(json.dumps(document))
+                mutate(broken)
+                with self.assertRaises(DistrictPartitionError) as caught:
+                    decode_partition(broken)
+                self.assertIn(rule, str(caught.exception))

@@ -120,10 +120,17 @@ def decode_partition(
     coarse = tuple(_expand(row, count, f"coarse row {ty}") for ty, row in enumerate(rows))
     exceptions: dict[tuple[int, int], tuple[int, ...]] = {}
     for entry in document["exceptions"]:
+        if len(entry) < 2 or not all(isinstance(value, int) for value in entry[:2]):
+            raise DistrictPartitionError("an exception entry has no integer tile position")
         tx, ty = entry[0], entry[1]
         if not (0 <= tx < count and 0 <= ty < count) or coarse[ty][tx] != MIXED:
             raise DistrictPartitionError(f"exception tile {(tx, ty)} is not a mixed tile")
-        exceptions[(tx, ty)] = _expand(entry[2:], tile * tile, f"exception tile {(tx, ty)}")
+        if (tx, ty) in exceptions:
+            raise DistrictPartitionError(f"exception tile {(tx, ty)} is listed twice")
+        cells = _expand(entry[2:], tile * tile, f"exception tile {(tx, ty)}")
+        if any(code < 0 for code in cells):
+            raise DistrictPartitionError(f"exception tile {(tx, ty)} holds a mixed marker")
+        exceptions[(tx, ty)] = cells
     mixed = sum(row.count(MIXED) for row in coarse)
     if mixed != len(exceptions):
         raise DistrictPartitionError("a mixed coarse tile has no exception entry")
@@ -135,6 +142,10 @@ def decode_partition(
     outlines = document["outlines"]
     if set(outlines) != set(keys):
         raise DistrictPartitionError("outlines do not cover exactly the districts")
+    for key, rings in outlines.items():
+        for ring in rings:
+            if len(ring) % 2 or not all(isinstance(value, int) for value in ring):
+                raise DistrictPartitionError(f"outline of {key!r} holds a malformed ring")
     return DistrictPartition(
         fingerprint=document["fingerprint"],
         frame_cells=frame,
