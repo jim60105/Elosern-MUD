@@ -92,12 +92,12 @@ class WorldMapPrivacyTests(TestCase):
         self.assertNotIn("world_map",registry.eager_panel_names)
         payload=validate_map_view_payload({"scope":"world"})
         self.assertEqual(map_view_adapter(None,payload)["affected_panels"],("world_map",))
-        attrs=NS(get=lambda key:None)
+        attrs=NS(get=lambda key,**kwargs:None)
         with fixtures(),patch.object(panel.geometry,"current_point",return_value=(4.5,7.5)), \
              patch.object(panel,"quest_markers",return_value=[]):
             result=panel.world_map_presenter(NS(actor=NS(attributes=attrs)))
             self.assertEqual(result["current"],dict(x=4.5,y=7.5))
-            with patch.object(panel,"parse_knowledge",side_effect=panel.KnowledgeError("corrupt")):
+            with patch.object(panel,"persisted_visits",side_effect=panel.KnowledgeError("corrupt")):
                 with self.assertRaises(PanelUnavailableError):
                     panel.world_map_presenter(NS(actor=NS(attributes=NS(get=lambda key:{}))))
 
@@ -129,7 +129,7 @@ class WorldMapPrivacyTests(TestCase):
                 "t_anchor":NS(cell=(123,456))}):
             self.assertEqual(panel.geometry.current_point(actor),(123.5,456.5))
             instance=Mock(spec=InstanceRoom)
-            instance.origin_room=room
+            instance.attributes.get.return_value=room
             self.assertEqual(panel.geometry.current_point(NS(location=instance)),(123.5,456.5))
             room.tags.all.return_value=[]
             self.assertIsNone(panel.geometry.current_point(actor))

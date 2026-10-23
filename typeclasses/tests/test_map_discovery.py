@@ -114,6 +114,68 @@ class LandmarkArrivalTests(EvenniaTest):
             self.assertIs(self.char1.location,self.landmark)
             self.assertEqual(warning.call_args.args[0],"map_discovery_delivery_failed")
 
+    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
+    def test_existing_attribute_save_failure_cannot_discover_or_light_from_dirty_cache(self):
+        from world.rules.map_knowledge import record_arrival
+        from world.rules.map_district_lighting import lit_district_keys
+        from web.webclient.presentation.world_map import world_map_presenter
+        from web.webclient.presentation.tests.test_world_map import fixtures, SECRET
+        from evennia.utils.dbserialize import to_pickle
+
+        record_arrival(self.char1)
+        before={visit.node_id for visit in parse_knowledge(self.char1)}
+        attribute=self.char1.attributes.get("map_knowledge",return_obj=True)
+        original_save=type(attribute).save
+        dirty_seen=[]
+        def fail_knowledge_save(instance,*args,**kwargs):
+            if instance.pk == attribute.pk:
+                dirty_seen.append(self.district.landmark_node in instance.value["visited"])
+                raise RuntimeError("attribute save failed after cached value assignment")
+            return original_save(instance,*args,**kwargs)
+        with patch.object(type(attribute),"save",new=fail_knowledge_save), \
+             patch.object(self.char1,"msg") as msg, \
+             patch("world.rules.map_knowledge.log_warn") as warning, \
+             patch("world.rules.map_discovery.log_info") as info:
+            self.move()
+        self.assertEqual(dirty_seen,[True])
+        self.assertIs(self.char1.location,self.landmark)
+        self.assertNotIn("已探明",str(self.narratives(msg)))
+        info.assert_not_called()
+        self.assertEqual(warning.call_args.args[0],"map_knowledge_record_arrival_failed")
+        self.assertEqual({visit.node_id for visit in parse_knowledge(self.char1)},before)
+        self.assertEqual(lit_district_keys(self.char1,{"t_district":self.district}),frozenset())
+
+        # A map read must independently reject the same dirty cache, without
+        # relying on the narrative having already repaired it.
+        stored={"schema_version":1,"visited":{
+            visit.node_id:{"first_seen_tick":visit.first_seen_tick,"last_seen_tick":visit.last_seen_tick}
+            for visit in parse_knowledge(self.char1)
+        }}
+        stored["visited"][self.district.landmark_node]={"first_seen_tick":0,"last_seen_tick":0}
+        # Avoid SaverDict's persistence hook while recreating the failed-save
+        # in-memory state. This assignment never writes the database.
+        attribute.db_value=to_pickle(stored)
+        with fixtures(),patch("world.lore.map_districts.MAP_DISTRICT_REGISTRY",{SECRET:self.district}), \
+             patch("web.webclient.presentation.world_map_geometry.current_point",return_value=(1,2)), \
+             patch("web.webclient.presentation.world_map.quest_markers",return_value=[]):
+            body=world_map_presenter(NS(actor=self.char1))
+        self.assertFalse(body["districts"][0]["lit"])
+        self.assertEqual({visit.node_id for visit in parse_knowledge(self.char1)},before)
+
+    def test_missing_instance_origin_map_read_does_not_create_an_attribute(self):
+        from typeclasses.rooms import InstanceRoom
+        from web.webclient.presentation.world_map import world_map_presenter
+        from web.webclient.presentation.registry import PanelUnavailableError
+
+        instance=create_object(InstanceRoom,key="t_missing_origin")
+        instance.attributes.remove("origin_room")
+        self.char1.location=instance
+        self.assertFalse(instance.attributes.has("origin_room"))
+        with self.assertRaises(PanelUnavailableError):
+            world_map_presenter(NS(actor=self.char1))
+        self.assertFalse(instance.attributes.has("origin_room"))
+
     def test_possessed_npc_nested_settlement_narrates_once_and_direct_move_never_discovers(self):
         npc=create_object(NPC,key="t_puppet",location=self.room1)
         npc.db.possessed_by=self.char1.pk

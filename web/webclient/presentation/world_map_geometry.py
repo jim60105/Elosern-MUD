@@ -61,7 +61,7 @@ def current_point(actor):
 
     location = getattr(actor, "location", None)
     if isinstance(location, InstanceRoom):
-        location = location.origin_room
+        location = location.attributes.get("origin_room")
     if isinstance(location, (GridRoom, TerrainRoom)):
         node_id = _derive_node_id(location)
         return world_node_point(node_id) if node_id is not None else None

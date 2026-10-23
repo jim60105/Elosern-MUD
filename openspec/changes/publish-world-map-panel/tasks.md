@@ -75,3 +75,28 @@ narrative and production transport measurements. The new arrival module is
 owned by the existing `typeclasses` shard prefix; the new presenter test module
 has its explicit web-presentation shard entry. The real-geography measurement
 module has matching production-contract classification and rationale.
+
+## Blocking review dispositions
+
+The planning review's identity, hidden-village classification, terrain geometry,
+and nested-settlement narration findings were adopted before implementation.
+The final review identified a cached-Attribute persistence hazard and an
+autocreating instance-origin read. Both were corrected.
+
+- Persisted knowledge confirmation now bypasses identity-mapped model reads
+  with a values query, repairs only the in-memory cached `db_value`, and uses
+  the unchanged knowledge parser. The knowledge writer and stored schema are
+  unchanged. A real pre-existing Attribute regression injects a save failure
+  after the cached value changes and proves no discovery or district lighting.
+  The presenter also independently rejects a recreated dirty cache.
+- Instance origin resolution reads stored Attributes directly. A real
+  `InstanceRoom` without an origin remains without that Attribute after an
+  unavailable world-map request.
+- The focused prefix above with `typeclasses.tests.test_map_discovery`,
+  `web.webclient.presentation.tests.test_world_map`, and
+  `web.webclient.presentation.tests.test_area_map.MapViewDispatchTests`
+  passed 23 tests after these fixes.
+- The post-fix root contract gate passed all five groups: 2,485 requirements,
+  11,120 associations, no uncovered requirements or traceability errors,
+  no observability/test-data violations, and 18 passing contract tests.
+  Strict validation of `publish-world-map-panel` also passed.

@@ -93,6 +93,14 @@ outer rollbacks discard it, and message-delivery failures log without compensati
 committed movement. Nested NPC relocations, direct teleports, reads and reconnects
 do not produce discovery.
 
+Knowledge confirmation reads the persisted Attribute value with a values query
+and reconciles its in-memory cache before using the unchanged parser. Evennia
+assigns a cached Attribute value before saving, so a second cached parse alone
+cannot establish persistence after a swallowed save failure. The world presenter
+uses the same read boundary and cannot light a district from that dirty cache.
+Missing instance origins are read directly from stored Attributes, avoiding the
+autocreating `origin_room` descriptor during a read-only request.
+
 ## Area publisher layer details
 
 | Layer | Graph and identity | Labels and gateways |

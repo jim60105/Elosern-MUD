@@ -9,7 +9,8 @@ from web.webclient.presentation.map_panels import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation import world_map_geometry as geometry
-from world.rules.map_knowledge import KNOWLEDGE_ATTR, KnowledgeError, decode_node, parse_knowledge
+from world.rules.map_knowledge import KnowledgeError, decode_node
+from world.rules.map_discovery import persisted_visits
 
 
 TRAIL_CELL_CAP = 20_000
@@ -103,7 +104,7 @@ def world_map_presenter(context):
     if current is None:
         raise PanelUnavailableError
     try:
-        visits=parse_knowledge(actor) if actor.attributes.get(KNOWLEDGE_ATTR) is not None else ()
+        visits=persisted_visits(actor)
     except KnowledgeError as error:  # observability: ignore R2: unreadable knowledge is explicitly unavailable, never reset
         raise PanelUnavailableError from error
     ids={visit.node_id for visit in visits}
