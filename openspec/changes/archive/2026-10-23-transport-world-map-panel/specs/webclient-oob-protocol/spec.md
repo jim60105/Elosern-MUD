@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's existing command/args/kwargs transport triple. Protocol version 1 SHALL define client messages ui_sync and ui_action and server messages ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Every envelope SHALL reject unknown fields, invalid scalar types and non-finite numbers. The measured, bounded world_map panel SHALL have a panel-specific size/collection exception sufficient for real continental data; area_map SHALL retain its separately measured logical bounds and unrelated panels including local_map SHALL retain existing bounds. Transport SHALL deliver one complete replacement or bounded parts reassembled atomically under the same epoch/revision, never partial visible state.
+Each Elosern OOB message SHALL be exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Envelopes SHALL reject unknown fields, invalid scalars and non-finite numbers. world_map SHALL have its own size exception; other panels keep their bounds. Transport SHALL deliver one complete replacement or parts reassembled atomically.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot

@@ -5,31 +5,31 @@ Versioned WebSocket OOB envelopes, epoch/revision ordering, authenticated synchr
 ## Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types and non-finite numbers. Map part frames keep per-frame bounds; reassembled area_map uses finite schema bounds.
+Each Elosern OOB message SHALL be exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Envelopes SHALL reject unknown fields, invalid scalars and non-finite numbers. world_map SHALL have its own size exception; other panels keep their bounds. Transport SHALL deliver one complete replacement or parts reassembled atomically.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
-- **THEN** the transport command is `ui_snapshot`, its first positional argument is the complete envelope object, and no protocol field is encoded as a transport keyword argument
+- **THEN** the transport command is ui_snapshot, its first positional argument is the complete envelope object, and no protocol field is encoded as a transport keyword argument
 
 #### Scenario: An exact envelope rejects additional input
-- **WHEN** a client sends an otherwise valid `ui_sync` or `ui_action` object with an unknown field, a boolean in an integer field, or a value over a global bound
+- **WHEN** a client sends an otherwise valid ui_sync or ui_action object with an unknown field, a boolean in an integer field, or a value over its applicable bound
 - **THEN** the server rejects the message before synchronization or adapter dispatch and returns a safe protocol error without a traceback or raw payload
 
 #### Scenario: Negative safe integers pass the global bound
-- **WHEN** an OOB envelope carries a negative integer within the JavaScript-safe range, such as a signed combat modifier value (`defense: -15` or `accuracy: -10`)
+- **WHEN** an OOB envelope carries a negative integer within the JavaScript-safe range
 - **THEN** the global JSON-safety check accepts it and the value reaches the client unchanged
 
 #### Scenario: Integers outside the safe range are rejected
-- **WHEN** an OOB envelope carries an integer below `-9,007,199,254,740,991` or above `9,007,199,254,740,991`
+- **WHEN** an OOB envelope carries an integer outside -9007199254740991..9007199254740991
 - **THEN** the envelope is rejected before dispatch or adoption
 
 #### Scenario: Global structural bounds reject oversized envelopes
-- **WHEN** a message is canonical UTF-8 JSON over 65,536 bytes, nests deeper than 8, holds an object with more than 64 fields, a list with more than 128 items, a generic string over 2,048 Unicode code points, or an integer outside `-9,007,199,254,740,991..9,007,199,254,740,991` (the full JavaScript-safe range)
-- **THEN** every wire-frame validator rejects it before dispatch/adoption; reassembled logical area_map data instead uses its finite measured panel bounds, while retaining exact-field/scalar safety
+- **WHEN** a non-exempt message exceeds the existing 65536-byte or other generic structural limits, or a world-map message exceeds its separately measured declared bounds
+- **THEN** both validators reject it before dispatch/adoption, retaining all non-size scalar safety rules and panel-local bounds
 
 #### Scenario: Field-specific limits stay within global bounds
 - **WHEN** a registered field defines a field-specific limit
-- **THEN** that limit SHALL be equal to or smaller than the applicable enclosing bound; reassembled logical area_map uses its declared schema-specific bounds and all unrelated payloads retain generic bounds
+- **THEN** it is no larger than its applicable enclosing bound, with world_map and reassembled area_map using only their explicitly scoped finite logical bounds, and unrelated panel budgets unchanged
 
 ### Requirement: Full snapshots and updates have registered replacement semantics
 A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand map bodies SHALL be omitted from eager snapshots, kept separately within an epoch, and cleared on a new epoch. No JSON Patch is used.
@@ -302,3 +302,14 @@ When a `ui_action` arrives without a puppet, the system SHALL respond with a bou
 
 - **WHEN** the client sends a `ui_action` while the session has no puppet
 - **THEN** the server returns a bounded rejection envelope, and the client's mutation lock is released
+
+### Requirement: Continental map transport is measured end to end
+The real authored continental map payload SHALL be measured in canonical UTF-8 bytes, including common layers, all district outlines, maximum lit details and bounded trail/quest data. A documented bound SHALL be enforced on both server and browser. The actual Evennia WebSocket transport SHALL carry and adopt the representative payload above 64 KB; if its frame path cannot, bounded parts SHALL be used without losing the existing epoch/revision safety contract.
+
+#### Scenario: Real continental data exceeds the local map envelope
+- **WHEN** generated production geography and the final landmark roster are serialized into representative and supported worst-case world-map payloads
+- **THEN** their measured sizes and the selected bound are recorded, a payload at that supported size travels through the real socket and browser validator/store intact, and local_map remains limited to 65536 bytes
+
+#### Scenario: Multipart delivery never exposes incomplete state
+- **WHEN** measured frame limitations require parts and a part is missing, duplicated, malformed, superseded or from an old epoch
+- **THEN** the browser never adopts an incomplete/mixed map, retains or safely invalidates its prior complete map, bounds assembly memory and discards old-epoch data
