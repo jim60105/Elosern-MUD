@@ -24,6 +24,23 @@ Exact destination coordinates can leak through IDs, distances or unfiltered cach
 
 ## Implementation verification contract
 
+Production measurement resolves a prerequisite limit mismatch. The transport
+fixture's original 20,000-run limit covered the 1 km threshold but excluded
+valid larger histories after 5 km downsampling. A 540 by 540 coarse grid can
+contain 145,800 separated runs. Keep 20,000 runs at 1 km and admit 145,800 at
+5 km in both validators. Actual all-lit geometry plus the maximal coarse
+trail and full markers measures 1,535,088 canonical bytes, so the scoped
+world-only logical ceiling becomes 2,097,152 bytes. Schema version 1 and its
+field shapes stay unchanged; unrelated envelopes retain their original bounds.
+
+The planning critique also identified non-production measurement shortcuts.
+The runtime uses stable nonsemantic district wire identities, visit-only
+classification for elven villages as well as dungeons, classifier-derived
+5 km terrain unions, and authored public settlement roads transformed to the
+continental frame. Continental overland roads have no authored source.
+Explicit exit traversals opt into the shared committed narrative; nested NPC
+relocation settlements and teleports do not narrate independently.
+
 Implementation MUST run the smallest affected Evennia label, Node file, Vitest file, or managed browser class, never broad suites or CI shard commands locally. Every local test command must stay below ten minutes. Use `uv run --locked --env-file=<path> evennia test --settings test_settings.py --keepdb <focused.label>`, with `MUD_TEST_SETTINGS=1` in that env file. Pure tool tests use a focused `uv run --locked python -m unittest <module>`; client units use a single-file runner.
 
 Register every new/moved non-browser package test module in exactly one `.github/evennia-shards.json` shard; register every new browser class/method in `.github/browser-shards.json`. Keep synthetic mechanism fixtures independent of production lore. Production content integrity tests need a first-line `Data-contract test: <reason>` and matching `tools/test_data_freeze.json` entry.
