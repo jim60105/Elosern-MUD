@@ -1047,6 +1047,8 @@ const rootStyle = computed(() => {
                 title="返回上一層"
                 data-testid="rest-step-back"
                 @click="onStepBack"
+                @keydown.space.stop
+                @keydown.enter.stop
                 @keydown.esc.stop.prevent="onStepBack"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1060,6 +1062,8 @@ const rootStyle = computed(() => {
                 title="關閉"
                 data-testid="rest-step-close"
                 @click="onStepClose"
+                @keydown.space.stop
+                @keydown.enter.stop
                 @keydown.esc.stop.prevent="onStepBack"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
