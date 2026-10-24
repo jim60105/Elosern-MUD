@@ -46,7 +46,7 @@ Tick a box only after its verification passes in the worktree.
   - Re-baseline `tests/world/map_layout_variants.test.js` and `tests/world/map_lattice_name_fit.test.js` for the graph label offset and glyph sizes.
   - Update `stories/World/MapLattice.stories.js` plays that depend on `markerScale`.
 - [ ] 2.3 [NEW] Island footprints.
-  - Pass the scale through: `minimap_projection.js` `spreadExits` uses `paintedMarkerFootprint(node, ISLAND_GLYPH_SCALE)`, and `use-map-lattice-geometry.js` `nodeFootprint` uses `ISLAND_GLYPH_SCALE * markerScale`.
+  - Pass the scale through: `minimap_projection.js` `spreadExits` uses `paintedMarkerFootprint(node, ISLAND_GLYPH_SCALE)`, and `use-map-lattice-geometry.js` `nodeFootprint` uses the variant's `glyphSize` (task 2.2).
   - Label-layout obstacles become `Math.max(HALO_R × s, footprint)`.
   - Verify by re-baselining:
     - `tests/minimap_projection.test.js` (explicit footprint and grouped overlap);
