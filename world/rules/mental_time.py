@@ -20,6 +20,7 @@ from fractions import Fraction
 from math import ceil
 from typing import Any
 
+from world.observability import log_warn
 from world.rules.clock import (
     MentalPlan,
     next_registered_boundary,
@@ -31,6 +32,11 @@ from world.rules.fatigue import (
     SleepPosture,
     get_policy,
     read_optional_fatigue_state,
+)
+from world.rules.sleep_receipt import (
+    SleepReceiptError,
+    next_sleep_offset,
+    read_sleep_receipt,
 )
 
 
@@ -50,13 +56,22 @@ def is_forced_sleeper(entity: Any) -> bool:
     return state is not None and state.posture is SleepPosture.FORCED
 
 
-def _offset_seconds(state: FatigueState, activity: FatigueActivity) -> int | None:
+def _offset_seconds(
+    state: FatigueState,
+    activity: FatigueActivity,
+    *,
+    entity: Any = None,
+    tick: int = 0,
+) -> int | None:
     """Whole seconds until the member's next *interactive* fatigue boundary.
 
     Awake intervals stop only at forced-sleep entry (depletion): ordinary
     stage floors are non-interactive and consume exactly. A forced sleeper
     stops at its natural wake threshold; a voluntary sleeper's target is the
-    caller's requested completion, so it declares no earlier boundary.
+    durable accepted receipt's own wake target, reevaluated against current
+    recovery needs under the unchanged accepted cap. A voluntary body with a
+    missing or corrupt receipt declares no boundary and is never repaired,
+    refilled or woken here.
     """
     policy = get_policy()
     if state.posture is SleepPosture.AWAKE:
@@ -70,17 +85,41 @@ def _offset_seconds(state: FatigueState, activity: FatigueActivity) -> int | Non
             return None
         gap = max(0, policy.wake_units - state.reserve_units)
         return ceil(Fraction(gap, sleep_rate))
+    if state.posture is SleepPosture.VOLUNTARY and entity is not None:
+        try:
+            receipt = read_sleep_receipt(entity)
+        except SleepReceiptError as error:
+            log_warn(
+                "sleep_receipt_unusable",
+                context={
+                    "char": str(getattr(entity, "pk", "?")),
+                    "reason": error.code,
+                    "stage": "next_boundary",
+                },
+            )
+            return None
+        if receipt is None:
+            return None
+        return next_sleep_offset(entity, receipt, tick)
     return None
 
 
 def next_mental_offset(
-    entity: Any, awake_activity: FatigueActivity = FatigueActivity.AWAKE
+    entity: Any,
+    awake_activity: FatigueActivity = FatigueActivity.AWAKE,
+    *,
+    tick: int = 0,
 ) -> int | None:
     """Return one member's next interactive mental offset, or ``None``."""
     state = read_optional_fatigue_state(entity)
     if state is None:
         return None
-    return _offset_seconds(state, sample_activity(entity, awake_activity))
+    return _offset_seconds(
+        state,
+        sample_activity(entity, awake_activity),
+        entity=entity,
+        tick=tick,
+    )
 
 
 def next_skip_boundary(
@@ -98,11 +137,20 @@ def next_skip_boundary(
     """
     if limit <= 0:
         return None
-    offsets = [
-        offset
-        for entity in scope
-        if (offset := next_mental_offset(entity, awake_activity)) is not None
-    ]
+    offsets: list[int] = []
+    for entity in scope:
+        offset = next_mental_offset(
+            entity, awake_activity, tick=tick
+        )
+        if offset is None:
+            continue
+        if offset == 0:
+            # A due accepted wake is a real zero-offset boundary: it must
+            # settle (and finalize) now instead of letting time run past it.
+            offsets.append(0)
+            continue
+        if offset <= limit:
+            offsets.append(offset)
     registered = next_registered_boundary(tick, tick + limit)
     if registered is not None:
         offsets.append(registered)

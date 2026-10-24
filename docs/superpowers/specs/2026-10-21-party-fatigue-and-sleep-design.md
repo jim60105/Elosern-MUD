@@ -1,7 +1,10 @@
 # Party Fatigue, Sleep, and Control Design
 
 Date: 2026-10-21
-Status: Approved; OpenSpec proposals created (§16); not implemented.
+Status: Approved. The original six changes are implemented and archived (§16.1).
+The durable per-body sleep receipt, explicit party/duration sleep and passive
+wake corrections are proposed in `openspec/changes/fix-body-sleep-lifecycle`
+and are not implemented by the archived original work.
 Companion design: [World Map Scale](2026-10-21-world-map-scale-design.md).
 
 ## 1. Outcome and architectural authority
@@ -62,6 +65,8 @@ Persist each member's posture as awake, voluntarily sleeping, or forcibly sleepi
 Forced sleep latches when reserve reaches zero at an accepted settlement boundary. Reaching one unit above zero does not wake the member. Natural forced-sleep release occurs at 20 percent or higher, outside live combat, and leaves the member with the fatigue stage associated with that reserve.
 
 A voluntary sleep operation explicitly names the body entering sleep, defaulting to the current acting body. Co-location, ownership or one shared clock advance never selects the other members for sleep. Controlling a companion, selecting sleep for that body, and returning to an awake owner is valid. Do not add a separate party sleep-planner feature.
+
+An explicit all-present-effective-party operation is a declared exception: it selects the owner plus every present, living, physiological effective member and commits one voluntary receipt per awake body atomically, retaining any existing voluntary or forced target. Remote members stay untouched. No private party sleep-planner, contextual auto-selection or SKIP-driven selection is added. Each body keeps exactly one accepted sleep receipt naming its kind, declared mode (duration, recovery or forced threshold), accepted target, limit, settled cursor, revision and lifecycle; posture remains the three existing values and no new posture enum is introduced.
 
 ## 5. Fatigue debuff projection
 
@@ -142,9 +147,13 @@ Existing current lack of active monsters remains unchanged. Do not add a random 
 
 When a wait wakes a companion or changes the controlled body's capability, stop and return control before automatically consuming further time. Fatigue-stage changes that do not require interaction can update within the same requested interval; they are not an excuse to drop fractional consumption.
 
+Every applicable deterministic party advance reconciles each living in-scope sleeper's own accepted target, including an unselected owner. Reaching a voluntary target wakes that body and completes its receipt once in the owning transaction and emits one post-commit notification; it changes no possession, commander, combat draft or binding. Reserve saturation alone never completes a voluntary duration, and a body whose receipt is missing or corrupt is not silently refilled, woken or migrated.
+
 ### 8.5 Indivisible nonmovement actions
 
 Existing indivisible actions such as a field cast retain their full accepted effects, resource costs and time cost as one atomic unit. Sample each settled member's actual activity/posture for that interval, apply its reserve delta for the full interval, and enter forced sleep at completion if the result reaches zero. Do not retrospectively turn the remainder into sleeping time or grant recovery. This is settlement granularity, rather than a claim that all physiology is simulated continuously inside an indivisible action.
+
+The one narrow exception is a pre-existing voluntary wake deadline: physiology is subdivided at that declared deadline only, so the sleeping portion recovers until the accepted target, the body wakes there, and the awake remainder consumes at the ordinary activity rate. The action's effects, cost, full duration, atomic rollback and completion-time collapse for previously awake bodies are unchanged; forced sleep and terminal combat keep their existing completion semantics.
 
 An actor already unable to act fails ordinary preflight with zero effects/time. An eligible actor with little reserve may complete an accepted indivisible action and then collapse. The same completion rule applies when an unselected awake companion reaches zero during that action's shared time; it does not erase the caster's effects or shorten the paid interval. Emit prompts only after the complete transaction commits.
 
@@ -155,6 +164,8 @@ Interruptible waits, sleep and their eligible study intervals use section 8.4 in
 ### 9.1 Voluntary sleep completion
 
 The existing voluntary sleep-to-full calculation must include mental reserve alongside the existing HP/MP/SP recovery requirement, subject to the existing maximum skip bound and actual interruption. Full ordinary gauges must no longer produce zero-duration sleep while mental reserve still needs recovery.
+
+The accepted target is declared at entry. `until-recovered` (and the default recovery request) targets full HP/MP/SP and full mental reserve; the deadline is the slowest of those times-to-full recalculated against current unmet needs, always capped by the accepted `limit_tick`. An explicit duration targets `entry_tick + accepted seconds`, and full reserve or gauges never shorten it. A recovery that would exceed the configured cap accepts the cap, wakes at it and reports partial recovery truthfully. An already-met recovery target reconciles awake in the entry transaction with zero elapsed time and no completed-sleep claim. An accepted external effect may move the next recovery boundary but never extends the cap or replaces the sleep identity; death, deletion or defeat cancels physiological completion and revives nobody.
 
 A forced-sleeping body naturally targets the minimum 20-percent wake threshold. Sleep is settled once. Later optional dream collaboration uses the committed result without restoring resources or advancing time a second time. Forced sleep never opens a dream automatically.
 
@@ -241,16 +252,19 @@ The implementation should have small deterministic interfaces with these respons
 | Fatigue policy | Exact reserve, sleep posture, declared activity and game seconds | Pure interval effects, next boundaries, fatigue stage and travel modifier; authored constants have one read-only source |
 | Fatigue settlement | Validated entities and interval effects | Atomic reserve/posture/debuff writes through the rules core |
 | Time-skip orchestration | Explicit sleep or waiting request, authoritative party scope and safety | One actual elapsed interval, member-specific activities, interruptions and existing clock events |
+| Sleep receipt | Validated entry request, clock tick and current physiology | One durable accepted episode per body: identity, mode, target, limit, settled cursor, revision, lifecycle and bounded latest interval result; passive boundary lookup and completion stay inside the clock transaction |
 | Movement integration | Sparse road geometry, party restrictions, changing fatigue speed | Validated cost and one atomic movement settlement; no sleeping follower movement |
 | Control handoff | Account/commander, current unavailable body, selected live candidate | Existing verified possession/return transition with transactional compensation |
 | Combat integration | Roster/posture, completed rounds, terminal outcome | Normal action prohibition and targetability; one terminal reserve settlement or immediate opening defeat |
 | Presentation | Read-only status and handoff eligibility | Localized labels, candidate choices, rejection reasons and ordinary wait/sleep results |
 
-Reserve policy does not own transport sessions or battlefield persistence. Possession does not own fatigue arithmetic. The clock remains the only world-time writer. Avoid a second debuff table or independent UI eligibility implementation.
+Reserve policy does not own transport sessions or battlefield persistence. Possession does not own fatigue arithmetic, and sleep receipt reconciliation never writes possession, sessions, locks or cmdsets. The clock remains the only world-time writer. Avoid a second debuff table, a second receipt writer or an independent UI eligibility implementation.
 
 ## 12. Persistence, errors, and observability
 
 Every new persistent surface must join the relevant clock, movement and terminal rollback snapshots. A failed multi-member settlement restores all members, including in-process Evennia caches. A committed forced-sleep transition and its projected debuff must never disagree after reload.
+
+The sleep receipt and the bounded latest-party-entry identity are durable surfaces of the same rollback owners as reserve, posture and the projection cache: entry snapshots each selected body's receipt before the first write, and every clock advance (including terminal combat settlement) snapshots and restores the receipt with the physiology. A forced depletion creates its threshold receipt from the committed transition itself, not from a later read or repair. Replay identity and its stored interval result commit with the interval; a rolled-back interval restores the previous cursor and result together.
 
 Use the existing observability facade and boundary-event conventions. Include available character, commander, room, tick, session and reason identifiers in context. Emit real state transitions and control-transfer outcomes after durable commit, not per-second noise or fake successful handoffs. Do not log credentials or expand unrelated observability scope.
 
@@ -306,7 +320,9 @@ Record the two designs as shared context, then obtain written-spec approval befo
 
 ## 16. Proposed changes
 
-This design is decomposed into six dependency-ordered OpenSpec changes. Each is sized to about one workday, was validated with `openspec validate <change> --strict`, and records the exact branch and worktree its implementation worker must use. All are committed on the primary branch; none is implemented.
+This design was decomposed into six dependency-ordered OpenSpec changes. Each was sized to about one workday, was validated with `openspec validate <change> --strict`, and recorded the exact branch and worktree its implementation worker used. All six are implemented on the primary branch and preserved in the OpenSpec archive; the table records the original archived implementation, not the current proposed corrections.
+
+The archived implementation is superseded only where a later approved change amends this document: `fix-body-sleep-lifecycle` (durable per-body receipts, duration/party sleep and passive voluntary wake, §4.2/§8.4/§8.5/§9.1/§11/§12) and its companions. Sections not amended here remain the archived contract.
 
 | Change | Commit | Scope | Tasks |
 | --- | --- | --- | ---: |

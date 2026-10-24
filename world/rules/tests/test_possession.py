@@ -413,14 +413,16 @@ class SleepHandoffTests(EvenniaTest):
         self.player.apply_race_baseline()
         self.player.location = self.room1
         self.player.save()
-        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+        # A real accepted recovery plan needs unmet reserve; a full body now
+        # reconciles awake at zero elapsed time instead of holding a pose.
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
 
     def _companion(self, key="同伴"):
         npc = create_object(NPC, key=key, location=self.room1)
         npc.race = "human"
         npc.apply_race_baseline()
         join_party(npc, self.player)
-        write_fatigue_state(npc, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(npc, 180000, SleepPosture.AWAKE)
         return npc
 
     def _sleeping_possession(self):
@@ -453,7 +455,7 @@ class SleepHandoffTests(EvenniaTest):
         )
         owner = entry.handoff_candidates[0]
         self.assertEqual(owner.dbid, int(self.player.pk))
-        self.assertEqual(owner.reserve_percent, 100)
+        self.assertEqual(owner.reserve_percent, 50)
         # Entry alone never takes control away from the selected body.
         self.assertEqual(current_possession(self.player)["npc_dbid"], int(sleeper.pk))
         options = sleep_handoff_candidates(
@@ -562,6 +564,7 @@ class SleepHandoffTests(EvenniaTest):
         first = self._transition_id(sleeper)
         continue_sleep(sleeper, entry)
         self.assertIs(read_fatigue_state(sleeper).posture, SleepPosture.AWAKE)
+        write_fatigue_state(sleeper, 180000, SleepPosture.AWAKE)
         enter_sleep(sleeper)
         self.assertNotEqual(first, self._transition_id(sleeper))
         with self.assertRaises(PossessionGateError) as ctx:

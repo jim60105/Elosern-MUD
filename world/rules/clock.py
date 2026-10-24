@@ -20,10 +20,13 @@ from world.rules.fatigue import (
     FatigueActivity,
     FatigueInterval,
     IntervalCompletion,
+    SleepPosture,
     predict_interval,
+    project_fatigue_status,
     read_optional_fatigue_state,
     settle_fatigue_intervals,
     sleep_blocks_actions,
+    write_fatigue_state,
 )
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
@@ -36,6 +39,20 @@ from world.rules.sexual_state import (
     reset_daily_counters,
 )
 from world.rules.sexual_transitions import apply_event
+from world.rules.sleep_receipt import (
+    MODE_RECOVERY,
+    SLEEP_RECEIPT_SURFACES,
+    STATE_COMPLETED,
+    STATE_INTERRUPTED,
+    STATE_SLEEPING,
+    SleepReceipt,
+    SleepReceiptError,
+    full_recovery_seconds,
+    next_sleep_offset,
+    read_sleep_receipt,
+    recovery_target_tick,
+    write_sleep_receipt,
+)
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import GAUGE_KEYS
 from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT, UnlockNotice
@@ -314,7 +331,7 @@ def _practice_settlement(
     seconds: int,
     source: AdvanceSource,
     due_tick: int,
-    eligible: frozenset[int] | None = None,
+    eligible: Mapping[int, int] | None = None,
 ) -> list[ScheduledEvent]:
     """Settle declared-practice bookings in closed form (D7: the real writer).
 
@@ -342,7 +359,6 @@ def _practice_settlement(
     """
     if source is not AdvanceSource.SKIP or seconds <= 0:
         return []
-    hours = seconds // 3600
     events: list[ScheduledEvent] = []
     for entity in entities:
         db = getattr(entity, "db", None)
@@ -354,8 +370,11 @@ def _practice_settlement(
                 # later eligible awake interval; it is never consumed by
                 # time the member spent asleep.
                 continue
+            hours = eligible[id(entity)] // 3600
         elif sleep_blocks_actions(entity):
             continue
+        else:
+            hours = seconds // 3600
         booking = getattr(db, "practice_booking", None)
         if booking is None:
             continue
@@ -477,7 +496,243 @@ class MentalPlan:
     record: list[Any] | None = None
 
 
-def _settle_mental(seconds: int, plan: MentalPlan | None) -> list[Any]:
+_RECEIPT_UNUSABLE = object()
+
+
+def _receipt_state(entity: Any, stage: str) -> Any:
+    """Read one receipt for settlement; a corrupt record fails closed locally."""
+    try:
+        return read_sleep_receipt(entity)
+    except SleepReceiptError as error:
+        log_warn(
+            "sleep_receipt_unusable",
+            context={
+                "char": str(getattr(entity, "pk", "?")),
+                "reason": error.code,
+                "stage": stage,
+            },
+        )
+        return _RECEIPT_UNUSABLE
+
+
+def _schedule_voluntary_wake(entity: Any, receipt: SleepReceipt, revision: int) -> None:
+    """Emit one post-commit wake notification for a committed voluntary wake."""
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(entity, PlayerCharacter):
+        return
+    from world.rules.fatigue import _notify_wake_transition_observers
+
+    occurrence_id = (
+        f"wake:voluntary:{getattr(entity, 'pk', '')}:{receipt.sleep_id}:{revision}"
+    )
+    transaction.on_commit(
+        lambda ent=entity, oid=occurrence_id: _notify_wake_transition_observers(
+            ent, occurrence_id=oid, in_combat=False
+        )
+    )
+
+
+def _reconcile_sleep_receipt(entity: Any, end_tick: int) -> bool:
+    """Advance one body's receipt to ``end_tick`` and complete a due wake.
+
+    The reconciliation runs inside the owning clock transaction and never
+    changes possession, control or death state. A due voluntary target wakes
+    the body once and completes the receipt; a body already awake without
+    reaching its target is recorded as interrupted, never as completed sleep.
+    """
+    if getattr(entity, "_is_deleted", False):
+        return False
+    state = _mental_state_or_none(entity)
+    if state is None or _is_dead(entity):
+        return False
+    receipt = _receipt_state(entity, "sleep_reconcile")
+    if receipt is _RECEIPT_UNUSABLE or receipt is None:
+        return False
+    if not receipt.sleeping:
+        return False
+    target = recovery_target_tick(entity, receipt, end_tick)
+    due = target <= end_tick
+    woke = False
+    new_state = receipt.state
+    partial = receipt.partial
+    if due and state.posture is SleepPosture.VOLUNTARY:
+        write_fatigue_state(entity, state.reserve_units, SleepPosture.AWAKE)
+        project_fatigue_status(entity)
+        woke = True
+        new_state = STATE_COMPLETED
+        if receipt.mode == MODE_RECOVERY:
+            partial = full_recovery_seconds(entity) > 0
+    elif due:
+        new_state = STATE_COMPLETED
+    elif state.posture is SleepPosture.AWAKE:
+        new_state = STATE_INTERRUPTED
+    if (
+        target == receipt.target_tick
+        and new_state == receipt.state
+        and end_tick <= receipt.settled_through_tick
+    ):
+        return False
+    updated = receipt.with_progress(
+        settled_through_tick=end_tick,
+        target_tick=target,
+        state=new_state,
+        partial=partial,
+    )
+    write_sleep_receipt(entity, updated)
+    if woke:
+        _schedule_voluntary_wake(entity, updated, updated.revision)
+    return woke
+
+
+def _settle_interruptible_member(
+    entity: Any,
+    plan: MentalPlan,
+    seconds: int,
+    start_tick: int,
+    commits: list[Any],
+) -> None:
+    """Commit one member's interactively segmented interval."""
+    state = _mental_state_or_none(entity)
+    remaining = seconds
+    cursor = start_tick
+    for _ in range(16):
+        activity = plan.activity_for(entity)
+        prediction = predict_interval(
+            state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
+        )
+        step = prediction.applicable_seconds
+        settlement = settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    entity,
+                    activity,
+                    step,
+                    state,
+                    IntervalCompletion.INTERRUPTIBLE,
+                ),
+            ),
+            context={"stage": "mental_settlement"},
+            start_tick=cursor,
+        )
+        commit = settlement.commits[0]
+        commits.append(commit)
+        state = commit.end
+        cursor += step
+        remaining -= step
+        if remaining <= 0:
+            break
+        if step == 0 and _same_state(commit.end, commit.start):
+            raise RuntimeError(
+                "mental settlement made no progress at a zero-second boundary"
+            )
+    else:
+        raise RuntimeError("mental settlement exceeded its internal segment bound")
+
+
+def _settle_indivisible_member(
+    entity: Any,
+    plan: MentalPlan,
+    seconds: int,
+    start_tick: int,
+    receipt: Any,
+    commits: list[Any],
+) -> None:
+    """Commit one member's indivisible interval, splitting only physiology.
+
+    A pre-existing voluntary accepted deadline inside the action subdivides the
+    body's own physiology: it sleeps up to the deadline, wakes there, then
+    consumes the remaining action time at the ordinary awake rate. The action's
+    effects, cost, full duration and atomicity are unchanged.
+    """
+    state = _mental_state_or_none(entity)
+    voluntary_deadline = None
+    if (
+        isinstance(receipt, SleepReceipt)
+        and receipt.sleeping
+        and state.posture is SleepPosture.VOLUNTARY
+    ):
+        voluntary_deadline = next_sleep_offset(entity, receipt, start_tick)
+    if voluntary_deadline is None or voluntary_deadline >= seconds:
+        settlement = settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    entity,
+                    plan.activity_for(entity),
+                    seconds,
+                    state,
+                    plan.completion,
+                ),
+            ),
+            context={"stage": "mental_settlement"},
+            start_tick=start_tick,
+        )
+        commits.extend(settlement.commits)
+        return
+    sleeping_seconds = max(0, min(seconds, voluntary_deadline))
+    if sleeping_seconds > 0:
+        settlement = settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    entity,
+                    plan.activity_for(entity),
+                    sleeping_seconds,
+                    state,
+                    IntervalCompletion.INDIVISIBLE,
+                ),
+            ),
+            context={"stage": "mental_settlement"},
+            start_tick=start_tick,
+        )
+        commits.extend(settlement.commits)
+    _reconcile_sleep_receipt(entity, start_tick + sleeping_seconds)
+    remaining = seconds - sleeping_seconds
+    if remaining <= 0:
+        return
+    awake_state = _mental_state_or_none(entity)
+    if awake_state is None:
+        return
+    cursor = start_tick + sleeping_seconds
+    for _ in range(16):
+        activity = plan.activity_for(entity)
+        prediction = predict_interval(
+            awake_state,
+            activity,
+            remaining,
+            completion=IntervalCompletion.INTERRUPTIBLE,
+        )
+        step = prediction.applicable_seconds
+        settlement = settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    entity,
+                    activity,
+                    step,
+                    awake_state,
+                    IntervalCompletion.INTERRUPTIBLE,
+                ),
+            ),
+            context={"stage": "mental_settlement"},
+            start_tick=cursor,
+        )
+        commit = settlement.commits[0]
+        commits.append(commit)
+        awake_state = commit.end
+        cursor += step
+        remaining -= step
+        if remaining <= 0:
+            break
+        if step == 0 and _same_state(commit.end, commit.start):
+            raise RuntimeError(
+                "mental settlement made no progress at a zero-second boundary"
+            )
+    else:
+        raise RuntimeError("mental settlement exceeded its internal segment bound")
+
+
+def _settle_mental(
+    seconds: int, plan: MentalPlan | None, start_tick: int = 0
+) -> list[Any]:
     """Settle one present party's mental intervals inside the clock transaction.
 
     An ``INTERRUPTIBLE`` plan is segmented only across ordinary fatigue-stage
@@ -485,7 +740,13 @@ def _settle_mental(seconds: int, plan: MentalPlan | None) -> list[Any]:
     truncated the accepted interval). Each segment is committed through the
     sole fatigue writer, so exact reserve consumption and every exclusive
     projection survive one long advance. An ``INDIVISIBLE`` plan commits its
-    full duration once.
+    full duration once, subdividing only the body's physiology at a
+    pre-existing voluntary accepted deadline.
+
+    Every living in-scope sleeper's own receipt cursor is reconciled at the
+    interval end, including bodies this advance did not explicitly continue.
+    A voluntary body whose receipt is missing or corrupt is left completely
+    un-settled: no refill, no invented wake and no repair.
     """
     if plan is None:
         return []
@@ -496,71 +757,57 @@ def _settle_mental(seconds: int, plan: MentalPlan | None) -> list[Any]:
         state = _mental_state_or_none(entity)
         if state is None or _is_dead(entity):
             continue
+        receipt = _receipt_state(entity, "mental_settlement")
+        if state.posture is SleepPosture.VOLUNTARY:
+            if receipt is _RECEIPT_UNUSABLE or receipt is None:
+                continue
+        elif receipt is _RECEIPT_UNUSABLE:
+            receipt = None
         if plan.completion is not IntervalCompletion.INTERRUPTIBLE:
-            settlement = settle_fatigue_intervals(
-                (
-                    FatigueInterval(
-                        entity,
-                        plan.activity_for(entity),
-                        seconds,
-                        state,
-                        plan.completion,
-                    ),
-                ),
-                context={"stage": "mental_settlement"},
+            _settle_indivisible_member(
+                entity, plan, seconds, start_tick, receipt, commits
             )
-            commits.extend(settlement.commits)
-            continue
-        remaining = seconds
-        for _ in range(16):
-            activity = plan.activity_for(entity)
-            prediction = predict_interval(
-                state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
-            )
-            step = prediction.applicable_seconds
-            settlement = settle_fatigue_intervals(
-                (
-                    FatigueInterval(
-                        entity,
-                        activity,
-                        step,
-                        state,
-                        IntervalCompletion.INTERRUPTIBLE,
-                    ),
-                ),
-                context={"stage": "mental_settlement"},
-            )
-            commit = settlement.commits[0]
-            commits.append(commit)
-            state = commit.end
-            remaining -= step
-            if remaining <= 0:
-                break
-            if step == 0 and _same_state(commit.end, commit.start):
-                raise RuntimeError(
-                    "mental settlement made no progress at a zero-second boundary"
-                )
         else:
-            raise RuntimeError("mental settlement exceeded its internal segment bound")
+            _settle_interruptible_member(entity, plan, seconds, start_tick, commits)
+        _reconcile_sleep_receipt(entity, start_tick + seconds)
     if plan.record is not None:
         plan.record.extend(commits)
     return commits
 
 
-def _initial_practice_eligible(plan: MentalPlan | None) -> frozenset[int] | None:
-    """The members whose sampled initial activity permits study settlement."""
+def _awake_practice_seconds(
+    plan: MentalPlan | None, seconds: int, start_tick: int
+) -> dict[int, int] | None:
+    """The actual awake seconds each member may settle study over.
+
+    A body that starts asleep earns no practice for the sleeping portion; a
+    pre-existing voluntary deadline leaves its awake remainder eligible. A
+    body whose receipt is missing or corrupt earns no study time and keeps its
+    standing booking.
+    """
     if plan is None:
         return None
-    eligible: set[int] = set()
+    eligible: dict[int, int] = {}
     for entity in plan.scope:
         if getattr(entity, "_is_deleted", False) or _is_dead(entity):
             continue
-        if _mental_state_or_none(entity) is None:
-            eligible.add(id(entity))
+        state = _mental_state_or_none(entity)
+        if state is None:
+            eligible[id(entity)] = seconds
             continue
         if plan.activity_for(entity) is not FatigueActivity.SLEEP:
-            eligible.add(id(entity))
-    return frozenset(eligible)
+            eligible[id(entity)] = seconds
+            continue
+        if state.posture is SleepPosture.VOLUNTARY:
+            receipt = _receipt_state(entity, "practice_eligibility")
+            if receipt is _RECEIPT_UNUSABLE or receipt is None:
+                continue
+            offset = next_sleep_offset(entity, receipt, start_tick)
+            if offset is not None:
+                awake_seconds = max(0, seconds - offset)
+                if awake_seconds > 0:
+                    eligible[id(entity)] = awake_seconds
+    return eligible
 
 
 def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any, ...]) -> list[ScheduledEvent]:
@@ -585,11 +832,11 @@ def _run_stages(
     entities: tuple[Any, ...],
     mental: MentalPlan | None = None,
 ) -> list[ScheduledEvent]:
-    practice_eligible = _initial_practice_eligible(mental)
+    practice_eligible = _awake_practice_seconds(mental, seconds, clock.tick)
     _settle_gauge_regen(entities, seconds)
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
-        _settle_mental(seconds, mental)
+        _settle_mental(seconds, mental, clock.tick)
         _settle_buffs_and_decay(entities, seconds, start_tick=clock.tick)
         events.extend(
             _practice_settlement(
@@ -636,7 +883,7 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("skill_proficiency", None),
     ("skill_practice_day", None),
     ("practice_booking", None),
-) + FATIGUE_ATTRIBUTE_SURFACES + tuple(
+) + FATIGUE_ATTRIBUTE_SURFACES + SLEEP_RECEIPT_SURFACES + tuple(
     (f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG
 )
 
@@ -660,6 +907,25 @@ def _restore_clock_tick(
     script = getattr(clock, "_script", None)
     if script is not None and tick_snapshot is not None:
         restore_attribute_best_effort(script, "tick", tick_snapshot)
+
+
+def validate_advance_sleep_receipts(
+    scope: Iterable[Any], mental_scope: Iterable[Any] = ()
+) -> None:
+    """Reject a corrupt accepted-sleep record before any resource or time write.
+
+    A malformed receipt is an integrity failure: the advance fails closed
+    instead of refilling, waking or migrating the body. An absent receipt on a
+    voluntary body is a synthetic/legacy state, not a repair request; it is
+    handled as "no plan" by settlement and never written here.
+    """
+    for entity in tuple(scope) + tuple(mental_scope):
+        if getattr(entity, "_is_deleted", False):
+            continue
+        attributes = getattr(entity, "attributes", None)
+        if attributes is None or not callable(getattr(attributes, "has", None)):
+            continue
+        read_sleep_receipt(entity)  # raises SleepReceiptError on a malformed value
 
 
 def build_advance_snapshot_registry(
@@ -965,6 +1231,7 @@ class WorldClock:
             )
         scope = tuple(entities)
         mental_scope = mental.scope if mental is not None else ()
+        validate_advance_sleep_receipts(scope, mental_scope)
         registry = build_advance_snapshot_registry(
             self, seconds, source, scope, mental_scope=mental_scope
         )
@@ -1024,6 +1291,7 @@ class WorldClock:
             return self.advance(seconds, source, entities, mental=mental)
         scope = tuple(entities)
         mental_scope = mental.scope if mental is not None else ()
+        validate_advance_sleep_receipts(scope, mental_scope)
         registry = build_advance_snapshot_registry(
             self, seconds, source, scope, mental_scope=mental_scope
         )

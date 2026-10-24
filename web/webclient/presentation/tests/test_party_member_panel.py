@@ -538,7 +538,7 @@ class PartyMemberPresenterTests(QuestRegistryIsolation, EvenniaTest):
         self.player.sessions.add(self.session)
         sleeper = _companion("沉睡同伴", self.room)
         join_party(sleeper, self.player)
-        write_fatigue_state(sleeper, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(sleeper, 180000, SleepPosture.AWAKE)
         candidate = _companion("清醒同伴", self.room)
         join_party(candidate, self.player)
         write_fatigue_state(candidate, 360000, SleepPosture.AWAKE)

@@ -700,7 +700,7 @@ class PossessionPresentationTests(EvenniaTest):
         candidate.race = "human"
         candidate.apply_race_baseline()
         join_party(candidate, self.player)
-        write_fatigue_state(self.npc, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(self.npc, 180000, SleepPosture.AWAKE)
         write_fatigue_state(candidate, 360000, SleepPosture.AWAKE)
         enter_possession(self.player, self.npc)
         entry = enter_sleep(self.npc)
