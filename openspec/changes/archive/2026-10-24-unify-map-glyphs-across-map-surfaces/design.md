@@ -61,11 +61,11 @@ Before this change, each surface had its own glyph vocabulary:
 
 3. **Island glyph scale (new).**
    - `lib/map_marker_geometry.js` exports `ISLAND_GLYPH_SCALE = 0.75`. This is the one place it is set.
-   - `MapLattice.vue` passes `size = ISLAND_GLYPH_SCALE * markerScale` (`markerScale` defaults to 1, and `LocalMap` passes none).
+   - `MapLattice.vue` passes `size = glyphSize`, the variant's glyph scale defined below (`markerScale` defaults to 1, and `LocalMap` passes none).
    - `paintedMarkerFootprint(node, size = 1)` returns the base footprint times `size`. The base footprint is the maximum of `HALO_R + 1` when the node has an action, `HERE_GLOW_R` for current, `GATE_FOOTPRINT` for a gateway, and `NODE_DOT_R + 1` otherwise.
    - Island callers pass the island scale:
      - `lib/minimap_projection.js` `spreadExits` uses `ISLAND_GLYPH_SCALE`. Projection runs only on coordinate layers, where `markerScale` is 1.
-     - `nodeFootprint` in `use-map-lattice-geometry.js` uses `ISLAND_GLYPH_SCALE * markerScale`.
+     - `nodeFootprint` in `use-map-lattice-geometry.js` uses the variant's `glyphSize` (below): `ISLAND_GLYPH_SCALE` on the lattice variant, `ISLAND_GLYPH_SCALE * markerScale` on the graph variant.
      - The label-layout obstacle radius becomes `Math.max(HALO_R * s, nodeFootprint)`.
      - The `MapLattice` gateway stub start becomes `(HALO_R + 1) * s`.
    - `MARKER_CURRENT_RING_R` (the compass aim ring, drawn with a 1.6 px non-scaling stroke) becomes `HALO_R * ISLAND_GLYPH_SCALE + 2`, which is 13.25. Its inner stroke edge (about 12.45) then stays outside the halo's outer edge (15.6 × 0.75 = 11.7).
@@ -81,7 +81,8 @@ Before this change, each surface had its own glyph vocabulary:
 4. **Wilderness-cell cutover (new).**
    - In the `node.cell` branch, AreaMapView draws `<MapNodeGlyph :state :gate :size="AREA_CELL_GLYPH_SCALE">` for current and gate cells, and `MapCommissionGlyph` at the same scale with the existing corner offset.
    - It deletes its private `area-map__here-*`, `area-map__gate` and cell commission path rules.
-   - `AREA_CELL_GLYPH_SCALE = 0.875` is recommended, so the arch keeps its former 7-unit half-width and the glow becomes 12.25. Verify that it fits the smallest cell in the wilderness stories.
+   - `AREA_CELL_GLYPH_SCALE = 0.875`, so the arch keeps its former 7-unit half-width and the glow becomes 12.25.
+   - Measured during apply (resolved): the cell side is `k − 2 × inset`, with `k = frame.width / span` px per cell and `inset = min(3, 0.06 k)`. At the widest zoom stop (周邊, the 15-cell window) the 960 × 600 fallback frame gives `k ≈ 36.8` and a side of about 32.4 px, so half a side is about 16.2 ≥ 12.25. Even at the continuous zoom-out limit (1.25 × that span) half a side is about 12.95. 1451 × 790 and 1920 × 1080 frames give larger cells. The value 0.875 stays.
    - The cell commission mark changes from the pin path to the shared diamond. This is a deliberate visible change.
 
 5. **Island state mapping and hooks** (exists):
@@ -106,14 +107,20 @@ Before this change, each surface had its own glyph vocabulary:
 - **[Island colour tokens]** The old ladder used tokens. The shared glyph carries the area map's paint, which mixes tokens and hex literals. The delta narrows the island token scenarios to edges, labels, rim markers and chrome.
 - **[Re-baselined geometry]** Footprints, spreading tests, label offsets (for example the current label `y`) and the browser geometry `INSET` all move with the scale. Every affected test is listed in `tasks.md`.
 - **[Remembered in-canvas nodes]** `glyphState` maps `remembered` to the visited dot, but the coordinate projection never draws a remembered node in-canvas. Remembered places appear as rim diamonds, so this branch exists only for safety.
-- **[Pre-existing timeout]** In `map_drawer.test.js`, "opens with focus on the selected tab even when it is not the first" takes about 4.7 s on master and can time out under full-suite load. It passes alone.
+- **[Radial model label depth]** The preserved UMD radial model (`web/static/webclient/js/elosern/local_map.js`) declares `RADIAL_GEOMETRY.LABEL_BOTTOM` 26 with a 24-unit `PAD`. The drawn graph baseline was already 29 at the 16-unit step and is now 30 (`16 × 0.75 + 2 + 16`); the padding absorbs the extra unit, so the model is left unchanged.
+- **[Halo under the state glyph]** The shared glyph paints the travel halo beneath the state glyph, so at a node's centre a pointer lands on the marker, not the halo. Browser journeys click the node's marker (or the here-seal's dot) inside the same activating node group.
+- **[Pre-existing timeout]** In `map_drawer.test.js`, "opens with focus on the selected tab even when it is not the first" takes about 4.7 s on master and can time out under full-suite load. It passes alone. During apply the full suite also timed out "cached reopen waits for its own silent fresh baseline (body-first)" (about 7.4 s alone on both master and this branch); the same tests fail under full-suite load on master too.
 
 ## Migration Plan
 
 Pre-release, so there is no compatibility layer and no data migration. All removed classes and private paths are deleted together with their consumers. `styles/app-shell.css` holds no `.elosern-root` duplicates of them.
 
+## Resolved Questions
+
+- **Minimap glyph scale (user decision).** `ISLAND_GLYPH_SCALE` is 0.75 for now. Storybook screenshots of the island (World/LocalMap `MetricAltoriaPlaza` and `MetricAltoriaSouthGate`) are captured during apply so the size can be judged visually; tuning stays a one-line change.
+- **World glyph strokes (user decision).** World glyph strokes scale with the UI scale under the proportional rule, with no fixed-screen-width exception. `WorldMapGlyph` drops `vector-effect: non-scaling-stroke`.
+- **Wilderness cell scale (measured).** `AREA_CELL_GLYPH_SCALE = 0.875` fits the smallest wilderness cell; see Decision 4 for the measurement.
+
 ## Open Questions
 
-- Is 0.75 the right minimap size? It is the recommended default. Confirm visually during apply, and adjust the single constant if needed.
-- `AREA_CELL_GLYPH_SCALE` is recommended at 0.875. Confirm that it fits the smallest wilderness cell.
-- Should world glyph strokes really scale with the UI scale (the proportional rule), or should the world map keep fixed screen-width strokes as an accepted per-surface difference? The proposal assumes they scale.
+(none)

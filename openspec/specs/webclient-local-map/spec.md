@@ -571,7 +571,7 @@ When the nearest uniform exit radius is below 36 or no ladder level fits the far
 - **THEN** compressed mode is used; a nearest radius exactly 36 remains uniform if all exits fit, and a farthest radius exactly 88 at level 5000 still fits.
 
 ### Requirement: Island projection handles sparse and coincident nodes deterministically
-No-exit, zero-distance and overlapping-exit inputs SHALL produce finite deterministic positions. Overlap handling SHALL account for painted marker footprints, including gateway arches and feet. Context SHALL use the same mapping, with off-canvas context omitted and remembered remote nodes retaining their existing edge-direction presentation.
+No-exit, zero-distance and overlapping-exit inputs SHALL produce finite deterministic positions. Overlap handling SHALL account for the painted shared glyph footprint at the island glyph scale: the travel halo for a move action, the here-seal glow for current, the gate arch's base corners for a non-current gateway, and the dot plus stroke otherwise. Context SHALL use the same mapping, with off-canvas context omitted and remembered remote nodes keeping their edge-direction presentation.
 
 #### Scenario: No exits and no distance
 - **WHEN** a model has no exits
@@ -587,7 +587,7 @@ No-exit, zero-distance and overlapping-exit inputs SHALL produce finite determin
 
 #### Scenario: Gateway feet overlap despite separated marker centres
 - **WHEN** current is at grid coordinate (0,0) and two gateway exits at (-120,800) and (120,800) project at level 1000
-- **THEN** the painted gate footprints receive clearance within the existing spread cap, current remains at (120,120), exit radii and distance order are unchanged, and every node and action retains its original identity.
+- **THEN** the painted footprints of both gateways receive clearance within the existing spread cap. These are their scaled travel halos, which are wider than the scaled arch, because both exits carry a move action. Current remains at (120,120), exit radii and distance order are unchanged, and every node and action retains its original identity.
 
 #### Scenario: Mixed exit footprints and unaffected bearings
 - **WHEN** gateway and ordinary exits include an overlapping pair that can be separated within the cap and a separate non-overlapping exit
@@ -620,7 +620,7 @@ Uniform projection SHALL return dots with 20-unit spacing anchored to integer wo
 - **THEN** rings remain finite, distance-ordered and correctly mapped, with the existing readability limits; zero-only or missing positive ranges do not cause logarithms of zero, unbounded iteration or fabricated distance rings.
 
 ### Requirement: Island gateways expose labelled accessible exit-ring controls
-The island SHALL draw gateway nodes with a gate glyph, room label and second line `通往 <leads_to>`. A cross-layer target SHALL appear only as an exit-ring arrow labelled `通往 <leads_to>`, retaining its nullable move action. An actionable stub SHALL be a focusable button named `往 <leads_to> 移動`; its arrow and label SHALL have separate compact hit regions for every label placement, leaving the intervening empty space clear of stub activation.
+The island SHALL draw a non-current gateway with the area map's filled gate arch (the shared node glyph's gate), and a current gateway with the here-seal, which takes precedence. Every gateway node SHALL carry its room label and the second line `通往 <leads_to>`. A cross-layer target SHALL appear only as an exit-ring arrow labelled `通往 <leads_to>`, retaining its nullable move action. An actionable stub SHALL be a focusable button named `往 <leads_to> 移動`.
 
 #### Scenario: Current city gate offers wilderness travel
 - **WHEN** the current city gate carries its far-side region metadata and a cross-layer target move descriptor
@@ -644,7 +644,15 @@ The island SHALL draw gateway nodes with a gate glyph, room label and second lin
 
 #### Scenario: Separate stub regions preserve native activation
 - **WHEN** the stub arrow or its separated label is pointer-activated, or the focused native stub button receives Enter or Space through the browser's normal keyboard sequence
-- **THEN** each independent activation sends exactly one original gateway move, retains the full accessible name and never opens the drawer; leadered and unleadered labels obey the same hit-region rule.
+- **THEN** each independent activation sends exactly one original gateway move, retains the full accessible name and never opens the drawer; leadered and unleadered labels obey the same hit-region rule, and the intervening empty space stays clear of stub activation.
+
+#### Scenario: The current gate room wears the here-seal
+- **WHEN** the player stands in the Altoria south gate room on the island
+- **THEN** that node draws the here-seal and no gate arch, its label lines are `南門` and `通往 西部丘陵與谷地`, and the cross-layer target remains a labelled exit-ring stub
+
+#### Scenario: A non-current gateway wears the area map's arch
+- **WHEN** a non-current same-layer gateway node is drawn on the island
+- **THEN** its primary shape is the filled arch with path data `M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z`, identical to the area map's gate arch, inside a glyph group scaled uniformly by the island glyph scale
 
 ### Requirement: Island movement uses scale-aware effective motion
 For unchanged mode and level, island movement SHALL retain its existing FLIP pan and move world-anchored dots with the drawing. A changed level or mode SHALL use a short crossfade for effective full motion and switch immediately for effective reduced or off motion. Instance/interior island transitions SHALL remain unchanged; the new drawer reveal follows its separate reduced-motion contract.
@@ -687,12 +695,13 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: Map visual language comes from design tokens
 - **WHEN** the island present the redesign draft's map visual language
-- **THEN** every marker, edge, label, and legend colour SHALL come from a design token (including the draft seal pair and map label-tier tokens), and no component SHALL hardcode a draft hex value
+- **THEN** every edge, label, rim edge-marker, compass-aim and chrome colour SHALL come from a design token (including the draft seal pair and map label-tier tokens), and the island SHALL NOT hardcode a draft hex value for any of them
+- **AND** the paint of a node glyph SHALL come only from the shared map node glyph that the area map uses; the island SHALL NOT restyle it, so an island node is coloured exactly like the area map's node
 - **AND** node labels SHALL use the draft label-tier tokens (current, landmark-gold, seen, far)
 
 #### Scenario: The marker shape ladder holds at both scales
 - **WHEN** the island renders visibility or a gateway
-- **THEN** current/visited/unvisited/remembered retain non-colour distinction, gateway nodes have their gate glyph and graph glyph semantics are unchanged
+- **THEN** current (glow, ring and seal dot), visited (solid ringed dot) and unvisited (dashed-outline dot) keep a non-colour distinction, a remembered place keeps its rim diamond, a non-current gateway node shows the area map's filled gate arch, and graph glyph semantics are unchanged
 
 #### Scenario: Each surface declares its label type steps
 - **WHEN** a surface draws node labels or marker names
@@ -1074,11 +1083,11 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: Draft marker ladder reads without colour
 - **WHEN** the island renders current, visited, unvisited and gateway nodes
-- **THEN** current retains its larger seal treatment, visited is solid and unvisited hollow; gateway nodes add the gate glyph, room name and `通往 <leads_to>` second line without relying on colour to identify a gateway.
+- **THEN** current shows the area map's here-seal, the largest node glyph; visited is a solid ringed dot and unvisited a dot with a dashed outline. A non-current gateway shows the filled gate arch in place of the dot, and a current gateway shows the here-seal. Every gateway carries its room name and `通往 <leads_to>` second line, so no gateway is identified by colour alone.
 
 #### Scenario: Map chrome colours resolve to design tokens
 - **WHEN** the island renders its chrome
-- **THEN** every marker, edge, label, and legend colour resolves to a design token value, and the draft seal pair and label tiers match the tokens added with this change
+- **THEN** every edge, label, rim edge-marker and chrome colour resolves to a design token value, the draft seal pair and label tiers match the tokens added with this change, and node glyph colours are exactly the area map's node glyph colours
 
 #### Scenario: The radial placement is deterministic and edge-honest
 - **WHEN** the model computes the radial placement for a payload whose in-view nodes are joined by edges
@@ -1275,3 +1284,67 @@ The WebClient `local-map` component SHALL make a currently traversable adjacent 
 - **WHEN** the player activates a node marker after the pitch/sizing fix has been applied
 - **THEN** the `explore.move` submission carries the same node's `exit_ref` and destination as before the
   fix, unaffected by the marker's new visual size or position within its (now larger) cell
+
+### Requirement: The minimap island draws the area map's node glyphs
+The island SHALL draw every in-canvas node with the area map's shared node glyph, with no private marker ladder. It SHALL scale the whole glyph group, including strokes and dashes, by one island glyph scale that is defined once and is below 1 (0.75 by default). A move action SHALL add the travel halo. A non-current gateway SHALL show the gate arch and a current one the here-seal. In-canvas landmarks SHALL get no extra ring, and the stable test hooks SHALL remain.
+
+#### Scenario: Visibility maps to the shared glyph states
+- **WHEN** the island draws nodes of each visibility
+- **THEN** each visibility draws the shared glyph state below, at the base geometry, inside a glyph group scaled by the island glyph scale:
+  - `current`: the here-seal (glow 14, ring 10, seal dot 6);
+  - `visible_visited`: the visited dot (5.5);
+  - `visible_unvisited`: the seen dot, with a dark fill and a dashed outline.
+- **AND** each glyph's rendered radii, stroke widths and dash lengths are the base values times the island glyph scale
+- **AND** remembered places keep their rim diamonds as their non-colour distinction
+
+#### Scenario: Both minimap variants use the island glyph scale
+- **WHEN** the island draws a coordinate-bearing projection (lattice variant) or a coordinate-free radial layout (graph variant)
+- **THEN** the lattice variant's glyph group scale is exactly the island glyph scale, independent of `markerScale`, because its projected positions do not use `markerScale`
+- **AND** the graph variant's glyph group scale is the island glyph scale times `markerScale`, because its radial positions scale by `markerScale`
+- **AND** in the graph variant, the node-label baseline offset derives from the largest scaled base footprint (16 × that glyph scale) instead of the old fixed half-extent
+
+#### Scenario: The island differs from the area map only by its scale
+- **WHEN** the island and the area map draw the same node state
+- **THEN** after dividing out each surface's uniform scale, the shapes, path data, radii, fills, strokes, stroke widths and dash patterns are identical
+
+#### Scenario: A landmark carries no extra ring on the canvas
+- **WHEN** a wilderness island payload with a visited landmark node renders, including a landmark node that also carries a move action
+- **THEN** the node's primary shape is the visited dot, no `.local-map__landmark` ring exists on any in-canvas node, the landmark's treatment is its landmark-gold label tier, and rim edge markers keep their own landmark ring
+
+#### Scenario: A move action wears the travel halo inside the aim ring
+- **WHEN** an adjacent node carries a move action and the compass aims at it
+- **THEN** its glyph group contains one dashed travel halo (base radius 15) carrying the `local-map__actionable` hook, drawn beneath the node's state glyph
+- **AND** the compass aim ring is concentric with the node, and its inner stroke edge lies outside the halo's outer stroke edge at the island glyph scale
+
+#### Scenario: Painted footprints scale with the island glyph
+- **WHEN** the island measures a node's painted footprint
+- **THEN** the footprint is the island glyph scale times the largest base value that applies:
+  - 16 when the node carries a move action;
+  - 14 for current;
+  - √(9² + 9²) for a non-current gateway;
+  - 6.5 for any other node.
+- **AND** overlap spreading, label clearance, label-layout obstacles and the gateway stub's start radius all use these scaled values
+- **AND** the here-glow's breathing animation, which peaks at about 1.18 × its radius, is decoration and is excluded from the footprint, as it is on the area map
+
+#### Scenario: One constant rescales the whole island glyph system
+- **WHEN** the island glyph scale constant changes
+- **THEN** glyph size, footprints, label clearance, the stub start and the aim ring all follow it together, and no other island glyph size literal needs editing
+
+#### Scenario: Test hooks survive the shared glyph
+- **WHEN** island tests and the browser geometry audit query node shapes
+- **THEN** the following hooks exist:
+  - `local-map__marker--current` on the current ring;
+  - `local-map__gate-glyph` on a non-current gateway's arch;
+  - `local-map__actionable` on the travel halo;
+  - the `local-map__marker` and `local-map__marker--<visibility>` classes on each node's primary shape.
+
+#### Scenario: The current glyph glides as one
+- **WHEN** a committed move pans the island at an unchanged scale under full motion
+- **THEN** the current node's whole glyph (glow, ring and dot) glides from the previous position, and the dissolve copy pairs that same glyph group
+
+### Requirement: An island fallback label never covers its own node glyph
+When none of a label's eight candidate positions fits, the island tries the raster fallback. That fallback SHALL reject any box whose distance to the label's own node centre is less than that node's painted footprint plus the label gap. A label SHALL never be placed over the node glyph it names, even though the node is not counted as an obstacle to its own label.
+
+#### Scenario: A crowded label does not land on its own marker
+- **WHEN** an island label falls through to raster placement and the nearest free raster box lies inside its own node's footprint plus the label gap
+- **THEN** that box is skipped, the label takes the nearest box outside that reach (or a leadered or truncated placement under the existing rules), and the node glyph stays uncovered

@@ -715,7 +715,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         actionable = page.locator('[data-testid="local-map__actionable"]')
         self.assertEqual(actionable.count(), 1)
         moves_before = sent_action_count(page, "explore.move")
-        actionable.first.click()
+        # The halo sits beneath the node's state glyph (the shared node
+        # glyph's paint order), so a pointer lands on the node's marker.
+        page.locator(
+            '.local-map__glyph:has([data-testid="local-map__actionable"]) .local-map__marker'
+        ).first.click()
         self.assertEqual(page.locator('[data-testid="map-drawer"]').count(), 0)
         self.assertEqual(
             sent_action_count(page, "explore.move"),

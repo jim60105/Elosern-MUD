@@ -348,11 +348,14 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             island.locator(".local-map__stub-button").get_attribute("aria-label"),
             f"往 {leads_to} 移動",
         )
+        # As on the area map, the current gate room wears the here-seal (the
+        # current glyph wins over the gate arch), drawn at the island scale.
+        current_node = island.locator(f'[data-node="{panel["current_node"]}"]')
+        self.assertEqual(current_node.locator(".map-glyph__here-ring").count(), 1)
+        self.assertEqual(current_node.locator('[data-testid="local-map__gate-glyph"]').count(), 0)
         self.assertEqual(
-            island.locator(
-                f'[data-node="{panel["current_node"]}"] [data-testid="local-map__gate-glyph"]'
-            ).count(),
-            1,
+            current_node.locator(".local-map__glyph > g.map-glyph").get_attribute("transform"),
+            "scale(0.75)",
         )
         stub_box = island.locator(".local-map__stub-arrow").bounding_box()
         canvas_box = island.locator('[data-testid="local-map__lattice"]').bounding_box()

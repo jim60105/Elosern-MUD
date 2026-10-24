@@ -320,6 +320,28 @@ class MapDrawerContracts(VitestContractMixin, unittest.TestCase):
         # marker with no identity on the world map.
         self.assert_block_passed("the drawer current marker makes one truthful position claim")
 
+    @covers_requirement(
+        "webclient-map-drawer::every-map-surface-draws-a-shared-map-concept-from-its-one-glyph-source"
+    )
+    def test_shared_glyph_sources(self):
+        # The island and the area map draw identical node glyphs up to each
+        # surface's uniform group scale; wilderness cells draw the shared
+        # seal, arch and commission diamond at the cell scale; the legend's
+        # road and commission samples and both hatch instances come from the
+        # one source; world glyphs scale with the UI; a static guard keeps
+        # every shared concept's geometry in its single file.
+        self.assert_block_passed("every map surface draws a shared map concept from its one glyph source")
+
+    @covers_requirement(
+        "webclient-map-drawer::map-legend-samples-are-drawn-by-the-map-they-explain"
+    )
+    def test_legend_samples_drawn_by_their_map(self):
+        # SVG-only samples from the maps' own definitions (no CSS-drawn
+        # approximation), the area gate arch and the world spire and pin
+        # identical to the maps', the r 14 approximate ring, and sample
+        # boxes of 32 units times the UI scale.
+        self.assert_block_passed("map legend samples are drawn by the map they explain")
+
 
 class MapEdgePointerContracts(VitestContractMixin, unittest.TestCase):
     """Runs ``map_edge_pointers.test.js`` once."""

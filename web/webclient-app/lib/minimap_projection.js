@@ -100,7 +100,7 @@
 //   those nearest it; each ring clears every other by RING_MIN_GAP units, at
 //   most MAX_RINGS of them, returned in ascending distance.
 import LocalMap from "./local_map.js";
-import { paintedMarkerFootprint } from "./map_marker_geometry.js";
+import { ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "./map_marker_geometry.js";
 
 export const CANVAS_SIZE = 240;
 export const CENTRE = CANVAS_SIZE / 2;
@@ -235,10 +235,13 @@ export function radialMapper(mode, level, candidates) {
   return (d) => (d < dMin ? (R_MIN * d) / dMin : R_MIN + ((R_MAX - R_MIN) * Math.log(d / dMin)) / span);
 }
 
-// Spreads overlapping exits (each { bearing, radius, order }) in place.
+// Spreads overlapping exits (each { bearing, radius, order }) in place. The
+// default clearance is both exits' painted footprints at the island glyph
+// scale (projection runs only on coordinate layers, where markerScale is 1).
 export function spreadExits(exits, footprint = null) {
   if (exits.length < 2) return exits;
-  const clearance = (a, b) => footprint ?? (paintedMarkerFootprint(a.node) + paintedMarkerFootprint(b.node));
+  const clearance = (a, b) =>
+    footprint ?? (paintedMarkerFootprint(a.node, ISLAND_GLYPH_SCALE) + paintedMarkerFootprint(b.node, ISLAND_GLYPH_SCALE));
   const overlaps = (a, b) => {
     const pa = screen(a.radius, a.bearing);
     const pb = screen(b.radius, b.bearing);

@@ -212,12 +212,14 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         # Click the current node's marker itself: the node GROUP's bounding
         # box centre falls in the transparent gap between the marker and the
         # label, so a group click hit-tests nothing (the current node has no
-        # actionable halo). The marker's action is null, so activation still
-        # sends nothing outbound.
+        # actionable halo). The here-seal's ring is unfilled, so the paint a
+        # pointer lands on at its centre is the seal dot drawn over it, inside
+        # the same node group. The marker's action is null, so activation
+        # still sends nothing outbound.
         page.locator(
             '[data-testid="local-map"]'
             f' [data-testid="local-map__node--{panel["current_node"]}"]'
-            ' [data-testid="local-map__marker--current"]'
+            ' .map-glyph__here-dot'
         ).first.click()
         expected_figure = f"座標 {current['x']},{current['y']}"
         page.wait_for_function(

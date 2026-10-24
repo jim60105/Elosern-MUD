@@ -137,47 +137,6 @@
   fill: var(--map-label-far);
 }
 
-/* The draft marker ladder (D2): the large seal-stroked current circle, the
-   small ink-filled visited dot, the small hollow unvisited dot (keeps the
-   未探索 rule), the remembered diamond. Shape/size distinguish the states
-   without colour. */
-.local-map__marker--current {
-  fill: var(--seal-deep);
-  stroke: var(--seal-light);
-  stroke-width: 2;
-}
-
-.local-map__marker--visible_unvisited {
-  fill: transparent;
-  stroke: var(--vit-sp);
-  stroke-width: 2;
-}
-
-.local-map__marker--visible_visited {
-  fill: var(--ink-700);
-  stroke: var(--ink-edge);
-  stroke-width: 1;
-}
-
-.local-map__marker--remembered {
-  fill: var(--paper-500);
-}
-
-/* The gold landmark ring (draft `.mini` 金環): a decoration over the node's
-   own visibility marker, never a second position claim. */
-.local-map__landmark {
-  fill: none;
-  stroke: var(--gold-500);
-  stroke-width: 1;
-  pointer-events: none;
-}
-
-.local-map__actionable {
-  fill: var(--gold-glow);
-  stroke: var(--gold-500);
-  stroke-width: 2;
-}
-
 /* The exit compass's aimed destination (exploration-exit-compass D6): a
    gold ring around the node and a brighter label, so the minimap confirms
    the aim. */
@@ -193,8 +152,8 @@
 }
 
 /* Edge direction markers (map-02 D3b): a non-interactive decoration layer
-   on the island's rim. The diamond reuses the remembered-node fill so the off-
-   canvas place reads with the same state identity; the landmark ring and
+   on the island's rim. The diamond is a direction pointer, not a place
+   glyph (those are MapNodeGlyph's); the landmark ring and
    the monospace name follow the node-label precedent (glyphs
    never scale with markerScale). */
 .local-map__edge-marker {
@@ -252,7 +211,7 @@
 }
 /* Its own variables: the marker sits inside a pan group, whose `--pan-*`
    it would otherwise inherit and apply twice. */
-.map-lattice__pan .local-map__marker--current {
+.map-lattice__pan .local-map__here {
   transform: translate(
     calc(var(--glide-x, 0px) * var(--motion-travel)),
     calc(var(--glide-y, 0px) * var(--motion-travel))
@@ -323,16 +282,6 @@
    family as the gate arch it explains. */
 .local-map__via {
   fill: var(--map-label-gold);
-}
-
-/* The gate arch: a gold outline framing the node's own marker, so a gateway
-   reads by shape over every visibility state. */
-.local-map__gate-glyph {
-  fill: none;
-  stroke: var(--gold-400);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  pointer-events: none;
 }
 
 /* A label set farther out than its eight candidate spots joins its marker by

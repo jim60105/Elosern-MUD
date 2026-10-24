@@ -40,8 +40,8 @@ import {
   MARKER_CURRENT_RING_R,
   STUB_FOOTPRINT,
 } from "../composables/use-map-lattice-geometry.js";
-import { MARKER_CURRENT_R, MARKER_DOT_R, MARKER_LANDMARK_R, HALO_R,
-  GATE_ARCH_R, GATE_FOOT_REACH, GATE_STROKE } from "../lib/map_marker_geometry.js";
+import { MARKER_LANDMARK_R, HALO_R } from "../lib/map_marker_geometry.js";
+import MapNodeGlyph from "./MapNodeGlyph.vue";
 import { useMapLatticeRender } from "../composables/use-map-lattice-render.js";
 import { CANVAS_SIZE } from "../lib/minimap_projection.js";
 
@@ -127,6 +127,7 @@ const {
   visibleNodeLabel,
   nodePos,
   isIsland,
+  glyphSize,
   nodeTier,
   islandDots,
   islandRings,
@@ -141,6 +142,22 @@ const {
 // with no visible label and no activation.
 function isContext(node) {
   return nodeTier(node) === "context";
+}
+
+// The full map's glyph state for a lattice visibility: an unvisited place is
+// the dashed seen dot, a visited or remembered one the solid visited dot.
+function glyphState(node) {
+  if (node.visibility === "current") return "current";
+  return node.visibility === "visible_unvisited" ? "seen" : "visited";
+}
+
+// The glyph's test hooks: the current here ring, a gateway's arch, and the
+// travel halo keep the ids the lattice's markers have always carried.
+function glyphTestIds(node) {
+  let marker = null;
+  if (node.visibility === "current") marker = "local-map__marker--current";
+  else if (isGateway(node)) marker = "local-map__gate-glyph";
+  return { marker, halo: "local-map__actionable" };
 }
 
 // The island's placed label block for a node (lib/island_labels.js), in the
@@ -373,7 +390,7 @@ watch(
         });
       const moving = [
         ...panGroups(svg),
-        ...svg.querySelectorAll(".map-lattice__pan .local-map__marker--current"),
+        ...svg.querySelectorAll(".map-lattice__pan .local-map__here"),
       ].filter(offset);
       for (const el of moving) {
         el.style.transition = "none";
@@ -393,7 +410,7 @@ watch(
     // was to where it is now.
     const from = nodeTranslate(svg, recorded.id);
     const to = nodeTranslate(svg, nextId);
-    const marker = svg.querySelector(".local-map__marker--current");
+    const marker = svg.querySelector(".local-map__here");
     const glides = [];
     if (marker && from && to) {
       glides.push([marker, from.x - to.x, from.y - to.y]);
@@ -645,11 +662,6 @@ onBeforeUnmount(() => {
         </text>
       </template>
       <template v-else>
-      <!-- The draft marker ladder (webclient-map-01-draft-chrome D2): the
-           current node is the large seal-stroked circle; visited is a small
-           ink-filled circle; unvisited is a small hollow circle (keeps the
-           未探索 rule); remembered keeps the rotated diamond. Shape/size
-           distinguish the states without colour. -->
       <!-- The compass aim ring (exploration-exit-compass D6): decoration
            only, outside the `local-map__marker` class the geometry audit
            pairs, so it never reads as a second location. -->
@@ -657,68 +669,27 @@ onBeforeUnmount(() => {
         v-if="aimedNode !== null && String(node.id) === String(aimedNode)"
         class="local-map__aim-ring"
         data-testid="local-map__aim-ring"
-        :r="MARKER_CURRENT_RING_R * markerScale"
+        :r="MARKER_CURRENT_RING_R * (isGraph ? markerScale : 1)"
         aria-hidden="true"
       />
-      <circle
-        v-if="node.visibility === 'current'"
-        class="local-map__marker local-map__marker--current"
-        data-testid="local-map__marker--current"
-        :r="MARKER_CURRENT_R * markerScale"
-        aria-hidden="true"
-      />
-      <circle
-        v-else-if="node.visibility === 'visible_unvisited'"
-        class="local-map__marker local-map__marker--visible_unvisited"
-        :r="MARKER_DOT_R * markerScale"
-        aria-hidden="true"
-      />
-      <circle
-        v-else-if="node.visibility === 'visible_visited'"
-        class="local-map__marker local-map__marker--visible_visited"
-        :r="MARKER_DOT_R * markerScale"
-        aria-hidden="true"
-      />
-      <rect
-        v-else-if="node.visibility === 'remembered'"
-        class="local-map__marker local-map__marker--remembered"
-        :x="-MARKER_DIAMOND_HALF * markerScale"
-        :y="-MARKER_DIAMOND_HALF * markerScale"
-        :width="MARKER_DIAMOND_HALF * 2 * markerScale"
-        :height="MARKER_DIAMOND_HALF * 2 * markerScale"
-        transform="rotate(45)"
-        aria-hidden="true"
-      />
-      <!-- The gold landmark treatment (draft `.mini` gold dots): an extra
-           gold ring drawn over (never replacing) the node's visibility
-           marker. Deliberately OUTSIDE the `local-map__marker` class: the
-           browser geometry audit pairs every `.local-map__marker` box, and a
-           same-node decoration is not a node marker. -->
-      <circle
-        v-if="node.landmark && node.visibility !== 'remembered'"
-        class="local-map__landmark"
-        data-testid="local-map__landmark"
-        :r="MARKER_LANDMARK_R * markerScale"
-        aria-hidden="true"
-      />
-      <circle
-        v-if="node.action"
-        class="local-map__actionable"
-        data-testid="local-map__actionable"
-        :r="HALO_R * markerScale"
-        aria-hidden="true"
-      />
-      <!-- The island's gate glyph (label-minimap-exits-and-gateways): an
-           arch framing the node's own visibility marker, so a gateway reads
-           by shape whatever its state. Decoration: not a marker class. -->
-      <path
-        v-if="isGateway(node)"
-        class="local-map__gate-glyph"
-        data-testid="local-map__gate-glyph"
-        :stroke-width="GATE_STROKE"
-        :d="`M ${-GATE_ARCH_R} ${GATE_ARCH_R - 2} V -1 A ${GATE_ARCH_R} ${GATE_ARCH_R} 0 0 1 ${GATE_ARCH_R} -1 V ${GATE_ARCH_R - 2} M ${-GATE_ARCH_R - GATE_FOOT_REACH} ${GATE_ARCH_R - 2} H ${-GATE_ARCH_R + GATE_FOOT_REACH} M ${GATE_ARCH_R - GATE_FOOT_REACH} ${GATE_ARCH_R - 2} H ${GATE_ARCH_R + GATE_FOOT_REACH}`"
-        aria-hidden="true"
-      />
+      <!-- The full map's own node glyph (MapNodeGlyph), so the minimap and the
+           map drawer draw a place identically: the current here-seal, the
+           visited dot, the dashed seen dot, the filled gate arch (island
+           gateways), and the dashed travel halo on a node with a move action.
+           The state's primary shape carries the `local-map__marker` class the
+           geometry audit pairs; the wrapper is what the current glide moves. -->
+      <g class="local-map__glyph" :class="{ 'local-map__here': node.visibility === 'current' }">
+        <MapNodeGlyph
+          :state="glyphState(node)"
+          :gate="isGateway(node)"
+          :travel="!!node.action"
+          :size="glyphSize"
+          :marker-class="['local-map__marker', `local-map__marker--${node.visibility}`,
+            { 'local-map__gate-glyph': isGateway(node) && node.visibility !== 'current' }]"
+          halo-class="local-map__actionable"
+          :test-ids="glyphTestIds(node)"
+        />
+      </g>
       <template v-if="isIsland">
         <!-- A suppressed duplicate region name keeps the full name. -->
         <title v-if="!placedLabel(node)">{{ node.label }}</title>
@@ -782,8 +753,8 @@ onBeforeUnmount(() => {
       <line
         class="local-map__edge"
         :class="stub.actionable ? 'local-map__edge--traversable' : 'local-map__edge--blocked'"
-        :x1="120 + (HALO_R + 1) * Math.sin((stub.bearing * Math.PI) / 180)"
-        :y1="120 - (HALO_R + 1) * Math.cos((stub.bearing * Math.PI) / 180)"
+        :x1="120 + (HALO_R + 1) * glyphSize * Math.sin((stub.bearing * Math.PI) / 180)"
+        :y1="120 - (HALO_R + 1) * glyphSize * Math.cos((stub.bearing * Math.PI) / 180)"
         :x2="120 + (88 - 6) * Math.sin((stub.bearing * Math.PI) / 180)"
         :y2="120 - (88 - 6) * Math.cos((stub.bearing * Math.PI) / 180)"
       />

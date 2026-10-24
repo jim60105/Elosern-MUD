@@ -42,6 +42,8 @@
 // whose focus draws a ring on the map and pans it into view. This component
 // requests no data and owns no drawer chrome.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import WorldMapGlyph from "./WorldMapGlyph.vue";
+import WorldHatchPattern from "./WorldHatchPattern.vue";
 import WorldMapDetail from "./WorldMapDetail.vue";
 import {
   DETAIL_DRAWER_WIDTH,
@@ -740,9 +742,7 @@ const litCount = computed(() => litDistricts.value.length);
           <pattern :id="`${uid}-swell`" patternUnits="userSpaceOnUse" width="28" height="14">
             <path class="world-map__swell" d="M0 10 Q7 6 14 10 T28 10" />
           </pattern>
-          <pattern :id="`${uid}-hatch`" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-            <line class="world-map__hatch-line" x1="0" y1="0" x2="0" y2="8" />
-          </pattern>
+          <WorldHatchPattern :id="`${uid}-hatch`" />
           <clipPath :id="`${uid}-coast`" clipPathUnits="userSpaceOnUse">
             <path :d="coastD" :transform="matrix" />
           </clipPath>
@@ -942,8 +942,7 @@ const litCount = computed(() => litDistricts.value.length);
             :transform="`translate(${draw.p.x} ${draw.p.y}) scale(${uiScale})`"
           >
             <circle class="world-map__hit" r="12" />
-            <path class="world-map__spire" d="M-5 7 L-3.2 -5 L0 -10 L3.2 -5 L5 7 Z" />
-            <path class="world-map__spire-light" d="M0 -10 L1.4 -5.6 L0 -2 L-1.4 -5.6 Z" />
+            <WorldMapGlyph kind="landmark" />
           </g>
           <g
             v-for="draw in placeDraws"
@@ -956,12 +955,7 @@ const litCount = computed(() => litDistricts.value.length);
             :transform="`translate(${draw.p.x} ${draw.p.y}) scale(${uiScale})`"
           >
             <circle class="world-map__hit" r="12" />
-            <template v-if="draw.kind === 'capital'">
-              <rect class="world-map__place-glyph" x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
-              <rect class="world-map__place-core" x="-2.6" y="-2.6" width="5.2" height="5.2" transform="rotate(45)" />
-            </template>
-            <circle v-else-if="draw.kind === 'harbour'" class="world-map__place-glyph" r="5.5" />
-            <rect v-else class="world-map__place-glyph" x="-5" y="-5" width="10" height="10" transform="rotate(45)" />
+            <WorldMapGlyph kind="place" :place-kind="draw.kind" />
           </g>
         </g>
 
@@ -977,16 +971,12 @@ const litCount = computed(() => litDistricts.value.length);
             :transform="`translate(${draw.p.x} ${draw.p.y}) scale(${uiScale})`"
           >
             <circle class="world-map__hit" r="14" />
-            <circle v-if="draw.tracked" class="world-map__quest-halo" cy="-5" r="12" />
-            <path class="world-map__quest-pin" d="M0 -16 L8.5 -5 L0 6 L-8.5 -5 Z" />
-            <circle class="world-map__quest-eye" cy="-5" r="2.4" />
+            <WorldMapGlyph kind="quest" :tracked="draw.tracked" />
           </g>
         </g>
 
         <g data-layer="current" class="world-map__layer" :transform="`translate(${here.x} ${here.y}) scale(${uiScale})`">
-          <circle class="world-map__here-glow" r="14" />
-          <circle class="world-map__here-ring" r="10" />
-          <circle class="world-map__here-dot" r="5.5" />
+          <WorldMapGlyph kind="here" />
         </g>
 
         <g data-layer="labels" class="world-map__layer" aria-hidden="true">
@@ -1076,6 +1066,8 @@ const litCount = computed(() => litDistricts.value.length);
   </div>
 </template>
 
+<style scoped src="./world-map-ink.css"></style>
+
 <style scoped>
 .world-map {
   position: relative;
@@ -1114,13 +1106,11 @@ const litCount = computed(() => litDistricts.value.length);
 .world-map__layer path,
 .world-map__layer circle { vector-effect: non-scaling-stroke; }
 
-/* sea and land */
+/* sea and land (the land, lit wash, unlit hatching, borders, trail and
+   approximate ring share ./world-map-ink.css with the map legend) */
 .world-map__swell { fill: none; stroke: #5b7a8c; stroke-opacity: 0.07; stroke-width: 1; }
 .world-map__shelf { fill: none; stroke: #2a3b47; stroke-opacity: 0.55; stroke-width: 14; stroke-linejoin: round; }
-.world-map__land { fill: #1d1b17; }
 
-/* lit ink: a warm vellum wash under terrain tints */
-.world-map__wash { fill: #4a4535; }
 .world-map__wash.tone-1 { fill: #5a5240; }
 .world-map__wash.tone-2 { fill: #3f3b2e; }
 .world-map__terrain { fill: #575238; fill-opacity: 0.8; }
@@ -1135,8 +1125,6 @@ const litCount = computed(() => litDistricts.value.length);
 .world-map__ridge { fill: none; stroke: #d6c7a2; stroke-width: 2.4; stroke-dasharray: 1 4; stroke-linecap: round; stroke-opacity: 0.8; }
 .world-map__road { fill: none; stroke: #ead8aa; stroke-width: 1.5; stroke-dasharray: 7 4; stroke-opacity: 0.82; }
 
-/* unlit: diagonal hatching over the bare land */
-.world-map__hatch-line { stroke: #8a7f68; stroke-width: 1.1; stroke-opacity: 0.34; }
 .world-map__hatch { pointer-events: none; }
 
 /* district borders: solid gilt for lit, dotted ash for unlit; the fill is a
@@ -1144,8 +1132,6 @@ const litCount = computed(() => litDistricts.value.length);
 .world-map__district { fill: transparent; cursor: pointer; stroke-linejoin: round; }
 /* a soft umber rim inside each lit district, like a hand-tinted plate */
 .world-map__district-edge { fill: none; stroke: #1a150d; stroke-opacity: 0.16; stroke-width: 7; stroke-linejoin: round; pointer-events: none; }
-.world-map__district.is-lit { stroke: #d9c493; stroke-width: 1.1; stroke-opacity: 0.6; }
-.world-map__district.is-unlit { stroke: #7d7462; stroke-width: 1.1; stroke-dasharray: 1 4; stroke-linecap: round; stroke-opacity: 0.6; }
 .world-map__district:hover { fill: rgba(238, 221, 180, 0.04); }
 .world-map__district-selected {
   fill: rgba(228, 200, 142, 0.1);
@@ -1155,30 +1141,15 @@ const litCount = computed(() => litDistricts.value.length);
   pointer-events: none;
 }
 
-/* national borders: a dark casing under a dash-dot seal line */
-.world-map__nation-casing { fill: none; stroke: #0b0a08; stroke-opacity: 0.5; stroke-width: 4.5; stroke-linejoin: round; }
-.world-map__nation-border {
-  fill: none;
-  stroke: #c0645a;
-  stroke-width: 2;
-  stroke-dasharray: 10 4 2 4;
-  stroke-linejoin: round;
-  stroke-opacity: 0.9;
-}
-
 /* coastline: an inked line with a faint surf glow */
 .world-map__coast-glow { fill: none; stroke: #b9a77c; stroke-opacity: 0.16; stroke-width: 6; stroke-linejoin: round; }
 .world-map__coast { fill: none; stroke: #b9a77c; stroke-width: 1.5; stroke-linejoin: round; }
 
 /* trail: a gold line with a soot casing, or real cells at 近郊 */
-.world-map__trail-casing { fill: none; stroke: #120f0a; stroke-opacity: 0.7; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
-.world-map__trail-line { fill: none; stroke: var(--gold-300); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .world-map__trail-cells { fill: rgba(238, 221, 180, 0.32); stroke: var(--gold-300); stroke-width: 1; stroke-opacity: 0.85; }
 
 /* approximate commissions: a dashed seal ring, never a point */
 .world-map__approx { cursor: pointer; }
-.world-map__approx-fill { fill: rgba(207, 68, 68, 0.09); }
-.world-map__approx-ring { fill: none; stroke: var(--seal-400); stroke-width: 1.8; stroke-dasharray: 6 5; }
 .world-map__approx.is-tracked .world-map__approx-ring { stroke-width: 2.4; }
 .world-map__approx.is-selected .world-map__approx-ring { stroke: var(--gold-300); stroke-width: 2.6; }
 
@@ -1187,35 +1158,7 @@ const litCount = computed(() => litDistricts.value.length);
 .world-map__landmark,
 .world-map__place,
 .world-map__quest { cursor: pointer; }
-.world-map__spire { fill: var(--gold-400); stroke: #15140f; stroke-width: 1.5; stroke-linejoin: round; }
-.world-map__spire-light { fill: #fff3d2; fill-opacity: 0.75; }
-.world-map__landmark.is-selected .world-map__spire { stroke: var(--gold-300); stroke-width: 2.4; }
-.world-map__place-glyph { fill: #e7e0d1; stroke: #15140f; stroke-width: 2; }
-.world-map__place.is-capital .world-map__place-glyph { fill: var(--gold-400); }
-.world-map__place-core { fill: #15140f; }
-.world-map__place.is-harbour .world-map__place-glyph { fill: #9cc1d2; }
-.world-map__place.is-hidden .world-map__place-glyph { fill: #2a2722; stroke: #cfc4ad; stroke-width: 1.4; stroke-dasharray: 2 2; }
-.world-map__place.is-selected .world-map__place-glyph { stroke: var(--gold-300); stroke-width: 2.6; stroke-dasharray: none; }
-
-/* exact commissions */
-.world-map__quest-halo { fill: rgba(207, 68, 68, 0.18); stroke: rgba(224, 107, 107, 0.6); stroke-width: 1; }
-.world-map__quest-pin { fill: var(--seal-500); stroke: #fff2e6; stroke-width: 1.6; stroke-linejoin: round; }
-.world-map__quest-eye { fill: #fff2e6; }
-.world-map__quest.is-selected .world-map__quest-pin { stroke: var(--gold-300); stroke-width: 2.6; }
-
-/* the player */
-.world-map__here-glow {
-  fill: rgba(165, 44, 49, 0.24);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: world-map-here-breathe var(--motion-pulse) ease-in-out infinite;
-}
-@keyframes world-map-here-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(0.86); }
-  50% { opacity: 1; transform: scale(1.2); }
-}
-.world-map__here-ring { fill: none; stroke: #fff2e6; stroke-width: 2; }
-.world-map__here-dot { fill: var(--seal-deep); stroke: #fff2e6; stroke-width: 1.5; }
+/* the landmark, place, commission and player glyphs: WorldMapGlyph */
 
 /* labels: screen-space, 16 CSS px times the UI scale or larger, with a soot
    halo; nation names are spaced display type */

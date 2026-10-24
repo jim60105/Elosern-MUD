@@ -409,6 +409,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `.empty-state__glyph` (the shared EmptyState's decorative glyph icon; targeted by `test_browser_drawer_content.py`) | REMAP-TO-TESTID |
 | `.npe-confirm` (the NPC persona editor's dirty-close confirmation dialog root, styled by `npc-persona-editor.css`; the managed suite asserts its absence after a confirmed close via `page.locator(".npe-confirm")` in `test_browser_npc_persona_editor.py`; the hook was added by the npc-persona-editor-window change alongside the `npc-persona-editor-*` testid family) | REMAP-TO-TESTID |
 | `.local-map__stub`, `.local-map__stub-label`, `.local-map__stub-arrow`, `.local-map__stub-button` (the minimap island's cross-layer gateway exit stub: its decoration group, its `通往 <leads_to>` label, its exit-ring arrowhead, and the native move button named `往 <leads_to> 移動`; targeted by `test_browser_local_map_rendering.py`, `test_browser_local_map_interaction.py` and `test_browser_local_map_geometry.py`; added by the label-minimap-exits-and-gateways change) | REMAP-TO-TESTID |
+| `.map-glyph`, `.map-glyph__here-ring`, `.map-glyph__here-dot` (the shared node glyph `MapNodeGlyph.vue` drawn by the minimap island, the area map and its legend: its scaled root group and the here-seal's ring and dot; unify-map-glyphs-across-map-surfaces, targeted by `test_browser_local_map_rendering.py` and `test_browser_local_map_layout_variants.py`) | REMAP-TO-TESTID |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
 | `.lm_header` (legacy GoldenLayout header assertion: must NOT render) | RETIRED-WITH-SHELL |
 | `.dock-menu-layout` (the removed dock pane wrapper per the remove-redundant-dock-menu-layout change: the managed suite asserts it must NOT render; no replacement selector) | RETIRED-WITH-SHELL |
@@ -573,6 +574,11 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### unify-map-glyphs-across-map-surfaces — 2026-10-24（unify-map-glyphs-across-map-surfaces）
+
+- **§2.3 補登 hook：** 共用節點圖示 `MapNodeGlyph.vue` 的類別掛鉤 `.map-glyph`（以 `scale()` 整體縮放的根群組）、`.map-glyph__here-ring` 與 `.map-glyph__here-dot`（目前位置印記的環與點）登記於 CSS class hooks 表為 REMAP-TO-TESTID。小地圖島嶼改由此共用圖示繪製後，受管套件在 `test_browser_local_map_rendering.py` 斷言目前所在的城門房間繪出印記環、群組帶 `scale(0.75)`，並在 `test_browser_local_map_layout_variants.py` 點擊印記點（島嶼本地的 `local-map__<suffix>` 掛鉤維持原登記）。
+- **§5 完整性聲明維持成立：** 本項僅為新掛鉤的登記，未改變凍結 façade（§1）或增量清單（§3）。
 
 ### webclient-main-navigation-hotkeys — 2026-10-20（webclient-main-navigation-hotkeys）
 

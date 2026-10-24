@@ -237,6 +237,22 @@ export const A_AreaWilderness = {
     assertShell(canvasElement, "A_AreaWilderness", "area");
     if (!canvasElement.querySelector(".drawer-header__subtitle").textContent.includes("灰鬃荒原東麓")) fail("A_AreaWilderness", "caption names the district");
     if (!$$(canvasElement, "area-map__node").length) fail("A_AreaWilderness", "cells are drawn");
+    // The cell marks are the shared glyphs at the cell scale: the here-seal
+    // and gate arch (MapNodeGlyph) and the commission diamond.
+    const nodes = canvasElement.querySelector(".area-map__nodes");
+    const seal = nodes.querySelector(".area-map__node.is-current g.map-glyph");
+    if (!seal?.querySelector(".map-glyph__here-ring") || seal.getAttribute("transform") !== "scale(0.875)") {
+      fail("A_AreaWilderness", "the current cell wears the shared here-seal at the cell scale");
+    }
+    if (!nodes.querySelector(".area-map__node.is-gate g.map-glyph[transform='scale(0.875)'] .map-glyph__gate")) {
+      fail("A_AreaWilderness", "the gate cell wears the shared gate arch at the cell scale");
+    }
+    if (!nodes.querySelector("g.map-commission[transform='scale(0.875)'] .area-map__quest")) {
+      fail("A_AreaWilderness", "the commission cell wears the shared commission diamond");
+    }
+    if (nodes.querySelector('[class*="area-map__here-"], .area-map__gate')) {
+      fail("A_AreaWilderness", "no private cell seal or arch remains");
+    }
   },
 };
 
@@ -391,6 +407,96 @@ export const LegendEscape = {
     if (log(canvasElement).closes !== 0) fail("LegendEscape", "the map is still open");
     await key(toggle, "Escape");
     if (log(canvasElement).closes !== 1) fail("LegendEscape", "third Escape closes the map");
+  },
+};
+
+// The area legend draws the area map's own glyphs: every node sample is the
+// map's MapNodeGlyph, and the gate sample is the very arch the map paints.
+export const LegendAreaGlyphs = {
+  render,
+  args: { area: townArea(), world: worldBase() },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    $(canvasElement, "map-drawer-legend-toggle").click();
+    await frames();
+    const legend = $(canvasElement, "map-drawer-legend");
+    if (getComputedStyle(legend).display === "none") fail("LegendAreaGlyphs", "the legend opens");
+    for (const cls of ["here-glow", "here-ring", "here-dot", "dot", "halo", "gate"]) {
+      if (!legend.querySelector(`.map-glyph__${cls}`)) fail("LegendAreaGlyphs", `the legend draws the map's ${cls} glyph`);
+    }
+    if (!legend.querySelector(".map-glyph__dot.is-seen")) fail("LegendAreaGlyphs", "the seen sample is the dashed map dot");
+    const mapGate = canvasElement.querySelector(".area-map__nodes .map-glyph__gate");
+    const legendGate = legend.querySelector(".map-glyph__gate");
+    if (!mapGate || mapGate.getAttribute("d") !== legendGate.getAttribute("d")) {
+      fail("LegendAreaGlyphs", "the legend gate is the map's gate arch");
+    }
+    if (legend.querySelector("ul .lg")) fail("LegendAreaGlyphs", "no CSS-drawn approximation remains in the area legend");
+    // Roads and the commission come from the area map's own sources.
+    for (const variant of ["is-walked", "is-frontier"]) {
+      const road = legend.querySelector(`g.area-map__road.${variant}`);
+      if (!road?.querySelector(".area-map__road-casing") || !road.querySelector(".area-map__road-core")) {
+        fail("LegendAreaGlyphs", `the ${variant} road sample is the map's road ink`);
+      }
+    }
+    const legendCore = legend.querySelector(".area-map__road.is-walked .area-map__road-core");
+    const mapCore = canvasElement.querySelector(".area-map__roads .area-map__road.is-walked .area-map__road-core");
+    if (mapCore && getComputedStyle(legendCore).stroke !== getComputedStyle(mapCore).stroke) {
+      fail("LegendAreaGlyphs", "the walked road sample strokes like the map");
+    }
+    if (legend.querySelector("[class*='lg-road'], .lg-quest")) fail("LegendAreaGlyphs", "no copied road or commission paint remains");
+    if (!legend.querySelector("g.map-commission .area-map__quest")) fail("LegendAreaGlyphs", "the commission sample is the shared diamond");
+  },
+};
+
+// The world legend draws the world map's own point glyphs (WorldMapGlyph)
+// and its shared ink: the here seal, spire, place and pin are the map's very
+// shapes, and the border, trail and ring samples use the map's own classes.
+export const LegendWorldGlyphs = {
+  render,
+  args: { tab: "world", area: townArea(), world: worldBase(), span: 200, centre: nearestLit().landmark },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    $(canvasElement, "map-drawer-legend-toggle").click();
+    await frames();
+    const legend = $(canvasElement, "map-drawer-legend");
+    if (getComputedStyle(legend).display === "none") fail("LegendWorldGlyphs", "the legend opens");
+    for (const cls of [
+      "here-glow", "here-ring", "here-dot", "wash", "land", "hatch-line", "district.is-lit", "district.is-unlit",
+      "nation-casing", "nation-border", "trail-casing", "trail-line", "spire", "place-glyph", "quest-pin",
+      "approx-ring",
+    ]) {
+      if (!legend.querySelector(`.world-map__${cls}`)) fail("LegendWorldGlyphs", `the legend draws the map's ${cls}`);
+    }
+    const svg = canvasElement.querySelector(".world-map__svg");
+    for (const cls of ["spire", "quest-pin"]) {
+      const onMap = [...svg.querySelectorAll(`.world-map__${cls}`)].find((el) => !legend.contains(el));
+      const inLegend = legend.querySelector(`.world-map__${cls}`);
+      if (onMap && onMap.getAttribute("d") !== inLegend.getAttribute("d")) {
+        fail("LegendWorldGlyphs", `the legend ${cls} is the map's shape`);
+      }
+    }
+    const lit = legend.querySelector(".world-map__district.is-lit");
+    const mapLit = [...canvasElement.querySelectorAll(".world-map__district.is-lit")].find((el) => !legend.contains(el));
+    if (mapLit && getComputedStyle(lit).stroke !== getComputedStyle(mapLit).stroke) {
+      fail("LegendWorldGlyphs", "the lit district sample strokes like the map");
+    }
+    if (legend.querySelector("ul .lg")) fail("LegendWorldGlyphs", "no CSS-drawn approximation remains in the world legend");
+    // One hatch pattern definition, instantiated by the map and the legend.
+    const hatches = [...canvasElement.querySelectorAll("pattern")].filter((p) => p.querySelector(".world-map__hatch-line"));
+    if (hatches.length !== 2 || hatches.some((p) => p.getAttribute("patternTransform") !== "rotate(45)")) {
+      fail("LegendWorldGlyphs", "the map and the legend each place the shared hatch pattern");
+    }
+    const legendLine = legend.querySelector("pattern .world-map__hatch-line");
+    const mapLine = hatches.map((p) => p.querySelector(".world-map__hatch-line")).find((el) => !legend.contains(el));
+    if (!legendLine || !mapLine || getComputedStyle(legendLine).stroke !== getComputedStyle(mapLine).stroke) {
+      fail("LegendWorldGlyphs", "the legend hatch line strokes like the map's");
+    }
+    // World glyph strokes scale with the glyph group.
+    for (const shape of svg.querySelectorAll(".world-glyph path, .world-glyph circle")) {
+      if (getComputedStyle(shape).vectorEffect !== "none") fail("LegendWorldGlyphs", "world glyph strokes scale with the glyph");
+    }
   },
 };
 

@@ -30,24 +30,20 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     return wrapper;
   }
 
-  it("draws the gold landmark ring over (not instead of) the visibility marker", () => {
+  it("draws a landmark with the full map's plain glyph, no extra ring", () => {
     // The wilderness fixture's non-current landmark: 舊營地 (visited) at
-    // island scale — ring r=5 coexists with the visited dot r=4.5.
+    // island scale. The area map marks no landmark, so neither does the
+    // island: the node wears the visited dot alone.
     const w = mountLattice({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     const node = w.get('[data-testid="local-map__node--wild:plains:2:2"]');
-    const rings = node.findAll(".local-map__landmark");
-    expect(rings).toHaveLength(1);
-    expect(rings[0].attributes("r")).toBe("5");
     expect(node.find(".local-map__marker--visible_visited").exists()).toBe(true);
-    // The ring is deliberately outside the `local-map__marker` class (the
-    // browser geometry audit pairs marker boxes; decorations must not
-    // self-overlap).
-    expect(rings[0].classes()).not.toContain("local-map__marker");
-    // The current landmark keeps exactly one ring; the remembered landmark
-    // (遠處山徑) stays in the mirror/edge marker presentation with no ring on the canvas.
-    expect(w.findAll('[data-testid="local-map__node--wild:plains:3:1"] .local-map__landmark')).toHaveLength(1);
+    expect(node.find(".local-map__marker--visible_visited").attributes("r")).toBe("5.5");
+    expect(w.findAll(".local-map__landmark")).toHaveLength(0);
+    // The remembered landmark (遠處山徑) stays in the mirror/edge marker
+    // presentation, off the canvas.
     expect(w.findAll('[data-testid="local-map__node--wild:plains:7:5"]').length).toBe(0);
-    expect(w.findAll(".local-map__landmark")).toHaveLength(2);
+    wrapper = null;
+    document.body.innerHTML = "";
   });
 
   it("labels nodes by draft tier: here, gold, seen, far", () => {

@@ -1117,6 +1117,12 @@ def visible_minimap_actionable(page: Page):
     viewport. A journey that exercises the island's own move path therefore
     selects a control with a hit area inside the canvas, exactly as a reader
     would, and never clicks through the clip.
+
+    The node's travel halo must lie inside the canvas, but the returned
+    locator is the node's primary glyph shape (``.local-map__marker``): the
+    shared node glyph paints its halo beneath the state glyph, so the shape a
+    pointer lands on at the node's centre is the marker, inside the same
+    activating node group.
     """
     canvas = page.locator('[data-testid="local-map__lattice"]')
     canvas_box = canvas.bounding_box()
@@ -1138,7 +1144,9 @@ def visible_minimap_actionable(page: Page):
             and node_box["y"] + node_box["height"]
             <= canvas_box["y"] + canvas_box["height"]
         ):
-            return candidate
+            return candidate.locator(
+                "xpath=../*[contains(concat(' ', normalize-space(@class), ' '), ' local-map__marker ')]"
+            )
     return None
 
 
