@@ -413,6 +413,154 @@ class MovementSettlementWildernessTests(EvenniaTest):
         for coordinates, room in self._script().db.rooms.items():
             self.assertEqual(room.ndb.active_coordinates, coordinates)
 
+    def _surface_snapshot(self, entities):
+        """Every persisted/cache surface a refused traversal must leave alone."""
+        from world.rules.fatigue import read_optional_fatigue_state
+
+        return (
+            tuple(entity.location for entity in entities),
+            get_world_clock().tick,
+            self._bookkeeping(),
+            tuple(
+                entity.attributes.get("map_knowledge") for entity in entities
+            ),
+            tuple(entity.home for entity in entities),
+            tuple(
+                tuple(
+                    getattr(entity.traits, key).current
+                    for key in ("hp", "mp", "sp")
+                )
+                for entity in entities
+            ),
+            tuple(read_optional_fatigue_state(entity) for entity in entities),
+        )
+
+    def _join_sleeper(self, posture, reserve):
+        from world.rules.fatigue import (
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        sleeper = create_object(NPC, key="沉睡同伴", location=self.char1.location)
+        sleeper.race = "human"
+        sleeper.apply_race_baseline()
+        join_party(sleeper, self.char1)
+        initialize_fatigue_state(sleeper)
+        write_fatigue_state(sleeper, reserve, posture)
+        return sleeper
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_every_sleep_posture_refuses_gate_entry_before_any_write(self):
+        """Scenario: Ordinary connectors and both gate directions."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.fatigue import SleepPosture
+
+        self.char1.location = self.east_gate
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                sleeper = self._join_sleeper(posture, reserve)
+                before = self._surface_snapshot((self.char1, sleeper))
+                with mock_patch(
+                    "world.rules.travel_cost.log_traversal_refusal"
+                ) as refusal:
+                    self.assertFalse(
+                        self.gate.at_traverse(self.char1, self.east_gate)
+                    )
+                refusal.assert_called_once()
+                self.assertEqual(refusal.call_args.args[2], "party_sleeping")
+                self.assertEqual(
+                    self._surface_snapshot((self.char1, sleeper)), before
+                )
+                self.assertIsInstance(self.char1.location, GridRoom)
+                self.assertEqual(self._bookkeeping()[0], {})
+                sleeper.delete()
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_every_sleep_posture_refuses_a_wilderness_step_before_any_write(self):
+        """Scenario: Ordinary connectors and both gate directions."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.fatigue import SleepPosture
+
+        self.gate.at_traverse(self.char1, self.east_gate)
+        sleeper = None
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                if sleeper is None:
+                    # One real two-member roster for both postures; only the
+                    # persisted posture changes between runs.
+                    sleeper = self._join_sleeper(posture, reserve)
+                else:
+                    from world.rules.fatigue import write_fatigue_state
+
+                    write_fatigue_state(sleeper, reserve, posture)
+                before = self._surface_snapshot((self.char1, sleeper))
+                with mock_patch(
+                    "world.rules.travel_cost.log_traversal_refusal"
+                ) as refusal:
+                    self.assertFalse(
+                        self._exit("east").at_traverse(
+                            self.char1, self.char1.location
+                        )
+                    )
+                refusal.assert_called_once()
+                self.assertEqual(refusal.call_args.args[2], "party_sleeping")
+                self.assertEqual(
+                    self._surface_snapshot((self.char1, sleeper)), before
+                )
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_every_sleep_posture_refuses_the_grid_return_before_any_write(self):
+        """Scenario: Ordinary connectors and both gate directions."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.fatigue import SleepPosture
+
+        self.gate.at_traverse(self.char1, self.east_gate)
+        sleeper = None
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                if sleeper is None:
+                    sleeper = self._join_sleeper(posture, reserve)
+                else:
+                    from world.rules.fatigue import write_fatigue_state
+
+                    write_fatigue_state(sleeper, reserve, posture)
+                before = self._surface_snapshot((self.char1, sleeper))
+                with mock_patch(
+                    "world.rules.travel_cost.log_traversal_refusal"
+                ) as refusal:
+                    self.assertFalse(
+                        self._exit("west").at_traverse(
+                            self.char1, self.char1.location
+                        )
+                    )
+                refusal.assert_called_once()
+                self.assertEqual(refusal.call_args.args[2], "party_sleeping")
+                self.assertEqual(
+                    self._surface_snapshot((self.char1, sleeper)), before
+                )
+                self.assertIsInstance(self.char1.location, TerrainRoom)
+
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")
     def test_gate_entry_charge_failure_returns_player_to_the_grid_room(self):
         self.char1.location = self.east_gate

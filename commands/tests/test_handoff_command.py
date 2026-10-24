@@ -148,6 +148,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
     )
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
     def test_sleeping_body_still_cannot_cast_use_items_or_travel(self):
         from world.rules.field_cast import cast_as_member
         from world.rules.party_inventory import use_member_item
@@ -163,6 +166,24 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             with self.assertRaises(PartyScopeError) as ctx:
                 operation()
             self.assertEqual(ctx.exception.reason, REASON_MEMBER_ASLEEP)
+        # The stationary rule is a real traversal boundary, not a pure speed
+        # assertion: the awake owner's party still contains the sleeper.
+        from typeclasses.exits import Exit
+
+        door = create_object(
+            Exit, key="door", location=self.room1, destination=self.room2
+        )
+        before = int(get_world_clock().tick)
+        self.assertIsNone(door.at_traverse(self.player, self.room2))
+        self.assertIs(self.player.location, self.room1)
+        self.assertIs(self.sleeper.location, self.room1)
+        self.assertEqual(int(get_world_clock().tick), before)
+
+    @covers_requirement(
+        "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work"
+    )
+    def test_a_sleeping_body_forbids_foot_travel_by_policy(self):
+        """Pure-policy unit assertion, separate from the consumer boundary."""
         with self.assertRaises(FatigueStateError) as ctx:
             foot_speed_scale(read_fatigue_state(self.sleeper))
         self.assertIs(ctx.exception.reason, FatigueRejectReason.TRAVEL_FORBIDDEN)

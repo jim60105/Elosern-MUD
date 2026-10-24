@@ -446,50 +446,107 @@ class MovementPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
     @covers_requirement(
-        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
     )
-    def test_present_forced_sleeper_blocks_a_plain_exit_with_zero_writes(self):
-        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
+    def test_every_sleep_posture_blocks_a_plain_exit_with_zero_writes(self):
+        """Scenario: Every exit family (ordinary connector)."""
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                write_fatigue_state(self.ella, reserve, posture)
+                before_state = read_fatigue_state(self.ella)
+                before_gauges = self._gauges(self.player)
+                before = get_world_clock().tick
+                self.assertIsNone(self.door.at_traverse(self.player, self.room2))
+                self.assertIs(self.player.location, self.room1)
+                self.assertIs(self.ella.location, self.room1)
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertEqual(self._gauges(self.player), before_gauges)
+                # A full reserve never rewrites the sleeper's posture.
+                self.assertEqual(read_fatigue_state(self.ella), before_state)
+
+    @covers_requirement(
+        "party-system::companions-follow-the-player-through-every-exit-traversal"
+    )
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_remote_sleeper_does_not_block_the_present_party(self):
+        """Scenario: Exact presence and effective membership."""
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                self.kahn.location = self.room2
+                write_fatigue_state(self.kahn, reserve, posture)
+                before = get_world_clock().tick
+                self.door.at_traverse(self.player, self.room2)
+                self.assertIs(self.player.location, self.room2)
+                self.assertIs(self.ella.location, self.room2)
+                self.assertIs(self.kahn.location, self.room2)
+                self.assertEqual(get_world_clock().tick - before, MOVE)
+                self.assertEqual(
+                    read_fatigue_state(self.kahn).reserve_units, reserve
+                )
+                self.player.location = self.room1
+                self.ella.location = self.room1
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_local_actions_remain_available_while_a_companion_sleeps(self):
+        """Scenario: Local play -- the barrier adds no party action lock."""
+        from world.rules.fatigue import sleep_blocks_actions
+
+        write_fatigue_state(self.ella, 360000, SleepPosture.VOLUNTARY)
+        self.assertFalse(sleep_blocks_actions(self.player))
+        self.assertTrue(sleep_blocks_actions(self.ella))
         before = get_world_clock().tick
-        self.assertIsNone(self.door.at_traverse(self.player, self.room2))
-        self.assertIs(self.player.location, self.room1)
+        advance_wait(self.player, 60)
+        self.assertEqual(get_world_clock().tick - before, 60)
         self.assertIs(self.ella.location, self.room1)
-        self.assertEqual(get_world_clock().tick, before)
-        self.assertEqual(
-            read_fatigue_state(self.ella).reserve_units, 0
+        self.assertIs(
+            read_fatigue_state(self.ella).posture, SleepPosture.VOLUNTARY
         )
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
     @covers_requirement(
-        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
-    )
-    def test_remote_forced_sleeper_does_not_block_the_present_party(self):
-        write_fatigue_state(self.kahn, 0, SleepPosture.FORCED)
-        before = get_world_clock().tick
-        self.door.at_traverse(self.player, self.room2)
-        self.assertIs(self.player.location, self.room2)
-        self.assertIs(self.ella.location, self.room2)
-        self.assertIs(self.kahn.location, self.room2)
-        self.assertEqual(get_world_clock().tick - before, MOVE)
-        self.assertEqual(read_fatigue_state(self.kahn).reserve_units, 0)
-
-    @covers_requirement(
-        "party-system::companions-follow-the-player-through-every-exit-traversal"
-    )
-    @covers_requirement(
-        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
     )
     def test_possessing_an_awake_member_cannot_carry_a_sleeper(self):
+        """Scenario: Every exit family (possessed controller)."""
         self.kahn.location = self.room1
-        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
         enter_possession(self.player, self.kahn)
-        before = get_world_clock().tick
-        self.assertIsNone(self.door.at_traverse(self.kahn, self.room2))
-        for member in (self.kahn, self.player, self.ella):
-            self.assertIs(member.location, self.room1)
-        self.assertEqual(get_world_clock().tick, before)
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            for sleeper_role in ("follower", "owner"):
+                with self.subTest(posture=posture, sleeper=sleeper_role):
+                    for member in (self.player, self.ella, self.kahn):
+                        write_fatigue_state(
+                            member, 360000, SleepPosture.AWAKE
+                        )
+                    sleeper = (
+                        self.ella if sleeper_role == "follower" else self.player
+                    )
+                    write_fatigue_state(sleeper, reserve, posture)
+                    before_state = read_fatigue_state(sleeper)
+                    before = get_world_clock().tick
+                    self.assertIsNone(
+                        self.door.at_traverse(self.kahn, self.room2)
+                    )
+                    for member in (self.kahn, self.player, self.ella):
+                        self.assertIs(member.location, self.room1)
+                    self.assertEqual(get_world_clock().tick, before)
+                    self.assertEqual(
+                        read_fatigue_state(sleeper), before_state
+                    )
 
     @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-"
@@ -583,35 +640,86 @@ class WildernessPartySettlementTests(_PartySettlementFixture, EvenniaTest):
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
     @covers_requirement(
-        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
     )
-    def test_present_forced_sleeper_blocks_gate_entry_with_zero_writes(self):
-        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
-        before = get_world_clock().tick
-        self.assertFalse(self.gate.at_traverse(self.player, self.east_gate))
-        self.assertIs(self.player.location, self.east_gate)
-        self.assertIs(self.ella.location, self.east_gate)
-        self.assertIs(self.kahn.location, self.east_gate)
-        self.assertEqual(get_world_clock().tick, before)
+    def test_every_sleep_posture_blocks_gate_entry_with_zero_writes(self):
+        """Scenario: Ordinary connectors and both gate directions."""
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                write_fatigue_state(self.ella, reserve, posture)
+                before_state = read_fatigue_state(self.ella)
+                before = get_world_clock().tick
+                self.assertFalse(
+                    self.gate.at_traverse(self.player, self.east_gate)
+                )
+                self.assertIs(self.player.location, self.east_gate)
+                self.assertIs(self.ella.location, self.east_gate)
+                self.assertIs(self.kahn.location, self.east_gate)
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertEqual(
+                    read_fatigue_state(self.ella), before_state
+                )
 
     @covers_requirement(
         "party-system::companions-follow-the-player-through-every-exit-traversal"
     )
     @covers_requirement(
-        "party-system::any-present-forced-sleeper-makes-party-travel-stationary"
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
     )
-    def test_present_forced_sleeper_blocks_a_wilderness_step(self):
+    def test_every_sleep_posture_blocks_a_wilderness_step(self):
+        """Scenario: Ordinary connectors and both gate directions."""
         self.gate.at_traverse(self.player, self.east_gate)
-        write_fatigue_state(self.ella, 0, SleepPosture.FORCED)
-        before = get_world_clock().tick
-        coordinates = self.player.location.coordinates
-        result = self._exit("east").at_traverse(
-            self.player, self.player.location
-        )
-        self.assertFalse(result)
-        self.assertEqual(self.player.location.coordinates, coordinates)
-        self.assertEqual(self.ella.location.coordinates, coordinates)
-        self.assertEqual(get_world_clock().tick, before)
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                write_fatigue_state(self.ella, reserve, posture)
+                before = get_world_clock().tick
+                coordinates = self.player.location.coordinates
+                result = self._exit("east").at_traverse(
+                    self.player, self.player.location
+                )
+                self.assertFalse(result)
+                self.assertEqual(
+                    self.player.location.coordinates, coordinates
+                )
+                self.assertEqual(self.ella.location.coordinates, coordinates)
+                self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_possessed_controller_cannot_enter_with_a_sleeping_owner(self):
+        """Scenario: Every exit family (possessed owner body)."""
+        from world.rules.possession import release_possession
+
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                for member in (self.player, self.ella, self.kahn):
+                    write_fatigue_state(member, 360000, SleepPosture.AWAKE)
+                enter_possession(self.player, self.ella)
+                write_fatigue_state(self.player, reserve, posture)
+                before_state = read_fatigue_state(self.player)
+                before = get_world_clock().tick
+                self.assertFalse(
+                    self.gate.at_traverse(self.ella, self.east_gate)
+                )
+                for member in (self.player, self.ella, self.kahn):
+                    self.assertIs(member.location, self.east_gate)
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertEqual(
+                    read_fatigue_state(self.player), before_state
+                )
+                release_possession(
+                    self.player, npc=self.ella, reason="handback"
+                )
 
     @covers_requirement(
         "movement-cost-charging::charge-movement-is-the-single-shared-movement-"
