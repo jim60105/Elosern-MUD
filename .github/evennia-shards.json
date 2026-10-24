@@ -367,6 +367,7 @@
         "web.webclient.presentation.tests.test_party_member_panel",
         "web.webclient.presentation.tests.test_party_panel",
         "web.webclient.presentation.tests.test_possession_presentation",
+        "web.webclient.presentation.tests.test_sleep_handoff",
         "web.webclient.presentation.tests.test_presentation_context",
         "web.webclient.presentation.tests.test_services_panel",
         "web.webclient.presentation.tests.test_title_codex_panel"

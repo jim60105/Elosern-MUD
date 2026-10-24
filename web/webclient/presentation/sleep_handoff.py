@@ -78,8 +78,7 @@ def validate_sleep_handoff(payload: Any) -> dict[str, Any]:
     if not isinstance(selection, dict):
         raise ProtocolValidationError("selection must be an object")
     _require_exact_fields(selection, "selection", {"available", "rows"}, {})
-    if not _require_bool(selection, "available"):
-        raise ProtocolValidationError("selection.available must be a boolean")
+    _require_bool(selection, "available")
     rows = selection["rows"]
     if not isinstance(rows, list) or len(rows) > MAX_ROWS:
         raise ProtocolValidationError("selection.rows exceeds its bound")
@@ -92,8 +91,7 @@ def validate_sleep_handoff(payload: Any) -> dict[str, Any]:
         _require_str(row, "name", maximum=MAX_NAME_CODE_POINTS)
         _require_str(row, "stage", maximum=64)
         _require_str(row, "label", maximum=MAX_LABEL_CODE_POINTS)
-        if not _require_bool(row, "enabled"):
-            raise ProtocolValidationError("row enabled must be a boolean")
+        _require_bool(row, "enabled")
         reserve = row["reserve_percent"]
         if reserve is not None and (
             not isinstance(reserve, int) or isinstance(reserve, bool) or not 0 <= reserve <= 100
@@ -106,8 +104,7 @@ def validate_sleep_handoff(payload: Any) -> dict[str, Any]:
         raise ProtocolValidationError("party must be an object")
     _require_exact_fields(party, "party", {"label", "enabled", "reason"}, {})
     _require_str(party, "label", maximum=MAX_LABEL_CODE_POINTS)
-    if not _require_bool(party, "enabled"):
-        raise ProtocolValidationError("party enabled must be a boolean")
+    _require_bool(party, "enabled")
     _require_optional_str(party, "reason", MAX_REASON_CODE_POINTS)
 
     controlled = payload["controlled_sleep"]
@@ -139,8 +136,7 @@ def validate_sleep_handoff(payload: Any) -> dict[str, Any]:
         _require_str(owner_sleep, "sleep_id", maximum=MAX_SLEEP_ID_CODE_POINTS)
         _require_int(owner_sleep, "revision", minimum=0, maximum=MAX_SAFE_INTEGER)
         _require_int(owner_sleep, "generation", minimum=0, maximum=MAX_SAFE_INTEGER)
-        if not _require_bool(owner_sleep, "dream_pending"):
-            raise ProtocolValidationError("dream_pending must be a boolean")
+        _require_bool(owner_sleep, "dream_pending")
         if owner_sleep["continuation"] not in (
             "none",
             "pending",
@@ -148,8 +144,7 @@ def validate_sleep_handoff(payload: Any) -> dict[str, Any]:
             "complete",
         ):
             raise ProtocolValidationError("continuation is invalid")
-        if not _require_bool(owner_sleep, "continuation_available"):
-            raise ProtocolValidationError("continuation_available must be a boolean")
+        _require_bool(owner_sleep, "continuation_available")
         _require_optional_str(
             owner_sleep, "continuation_reason", MAX_REASON_CODE_POINTS
         )
