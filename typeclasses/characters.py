@@ -190,6 +190,21 @@ class PlayerCharacter(LivingEntity):
         from world.quests.encounter_dispatch import activate_for_move
 
         activate_for_move(self)
+        # A login, reconnect or handback is the deterministic resume point for
+        # one durable owner sleep continuation that a crash left pending. The
+        # rules owner resumes only that uncommitted target, once.
+        try:
+            from server.dream_service import resume_owner_sleep_continuation
+
+            resume_owner_sleep_continuation(self)
+        except Exception as error:  # observability: ignore R2: a resume failure is logged here and the pending intent stays retryable on the next attach
+            from world.observability import log_warn
+
+            log_warn(
+                "owner_sleep_resume_failed",
+                context={"char": str(getattr(self, "pk", "?"))},
+                exc=error,
+            )
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""

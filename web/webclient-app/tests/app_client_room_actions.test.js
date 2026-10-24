@@ -96,7 +96,6 @@ describe("AppClient room actions (exploration-room-actions)", () => {
   const pill = () => wrapper.find('#action-dock [data-testid="suggestions-pill"]');
   const waitCard = () => wrapper.find('[data-anchor="choices"] [data-testid="wait-card"]');
   const sugCard = () => wrapper.find('[data-anchor="choices"] [data-testid="suggestions-card"]');
-  const question = () => wrapper.find('[data-anchor="choices"] [data-testid="dream-question"]');
   const rowsOf = (card) => card.findAll('[role="menuitem"]');
   const readout = () => ({
     lead: wrapper.get('[data-testid="exploration-readout-lead"]').text(),
@@ -111,13 +110,6 @@ describe("AppClient room actions (exploration-room-actions)", () => {
     await waitButton().trigger("click");
     await settle();
     expect(waitCard().exists()).toBe(true);
-  }
-
-  async function openSleepQuestion() {
-    await openWaitCard();
-    await rowsOf(waitCard())[1].trigger("click");
-    await settle();
-    expect(question().exists()).toBe(true);
   }
 
   beforeEach(() => {
@@ -270,86 +262,70 @@ describe("AppClient room actions (exploration-room-actions)", () => {
     });
   });
 
-  describe("the 進入夢境協作？ question", () => {
-    it("opens without a request when 睡眠至完全恢復 is chosen, focus on 是", async () => {
+  describe("the sleep form", () => {
+    const sleepForm = () => wrapper.find('[data-anchor="choices"] [data-testid="sleep-form"]');
+
+    async function openSleepForm() {
+      await openWaitCard();
+      await rowsOf(waitCard())[1].trigger("click");
+      await settle();
+      expect(sleepForm().exists()).toBe(true);
+    }
+
+    it("opens without a request and focuses the duration input", async () => {
       await mountWith();
-      await openSleepQuestion();
+      await openSleepForm();
       expect(sender.sent.actions).toHaveLength(0);
-      expect(question().get('[data-testid="question-card-question"]').text()).toBe("進入夢境協作？");
-      expect(document.activeElement).toBe(question().get('[data-testid="question-card-yes"]').element);
-      // No separate dream row on the card.
-      expect(rowsOf(waitCard()).map((row) => row.text())).not.toContain("睡眠並進入夢境協作");
+      expect(document.activeElement).toBe(sleepForm().element.querySelector("input"));
     });
 
-    it("是 sleeps into the dream: one explore.wait with sleep and dream", async () => {
+    it("recovery dispatches exactly one accepted sleep request", async () => {
       await mountWith();
-      await openSleepQuestion();
-      await question().get('[data-testid="question-card-yes"]').trigger("click");
+      await openSleepForm();
+      await sleepForm().get('[data-testid="sleep-form-recovery"]').trigger("click");
       await settle();
       expect(sender.sent.actions).toHaveLength(1);
-      expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.wait", payload: { sleep: true, dream: true } });
-      expect(question().exists()).toBe(false);
+      expect(sender.sent.actions[0]).toMatchObject({
+        action_id: "explore.wait",
+        payload: { sleep: true },
+      });
       expect(waitCard().exists()).toBe(false);
     });
 
-    it("否 is a plain sleep: one explore.wait with sleep only", async () => {
+    it("duration converts hours once and dispatches the bounded seconds", async () => {
       await mountWith();
-      await openSleepQuestion();
-      await question().get('[data-testid="question-card-no"]').trigger("click");
+      await openSleepForm();
+      await sleepForm().element.querySelector("input").value;
+      await sleepForm().find("input").setValue("1.5");
+      await sleepForm().trigger("submit");
       await settle();
       expect(sender.sent.actions).toHaveLength(1);
-      expect(sender.sent.actions[0].payload).toEqual({ sleep: true });
+      expect(sender.sent.actions[0].payload).toEqual({
+        sleep: true,
+        sleep_mode: "duration",
+        seconds: 5400,
+      });
     });
 
-    it("the close control and Escape cancel the sleep and return to the sleep row", async () => {
+    it("an out-of-bounds duration errors without dispatching", async () => {
       await mountWith();
-      await openSleepQuestion();
-      await question().get('[data-testid="question-card-close"]').trigger("click");
+      await openSleepForm();
+      await sleepForm().find("input").setValue("0");
+      await sleepForm().trigger("submit");
       await settle();
-      expect(question().exists()).toBe(false);
-      expect(document.activeElement).toBe(waitCard().element);
-      expect(waitCard().get('[data-active="true"]').attributes("data-row-key")).toBe("wait-sleep");
-
-      key(waitCard().element, "Enter");
-      await settle();
-      expect(question().exists()).toBe(true);
-      key(question().element, "Escape");
-      await settle();
-      expect(question().exists()).toBe(false);
-      expect(document.activeElement).toBe(waitCard().element);
       expect(sender.sent.actions).toHaveLength(0);
+      expect(sleepForm().find('[role="alert"]').text()).toContain("請輸入有效時長");
+      expect(sleepForm().exists()).toBe(true);
     });
 
-    it("traps focus and honours the lock with the wait rows' reason", async () => {
+    it("Escape returns to the sleep row without dispatching", async () => {
       await mountWith();
-      await openSleepQuestion();
-      const yes = question().get('[data-testid="question-card-yes"]').element;
-      const no = question().get('[data-testid="question-card-no"]').element;
-      const close = question().get('[data-testid="question-card-close"]').element;
-      key(yes, "Tab");
-      expect(document.activeElement).toBe(no);
-      key(no, "Tab");
-      expect(document.activeElement).toBe(close);
-      key(close, "Tab");
-      expect(document.activeElement).toBe(yes);
-      // Another action goes in flight while the question is open.
-      store.dispatchAction("explore.look", { room: true });
+      await openSleepForm();
+      key(sleepForm().element, "Escape");
       await settle();
-      expect(question().get('[data-testid="question-card-yes"]').attributes("disabled")).toBeDefined();
-      expect(question().get('[data-testid="question-card-no"]').attributes("disabled")).toBeDefined();
-      expect(question().get('[data-testid="question-card-reason"]').text()).toContain("上一個行動尚未完成");
-      await question().get('[data-testid="question-card-yes"]').trigger("click");
-      expect(sender.sent.actions).toHaveLength(1);
-      expect(question().element.contains(document.activeElement)).toBe(true);
-    });
-
-    it("re-resolves the sleep row at activation: a vanished panel sends nothing", async () => {
-      await mountWith();
-      await openSleepQuestion();
-      expect(store.activateWaitRow("wait-sleep", { dream: true })).toMatchObject({ sent: true });
-      // A second answer once the card is gone resolves nothing.
-      expect(store.activateWaitRow("wait-sleep", { dream: true })).toMatchObject({ sent: false, reason: "missing" });
-      expect(sender.sent.actions).toHaveLength(1);
+      expect(sleepForm().exists()).toBe(false);
+      expect(waitCard().get('[data-active="true"]').attributes("data-row-key")).toBe("wait-sleep");
+      expect(sender.sent.actions).toHaveLength(0);
     });
   });
 

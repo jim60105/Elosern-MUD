@@ -74,15 +74,54 @@ class DreamSurfaceTests(EvenniaTest):
         _OUTPUT_SCHEMAS.update(self.saved_schemas)
         super().tearDown()
 
-    def enter(self, **overrides):
+    def grant_sleep(self, **overrides):
         values = {
             "tick_from": 100,
             "tick_to": 700,
             "requested_seconds": 600,
-            "voluntary": True,
         }
         values.update(overrides)
-        return service.enter_after_sleep(self.actor, **values)
+        from world.rules.sleep_receipt import (
+            KIND_VOLUNTARY,
+            MODE_DURATION,
+            SleepReceipt,
+            STATE_SLEEPING,
+            read_sleep_view_generation,
+            write_sleep_receipt,
+        )
+
+        self._sleep_seq = getattr(self, "_sleep_seq", 0) + 1
+        sleep_id = f"synthetic-sleep-{self._sleep_seq}"
+        accepted = int(values["requested_seconds"])
+        receipt = SleepReceipt(
+            sleep_id=sleep_id,
+            body_id=int(self.actor.pk),
+            owner_id=int(self.actor.pk),
+            kind=KIND_VOLUNTARY,
+            mode=MODE_DURATION,
+            entry_tick=int(values["tick_from"]),
+            target_tick=int(values["tick_from"]) + accepted,
+            limit_tick=int(values["tick_from"]) + accepted,
+            settled_through_tick=int(values["tick_to"]),
+            revision=0,
+            state=STATE_SLEEPING,
+            accepted_seconds=accepted,
+            partial=False,
+            entry_operation_id=sleep_id,
+        )
+        write_sleep_receipt(self.actor, receipt)
+        return sleep_id, receipt
+
+    def enter(self, **overrides):
+        from world.rules.sleep_receipt import read_sleep_view_generation
+
+        sleep_id, receipt = self.grant_sleep(**overrides)
+        return surface.enter_for_owner(
+            self.actor,
+            sleep_id=sleep_id,
+            revision=0,
+            generation=read_sleep_view_generation(self.actor),
+        )
 
     def request(self, action, **kwargs):
         state = service.dream_state(self.actor)
@@ -116,14 +155,15 @@ class DreamSurfaceTests(EvenniaTest):
         command.args = ""
         command.func()
         self.assertIsNone(service.dream_state(self.actor))
+        self.assertIn("完全恢復", command.caller.msg.call_args_list[-1].args[0])
+        # The legacy combined text entry is gone; it is a usage refusal and
+        # never opens a dream.
         command.args = "dream"
         before = self.physical()
         command.func()
         self.assertIsNone(service.dream_state(self.actor))
         self.assertEqual(before, self.physical())
-        # An already-met recovery target reconciles awake without inventing
-        # elapsed sleep; no dream question is opened either way.
-        self.assertIn("完全恢復", command.caller.msg.call_args_list[-1].args[0])
+        self.assertIn("用法", command.caller.msg.call_args_list[-1].args[0])
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     def test_browser_zero_sleep_choice_and_ordinary_rest_wait(self):
@@ -145,13 +185,14 @@ class DreamSurfaceTests(EvenniaTest):
                     "success",
                 )
                 self.assertIsNone(service.dream_state(self.actor))
-        with patch("web.webclient.actions.exploration_actions.begin_sleep", return_value=SleepOutcome(entry, zero)):
-            result = _wait_adapter(
-                self.actor, validate_wait_payload({"sleep": True, "dream": True})
-            )
-        self.assertEqual(result["outcome"], "success")
-        self.assertIsNone(service.dream_state(self.actor))
-        for forged in ({"sleep": 1, "dream": True}, {"sleep": True, "dream": 1}, {"sleep": True, "dream": True, "seconds": 0}):
+        # The combined sleep-and-dream payload is malformed: the accepted view
+        # answer is the sole dream entry surface.
+        for forged in (
+            {"sleep": 1, "dream": True},
+            {"sleep": True, "dream": 1},
+            {"sleep": True, "dream": True},
+            {"sleep": True, "dream": True, "seconds": 0},
+        ):
             with self.assertRaises(ValueError):
                 validate_wait_payload(forged)
 
@@ -176,43 +217,35 @@ class DreamSurfaceTests(EvenniaTest):
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     @covers_requirement("dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result")
+    @covers_requirement(
+        "dream-sleep-surface::explicit-dream-answers-have-browser-and-text-parity"
+    )
     def test_interrupted_committed_result_uses_actual_ticks_on_both_clients(self):
         for browser in (False, True):
-            from typeclasses.npcs import NPC
-            from world.rules.clock import get_world_clock
-            from world.rules.fatigue import SleepPosture, write_fatigue_state
-            from world.rules.party import join_party
-
-            companion = create_object(
-                NPC, key=f"interrupted-{browser}", location=self.actor.location
-            )
-            join_party(companion, self.actor)
-            # The voluntary target is 30 s (360 units at 12/s), but the
-            # companion's natural wake falls at 7 s (84 units at 12/s).
-            write_fatigue_state(self.actor, 359640, SleepPosture.AWAKE)
-            write_fatigue_state(companion, 71916, SleepPosture.FORCED)
-            for gauge in ("hp", "mp", "sp"):
-                trait = self.actor.traits.get(gauge)
-                trait.current = trait.max
-                trait.rate = 0.0
             clock = get_world_clock()
             before = clock.tick
-            if browser:
-                _wait_adapter(self.actor, {"sleep": True, "dream": True})
-            else:
-                command = CmdSleep()
-                command.caller = self.actor
-                command.args = "dream"
-                command.func()
-            state = service.dream_state(self.actor)
-            self.assertEqual(state["sleep"]["seconds"], 7)
-            self.assertEqual(state["sleep"]["requested_seconds"], 30)
-            self.assertIn(
-                "時間經過了 7 秒。",
-                [call.args[0] for call in self.actor.msg.call_args_list],
+            sleep_id, _receipt = self.grant_sleep(
+                tick_from=before, tick_to=before, requested_seconds=30
             )
-            self.assertEqual(self.request("awaken").result["outcome"], "success")
-            self.assertEqual(get_world_clock().tick - before, 7)
+            if browser:
+                answer = service.answer_sleep_dream(
+                    self.actor,
+                    decision="enter",
+                    sleep_id=sleep_id,
+                    revision=0,
+                    generation=0,
+                )
+                self.assertEqual(answer["outcome"], "success")
+            else:
+                dream = CmdDream()
+                dream.caller = self.actor
+                dream.args = "enter"
+                dream.session = None
+                dream.func()
+            state = service.dream_state(self.actor)
+            self.assertEqual(state["sleep"]["seconds"], 0)
+            self.assertEqual(state["sleep"]["requested_seconds"], 30)
+            self.assertEqual(get_world_clock().tick, before)
             self.actor.db.dream_surface = None
 
     @covers_requirement(

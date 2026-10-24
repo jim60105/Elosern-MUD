@@ -22,6 +22,7 @@ from web.webclient.actions.exploration_actions import (
     _party_leave_adapter,
     _present_by_id,
     _resolve_exit,
+    _sleep_continue_adapter,
     _talk_freeform_adapter,
     _talk_scripted_adapter,
     _wait_adapter,
@@ -38,7 +39,14 @@ from web.webclient.actions.exploration_actions import (
 )
 from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
-from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
+from world.rules.clock import (
+    CLOCK_YAML,
+    ScheduledEvent,
+    WorldClock,
+    _EVENT_SOURCES,
+    get_world_clock,
+    register_event_source,
+)
 from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
@@ -268,6 +276,18 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
         )
         self.assertEqual(result["outcome"], "success")
+        from server.dream_service import answer_sleep_dream
+        from world.rules.time_skip import owner_sleep_view_state
+
+        view = owner_sleep_view_state(self.player)
+        answer = answer_sleep_dream(
+            self.player,
+            decision="decline",
+            sleep_id=view["sleep_id"],
+            revision=view["revision"],
+            generation=view["generation"],
+        )
+        self.assertEqual(answer["outcome"], "success")
         self.assertEqual(get_world_clock().tick - before, 7200)
         self.assertIs(
             read_fatigue_state(self.player).posture, SleepPosture.AWAKE
@@ -293,7 +313,51 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         before = get_world_clock().tick
         result = _wait_adapter(self.player, payload)
         self.assertEqual(result["outcome"], "success")
+        from server.dream_service import answer_sleep_dream
+        from world.rules.time_skip import owner_sleep_view_state
+
+        view = owner_sleep_view_state(self.player)
+        answer_sleep_dream(
+            self.player,
+            decision="decline",
+            sleep_id=view["sleep_id"],
+            revision=view["revision"],
+            generation=view["generation"],
+        )
         self.assertEqual(get_world_clock().tick - before, 7200)
+
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
+    def test_sleep_continue_stops_at_its_own_interactive_pause(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+        from world.rules.time_skip import enter_sleep, owner_sleep_view_state
+
+        original = _EVENT_SOURCES.get("shop_hours")
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent("synthetic_interactive", end, {}, interactive=True)
+            ],
+            next_boundary=lambda start, end: start + 37,
+        )
+        try:
+            write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+            entry = enter_sleep(self.player, mode="duration", seconds=600)
+            before = int(get_world_clock().tick)
+            result = _sleep_continue_adapter(
+                self.player,
+                {"sleep_id": entry.sleep_id, "revision": 0},
+            )
+            self.assertEqual(result["outcome"], "success")
+            self.assertEqual(int(get_world_clock().tick) - before, 37)
+            view = owner_sleep_view_state(self.player)
+            self.assertEqual(view["continuation"], "paused")
+        finally:
+            if original is not None:
+                _EVENT_SOURCES["shop_hours"] = original
+            else:
+                _EVENT_SOURCES.pop("shop_hours", None)
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_wait_explicit_sleep_never_replaces_an_active_plan(self):

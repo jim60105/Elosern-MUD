@@ -548,6 +548,14 @@ class SleepEntryLifecycleTests(EvenniaTest):
         before = int(get_world_clock().tick)
         with patch.object(self.player, "msg"):
             command.func()
+        # Acceptance is zero-time; the owner question precedes recovery.
+        self.assertEqual(int(get_world_clock().tick), before)
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY
+        )
+        command.args = "continue"
+        with patch.object(self.player, "msg"):
+            command.func()
         self.assertEqual(int(get_world_clock().tick) - before, 7200)
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
         self.assertEqual(read_sleep_receipt(self.player).state, "completed")

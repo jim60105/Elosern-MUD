@@ -497,7 +497,8 @@ count means the checkout is incomplete (`refused` names the affected scene
 keys), and the missing identities answer 404 rather than a substitute image.
 
 For the collaborative dream stage specifically, the indexed image count must
-include `npc/dream_goddess/dream-throne.webp`: run one `sleep dream` and check
+include `npc/dream_goddess/dream-throne.webp`: run `sleep`, answer the owner
+question with `dream enter`, and check
 that the dream panel's `scene_art` state field is the canonical scene
 descriptor whose preferred position (`scene.operator:dream_throne`) carries an
 `/art/official/...` URL. When the artwork was not indexed, that position is

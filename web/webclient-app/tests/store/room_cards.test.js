@@ -116,16 +116,19 @@ describe("the room card slice (exploration-room-actions)", () => {
     open();
     store.openRoomCard("wait");
     store.dispatchAction("explore.look", { room: true });
-    expect(store.activateWaitRow("wait-sleep", { dream: true })).toMatchObject({ sent: false, reason: "locked" });
+    expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: false, reason: "locked" });
     expect(store.view.roomCard).toEqual({ kind: "wait" });
     expect(sender.sent.actions).toHaveLength(1);
   });
 
-  it("the dream flag rides only the sleep row", () => {
+  it("the sleep row submits the recovery payload without a dream flag", () => {
     open();
     store.openRoomCard("wait");
-    expect(store.activateWaitRow("wait-sleep", { dream: true })).toMatchObject({ sent: true });
-    expect(sender.sent.actions[0].payload).toEqual({ sleep: true, dream: true });
+    expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: true });
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.wait",
+      payload: { sleep: true },
+    });
   });
 
   it("suggestion rows submit their builder envelopes, dismiss included", () => {

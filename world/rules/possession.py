@@ -652,6 +652,18 @@ class SleepHandoffOptions:
         return self.reason is None and bool(self.candidates)
 
 
+def handoff_candidate_label(candidate: SleepHandoffCandidate) -> str:
+    """The one player-facing label shared by text and the browser panel."""
+    reserve = (
+        ""
+        if candidate.reserve_percent is None
+        else f"（精神儲備 {candidate.reserve_percent}%）"
+    )
+    if candidate.kind == SLEEP_HANDOFF_RETURN:
+        return f"回到自己的身體{reserve}"
+    return f"接手 {candidate.name}{reserve}"
+
+
 def _sleep_posture_blocks(entity: Any) -> bool:
     """Whether one body's committed posture forbids ordinary actions."""
     from world.rules.fatigue import sleep_blocks_actions
@@ -1285,6 +1297,26 @@ def enter_possession(player: Any, npc: Any) -> None:
     _enter_possession(player, npc)
 
 
+def _bump_released_owner_view(player: Any) -> None:
+    """Open a fresh owner control view when the released owner still sleeps.
+
+    A sleeping receipt is unchanged by release, so the view generation is what
+    makes the newly entered no-possession view ask about a dream even at the
+    same receipt revision.
+    """
+    from world.rules.sleep_receipt import (
+        bump_sleep_view_generation,
+        read_sleep_receipt,
+    )
+
+    try:
+        receipt = read_sleep_receipt(player)
+    except Exception:  # observability: ignore R2: an unreadable receipt opens no new view; release itself stays truthful
+        return
+    if receipt is not None and receipt.sleeping:
+        bump_sleep_view_generation(player)
+
+
 def release_possession(
     player: Any, npc: Any | None = None, reason: str = "handback"
 ) -> None:
@@ -1326,6 +1358,7 @@ def release_possession(
                         pass
                 _strip_puppet_lock(npc, account)
             npc.db.possessed_by = None
+            _bump_released_owner_view(player)
         return
 
     canonical_npc_id = current["npc_dbid"]
@@ -1386,6 +1419,7 @@ def release_possession(
             if hasattr(resolved_npc, "db"):
                 if getattr(resolved_npc.db, "possessed_by", None) == int(player.pk):
                     resolved_npc.db.possessed_by = None
+            _bump_released_owner_view(player)
     except PossessionWriteError:
         restore_party_control(player, resolved_npc, control_before)
         raise

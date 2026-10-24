@@ -16,6 +16,7 @@ beyond the configured maximum.
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
@@ -58,6 +59,13 @@ from world.rules.party_scope import (
 )
 from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.sleep_receipt import (
+    CONTINUATION_COMPLETE,
+    CONTINUATION_NONE,
+    CONTINUATION_PAUSED,
+    CONTINUATION_PENDING,
+    DECISION_DECLINED,
+    DECISION_ENTERED,
+    KIND_FORCED,
     KIND_VOLUNTARY,
     MISSING_RECEIPT_CODE,
     MISSING_RECEIPT_MESSAGE,
@@ -68,10 +76,14 @@ from world.rules.sleep_receipt import (
     STATE_SLEEPING,
     SleepReceipt,
     SleepReceiptError,
+    bump_sleep_view_generation,
     full_recovery_seconds,
     next_sleep_offset,
+    read_sleep_view_decision,
+    read_sleep_view_generation,
     read_party_operation,
     read_sleep_receipt,
+    write_sleep_view_decision,
     write_party_operation,
     write_sleep_receipt,
 )
@@ -125,19 +137,9 @@ PARTY_MEMBER_MISSING_RECEIPT_MESSAGE = "隊伍中有成員的睡眠紀錄缺失�
 
 def render_handoff_offer_message(candidates: Any) -> str:
     """Render the textual handoff choices: fatigue percent and return/possess."""
-    from world.rules.possession import SLEEP_HANDOFF_RETURN
+    from world.rules.possession import handoff_candidate_label
 
-    parts: list[str] = []
-    for candidate in candidates:
-        fatigue = (
-            ""
-            if candidate.reserve_percent is None
-            else f"（精神儲備 {candidate.reserve_percent}%）"
-        )
-        if candidate.kind == SLEEP_HANDOFF_RETURN:
-            parts.append(f"回到自己的身體{fatigue}")
-        else:
-            parts.append(f"接手 {candidate.name}{fatigue}")
+    parts = [handoff_candidate_label(candidate) for candidate in candidates]
     if not parts:
         return HANDOFF_OFFERED_MESSAGE
     return f"{HANDOFF_OFFERED_MESSAGE}可交接：{'、'.join(parts)}。"
@@ -209,6 +211,8 @@ class SkipResult:
     partial: bool = False
     summary: str | None = None
     replayed: bool = False
+    interrupted: bool = False
+    continuation: str = CONTINUATION_NONE
 
 
 @dataclass(frozen=True)
@@ -707,6 +711,8 @@ def enter_sleep(
             )
             write_sleep_receipt(member, receipt)
             project_fatigue_status(member)
+            if _owner_id_for(member) == int(member.pk):
+                bump_sleep_view_generation(member)
     except Exception:
         # The projection requires its caller to own the transaction; restore
         # the durable and cached physiology so a failed write leaves no
@@ -733,11 +739,21 @@ def enter_sleep(
 def _replayed_result(receipt: SleepReceipt, body: Any) -> SkipResult:
     """Reconstruct one durable committed interval result without settlement."""
     stored = receipt.last_result or {}
+    kinds = tuple(str(kind) for kind in stored.get("event_kinds", ()))
+    interactive = bool(stored.get("interactive", False))
     return SkipResult(
         operation_id=str(stored.get("operation_id") or receipt.sleep_id),
         requested_seconds=int(stored.get("requested_seconds", 0)),
         elapsed_seconds=int(stored.get("elapsed_seconds", 0)),
-        events=(),
+        events=tuple(
+            ScheduledEvent(
+                kind,
+                int(stored.get("tick_to", 0)),
+                {},
+                interactive=interactive,
+            )
+            for kind in kinds
+        ),
         voluntary=True,
         woke=bool(stored.get("woke")),
         body_id=getattr(body, "pk", None),
@@ -746,6 +762,7 @@ def _replayed_result(receipt: SleepReceipt, body: Any) -> SkipResult:
         partial=bool(stored.get("partial")),
         summary=stored.get("summary"),
         replayed=True,
+        interrupted=interactive,
     )
 
 
@@ -756,8 +773,9 @@ def continue_sleep(
     operation_id: str | None = None,
     expected_sleep_id: str | None = None,
     expected_revision: int | None = None,
+    continuation: dict[str, Any] | None = None,
 ) -> SkipResult:
-    """Explicitly continue one accepted voluntary sleep up to its first boundary.
+    """Explicitly continue one accepted sleep up to its first boundary.
 
     The durable receipt is the identity: a continuation rechecks safety and the
     selected body, compares the caller's expected sleep/revision when one is
@@ -765,8 +783,17 @@ def continue_sleep(
     clock (which truncates at the earliest relevant boundary), and records the
     interval result on the receipt in the same transaction. A retried identity
     returns the committed result without replaying time, including after a
-    reload. A receipt that has not reached its target stays sleeping with its
-    remaining plan intact.
+    reload and after the receipt's own revision advanced with that same
+    operation. A receipt that has not reached its target stays sleeping with
+    its remaining plan intact.
+
+    ``continuation`` is the owner-target executor's bounded disposition
+    record. When supplied it is committed in the same transaction as the
+    interval receipt, so a crash after an interactive interval cannot leave
+    an authorization that would continue past the interruption.
+
+    A forced sleep is an accepted receipt too: its existing threshold target
+    is continued without inventing a voluntary posture or a new plan.
     """
     recorded = _recorded(operation_id)
     if recorded is not None:
@@ -801,16 +828,22 @@ def continue_sleep(
             if (
                 expected_sleep_id is not None
                 and receipt.sleep_id != expected_sleep_id
-            ) or (
-                expected_revision is not None
-                and receipt.revision != expected_revision
             ):
                 raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
             if receipt.last_operation_id == interval_operation:
                 return _replayed_result(receipt, member)
+            if (
+                expected_revision is not None
+                and receipt.revision != expected_revision
+            ):
+                raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
             if not receipt.sleeping:
                 raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
-            if state.posture is not SleepPosture.VOLUNTARY:
+            if state.posture not in (SleepPosture.VOLUNTARY, SleepPosture.FORCED):
+                raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
+            if receipt.kind == KIND_VOLUNTARY and state.posture is not SleepPosture.VOLUNTARY:
+                raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
+            if receipt.kind == KIND_FORCED and state.posture is not SleepPosture.FORCED:
                 raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
             remaining = next_sleep_offset(member, receipt, int(clock.tick))
             assert remaining is not None
@@ -838,9 +871,30 @@ def continue_sleep(
                 ),
                 "partial": bool(updated.partial if updated is not None else receipt.partial),
                 "summary": summary,
+                "interactive": any(event.interactive for event in events),
+                "event_kinds": [str(event.kind) for event in events],
             }
             if updated is not None:
                 write_sleep_receipt(member, updated.with_result(result_payload))
+            if continuation is not None:
+                disposition = dict(continuation)
+                disposition["continuation"] = (
+                    CONTINUATION_COMPLETE
+                    if not (updated is not None and updated.sleeping)
+                    else CONTINUATION_PAUSED
+                    if result_payload["interactive"]
+                    else CONTINUATION_PENDING
+                )
+                disposition["last_operation_id"] = interval_operation
+                disposition["elapsed_seconds"] = (
+                    int(disposition.get("elapsed_seconds", 0))
+                    + int(elapsed)
+                )
+                disposition["interrupted"] = bool(
+                    result_payload["interactive"]
+                )
+                disposition["summary"] = summary
+                write_sleep_view_decision(member, disposition)
     except Exception:
         _restore_clock_tick(clock, tick_snapshot)
         _restore_advance_registry(registry, entities)
@@ -866,9 +920,571 @@ def continue_sleep(
                 else ""
             )
         ),
+        interrupted=any(event.interactive for event in events),
     )
     _record(result)
     return result
+
+
+def _operable_if_awake(member: Any) -> bool:
+    """Whether one present body could act if it were awake.
+
+    Dead, knocked-out and buff/modifier-incapable bodies cannot substitute for
+    an awake controller, so they neither require sleep nor block the all-asleep
+    owner continuation.
+    """
+    from world.rules.action.gates import capability_failure
+    from world.rules.buffs import blocks_action
+    from world.rules.party_scope import is_knocked_out
+
+    if is_knocked_out(member):
+        return False
+    try:
+        hp = float(getattr(member.traits.hp, "current", member.traits.hp.value))
+    except Exception:  # observability: ignore R2: an unreadable gauge is not an operable body; this display read writes nothing
+        return False
+    if hp <= 0:
+        return False
+    attributes = getattr(member, "attributes", None)
+    blocked = bool(
+        attributes is not None
+        and attributes.has("buffs")
+        and blocks_action(member)
+    )
+    return capability_failure(member, blocked, asleep=False) is None
+
+
+def all_operable_asleep(actor: Any) -> bool:
+    """Whether every operable present party body is currently asleep."""
+    try:
+        members = present_party_scope(actor)
+    except PartyScopeError:  # observability: ignore R2: a non-player body has no party scope and therefore no automatic continuation
+        return False
+    operable = 0
+    for member in members:
+        if getattr(member, "_is_deleted", False):
+            continue
+        if not _operable_if_awake(member):
+            continue
+        operable += 1
+        if not sleep_blocks_actions(member):
+            return False
+    return operable > 0
+
+
+def _owner_sleep_receipt(actor: Any) -> tuple[Any, SleepReceipt]:
+    """Resolve the authenticated owner and its accepted sleeping receipt."""
+    commander = resolve_commander(actor)
+    if commander is not actor:
+        raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+    receipt = _receipt_for(commander)
+    if receipt is None:
+        raise SleepRefused(MISSING_RECEIPT_CODE, MISSING_RECEIPT_MESSAGE)
+    if not receipt.sleeping:
+        raise SleepRefused("not_sleeping", NOT_SLEEPING_MESSAGE)
+    return commander, receipt
+
+
+def owner_sleep_view_state(actor: Any) -> dict[str, Any] | None:
+    """The current no-possession owner-sleep decision state, or ``None``.
+
+    Reads only committed state: the owner body, its accepted sleeping receipt,
+    the control-view generation and the durable answer. It never writes.
+    """
+    from world.rules.possession import current_possession
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a non-player body has no owner-sleep view
+        return None
+    if commander is not actor or current_possession(commander) is not None:
+        return None
+    if getattr(getattr(commander, "db", None), "possessed_by", None) is not None:
+        return None
+    try:
+        receipt = _receipt_for(commander)
+    except SleepRefused:  # observability: ignore R2: a corrupt receipt is reported by the authoritative continuation, not the pure view
+        return None
+    if receipt is None or not receipt.sleeping:
+        return None
+    generation = read_sleep_view_generation(commander)
+    decision = read_sleep_view_decision(commander)
+    answered = bool(
+        decision is not None
+        and decision["generation"] == generation
+        and decision["sleep_id"] == receipt.sleep_id
+    )
+    return {
+        "owner": commander,
+        "sleep_id": receipt.sleep_id,
+        "revision": receipt.revision,
+        "generation": generation,
+        "decision": decision,
+        "pending": not answered,
+        "continuation": (
+            decision["continuation"] if answered else CONTINUATION_NONE
+        ),
+        "receipt": receipt,
+    }
+
+
+def record_owner_sleep_decision(
+    actor: Any,
+    *,
+    sleep_id: str,
+    revision: int,
+    generation: int,
+    decision: str,
+    continuation: str = CONTINUATION_NONE,
+) -> dict[str, Any]:
+    """Record one explicit owner dream answer against the offered view.
+
+    Every identity is rechecked under the owner row lock: the authenticated
+    owner body, no active possession, the accepted sleeping receipt and its
+    revision, and the control-view generation the player actually answered.
+    A stale answer writes nothing.
+    """
+    from world.rules.possession import current_possession
+
+    if decision not in (DECISION_ENTERED, DECISION_DECLINED):
+        raise SleepRefused("invalid_decision", STALE_SLEEP_MESSAGE)
+    commander, receipt = _owner_sleep_receipt(actor)
+    if current_possession(commander) is not None:
+        raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+    with transaction.atomic():
+        _lock_members((commander,))
+        if current_possession(commander) is not None:
+            raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+        receipt = _receipt_for(commander)
+        if (
+            receipt is None
+            or not receipt.sleeping
+            or receipt.sleep_id != sleep_id
+            or receipt.revision != int(revision)
+            or read_sleep_view_generation(commander) != int(generation)
+        ):
+            raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
+        value = {
+            "generation": int(generation),
+            "sleep_id": receipt.sleep_id,
+            "decision": decision,
+            "continuation": continuation,
+            "last_operation_id": None,
+        }
+        write_sleep_view_decision(commander, value)
+    return value
+
+
+def decline_owner_sleep_dream(
+    actor: Any,
+    *,
+    sleep_id: str,
+    revision: int,
+    generation: int,
+) -> tuple[dict[str, Any], bool]:
+    """Record a decline and its automatic-continuation authorization atomically.
+
+    The all-asleep precondition is evaluated while the owner row and the
+    present party rows are locked, so an awake operable companion observed here
+    is the same fact the continuation authorization commits. Returns the
+    durable decision and whether the caller must run the rules continuation.
+    """
+    from world.rules.possession import current_possession
+
+    commander, receipt = _owner_sleep_receipt(actor)
+    if current_possession(commander) is not None:
+        raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+    with transaction.atomic():
+        members = present_party_scope(commander)
+        _lock_members((commander, *members))
+        if current_possession(commander) is not None:
+            raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+        receipt = _receipt_for(commander)
+        if (
+            receipt is None
+            or not receipt.sleeping
+            or receipt.sleep_id != sleep_id
+            or receipt.revision != int(revision)
+            or read_sleep_view_generation(commander) != int(generation)
+        ):
+            raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
+        auto = all_operable_asleep(commander)
+        value = {
+            "generation": int(generation),
+            "sleep_id": receipt.sleep_id,
+            "decision": DECISION_DECLINED,
+            "continuation": (
+                CONTINUATION_PENDING if auto else CONTINUATION_NONE
+            ),
+            "last_operation_id": None,
+        }
+        write_sleep_view_decision(commander, value)
+    return value, auto
+
+
+def authorize_owner_sleep_continuation(
+    actor: Any,
+    *,
+    sleep_id: str,
+    revision: int,
+    generation: int,
+) -> dict[str, Any] | None:
+    """Commit same-receipt departure intent without advancing time.
+
+    Called inside the narrative owner's transaction so a confirmed/awakened
+    dream and its continuation authorization commit together. A draft save,
+    failed generation and rejected confirmation never call this.
+    """
+    from world.rules.possession import current_possession
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a non-player body cannot authorize an owner continuation
+        return None
+    if commander is not actor or current_possession(commander) is not None:
+        return None
+    with transaction.atomic():
+        _lock_members((commander,))
+        receipt = _receipt_for(commander)
+        if (
+            receipt is None
+            or not receipt.sleeping
+            or receipt.sleep_id != sleep_id
+            or receipt.revision != int(revision)
+            or read_sleep_view_generation(commander) != int(generation)
+        ):
+            return None
+        current = read_sleep_view_decision(commander)
+        value = {
+            "generation": int(generation),
+            "sleep_id": receipt.sleep_id,
+            "decision": (
+                current["decision"]
+                if current is not None
+                and current["generation"] == int(generation)
+                else DECISION_ENTERED
+            ),
+            "continuation": CONTINUATION_PENDING,
+            "last_operation_id": None,
+        }
+        write_sleep_view_decision(commander, value)
+    return value
+
+
+def _party_progress_signature(commander: Any) -> tuple[tuple[int, str | None, int | None], ...]:
+    """One pure snapshot of present bodies' posture/receipt progress."""
+    signature: list[tuple[int, str | None, int | None]] = []
+    for member in present_party_scope(commander):
+        try:
+            state = read_optional_fatigue_state(member)
+        except Exception:  # observability: ignore R2: malformed physiology only weakens the progress comparison; no state is written
+            state = None
+        try:
+            receipt = read_sleep_receipt(member)
+        except SleepReceiptError:  # observability: ignore R2: a corrupt receipt is a no-progress marker; the interval owner reports it
+            receipt = None
+        signature.append(
+            (
+                int(member.pk),
+                state.posture.value if state is not None else None,
+                receipt.revision if receipt is not None else None,
+            )
+        )
+    return tuple(signature)
+
+
+_CONTINUATION_INTERVAL_BOUND = 64
+
+
+def continue_owner_sleep(
+    actor: Any,
+    *,
+    sleep_id: str | None = None,
+    expected_revision: int | None = None,
+    expected_generation: int | None = None,
+    operation_id: str | None = None,
+) -> SkipResult:
+    """Continue the owner's accepted sleep past intermediate companion wakes.
+
+    The owner's receipt target is the terminal goal; each iteration delegates
+    one boundary-sized interval to :func:`continue_sleep`, so a companion
+    waking earlier commits that boundary and the next iteration keeps the
+    owner's retained authorization. A real registered interactive event, the
+    safety gate, a control change or a corrupt/stale receipt pauses the
+    continuation with its remaining target intact. A retried interval replays
+    from its receipt identity instead of settling again.
+    """
+    from world.rules.possession import current_possession
+
+    recorded = _recorded(operation_id)
+    if recorded is not None:
+        return recorded
+    commander = resolve_commander(actor)
+    if commander is not actor:
+        raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+    durable = read_sleep_view_decision(commander)
+    if (
+        operation_id is not None
+        and durable is not None
+        and durable.get("owner_operation_id") == operation_id
+        and durable["continuation"] in (
+            CONTINUATION_COMPLETE,
+            CONTINUATION_PAUSED,
+        )
+    ):
+        replayed = _owner_result_from_decision(commander, durable)
+        _record(replayed)
+        return replayed
+    commander, receipt = _owner_sleep_receipt(actor)
+    if sleep_id is not None and receipt.sleep_id != sleep_id:
+        raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
+    if expected_revision is not None and receipt.revision != int(expected_revision):
+        raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
+    generation = read_sleep_view_generation(commander)
+    if expected_generation is not None and generation != int(expected_generation):
+        raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
+    decision = durable
+    base_decision = (
+        decision["decision"]
+        if decision is not None
+        and decision["generation"] == generation
+        and decision["sleep_id"] == receipt.sleep_id
+        else DECISION_DECLINED
+    )
+    base_operation = operation_id or (
+        f"owner:{receipt.sleep_id[:48]}:{generation}:{uuid4().hex[:12]}"
+    )
+    resume_same_operation = bool(
+        operation_id is not None
+        and decision is not None
+        and decision.get("owner_operation_id") == operation_id
+        and decision["continuation"] == CONTINUATION_PENDING
+    )
+    start_index = (
+        int(decision["interval_index"]) + 1 if resume_same_operation else 0
+    )
+    total_elapsed = (
+        int(decision["elapsed_seconds"]) if resume_same_operation else 0
+    )
+    all_events: list[ScheduledEvent] = []
+    summaries: list[str] = (
+        [decision["summary"]] if resume_same_operation and decision["summary"] else []
+    )
+    continuation = CONTINUATION_PENDING
+    interrupted = (
+        bool(decision["interrupted"]) if resume_same_operation else False
+    )
+    pause_message: str | None = None
+    last_index = start_index - 1
+    for index in range(start_index, _CONTINUATION_INTERVAL_BOUND):
+        last_index = index
+        if current_possession(commander) is not None:
+            continuation = CONTINUATION_PAUSED
+            pause_message = "控制權已改變，保留剩餘睡眠。"
+            break
+        receipt = _receipt_for(commander)
+        if receipt is None or not receipt.sleeping:
+            continuation = CONTINUATION_COMPLETE
+            break
+        if read_sleep_view_generation(commander) != generation:
+            continuation = CONTINUATION_PAUSED
+            pause_message = STALE_SLEEP_MESSAGE
+            break
+        before = _party_progress_signature(commander)
+        interval_operation = f"{base_operation}:{index}"
+        try:
+            interval = continue_sleep(
+                commander,
+                operation_id=interval_operation,
+                expected_sleep_id=receipt.sleep_id,
+                expected_revision=receipt.revision,
+                continuation={
+                    "generation": generation,
+                    "sleep_id": receipt.sleep_id,
+                    "decision": base_decision,
+                    "owner_operation_id": base_operation,
+                    "interval_index": index,
+                    "elapsed_seconds": total_elapsed,
+                },
+            )
+        except SkipRefused as error:  # observability: ignore R2: the stable safety refusal IS the continuation pause result
+            continuation = CONTINUATION_PAUSED
+            pause_message = rejection_message(error.reason)
+            break
+        except SleepRefused as error:  # observability: ignore R2: the stable sleep refusal IS the continuation pause result
+            continuation = CONTINUATION_PAUSED
+            pause_message = error.message
+            break
+        total_elapsed += interval.elapsed_seconds
+        all_events.extend(interval.events)
+        if interval.summary:
+            summaries.append(interval.summary)
+        if interval.interrupted:
+            continuation = CONTINUATION_PAUSED
+            interrupted = True
+            break
+        after_receipt = _receipt_for(commander)
+        if after_receipt is None or not after_receipt.sleeping:
+            continuation = CONTINUATION_COMPLETE
+            break
+        if interval.elapsed_seconds <= 0 and (
+            _party_progress_signature(commander) == before
+        ):
+            # A zero-offset boundary that changed nothing cannot make progress;
+            # retain the plan instead of looping forever.
+            continuation = CONTINUATION_PAUSED
+            break
+    else:
+        # The safety bound is a progress guard, never a completion claim.
+        continuation = CONTINUATION_PAUSED
+        pause_message = "睡眠仍在進行；可再次使用 sleep continue。"
+
+    if pause_message:
+        summaries.append(pause_message)
+    summary = " ".join(part for part in summaries if part)
+    _mark_owner_continuation(
+        commander,
+        generation=generation,
+        sleep_id=receipt.sleep_id,
+        decision=base_decision,
+        continuation=continuation,
+        last_operation_id=(
+            f"{base_operation}:{last_index}"
+            if last_index >= 0
+            else f"{base_operation}:last"
+        ),
+        owner_operation_id=base_operation,
+        interval_index=max(last_index, 0),
+        elapsed_seconds=total_elapsed,
+        interrupted=interrupted,
+        summary=summary,
+    )
+    result = SkipResult(
+        operation_id=base_operation,
+        requested_seconds=int(receipt.accepted_seconds),
+        elapsed_seconds=total_elapsed,
+        events=tuple(all_events),
+        voluntary=receipt.kind == KIND_VOLUNTARY,
+        woke=continuation == CONTINUATION_COMPLETE,
+        body_id=int(commander.pk),
+        sleep_id=receipt.sleep_id,
+        completed=continuation == CONTINUATION_COMPLETE,
+        partial=bool(receipt.partial),
+        summary=summary or None,
+        interrupted=interrupted,
+        continuation=continuation,
+    )
+    _record(result)
+    return result
+
+
+def _owner_result_from_decision(
+    commander: Any, decision: Mapping[str, Any]
+) -> SkipResult:
+    """Reconstruct one durably completed/paused owner operation."""
+    continuation = str(decision["continuation"])
+    return SkipResult(
+        operation_id=str(decision["owner_operation_id"]),
+        requested_seconds=0,
+        elapsed_seconds=int(decision["elapsed_seconds"]),
+        events=(),
+        voluntary=True,
+        woke=continuation == CONTINUATION_COMPLETE,
+        body_id=int(commander.pk),
+        sleep_id=decision["sleep_id"],
+        completed=continuation == CONTINUATION_COMPLETE,
+        partial=False,
+        summary=decision["summary"] or None,
+        replayed=True,
+        interrupted=bool(decision["interrupted"]),
+        continuation=continuation,
+    )
+
+
+def _mark_owner_continuation(
+    commander: Any,
+    *,
+    generation: int,
+    sleep_id: str,
+    decision: str,
+    continuation: str,
+    last_operation_id: str,
+    owner_operation_id: str | None = None,
+    interval_index: int = 0,
+    elapsed_seconds: int = 0,
+    interrupted: bool = False,
+    summary: str = "",
+) -> None:
+    """Persist the executor's final disposition under the owner row lock."""
+    with transaction.atomic():
+        _lock_members((commander,))
+        write_sleep_view_decision(
+            commander,
+            {
+                "generation": int(generation),
+                "sleep_id": sleep_id,
+                "decision": decision,
+                "continuation": continuation,
+                "last_operation_id": last_operation_id,
+                "owner_operation_id": owner_operation_id,
+                "interval_index": int(interval_index),
+                "elapsed_seconds": int(elapsed_seconds),
+                "interrupted": bool(interrupted),
+                "summary": summary,
+            },
+        )
+
+
+def resume_pending_owner_continuation(actor: Any) -> SkipResult | None:
+    """Resume one durable pending owner continuation after reconnect/login.
+
+    A paused or completed intent is never auto-resumed; a pending one runs
+    once and advances only the receipt's uncommitted target.
+    """
+    from world.rules.possession import current_possession
+
+    try:
+        decision = read_sleep_view_decision(actor)
+    except Exception:  # observability: ignore R2: an unreadable intent resumes nothing
+        return None
+    if decision is None or decision["continuation"] != CONTINUATION_PENDING:
+        return None
+    if current_possession(actor) is not None:
+        return None
+    if read_sleep_view_generation(actor) != decision["generation"]:
+        return None
+    try:
+        receipt = read_sleep_receipt(actor)
+    except SleepReceiptError:  # observability: ignore R2: a corrupt receipt cannot resume; the stored intent stays visible for the authoritative retry
+        return None
+    if receipt is None or not receipt.sleeping:
+        _mark_owner_continuation(
+            actor,
+            generation=decision["generation"],
+            sleep_id=decision["sleep_id"],
+            decision=decision["decision"],
+            continuation=CONTINUATION_COMPLETE,
+            last_operation_id=decision["last_operation_id"] or "resume:complete",
+        )
+        return None
+    try:
+        return continue_owner_sleep(
+            actor,
+            sleep_id=decision["sleep_id"],
+            expected_generation=decision["generation"],
+            operation_id=decision["owner_operation_id"],
+        )
+    except (SkipRefused, SleepRefused) as error:
+        log_warn(
+            "owner_sleep_continuation_paused",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "sleep_id": decision["sleep_id"],
+                "reason": getattr(error, "reason", None)
+                or getattr(error, "code", "refused"),
+            },
+        )
+        return None
 
 
 def begin_sleep(
@@ -927,6 +1543,10 @@ def begin_sleep(
         return SleepOutcome(
             entry, None, render_handoff_offer_message(entry.handoff_candidates)
         )
+    if _owner_id_for(entry.member) == int(entry.member.pk):
+        # The owner's accepted sleep must first offer its owner-only dream
+        # decision; no recovery interval may commit before that answer.
+        return SleepOutcome(entry, None, None)
     return SleepOutcome(entry, continue_sleep(actor, entry))
 
 
@@ -1096,6 +1716,7 @@ def enter_party_sleep(
                 write_sleep_receipt(member, receipt)
                 project_fatigue_status(member)
             write_party_operation(commander, operation, body_ids)
+            bump_sleep_view_generation(commander)
     except Exception:
         for member, member_snapshots in (snapshots or {}).values():
             _restore_sleep_surfaces(member, member_snapshots)
@@ -1154,17 +1775,24 @@ __all__ = [
     "SleepRefused",
     "advance_wait",
     "accepted_wait_handoff_offer",
+    "all_operable_asleep",
+    "authorize_owner_sleep_continuation",
     "begin_sleep",
     "book_member_practice",
     "continue_sleep",
+    "continue_owner_sleep",
+    "decline_owner_sleep_dream",
     "enter_party_sleep",
     "enter_sleep",
+    "owner_sleep_view_state",
     "parse_duration",
     "preflight_practice_booking",
     "read_sleep_receipt",
+    "record_owner_sleep_decision",
     "rejection_message",
     "render_handoff_offer_message",
     "render_skip_summary",
+    "resume_pending_owner_continuation",
     "seconds_to_full_regen",
     "seconds_to_natural_wake",
     "unsafe_rejection",

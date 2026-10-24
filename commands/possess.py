@@ -27,8 +27,8 @@ from world.rules.possession import (
     current_possession,
     enter_possession,
     release_possession,
-    sleep_handoff_candidates,
 )
+from world.rules.time_skip import SleepRefused
 
 _MISSING_TARGET = "你想附身誰？請指定一個同伴（possess <npc>）。"
 _AMBIGUOUS_TARGET = "這裡有好幾個目標，請說得更明確一些。"
@@ -37,6 +37,7 @@ _HANDOFF_USAGE = "用法：handoff、handoff <編號>、handoff cancel"
 _HANDOFF_CANCELLED = "你取消了交接，控制權沒有改變。"
 _HANDOFF_NO_RECOVERY = "目前沒有可以接手的清醒同伴。可先等待恢復：sleep。"
 _HANDOFF_STALE = "交接選項已經失效，以下是最新的選項。"
+_ALL_PARTY_TOKENS = ("party", "全員", "全員一起睡眠")
 
 
 class CmdPossess(Command):
@@ -117,17 +118,11 @@ class CmdUnpossess(Command):
                 self.caller.msg("歸位操作失敗，請稍後再試。")
             return
         self.caller.msg(UNPOSSESS_RELEASED_MESSAGE)
+        from server.dream_service import pending_sleep_question
 
-
-def _handoff_candidate_line(index: int, candidate) -> str:
-    fatigue = (
-        ""
-        if candidate.reserve_percent is None
-        else f"（精神儲備 {candidate.reserve_percent}%）"
-    )
-    if candidate.kind == SLEEP_HANDOFF_RETURN:
-        return f"{index}. 回到自己的身體{fatigue}"
-    return f"{index}. 接手 {candidate.name}{fatigue}"
+        question = pending_sleep_question(player)
+        if question is not None:
+            self.caller.msg(question)
 
 
 class CmdHandoff(Command):
@@ -146,43 +141,52 @@ class CmdHandoff(Command):
         if store is not None:
             store.sleep_handoff_listing = None
 
-    def _render(self, options) -> str:
-        lines = [_handoff_candidate_line(index, candidate) for index, candidate in enumerate(options.candidates, 1)]
-        lines.append(_HANDOFF_USAGE)
-        return "\n".join(lines)
-
-    def _show(self, options) -> None:
+    def _show(self, view) -> None:
         store = self._listing_store()
         if store is not None:
             store.sleep_handoff_listing = (
-                options.transition_id,
-                tuple(candidate.dbid for candidate in options.candidates),
+                view.transition_id,
+                tuple((row.identity, row.enabled) for row in view.rows),
             )
-        self.caller.msg(self._render(options))
+        from world.rules.sleep_control import render_sleep_control_text
+
+        self.caller.msg(render_sleep_control_text(view))
 
     def func(self) -> None:
         from world.rules.party_scope import PartyScopeError, resolve_commander
+        from world.rules.sleep_control import (
+            begin_all_party_sleep,
+            build_sleep_control_view,
+        )
 
         choice = self.args.strip()
         try:
-            commander = resolve_commander(self.caller)
+            resolve_commander(self.caller)
         except PartyScopeError:
             self.caller.msg(POSSESSION_REJECTION_MESSAGES[REASON_SESSION_MISMATCH])
             return
-        account = _resolve_account(commander, self.caller)
-        options = sleep_handoff_candidates(
-            account, commander, self.caller, session=getattr(self, "session", None)
+        session = getattr(self, "session", None)
+        view = build_sleep_control_view(
+            self.caller, session=session
         )
         if choice in ("cancel", "取消"):
             self._clear_listing()
             self.caller.msg(_HANDOFF_CANCELLED)
             return
-        if not options.candidates:
-            message = POSSESSION_REJECTION_MESSAGES.get(options.reason, _HANDOFF_NO_RECOVERY)
-            self.caller.msg(f"{message}\n{_HANDOFF_NO_RECOVERY}")
+        if view is None:
+            self.caller.msg(_HANDOFF_NO_RECOVERY)
             return
         if not choice:
-            self._show(options)
+            self._show(view)
+            return
+        if choice in _ALL_PARTY_TOKENS:
+            try:
+                begin_all_party_sleep(self.caller, session=session)
+            except (PossessionGateError, PossessionWriteError, SleepRefused) as error:
+                self.caller.msg(getattr(error, "message", None) or _HANDOFF_NO_RECOVERY)
+                return
+            self._clear_listing()
+            self.caller.msg("在場成員已進入睡眠。")
             return
 
         store = self._listing_store()
@@ -190,21 +194,25 @@ class CmdHandoff(Command):
         if (
             not isinstance(listing, tuple)
             or len(listing) != 2
-            or listing[0] != options.transition_id
+            or listing[0] != view.transition_id
             or not choice.isdigit()
             or not 1 <= int(choice) <= len(listing[1])
         ):
             self.caller.msg(_HANDOFF_STALE)
-            self._show(options)
+            self._show(view)
             return
-        candidate_id = listing[1][int(choice) - 1]
-        candidate = next(
-            (item for item in options.candidates if item.dbid == candidate_id), None
-        )
-        if candidate is None:
+        listed_id, listed_enabled = listing[1][int(choice) - 1]
+        candidate_id = listed_id
+        row = next((item for item in view.rows if item.identity == candidate_id), None)
+        if row is None or (listed_enabled and not row.enabled):
             self.caller.msg(_HANDOFF_STALE)
-            self._show(options)
+            self._show(view)
             return
+        if not row.enabled:
+            self.caller.msg(f"這個選項目前無法使用：{row.reason}")
+            return
+        commander = resolve_commander(self.caller)
+        account = _resolve_account(commander, self.caller)
         try:
             confirm_sleep_handoff(
                 account,
@@ -212,15 +220,13 @@ class CmdHandoff(Command):
                 self.caller,
                 candidate_id,
                 transition_id=listing[0],
-                session=getattr(self, "session", None),
+                session=session,
             )
         except PossessionGateError as error:
             message = POSSESSION_REJECTION_MESSAGES.get(error.reason, _HANDOFF_STALE)
-            current = sleep_handoff_candidates(
-                account, commander, self.caller, session=getattr(self, "session", None)
-            )
             self.caller.msg(message)
-            if current.candidates:
+            current = build_sleep_control_view(self.caller, session=session)
+            if current is not None and current.rows:
                 self._show(current)
             else:
                 self.caller.msg(_HANDOFF_NO_RECOVERY)
@@ -229,7 +235,7 @@ class CmdHandoff(Command):
             self.caller.msg("交接操作失敗，請稍後再試。")
             return
         self._clear_listing()
-        if candidate.kind == SLEEP_HANDOFF_RETURN:
+        if row.kind == SLEEP_HANDOFF_RETURN:
             self.caller.msg(UNPOSSESS_RELEASED_MESSAGE)
         else:
-            self.caller.msg(f"你接手了{candidate.name}的身體。")
+            self.caller.msg(f"你接手了{row.name}的身體。")

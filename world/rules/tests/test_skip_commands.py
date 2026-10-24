@@ -178,18 +178,19 @@ class SleepCommandGrammarTests(unittest.TestCase):
         "recovery-modes"
     )
     def test_all_party_recovery_routes_the_party_scope(self):
-        caller, op = self._run(
-            "all until-recovered",
-            SleepOutcome(None, None, "在場成員已進入睡眠。"),
-        )
+        command, caller = self._command("all until-recovered")
+        with patch("commands.skip._safe_to_skip", return_value=True), patch(
+            "world.rules.sleep_control.begin_all_party_sleep",
+            return_value=SleepOutcome(None, None, "在場成員已進入睡眠。"),
+        ) as op:
+            command.func()
         op.assert_called_once_with(
             caller,
             mode="recovery",
             seconds=None,
-            scope="party",
-            allow_continue=False,
+            session=None,
         )
-        caller.msg.assert_called_once_with("在場成員已進入睡眠。")
+        self.assertIn("在場成員已進入睡眠", caller.msg.call_args.args[0])
 
     def test_continue_routes_the_shared_continuation(self):
         command, caller = self._command("continue")
@@ -227,20 +228,15 @@ class SleepCommandGrammarTests(unittest.TestCase):
             "你仍在自願睡眠中；若要繼續，請使用 sleep continue。"
         )
 
-    def test_legacy_dream_form_still_routes_ordinary_sleep(self):
+    def test_legacy_dream_form_is_a_usage_refusal(self):
         command, caller = self._command("dream")
         with patch("commands.skip._safe_to_skip", return_value=True), patch(
             "commands.skip.begin_sleep",
             return_value=SleepOutcome(None, None, "已接受睡眠。"),
         ) as op:
             command.func()
-        op.assert_called_once_with(
-            caller,
-            mode="recovery",
-            seconds=None,
-            scope="self",
-            allow_continue=True,
-        )
+        op.assert_not_called()
+        self.assertIn("用法", caller.msg.call_args.args[0])
 
 
 def _booking_caller(

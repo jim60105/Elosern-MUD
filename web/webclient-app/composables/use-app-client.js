@@ -17,6 +17,7 @@ import { useDock } from "./use-dock.js";
 import { useExitCompass } from "./use-exit-compass.js";
 import { usePersonFocus } from "./use-person-focus.js";
 import { useRoomActions } from "./use-room-actions.js";
+import { useSleepHandoff } from "./use-sleep-handoff.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
@@ -78,6 +79,13 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       compassRef,
       onPlaceHover: compass.onPlaceHover,
       onPillHover: compass.onPillHover,
+    }),
+    // The server-owned contextual sleep-control surface
+    // (align-sleep-handoff-and-owner-dream).
+    ...useSleepHandoff(store, {
+      dispatchIntent,
+      skipDisabled: restWait.skipDisabled,
+      compassRef,
     }),
   };
 }

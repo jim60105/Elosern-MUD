@@ -1,9 +1,8 @@
 // The room actions' wiring (exploration-room-actions design D1/D3/D4/D5/D6):
 // the place card's 查看房間 and 等待, the 建議 pill, the wait and suggestions
-// cards through ChoiceCard, the wait card's 進入夢境協作？ question and its
-// rest form, focus return to the opener, the readout feed of the buttons and
-// the pill, and the exploration screen's Tab chain (compass → rail →
-// 查看房間 → 等待 → 建議).
+// cards through ChoiceCard, the wait card's sleep and rest forms, focus return
+// to the opener, the readout feed of the buttons and the pill, and the
+// exploration screen's Tab chain (compass → rail → 查看房間 → 等待 → 建議).
 //
 // The open card is the store's client-local slice (`store.view.roomCard`, a
 // sibling of the presence card), so a commit can close it atomically and the
@@ -22,8 +21,6 @@ export const WAIT_LOCKED_REASON = "上一個行動尚未完成，請稍候。";
 export const SUGGESTIONS_GENERATING_NOTE = "AI 正在構思建議…";
 export const SUGGESTIONS_DEGRADED_NOTE = "AI 建議目前不可用";
 export const SUGGESTIONS_EMPTY_NOTE = "現在沒有什麼值得做的動作";
-export const DREAM_QUESTION = "進入夢境協作？";
-
 const DISMISS_ACTION = "options.dismiss";
 
 function digitBadge(index) {
@@ -142,7 +139,7 @@ export function useRoomActions(
   { panelAvailable, dispatchIntent, skipDisabled, compassRef, onPlaceHover, onPillHover },
 ) {
   const roomCardRef = ref(null);
-  // The view-local sub-view over the wait card: null | "dream" | "rest".
+  // The view-local sub-view over the wait card: null | "sleep" | "rest".
   const waitStep = ref(null);
   // Which control opened the open card: "wait" | "pill" | null.
   const opener = ref(null);
@@ -190,7 +187,7 @@ export function useRoomActions(
   const roomCardCaption = computed(() => (roomCard.value?.kind === "wait" ? "等待" : roomCard.value ? "建議" : null));
   const roomCardLabel = computed(() => (roomCard.value?.kind === "wait" ? "等待與休息" : "建議"));
   const roomCardShown = computed(() => roomCardOpen.value && waitStep.value === null);
-  const dreamOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "dream");
+  const sleepOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "sleep");
   const restOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "rest");
 
   // --- activation -----------------------------------------------------------
@@ -217,7 +214,7 @@ export function useRoomActions(
     }
     if (roomCard.value.kind === "wait") {
       if (key === "wait-sleep") {
-        waitStep.value = "dream";
+        waitStep.value = "sleep";
       } else if (key === "wait-rest") {
         waitStep.value = "rest";
       } else {
@@ -250,14 +247,31 @@ export function useRoomActions(
     card.focus();
   }
 
-  function onDreamAnswer(dream) {
+  function onSleepRecover() {
     if (skipDisabled.value) {
       return;
     }
-    store.activateWaitRow("wait-sleep", dream ? { dream: true } : {});
+    if (dispatchIntent("explore.wait", { sleep: true }) !== null) {
+      store.closeRoomCard();
+    }
   }
 
-  function onDreamClose() {
+  function onSleepSubmit(seconds) {
+    if (skipDisabled.value) {
+      return;
+    }
+    if (
+      dispatchIntent("explore.wait", {
+        sleep: true,
+        sleep_mode: "duration",
+        seconds,
+      }) !== null
+    ) {
+      store.closeRoomCard();
+    }
+  }
+
+  function onSleepClose() {
     void returnToWaitCard("wait-sleep");
   }
 
@@ -416,7 +430,7 @@ export function useRoomActions(
     roomCardTrailing,
     roomCardCaption,
     roomCardLabel,
-    dreamOpen,
+    sleepOpen,
     restOpen,
     placeActions,
     explorationRootLive,
@@ -428,8 +442,9 @@ export function useRoomActions(
     onPill,
     onRoomCardPick,
     onRoomCardBack,
-    onDreamAnswer,
-    onDreamClose,
+    onSleepRecover,
+    onSleepSubmit,
+    onSleepClose,
     onRestSubmit,
     onRestClose,
     onPlaceHover: onPlaceHoverContent,

@@ -53,16 +53,37 @@ class DreamArtworkWireTest(EvenniaTest):
         self.registry = build_production_registry()
 
     def entered(self, actor):
-        """One real accepted positive-elapsed voluntary sleep session."""
-        from server import dream_service as service
+        """One real accepted sleeping receipt associated to its owner."""
+        from world.rules.sleep_receipt import (
+            KIND_VOLUNTARY,
+            MODE_DURATION,
+            STATE_SLEEPING,
+            SleepReceipt,
+            write_sleep_receipt,
+        )
 
-        return service.enter_after_sleep(
+        sleep_id = "synthetic-artwork-sleep"
+        write_sleep_receipt(
             actor,
-            tick_from=100,
-            tick_to=700,
-            requested_seconds=600,
-            elapsed_seconds=600,
-            voluntary=True,
+            SleepReceipt(
+                sleep_id=sleep_id,
+                body_id=int(actor.pk),
+                owner_id=int(actor.pk),
+                kind=KIND_VOLUNTARY,
+                mode=MODE_DURATION,
+                entry_tick=100,
+                target_tick=700,
+                limit_tick=700,
+                settled_through_tick=700,
+                revision=0,
+                state=STATE_SLEEPING,
+                accepted_seconds=600,
+                partial=False,
+                entry_operation_id=sleep_id,
+            ),
+        )
+        return surface.enter_for_owner(
+            actor, sleep_id=sleep_id, revision=0, generation=0
         )
 
     def context(self, actor=_UNSET):

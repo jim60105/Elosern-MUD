@@ -1811,14 +1811,13 @@ class PresenceRailEvidenceTest(unittest.TestCase):
 
 
 class RoomActionsEvidenceTest(unittest.TestCase):
-    """exploration-room-actions: the wait card, the dream question, and the
-    suggestions card are the AppClient's room-actions composition contract;
-    the Vitest files are their executed evidence (the browser journeys cover
-    the live client's geometry and the retired surfaces)."""
+    """exploration-room-actions: the wait card and the suggestions card are the
+    AppClient's room-actions composition contract; the Vitest files are their
+    executed evidence (the browser journeys cover the live client's geometry
+    and the retired surfaces)."""
 
     @covers_requirement(
         "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
-        "webclient-room-actions::sleeping-asks-whether-to-enter-dream-collaboration-first",
     )
     def test_room_actions_wait_card_vitest_evidence_passes(self):
         result = subprocess.run(

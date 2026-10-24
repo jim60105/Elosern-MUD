@@ -23,7 +23,6 @@ from world.narrative.authoring import (
 )
 from world.observability import log_info, log_warn
 
-enter_after_sleep = surface.enter_after_sleep
 dream_state = surface.dream_state
 
 
@@ -35,8 +34,13 @@ def _controlled(actor, session):
             and any(candidate is session for candidate in evennia.SESSION_HANDLER.get_sessions(include_unloggedin=True)))
 
 
-def _result(outcome, code, message):
-    return {"outcome": outcome, "code": code, "message": message, "affected_panels": ("dream",)}
+def _result(outcome, code, message, *, panels=("dream",)):
+    return {
+        "outcome": outcome,
+        "code": code,
+        "message": message,
+        "affected_panels": panels,
+    }
 
 
 def _direction_refusal(error: AuthoringError) -> str:
@@ -55,11 +59,219 @@ def _refresh(actor, session):
         refresh_after_command(session, actor)
 
 
+def _sleep_view_panels():
+    return ("dream", "sleep_handoff", "status")
+
+
+def _sleep_result(outcome, code, message, *, continuation=None, panels=None):
+    result = {
+        "outcome": outcome,
+        "code": code,
+        "message": message,
+        "affected_panels": (
+            _sleep_view_panels() if panels is None else panels
+        ),
+    }
+    if continuation is not None:
+        result["data"] = {"continuation": str(continuation)}
+    return result
+
+
+def _continue_owner_after_commit(actor, sleep_id, generation):
+    """Run the rules continuation after the narrative transaction commits.
+
+    The durable pending intent was written in that same transaction, so a
+    crash before this callback leaves a resumable authorization instead of a
+    stranded sleep.
+    """
+    from world.rules.time_skip import continue_owner_sleep
+
+    try:
+        return continue_owner_sleep(
+            actor, sleep_id=sleep_id, expected_generation=generation
+        )
+    except Exception as error:  # observability: ignore R2: the committed narrative closure stays truthful; the durable pending intent resumes the rules continuation
+        log_warn(
+            "owner_sleep_continuation_deferred",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "sleep_id": sleep_id,
+            },
+            exc=error,
+        )
+        return None
+
+
+def authorize_departure_continuation(actor) -> None:
+    """Commit same-receipt intent for an explicit confirm/awaken departure.
+
+    Called inside the narrative transaction. Draft preservation, failed
+    generation and rejected confirmation never call it.
+    """
+    from world.rules.sleep_receipt import read_sleep_view_generation
+    from world.rules.time_skip import authorize_owner_sleep_continuation
+
+    value = surface.association(actor)
+    if value is None or "sleep_id" not in value:
+        return
+    owner = surface.owner_character(actor)
+    if owner is None:
+        return
+    generation = read_sleep_view_generation(owner)
+    authorized = authorize_owner_sleep_continuation(
+        owner,
+        sleep_id=value["sleep_id"],
+        revision=int(value.get("sleep_revision", 0)),
+        generation=generation,
+    )
+    if authorized is not None:
+        transaction.on_commit(
+            lambda: _continue_owner_after_commit(
+                owner, authorized["sleep_id"], authorized["generation"]
+            )
+        )
+
+
+def pending_sleep_question(actor) -> str | None:
+    """Return the pending owner-sleep dream question, or ``None``."""
+    from world.rules.sleep_control import SLEEP_DREAM_QUESTION
+    from world.rules.time_skip import owner_sleep_view_state
+
+    state = owner_sleep_view_state(actor)
+    if state is None or not state["pending"]:
+        return None
+    return SLEEP_DREAM_QUESTION
+
+
+def answer_sleep_dream(
+    actor,
+    *,
+    decision,
+    sleep_id,
+    revision,
+    generation,
+    session=None,
+):
+    """Answer the authenticated owner's current pre-recovery dream question.
+
+    Text ``dream enter``/``dream decline`` and the browser's separate answer
+    action share this one guarded operation. Enter revalidates owner, control
+    and the accepted receipt; decline records the durable decision and starts
+    the retained owner continuation only when every operable present body is
+    asleep. Neither branch invents elapsed time.
+    """
+    from world.rules.time_skip import (
+        decline_owner_sleep_dream,
+        owner_sleep_view_state,
+    )
+
+    boundary = {
+        "char": getattr(actor, "pk", "?"),
+        "sleep_id": sleep_id,
+        "decision": decision,
+    }
+    if decision == "enter":
+        view = owner_sleep_view_state(actor)
+        if (
+            view is None
+            or view["sleep_id"] != sleep_id
+            or view["revision"] != int(revision)
+            or view["generation"] != int(generation)
+            or (
+                not view["pending"]
+                and view["decision"] is not None
+                and view["decision"]["decision"] == "declined"
+            )
+        ):
+            return _sleep_result(
+                "rejected", "stale_sleep", "這次睡眠已經更新，請重新查看。"
+            )
+        try:
+            state = surface.enter_for_owner(
+                actor,
+                sleep_id=sleep_id,
+                revision=revision,
+                generation=generation,
+                session=session,
+            )
+        except surface.DreamEntryError as error:
+            log_warn(
+                "sleep_dream_answer_rejected",
+                context={**boundary, "reason": error.code},
+            )
+            return _sleep_result("rejected", error.code, error.message)
+        except Exception as error:
+            log_warn(
+                "sleep_dream_answer_rejected",
+                context={**boundary, "reason": "invalid_state"},
+                exc=error,
+            )
+            return _sleep_result(
+                "rejected", "dream_refused", "目前無法進入夢境，請重新查看睡眠狀態。"
+            )
+        if state is None:
+            return _sleep_result(
+                "rejected", "dream_refused", "目前無法進入夢境，請重新查看睡眠狀態。"
+            )
+        return _sleep_result("success", "dream_entered", "你進入了夢境。")
+
+    if decision != "decline":
+        return _sleep_result("rejected", "invalid_decision", "無法執行這個夢境操作。")
+    try:
+        value, auto = decline_owner_sleep_dream(
+            actor,
+            sleep_id=sleep_id,
+            revision=revision,
+            generation=generation,
+        )
+    except Exception as error:
+        log_warn(
+            "sleep_dream_answer_rejected",
+            context={**boundary, "reason": "stale_or_invalid"},
+            exc=error,
+        )
+        return _sleep_result(
+            "rejected", "stale_sleep", "這次睡眠已經更新，請重新查看。"
+        )
+    if auto:
+        result = _continue_owner_after_commit(
+            actor, value["sleep_id"], value["generation"]
+        )
+        continuation = (
+            result.continuation if result is not None else "none"
+        )
+        message = (
+            result.summary
+            if result is not None and result.summary
+            else "已保留這次睡眠。"
+        )
+    else:
+        continuation = "none"
+        message = "已保留這次睡眠；可輸入 sleep continue 繼續。"
+    return _sleep_result(
+        "success",
+        "dream_declined",
+        message,
+        continuation=continuation,
+        panels=() if auto else None,
+    )
+
+
+def resume_owner_sleep_continuation(actor):
+    """Resume one durable pending owner continuation after reconnect."""
+    from world.rules.time_skip import resume_pending_owner_continuation
+
+    return resume_pending_owner_continuation(actor)
+
+
 @defer.inlineCallbacks
 def act(actor, action, *, session_id, revision, message="", direction="", session=None, client=None):
     """Authorize a current surface request, then invoke the shared lifecycle."""
     owner = surface.owner_id(actor)
     boundary = {"char": actor.pk, "session_id": session_id, "action": action}
+    if owner is None:
+        log_warn("dream_surface_rejected", context={**boundary, "reason": "not_owner"})
+        return _result("rejected", "dream_not_owner", "只有甦醒的主人可以進入自己的夢境。")
     try:
         with transaction.atomic():
             current = surface.associated_session(actor)
@@ -144,6 +356,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                     from world.narrative import dispatch_status
 
                     lifecycle.confirm_session(session_id, owner, direction=payload, tick=tick)
+                    authorize_departure_continuation(actor)
                     # Delivered only once the confirmation has committed, so a
                     # rolled-back confirmation never produced a receipt. The
                     # durable work record, not this notice, is the evidence.
@@ -155,11 +368,21 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
                         surface.store_direction(actor, summary)
                     lifecycle.awaken_session(session_id, owner, tick=tick)
+                    authorize_departure_continuation(actor)
                 state = dream_state(actor)
                 text = state["ending"] or "故事方向已存為私人草稿。"
                 actor.msg(text)
                 log_info("dream_surface_action", context={**boundary, "completed": state["completed"], "tick": tick})
-                return _result("success", "dream_" + action, text)
+                return _result(
+                    "success",
+                    "dream_" + action,
+                    text,
+                    panels=(
+                        ()
+                        if action in {"confirm", "awaken"}
+                        else ("dream",)
+                    ),
+                )
     except lifecycle.DreamInputRejected as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": error.code}, exc=error)
         text = "交流文字不可空白。" if error.code == lifecycle.REASON_EMPTY_INPUT else "交流文字上限為 4000 字。"

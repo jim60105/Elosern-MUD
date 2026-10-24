@@ -174,34 +174,46 @@ alongside the elapsed duration, using no LLM call.
 sed: -e 表示式 #1，字元 2: 未預期的「,」
 
 ### Requirement: Interruptible skips stop at the earliest relevant boundary
-Wait, sleep and eligible study SHALL stop at the earliest involved forced-sleep entry, natural wake target or registered interactive event. Only elapsed time SHALL commit; the unperformed remainder SHALL be discarded. Noninteractive fatigue-stage crossings SHALL preserve exact consumption without forcing an early return.
+Ordinary wait, sleep and eligible study SHALL stop at the earliest involved forced-sleep entry, natural wake target or registered interaction; only elapsed time SHALL commit and unperformed request time SHALL be discarded. The explicit owner-targeted automatic sleep continuation SHALL consume successive physiological boundaries under its retained authorization, stopping at the owner's target or a real interaction/safety interruption. Noninteractive stages SHALL preserve exact consumption.
 
 #### Scenario: First wake
-- **WHEN** a forced sleeper at zero is involved in a requested 10000-second safe wait
-- **THEN** exactly 6000 seconds commits, the undefeated sleeper wakes at 72000, control returns and 4000 seconds is discarded
+- **WHEN** a forced sleeper at zero is involved in an ordinary 10000-second safe wait
+- **THEN** exactly 6000 seconds commits, the undefeated sleeper wakes at 72000, control returns and 4000 seconds of that wait is discarded
 
 #### Scenario: First collapse
-- **WHEN** an awake companion has 2400 units during a requested 1200-second wait
-- **THEN** exactly 600 seconds commits, that companion enters forced sleep and the remainder is discarded
+- **WHEN** an awake companion has 2400 units during an ordinary requested 1200-second wait
+- **THEN** exactly 600 seconds commits, the companion enters forced sleep and the remainder of that wait is discarded
 
 #### Scenario: Registered event
-- **WHEN** an actual registered interactive event is due in 37 seconds before any physiological boundary
-- **THEN** exactly 37 seconds commits and the event is published without a random ambush roll
+- **WHEN** a real registered interactive event is due in 37 seconds before the next physiological boundary
+- **THEN** exactly 37 seconds commits and the event publishes without a random ambush roll; automatic continuation pauses too
 
 #### Scenario: No replay
-- **WHEN** a completed interrupted result is retried with the same accepted operation identity
-- **THEN** the committed interval is not replayed; any later advance requires a new explicit action
+- **WHEN** an interrupted result is retried with the same accepted interval identity
+- **THEN** that interval never replays; ordinary wait needs a new action and owner sleep recovery uses only its retained uncommitted target after interaction is resolved
 
-### Requirement: Recovery waiting preserves skip safety
-An authenticated player with no awake candidate SHALL retain non-acting status and explicit outside-combat recovery waiting. Safe recovery SHALL stop at the first eligible wake. Active combat or a present hostile SHALL still block skips; forced-sleep entry itself SHALL grant no skip or safety.
+### Requirement: Owner-targeted sleep continuation preserves skip safety
+If every operable present body sleeps, no companion is possessed and the player declines/closes dream entry, recovery SHALL automatically continue the same owner sleep to its duration deadline or declared recovery target. Earlier companion wake SHALL not stop it. Real interaction or combat/hostile safety SHALL interrupt without unsafe skips. A sleeping owner SHALL retain actionable status/recovery/handoff, without ordinary action authority.
 
 #### Scenario: Unsafe collapse
 - **WHEN** an accepted indivisible action collapses a body in a hostile room
-- **THEN** posture commits with the action but a later recovery wait is refused with existing unsafe reason and zero extra time
+- **THEN** posture commits with that action, automatic recovery adds no unsafe time and existing engagement/defeat policy remains available
 
 #### Scenario: Safe all asleep
-- **WHEN** the party has no awake eligible member in a safe room
-- **THEN** the account can inspect and explicitly wait until the first eligible wake without background time or sleeper actions
+- **WHEN** all operable bodies sleep in safety and the unpossessed player declines or closes the owner dream prompt
+- **THEN** the server continues to the owner's accepted target without wait clicks or a nonacting dead end
+
+#### Scenario: Companion wakes earlier
+- **WHEN** all-asleep continuation targets owner deadline at tick 7200 and a companion wakes at tick 100
+- **THEN** it reconciles companion wake and subsequent awake consumption, then reaches tick 7200 unless a real interaction or safety boundary intervenes
+
+#### Scenario: Interruption recovery
+- **WHEN** an actual interactive event interrupts automatic recovery
+- **THEN** the committed prefix persists, the event and status expose lawful response plus resume of the same remaining sleep after resolution, and no repeated wait clicks are needed merely to cross wake boundaries
+
+#### Scenario: Awake alternatives after decline
+- **WHEN** the owner sleeps without possession but an operable companion is awake when dream entry is declined
+- **THEN** no automatic all-asleep continuation starts; refreshed handoff and explicit same-sleep continuation remain available without forcing possession
 
 ### Requirement: Accepted sleep identity survives control changes
 Each body SHALL retain one accepted sleep identity with its declared mode, target and committed progress until wake or explicit interruption. Continuation SHALL use that identity without replacing its target or replaying elapsed time. Reload, reconnect and control handoff SHALL preserve it without wall-clock advancement.

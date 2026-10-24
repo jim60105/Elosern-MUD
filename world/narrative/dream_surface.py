@@ -24,9 +24,37 @@ OPENING = (
 )
 
 
+class DreamEntryError(RuntimeError):
+    """One owner-bound dream entry was refused before any write."""
+
+    def __init__(self, code, message):
+        super().__init__(code)
+        self.code = code
+        self.message = message
+
+
+def owner_character(actor):
+    """The authenticated owner body, or ``None`` for a non-owner caller.
+
+    A possessed companion is never the dream owner: only the player character
+    itself may open its own accepted sleep's dream. This keeps every session,
+    draft and dispatch record owner-scoped even when the player currently
+    drives an NPC.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.possession import current_possession
+
+    if not isinstance(actor, PlayerCharacter):
+        return None
+    if current_possession(actor) is not None:
+        return None
+    return actor
+
+
 def owner_id(actor):
-    """Use the same persistent character identity on both transports."""
-    return str(actor.pk)
+    """Use the authenticated owner character identity on both transports."""
+    owner = owner_character(actor)
+    return None if owner is None else str(owner.pk)
 
 
 def scene_subject_id(actor):
@@ -52,53 +80,149 @@ def association(actor):
 
 
 def associated_session(actor):
+    owner = owner_character(actor)
+    if owner is None:
+        return None
     value = association(actor)
     if value is None:
+        return None
+    session = lifecycle.get_session(value["session_id"], owner_id(actor))
+    if session is None or session.state != lifecycle.STATE_OPEN:
+        return session
+    from world.rules.sleep_receipt import (
+        read_sleep_receipt,
+        read_sleep_view_generation,
+    )
+
+    if value.get("view_generation") != read_sleep_view_generation(owner):
+        return None
+    try:
+        receipt = read_sleep_receipt(owner)
+    except Exception:  # observability: ignore R2: an unreadable receipt closes the active surface; the authoritative entry reports the fault
+        return None
+    if (
+        receipt is None
+        or not receipt.sleeping
+        or receipt.sleep_id != value.get("sleep_id")
+    ):
+        return None
+    return session
+
+
+def _raw_associated_session(actor):
+    """The recorded session without the current-view freshness check.
+
+    Entry uses this to resume an unconfirmed discussion across a later
+    explicit sleep; every read and action keeps the strict
+    :func:`associated_session` guard so a superseded control view is never
+    presented as current.
+    """
+    value = association(actor)
+    if value is None or owner_id(actor) is None:
         return None
     return lifecycle.get_session(value["session_id"], owner_id(actor))
 
 
-def enter_after_sleep(
+def enter_for_owner(
     actor,
     *,
-    tick_from,
-    tick_to,
-    requested_seconds,
-    elapsed_seconds=None,
-    voluntary=False,
-    events=(),
+    sleep_id,
+    revision,
+    generation,
+    session=None,
 ):
-    """Associate one real positive elapsed voluntary-sleep receipt.
+    """Associate the authenticated owner's accepted sleeping receipt.
 
-    Posture entry, repaired zero-duration recovery, forced sleep and any
-    interrupted non-positive result open no dream and write no association.
-    The caller owns the accepted receipt; this owner never advances time or
-    re-settles sleep.
+    Entry is legal at zero accepted elapsed time and for a forced receipt with
+    explicit opt-in; it never claims completed sleep, restores resources or
+    advances the clock. The accepted receipt is the identity: the caller must
+    name its exact ``sleep_id``/``revision`` and the owner must still be the
+    sleeping, unpossessed body. An NPC companion can never become the owner.
     """
-    elapsed = (
-        int(elapsed_seconds)
-        if elapsed_seconds is not None
-        else int(tick_to) - int(tick_from)
+    from world.rules.possession import current_possession
+    from world.rules.sleep_receipt import (
+        KIND_FORCED,
+        KIND_VOLUNTARY,
+        STATE_SLEEPING,
+        read_sleep_receipt,
+        read_sleep_view_generation,
+        write_sleep_view_decision,
+        DECISION_ENTERED,
+        CONTINUATION_NONE,
     )
-    if not voluntary or elapsed <= 0:
-        return None
+
+    owner = owner_character(actor)
+    if owner is None:
+        raise DreamEntryError(
+            "dream_not_owner", "只有甦醒的主人可以進入自己的夢境。"
+        )
+    if getattr(getattr(owner, "db", None), "possessed_by", None) is not None:
+        raise DreamEntryError(
+            "dream_not_owner", "只有甦醒的主人可以進入自己的夢境。"
+        )
+    if current_possession(owner) is not None:
+        raise DreamEntryError(
+            "dream_possessed", "請先歸位，再進入自己的夢境。"
+        )
+    if session is not None and getattr(session, "puppet", None) is not owner:
+        raise DreamEntryError(
+            "dream_not_owner", "只有甦醒的主人可以進入自己的夢境。"
+        )
+    try:
+        receipt = read_sleep_receipt(owner)
+    except Exception as error:
+        raise DreamEntryError(
+            "dream_stale_sleep", "找不到這次睡眠的紀錄，無法進入夢境。"
+        ) from error
+    if (
+        receipt is None
+        or not receipt.sleeping
+        or receipt.state != STATE_SLEEPING
+        or receipt.sleep_id != sleep_id
+        or receipt.revision != int(revision)
+        or receipt.kind not in (KIND_VOLUNTARY, KIND_FORCED)
+        or (
+            receipt.owner_id is not None
+            and int(receipt.owner_id) != int(owner.pk)
+        )
+    ):
+        raise DreamEntryError(
+            "dream_stale_sleep", "這次睡眠已經更新，請重新查看。"
+        )
+    current_generation = read_sleep_view_generation(owner)
+    if int(current_generation) != int(generation):
+        raise DreamEntryError(
+            "dream_stale_sleep", "這次睡眠已經更新，請重新查看。"
+        )
+    generation = current_generation
+    tick_from = int(receipt.entry_tick)
+    tick_to = int(receipt.settled_through_tick)
+    requested_seconds = int(receipt.accepted_seconds)
+    elapsed = max(0, tick_to - tick_from)
+    event_kinds = ()
+    if receipt.last_result:
+        event_kinds = tuple(receipt.last_result.get("event_kinds", ()))
     with transaction.atomic():
-        previous = associated_session(actor)
+        previous = _raw_associated_session(owner)
         if previous and previous.outcome != lifecycle.OUTCOME_CONFIRMED:
             session = lifecycle.resume_saved_session(previous.session_id, owner_id(actor), tick=int(tick_to))
         else:
             session = lifecycle.open_session_for(owner_id(actor))
         if session is None:
             session = lifecycle.open_session(owner_id(actor), tick=int(tick_to))
-        old = association(actor)
+        old = association(owner)
         retained = old if old and old["session_id"] == session.session_id else {}
-        actor.db.dream_surface = {
+        owner.db.dream_surface = {
             "session_id": session.session_id,
+            "owner_id": int(owner.pk),
+            "sleep_id": receipt.sleep_id,
+            "sleep_revision": int(receipt.revision),
+            "view_generation": int(generation),
             "sleep": {
                 "tick_from": int(tick_from), "tick_to": int(tick_to),
                 "requested_seconds": int(requested_seconds),
                 "seconds": elapsed,
-                "event_kinds": sorted({str(event.kind) for event in events}),
+                "event_kinds": sorted({str(kind) for kind in event_kinds}),
             },
             "scene": retained.get("scene", ""),
             "dialogue": retained.get("dialogue", ""),
@@ -106,14 +230,24 @@ def enter_after_sleep(
             "failure": False,
         }
         if retained:
-            bump_revision_if_unchanged(actor, int(session.revision))
+            bump_revision_if_unchanged(owner, int(session.revision))
+        write_sleep_view_decision(
+            owner,
+            {
+                "generation": int(generation),
+                "sleep_id": receipt.sleep_id,
+                "decision": DECISION_ENTERED,
+                "continuation": CONTINUATION_NONE,
+                "last_operation_id": None,
+            },
+        )
         log_info("dream_sleep_associated", context={
-            "char": actor.pk, "session_id": session.session_id,
+            "char": owner.pk, "session_id": session.session_id,
             "tick_from": int(tick_from), "tick_to": int(tick_to),
             "requested_seconds": int(requested_seconds),
             "completed": int(session.completed_exchanges),
         })
-    return dream_state(actor)
+    return dream_state(owner)
 
 
 def store_direction(actor, message):

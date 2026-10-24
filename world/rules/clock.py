@@ -200,6 +200,11 @@ class ScheduledEvent:
     kind: str
     due_tick: int
     payload: dict[str, Any]
+    #: Whether this event is an interactive registered boundary (the same
+    #: sources that declare ``next_boundary`` for ordinary skips). Maintenance
+    #: stages stay non-interactive, so an owner-target sleep continuation
+    #: consumes across them instead of stopping for housekeeping.
+    interactive: bool = False
 
 
 def _gauge_value(gauge: Any) -> float:
@@ -841,7 +846,16 @@ def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any,
     for kind in _STAGE_ORDER[5:]:
         registration = _EVENT_SOURCES.get(kind)
         if registration is not None:
-            events.extend(registration.settle(start_tick, end_tick))
+            interactive = registration.next_boundary is not None
+            for event in registration.settle(start_tick, end_tick):
+                events.append(
+                    ScheduledEvent(
+                        event.kind,
+                        event.due_tick,
+                        event.payload,
+                        interactive=interactive or event.interactive,
+                    )
+                )
     return events
 
 

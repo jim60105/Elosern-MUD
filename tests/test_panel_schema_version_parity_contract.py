@@ -63,6 +63,7 @@ _PANEL_MODULES = (
     ("combat_beats", "combat_beats.py"),
     ("dream", "dream.py"),
     ("skill_use", "skill_use.py"),
+    ("sleep_handoff", "sleep_handoff.py"),
 )
 
 

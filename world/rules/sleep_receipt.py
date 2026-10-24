@@ -29,11 +29,20 @@ from world.rules.traits import GAUGE_KEYS
 RECEIPT_ATTRIBUTE = "sleep_receipt"
 #: Bounded identity of the latest accepted explicit all-party entry.
 PARTY_OPERATION_ATTRIBUTE = "sleep_party_operation"
+#: The owner's durable answer/continuation state for one control view.
+VIEW_DECISION_ATTRIBUTE = "sleep_view_decision"
+#: Monotonic identity of each qualifying owner control view. It changes on a
+#: new owner sleep entry and on a verified release back onto a sleeping owner,
+#: so a decision cannot survive a new view merely because the receipt
+#: revision did not move.
+VIEW_GENERATION_ATTRIBUTE = "sleep_view_generation"
 
 #: Durable attributes the sleep receipt owner can write.
 SLEEP_RECEIPT_SURFACES: tuple[tuple[str, str | None], ...] = (
     (RECEIPT_ATTRIBUTE, None),
     (PARTY_OPERATION_ATTRIBUTE, None),
+    (VIEW_DECISION_ATTRIBUTE, None),
+    (VIEW_GENERATION_ATTRIBUTE, None),
 )
 
 KIND_VOLUNTARY = "voluntary"
@@ -49,6 +58,21 @@ STATE_SLEEPING = "sleeping"
 STATE_INTERRUPTED = "interrupted"
 STATE_COMPLETED = "completed"
 STATES = (STATE_SLEEPING, STATE_INTERRUPTED, STATE_COMPLETED)
+
+DECISION_ENTERED = "entered"
+DECISION_DECLINED = "declined"
+DECISIONS = (DECISION_ENTERED, DECISION_DECLINED)
+
+CONTINUATION_NONE = "none"
+CONTINUATION_PENDING = "pending"
+CONTINUATION_PAUSED = "paused"
+CONTINUATION_COMPLETE = "complete"
+CONTINUATIONS = (
+    CONTINUATION_NONE,
+    CONTINUATION_PENDING,
+    CONTINUATION_PAUSED,
+    CONTINUATION_COMPLETE,
+)
 
 MISSING_RECEIPT_CODE = "missing_sleep_receipt"
 CORRUPT_RECEIPT_CODE = "corrupt_sleep_receipt"
@@ -76,8 +100,11 @@ _RESULT_FIELDS = (
     "completed",
     "partial",
     "summary",
+    "interactive",
+    "event_kinds",
 )
 _MAX_SUMMARY = 500
+_MAX_EVENT_KINDS = 32
 _MAX_ID = 128
 
 
@@ -191,7 +218,16 @@ def _validate_result(result: Any) -> dict[str, Any]:
         "completed": bool(result["completed"]),
         "partial": bool(result["partial"]),
         "summary": _clamp_text(result["summary"], _MAX_SUMMARY),
+        "interactive": bool(result["interactive"]),
+        "event_kinds": [],
     }
+    kinds = result["event_kinds"]
+    if not isinstance(kinds, Sequence) or isinstance(kinds, (str, bytes)):
+        raise ValueError("sleep result event kinds are not a sequence")
+    for kind in list(kinds)[:_MAX_EVENT_KINDS]:
+        if not isinstance(kind, str):
+            raise ValueError("sleep result event kind is not text")
+        clean["event_kinds"].append(_clamp_text(kind, 64))
     for key in (
         "revision",
         "requested_seconds",
@@ -202,6 +238,167 @@ def _validate_result(result: Any) -> dict[str, Any]:
         if not _is_int(clean[key]) or clean[key] < 0:
             raise ValueError(f"sleep result {key} is not a non-negative integer")
     return clean
+
+
+def read_sleep_view_generation(entity: Any) -> int:
+    """Return the entity's current control-view generation (0 when unset)."""
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return 0
+    value = attributes.get(VIEW_GENERATION_ATTRIBUTE, default=0)
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return 0
+
+
+def bump_sleep_view_generation(entity: Any) -> int:
+    """Advance one owner's control-view identity; never decreases.
+
+    Called inside the owning transaction after a committed owner sleep entry
+    or a verified release onto the sleeping owner. It writes no physiology and
+    advances no time.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return 0
+    generation = read_sleep_view_generation(entity) + 1
+    attributes.add(VIEW_GENERATION_ATTRIBUTE, generation)
+    return generation
+
+
+def read_sleep_view_decision(entity: Any) -> dict[str, Any] | None:
+    """Return the owner's validated control-view decision, or ``None``.
+
+    A malformed stored value is treated as absent: the deterministic surface
+    simply asks again rather than trusting a record it cannot interpret.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return None
+    raw = attributes.get(VIEW_DECISION_ATTRIBUTE, default=None)
+    if not isinstance(raw, Mapping):
+        return None
+    generation = raw.get("generation")
+    sleep_id = raw.get("sleep_id")
+    decision = raw.get("decision")
+    continuation = raw.get("continuation", CONTINUATION_NONE)
+    last_operation_id = raw.get("last_operation_id")
+    owner_operation_id = raw.get("owner_operation_id")
+    interval_index = raw.get("interval_index", 0)
+    elapsed_seconds = raw.get("elapsed_seconds", 0)
+    interrupted = raw.get("interrupted", False)
+    summary = raw.get("summary", "")
+    if (
+        not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or generation < 0
+        or not isinstance(sleep_id, str)
+        or not sleep_id
+        or len(sleep_id) > _MAX_ID
+        or decision not in DECISIONS
+        or continuation not in CONTINUATIONS
+        or (
+            last_operation_id is not None
+            and not isinstance(last_operation_id, str)
+        )
+        or (
+            owner_operation_id is not None
+            and (
+                not isinstance(owner_operation_id, str)
+                or len(owner_operation_id) > _MAX_ID
+            )
+        )
+        or not _is_int(interval_index)
+        or interval_index < 0
+        or not _is_int(elapsed_seconds)
+        or elapsed_seconds < 0
+        or not isinstance(interrupted, bool)
+        or not isinstance(summary, str)
+    ):
+        return None
+    return {
+        "generation": int(generation),
+        "sleep_id": _clamp_text(sleep_id),
+        "decision": str(decision),
+        "continuation": str(continuation),
+        "last_operation_id": (
+            None
+            if last_operation_id is None
+            else _clamp_text(last_operation_id)
+        ),
+        "owner_operation_id": (
+            None
+            if owner_operation_id is None
+            else _clamp_text(owner_operation_id)
+        ),
+        "interval_index": int(interval_index),
+        "elapsed_seconds": int(elapsed_seconds),
+        "interrupted": bool(interrupted),
+        "summary": _clamp_text(summary, _MAX_SUMMARY),
+    }
+
+
+def write_sleep_view_decision(entity: Any, value: Mapping[str, Any]) -> None:
+    """Persist one bounded control-view decision; validates before writing."""
+    generation = value.get("generation")
+    sleep_id = value.get("sleep_id")
+    decision = value.get("decision")
+    continuation = value.get("continuation", CONTINUATION_NONE)
+    last_operation_id = value.get("last_operation_id")
+    owner_operation_id = value.get("owner_operation_id")
+    interval_index = value.get("interval_index", 0)
+    elapsed_seconds = value.get("elapsed_seconds", 0)
+    interrupted = value.get("interrupted", False)
+    summary = value.get("summary", "")
+    if (
+        not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or generation < 0
+    ):
+        raise ValueError("invalid control-view generation")
+    if not isinstance(sleep_id, str) or not sleep_id or len(sleep_id) > _MAX_ID:
+        raise ValueError("invalid control-view sleep identity")
+    if decision not in DECISIONS:
+        raise ValueError("invalid control-view decision")
+    if continuation not in CONTINUATIONS:
+        raise ValueError("invalid control-view continuation")
+    if last_operation_id is not None and not isinstance(last_operation_id, str):
+        raise ValueError("invalid control-view operation identity")
+    if owner_operation_id is not None and (
+        not isinstance(owner_operation_id, str)
+        or len(owner_operation_id) > _MAX_ID
+    ):
+        raise ValueError("invalid owner continuation identity")
+    if not _is_int(interval_index) or interval_index < 0:
+        raise ValueError("invalid owner continuation cursor")
+    if not _is_int(elapsed_seconds) or elapsed_seconds < 0:
+        raise ValueError("invalid owner continuation elapsed time")
+    if not isinstance(interrupted, bool) or not isinstance(summary, str):
+        raise ValueError("invalid owner continuation disposition")
+    attributes = _attributes(entity)
+    attributes.add(
+        VIEW_DECISION_ATTRIBUTE,
+        {
+            "generation": int(generation),
+            "sleep_id": _clamp_text(sleep_id),
+            "decision": str(decision),
+            "continuation": str(continuation),
+            "last_operation_id": (
+                None
+                if last_operation_id is None
+                else _clamp_text(last_operation_id)
+            ),
+            "owner_operation_id": (
+                None
+                if owner_operation_id is None
+                else _clamp_text(owner_operation_id)
+            ),
+            "interval_index": int(interval_index),
+            "elapsed_seconds": int(elapsed_seconds),
+            "interrupted": bool(interrupted),
+            "summary": _clamp_text(summary, _MAX_SUMMARY),
+        },
+    )
 
 
 def validate_receipt(payload: Any) -> SleepReceipt:

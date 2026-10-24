@@ -72,7 +72,10 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("handoff <編號>", output)
         self.assertEqual(
             self.session.ndb.sleep_handoff_listing[1],
-            (int(self.player.pk), int(self.candidate.pk)),
+            (
+                (int(self.player.pk), True),
+                (int(self.candidate.pk), True),
+            ),
         )
 
     @covers_requirement(
@@ -142,7 +145,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdHandoff(), "2", caller=self.sleeper)
         self.assertIn("交接選項已經失效", output)
         self.assertIn("回到自己的身體", output)
-        self.assertNotIn("接手 清醒同伴", output)
+        # The complete roster stays visible; the vanished candidate is listed
+        # with its committed disabled reason instead of being substituted.
+        self.assertIn("接手 清醒同伴（精神儲備 100%）（不在同一地點）", output)
         self.assertEqual(
             current_possession(self.player)["npc_dbid"], int(self.sleeper.pk)
         )

@@ -300,10 +300,13 @@ converted into a formal commitment.
 Sleeping offers an explicit dream-collaboration choice. Ordinary sleep can finish
 without conversation; resting and waiting do not force the encounter.
 
-Preserve existing sleep safety, duration, and restoration rules. Settle sleep
-once before presenting the dream, with no second settlement when leaving.
-Conversation exchanges do not advance world time. A fully restored character
-may still enter the dream after a zero-duration sleep result.
+Preserve existing sleep safety, duration, and restoration rules. Present the
+dream from one accepted owner sleeping receipt while no companion is
+possessed, before recovery completes; a zero-elapsed accepted entry qualifies.
+Conversation exchanges and draft saves do not advance world time. Only an
+explicit confirm/awaken departure hands the same receipt to the outer rules
+continuation, which settles the uncommitted remainder once. A fully recovered
+target reconciles awake and has no dream offer.
 Rejected sleep does not open a dream session. If sleep is interrupted, use its
 actual committed outcome and the existing safety rules rather than pretending
 the requested interval completed.

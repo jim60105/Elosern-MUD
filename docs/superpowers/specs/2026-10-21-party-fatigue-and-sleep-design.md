@@ -36,6 +36,8 @@ The following earlier brainstorming proposals were expressly superseded and must
 
 `world/rules/clock.py` settles world time and restores transactional surfaces. `world/rules/movement_settlement.py` owns movement compensation. `world/rules/time_skip.py`, `commands/skip.py`, and the exploration wait adapter currently route sleep/wait through `AdvanceSource.SKIP`. Existing sleep duration comes from the slowest HP/MP/SP time-to-full and can be zero for full gauges. None of those facts identifies which individual member is actually asleep.
 
+The durable per-body sleep receipt (applied by `fix-body-sleep-lifecycle`) is the identity of an accepted sleep episode, not positive elapsed time. Optional dream collaboration is offered from accepted owner sleep plus the released/no-companion-possession view; forced sleep requires explicit opt-in. This supersedes the earlier positive-elapsed and recovery-before-dream ordering.
+
 The existing party-time contract settles co-located companions with the commander during relevant advances, including when controlling a possessed companion. It does not imply that co-located members share an activity or all sleep together.
 
 `world/rules/possession.py` currently refuses entry during combat and maintains one mirrored possession with verified session transfer. `world/rules/combat_session/` permits commander-selected companion commands without changing possession, excludes action-forbidden allies from required commands, and advances accumulated combat time once at terminal settlement. Sleep must remain distinct from the persisted knockout/defeat sets.
@@ -145,7 +147,7 @@ Preserve the existing safe-skip gate. Waiting cannot bypass an active combat ses
 
 Existing current lack of active monsters remains unchanged. Do not add a random ambush roll to make waiting appear useful.
 
-When a wait wakes a companion or changes the controlled body's capability, stop and return control before automatically consuming further time. Fatigue-stage changes that do not require interaction can update within the same requested interval; they are not an excuse to drop fractional consumption.
+Ordinary waits and sleep stop at the earliest relevant boundary and discard their unperformed remainder. The one explicit exception is the retained owner-target sleep continuation after an owner dream decline or explicit departure: once every operable present body is asleep and no companion is possessed, it consumes successive physiological boundaries until the owner's own duration deadline or recovery target. An earlier companion wake neither interrupts nor steals control; that companion's subsequent time uses the awake consumption/practice rules. A real registered interactive event, combat/hostile safety refusal, or changed control intent pauses the continuation with the committed prefix and remaining target intact. Interruptible waits and study still stop at the first boundary and never inherit this exception.
 
 Every applicable deterministic party advance reconciles each living in-scope sleeper's own accepted target, including an unselected owner. Reaching a voluntary target wakes that body and completes its receipt once in the owning transaction and emits one post-commit notification; it changes no possession, commander, combat draft or binding. Reserve saturation alone never completes a voluntary duration, and a body whose receipt is missing or corrupt is not silently refilled, woken or migrated.
 
@@ -171,13 +173,13 @@ A forced-sleeping body naturally targets the minimum 20-percent wake threshold. 
 
 Sleep entry and elapsed sleep are separate boundaries. Commit the selected body's sleeping posture without advancing time, then, when an awake eligible body exists, offer the handoff choice before advancing the requested sleep interval. The player may transfer and perform awake activities while that body remains asleep, or explicitly continue the existing sleep-to-recovery operation. Without an awake candidate, use the non-acting recovery surface in section 9.3. Closing the choice advances no time and does not falsely report a completed sleep.
 
-This ordering preserves the path of putting a possessed companion to sleep and returning to the awake owner. It does not add a party sleep planner. Dream collaboration can be offered only after a real accepted elapsed sleep result, never merely from committing sleep entry.
+This ordering preserves the path of putting a possessed companion to sleep and returning to the awake owner. It does not add a party sleep planner. Dream collaboration is offered while the authenticated owner still sleeps and no companion is possessed, before recovery completes; an accepted zero-elapsed positive-target sleep qualifies without claiming completed sleep. Any sleep type requires explicit opt-in, and forced sleep never auto-enters. The narrative owner may write its own dream session but cannot wake bodies, replace sleep targets or tick the clock.
 
 ### 9.2 Current body falls asleep
 
-After a successful committed transition makes the currently controlled body unable to act through sleep, offer control transfer to an awake, living, action-capable, co-located eligible party member. If controlling a companion while the owner is awake, returning to that owner is also a valid choice. Another companion can be selected through a full verified transfer rather than creating nested possession.
+After a successful committed transition makes the currently controlled body unable to act through sleep, publish the complete contextual selection automatically: every effective companion in roster order with current reserve, exact stage and one stable disabled reason (remote, asleep, possession, dialogue, or action-incapable), plus a lawful owner return and the final `全員一起睡眠` option. If controlling a companion while the owner is awake, returning to that owner is a valid choice. Another companion can be selected through a full verified transfer rather than creating nested possession.
 
-The prompt lists actual candidates with their current fatigue state and whether the operation returns to the owner or possesses a companion. Do not automatically possess the first candidate. Selecting or inspecting candidates costs no game time. Revalidate membership, presence, sleep, living/action state, and session identity when confirming; a stale candidate is rejected without changing control.
+The prompt lists every companion with its current fatigue state and whether the operation returns to the owner or possesses a companion. Do not automatically possess the first candidate. Selecting or inspecting candidates costs no game time. Revalidate membership, presence, sleep, living/action state, and session identity when confirming; a stale candidate is rejected without changing control. The final `全員一起睡眠` choice runs the explicit atomic party entry and, when a sleeping companion is controlled, a verified release as one outer compensated operation; no time passes.
 
 This is a contextual handoff prompt, not a new general unrestricted combat-possession feature. When the controlled body becomes unavailable, the deterministic core retains the authenticated account's authority to inspect status and choose a valid handoff or wait. It does not authorize that sleeping body to cast, move, or use an item.
 
@@ -185,11 +187,11 @@ Existing single-possession mirrors, account scope, puppet locks, cmdsets and rol
 
 An unselected member falling asleep produces a status notification without stealing the current selection or opening a mandatory transfer prompt. A sleeping body waking does not automatically pull control away from the companion the player selected.
 
-### 9.3 No awake candidate outside combat
+### 9.3 Owner-target sleep continuation and interruptions
 
-Retain a non-acting waiting/status surface for the authenticated player. Offer explicit waiting for recovery; no realtime background advance occurs. A safe advance stops when the first eligible member wakes, then offers the ordinary handoff choice. If a hostile is already present, do not bypass the skip-safety gate; resolve the valid engagement path, including immediate all-forced-sleep defeat.
+When every operable present body sleeps, no companion is possessed and the player declines or closes the owner dream question, recovery automatically continues the same owner sleep to its duration deadline or declared recovery target. Earlier companion wakes do not stop it. Real interactive events and combat/hostile safety pause it without unsafe skips, preserving the committed prefix and remaining plan; one resume action later continues the same target. A sleeping owner retains actionable status, lawful handoff and recovery controls, but no ordinary action authority.
 
-This is outside-combat waiting. There is no all-sleeping combat observation mode.
+If an operable awake companion exists when the question is declined, no automatic all-asleep continuation starts; refreshed handoff and explicit same-sleep `sleep continue` remain available without forcing possession. This is outside-combat waiting, and there is no all-sleeping combat observation mode.
 
 ### 9.4 Stationary party
 
@@ -278,7 +280,7 @@ A malformed reserve or posture fails before action writes. An unavailable or sta
 
 Use the existing status/debuff surface for fatigue stages and forced sleep. Show the member identity and reserve percentage using display rounding that does not change exact thresholds. Convey inability to act with text as well as existing severity styling.
 
-The handoff prompt is shown only when the current body becomes unable to act through sleep. It offers eligible awake candidates, a return-to-owner choice when lawful, and waiting/status when there is no candidate or the player declines. Cancel costs no time and never grants a sleeping body normal actions. Keyboard focus and stale-response handling must follow the existing modal/selection conventions; no independent visual redesign is in scope.
+The contextual selection opens automatically when the current body becomes unable to act through sleep. It shows every effective companion in roster order with reserve and one availability reason, a return-to-owner choice when lawful, and the final `全員一起睡眠` option; a sleeping owner without possession exposes the owner-only dream question in the same decision area after the companion list is dismissed. Cancel costs no time and never grants a sleeping body normal actions. Keyboard focus, stale-response handling and the single focus owner must follow the existing modal/selection conventions; no independent visual redesign is in scope.
 
 Keep sleeping members visible in combat with an explicit sleeping/action-unavailable label. Do not hide them, assign a command, or show a defeated appearance solely from fatigue. Existing HP/defeat presentation remains separate.
 
@@ -297,9 +299,9 @@ Required scenarios include:
 5. Full HP/MP/SP with incomplete mental reserve still gives a nonzero voluntary sleep requirement; forced sleep stops at the minimum wake boundary without claiming full recovery.
 6. A sleeping member's practice booking is preserved and earns nothing for sleeping time; a different awake studying member can settle its own booking.
 7. Every party exit family refuses with zero time, location, resource, reserve and knowledge changes while any present effective member is voluntarily or forcibly sleeping, including while controlling an awake companion and when a movement-cost waiver applies.
-8. A current-body sleep transition offers only valid co-located awake candidates, preserves owner identity, and revalidates a stale selection. Inject a transfer failure and prove the verified binding/session/cmdsets restore.
+8. A current-body sleep transition opens the complete roster with one reason per unavailable companion and the exact final `全員一起睡眠` option, preserves owner identity, and revalidates a stale selection. Inject a transfer or release failure and prove the verified binding/session/cmdsets/location and every sleep surface restore.
 9. An unselected companion sleeping does not steal control; a body waking does not automatically repuppet the owner.
-10. Waiting stops at the first relevant forced-sleep/wake/registered-event boundary and commits no requested remainder. Existing unsafe-wait rejection remains effective.
+10. Ordinary waiting stops at the first relevant forced-sleep/wake/registered-event boundary and commits no requested remainder. The owner-target continuation crosses an earlier companion wake to the owner target, stops at a real registered interactive event or safety refusal, and resumes the same remaining plan once.
 11. Sleeping allies are present, targetable, observed as unable to act by monster AI, and absent from required commands. Sleeping alone does not populate knockout IDs or end the session.
 12. A nonterminal combat round changes neither mental reserve nor the world clock. Ten completed rounds settle 60 seconds once at terminal outcome; a retry/reconnect cannot settle again.
 13. A near-threshold sleeper remains asleep throughout live rounds. An undefeated sleeper reaching the threshold wakes during terminal settlement. Sleep recovery never revives an already defeated entity.
@@ -307,7 +309,7 @@ Required scenarios include:
 15. The existing combat round cap and unrelated HP/MP/SP settlement remain unchanged. No per-round fatigue or extended spectator loop survives from the rejected proposal.
 16. A fault after reserve/debuff or later terminal writes restores clock, every touched member, activity/session metadata and cached state together.
 17. An indivisible field action with a nearly depleted actor completes its accepted effects, full costs and full elapsed time once, then enters forced sleep. Repeat with only an unselected companion nearly depleted and prove the caster's completed action is not truncated.
-18. Putting a possessed companion to sleep commits entry without elapsed time and offers return to an awake owner before recovery; later owner actions recover the sleeping companion without marking the owner asleep.
+18. Putting a possessed companion to sleep commits entry without elapsed time and opens the complete contextual roster before recovery; later owner actions recover the sleeping companion without marking the owner asleep, and an early release onto a still-sleeping owner asks the owner-only dream question even when another companion is awake.
 19. An awake combatant at 0.1 percent stays unchanged during live rounds, then reaches zero and forced sleep after ten rounds settle once, with no retrospective sleeping recovery or pre-commit handoff.
 
 Implementation smoke evidence must exercise real wait/sleep commands and a real party battle/control boundary, including reload. Verify the actual browser handoff/status surface and a text path without a live LLM. The current documentation work does not claim those runtime changes are implemented.

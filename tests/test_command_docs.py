@@ -83,16 +83,16 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
     "修煉": {"syntax": "修煉 <技能> [= <成員>]", "context": "一般（戰鬥中拒絕）"},
     "sleep": {
-        "syntax": "sleep [<時長>|until-recovered]、sleep all [<時長>|until-recovered]、sleep continue、sleep dream",
+        "syntax": "sleep [<時長>|until-recovered]、sleep all [<時長>|until-recovered]、sleep continue",
         "context": "一般",
     },
     "handoff": {
-        "syntax": "handoff、handoff <編號>、handoff cancel",
+        "syntax": "handoff、handoff <編號>、handoff party、handoff cancel",
         "context": "一般（需控制的身體正在沉睡）",
     },
     "dream": {
-        "syntax": "dream、dream say <文字>、dream draft [故事方向]、dream confirm [故事方向]、dream awaken",
-        "context": "一般（需先以 sleep dream 進入；查看狀態隨時可用）",
+        "syntax": "dream、dream enter、dream decline、dream say <文字>、dream draft [故事方向]、dream confirm [故事方向]、dream awaken",
+        "context": "一般（夢境問題需主人未附身且仍在睡眠；查看狀態隨時可用）",
     },
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},

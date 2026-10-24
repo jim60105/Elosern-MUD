@@ -29,7 +29,9 @@ from world.rules.time_skip import (
     advance_wait,
     begin_sleep,
     book_member_practice,
+    continue_owner_sleep,
     continue_sleep,
+    owner_sleep_view_state,
     parse_duration,
     preflight_practice_booking,
     rejection_message,
@@ -53,7 +55,12 @@ def _safe_to_skip(caller) -> bool:
 def _with_handoff_offer(caller, message: str) -> str:
     """Append the post-commit sleep handoff offer, when one now exists."""
     offer = accepted_wait_handoff_offer(caller)
-    return message if offer is None else f"{message}\n{offer}"
+    if offer is not None:
+        message = f"{message}\n{offer}"
+    from server.dream_service import pending_sleep_question
+
+    question = pending_sleep_question(caller)
+    return message if question is None else f"{message}\n{question}"
 
 
 # ``rest <duration> [practice <skill>]``: a duration token plus an optional
@@ -63,7 +70,7 @@ _REST_ARGS_RE = re.compile(
 )
 
 _REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
-_NO_DREAM_MESSAGE = "身體已完全恢復，沒有進入夢境。"
+_SLEEP_ACCEPTED_MESSAGE = "你進入睡眠。"
 _SLEEP_USAGE = (
     "用法：sleep [<時長>|until-recovered]、"
     "sleep all [<時長>|until-recovered]、sleep continue"
@@ -170,7 +177,36 @@ class CmdSleep(Command):
                 self.caller.msg(_SLEEP_USAGE)
                 return
             try:
-                result = continue_sleep(self.caller)
+                owner_state = owner_sleep_view_state(self.caller)
+                if owner_state is not None:
+                    if owner_state["pending"]:
+                        from server.dream_service import answer_sleep_dream
+
+                        answer = answer_sleep_dream(
+                            self.caller,
+                            decision="decline",
+                            sleep_id=owner_state["sleep_id"],
+                            revision=owner_state["revision"],
+                            generation=owner_state["generation"],
+                        )
+                        if answer["outcome"] != "success":
+                            self.caller.msg(answer["message"])
+                            return
+                        status = (answer.get("data") or {}).get("continuation")
+                        if status in ("complete", "paused", "pending"):
+                            self.caller.msg(answer["message"])
+                            return
+                        current = owner_sleep_view_state(self.caller)
+                        if current is None:
+                            self.caller.msg(answer["message"])
+                            return
+                    result = continue_owner_sleep(
+                        self.caller,
+                        sleep_id=owner_state["sleep_id"],
+                        expected_generation=owner_state["generation"],
+                    )
+                else:
+                    result = continue_sleep(self.caller)
             except SkipRefused as error:
                 self.caller.msg(rejection_message(error.reason))
                 return
@@ -190,9 +226,6 @@ class CmdSleep(Command):
                 self.caller, notices_from_events(result.events), announce=False
             )
             return
-        legacy_dream = tokens == ["dream"] and scope == "self"
-        if legacy_dream:
-            tokens = []
         request = self._request(tokens)
         if request is None:
             self.caller.msg(_SLEEP_USAGE)
@@ -201,6 +234,23 @@ class CmdSleep(Command):
             return
         mode, seconds, explicit = request
         try:
+            if scope == "party":
+                from world.rules.sleep_control import begin_all_party_sleep
+
+                outcome = begin_all_party_sleep(
+                    self.caller,
+                    mode=mode,
+                    seconds=seconds,
+                    session=getattr(self, "session", None),
+                )
+                self.caller.msg(
+                    _with_handoff_offer(
+                        self.caller,
+                        getattr(outcome, "message", None)
+                        or _SLEEP_ACCEPTED_MESSAGE,
+                    )
+                )
+                return
             outcome = begin_sleep(
                 self.caller,
                 mode=mode,
@@ -215,10 +265,14 @@ class CmdSleep(Command):
             self.caller.msg(error.message)
             return
         if outcome.message is not None:
-            self.caller.msg(outcome.message)
+            self.caller.msg(_with_handoff_offer(self.caller, outcome.message))
             return
         result = outcome.result
-        assert result is not None
+        if result is None:
+            self.caller.msg(
+                _with_handoff_offer(self.caller, _SLEEP_ACCEPTED_MESSAGE)
+            )
+            return
         self.caller.msg(
             _with_handoff_offer(
                 self.caller,
@@ -231,23 +285,6 @@ class CmdSleep(Command):
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
-        if legacy_dream:
-            from commands.dream import render_state
-            from server.dream_service import enter_after_sleep
-
-            if not result.voluntary or result.elapsed_seconds <= 0:
-                self.caller.msg(_NO_DREAM_MESSAGE)
-                return
-            state = enter_after_sleep(
-                self.caller,
-                tick_from=int(get_world_clock().tick) - result.elapsed_seconds,
-                tick_to=int(get_world_clock().tick),
-                requested_seconds=result.requested_seconds,
-                elapsed_seconds=result.elapsed_seconds,
-                voluntary=result.voluntary,
-                events=result.events,
-            )
-            self.caller.msg(render_state(state))
 
 class CmdWaitUntil(Command):
     key = "wait"

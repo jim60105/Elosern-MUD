@@ -722,7 +722,7 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 - **THEN** the completion publishes the safe stable reason and does not create a session or advance time
 
 ### Requirement: explore.wait obeys the shared skip safety and clock API
-`explore.wait` SHALL accept daypart wait, duration wait or sleep. Sleep SHALL use `sleep: true`, `sleep_scope: self|party` and `sleep_mode: recovery|duration`; scope/mode SHALL default to self/recovery. Only duration sleep SHALL add bounded positive integer `seconds`. Unknown, contradictory or extra fields SHALL reject before writes. All modes SHALL use shared text rules, current safety and actual receipts; dream behavior SHALL follow its owning capability.
+`explore.wait` SHALL accept daypart wait, duration wait or `sleep: true` with `sleep_scope: self|party` and `sleep_mode: recovery|duration` (default self/recovery); only duration sleep SHALL add bounded positive integer `seconds`. Contradictory or extra fields SHALL reject before writes. Shared rules and current safety SHALL govern entry and receipts. Entry SHALL publish contextual handoff; the owner-only dream decision is asked separately before recovery.
 
 #### Scenario: Wait until dawn advances to the next occurrence
 - **WHEN** a safe actor submits `explore.wait` with `daypart: "dawn"`
@@ -758,11 +758,19 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 
 #### Scenario: Sleep payload grammar
 - **WHEN** requests separately submit `{sleep: true}`, `{sleep: true, sleep_scope: "party", sleep_mode: "recovery"}` or `{sleep: true, sleep_scope: "self", sleep_mode: "duration", seconds: 7200}`
-- **THEN** they respectively select self recovery, party recovery and self duration with deadline entry tick plus 7200; absent scope/mode default self/recovery
+- **THEN** they respectively select self recovery, party recovery and self duration with deadline entry tick plus 7200; sleep scope defaults self and mode defaults recovery
 
 #### Scenario: Contradictory fields reject
 - **WHEN** a payload combines daypart with sleep/seconds, puts seconds on recovery sleep, omits seconds for duration sleep, carries sleep scope/mode on ordinary wait, uses `sleep: false`, unknown scope/mode, boolean seconds or an extra key
 - **THEN** it rejects as malformed with no operation or state write
+
+#### Scenario: Accepted zero-time owner sleep
+- **WHEN** the owner accepts positive-target sleep at zero elapsed time with no companion possession, even while a companion is awake
+- **THEN** the authoritative view offers owner dream entry before recovery; a separate stale/wrong-owner/possessed answer rejects without a dream or interval write
+
+#### Scenario: Combined sleep and dream is removed
+- **WHEN** an initial sleep payload includes a dream flag
+- **THEN** it rejects as malformed; the accepted-view answer operation is the sole dream entry surface
 
 ### Requirement: Portrait focus stays client-local against the art catalog seam
 Exploration look/interact descriptors SHALL carry null or an unchanged bounded ASCII-decimal portrait_ref. Every non-null reference SHALL name an admitted canonical entry regardless of real-image availability. Existing visibility, capacity, age eligibility and no client-built URL/key rules SHALL remain; admitted missing/pending/failed/alpha-only subjects SHALL retain their reference.
@@ -865,39 +873,47 @@ The exploration menu's wilderness move rows SHALL use the canonical destination 
 - **THEN** each row's destination is the canonical arrival node, including the gateway south row that returns to the grid
 
 ### Requirement: The waiting surface offers exactly three operations
-The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, which submits `explore.wait` with the exact `sleep` flag, and offers handoff after zero-time posture entry, with optional dream collaboration only after an actual accepted elapsed sleep result; and 等待 N 小時, opening the bounded custom-duration form instead of dispatching.
+The place-card wait surface SHALL retain dawn wait, sleep and custom-duration wait. Sleep SHALL offer recovery or explicit-duration mode using existing bounded input conventions, dispatch once, then show server-accepted contextual handoff and owner-only optional dream decisions before recovery. No client-side dream-before-sleep question or dream/initial-sleep combined dispatch SHALL remain. In-flight/revision locks SHALL apply throughout.
 
 #### Scenario: The waiting frame renders the three operations
-- **WHEN** the player activates 等待 on the place card in exploration mode
-- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, and 等待 N 小時 followed by `✕ 返回`, with no separate dream row and no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
+- **WHEN** the player opens the wait card
+- **THEN** dawn wait, sleep and custom-duration wait remain with back navigation, no separate dream row and existing active-row treatment
 
 #### Scenario: The hours form dispatches whole seconds exactly once
-- **WHEN** the player enters `1.5` hours in the 等待 form and confirms
-- **THEN** exactly one `ui_action` is submitted — `explore.wait` with `seconds: 5400` — the form closes, and no resulting world time is displayed before the server snapshot arrives
+- **WHEN** the player confirms 1.5 hours of ordinary waiting
+- **THEN** exactly one `explore.wait` submits `seconds: 5400`, the form closes and no resulting time is fabricated before the snapshot
 
 #### Scenario: An out-of-bounds hours value errors without dispatching
-- **WHEN** the player enters `12.01` hours (or clears the field) and confirms
-- **THEN** the form shows the bounded Traditional Chinese message, emits no `ui_action`, and stays open for correction
+- **WHEN** the custom-duration value is empty or outside existing bounds
+- **THEN** localized validation shows, no request dispatches and correction remains possible
 
 #### Scenario: Locked controls cannot start a skip
-- **WHEN** an action is in flight or the client awaits its declared presentation revision
-- **THEN** every wait row is disabled and Enter or pointer activation on them submits nothing
+- **WHEN** an action is in flight or its presentation revision is pending
+- **THEN** keyboard and pointer cannot submit another wait/sleep/selection action
 
 #### Scenario: The frame shows three cards plus a back row with focused treatment
 - **WHEN** the wait card renders
-- **THEN** it shows exactly those operations plus the trailing `✕ 返回` row, and the row that `aria-activedescendant` names carries the active-row fill
+- **THEN** the existing three operation rows and back row retain focus and active-descendant conventions
 
 #### Scenario: The custom hours form bounds, converts, and dispatches once
-- **WHEN** the player fills in the 等待 N 小時 form
-- **THEN** it accepts hours with fractional input allowed, bounds the value to at least one second and at most the documented WebClient skip maximum (twelve hours), converts hours to whole seconds exactly once at the presentation boundary, and dispatches that value as the unchanged `explore.wait` `seconds` payload
+- **WHEN** the existing custom wait form is submitted
+- **THEN** fractional hours convert once to whole seconds between one second and the existing twelve-hour WebClient bound
 
 #### Scenario: The form shows no resulting world time and reports bounds in Chinese
-- **WHEN** the custom form is filled in, or its value is rejected or out of bounds
-- **THEN** it does not derive or display a resulting world time, and a rejected or out-of-bounds value shows a Traditional Chinese bound message with no dispatch
+- **WHEN** duration input is edited or rejected
+- **THEN** the client derives no resulting clock time and displays Traditional Chinese validation without dispatch on rejection
 
 #### Scenario: The surrounding skip vocabulary is unchanged
-- **WHEN** the waiting surface is scoped
-- **THEN** the server-side skip maximum is unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
+- **WHEN** the sleep correction is applied
+- **THEN** existing server skip maximum and four daypart payload vocabulary remain unchanged
+
+#### Scenario: Sleep duration and accepted ordering
+- **WHEN** browser sleep duration/recovery is confirmed
+- **THEN** one authoritative entry request is sent, acceptance opens contextual selection automatically, and dream eligibility comes from the resulting owner/control view
+
+#### Scenario: No premature wait-card teardown
+- **WHEN** sleep entry, handoff or dream response awaits its authoritative revision
+- **THEN** presentation retains enough operation identity to process the resulting selection/recovery surface and never drops the request through an early narrative-only success
 
 ### Requirement: explore.practice books one declared skill for a member
 The production action registry SHALL register `explore.practice` with a payload of exactly `actor_id` (positive safe-integer party member id) and `skill` (bounded non-space key, at most 64 characters). The adapter SHALL reauthorize the member for the acting purpose, reject active combat with `booking_in_combat`, preflight the skill against that member, and record the booking without advancing the clock; the next eligible awake SKIP interval that settles the member grows the booked skill.

@@ -268,7 +268,11 @@ describe("server-authored dream surface", () => {
       thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
     }) }).state.thread_choices[0].label).toBe("合成已知故事");
     expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
-    expect(CommandEcho.commandLine("explore.wait", { sleep: true, dream: true })).toBe("sleep dream");
+    expect(CommandEcho.commandLine("explore.wait", { sleep: true })).toBe("sleep");
+    expect(CommandEcho.commandLine("explore.sleep_party", {})).toBe("sleep all");
+    expect(CommandEcho.commandLine("explore.sleep_continue", {})).toBe("sleep continue");
+    expect(CommandEcho.commandLine("explore.sleep_dream", { decision: "enter" })).toBe("dream enter");
+    expect(CommandEcho.commandLine("explore.sleep_dream", { decision: "decline" })).toBe("dream decline");
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
   });

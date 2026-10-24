@@ -127,6 +127,30 @@ test("explore.possess_release resolves to unpossess", () => {
   );
 });
 
+test("the sleep control actions resolve their typed commands", () => {
+  assert.strictEqual(Echo.commandLine("explore.sleep_party", {}, {}), "sleep all");
+  assert.strictEqual(
+    Echo.commandLine("explore.sleep_continue", { sleep_id: "s", revision: 0 }, {}),
+    "sleep continue",
+  );
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.sleep_dream",
+      { sleep_id: "s", revision: 0, generation: 1, decision: "enter" },
+      {},
+    ),
+    "dream enter",
+  );
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.sleep_dream",
+      { sleep_id: "s", revision: 0, generation: 1, decision: "decline" },
+      {},
+    ),
+    "dream decline",
+  );
+});
+
 test("explore.engage resolves to engage <target>", () => {
   assert.strictEqual(
     Echo.commandLine(
@@ -680,6 +704,9 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.possess_release": { payload: { npc_id: "bard" }, display: {} },
   "explore.practice": { payload: { actor_id: 42, skill: "firebolt" }, display: {} },
   "explore.skill_preview": null,
+  "explore.sleep_continue": { payload: { sleep_id: "sleep-1", revision: 0 }, display: {} },
+  "explore.sleep_dream": { payload: { sleep_id: "sleep-1", revision: 0, generation: 1, decision: "enter" }, display: {} },
+  "explore.sleep_party": { payload: {}, display: {} },
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
