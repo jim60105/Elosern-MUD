@@ -165,7 +165,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             activate_overview_chip(page, "target-11")
             page.wait_for_selector(CARD_SELECTOR, timeout=15000)
             after_interact = page.evaluate(measure)
-            # Escape closes the card, and the place card's 等待 then opens
+            # Escape closes the card, and the place card's 休息 then opens
             # the wait card.
             _press(page, "Escape")
             wait_for_store_state(page, lambda s: s.get("presenceCard") is None)

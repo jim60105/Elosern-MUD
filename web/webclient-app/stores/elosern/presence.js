@@ -226,10 +226,10 @@ export function applyPresence(ctx) {
     // under a drawer or an overlay (the card stays open beneath a drawer its
     // navigate row opened): those digits are not the card's and not claimed.
     if (ctx.roomCard !== null) {
-      // A room card's digits are its own keydown's: the sleep row opens the
-      // view's sleep form and the rest row the rest form, which the
-      // store cannot. A stray digit is claimed and does nothing, so it never
-      // reaches the rail beneath the card.
+      // A room card's digits are its own keydown's: the rest entry's tiles
+      // open the view's wait or sleep form, which the store cannot. A stray
+      // digit is claimed and does nothing, so it never reaches the rail
+      // beneath the card.
       return !(ctx.hudDrawer.value || ctx.hudOverlay.value);
     }
     if (ctx.presenceCard !== null) {

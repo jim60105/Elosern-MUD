@@ -18,10 +18,11 @@
 // compass's, read through `explorationExits`; the people and objects are the
 // presence rail's, read through `explorationPresence`; an interact target's
 // verbs are the client-local verb card's, read through `explorationVerbs`
-// (exploration-presence-rail); and the room actions (查看房間, the wait card,
-// the suggestions card) are the place card's and the 建議 pill's, read through
-// `explorationRoomLook`, `explorationWait`, and `explorationSuggestions`
-// (exploration-room-actions). None of them is a router frame: the retired
+// (exploration-presence-rail); and the room actions (查看房間 and the
+// suggestions card) are the place card's and the 建議 pill's, read through
+// `explorationRoomLook` and `explorationSuggestions` (exploration-room-
+// actions); the place card's rest entry reads no builder rows
+// (redesign-rest-entry). None of them is a router frame: the retired
 // `exploration.target`, `exploration.wait`, and `exploration.suggestions`
 // sources are unregistered. `exploration.navigation` is the top navigation
 // bar's own entry set (the character status, quest, and inventory surfaces,
@@ -221,18 +222,6 @@ export function createFrameResolver(deps) {
       if (!gate.ok) return null;
       const row = ExplorationMenu.lookItems(gate.panel).find((item) => item.key === "look-room");
       return row ? isolate(row) : null;
-    } catch (err) {
-      return null;
-    }
-  };
-
-  // The wait card's rows (exploration-room-actions design D5): `waitItems`
-  // without its router back row. Null when the panel is unavailable.
-  const explorationWait = () => {
-    try {
-      const gate = requireExplorationPanel();
-      if (!gate.ok) return null;
-      return isolate(ExplorationMenu.waitItems().filter((item) => !item.goBack));
     } catch (err) {
       return null;
     }
@@ -578,7 +567,6 @@ export function createFrameResolver(deps) {
     explorationPresence,
     explorationVerbs,
     explorationRoomLook,
-    explorationWait,
     explorationSuggestions,
     // The combat model accessor (the declared selection-state home): the
     // store's client-local combat interactions (focus-skill recording, AREA

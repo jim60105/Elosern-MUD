@@ -1,7 +1,8 @@
 // The room-actions group of the composed Elosern store (exploration-room-
-// actions design D1/D3/D4/D5): the place card's 查看房間, and the client-local
-// room card slice — the wait card the place card's 等待 opens and the
-// suggestions card the 建議 pill opens.
+// actions design D1/D3/D4/D5; redesign-rest-entry design D1/D2): the place
+// card's 查看房間, and the client-local room card slice — the rest entry
+// (kind "wait") the place card's 休息 opens and the suggestions card the 建議
+// pill opens.
 //
 // A room card is client-local state, never a router frame: opening it sends
 // no request and pushes nothing. It is its own slice beside the presence
@@ -11,10 +12,12 @@
 // that hides the rail, stops the compass, and claims the digits. Opening one
 // kind of card closes the other: the `choices` anchor holds one card.
 //
-// Every row is re-resolved from the committed panels at activation time and
-// submitted through the one gated exploration activation
+// Every suggestions row is re-resolved from the committed panels at
+// activation time and submitted through the one gated exploration activation
 // (`activateExplorationRow`), so payloads, the command echo, and the
-// in-flight and awaiting-revision lock are the retired router rows'.
+// in-flight and awaiting-revision lock are the retired router rows'. The
+// rest entry has no rows: its forms dispatch through the view's single
+// `dispatchIntent` entry.
 
 // The committed location (room identity plus the committed current node), as
 // the presence card records it: a move closes an open room card.
@@ -65,16 +68,22 @@ export function applyRoomActions(ctx) {
     return ctx.activateExplorationRow(ctx.frameResolver.explorationRoomLook());
   };
 
-  // Open the wait card or the suggestions card. Local: no request, no frame.
-  // The suggestions card opens only while the committed envelope presents
-  // one (its status is not `unavailable`).
+  // Open the rest entry or the suggestions card. Local: no request, no
+  // frame. The rest entry opens only while the committed exploration panel
+  // is present and available (redesign-rest-entry design D2); the
+  // suggestions card only while the committed envelope presents one (its
+  // status is not `unavailable`).
   ctx.openRoomCard = function openRoomCard(kind) {
     const rs = ctx.reducer.getState();
     if (!ROOM_CARD_KINDS.has(kind) || rs.mode !== "exploration") {
       return false;
     }
-    const source = kind === "wait" ? ctx.frameResolver.explorationWait() : ctx.frameResolver.explorationSuggestions();
-    if (!source || (kind === "suggestions" && ctx.activeSubDock.value)) {
+    if (kind === "wait") {
+      const panel = rs.panels && rs.panels.exploration;
+      if (!panel || panel.available === false) {
+        return false;
+      }
+    } else if (!ctx.frameResolver.explorationSuggestions() || ctx.activeSubDock.value) {
       return false;
     }
     ctx.presenceCard = null;
@@ -90,29 +99,6 @@ export function applyRoomActions(ctx) {
     ctx.roomCard = null;
     ctx.publishView();
     return true;
-  };
-
-  // A wait row (design D5), re-resolved now. The sleep row opens the view's
-  // sleep form; the rest row opens the rest form. Neither is submitted here.
-  ctx.activateWaitRow = function activateWaitRow(key) {
-    if (!ctx.roomCard || ctx.roomCard.kind !== "wait") {
-      return { sent: false, handled: false, reason: "missing" };
-    }
-    const rows = ctx.frameResolver.explorationWait();
-    const found = rows ? rows.find((item) => item.key === key) : null;
-    if (!found || !found.actionId) {
-      return { sent: false, handled: false, reason: "missing" };
-    }
-    const outcome = ctx.activateExplorationRow(found);
-    // A card row's action takes the surface over, so the card closes with its
-    // dispatch; the dismiss row keeps the card exactly as last committed —
-    // the committed `unavailable` envelope closes it (`settleRoomCard`), so a
-    // stale/busy rejection never tears down a surface the commit still backs
-    // (webclient-context-actions-suggestions' preserved dismiss invariant).
-    if (outcome.sent && found.actionId !== "options.dismiss") {
-      ctx.closeRoomCard();
-    }
-    return outcome;
   };
 
   // A suggestions card row (design D4): a card or the dismiss row, matched by
@@ -164,13 +150,12 @@ export function applyRoomActions(ctx) {
     ctx.roomCard = null;
   };
 
-  // The view slice: the open card, the place card's room row, the wait rows,
-  // and the suggestions content (null while the envelope presents nothing).
+  // The view slice: the open card, the place card's room row, and the
+  // suggestions content (null while the envelope presents nothing).
   ctx.roomActionsView = function roomActionsView() {
     return {
       roomCard: ctx.roomCard ? { kind: ctx.roomCard.kind } : null,
       roomLook: ctx.frameResolver.explorationRoomLook(),
-      waitRows: ctx.frameResolver.explorationWait(),
       suggestionsCard: ctx.frameResolver.explorationSuggestions(),
     };
   };

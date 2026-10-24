@@ -7,10 +7,10 @@
 // its motion-level handling. It is passive: rows arrive as data and an
 // activation emits `pick(key)` (an enabled row) or `back` (a back row, or
 // Escape). Consumers: the dialogue choice list, the person-focus verb card,
-// the presence overflow card, and the room cards — the wait card and the
-// suggestions card (exploration-room-actions), whose rows may carry a second
-// `hint` line and whose muted `notes` (the generating, degraded, and empty
-// states) are lines above the rows that are not rows at all.
+// the presence overflow card, and the suggestions room card
+// (exploration-room-actions), whose rows may carry a second `hint` line and
+// whose muted `notes` (the generating, degraded, and empty states) are lines
+// above the rows that are not rows at all.
 //
 // One keyboard composite, one tab stop: DOM focus rests on the menu
 // container, which names its active row through `aria-activedescendant`.

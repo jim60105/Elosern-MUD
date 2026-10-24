@@ -100,35 +100,19 @@ describe("the room card slice (exploration-room-actions)", () => {
     expect(store.view.presenceCard).toBeNull();
   });
 
-  it("wait rows submit the builder payloads through the gate and close the card", () => {
+  it("the rest entry opens only while the exploration panel is available", () => {
+    // redesign-rest-entry design D2: the gate reads the committed panel
+    // directly (no builder rows); the view publishes no wait-row list.
     open();
-    store.openRoomCard("wait");
-    expect(store.activateWaitRow("wait-rest")).toMatchObject({ sent: false, reason: "missing" });
-    expect(store.activateWaitRow("wait-dawn")).toMatchObject({ sent: true });
-    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.wait", payload: { daypart: "dawn" } });
+    expect(store.view.waitRows).toBeUndefined();
+    commit({ exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
+    expect(store.openRoomCard("wait")).toBe(false);
     expect(store.view.roomCard).toBeNull();
-    // The card is gone: a second row resolves nothing.
-    expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: false, reason: "missing" });
-    expect(sender.sent.actions).toHaveLength(1);
-  });
-
-  it("a locked submission keeps the card open and sends nothing", () => {
-    open();
-    store.openRoomCard("wait");
-    store.dispatchAction("explore.look", { room: true });
-    expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: false, reason: "locked" });
+    commit({ exploration: fx.explorationPanel() });
+    expect(store.openRoomCard("wait")).toBe(true);
     expect(store.view.roomCard).toEqual({ kind: "wait" });
-    expect(sender.sent.actions).toHaveLength(1);
-  });
-
-  it("the sleep row submits the recovery payload without a dream flag", () => {
-    open();
-    store.openRoomCard("wait");
-    expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: true });
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.wait",
-      payload: { sleep: true },
-    });
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.activateWaitRow).toBeUndefined();
   });
 
   it("suggestion rows submit their builder envelopes, dismiss included", () => {

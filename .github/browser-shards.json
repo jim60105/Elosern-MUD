@@ -256,6 +256,7 @@
         "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_frame_resolver_follows_committed_state_across_a_real_move",
         "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_open_overview_follows_a_committed_move",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_safe_wait_until_dawn_advances_the_clock",
+        "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_rest_entry_tile_form_dispatch_path",
         "web.tests.browser.test_browser_exploration_actions.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing"
       ],
       "files_b": [

@@ -141,6 +141,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/FullLogOverlay", "Core/HudDrawer", "Core/DrawerHeader", "Core/EmptyState",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
                 "Action/RestForm",
+                "Action/WaitForm",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
                 "World/LocalMap", "World/ShopWindow",
@@ -244,6 +245,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The wait card's 進入夢境協作？ question joined with
                 # exploration-room-actions.
                 "Core/QuestionCard",
+                "Core/TimeChoiceCard",
                 # The correspondence folio and the gallery stage-transform
                 # drawer refroze the manifest after this baseline was
                 # pinned: World/LettersPanel and

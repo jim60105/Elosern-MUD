@@ -507,17 +507,17 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The place card's 等待 opens the wait card, whose third row 休息 N
-        # 小時 (wait-rest) opens the bounded custom-duration form
-        # (exploration-room-actions).
+        # The place card's 休息 opens the rest entry, whose 等待 tile
+        # (wait-rest) opens the wait form with its bounded custom-duration
+        # input (redesign-rest-entry).
         activate_wait_row(page, "wait-rest")
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="exploration-rest-form"]',
+                "selector": '[data-testid="wait-form"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+                    "() => document.querySelector('[data-testid=\"wait-form\"]') !== null"
                 ),
                 "description": "rest form rendered",
             },

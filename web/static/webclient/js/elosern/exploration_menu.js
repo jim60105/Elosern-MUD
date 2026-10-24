@@ -3,8 +3,8 @@
  *
  * Reduces a validated `exploration` panel into the logical keyboard menus
  * builders the exploration screen reads outside the keyboard router: the
- * bounded exit list and look room/entity/object rows, the wait card's rows,
- * the suggestions card's rows, and each interact target's server-authored
+ * bounded exit list and look room/entity/object rows, the suggestions card's
+ * rows, and each interact target's server-authored
  * affordances (交談, engage, party, delivery, or a navigate-kind guild/shop
  * service entry). Move payloads carry the canonical
  * `current_node` supplied by the local-map panel so `explore.move` passes its
@@ -25,9 +25,9 @@
  * lives outside it. The exits are the exit compass's (`exitTargets`,
  * exploration-exit-compass); the people and objects are the presence rail's
  * (`presenceEntries`, exploration-presence-rail); the room's 查看房間 row
- * (`lookItems`), the wait rows (`waitItems`), and the suggestions rows
- * (`suggestionsMenu`) are the place card's, the wait card's, and the
- * suggestions card's (exploration-room-actions). `verbMenuFor` is an
+ * (`lookItems`) and the suggestions rows (`suggestionsMenu`) are the place
+ * card's and the suggestions card's (exploration-room-actions); the place
+ * card's rest entry reads no builder rows (redesign-rest-entry). `verbMenuFor` is an
  * interact target's verb card (the target's affordances plus 查看).
  *
  * No `document` or `window` access at load time; Node tests exercise the model
@@ -159,39 +159,6 @@
         openDrawer: "inventory",
       });
     }
-    return items;
-  }
-
-  // -------------------------------------------------------------------------
-  // Wait rows (the wait card, exploration-room-actions design D5).
-  // -------------------------------------------------------------------------
-
-  function waitItems() {
-    var items = [
-      {
-        key: "wait-dawn",
-        label: "等待直到黎明",
-        enabled: true,
-        actionId: "explore.wait",
-        payload: { daypart: "dawn" },
-      },
-      {
-        key: "wait-sleep",
-        label: "睡眠至完全恢復",
-        enabled: true,
-        actionId: "explore.wait",
-        payload: { sleep: true },
-      },
-      {
-        key: "wait-rest",
-        label: "等待 N 小時",
-        enabled: true,
-        actionId: null,
-        payload: null,
-        openRestForm: true,
-      },
-    ];
-    items.push(backItem());
     return items;
   }
 
@@ -690,7 +657,6 @@
      moveItems: moveItems,
      exitTargets: exitTargets,
      lookItems: lookItems,
-     waitItems: waitItems,
      targetMenuFor: targetMenuFor,
      verbMenuFor: verbMenuFor,
      presenceEntries: presenceEntries,

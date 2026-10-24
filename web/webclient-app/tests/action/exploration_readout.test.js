@@ -116,7 +116,7 @@ describe("readoutContent: the final priority (exploration-room-actions design D6
 
   it("names the place-card buttons and the pill", () => {
     expect(PLACE_LOOK_READOUT).toEqual({ lead: "查看房間", text: "重新觀察四周", tone: "normal" });
-    expect(PLACE_WAIT_READOUT).toEqual({ lead: "等待", text: "讓時間流逝、休息或睡眠", tone: "normal" });
+    expect(PLACE_WAIT_READOUT).toEqual({ lead: "休息", text: "保持清醒等待，或入睡恢復精力", tone: "normal" });
     expect(pillReadout("ready", 4)).toEqual({ lead: "建議", text: "4 個可行的下一步", tone: "normal" });
     expect(pillReadout("generating", 0).text).toBe("AI 正在構思建議…");
     expect(pillReadout("degraded", 0).text).toBe("查看可行的下一步");
@@ -144,7 +144,7 @@ describe("readoutContent: the final priority (exploration-room-actions design D6
     expect(state.content.value.lead).toBe("前往 ←");
     state.setPlace(place);
     state.setRail(rail);
-    expect(state.content.value.lead).toBe("等待");
+    expect(state.content.value.lead).toBe("休息");
     state.setPlace(null);
     expect(state.content.value.lead).toBe("店長");
     state.clear();

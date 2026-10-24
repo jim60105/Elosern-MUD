@@ -20,8 +20,10 @@ import HudDrawer from "./components/HudDrawer.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapDrawer from "./components/MapDrawer.vue";
-import RestForm from "./components/RestForm.vue";
 import SleepForm from "./components/SleepForm.vue";
+import TimeChoiceCard from "./components/TimeChoiceCard.vue";
+import WaitForm from "./components/WaitForm.vue";
+import { focusableElements } from "./components/focus-trap.js";
 import QuestDrawer from "./components/QuestDrawer.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
@@ -104,9 +106,11 @@ const {
   cardRows, cardKey, cardCaption, cardLabel, speaker,
   onRailActivate, onCardPick, onCardBack,
   roomCardRef, roomCard, roomCardOpen, roomCardShown, roomCardRows, roomCardNotes, roomCardTrailing,
-  roomCardCaption, roomCardLabel, sleepOpen, restOpen, placeActions, pillShown, pillCount, pillLabel,
+  roomCardCaption, roomCardLabel, tilesShown, waitFormOpen, sleepOpen, lastTile, returning,
+  waitTileTime, sleepTileFatigue, placeActions, pillShown, pillCount, pillLabel,
   onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack,
-  onSleepRecover, onSleepSubmit, onSleepClose, onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
+  onTilePick, onStepBack, onStepClose, onWaitDawn, onWaitSubmit,
+  onSleepRecover, onSleepSubmit, onPlaceHover, onPillHoverChange,
   sleepHandoffSelectionOpen, sleepHandoffQuestionOpen, sleepHandoffContinuationOpen,
   sleepHandoffRows, sleepHandoffContinuationRows, sleepHandoffCaption, sleepHandoffQuestionCaption,
   onSleepHandoffPick, onSleepContinuationPick,
@@ -132,6 +136,28 @@ const {
   onViewShopItem,
   openPartyWindow,
 } = usePartyWindow(store, dispatchIntent, { panel });
+// The rest entry's second-layer Tab trap (redesign-rest-entry design D6), in
+// the capture phase because the forms stop every keydown at their root: Tab
+// from the last focusable control wraps to the first and Shift+Tab from the
+// first to the last; every other Tab, and every other key, stays native.
+function onRestStepKeydown(event) {
+  if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) {
+    return;
+  }
+  const list = focusableElements(event.currentTarget);
+  if (list.length === 0) {
+    return;
+  }
+  const first = list[0];
+  const last = list[list.length - 1];
+  const active = document.activeElement;
+  const wrapTo = event.shiftKey ? (active === first || !list.includes(active) ? last : null) : active === last || !list.includes(active) ? first : null;
+  if (wrapTo) {
+    event.preventDefault();
+    event.stopPropagation();
+    wrapTo.focus({ preventScroll: true });
+  }
+}
 // The top navigation (webclient-main-navigation-hotkeys): 隊伍 opens the
 // party window on its remembered tab — a reference surface, so it neither
 // pops the dock's frames nor waits on the submission lock — and 任務 keeps
@@ -951,15 +977,26 @@ const rootStyle = computed(() => {
             @pick="onSleepContinuationPick"
             @back="onSleepContinuationPick('back')"
           />
-          <!-- The room cards (exploration-room-actions design D1/D4/D5): the
-               wait card the place card's 等待 opens and the suggestions card
-               the 建議 pill opens, through the one card shell, trapping focus
-               until they close. The wait card stays mounted (hidden) under
-               its sleep and rest forms, so it keeps its active row for the
-               return. -->
+          <!-- The room cards (exploration-room-actions design D1/D4/D5;
+               redesign-rest-entry design D6): the rest entry the place card's
+               休息 opens — first the TimeChoiceCard tiles, then one shared
+               shell around the wait or sleep form — and the suggestions card
+               the 建議 pill opens through the one card shell, each trapping
+               focus until it closes. -->
           <template v-else-if="roomCardOpen">
+            <TimeChoiceCard
+              v-if="tilesShown"
+              ref="roomCardRef"
+              :time-label="waitTileTime"
+              :fatigue="sleepTileFatigue"
+              :locked="skipDisabled"
+              :initial-tile="lastTile"
+              :entrance="!modeHydrating && !returning"
+              @pick="onTilePick"
+              @close="onStepClose"
+            />
             <ChoiceCard
-              v-show="roomCardShown"
+              v-else-if="roomCardShown"
               ref="roomCardRef"
               :key="roomCard.kind"
               :test-id="`${roomCard.kind}-card`"
@@ -975,32 +1012,64 @@ const rootStyle = computed(() => {
               @pick="onRoomCardPick"
               @back="onRoomCardBack"
             />
+            <!-- The rest entry's second layer: a visible caption naming the
+                 mode, the form, then (after the form in tab order) the
+                 paired corner buttons ‹ 返回上一層 and ✕ 關閉. -->
             <section
-              v-if="sleepOpen"
-              class="choice-card rest-card"
+              v-else-if="waitFormOpen || sleepOpen"
+              class="choice-card rest-step"
               role="dialog"
-              aria-label="睡眠模式"
-              data-testid="sleep-card"
+              aria-modal="true"
+              aria-labelledby="rest-step-caption"
+              :data-testid="waitFormOpen ? 'wait-form-card' : 'sleep-card'"
+              @keydown.capture="onRestStepKeydown"
             >
               <span class="choice-card__corners" aria-hidden="true"></span>
-              <div class="choice-card__caption" aria-hidden="true">睡眠模式</div>
+              <div id="rest-step-caption" class="choice-card__caption">{{ waitFormOpen ? "等待" : "睡眠" }}</div>
+              <WaitForm
+                v-if="waitFormOpen"
+                :disabled="skipDisabled"
+                @dawn="onWaitDawn"
+                @submit="onWaitSubmit"
+                @close="onStepBack"
+              />
               <SleepForm
+                v-else
                 :disabled="skipDisabled"
                 @recover="onSleepRecover"
                 @submit="onSleepSubmit"
-                @close="onSleepClose"
+                @close="onStepBack"
               />
-            </section>
-            <section
-              v-if="restOpen"
-              class="choice-card rest-card"
-              role="dialog"
-              aria-label="等待 N 小時"
-              data-testid="rest-card"
-            >
-              <span class="choice-card__corners" aria-hidden="true"></span>
-              <div class="choice-card__caption" aria-hidden="true">等待 N 小時</div>
-              <RestForm :disabled="skipDisabled" @submit="onRestSubmit" @close="onRestClose" />
+              <button
+                type="button"
+                class="rest-step__back"
+                aria-label="返回上一層"
+                title="返回上一層"
+                data-testid="rest-step-back"
+                @click="onStepBack"
+                @keydown.space.stop
+                @keydown.enter.stop
+                @keydown.esc.stop.prevent="onStepBack"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14.5 6l-6 6 6 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="rest-step__close"
+                aria-label="關閉並回到探索"
+                title="關閉"
+                data-testid="rest-step-close"
+                @click="onStepClose"
+                @keydown.space.stop
+                @keydown.enter.stop
+                @keydown.esc.stop.prevent="onStepBack"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                  <path d="M7 7l10 10M17 7L7 17" />
+                </svg>
+              </button>
             </section>
           </template>
           <!-- The exploration cards (exploration-presence-rail design D4):
@@ -1832,17 +1901,59 @@ const rootStyle = computed(() => {
   box-shadow: 0 0 0 1px var(--gold-400);
 }
 
-/* The wait card's rest form (exploration-room-actions design D5): the
-   bounded RestForm in the centred card frame. */
-.rest-card {
+/* The rest entry's second layer (redesign-rest-entry design D6): one shell
+   in the centred card frame around the wait or sleep form, which sits flat
+   in it, with the paired corner buttons (QuestionCard's close-button style)
+   at the top left (‹) and the top right (✕). */
+.rest-step {
+  position: relative;
   align-self: center;
   width: min(100%, calc(360px * var(--ui-scale)));
   padding: 0 calc(14px * var(--ui-scale)) calc(14px * var(--ui-scale));
   gap: calc(8px * var(--ui-scale));
 }
-.rest-card .exploration-rest-form {
+.rest-step .exploration-sleep-form,
+.rest-step .exploration-wait-form {
   background: transparent;
   border: 0;
   padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale)) 0;
+}
+.rest-step__back,
+.rest-step__close {
+  position: absolute;
+  top: calc(8px * var(--ui-scale));
+  right: calc(8px * var(--ui-scale));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(28px * var(--ui-scale));
+  height: calc(28px * var(--ui-scale));
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--paper-400);
+  cursor: pointer;
+}
+.rest-step__back {
+  left: calc(8px * var(--ui-scale));
+  right: auto;
+}
+.rest-step__back svg,
+.rest-step__close svg {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+}
+.rest-step__back svg {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+}
+.rest-step__back:hover,
+.rest-step__back:focus-visible,
+.rest-step__close:hover,
+.rest-step__close:focus-visible {
+  border-color: var(--gold-500);
+  color: var(--paper-50);
+  outline: none;
 }
 </style>

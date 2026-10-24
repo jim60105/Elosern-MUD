@@ -76,7 +76,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 #### Scenario: The exploration table is exactly five sources
 
 - **WHEN** the exploration-family source table is declared
-- **THEN** its live sources (panel `exploration`; `exploration.root` resolves to an empty menu under the exploration panel gate) are exactly `exploration.root` `{}` and `exploration.navigation` `{}` — of the five sources this scenario once named, `exploration.target` and `exploration.keywords` are retired, and `exploration.wait` and `exploration.suggestions` with them, each degrading like every unregistered source — the independent compass and dialogue exit rows (reading `local_map.current_node`), the presence rail's entries, an interact target's verb rows, the place card's room look row, the wait card's rows, and the suggestions card's content (reading `context_actions.suggestions`) are read through accessors outside the table and are never frames
+- **THEN** its live sources (panel `exploration`; `exploration.root` resolves to an empty menu under the exploration panel gate) are exactly `exploration.root` `{}` and `exploration.navigation` `{}` — of the five sources this scenario once named, `exploration.target` and `exploration.keywords` are retired, and `exploration.wait` and `exploration.suggestions` with them, each degrading like every unregistered source — the independent compass and dialogue exit rows (reading `local_map.current_node`), the presence rail's entries, an interact target's verb rows, the place card's room look row, and the suggestions card's content (reading `context_actions.suggestions`) are read through accessors outside the table and are never frames
 
 ### Requirement: Dynamic rows and payloads are verbatim from the panel while client-owned navigation rows are reproduced
 
@@ -84,8 +84,8 @@ Domain rows — entity lists, exits, targets, quest/board/shop entries, skill de
 
 #### Scenario: A resolved submenu keeps its back row
 
-- **WHEN** the wait card's accessor reads an available panel
-- **THEN** it holds the builder's wait rows without the builder's `back` row, which the card replaces with its own trailing `✕ 返回`, and no back row submits anything
+- **WHEN** the suggestions card's accessor reads available exploration and `context_actions` panels whose suggestions status is `ready`
+- **THEN** it holds the builder's suggestion rows without the builder's `back` row, which the card replaces with its own trailing `✕ 返回`, and no back row submits anything
 
 #### Scenario: Domain relabeling is absent by construction
 
@@ -94,7 +94,7 @@ Domain rows — entity lists, exits, targets, quest/board/shop entries, skill de
 
 #### Scenario: Required navigation rows are reproduced, not fabricated
 
-- **WHEN** a resolved menu needs the client-owned navigation and presentation rows that the shipped dock contract requires — the place card's room look row, the wait card's and the suggestions card's builder rows, the presence rail's and the verb card's builder rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows
+- **WHEN** a resolved menu needs the client-owned navigation and presentation rows that the shipped dock contract requires — the place card's room look row, the suggestions card's builder rows, the presence rail's and the verb card's builder rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows
 - **THEN** those rows are reproduced by the same builders, and reproducing them does not count as fabrication
 
 ### Requirement: An unresolvable descriptor yields the shared degradation marker with the server-authored reason

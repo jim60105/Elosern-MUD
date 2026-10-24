@@ -155,22 +155,10 @@ test("look rows cover the room marker plus entities and objects, with no back ro
   assert.deepEqual(items[2].payload, { target_id: 6 });
 });
 
-test("the wait rows are dawn, sleep, and the rest form, then the back row", () => {
-  // exploration-room-actions design D5: the wait card's rows (the card drops
-  // the builder's back row and draws its own `✕ 返回`).
-  const items = ExplorationMenu.waitItems();
-  assert.deepEqual(
-    items.map((item) => item.key),
-    ["wait-dawn", "wait-sleep", "wait-rest", "back"]
-  );
-  assert.deepEqual(items[0].payload, { daypart: "dawn" });
-  assert.equal(items[0].actionId, "explore.wait");
-  assert.deepEqual(items[1].payload, { sleep: true }, "the dream flag is the question's, never the row's");
-  assert.equal(items[2].actionId, null, "the rest row opens the form and submits nothing");
-  assert.equal(items[2].openRestForm, true);
-  const back = items[items.length - 1];
-  assert.equal(back.goBack, true);
-  assert.equal(back.actionId, null, "the back row never submits an action");
+test("dynamic menus end with the back row, and no wait-row builder remains", () => {
+  // redesign-rest-entry: the place card's rest entry renders tiles and forms,
+  // not builder rows, so the wait-row builder is retired.
+  assert.equal(ExplorationMenu.waitItems, undefined, "the wait-row builder is retired");
   // Dynamic menus (a target's affordances) and the suggestions rows end with
   // the same back cell.
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });

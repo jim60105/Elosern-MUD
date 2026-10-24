@@ -1861,7 +1861,7 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 
 #### Scenario: The card carries the room actions at the exploration root
 - **WHEN** the committed mode is exploration while the exploration panel is available and the exploration dock is at its root frame
-- **THEN** the card also carries the room actions `webclient-room-actions` defines — a 查看房間 icon button beside the heading and a 等待 button beside the time — and in every other mode and state it carries no control
+- **THEN** the card also carries the room actions `webclient-room-actions` defines — a 查看房間 icon button beside the heading and a 休息 button beside the time — and in every other mode and state it carries no control
 
 #### Scenario: The location resolves in a fixed order
 - **WHEN** the card resolves its location
@@ -1881,7 +1881,7 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 
 #### Scenario: The card is display-only
 - **WHEN** the card renders outside exploration, or while the exploration panel is unavailable
-- **THEN** it carries no control, no tab stop, and no dispatch; in exploration with the panel available its only controls are the 查看房間 and 等待 buttons, which never truncate the heading's accessible name, and the card itself dispatches nothing
+- **THEN** it carries no control, no tab stop, and no dispatch; in exploration with the panel available its only controls are the 查看房間 and 休息 buttons, which never truncate the heading's accessible name, and the card itself dispatches nothing
 
 #### Scenario: The two values read on two levels
 - **WHEN** the card renders heading and time

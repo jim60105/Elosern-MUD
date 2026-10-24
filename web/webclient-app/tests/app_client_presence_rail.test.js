@@ -560,7 +560,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(compass.classes()).not.toContain("exit-compass--inactive");
   });
 
-  it("Tab walks compass → rail → 查看房間 → 等待 → 建議, and Shift+Tab walks back", async () => {
+  it("Tab walks compass → rail → 查看房間 → 休息 → 建議, and Shift+Tab walks back", async () => {
     await mountWith();
     const compass = wrapper.get('[data-testid="exit-compass"]').element;
     const look = wrapper.get('[data-anchor="map"] [data-testid="place-card-look"]').element;

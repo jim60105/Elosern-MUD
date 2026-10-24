@@ -223,7 +223,6 @@ export const useElosernStore = defineStore("elosern", () => {
     activateRoomLook: ctx.activateRoomLook,
     openRoomCard: ctx.openRoomCard,
     closeRoomCard: ctx.closeRoomCard,
-    activateWaitRow: ctx.activateWaitRow,
     activateSuggestion: ctx.activateSuggestion,
     chooseScale: ctx.chooseScale,
     // The 技能-tab 施放 entry (skillbook-authoritative-casting D6).

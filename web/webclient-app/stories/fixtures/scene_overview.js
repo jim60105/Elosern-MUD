@@ -3,14 +3,14 @@
 // story is bound to the same reducer-derived shape the live wiring passes).
 // Every PresenceRail, ExitCompass, and ChoiceCard story builds its args
 // here, by running the real `presenceEntries` /
-// `verbMenuFor` / `waitItems` / `suggestionsMenu` of the exploration-menu
+// `verbMenuFor` / `suggestionsMenu` of the exploration-menu
 // model over a synthesized `exploration` panel. Every value is a fixed
 // literal: no live server, LLM, or image data.
 import ExplorationMenu from "../../lib/exploration_menu.js";
 import { resolveTargets } from "../../components/compass-model.js";
 import { localMapModelFor } from "./local_map.js";
 import { overflowCardRows, verbCardRows } from "../../composables/use-person-focus.js";
-import { suggestionsCardContent, waitCardRows } from "../../composables/use-room-actions.js";
+import { suggestionsCardContent } from "../../composables/use-room-actions.js";
 
 const DIRECTION_LABELS = ["北", "東", "南", "西", "東北", "西北", "東南", "西南", "上", "下"];
 
@@ -100,14 +100,23 @@ export function overflowCardArgs(panel) {
   return { rows, trailingIndex: rows.length - 1, caption: "在場", ariaLabel: "其餘在場者與物件" };
 }
 
-// ChoiceCard args for the wait card and the suggestions card
-// (exploration-room-actions): the builders' rows mapped exactly as the room
-// actions' wiring maps them.
-export function waitCardArgs({ locked = false } = {}) {
-  const rows = waitCardRows(ExplorationMenu.waitItems().filter((item) => !item.goBack), locked);
-  return { rows, trailingIndex: rows.length - 1, caption: "等待", ariaLabel: "等待與休息", testId: "wait-card" };
+// TimeChoiceCard args for the rest entry's first layer (redesign-rest-entry
+// design D9): the exact props the room actions' wiring passes — the clock
+// part of the committed world-time label and the controlled body's fatigue
+// row (`{reserve_percent, label}`), or null when the status panel carries
+// none.
+export function timeChoiceArgs({ locked = false, fatigue = true } = {}) {
+  return {
+    timeLabel: "22:40",
+    fatigue: fatigue ? { reserve_percent: 62, label: "輕度疲勞" } : null,
+    locked,
+    entrance: false,
+    autofocus: true,
+  };
 }
 
+// ChoiceCard args for the suggestions card (exploration-room-actions): the
+// builder's rows mapped exactly as the room actions' wiring maps them.
 export function suggestionsCardArgs(suggestions) {
   const items = ExplorationMenu.suggestionsMenu(suggestions).items.filter((item) => !item.goBack);
   const content = suggestionsCardContent({ status: suggestions.status, items });

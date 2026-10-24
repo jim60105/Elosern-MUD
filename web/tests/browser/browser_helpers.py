@@ -364,15 +364,20 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
 PRESENCE_KEY_PREFIXES = ("target-", "entity-", "object-", "presence-more")
 RAIL_SELECTOR = '[data-anchor="presence"] [data-testid="presence-rail"]'
 CARD_SELECTOR = '[data-anchor="choices"] [data-testid="presence-card"]'
-# The room cards (exploration-room-actions): the wait card the place card's
-# 等待 opens, the suggestions card the 建議 pill opens, and the owner-only
-# 進入夢境協作？ question the accepted sleep handoff asks.
+# The room cards (exploration-room-actions; redesign-rest-entry): the rest
+# entry's first layer the place card's 休息 opens (its two choice tiles), the
+# suggestions card the 建議 pill opens, and the owner-only 進入夢境協作？
+# question the accepted sleep handoff asks.
 WAIT_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="wait-card"]'
+WAIT_TILE_SELECTOR = WAIT_CARD_SELECTOR + ' [data-testid="wait-card-tile"][data-tile="%s"]'
+WAIT_FORM_SELECTOR = '[data-anchor="choices"] [data-testid="wait-form"]'
 SUGGESTIONS_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="suggestions-card"]'
 DREAM_QUESTION_SELECTOR = '[data-anchor="choices"] [data-testid="dream-question"]'
 PLACE_LOOK_SELECTOR = '[data-anchor="map"] [data-testid="place-card-look"]'
 PLACE_WAIT_SELECTOR = '[data-anchor="map"] [data-testid="place-card-wait"]'
 PILL_SELECTOR = '#action-dock [data-testid="suggestions-pill"]'
+# The retired wait rows' key vocabulary, kept by ``activate_wait_row``: each
+# key maps onto the rest entry's tile-then-form path (redesign-rest-entry).
 WAIT_ROW_KEYS = ("wait-dawn", "wait-sleep", "wait-rest")
 
 
@@ -475,7 +480,7 @@ def press_control(page: Page, selector: str, timeout: int = 30000) -> None:
 
 
 def open_wait_card(page: Page, timeout: int = 30000) -> None:
-    """Open the wait card from the place card's 等待 and wait for it."""
+    """Open the rest entry's first layer from the place card's 休息 and wait for it."""
     if page.locator(WAIT_CARD_SELECTOR).count() == 0:
         press_control(page, PLACE_WAIT_SELECTOR, timeout=timeout)
     page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=timeout)
@@ -497,16 +502,28 @@ def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None
 
 
 def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 30000) -> None:
-    """Activate one wait row through the wait card.
+    """Run one of the retired wait rows through the two-layer rest entry.
 
-    The sleep row opens the recovery/duration form. One hour of explicit
-    duration keeps the entry positive even on a fully restored fixture;
-    ``dream`` dismisses the contextual roster if it appears and answers the
-    owner question 是; without it the authoritative surface is left for the
-    caller.
+    The key vocabulary is the retired rows' (redesign-rest-entry): every path
+    opens the place card's 休息 and presses a tile, then acts in its form, each
+    press with Enter on a focused control. ``wait-dawn`` presses the 等待 tile
+    and the wait form's 等待直到黎明; ``wait-rest`` presses the 等待 tile and
+    returns with the wait form open; ``wait-sleep`` presses the 睡眠 tile and
+    submits one hour of explicit duration, which keeps the entry positive
+    even on a fully restored fixture. ``dream`` dismisses the contextual
+    roster if it appears and answers the owner question 是; without it the
+    authoritative surface is left for the caller.
     """
+    if key not in WAIT_ROW_KEYS:
+        raise AssertionError("no wait path %r (keys %r)" % (key, WAIT_ROW_KEYS))
     open_wait_card(page, timeout=timeout)
-    activate_card_row(page, key, timeout=timeout, selector=WAIT_CARD_SELECTOR)
+    if key in ("wait-dawn", "wait-rest"):
+        press_control(page, WAIT_TILE_SELECTOR % "wait", timeout=timeout)
+        page.locator(WAIT_FORM_SELECTOR).wait_for(state="visible", timeout=timeout)
+        if key == "wait-dawn":
+            press_control(page, WAIT_FORM_SELECTOR + ' [data-testid="wait-form-dawn"]', timeout=timeout)
+        return
+    press_control(page, WAIT_TILE_SELECTOR % "sleep", timeout=timeout)
     if key == "wait-sleep":
         form = page.locator('[data-testid="sleep-form"]')
         form.wait_for(state="visible", timeout=timeout)
@@ -543,7 +560,7 @@ def suggestion_row_key(page: Page, builder_key: str) -> str:
 
 def exploration_root_controls(page: Page) -> dict:
     """The exploration screen's room-action controls and the dock's rows
-    (exploration-room-actions): whether the place card's 查看房間 and 等待
+    (exploration-room-actions): whether the place card's 查看房間 and 休息
     and the 建議 pill are rendered, and the dock's row keys (none at the
     empty exploration root)."""
     return page.evaluate(
@@ -563,10 +580,12 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
 
     The exploration screen's entries live outside the router's (empty) root
     (exploration-room-actions): ``look-room`` is the place card's 查看房間,
-    ``wait`` its 等待 (opening the wait card), and ``suggestions`` the 建議
-    pill (opening the suggestions card); a wait row key (``wait-dawn``,
-    ``wait-sleep``, ``wait-rest``) runs through the wait card, the sleep row
-    submitting its form and leaving the accepted sleep view to the caller; and
+    ``wait`` its 休息 (opening the rest entry's first layer), and
+    ``suggestions`` the 建議 pill (opening the suggestions card); a retired
+    wait row key (``wait-dawn``, ``wait-sleep``, ``wait-rest``) runs through
+    the rest entry's tile and form (``activate_wait_row``), the sleep path
+    submitting its form and leaving the accepted sleep view to the caller;
+    ``back`` while the rest entry's first layer is open presses its ✕; and
     while the suggestions card is open a builder key (``action-<code>``,
     ``action-options.dismiss``) names
     one of its rows. The exits are the exit compass's
@@ -602,8 +621,12 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
         activate_card_row(page, row, timeout=timeout, selector=SUGGESTIONS_CARD_SELECTOR)
         return
     if page.locator(WAIT_CARD_SELECTOR).count() > 0:
-        activate_card_row(page, key, timeout=timeout, selector=WAIT_CARD_SELECTOR)
-        return
+        # The rest entry's first layer has tiles, not rows: only its ✕ is
+        # reachable by a key here.
+        if key == "back":
+            press_control(page, WAIT_CARD_SELECTOR + ' [data-testid="wait-card-close"]', timeout=timeout)
+            return
+        raise AssertionError("the rest entry has no row %r" % (key,))
     raise AssertionError("no exploration entry with key %r" % (key,))
 
 
