@@ -10,6 +10,7 @@ All map surfaces (island, area map including wilderness cells, world map, both l
   - area ink family: road casing and core (walked, frontier and travel variants) and the commission diamond;
   - world point family: player position, district landmark, place by kind (settlement, capital, harbour, hidden) and exact commission pin with its tracked halo;
   - world ink family: land, lit wash, the unlit hatch pattern and its hatch line, lit and unlit district strokes, nation border with casing, walked trail with casing, and the approximate-commission ring.
+- **AND** the island's rim edge-direction markers (the diamond, its landmark ring and the gateway stub arrow) are not map-place concepts. They point toward places beyond the canvas edge, no other surface draws them, and they belong to the island alone.
 
 #### Scenario: Surfaces differ only by uniform scale
 - **WHEN** any two surfaces draw the same concept in the same state

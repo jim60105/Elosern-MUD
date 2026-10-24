@@ -8,10 +8,15 @@ The island SHALL draw every in-canvas node with the area map's shared node glyph
 - **THEN** each visibility draws the shared glyph state below, at the base geometry, inside a glyph group scaled by the island glyph scale:
   - `current`: the here-seal (glow 14, ring 10, seal dot 6);
   - `visible_visited`: the visited dot (5.5);
-  - `visible_unvisited`: the seen dot, with a dark fill and a dashed outline;
-  - `remembered`: a remembered node drawn in-canvas would use the visited dot, but the coordinate projection never draws one in-canvas.
+  - `visible_unvisited`: the seen dot, with a dark fill and a dashed outline.
 - **AND** each glyph's rendered radii, stroke widths and dash lengths are the base values times the island glyph scale
 - **AND** remembered places keep their rim diamonds as their non-colour distinction
+
+#### Scenario: Both minimap variants use the island glyph scale
+- **WHEN** the island draws a coordinate-bearing projection (lattice variant) or a coordinate-free radial layout (graph variant)
+- **THEN** the lattice variant's glyph group scale is exactly the island glyph scale, independent of `markerScale`, because its projected positions do not use `markerScale`
+- **AND** the graph variant's glyph group scale is the island glyph scale times `markerScale`, because its radial positions scale by `markerScale`
+- **AND** in the graph variant, the node-label baseline offset derives from the largest scaled base footprint (16 × that glyph scale) instead of the old fixed half-extent
 
 #### Scenario: The island differs from the area map only by its scale
 - **WHEN** the island and the area map draw the same node state

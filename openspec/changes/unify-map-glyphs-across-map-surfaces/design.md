@@ -71,6 +71,12 @@ Before this change, each surface had its own glyph vocabulary:
    - `MARKER_CURRENT_RING_R` (the compass aim ring, drawn with a 1.6 px non-scaling stroke) becomes `HALO_R * ISLAND_GLYPH_SCALE + 2`, which is 13.25. Its inner stroke edge (about 12.45) then stays outside the halo's outer edge (15.6 × 0.75 = 11.7).
    - The rim comment becomes `R_MAX + HALO_R × s`.
    - Why a new constant instead of `markerScale`: `markerScale` also scales the radial graph layout's positions (`placed.x * markerScale`). Changing it would move nodes as well as shrink glyphs.
+   - The two variants differ:
+     - The lattice (coordinate) variant uses `glyphSize = ISLAND_GLYPH_SCALE`. Its `nodePos` ignores `markerScale`, so glyph, footprint, label obstacles and `spreadExits` all agree even when a bare mount passes `markerScale`.
+     - The graph (radial) variant uses `glyphSize = ISLAND_GLYPH_SCALE * markerScale`, because its positions scale by `markerScale`.
+     - `labelY()` in `use-map-lattice-render.js` is used only by the graph variant. It becomes `LABEL_BASELINE_HALF * glyphSize + 2 + labelFont`, with `LABEL_BASELINE_HALF = HALO_R + 1` (16, the largest base footprint) instead of the old 11.
+   - Leave alone: `STUB_FOOTPRINT` (the stub arrow) and the rim diamonds, which are island-only rim pointers.
+   - The aim-ring margin of 13.25 − 0.8 against 11.7 holds while the canvas renders at more than about 0.52× its 240-unit size. The island is 240 px or larger at the reference scale, so it always holds.
 
 4. **Wilderness-cell cutover (new).**
    - In the `node.cell` branch, AreaMapView draws `<MapNodeGlyph :state :gate :size="AREA_CELL_GLYPH_SCALE">` for current and gate cells, and `MapCommissionGlyph` at the same scale with the existing corner offset.
@@ -96,10 +102,10 @@ Before this change, each surface had its own glyph vocabulary:
 ## Risks / Trade-offs
 
 - **[Smaller island marks lose fine detail]** At 0.75, the seen dash becomes about 1.65 / 1.5 units and the halo dash 2.25. Verify readability on the 240 px island in Storybook and in the live client. The scale is a single constant, so tuning it is a one-line change.
-- **[World glyph strokes thicken above UI scale 1]** Proportional scaling is the rule. It changes the world map's look at large viewports. Check it in the 1920×1080 stories.
+- **[World glyph strokes thicken above UI scale 1]** Proportional scaling is the rule, and it changes the world map's look at large viewports. Check it in the 1920×1080 stories. The world SVG's viewBox is its frame size, so confirm that it displays at 1:1; otherwise glyph strokes would also follow the fit scale.
 - **[Island colour tokens]** The old ladder used tokens. The shared glyph carries the area map's paint, which mixes tokens and hex literals. The delta narrows the island token scenarios to edges, labels, rim markers and chrome.
 - **[Re-baselined geometry]** Footprints, spreading tests, label offsets (for example the current label `y`) and the browser geometry `INSET` all move with the scale. Every affected test is listed in `tasks.md`.
-- **[Remembered in-canvas nodes]** They would show the visited dot. The coordinate projection never draws one in-canvas.
+- **[Remembered in-canvas nodes]** `glyphState` maps `remembered` to the visited dot, but the coordinate projection never draws a remembered node in-canvas. Remembered places appear as rim diamonds, so this branch exists only for safety.
 - **[Pre-existing timeout]** In `map_drawer.test.js`, "opens with focus on the selected tab even when it is not the first" takes about 4.7 s on master and can time out under full-suite load. It passes alone.
 
 ## Migration Plan

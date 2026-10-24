@@ -12,14 +12,16 @@ Tick a box only after its verification passes in the worktree.
 - [ ] 1.1 [EXISTS+NEW] `components/MapNodeGlyph.vue`.
   - Adopt: the state, gate, travel, selected, `markerClass`, `haloClass` and `testIds` contract, and the styles moved from AreaMapView.
   - New: replace the radius-only `scale` prop with `size` (default 1). Make it a single root `<g transform="scale(size)">` around base-unit shapes, with no `vector-effect`. Make `gatePath()` return the base path.
-  - Verify: a Vitest case mounts `size=0.5`. The `r` and `d` attributes are the base values, the group carries `scale(0.5)`, and the bounding boxes, stroke widths and dash lengths are halved.
+  - Verify in Vitest: a mount with `size=0.5` keeps the base `r` and `d` attributes, the root group carries `scale(0.5)`, and the component source holds no `vector-effect`.
+  - Verify in a Storybook play (task 6.2): the halved rendered box, stroke width and dash lengths. jsdom has no layout, so these checks cannot run in Vitest.
 - [ ] 1.2 [EXISTS+NEW] `lib/map_marker_geometry.js`.
   - Adopt: the base constants, `GATE_FOOTPRINT = hypot(9, 9)` and `paintedMarkerFootprint`.
   - New: export `ISLAND_GLYPH_SCALE = 0.75`, the single definition, and `AREA_CELL_GLYPH_SCALE = 0.875`. Change the signature to `paintedMarkerFootprint(node, size = 1)`, returning the base value times `size`.
   - Verify: `tests/minimap_projection.test.js` is re-baselined. Base footprints are 16/14/hypot(9,9)/6.5. The scaled island footprints are those values times 0.75. The default spread clearance is `2 × 16 × 0.75`.
 - [ ] 1.3 [EXISTS+NEW] `components/WorldMapGlyph.vue` and `components/world-map-ink.css`, included scoped in `WorldMapView.vue`.
   - New: give `WorldMapGlyph` a single `<g>` root and drop its `vector-effect: non-scaling-stroke`, so strokes scale with `scale(uiScale)`.
-  - Verify: `tests/world/world_map_view.test.js` passes. A case asserts that the glyph shapes' computed `vector-effect` is not `non-scaling-stroke`, and that the glyph group carries `scale(uiScale)`.
+  - Verify in Vitest: `tests/world/world_map_view.test.js` passes, the glyph group carries `scale(uiScale)`, and `WorldMapGlyph.vue`'s source holds no `vector-effect`.
+  - Verify in the browser (task 7.3, or a Storybook play): the computed `vector-effect` of the glyph shapes is `none`.
 - [ ] 1.4 [NEW] Shared area ink.
   - Create `components/area-map-ink.css` for the road casing and core rules (walked, frontier, travel), and include it scoped in `AreaMapView.vue` and `MapDrawer.vue`.
   - Create `components/MapCommissionGlyph.vue`, holding the diamond `M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z` and its paint, and use it for AreaMapView's point-node commission.
@@ -36,14 +38,19 @@ Tick a box only after its verification passes in the worktree.
   - the in-canvas landmark ring removed.
 
   Verify: `tests/world/map_lattice_legend_labels.test.js` (visited dot, no `.local-map__landmark`, including a landmark node with a move action) and `tests/world/map_lattice_renderer.test.js` (base arch path equals the area map's).
-- [ ] 2.2 [NEW] `MapLattice.vue` passes `size = ISLAND_GLYPH_SCALE * markerScale` to `MapNodeGlyph`, and the stub start becomes `(HALO_R + 1) × s`.
-  - Verify: a Vitest case asserts the glyph group transform `scale(0.75)` at `markerScale` 1, and a stub line start at radius `16 × 0.75`.
+- [ ] 2.2 [NEW] `MapLattice.vue` computes `glyphSize`: `ISLAND_GLYPH_SCALE` for the lattice variant, and `ISLAND_GLYPH_SCALE * markerScale` for the graph variant. It passes that value to `MapNodeGlyph`, and the stub start becomes `(HALO_R + 1) × glyphSize`. In `use-map-lattice-render.js`, the graph `labelY()` uses `LABEL_BASELINE_HALF = HALO_R + 1` times `glyphSize`.
+  - Verify with Vitest cases:
+    - the lattice glyph group is `scale(0.75)` at `markerScale` 1 and also at 2;
+    - the graph glyph group is `scale(0.75 × markerScale)`;
+    - the stub line starts at radius 12.
+  - Re-baseline `tests/world/map_layout_variants.test.js` and `tests/world/map_lattice_name_fit.test.js` for the graph label offset and glyph sizes.
+  - Update `stories/World/MapLattice.stories.js` plays that depend on `markerScale`.
 - [ ] 2.3 [NEW] Island footprints.
   - Pass the scale through: `minimap_projection.js` `spreadExits` uses `paintedMarkerFootprint(node, ISLAND_GLYPH_SCALE)`, and `use-map-lattice-geometry.js` `nodeFootprint` uses `ISLAND_GLYPH_SCALE * markerScale`.
   - Label-layout obstacles become `Math.max(HALO_R × s, footprint)`.
   - Verify by re-baselining:
     - `tests/minimap_projection.test.js` (explicit footprint and grouped overlap);
-    - `tests/world/local_map.test.js` (gateway-feet spacing `2 × 16 × 0.75`, and the current label `y = 14 × 0.75 + 3 + 0.8 × 16`, or whatever the label geometry derives);
+    - `tests/world/local_map.test.js` (gateway-feet spacing `2 × 16 × 0.75 = 24`, and the current label `y = 14 × 0.75 + 3 + 0.8 × 16 = 26.3`);
     - `tests/world/map_lattice_renderer.test.js` (actionable gate spacing).
   - Add a case that changes the constant (mocked) and asserts that glyph size, footprint, stub start and aim ring all follow it.
 - [ ] 2.4 [EXISTS+NEW] `composables/use-map-lattice-geometry.js`.
@@ -57,12 +64,12 @@ Tick a box only after its verification passes in the worktree.
 ## 3. Area map wilderness cells
 
 - [ ] 3.1 [NEW] The AreaMapView `node.cell` branch draws `MapNodeGlyph` (current, gate) and `MapCommissionGlyph` at `AREA_CELL_GLYPH_SCALE`, keeping the corner offset. Delete the private r13/9/5 seal, the 7-unit arch, the cell pin path and their `area-map__here-*` and `area-map__gate` rules.
-  - Verify: a Vitest case on a wilderness area map asserts that the cell current, gate and commission marks use the shared classes and base paths inside a `scale(0.875)` group. It also asserts that no `area-map__here-*` or `area-map__gate` element remains, and that the glyph fits inside the smallest cell rectangle in the fixture.
+  - Verify: a Vitest case on a wilderness area map asserts that the cell current, gate and commission marks use the shared classes and base paths inside a `scale(0.875)` group. It also asserts that no `area-map__here-*` or `area-map__gate` element remains, and that the scaled glyph's extent (`HERE_GLOW_R × 0.875 = 12.25`) is no more than half of the smallest cell side in the `tests/world/area_map_view.test.js` wilderness fixture at its minimum zoom stop. If it is larger, lower `AREA_CELL_GLYPH_SCALE` and record the new value in `design.md`.
 
 ## 4. Island label fix
 
 - [ ] 4.1 [EXISTS] The `lib/island_labels.js` raster-fallback guard: skip a box when `reach < request.footprint + LABEL_GAP`.
-  - New test in `tests/island_labels.test.js`: without the guard, the nearest raster box lies inside the label's own footprint. Verify the label lands outside it.
+  - New test in `tests/world/island_labels.test.js`: without the guard, the nearest raster box lies inside the label's own footprint. Verify the label lands outside it.
 
 ## 5. Map drawer legend
 
@@ -89,7 +96,14 @@ Tick a box only after its verification passes in the worktree.
   - the approx ring is r14.
 
   Verify it passes.
-- [ ] 5.5 [NEW] In "the drawer current marker makes one truthful position claim", add a case: the island current node draws one `map-glyph__here-glow/ring/dot` set at base radii 14/10/6 inside a `scale(ISLAND_GLYPH_SCALE)` group. Verify the block passes.
+- [ ] 5.5 [NEW] Add a static single-source guard test, in Vitest reading the component sources. It asserts that:
+  - `<pattern` appears only in `WorldHatchPattern.vue`;
+  - the gate arch path is produced only by `gatePath()` in `lib/map_marker_geometry.js`, and no `.vue` file holds an arch path literal (`A8 8 0 0 1` or `A7 7 0 0 1`);
+  - the diamond literal `M0 -7.5 L5.5 0` appears only in `MapCommissionGlyph.vue`;
+  - no `.lg-road`, `.lg-quest`, `.lg--`, `area-map__here-` or `area-map__gate` rule or element remains in any component.
+
+  Verify it passes.
+- [ ] 5.6 [NEW] In "the drawer current marker makes one truthful position claim", add a case: the island current node draws one `map-glyph__here-glow/ring/dot` set at base radii 14/10/6 inside a `scale(ISLAND_GLYPH_SCALE)` group. Verify the block passes.
 
 ## 6. Storybook
 
