@@ -66,6 +66,7 @@ from world.rules.time_skip import (
     MODE_RECOVERY,
     STALE_SLEEP_MESSAGE,
     SleepRefused,
+    _accepted_sleep_seconds,
     _party_member_eligible,
     _restore_sleep_surfaces,
     _sleep_surface_snapshot,
@@ -229,6 +230,7 @@ def _party_status(commander: Any, *, actor: Any) -> tuple[bool, str | None]:
     except PartyScopeError:  # observability: ignore R2: no party scope means no eligible party choice
         return False, REASON_NOT_CONTROLLING
     has_awake = False
+    has_unmet = False
     for member in members:
         if getattr(member, "_is_deleted", False):
             continue
@@ -244,7 +246,14 @@ def _party_status(commander: Any, *, actor: Any) -> tuple[bool, str | None]:
                 _party_member_eligible(member)
             except SleepRefused as error:  # observability: ignore R2: the stable refusal IS the party availability reason
                 return False, error.message
+            accepted, _partial = _accepted_sleep_seconds(
+                member, "recovery", None
+            )
+            if accepted > 0:
+                has_unmet = True
     if not has_awake:
+        return False, REASON_NO_SLEEPER
+    if not has_unmet:
         return False, REASON_NO_SLEEPER
     return True, None
 

@@ -159,9 +159,11 @@ def _exploration_fixture(character) -> None:
             from world.rules.fatigue import SleepPosture, write_fatigue_state
             from world.rules.party import live_companions
 
-            write_fatigue_state(character, 360000, SleepPosture.AWAKE)
+            # Half reserve keeps both recovery sleep and the all-party option
+            # meaningful; a fully recovered fixture correctly refuses them.
+            write_fatigue_state(character, 180000, SleepPosture.AWAKE)
             for member in live_companions(character):
-                write_fatigue_state(member, 360000, SleepPosture.AWAKE)
+                write_fatigue_state(member, 180000, SleepPosture.AWAKE)
 
         if os.environ.get("ELOSERN_BROWSER_TERMINAL_FATIGUE") == "1":
             # The terminal-fatigue journey opens a canonical engagement whose

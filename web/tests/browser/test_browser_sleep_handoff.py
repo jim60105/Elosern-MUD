@@ -66,8 +66,8 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
     def _fatigue_rows(self, page):
         return store_state(page)["panels"]["status"]["fatigue"]
 
-    def _all_awake(self, page):
-        rows = self._fatigue_rows(page)
+    def _all_awake(self, state):
+        rows = ((state.get("panels") or {}).get("status") or {}).get("fatigue") or []
         return bool(rows) and all(row.get("stage") != "sleeping" for row in rows)
 
     def _sleep_recovery(self, page):
@@ -154,6 +154,7 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         )
         before_wake = int(store_state(page)["panels"]["status"]["actor"]["identity"])
         self.assertEqual(before_wake, player_id)
+        before_time = store_state(page)["serverTime"]
 
         # Decline with an awake companion present: no automatic fast-forward.
         answer_dream_question(page, False)
@@ -163,7 +164,7 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         # the owner's accepted target.
         self._run_command(page, "sleep continue")
         wait_for_store_state(page, self._all_awake, timeout=60000)
-        self.assertIn("時間經過", narrative_log_text(page))
+        self.assertNotEqual(store_state(page)["serverTime"], before_time)
 
         page.reload()
         self._wait_exploration_available(page)
@@ -255,13 +256,26 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         party.wait_for(state="visible", timeout=30000)
         self.assertEqual(party.get_attribute("aria-disabled"), None)
         party.click()
-        page.wait_for_selector('[data-testid="dream-question"]', timeout=30000)
+        try:
+            page.wait_for_selector('[data-testid="dream-question"]', timeout=30000)
+        except Exception as error:
+            state = store_state(page)
+            panels = state.get("panels") or {}
+            raise AssertionError(
+                {
+                    "narrative": narrative_log_text(page)[-2000:],
+                    "sleep_handoff": panels.get("sleep_handoff"),
+                    "fatigue": (panels.get("status") or {}).get("fatigue"),
+                    "party_sent": sent_action_count(page, "explore.sleep_party"),
+                }
+            ) from error
 
         before = sent_action_count(page, "explore.sleep_party")
         self.assertEqual(before, 1)
+        before_time = store_state(page)["serverTime"]
         answer_dream_question(page, False)
         wait_for_store_state(page, self._all_awake, timeout=60000)
-        self.assertIn("時間經過", narrative_log_text(page))
+        self.assertNotEqual(store_state(page)["serverTime"], before_time)
         self.assertEqual(
             page.locator('[data-testid="sleep-handoff-card"]').count(), 0
         )
