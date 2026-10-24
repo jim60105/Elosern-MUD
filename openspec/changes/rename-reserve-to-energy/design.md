@@ -26,7 +26,7 @@ The other hits are comments or developer docs: `world/rules/fatigue.py` (module 
 - **A plain string replacement, no shared constant.** The four sources are owned by different layers (Vue template, two rules modules, two Markdown files); a shared term constant would cross the client/server boundary for one word. Each source replaces the literal in place.
 - **Docs grammar.** In the docs every 精神儲備 becomes 精力 with no other wording change; each resulting sentence reads naturally (for example `耗盡精力`, `生命、法力、體力與精力全滿`, `每秒 12 單位消耗精力`).
 - **Test coverage for the travel message.** No test asserts the refusal text today. The task adds one assertion of `str(caught.exception)` to the existing `test_a_non_distance_connector_refuses_exhaustion_before_arrival` in `world/rules/tests/test_movement.py`, which already raises that refusal.
-- **Traceability.** The new `mental-reserve` requirement has no canonical identifier until the archive syncs it. During apply, the touched tests keep their current annotations; at archive the travel, status-docs, and handoff tests are additionally annotated with the generated identifier (tasks.md, Workflow follow-up).
+- **Traceability.** The new `mental-reserve` requirement has no canonical identifier until the archive syncs it. During apply, the touched tests keep their current annotations; at archive the travel, status-docs, and handoff tests are additionally annotated with the generated identifier (tasks.md group 5).
 
 ## Risks / Trade-offs
 

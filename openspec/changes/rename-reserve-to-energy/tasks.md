@@ -19,7 +19,12 @@ Conventions: run Python tests with the Evennia test runner as `uv run --locked -
 
 - [ ] 4.1 Run `rg -n "精神儲備" web/webclient-app/components web/webclient-app/tests web/static/webclient/js world/rules/travel_cost.py world/rules/possession.py world/rules/tests commands tests docs/game` and confirm it prints nothing. Then run `uv run --locked python -m tools.contract_gate` and `uv run --locked python -m tools.spec_traceability check`. Verify: no match and both commands pass.
 
+## 5. Traceability (run during archive, right after the spec sync)
+
+Run in the archive step after `openspec archive` syncs the `mental-reserve` delta into `openspec/specs/`, before the archive merge. Do not run during apply.
+
+- [ ] 5.1 Run `uv run --locked python -m tools.spec_traceability list`, take the generated identifier of "Player-facing text names the reserve 精力", and add it (keeping the existing identifiers) to the `covers_requirement` of `test_a_non_distance_connector_refuses_exhaustion_before_arrival` (`world/rules/tests/test_movement.py`), `test_handoff_lists_fatigue_and_return_or_possess_meaning` (`commands/tests/test_handoff_command.py`), and `test_status_and_cast_entries_document_protected_physiology` (`tests/test_command_docs.py`). Verify: `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate` pass.
+
 ## Workflow follow-up
 
-- At archive, after the `mental-reserve` delta syncs, run `uv run --locked python -m tools.spec_traceability list` and add the generated identifier of "Player-facing text names the reserve 精力" to the `covers_requirement` of `test_a_non_distance_connector_refuses_exhaustion_before_arrival` (`world/rules/tests/test_movement.py`), `test_handoff_lists_fatigue_and_return_or_possess_meaning` (`commands/tests/test_handoff_command.py`), and `test_status_and_cast_entries_document_protected_physiology` (`tests/test_command_docs.py`), keeping their existing identifiers.
-- Archive the change after review.
+- Archive the change after review; group 5 is part of the archive step.
