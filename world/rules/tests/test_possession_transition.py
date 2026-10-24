@@ -1439,7 +1439,7 @@ class SleepHandoffTransitionTests(EvenniaTest):
         join_party(self.npc, self.char1)
         self.npc.race = "human"
         self.npc.apply_race_baseline()
-        write_fatigue_state(self.npc, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(self.npc, 180000, SleepPosture.AWAKE)
         self.target = create_object(NPC, key="接手同伴", location=self.room1)
         self.target.race = "human"
         self.target.apply_race_baseline()
@@ -1599,6 +1599,8 @@ class SleepHandoffTransitionTests(EvenniaTest):
         import world.rules.possession as possession_module
 
         release_possession(self.char1, npc=self.npc, reason="handback")
+        self.char1.apply_race_baseline()
+        write_fatigue_state(self.char1, 180000, SleepPosture.AWAKE)
         entry = enter_sleep(self.char1)
         self.assertTrue(entry.handoff_offered)
         tick_before = int(get_world_clock().tick)

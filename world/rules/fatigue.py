@@ -1051,11 +1051,85 @@ def _notify_wake_transition_observers(entity: Any, occurrence_id: str, in_combat
             pass
 
 
+def _receipt_surfaces() -> tuple[tuple[str, str | None], ...]:
+    """The durable receipt surfaces this writer may touch on a forced transition."""
+    from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
+
+    return SLEEP_RECEIPT_SURFACES
+
+
+def _sync_sleep_receipt(
+    entity: Any, prediction: "FatiguePrediction", start_tick: int | None
+) -> None:
+    """Create or complete a forced receipt from this committed transition.
+
+    Forced depletion creates the durable threshold receipt at the actual
+    committed transition, for every caller of the sole fatigue writer (clock
+    settlement and terminal combat alike). A forced natural wake completes the
+    receipt. A voluntary body's receipt is owned by the clock's reception; this
+    writer never invents or replaces one.
+    """
+    from world.rules.clock import get_world_clock
+    from world.rules.sleep_receipt import (
+        KIND_FORCED,
+        MODE_FORCED_THRESHOLD,
+        STATE_COMPLETED,
+        STATE_SLEEPING,
+        SleepReceipt,
+        forced_wake_seconds,
+        read_sleep_receipt,
+        write_sleep_receipt,
+    )
+
+    start = prediction.start
+    end = prediction.end
+    decaying = start.posture is not SleepPosture.FORCED and end.posture is SleepPosture.FORCED
+    waking = start.posture is SleepPosture.FORCED and end.posture is SleepPosture.AWAKE
+    if not (decaying or waking):
+        return
+    tick = (
+        int(get_world_clock().tick)
+        if start_tick is None
+        else int(start_tick) + int(prediction.seconds)
+    )
+    existing = read_sleep_receipt(entity)
+    if decaying:
+        if existing is not None and existing.sleeping:
+            return
+        seconds = forced_wake_seconds(entity)
+        receipt = SleepReceipt(
+            sleep_id=f"forced:{getattr(entity, 'pk', '?')}:{tick}",
+            body_id=int(getattr(entity, "pk", 0) or 0),
+            owner_id=None,
+            kind=KIND_FORCED,
+            mode=MODE_FORCED_THRESHOLD,
+            entry_tick=tick,
+            target_tick=tick + seconds,
+            limit_tick=tick + seconds,
+            settled_through_tick=tick,
+            revision=0,
+            state=STATE_SLEEPING,
+            accepted_seconds=seconds,
+            partial=False,
+        )
+        write_sleep_receipt(entity, receipt)
+        return
+    if existing is not None and existing.sleeping:
+        write_sleep_receipt(
+            entity,
+            existing.with_progress(
+                settled_through_tick=max(tick, existing.settled_through_tick),
+                state=STATE_COMPLETED,
+            ),
+        )
+
+
 def settle_fatigue_intervals(
     intervals: Iterable[FatigueInterval],
     *,
     context: Mapping[str, Any] | None = None,
     in_combat: bool = False,
+    start_tick: int | None = None,
 ) -> FatigueSettlement:
     """Commit accepted intervals atomically and emit committed transitions.
 
@@ -1083,6 +1157,7 @@ def settle_fatigue_intervals(
 
     caller_context = dict(context or {})
     snapshots: list[tuple[Any, dict[str, tuple[bool, Any]]]] = []
+    surfaces = tuple(FATIGUE_ATTRIBUTE_SURFACES) + tuple(_receipt_surfaces())
     for interval, _ in planned:
         entity = interval.entity
         snapshots.append(
@@ -1090,7 +1165,7 @@ def settle_fatigue_intervals(
                 entity,
                 {
                     key: attribute_snapshot(entity, key, category)
-                    for key, category in FATIGUE_ATTRIBUTE_SURFACES
+                    for key, category in surfaces
                 },
             )
         )
@@ -1109,6 +1184,7 @@ def settle_fatigue_intervals(
                 # reserve/posture write, so no observer sees a stage that
                 # disagrees with the persisted physiology.
                 project_fatigue_status(interval.entity, prediction.end, policy)
+                _sync_sleep_receipt(interval.entity, prediction, start_tick)
             for interval, prediction in planned:
                 if prediction.end == prediction.start:
                     continue

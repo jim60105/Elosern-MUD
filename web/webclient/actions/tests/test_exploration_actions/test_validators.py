@@ -180,7 +180,25 @@ class ExplorationValidatorTests(unittest.TestCase):
     def test_wait_payload_exact(self):
         self.assertEqual(validate_wait_payload({"daypart": "dawn"}), {"daypart": "dawn"})
         self.assertEqual(validate_wait_payload({"seconds": 3600}), {"seconds": 3600})
+        # Scope and mode default to self/recovery at dispatch; absent fields
+        # stay absent so the adapter can tell an explicit request apart.
         self.assertEqual(validate_wait_payload({"sleep": True}), {"sleep": True})
+        self.assertEqual(
+            validate_wait_payload({"sleep": True, "sleep_scope": "party"}),
+            {"sleep": True, "sleep_scope": "party"},
+        )
+        self.assertEqual(
+            validate_wait_payload(
+                {"sleep": True, "sleep_mode": "duration", "seconds": 7200}
+            ),
+            {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
+        )
+        # The combined dream-and-sleep form remains the canonical recovery
+        # request until the dependent dream change retires it.
+        self.assertEqual(
+            validate_wait_payload({"sleep": True, "dream": True}),
+            {"sleep": True, "dream": True},
+        )
         for bad in (
             None,
             {"daypart": "tea"},
@@ -190,6 +208,18 @@ class ExplorationValidatorTests(unittest.TestCase):
             {"sleep": "yes"},
             {"daypart": "dawn", "seconds": 60},
             {},
+            {"sleep": False},
+            {"sleep": True, "sleep_scope": "all"},
+            {"sleep": True, "sleep_mode": "until-recovered"},
+            {"sleep": True, "sleep_mode": "duration"},
+            {"sleep": True, "seconds": 60},
+            {"sleep": True, "sleep_mode": "duration", "seconds": True},
+            {"sleep": True, "sleep_mode": "duration", "seconds": 0},
+            {"sleep": True, "sleep_mode": "duration", "seconds": MAX_WEB_SKIP_SECONDS + 1},
+            {"sleep": True, "unknown": 1},
+            {"sleep": True, "sleep_scope": "party", "daypart": "dawn"},
+            {"sleep": True, "sleep_scope": "party", "dream": True},
+            {"sleep": True, "dream": True, "seconds": 60},
         ):
             with self.assertRaises(ExplorationActionError):
                 validate_wait_payload(bad)

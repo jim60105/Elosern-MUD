@@ -261,6 +261,8 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
     """Validate the exact ``explore.wait`` payload (one of daypart/seconds/sleep)."""
     if not isinstance(payload, dict):
         raise ExplorationActionError("explore.wait payload must be an object")
+    if "sleep" in payload:
+        return _validate_sleep_wait_payload(payload)
     if set(payload) == {"daypart"}:
         daypart = payload["daypart"]
         if not isinstance(daypart, str) or daypart not in DAYPARTS:
@@ -275,15 +277,58 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
                 f"explore.wait seconds must be within 1..{MAX_WEB_SKIP_SECONDS}"
             )
         return {"seconds": seconds}
-    if set(payload) == {"sleep"}:
-        if payload["sleep"] is not True:
-            raise ExplorationActionError("explore.wait sleep must be the exact boolean true")
-        return {"sleep": True}
-    if set(payload) == {"sleep", "dream"}:
-        if payload["sleep"] is not True or payload["dream"] is not True:
-            raise ExplorationActionError("dream sleep requires exact boolean true choices")
-        return {"sleep": True, "dream": True}
     raise ExplorationActionError("explore.wait requires exactly one of daypart, seconds, or sleep")
+
+
+_SLEEP_WAIT_KEYS = frozenset({"sleep", "sleep_scope", "sleep_mode", "seconds"})
+_SLEEP_SCOPES = ("self", "party")
+_SLEEP_MODES = ("recovery", "duration")
+
+
+def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the declared sleep scope/mode/seconds grammar exactly."""
+    if payload.get("sleep") is not True:
+        raise ExplorationActionError(
+            "explore.wait sleep must be the exact boolean true"
+        )
+    keys = set(payload)
+    if keys == {"sleep", "dream"}:
+        # The combined dream-and-sleep request remains the existing canonical
+        # recovery request until the dependent dream change retires it.
+        if payload["dream"] is not True:
+            raise ExplorationActionError(
+                "dream sleep requires exact boolean true choices"
+            )
+        return {"sleep": True, "dream": True}
+    if not keys <= _SLEEP_WAIT_KEYS:
+        raise ExplorationActionError(
+            "explore.wait sleep carries an unknown field"
+        )
+    scope = payload.get("sleep_scope", "self")
+    if scope not in _SLEEP_SCOPES:
+        raise ExplorationActionError("explore.wait sleep_scope is not a stable value")
+    mode = payload.get("sleep_mode", "recovery")
+    if mode not in _SLEEP_MODES:
+        raise ExplorationActionError("explore.wait sleep_mode is not a stable value")
+    sleep: dict[str, Any] = {"sleep": True}
+    if "sleep_scope" in payload:
+        sleep["sleep_scope"] = scope
+    if "sleep_mode" in payload:
+        sleep["sleep_mode"] = mode
+    if mode == "duration":
+        if "seconds" not in payload:
+            raise ExplorationActionError("duration sleep requires seconds")
+        seconds = payload["seconds"]
+        if isinstance(seconds, bool) or not isinstance(seconds, int):
+            raise ExplorationActionError("explore.wait seconds must be an integer")
+        if not 1 <= seconds <= MAX_WEB_SKIP_SECONDS:
+            raise ExplorationActionError(
+                f"explore.wait seconds must be within 1..{MAX_WEB_SKIP_SECONDS}"
+            )
+        sleep["seconds"] = seconds
+    elif "seconds" in payload:
+        raise ExplorationActionError("recovery sleep cannot carry seconds")
+    return sleep
 
 
 def validate_practice_payload(payload: Any) -> dict[str, Any]:
@@ -941,7 +986,14 @@ def _wait_adapter(
         return _rejected("malformed_payload", "缺少等待時長。")
     try:
         if sleep:
-            outcome = begin_sleep(actor)
+            explicit = "seconds" in payload or "sleep_mode" in payload
+            outcome = begin_sleep(
+                actor,
+                mode=payload.get("sleep_mode", "recovery"),
+                seconds=payload.get("seconds"),
+                scope=payload.get("sleep_scope", "self"),
+                allow_continue=not explicit,
+            )
         else:
             result = advance_wait(actor, seconds)
     except SkipRefused as exc:  # observability: ignore R2: the stable skip refusal IS the action result, not a swallowed failure
@@ -960,6 +1012,8 @@ def _wait_adapter(
             actor.msg(outcome.message)
             return _success("slept", outcome.message, AFFECTED_FULL)
         result = outcome.result
+        if result is None:
+            return _success("slept", "已接受睡眠。", AFFECTED_FULL)
         elapsed = result.elapsed_seconds
     else:
         elapsed = result.elapsed_seconds

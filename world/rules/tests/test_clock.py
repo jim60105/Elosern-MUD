@@ -454,6 +454,35 @@ class DeclaredPracticeSettlementTests(unittest.TestCase):
         self.assertEqual(sleeper.db.practice_booking, "fire_arrow")
         self.assertIsNone(awake.db.practice_booking)
 
+    @covers_requirement(
+        "party-time-settlement::each-member-owns-one-standing-practice-booking"
+    )
+    def test_mixed_interval_grants_only_the_elected_awake_remainder(self):
+        entity = BookingEntity()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            _practice_settlement(
+                (entity,),
+                7200,
+                AdvanceSource.SKIP,
+                7200,
+                {id(entity): 3600},
+            )
+        # One hour awake after the voluntary deadline, never the whole action.
+        grant.assert_called_once_with(entity, "fire_arrow", 1, unlocks_out=[])
+        self.assertIsNone(entity.db.practice_booking)
+
+    @covers_requirement(
+        "party-time-settlement::each-member-owns-one-standing-practice-booking"
+    )
+    def test_sleeping_only_interval_preserves_the_booking(self):
+        entity = BookingEntity()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            _practice_settlement(
+                (entity,), 7200, AdvanceSource.SKIP, 7200, {}
+            )
+        grant.assert_not_called()
+        self.assertEqual(entity.db.practice_booking, "fire_arrow")
+
     def test_zero_seconds_never_consumes_a_booking(self):
         entity = BookingEntity()
         with patch("world.rules.clock.grant_study_practice_xp") as grant:

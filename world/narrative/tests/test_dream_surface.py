@@ -121,7 +121,9 @@ class DreamSurfaceTests(EvenniaTest):
         command.func()
         self.assertIsNone(service.dream_state(self.actor))
         self.assertEqual(before, self.physical())
-        self.assertIn("沒有進入夢境", command.caller.msg.call_args_list[-1].args[0])
+        # An already-met recovery target reconciles awake without inventing
+        # elapsed sleep; no dream question is opened either way.
+        self.assertIn("完全恢復", command.caller.msg.call_args_list[-1].args[0])
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     def test_browser_zero_sleep_choice_and_ordinary_rest_wait(self):

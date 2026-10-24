@@ -43,7 +43,7 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.sleeper.race = "human"
         self.sleeper.apply_race_baseline()
         join_party(self.sleeper, self.player)
-        write_fatigue_state(self.sleeper, 360000, SleepPosture.AWAKE)
+        write_fatigue_state(self.sleeper, 180000, SleepPosture.AWAKE)
         self.candidate = create_object(NPC, key="清醒同伴", location=self.room1)
         self.candidate.race = "human"
         self.candidate.apply_race_baseline()

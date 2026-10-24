@@ -365,13 +365,24 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertIsNotNone(monster.pk)
 
     def test_entry_commits_posture_at_zero_elapsed(self):
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.player.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         before = get_world_clock().tick
         entry = enter_sleep(self.player)
         self.assertEqual(get_world_clock().tick, before)
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY)
-        self.assertEqual(entry.requested_seconds, 0)
+        # Full gauges with half reserve accept 15,000 seconds, never zero.
+        self.assertEqual(entry.requested_seconds, 15000)
 
     def test_entry_projection_failure_restores_the_prior_physiology(self):
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.player.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         before = read_fatigue_state(self.player)
         with patch(
             "world.rules.time_skip.project_fatigue_status",
@@ -415,6 +426,11 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
 
     def test_duplicate_continuation_identity_never_replays_time(self):
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.player.traits, key)
+            gauge.current = gauge.max
+            gauge.rate = 0.0
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         entry = enter_sleep(self.player)
         first = continue_sleep(
             self.player, entry, operation_id="synthetic-sleep-once"
