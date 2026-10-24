@@ -268,6 +268,18 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
         )
         self.assertEqual(result["outcome"], "success")
+        from server.dream_service import answer_sleep_dream
+        from world.rules.time_skip import owner_sleep_view_state
+
+        view = owner_sleep_view_state(self.player)
+        answer = answer_sleep_dream(
+            self.player,
+            decision="decline",
+            sleep_id=view["sleep_id"],
+            revision=view["revision"],
+            generation=view["generation"],
+        )
+        self.assertEqual(answer["outcome"], "success")
         self.assertEqual(get_world_clock().tick - before, 7200)
         self.assertIs(
             read_fatigue_state(self.player).posture, SleepPosture.AWAKE
@@ -293,6 +305,17 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         before = get_world_clock().tick
         result = _wait_adapter(self.player, payload)
         self.assertEqual(result["outcome"], "success")
+        from server.dream_service import answer_sleep_dream
+        from world.rules.time_skip import owner_sleep_view_state
+
+        view = owner_sleep_view_state(self.player)
+        answer_sleep_dream(
+            self.player,
+            decision="decline",
+            sleep_id=view["sleep_id"],
+            revision=view["revision"],
+            generation=view["generation"],
+        )
         self.assertEqual(get_world_clock().tick - before, 7200)
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")

@@ -406,12 +406,32 @@ class SkipHelperAdvanceTests(EvenniaTest):
         write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
         before = get_world_clock().tick
         outcome = begin_sleep(self.player)
-        self.assertIsNotNone(outcome.result)
-        self.assertEqual(outcome.result.elapsed_seconds, 15000)
+        # Entry is zero-time and the owner question gates recovery.
+        self.assertIsNone(outcome.result)
+        self.assertEqual(get_world_clock().tick, before)
+        from world.rules.time_skip import (
+            continue_owner_sleep,
+            decline_owner_sleep_dream,
+            owner_sleep_view_state,
+        )
+
+        state = owner_sleep_view_state(self.player)
+        decline_owner_sleep_dream(
+            self.player,
+            sleep_id=state["sleep_id"],
+            revision=state["revision"],
+            generation=state["generation"],
+        )
+        result = continue_owner_sleep(
+            self.player,
+            sleep_id=state["sleep_id"],
+            expected_generation=state["generation"],
+        )
+        self.assertEqual(result.elapsed_seconds, 15000)
         self.assertEqual(get_world_clock().tick - before, 15000)
         self.assertEqual(read_fatigue_state(self.player).reserve_units, 360000)
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
-        self.assertTrue(outcome.result.woke)
+        self.assertTrue(result.woke)
 
     @covers_requirement(
         "time-skip-commands::recovery-waiting-preserves-skip-safety"

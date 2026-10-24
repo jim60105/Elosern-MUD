@@ -193,14 +193,9 @@ class ExplorationValidatorTests(unittest.TestCase):
             ),
             {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
         )
-        # The combined dream-and-sleep form remains the canonical recovery
-        # request until the dependent dream change retires it.
-        self.assertEqual(
-            validate_wait_payload({"sleep": True, "dream": True}),
-            {"sleep": True, "dream": True},
-        )
         for bad in (
             None,
+            {"sleep": True, "dream": True},
             {"daypart": "tea"},
             {"seconds": 0},
             {"seconds": MAX_WEB_SKIP_SECONDS + 1},

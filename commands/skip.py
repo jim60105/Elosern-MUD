@@ -234,7 +234,10 @@ class CmdSleep(Command):
                 from world.rules.sleep_control import begin_all_party_sleep
 
                 outcome = begin_all_party_sleep(
-                    self.caller, mode=mode, seconds=seconds, session=self.session
+                    self.caller,
+                    mode=mode,
+                    seconds=seconds,
+                    session=getattr(self, "session", None),
                 )
                 self.caller.msg(
                     _with_handoff_offer(

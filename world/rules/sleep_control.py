@@ -445,10 +445,13 @@ def begin_all_party_sleep(
     commander = resolve_commander(actor)
     account = _resolve_account(commander, actor)
     view = build_sleep_control_view(actor, account=account, session=session)
-    if view is None or not view.party_enabled:
-        raise SleepRefused(
-            "party_unavailable", view.party_reason if view is not None else REASON_NOT_CONTROLLING
-        )
+    party_enabled, party_reason = (
+        (view.party_enabled, view.party_reason)
+        if view is not None
+        else _party_status(commander, actor=actor)
+    )
+    if not party_enabled:
+        raise SleepRefused("party_unavailable", party_reason)
     possessed = actor is not commander
     owner_sessions = tuple(_acting_sessions(actor)) if possessed else ()
     if possessed:
@@ -464,11 +467,13 @@ def begin_all_party_sleep(
         with transaction.atomic():
             _lock_control(account, commander, actor, members)
             locked = build_sleep_control_view(actor, account=account, session=session)
-            if locked is None or not locked.party_enabled:
-                raise SleepRefused(
-                    "party_unavailable",
-                    locked.party_reason if locked is not None else REASON_NOT_CONTROLLING,
-                )
+            enabled_after_lock, reason_after_lock = (
+                (locked.party_enabled, locked.party_reason)
+                if locked is not None
+                else _party_status(commander, actor=actor)
+            )
+            if not enabled_after_lock:
+                raise SleepRefused("party_unavailable", reason_after_lock)
             if possessed:
                 binding = current_possession(commander)
                 if (

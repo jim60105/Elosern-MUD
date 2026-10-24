@@ -146,7 +146,7 @@ class CmdHandoff(Command):
         if store is not None:
             store.sleep_handoff_listing = (
                 view.transition_id,
-                tuple(row.identity for row in view.rows),
+                tuple((row.identity, row.enabled) for row in view.rows),
             )
         from world.rules.sleep_control import render_sleep_control_text
 
@@ -201,9 +201,10 @@ class CmdHandoff(Command):
             self.caller.msg(_HANDOFF_STALE)
             self._show(view)
             return
-        candidate_id = listing[1][int(choice) - 1]
+        listed_id, listed_enabled = listing[1][int(choice) - 1]
+        candidate_id = listed_id
         row = next((item for item in view.rows if item.identity == candidate_id), None)
-        if row is None:
+        if row is None or (listed_enabled and not row.enabled):
             self.caller.msg(_HANDOFF_STALE)
             self._show(view)
             return
