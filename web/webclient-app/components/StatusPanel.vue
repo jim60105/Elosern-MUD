@@ -75,7 +75,7 @@ const fatigueRows = computed(() =>
           class="fatigue__row"
           :data-stage="row.stage"
           :data-identity="row.identity"
-        >{{ row.name }}：精神儲備 {{ row.reserve_percent }}%（{{ row.label }}）<template v-if="row.restriction">，{{ row.restriction }}</template></span>
+        >{{ row.name }}：精力 {{ row.reserve_percent }}%（{{ row.label }}）<template v-if="row.restriction">，{{ row.restriction }}</template></span>
       </div>
     </div>
   </Transition>

@@ -745,6 +745,7 @@ class TerrainCalibrationTests(EvenniaTest):
         with self.assertRaises(MovementPreflightRefused) as caught:
             refuse_pre_destination_depletion(30, [walker])
         self.assertEqual(caught.exception.reason, "pre_destination_depletion")
+        self.assertEqual(str(caught.exception), "隊伍成員的精力不足以支撐這趟旅行。")
         # Exactly zero at arrival is legal.
         write_fatigue_state(walker, 240, SleepPosture.AWAKE)
         refuse_pre_destination_depletion(30, [walker])

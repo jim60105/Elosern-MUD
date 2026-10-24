@@ -657,7 +657,7 @@ def handoff_candidate_label(candidate: SleepHandoffCandidate) -> str:
     reserve = (
         ""
         if candidate.reserve_percent is None
-        else f"（精神儲備 {candidate.reserve_percent}%）"
+        else f"（精力 {candidate.reserve_percent}%）"
     )
     if candidate.kind == SLEEP_HANDOFF_RETURN:
         return f"回到自己的身體{reserve}"

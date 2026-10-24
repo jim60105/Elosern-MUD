@@ -180,10 +180,10 @@ describe("StatusPanel (H2 island-stack root)", () => {
     // Each row identifies its own body: the controlled companion's truth is
     // never the owner's row relabelled.
     expect(rows[0].attributes("data-identity")).toBe("char-42");
-    expect(rows[0].text()).toContain("艾倫‧灰誓：精神儲備 80%（測試充沛）");
+    expect(rows[0].text()).toContain("艾倫‧灰誓：精力 80%（測試充沛）");
     expect(rows[1].attributes("data-identity")).toBe("char-77");
     expect(rows[1].attributes("data-stage")).toBe("forced_sleep");
-    expect(rows[1].text()).toContain("同行者：精神儲備 2%（測試強制睡眠）");
+    expect(rows[1].text()).toContain("同行者：精力 2%（測試強制睡眠）");
     expect(rows[1].text()).toContain("測試無法行動");
   });
 
