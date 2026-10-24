@@ -22,6 +22,7 @@ None. Extend existing deterministic sleep and party-settlement owners.
 
 - `time-skip-commands`: body-scoped accepted sleep lifecycle, explicit modes and party operation.
 - `party-time-settlement`: passive wake completion and receipt rollback with actual per-member activity.
+- `webclient-exploration-menu`: exact duration/recovery/party sleep payload grammar alongside ordinary waits.
 
 ## Impact
 

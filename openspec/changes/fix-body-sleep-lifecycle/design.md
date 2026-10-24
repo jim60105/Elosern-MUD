@@ -54,7 +54,7 @@ Expose a read-only sleep outcome with owner/body IDs, sleep ID/revision, target,
 
 ## Approved Design Amendments
 
-During apply, amend `docs/superpowers/specs/2026-10-21-party-fatigue-and-sleep-design.md` header and §16 stale implementation status to distinguish the archived original implementation from these proposed corrections. Amend §4.2/§9.1 to allow the explicit all-party operation and declared duration/recovery targets, §8.4 for passive voluntary boundaries, and §11/§12 for durable receipt/snapshot ownership. Retain all combat exclusions. This proposal commit itself stays entirely inside its change directory.
+During apply, amend `docs/superpowers/specs/2026-10-21-party-fatigue-and-sleep-design.md` header and §16 stale implementation status to distinguish the archived original implementation from these proposed corrections. Amend §4.2/§9.1 to allow the explicit all-party operation and declared duration/recovery targets, §8.4 for passive voluntary boundaries, and §11/§12 for durable receipt/snapshot ownership. Amend §8.5 narrowly for a pre-existing voluntary wake deadline inside an indivisible action, preserving atomic full effects and completion-time collapse for previously awake bodies. Retain all combat exclusions. This proposal commit itself stays entirely inside its change directory.
 
 ## Risks / Trade-offs
 
@@ -65,3 +65,7 @@ During apply, amend `docs/superpowers/specs/2026-10-21-party-fatigue-and-sleep-d
 ## Deployment and Rollback
 
 Apply with **gpt-luna**, branch `feat/fix-body-sleep-lifecycle`, worktree `.worktrees/fix-body-sleep-lifecycle`. Deploy as a clean pre-release cutover with no data migration. Revert implementation as one coherent change if necessary; do not introduce an old/new dual writer. Run only focused checks named in tasks; full CI and complete browser evidence remain CI-owned.
+
+## Batch Review Disposition
+
+The single blocking batch critique identified a retained exact-field transport contract and an omitted §8.5 design amendment. The follow-up adds the original explore.wait requirement delta with explicit duration-sleep grammar, malformed-payload scenarios and adapter tasks, and names the narrow indivisible-action amendment. No implementation or verification evidence is claimed by this planning correction.
