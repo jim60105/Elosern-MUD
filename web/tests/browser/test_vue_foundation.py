@@ -830,7 +830,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(keys["downClaimed"])
         self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
 
-        # The place card's 等待 opens the wait card without dispatching a
+        # The place card's 休息 opens the wait card without dispatching a
         # ui_action and without pushing a router frame: opening the card is
         # client-local (exploration-room-actions).
         enter_result = page.evaluate(

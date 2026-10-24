@@ -378,7 +378,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     [source, bridge.resolveFrame({ source })]
                 ),
                 suggestionsCard: state.suggestionsCard,
-                waitRows: (state.waitRows || []).map((row) => row.key),
               };
             }"""
         )
@@ -396,7 +395,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     {"unresolvable": True, "reason": None},
                     f"{source} is retired and must stay unregistered",
                 )
-        self.assertEqual(table["waitRows"], ["wait-dawn", "wait-sleep", "wait-rest"])
         if status in (None, "unavailable") or not table["explorationAvailable"]:
             self.assertIsNone(table["suggestionsCard"], "the suggestions card exists despite the no-pane condition")
         else:

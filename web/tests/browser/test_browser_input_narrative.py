@@ -942,18 +942,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     )
     def test_slash_while_the_rest_form_is_open_never_toggles_the_command_line(self):
         page = self.logged_in_page()
-        # Open the rest form (Wait/休息 → 休息一段時間).
-        # The place card's 等待 opens the wait card, whose third row 休息 N
-        # 小時 (wait-rest) opens the bounded custom-duration form
-        # (exploration-room-actions).
+        # Open the rest entry's wait form.
+        # The place card's 休息 opens the rest entry, whose 等待 tile
+        # (wait-rest) opens the wait form with its bounded custom-duration
+        # input (redesign-rest-entry).
         activate_wait_row(page, "wait-rest")
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),
             dom_readiness={
-                "selector": '[data-testid="exploration-rest-form"]',
+                "selector": '[data-testid="wait-form"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null"
+                    "() => document.querySelector('[data-testid=\"wait-form\"]') !== null"
                 ),
                 "description": "rest form rendered",
             },
@@ -972,7 +972,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             "the command line stays collapsed while the rest form owns the keyboard",
         )
         self.assertTrue(
-            page.evaluate("document.querySelector('[data-testid=\"exploration-rest-form\"]') !== null")
+            page.evaluate("document.querySelector('[data-testid=\"wait-form\"]') !== null")
         )
 
     @covers_requirement(

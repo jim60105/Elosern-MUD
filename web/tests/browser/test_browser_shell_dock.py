@@ -122,13 +122,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertEqual(
                 wait_button.evaluate("el => getComputedStyle(el).backgroundColor"),
                 gold_glow,
-                "the hovered 等待 button carries the muted-gold --gold-glow fill",
+                "the hovered 休息 button carries the muted-gold --gold-glow fill",
             )
             page.mouse.move(0, 0)
             # The exploration screen draws no detail pane: server-authored
             # reasons appear in the shared readout.
             self.assertEqual(page.locator('[data-testid="exploration-detail"]').count(), 0)
-            # The place card's 等待 opens the wait card over the stage; the
+            # The place card's 休息 opens the wait card over the stage; the
             # command region keeps its geometry.
             activate_overview_chip(page, "wait")
             page.wait_for_selector('[data-anchor="choices"] [data-testid="wait-card"]', timeout=15000)
@@ -137,7 +137,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 " return v ? getComputedStyle(v).display : null; }"
             )
             self.assertEqual(pane_display, "flex", "the wait card uses the card frame's layout")
-            # Escape closes the card and returns focus to 等待; the router never
+            # Escape closes the card and returns focus to 休息; the router never
             # left its root.
             page.keyboard.press("Escape")
             page.wait_for_timeout(150)
@@ -148,7 +148,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     "() => document.activeElement === document.querySelector("
                     "'[data-anchor=\"map\"] [data-testid=\"place-card-wait\"]')"
                 ),
-                "Escape returns focus to the 等待 button",
+                "Escape returns focus to the 休息 button",
             )
             self.assertEqual(page.locator('[data-anchor="choices"] [data-testid="wait-card"]').count(), 0)
 

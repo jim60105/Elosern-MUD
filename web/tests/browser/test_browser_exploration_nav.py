@@ -23,6 +23,7 @@ from .browser_helpers import (
     open_wait_card,
     outbound_messages,
     presence_entry_keys,
+    press_control,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -235,7 +236,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
         self.assertIn(chip_key, presence_entry_keys(page), "the rail renders the person again")
         self.assertTrue(controls["look"], "the place card renders 查看房間 again")
-        self.assertTrue(controls["wait"], "the place card renders 等待 again")
+        self.assertTrue(controls["wait"], "the place card renders 休息 again")
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
             page.evaluate("window.__elosernBridge.router.depth()"),
@@ -421,7 +422,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
-        # Opening the wait card from the place card's 等待 and then changing
+        # Opening the wait card from the place card's 休息 and then changing
         # the location closes the card in that commit (exploration-room-actions:
         # a committed location change discards the card).
         activate_overview_chip(page, "wait")
@@ -442,14 +443,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(controls["look"] and controls["wait"])
         self.assertEqual(controls["dockRows"], [])
 
+    def _assert_centred(self, placement, viewport, label):
+        self.assertTrue(placement["inside"], f"{viewport}: {label} is fully visible")
+        self.assertLess(placement["offAnchorX"], 2, f"{viewport}: {label} is centred horizontally")
+        self.assertLess(placement["offAnchorY"], 2, f"{viewport}: {label} is centred vertically in the choices anchor")
+
     @covers_requirement(
         "webclient-room-actions::retired-exploration-surfaces-are-gone-and-room-actions-are-verified-in-the-live-client"
     )
     def test_room_actions_hold_at_both_reference_viewports(self):
         """exploration-room-actions: at 1451x790 and 1920x1080 the place
-        card's 查看房間 and 等待 fit the card without truncating the
+        card's 查看房間 and 休息 fit the card without truncating the
         location heading's accessible name, the 建議 pill does not overlap
-        the compass, and the centred wait card is fully visible."""
+        the compass, and the rest entry's first layer and each second-layer
+        form (redesign-rest-entry) are centred and fully visible."""
         for viewport in ((1451, 790), (1920, 1080)):
             page = self.logged_in_page(viewport)
             self._wait_exploration_available(page)
@@ -491,10 +498,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
             self.assertTrue(
                 geometry["look"] and geometry["wait"],
-                f"{viewport}: the place card carries 查看房間 and 等待",
+                f"{viewport}: the place card carries 查看房間 and 休息",
             )
             self.assertGreater(geometry["look"]["height"], 0, f"{viewport}: 查看房間 is rendered")
-            self.assertGreater(geometry["wait"]["height"], 0, f"{viewport}: 等待 is rendered")
+            self.assertGreater(geometry["wait"]["height"], 0, f"{viewport}: 休息 is rendered")
             self.assertEqual(
                 geometry["cardScrolls"],
                 0,
@@ -508,31 +515,39 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 geometry["pillClearsCompass"],
                 f"{viewport}: the 建議 pill does not overlap the compass",
             )
-            # A centred card open: the wait card renders fully inside the
-            # stage, centred in the choices anchor (the `justify-content:
-            # center` span the design centres room cards on).
+            # A centred card open: the rest entry's first layer and each
+            # second-layer shell render fully inside the stage, centred in the
+            # choices anchor (the `justify-content: center` span the design
+            # centres room cards on).
+            def placement_of(card_selector):
+                return page.evaluate(
+                    """(cardSel) => {
+                      const card = document.querySelector(cardSel);
+                      const stage = document.querySelector('[data-testid="elosern-stage"]');
+                      const anchor = document.querySelector('[data-anchor="choices"]');
+                      const c = card.getBoundingClientRect();
+                      const s = stage.getBoundingClientRect();
+                      const a = anchor.getBoundingClientRect();
+                      return {
+                        inside:
+                          c.left >= s.left - 0.5 && c.right <= s.right + 0.5 &&
+                          c.top >= s.top - 0.5 && c.bottom <= s.bottom + 0.5,
+                        offAnchorX: Math.abs((c.left + c.right) / 2 - (a.left + a.right) / 2),
+                        offAnchorY: Math.abs((c.top + c.bottom) / 2 - (a.top + a.bottom) / 2),
+                      };
+                    }""",
+                    card_selector,
+                )
+
             open_wait_card(page)
-            placement = page.evaluate(
-                """(cardSel) => {
-                  const card = document.querySelector(cardSel);
-                  const stage = document.querySelector('[data-testid="elosern-stage"]');
-                  const anchor = document.querySelector('[data-anchor="choices"]');
-                  const c = card.getBoundingClientRect();
-                  const s = stage.getBoundingClientRect();
-                  const a = anchor.getBoundingClientRect();
-                  return {
-                    inside:
-                      c.left >= s.left - 0.5 && c.right <= s.right + 0.5 &&
-                      c.top >= s.top - 0.5 && c.bottom <= s.bottom + 0.5,
-                    offAnchorX: Math.abs((c.left + c.right) / 2 - (a.left + a.right) / 2),
-                    offAnchorY: Math.abs((c.top + c.bottom) / 2 - (a.top + a.bottom) / 2),
-                  };
-                }""",
-                WAIT_CARD_SELECTOR,
-            )
-            self.assertTrue(placement["inside"], f"{viewport}: the wait card is fully visible")
-            self.assertLess(placement["offAnchorX"], 2, f"{viewport}: the card is centred horizontally")
-            self.assertLess(placement["offAnchorY"], 2, f"{viewport}: the card is centred vertically in the choices anchor")
+            self._assert_centred(placement_of(WAIT_CARD_SELECTOR), viewport, "the first layer")
+            for tile, testid in (("wait", "wait-form-card"), ("sleep", "sleep-card")):
+                layer_selector = '[data-anchor="choices"] [data-testid="%s"]' % testid
+                press_control(page, WAIT_CARD_SELECTOR + ' [data-testid="wait-card-tile"][data-tile="%s"]' % tile)
+                page.locator(layer_selector).wait_for(state="visible", timeout=15000)
+                self._assert_centred(placement_of(layer_selector), viewport, "the %s layer" % testid)
+                press_control(page, '[data-anchor="choices"] [data-testid="rest-step-back"]')
+                page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
             page.close()
 
 

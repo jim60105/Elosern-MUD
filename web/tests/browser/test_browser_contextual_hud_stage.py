@@ -1175,7 +1175,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         activate_overview_chip(page, "target-11")
         page.wait_for_selector(CARD_SELECTOR, timeout=15000)
         states["verb-card"] = page.evaluate(measure)
-        # Close the card (Escape, or its ✕ 返回) so the place card's 等待 is
+        # Close the card (Escape, or its ✕ 返回) so the place card's 休息 is
         # in reach again.
         page.evaluate(f"() => {store}.closePresenceCard()")
         page.wait_for_selector(CARD_SELECTOR, state="detached", timeout=15000)

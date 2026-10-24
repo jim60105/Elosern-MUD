@@ -837,7 +837,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         })
         self.assertTrue(accepted["accepted"], accepted)
 
-        activate_overview_chip(page, "wait")  # the place card's 等待 -> the wait card
+        activate_overview_chip(page, "wait")  # the place card's 休息 -> the wait card
         page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
         self.assertEqual(self._depth(page), 1)
 
