@@ -104,7 +104,9 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
     () => !!panel.value?.selection?.available,
   );
   const continuationAvailable = computed(
-    () => !!panel.value?.owner_sleep?.continuation_available,
+    () =>
+      !!panel.value?.owner_sleep?.continuation_available ||
+      (!!panel.value?.controlled_sleep && !panel.value?.owner_sleep),
   );
 
   const selectionOpen = computed(
@@ -128,7 +130,8 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
       !selectionOpen.value &&
       !questionOpen.value &&
       !dreamPending.value &&
-      continuationAvailable.value,
+      continuationAvailable.value &&
+      !dismissed.value,
   );
   const anyOpen = computed(
     () => selectionOpen.value || questionOpen.value || continuationOpen.value,

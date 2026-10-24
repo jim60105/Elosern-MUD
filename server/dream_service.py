@@ -34,8 +34,13 @@ def _controlled(actor, session):
             and any(candidate is session for candidate in evennia.SESSION_HANDLER.get_sessions(include_unloggedin=True)))
 
 
-def _result(outcome, code, message):
-    return {"outcome": outcome, "code": code, "message": message, "affected_panels": ("dream",)}
+def _result(outcome, code, message, *, panels=("dream",)):
+    return {
+        "outcome": outcome,
+        "code": code,
+        "message": message,
+        "affected_panels": panels,
+    }
 
 
 def _direction_refusal(error: AuthoringError) -> str:
@@ -58,13 +63,18 @@ def _sleep_view_panels():
     return ("dream", "sleep_handoff", "status")
 
 
-def _sleep_result(outcome, code, message):
-    return {
+def _sleep_result(outcome, code, message, *, continuation=None, panels=None):
+    result = {
         "outcome": outcome,
         "code": code,
         "message": message,
-        "affected_panels": _sleep_view_panels(),
+        "affected_panels": (
+            _sleep_view_panels() if panels is None else panels
+        ),
     }
+    if continuation is not None:
+        result["data"] = {"continuation": str(continuation)}
+    return result
 
 
 def _continue_owner_after_commit(actor, sleep_id, generation):
@@ -227,14 +237,24 @@ def answer_sleep_dream(
         result = _continue_owner_after_commit(
             actor, value["sleep_id"], value["generation"]
         )
+        continuation = (
+            result.continuation if result is not None else "none"
+        )
         message = (
             result.summary
             if result is not None and result.summary
             else "已保留這次睡眠。"
         )
     else:
+        continuation = "none"
         message = "已保留這次睡眠；可輸入 sleep continue 繼續。"
-    return _sleep_result("success", "dream_declined", message)
+    return _sleep_result(
+        "success",
+        "dream_declined",
+        message,
+        continuation=continuation,
+        panels=() if auto else None,
+    )
 
 
 def resume_owner_sleep_continuation(actor):
@@ -353,7 +373,16 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                 text = state["ending"] or "故事方向已存為私人草稿。"
                 actor.msg(text)
                 log_info("dream_surface_action", context={**boundary, "completed": state["completed"], "tick": tick})
-                return _result("success", "dream_" + action, text)
+                return _result(
+                    "success",
+                    "dream_" + action,
+                    text,
+                    panels=(
+                        ()
+                        if action in {"confirm", "awaken"}
+                        else ("dream",)
+                    ),
+                )
     except lifecycle.DreamInputRejected as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": error.code}, exc=error)
         text = "交流文字不可空白。" if error.code == lifecycle.REASON_EMPTY_INPUT else "交流文字上限為 4000 字。"

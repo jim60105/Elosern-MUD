@@ -16,6 +16,7 @@ beyond the configured maximum.
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
@@ -885,6 +886,14 @@ def continue_sleep(
                     else CONTINUATION_PENDING
                 )
                 disposition["last_operation_id"] = interval_operation
+                disposition["elapsed_seconds"] = (
+                    int(disposition.get("elapsed_seconds", 0))
+                    + int(elapsed)
+                )
+                disposition["interrupted"] = bool(
+                    result_payload["interactive"]
+                )
+                disposition["summary"] = summary
                 write_sleep_view_decision(member, disposition)
     except Exception:
         _restore_clock_tick(clock, tick_snapshot)
@@ -1210,6 +1219,22 @@ def continue_owner_sleep(
     recorded = _recorded(operation_id)
     if recorded is not None:
         return recorded
+    commander = resolve_commander(actor)
+    if commander is not actor:
+        raise SleepRefused("not_owner_control", NOT_SLEEPING_MESSAGE)
+    durable = read_sleep_view_decision(commander)
+    if (
+        operation_id is not None
+        and durable is not None
+        and durable.get("owner_operation_id") == operation_id
+        and durable["continuation"] in (
+            CONTINUATION_COMPLETE,
+            CONTINUATION_PAUSED,
+        )
+    ):
+        replayed = _owner_result_from_decision(commander, durable)
+        _record(replayed)
+        return replayed
     commander, receipt = _owner_sleep_receipt(actor)
     if sleep_id is not None and receipt.sleep_id != sleep_id:
         raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
@@ -1218,7 +1243,7 @@ def continue_owner_sleep(
     generation = read_sleep_view_generation(commander)
     if expected_generation is not None and generation != int(expected_generation):
         raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
-    decision = read_sleep_view_decision(commander)
+    decision = durable
     base_decision = (
         decision["decision"]
         if decision is not None
@@ -1229,13 +1254,30 @@ def continue_owner_sleep(
     base_operation = operation_id or (
         f"owner:{receipt.sleep_id[:48]}:{generation}:{uuid4().hex[:12]}"
     )
-    total_elapsed = 0
+    resume_same_operation = bool(
+        operation_id is not None
+        and decision is not None
+        and decision.get("owner_operation_id") == operation_id
+        and decision["continuation"] == CONTINUATION_PENDING
+    )
+    start_index = (
+        int(decision["interval_index"]) + 1 if resume_same_operation else 0
+    )
+    total_elapsed = (
+        int(decision["elapsed_seconds"]) if resume_same_operation else 0
+    )
     all_events: list[ScheduledEvent] = []
-    summaries: list[str] = []
+    summaries: list[str] = (
+        [decision["summary"]] if resume_same_operation and decision["summary"] else []
+    )
     continuation = CONTINUATION_PENDING
-    interrupted = False
+    interrupted = (
+        bool(decision["interrupted"]) if resume_same_operation else False
+    )
     pause_message: str | None = None
-    for index in range(_CONTINUATION_INTERVAL_BOUND):
+    last_index = start_index - 1
+    for index in range(start_index, _CONTINUATION_INTERVAL_BOUND):
+        last_index = index
         if current_possession(commander) is not None:
             continuation = CONTINUATION_PAUSED
             pause_message = "控制權已改變，保留剩餘睡眠。"
@@ -1260,6 +1302,9 @@ def continue_owner_sleep(
                     "generation": generation,
                     "sleep_id": receipt.sleep_id,
                     "decision": base_decision,
+                    "owner_operation_id": base_operation,
+                    "interval_index": index,
+                    "elapsed_seconds": total_elapsed,
                 },
             )
         except SkipRefused as error:  # observability: ignore R2: the stable safety refusal IS the continuation pause result
@@ -1294,27 +1339,26 @@ def continue_owner_sleep(
         continuation = CONTINUATION_PAUSED
         pause_message = "睡眠仍在進行；可再次使用 sleep continue。"
 
-    if continuation != CONTINUATION_COMPLETE:
-        _mark_owner_continuation(
-            commander,
-            generation=generation,
-            sleep_id=receipt.sleep_id,
-            decision=base_decision,
-            continuation=continuation,
-            last_operation_id=f"{base_operation}:last",
-        )
-    else:
-        _mark_owner_continuation(
-            commander,
-            generation=generation,
-            sleep_id=receipt.sleep_id,
-            decision=base_decision,
-            continuation=CONTINUATION_COMPLETE,
-            last_operation_id=f"{base_operation}:last",
-        )
     if pause_message:
         summaries.append(pause_message)
     summary = " ".join(part for part in summaries if part)
+    _mark_owner_continuation(
+        commander,
+        generation=generation,
+        sleep_id=receipt.sleep_id,
+        decision=base_decision,
+        continuation=continuation,
+        last_operation_id=(
+            f"{base_operation}:{last_index}"
+            if last_index >= 0
+            else f"{base_operation}:last"
+        ),
+        owner_operation_id=base_operation,
+        interval_index=max(last_index, 0),
+        elapsed_seconds=total_elapsed,
+        interrupted=interrupted,
+        summary=summary,
+    )
     result = SkipResult(
         operation_id=base_operation,
         requested_seconds=int(receipt.accepted_seconds),
@@ -1334,6 +1378,29 @@ def continue_owner_sleep(
     return result
 
 
+def _owner_result_from_decision(
+    commander: Any, decision: Mapping[str, Any]
+) -> SkipResult:
+    """Reconstruct one durably completed/paused owner operation."""
+    continuation = str(decision["continuation"])
+    return SkipResult(
+        operation_id=str(decision["owner_operation_id"]),
+        requested_seconds=0,
+        elapsed_seconds=int(decision["elapsed_seconds"]),
+        events=(),
+        voluntary=True,
+        woke=continuation == CONTINUATION_COMPLETE,
+        body_id=int(commander.pk),
+        sleep_id=decision["sleep_id"],
+        completed=continuation == CONTINUATION_COMPLETE,
+        partial=False,
+        summary=decision["summary"] or None,
+        replayed=True,
+        interrupted=bool(decision["interrupted"]),
+        continuation=continuation,
+    )
+
+
 def _mark_owner_continuation(
     commander: Any,
     *,
@@ -1342,6 +1409,11 @@ def _mark_owner_continuation(
     decision: str,
     continuation: str,
     last_operation_id: str,
+    owner_operation_id: str | None = None,
+    interval_index: int = 0,
+    elapsed_seconds: int = 0,
+    interrupted: bool = False,
+    summary: str = "",
 ) -> None:
     """Persist the executor's final disposition under the owner row lock."""
     with transaction.atomic():
@@ -1354,6 +1426,11 @@ def _mark_owner_continuation(
                 "decision": decision,
                 "continuation": continuation,
                 "last_operation_id": last_operation_id,
+                "owner_operation_id": owner_operation_id,
+                "interval_index": int(interval_index),
+                "elapsed_seconds": int(elapsed_seconds),
+                "interrupted": bool(interrupted),
+                "summary": summary,
             },
         )
 
@@ -1395,6 +1472,7 @@ def resume_pending_owner_continuation(actor: Any) -> SkipResult | None:
             actor,
             sleep_id=decision["sleep_id"],
             expected_generation=decision["generation"],
+            operation_id=decision["owner_operation_id"],
         )
     except (SkipRefused, SleepRefused) as error:
         log_warn(

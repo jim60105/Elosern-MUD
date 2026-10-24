@@ -80,12 +80,33 @@ def association(actor):
 
 
 def associated_session(actor):
-    if owner_id(actor) is None:
+    owner = owner_character(actor)
+    if owner is None:
         return None
     value = association(actor)
     if value is None:
         return None
-    return lifecycle.get_session(value["session_id"], owner_id(actor))
+    session = lifecycle.get_session(value["session_id"], owner_id(actor))
+    if session is None or session.state != lifecycle.STATE_OPEN:
+        return session
+    from world.rules.sleep_receipt import (
+        read_sleep_receipt,
+        read_sleep_view_generation,
+    )
+
+    if value.get("view_generation") != read_sleep_view_generation(owner):
+        return None
+    try:
+        receipt = read_sleep_receipt(owner)
+    except Exception:  # observability: ignore R2: an unreadable receipt closes the active surface; the authoritative entry reports the fault
+        return None
+    if (
+        receipt is None
+        or not receipt.sleeping
+        or receipt.sleep_id != value.get("sleep_id")
+    ):
+        return None
+    return session
 
 
 def enter_for_owner(
@@ -182,6 +203,7 @@ def enter_for_owner(
             "owner_id": int(owner.pk),
             "sleep_id": receipt.sleep_id,
             "sleep_revision": int(receipt.revision),
+            "view_generation": int(generation),
             "sleep": {
                 "tick_from": int(tick_from), "tick_to": int(tick_to),
                 "requested_seconds": int(requested_seconds),

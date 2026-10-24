@@ -1135,6 +1135,9 @@ def _sleep_continue_adapter(
                 )
                 if answer["outcome"] != "success":
                     return answer
+                status = (answer.get("data") or {}).get("continuation")
+                if status in ("complete", "paused", "pending"):
+                    return answer
                 current = owner_sleep_view_state(actor)
                 if current is None:
                     return answer

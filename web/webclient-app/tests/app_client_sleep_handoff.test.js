@@ -276,4 +276,79 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0].action_id).toBe("explore.look");
   });
+
+  it("supports keyboard activation and Escape dismissal with focus restoration", async () => {
+    const panel = sleepHandoffPanel({
+      owner_sleep: {
+        sleep_id: "sleep-1",
+        revision: 0,
+        generation: 1,
+        dream_pending: false,
+        continuation: "none",
+        continuation_available: false,
+        continuation_reason: null,
+      },
+    });
+    await mountWith(panel);
+    const cardEl = card().element;
+    cardEl.focus();
+    cardEl.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await settle();
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.possess",
+      payload: { npc_id: 2 },
+    });
+
+    // A fresh mount: Escape dismisses the selection chrome.
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+    await mountWith(panel);
+    card().element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    );
+    await settle();
+    expect(card().exists()).toBe(false);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.closest?.('[data-anchor="choices"]')).toBeFalsy();
+  });
+
+  it("reflects a stale revision by disabling newly ineligible rows", async () => {
+    await mountWith();
+    const stale = sleepHandoffPanel({
+      selection: {
+        available: true,
+        rows: [
+          {
+            kind: "possess",
+            identity: 2,
+            name: "同伴",
+            reserve_percent: 100,
+            stage: "sleeping",
+            label: "接手 同伴（精神儲備 100%）",
+            enabled: false,
+            reason: "沉睡中，無法行動",
+          },
+        ],
+      },
+      party: { label: "全員一起睡眠", enabled: false, reason: "在場成員都已入睡或已完全恢復" },
+    });
+    revision += 1;
+    const result = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision, panels: { sleep_handoff: stale } })],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    await settle();
+    expect(rows()[0].attributes("aria-disabled")).toBe("true");
+    await rows()[0].trigger("click");
+    await settle();
+    expect(sender.sent.actions).toHaveLength(0);
+  });
 });

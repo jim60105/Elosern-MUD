@@ -283,6 +283,11 @@ def read_sleep_view_decision(entity: Any) -> dict[str, Any] | None:
     decision = raw.get("decision")
     continuation = raw.get("continuation", CONTINUATION_NONE)
     last_operation_id = raw.get("last_operation_id")
+    owner_operation_id = raw.get("owner_operation_id")
+    interval_index = raw.get("interval_index", 0)
+    elapsed_seconds = raw.get("elapsed_seconds", 0)
+    interrupted = raw.get("interrupted", False)
+    summary = raw.get("summary", "")
     if (
         not isinstance(generation, int)
         or isinstance(generation, bool)
@@ -296,6 +301,19 @@ def read_sleep_view_decision(entity: Any) -> dict[str, Any] | None:
             last_operation_id is not None
             and not isinstance(last_operation_id, str)
         )
+        or (
+            owner_operation_id is not None
+            and (
+                not isinstance(owner_operation_id, str)
+                or len(owner_operation_id) > _MAX_ID
+            )
+        )
+        or not _is_int(interval_index)
+        or interval_index < 0
+        or not _is_int(elapsed_seconds)
+        or elapsed_seconds < 0
+        or not isinstance(interrupted, bool)
+        or not isinstance(summary, str)
     ):
         return None
     return {
@@ -308,6 +326,15 @@ def read_sleep_view_decision(entity: Any) -> dict[str, Any] | None:
             if last_operation_id is None
             else _clamp_text(last_operation_id)
         ),
+        "owner_operation_id": (
+            None
+            if owner_operation_id is None
+            else _clamp_text(owner_operation_id)
+        ),
+        "interval_index": int(interval_index),
+        "elapsed_seconds": int(elapsed_seconds),
+        "interrupted": bool(interrupted),
+        "summary": _clamp_text(summary, _MAX_SUMMARY),
     }
 
 
@@ -318,6 +345,11 @@ def write_sleep_view_decision(entity: Any, value: Mapping[str, Any]) -> None:
     decision = value.get("decision")
     continuation = value.get("continuation", CONTINUATION_NONE)
     last_operation_id = value.get("last_operation_id")
+    owner_operation_id = value.get("owner_operation_id")
+    interval_index = value.get("interval_index", 0)
+    elapsed_seconds = value.get("elapsed_seconds", 0)
+    interrupted = value.get("interrupted", False)
+    summary = value.get("summary", "")
     if (
         not isinstance(generation, int)
         or isinstance(generation, bool)
@@ -332,6 +364,17 @@ def write_sleep_view_decision(entity: Any, value: Mapping[str, Any]) -> None:
         raise ValueError("invalid control-view continuation")
     if last_operation_id is not None and not isinstance(last_operation_id, str):
         raise ValueError("invalid control-view operation identity")
+    if owner_operation_id is not None and (
+        not isinstance(owner_operation_id, str)
+        or len(owner_operation_id) > _MAX_ID
+    ):
+        raise ValueError("invalid owner continuation identity")
+    if not _is_int(interval_index) or interval_index < 0:
+        raise ValueError("invalid owner continuation cursor")
+    if not _is_int(elapsed_seconds) or elapsed_seconds < 0:
+        raise ValueError("invalid owner continuation elapsed time")
+    if not isinstance(interrupted, bool) or not isinstance(summary, str):
+        raise ValueError("invalid owner continuation disposition")
     attributes = _attributes(entity)
     attributes.add(
         VIEW_DECISION_ATTRIBUTE,
@@ -345,6 +388,15 @@ def write_sleep_view_decision(entity: Any, value: Mapping[str, Any]) -> None:
                 if last_operation_id is None
                 else _clamp_text(last_operation_id)
             ),
+            "owner_operation_id": (
+                None
+                if owner_operation_id is None
+                else _clamp_text(owner_operation_id)
+            ),
+            "interval_index": int(interval_index),
+            "elapsed_seconds": int(elapsed_seconds),
+            "interrupted": bool(interrupted),
+            "summary": _clamp_text(summary, _MAX_SUMMARY),
         },
     )
 

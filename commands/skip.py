@@ -192,6 +192,10 @@ class CmdSleep(Command):
                         if answer["outcome"] != "success":
                             self.caller.msg(answer["message"])
                             return
+                        status = (answer.get("data") or {}).get("continuation")
+                        if status in ("complete", "paused", "pending"):
+                            self.caller.msg(answer["message"])
+                            return
                         current = owner_sleep_view_state(self.caller)
                         if current is None:
                             self.caller.msg(answer["message"])

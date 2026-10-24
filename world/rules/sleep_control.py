@@ -31,13 +31,11 @@ from world.rules.possession import (
     PossessionWriteError,
     _account_characters,
     _account_possession_holder,
-    _acting_sessions,
     _candidate_action_capable,
     _dialogue_open,
     _materialize_wilderness_location,
     _resolve_account,
     _restore_owner_control,
-    _restore_owner_session,
     _session_controls_body,
     _sleep_posture_blocks,
     _snapshot_owner_control,
@@ -211,7 +209,13 @@ class _LabelCandidate:
         self.reserve_percent = reserve_percent
 
 
-def _party_status(commander: Any, *, actor: Any) -> tuple[bool, str | None]:
+def _party_status(
+    commander: Any,
+    *,
+    actor: Any,
+    mode: str = "recovery",
+    seconds: int | None = None,
+) -> tuple[bool, str | None]:
     """Whether the explicit all-party choice is currently available."""
     reason = evaluate_skip_safety(commander)
     if reason is not None:
@@ -246,9 +250,7 @@ def _party_status(commander: Any, *, actor: Any) -> tuple[bool, str | None]:
                 _party_member_eligible(member)
             except SleepRefused as error:  # observability: ignore R2: the stable refusal IS the party availability reason
                 return False, error.message
-            accepted, _partial = _accepted_sleep_seconds(
-                member, "recovery", None
-            )
+            accepted, _partial = _accepted_sleep_seconds(member, mode, seconds)
             if accepted > 0:
                 has_unmet = True
     if not has_awake:
@@ -366,7 +368,9 @@ def build_sleep_control_view(
         rows.append(
             _build_row(commander, member, SLEEP_HANDOFF_POSSESS, current_body=actor)
         )
-    party_enabled, party_reason = _party_status(commander, actor=actor)
+    party_enabled, party_reason = _party_status(
+        commander, actor=actor, mode="recovery", seconds=None
+    )
 
     controlled_sleep = None
     try:
@@ -453,16 +457,13 @@ def begin_all_party_sleep(
     """
     commander = resolve_commander(actor)
     account = _resolve_account(commander, actor)
-    view = build_sleep_control_view(actor, account=account, session=session)
-    party_enabled, party_reason = (
-        (view.party_enabled, view.party_reason)
-        if view is not None
-        else _party_status(commander, actor=actor)
+    build_sleep_control_view(actor, account=account, session=session)
+    party_enabled, party_reason = _party_status(
+        commander, actor=actor, mode=mode, seconds=seconds
     )
     if not party_enabled:
         raise SleepRefused("party_unavailable", party_reason)
     possessed = actor is not commander
-    owner_sessions = tuple(_acting_sessions(actor)) if possessed else ()
     if possessed:
         try:
             _materialize_wilderness_location(commander)
@@ -475,11 +476,9 @@ def begin_all_party_sleep(
     try:
         with transaction.atomic():
             _lock_control(account, commander, actor, members)
-            locked = build_sleep_control_view(actor, account=account, session=session)
-            enabled_after_lock, reason_after_lock = (
-                (locked.party_enabled, locked.party_reason)
-                if locked is not None
-                else _party_status(commander, actor=actor)
+            build_sleep_control_view(actor, account=account, session=session)
+            enabled_after_lock, reason_after_lock = _party_status(
+                commander, actor=actor, mode=mode, seconds=seconds
             )
             if not enabled_after_lock:
                 raise SleepRefused("party_unavailable", reason_after_lock)
@@ -505,13 +504,15 @@ def begin_all_party_sleep(
     except Exception as error:
         # The outer transaction rolled the durable writes back; the puppet,
         # cmdset, lock and location effects are not transactional.
-        if possessed and control_before is not None:
-            restore_party_control(commander, actor, control_before)
-            if owner_before is not None:
-                _restore_owner_control(commander, owner_before)
-            _restore_owner_session(commander, account, owner_sessions)
+        # Restore physiology first, then the owner's bookkeeping, then the
+        # companion's verified control last (its synchronization republishes
+        # the final state and would otherwise observe stale sleep surfaces).
         for member, member_snapshots in snapshots.values():
             _restore_sleep_surfaces(member, member_snapshots)
+        if possessed and control_before is not None:
+            if owner_before is not None:
+                _restore_owner_control(commander, owner_before)
+            restore_party_control(commander, actor, control_before)
         if isinstance(error, (PossessionGateError, PossessionWriteError, SleepRefused)):
             raise
         log_error(

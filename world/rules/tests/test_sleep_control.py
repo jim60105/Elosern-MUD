@@ -142,6 +142,22 @@ class SleepControlViewTests(EvenniaTest):
     @covers_requirement(
         "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result"
     )
+    def test_a_new_control_generation_invalidates_the_old_open_dream(self):
+        companion = self._companion("同伴")
+        enter_sleep(self.player, mode="duration", seconds=600)
+        view = owner_sleep_view_state(self.player)
+        result = answer_sleep_dream_for(self.player, view, "enter")
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNotNone(associated_session(self.player))
+        enter_possession(self.player, companion)
+        release_possession(self.player, npc=companion, reason="handback")
+        self.assertIsNone(associated_session(self.player))
+        fresh = owner_sleep_view_state(self.player)
+        self.assertTrue(fresh["pending"])
+
+    @covers_requirement(
+        "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result"
+    )
     def test_owner_dream_entry_at_zero_elapsed(self):
         before = int(get_world_clock().tick)
         entry = enter_sleep(self.player, mode="duration", seconds=600)
@@ -253,6 +269,100 @@ class SleepControlViewTests(EvenniaTest):
         self.assertIsNone(resume_pending_owner_continuation(self.player))
 
     @covers_requirement(
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"
+    )
+    def test_completed_owner_operation_replays_durably_after_restart(self):
+        from world.rules import time_skip as time_skip_module
+
+        enter_sleep(self.player, mode="duration", seconds=600)
+        result = continue_owner_sleep(
+            self.player,
+            operation_id="restart-complete",
+            expected_generation=read_sleep_view_generation(self.player),
+        )
+        self.assertEqual(result.continuation, "complete")
+        after = int(get_world_clock().tick)
+        time_skip_module._RESULT_LEDGER.clear()
+        replay = continue_owner_sleep(
+            self.player,
+            operation_id="restart-complete",
+            expected_generation=read_sleep_view_generation(self.player),
+        )
+        self.assertTrue(replay.replayed)
+        self.assertEqual(replay.elapsed_seconds, result.elapsed_seconds)
+        self.assertEqual(int(get_world_clock().tick), after)
+
+    @covers_requirement(
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"
+    )
+    def test_paused_owner_operation_replays_durably_after_restart(self):
+        from world.rules import time_skip as time_skip_module
+
+        original = _EVENT_SOURCES.get("shop_hours")
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent("synthetic_interactive", end, {}, interactive=True)
+            ],
+            next_boundary=lambda start, end: start + 37,
+        )
+        try:
+            enter_sleep(self.player, mode="duration", seconds=600)
+            paused = continue_owner_sleep(
+                self.player,
+                operation_id="restart-paused",
+                expected_generation=read_sleep_view_generation(self.player),
+            )
+            self.assertEqual(paused.continuation, "paused")
+            after = int(get_world_clock().tick)
+            time_skip_module._RESULT_LEDGER.clear()
+            replay = continue_owner_sleep(
+                self.player,
+                operation_id="restart-paused",
+                expected_generation=read_sleep_view_generation(self.player),
+            )
+            self.assertTrue(replay.replayed)
+            self.assertTrue(replay.interrupted)
+            self.assertEqual(int(get_world_clock().tick), after)
+        finally:
+            if original is not None:
+                _EVENT_SOURCES["shop_hours"] = original
+            else:
+                _EVENT_SOURCES.pop("shop_hours", None)
+
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
+    def test_sleep_continue_does_not_resume_past_its_own_interactive_pause(self):
+        from commands.skip import CmdSleep
+
+        original = _EVENT_SOURCES.get("shop_hours")
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent("synthetic_interactive", end, {}, interactive=True)
+            ],
+            next_boundary=lambda start, end: start + 37,
+        )
+        try:
+            enter_sleep(self.player, mode="duration", seconds=600)
+            before = int(get_world_clock().tick)
+            command = CmdSleep()
+            command.caller = self.player
+            command.session = self.session
+            command.args = "continue"
+            command.func()
+            self.assertEqual(int(get_world_clock().tick) - before, 37)
+            view = owner_sleep_view_state(self.player)
+            self.assertFalse(view["pending"])
+            self.assertEqual(view["continuation"], "paused")
+        finally:
+            if original is not None:
+                _EVENT_SOURCES["shop_hours"] = original
+            else:
+                _EVENT_SOURCES.pop("shop_hours", None)
+
+    @covers_requirement(
         "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
     )
     def test_interactive_registered_event_pauses_then_resumes_the_same_target(self):
@@ -295,6 +405,8 @@ class SleepControlViewTests(EvenniaTest):
         finally:
             if original is not None:
                 _EVENT_SOURCES["shop_hours"] = original
+            else:
+                _EVENT_SOURCES.pop("shop_hours", None)
 
     @covers_requirement(
         "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
@@ -321,19 +433,51 @@ class SleepControlViewTests(EvenniaTest):
         sleeper = self._companion("沉睡者")
         enter_possession(self.player, sleeper)
         enter_sleep(sleeper, mode="duration", seconds=600)
+        before_receipt = read_sleep_receipt(sleeper)
         before_tick = int(get_world_clock().tick)
+        real_release = release_possession
+
+        def release_then_fail(*args, **kwargs):
+            real_release(*args, **kwargs)
+            raise PossessionWriteError("write_failed", "synthetic after release")
+
         with patch(
             "world.rules.sleep_control.release_possession",
-            side_effect=PossessionWriteError("write_failed", "synthetic"),
+            side_effect=release_then_fail,
         ):
             with self.assertRaises(PossessionWriteError):
                 begin_all_party_sleep(sleeper, session=self.session)
         self.assertEqual(int(get_world_clock().tick), before_tick)
         self.assertEqual(current_possession(self.player)["npc_dbid"], int(sleeper.pk))
+        self.assertIs(self.session.puppet, sleeper)
+        self.assertEqual(getattr(sleeper.db, "possessed_by", None), int(self.player.pk))
+        self.assertIs(sleeper.location, self.room1)
+        self.assertIn("puppet:", sleeper.locks.get("puppet") or "")
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
         self.assertIs(
             read_fatigue_state(sleeper).posture, SleepPosture.VOLUNTARY
         )
+        self.assertEqual(read_sleep_receipt(sleeper).sleep_id, before_receipt.sleep_id)
+
+    @covers_requirement(
+        "time-skip-commands::explicit-party-sleep-selects-present-effective-bodies-atomically"
+    )
+    def test_party_duration_is_admissible_at_full_recovery(self):
+        companion = self._companion("同伴")
+        for member in (self.player, companion):
+            write_fatigue_state(member, 360000, SleepPosture.AWAKE)
+        before = int(get_world_clock().tick)
+        begin_all_party_sleep(
+            self.player, mode="duration", seconds=7200, session=self.session
+        )
+        self.assertEqual(int(get_world_clock().tick), before)
+        for member in (self.player, companion):
+            receipt = read_sleep_receipt(member)
+            self.assertIsNotNone(receipt)
+            self.assertEqual(receipt.target_tick, before + 7200)
+            self.assertIs(
+                read_fatigue_state(member).posture, SleepPosture.VOLUNTARY
+            )
 
 
 def answer_sleep_dream_for(actor, view, decision):

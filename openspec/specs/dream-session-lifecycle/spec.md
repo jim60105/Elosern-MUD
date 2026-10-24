@@ -51,7 +51,7 @@ A valid explicit version confirmation SHALL atomically save the request, create/
 
 #### Scenario: Real confirmation with an unresolved model
 - **WHEN** confirmation uses the real dream surface while the injected background model response remains unresolved
-- **THEN** the player has returned to waking play, exactly one immutable request/work exists and original sleep tick/gauges and completed exchange count are unchanged
+- **THEN** exactly one immutable request/work exists, narrative closure wrote no clock, and only the outer same-receipt continuation may settle the uncommitted sleep before waking play
 
 #### Scenario: Work persistence fails
 - **WHEN** work creation fails in the confirmation transaction
