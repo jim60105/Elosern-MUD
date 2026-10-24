@@ -43,6 +43,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.sleeper.race = "human"
         self.sleeper.apply_race_baseline()
         join_party(self.sleeper, self.player)
+        # Half reserve with full gauges: the voluntary entry must keep a real
+        # recovery target instead of being reconciled back to awake, so this
+        # fixture stays valid under the per-body sleep receipt lifecycle.
         write_fatigue_state(self.sleeper, 180000, SleepPosture.AWAKE)
         self.candidate = create_object(NPC, key="清醒同伴", location=self.room1)
         self.candidate.race = "human"
