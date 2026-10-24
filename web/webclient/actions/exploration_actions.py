@@ -1006,7 +1006,6 @@ def _wait_adapter(
     actor: Any, payload: dict[str, Any], session: Any = None,
 ) -> dict[str, Any]:
     """Recheck safety and run the shared interruptible skip operation."""
-    del session
     rejection = unsafe_rejection(actor)
     if rejection is not None:
         return _rejected("unsafe_skip", rejection)
@@ -1028,13 +1027,23 @@ def _wait_adapter(
     try:
         if sleep:
             explicit = "seconds" in payload or "sleep_mode" in payload
-            outcome = begin_sleep(
-                actor,
-                mode=payload.get("sleep_mode", "recovery"),
-                seconds=payload.get("seconds"),
-                scope=payload.get("sleep_scope", "self"),
-                allow_continue=not explicit,
-            )
+            if payload.get("sleep_scope", "self") == "party":
+                from world.rules.sleep_control import begin_all_party_sleep
+
+                outcome = begin_all_party_sleep(
+                    actor,
+                    mode=payload.get("sleep_mode", "recovery"),
+                    seconds=payload.get("seconds"),
+                    session=session,
+                )
+            else:
+                outcome = begin_sleep(
+                    actor,
+                    mode=payload.get("sleep_mode", "recovery"),
+                    seconds=payload.get("seconds"),
+                    scope="self",
+                    allow_continue=not explicit,
+                )
         else:
             result = advance_wait(actor, seconds)
     except SkipRefused as exc:  # observability: ignore R2: the stable skip refusal IS the action result, not a swallowed failure

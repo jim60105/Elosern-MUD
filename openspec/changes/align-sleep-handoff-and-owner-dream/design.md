@@ -103,3 +103,16 @@ Apply with **gpt-luna**, branch `feat/align-sleep-handoff-and-owner-dream`, work
 ## Batch Review Disposition
 
 The single blocking batch critique identified three contract gaps. The follow-up amends explore.wait itself after the prerequisite's grammar delta, amends dream-session-lifecycle to separate time-free atomic narrative closure from outer deterministic sleep continuation, and preserves ordinary draft saving as a time-free open-session operation. Only explicit confirm/awaken departure authorizes recovery. Matching rejection, draft-save, unresolved-generation and partial-failure scenarios/tasks are included. These are planning fixes, without a second review or runtime evidence claim.
+
+## Applied Implementation Decisions
+
+The apply-time blocking critique added six mechanisms that this implementation uses:
+
+- A durable control-view generation (`sleep_view_generation`) changes on a new owner sleep entry and on a verified release onto the still-sleeping owner, so a decline cannot suppress the question after a possession round trip at the same receipt revision.
+- The departure continuation authorization commits inside the narrative confirmation/awakening transaction (`authorize_owner_sleep_continuation`); the rules executor runs after commit, and a reconnect/login resume consumer advances only a pending intent.
+- Each owner-continuation interval carries a stable operation identity and commits its `pending` / `paused` / `complete` disposition in the same transaction as the receipt result, so replay never crosses a committed interaction.
+- Forced sleep uses the same accepted-receipt continuation seam and its existing threshold target; it is never replaced by a voluntary plan.
+- Interactive boundaries are classified from the authoritative registered-source contract (`next_boundary`) rather than a hand-maintained event-kind blacklist; maintenance stages stay non-interactive.
+- The all-party choice runs entry plus verified release in one outer compensated transaction with owner/companion control snapshots and every member's sleep surfaces.
+
+The browser reads one new eager `sleep_handoff` panel; the dream panel wire shape is unchanged. Text `handoff` renders the same complete roster and party option, and `sleep continue` declines a pending question before continuing the owner target.

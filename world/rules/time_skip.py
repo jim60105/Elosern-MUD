@@ -1377,6 +1377,20 @@ def resume_pending_owner_continuation(actor: Any) -> SkipResult | None:
     if read_sleep_view_generation(actor) != decision["generation"]:
         return None
     try:
+        receipt = read_sleep_receipt(actor)
+    except SleepReceiptError:  # observability: ignore R2: a corrupt receipt cannot resume; the stored intent stays visible for the authoritative retry
+        return None
+    if receipt is None or not receipt.sleeping:
+        _mark_owner_continuation(
+            actor,
+            generation=decision["generation"],
+            sleep_id=decision["sleep_id"],
+            decision=decision["decision"],
+            continuation=CONTINUATION_COMPLETE,
+            last_operation_id=decision["last_operation_id"] or "resume:complete",
+        )
+        return None
+    try:
         return continue_owner_sleep(
             actor,
             sleep_id=decision["sleep_id"],
