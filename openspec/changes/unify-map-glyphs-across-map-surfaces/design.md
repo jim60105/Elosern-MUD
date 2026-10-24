@@ -107,7 +107,9 @@ Before this change, each surface had its own glyph vocabulary:
 - **[Island colour tokens]** The old ladder used tokens. The shared glyph carries the area map's paint, which mixes tokens and hex literals. The delta narrows the island token scenarios to edges, labels, rim markers and chrome.
 - **[Re-baselined geometry]** Footprints, spreading tests, label offsets (for example the current label `y`) and the browser geometry `INSET` all move with the scale. Every affected test is listed in `tasks.md`.
 - **[Remembered in-canvas nodes]** `glyphState` maps `remembered` to the visited dot, but the coordinate projection never draws a remembered node in-canvas. Remembered places appear as rim diamonds, so this branch exists only for safety.
-- **[Pre-existing timeout]** In `map_drawer.test.js`, "opens with focus on the selected tab even when it is not the first" takes about 4.7 s on master and can time out under full-suite load. It passes alone.
+- **[Radial model label depth]** The preserved UMD radial model (`web/static/webclient/js/elosern/local_map.js`) declares `RADIAL_GEOMETRY.LABEL_BOTTOM` 26 with a 24-unit `PAD`. The drawn graph baseline was already 29 at the 16-unit step and is now 30 (`16 × 0.75 + 2 + 16`); the padding absorbs the extra unit, so the model is left unchanged.
+- **[Halo under the state glyph]** The shared glyph paints the travel halo beneath the state glyph, so at a node's centre a pointer lands on the marker, not the halo. Browser journeys click the node's marker (or the here-seal's dot) inside the same activating node group.
+- **[Pre-existing timeout]** In `map_drawer.test.js`, "opens with focus on the selected tab even when it is not the first" takes about 4.7 s on master and can time out under full-suite load. It passes alone. During apply the full suite also timed out "cached reopen waits for its own silent fresh baseline (body-first)" (about 7.4 s alone on both master and this branch); the same tests fail under full-suite load on master too.
 
 ## Migration Plan
 
