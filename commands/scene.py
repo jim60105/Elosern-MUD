@@ -6,7 +6,10 @@ caller into the spawned room through the plain exit the builder created --
 ordinary traversal, which charges the standard ``move`` clock cost and records
 map knowledge through the shared ``typeclasses.exits.Exit`` machinery. The
 materialization commits before the move; every rejection is a named,
-side-effect-free message.
+side-effect-free message. Materialization creates the destination room, its
+exit pair and the stage occupants and binds the stage, so the shared stationary
+party admission runs before it: a sleeping source-present member refuses the
+entry without creating or binding anything.
 """
 
 from commands.command import Command
@@ -70,6 +73,29 @@ class CmdEnterScene(Command):
     aliases = ("enter",)
     help_category = "General"
 
+    def _refuse_sleeping_party(self, origin) -> bool:
+        """Refuse entry before materialization when a present member sleeps.
+
+        The exit's own preflight remains authoritative for the traversal; this
+        earlier check exists because materialization creates the destination
+        room, its exit and the stage occupants and binds the quest stage before
+        any exit is traversed. A refused entry must create nothing.
+        """
+        from world.rules.travel_cost import (
+            MovementPreflightRefused,
+            log_traversal_refusal,
+            refuse_sleeping_party,
+            source_present_members,
+        )
+
+        try:
+            refuse_sleeping_party(source_present_members(self.caller, origin))
+        except MovementPreflightRefused as error:  # observability: ignore R2: the structured refusal event below is this path's observable surface and the command writes nothing
+            log_traversal_refusal("scene_enter_command", self.caller, error.reason)
+            self.caller.msg(str(error))
+            return True
+        return False
+
     def func(self) -> None:
         try:
             records = read_records(self.caller)
@@ -90,6 +116,8 @@ class CmdEnterScene(Command):
         origin = self.caller.location
         if origin is None:
             self.caller.msg(_COULD_NOT_ENTER.format("你不在任何地方。"))
+            return
+        if self._refuse_sleeping_party(origin):
             return
         try:
             result = materialize_stage(self.caller, target.quest_id, origin_room=origin)

@@ -283,6 +283,66 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         self.call(CmdEnterScene(), "", "你目前沒有需要進入的任務場景", caller=self.player)
         self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
 
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_enter_scene_refuses_before_materializing_a_sleeping_party(self):
+        """Scenario: Waiver cannot bypass sleep (no destination creation)."""
+        from world.rules.clock import get_world_clock
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+
+        record, _ = self._accept(_instance_bound_payload())
+        self.player.move_to(self.anchor, quiet=True)
+        companion = create_object(NPC, key="沉睡同伴", location=self.anchor)
+        join_party(companion, self.player)
+        initialize_fatigue_state(companion)
+        exits_before = {exit_obj.pk for exit_obj in self.anchor.exits}
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                write_fatigue_state(companion, reserve, posture)
+                rooms_before = InstanceRoom.objects.all().count()
+                before = get_world_clock().tick
+                self.call(
+                    CmdEnterScene(),
+                    "",
+                    "同行成員正在沉睡",
+                    caller=self.player,
+                )
+                # The refused entry created no room, exit, occupant or stage
+                # binding and left every body at the anchor.
+                self.assertEqual(
+                    InstanceRoom.objects.all().count(), rooms_before
+                )
+                self.assertEqual(
+                    {exit_obj.pk for exit_obj in self.anchor.exits},
+                    exits_before,
+                )
+                self.assertIs(self.player.location, self.anchor)
+                self.assertIs(companion.location, self.anchor)
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertIsNone(self._fresh(record.quest_id).stage_room_id)
+        # All-awake control: the same entry still materializes and moves.
+        write_fatigue_state(companion, 360000, SleepPosture.AWAKE)
+        enter = CmdEnterScene()
+        enter.caller = self.player
+        enter.cmdstring = "進入"
+        enter.args = ""
+        enter.parse()
+        enter.func()
+        self.assertIsInstance(self.player.location, InstanceRoom)
+        self.assertEqual(
+            self._fresh(record.quest_id).stage_room_id,
+            self.player.location.pk,
+        )
+
     @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
     def test_enter_from_inside_the_bound_room_is_side_effect_free(self):
         record, _ = self._accept(_instance_bound_payload())

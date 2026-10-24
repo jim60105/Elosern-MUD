@@ -21,6 +21,7 @@ members and a fixed reserve/posture write. "Both postures" means
 | `flight` / `flash_step` access waiver | owner of either waiver key | `typeclasses.tests.test_exit_movement_cost` | access passes, traversal refuses before relocation |
 | Pure prediction | voluntary sleeper at full reserve | `world.rules.tests.test_movement` | `party_sleeping` before integration; the same awake route prices exactly 3,600 s |
 | Handoff command journey | possessed sleeping companion in the owner's party | `commands.tests.test_handoff_command` | real exit refusal with unchanged tick/locations; cast/item gates unchanged |
+| Scene-entry command | owner + sleeping follower, unmaterialized bound-instance stage | `world.quests.tests.test_scene_builder_offline` | the shared admission runs before materialization: no instance room, exit, occupant or stage binding is created |
 
 All-awake controls in the same modules keep the existing charge, waiver, follow
 and `MOVE` pricing intact; the existing independently known threshold and
@@ -38,9 +39,11 @@ uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settin
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_party_time_settlement
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb commands.tests.test_handoff_command world.rules.tests.test_party_identity world.rules.tests.test_combat_party
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_city_movement_cost world.maps.tests.test_movement_roundtrip world.rules.tests.test_party_follow world.rules.tests.test_party_follow_possession typeclasses.tests.test_exits
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_scene_builder_offline
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb server.conf.tests.test_scene_flavor_service tests.test_command_docs
 ```
 
-Results: 34, 22, 18, 34, 91 and 66 tests, all OK.
+Results: 34, 22, 18, 34, 91, 66, 10, 15 and 33 tests, all OK.
 
 ## Gates (task 3.3)
 
