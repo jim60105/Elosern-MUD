@@ -1,8 +1,10 @@
 <script setup>
-// The wait card's sleep configuration (align-sleep-handoff-and-owner-dream):
-// recovery/default or one bounded duration, using the existing rest-form
-// input conventions. Hours are presentation-only; the action contract remains
-// bounded seconds. Emits exactly one intent: `recover` or `submit(seconds)`.
+// The rest entry's sleep form (align-sleep-handoff-and-owner-dream;
+// redesign-rest-entry): recovery/default or one bounded duration, using the
+// existing rest-form input conventions. The second-layer shell's caption
+// (睡眠) names the form, so the form carries no caption of its own. Hours are
+// presentation-only; the action contract remains bounded seconds. Emits
+// exactly one intent: `recover` or `submit(seconds)`.
 import { computed, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
@@ -71,7 +73,6 @@ function onKeyDown(event) {
     @submit.prevent="submit"
     @keydown="onKeyDown"
   >
-    <p class="exploration-sleep-caption">睡眠模式</p>
     <button
       type="button"
       class="exploration-sleep-recover"
@@ -112,10 +113,6 @@ function onKeyDown(event) {
   border-radius: var(--radius-sm);
   color: var(--paper-100);
 }
-.exploration-sleep-caption {
-  margin: 0;
-  color: var(--paper-300);
-}
 .exploration-sleep-label {
   display: grid;
   gap: calc(8px * var(--ui-scale));
@@ -130,6 +127,7 @@ input {
   background: #101214;
   border: 1px solid var(--gold-600);
   font-size: var(--text-xl);
+  text-align: center;
 }
 button {
   padding: calc(10px * var(--ui-scale));
@@ -154,8 +152,5 @@ small {
 p {
   margin: 0;
   color: var(--warn);
-}
-.exploration-sleep-caption {
-  color: var(--paper-300);
 }
 </style>
