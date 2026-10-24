@@ -32,6 +32,8 @@ import DrawerHeader from "./DrawerHeader.vue";
 import MapEdgePointers from "./MapEdgePointers.vue";
 import MapNodeGlyph from "./MapNodeGlyph.vue";
 import WorldMapGlyph from "./WorldMapGlyph.vue";
+import MapCommissionGlyph from "./MapCommissionGlyph.vue";
+import WorldHatchPattern from "./WorldHatchPattern.vue";
 import { DETAIL_DRAWER_WIDTH, centreOn, project, usableRect } from "../lib/map_viewport.js";
 import { placeNodes, viewSignature } from "../lib/area_map_view.js";
 import { WORLD_SIGNATURE } from "../lib/world_map_view.js";
@@ -603,8 +605,8 @@ defineExpose({ viewRef });
           aria-label="圖例"
         >
           <!-- The area legend draws the area map's own glyphs (MapNodeGlyph,
-               the road casing and core, the commission pin) at the map's
-               size, so every sample is exactly what the map shows. -->
+               the shared road ink of area-map-ink.css, MapCommissionGlyph)
+               at the map's base size, so every sample is what the map shows. -->
           <ul v-if="tab === 'area'" class="map-drawer__legend-list">
             <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="current" /></svg>目前位置</li>
             <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="visited" /></svg>到過的地點</li>
@@ -613,17 +615,21 @@ defineExpose({ viewRef });
             <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="visited" gate /></svg>城門與出入口</li>
             <li>
               <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
-                <line class="lg-road__casing" x1="-12" y1="0" x2="12" y2="0" />
-                <line class="lg-road__core" x1="-12" y1="0" x2="12" y2="0" />
+                <g class="area-map__road is-walked">
+                  <line class="area-map__road-casing" x1="-12" y1="0" x2="12" y2="0" />
+                  <line class="area-map__road-core" x1="-12" y1="0" x2="12" y2="0" />
+                </g>
               </svg>走過的路
             </li>
             <li>
               <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
-                <line class="lg-road__casing is-frontier" x1="-12" y1="0" x2="12" y2="0" />
-                <line class="lg-road__core is-frontier" x1="-12" y1="0" x2="12" y2="0" />
+                <g class="area-map__road is-frontier">
+                  <line class="area-map__road-casing" x1="-12" y1="0" x2="12" y2="0" />
+                  <line class="area-map__road-core" x1="-12" y1="0" x2="12" y2="0" />
+                </g>
               </svg>看見但未走過的路
             </li>
-            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><path class="lg-quest" d="M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z" /></svg>委託目的地</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapCommissionGlyph /></svg>委託目的地</li>
           </ul>
           <!-- The world legend likewise: the world map's own point glyphs
                (WorldMapGlyph) and its shared ink (world-map-ink.css). -->
@@ -638,9 +644,7 @@ defineExpose({ viewRef });
             <li>
               <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
                 <defs>
-                  <pattern :id="`${uid}-lg-hatch`" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-                    <line class="world-map__hatch-line" x1="0" y1="0" x2="0" y2="8" />
-                  </pattern>
+                  <WorldHatchPattern :id="`${uid}-lg-hatch`" />
                 </defs>
                 <rect class="world-map__land" x="-11" y="-8" width="22" height="16" />
                 <rect x="-11" y="-8" width="22" height="16" :fill="`url(#${uid}-lg-hatch)`" />
@@ -679,6 +683,7 @@ defineExpose({ viewRef });
 </template>
 
 <style scoped src="./world-map-ink.css"></style>
+<style scoped src="./area-map-ink.css"></style>
 
 <style scoped>
 .map-drawer {
@@ -994,9 +999,9 @@ defineExpose({ viewRef });
   border: 1px solid var(--ink-600);
   border-radius: calc(3px * var(--ui-scale));
 }
-/* Legend samples: the maps' own SVG at their 1:1 size (AreaMapView roads and
-   commission pin here, the world ink from world-map-ink.css; the glyph
-   components style themselves). */
+/* Legend samples: the maps' own SVG at their base size times the UI scale
+   (the road ink from area-map-ink.css, the world ink from world-map-ink.css;
+   the glyph and pattern components style themselves). */
 .lg-svg {
   flex: none;
   display: block;
@@ -1005,13 +1010,6 @@ defineExpose({ viewRef });
   margin: calc(-4px * var(--ui-scale)) calc(-5px * var(--ui-scale));
   overflow: visible;
 }
-.lg-road__casing,
-.lg-road__core { fill: none; stroke-linecap: round; }
-.lg-road__casing { stroke: #0c0b09; stroke-opacity: 0.85; stroke-width: 7; }
-.lg-road__core { stroke: #b9aa86; stroke-width: 2.6; }
-.lg-road__casing.is-frontier { stroke-width: 5; stroke-opacity: 0.6; }
-.lg-road__core.is-frontier { stroke: #7a7162; stroke-width: 1.8; stroke-dasharray: 5 6; }
-.lg-quest { fill: var(--seal-500); stroke: #fff2e6; stroke-width: 1.3; stroke-linejoin: round; }
 
 @media (prefers-reduced-motion: reduce) {
   .map-drawer__pill { transition: none; }

@@ -43,6 +43,7 @@
 // requests no data and owns no drawer chrome.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WorldMapGlyph from "./WorldMapGlyph.vue";
+import WorldHatchPattern from "./WorldHatchPattern.vue";
 import WorldMapDetail from "./WorldMapDetail.vue";
 import {
   DETAIL_DRAWER_WIDTH,
@@ -741,9 +742,7 @@ const litCount = computed(() => litDistricts.value.length);
           <pattern :id="`${uid}-swell`" patternUnits="userSpaceOnUse" width="28" height="14">
             <path class="world-map__swell" d="M0 10 Q7 6 14 10 T28 10" />
           </pattern>
-          <pattern :id="`${uid}-hatch`" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-            <line class="world-map__hatch-line" x1="0" y1="0" x2="0" y2="8" />
-          </pattern>
+          <WorldHatchPattern :id="`${uid}-hatch`" />
           <clipPath :id="`${uid}-coast`" clipPathUnits="userSpaceOnUse">
             <path :d="coastD" :transform="matrix" />
           </clipPath>

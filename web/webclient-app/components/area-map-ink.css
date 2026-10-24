@@ -1,0 +1,12 @@
+/* The area map's shared ink: the road casing and core (walked, frontier and
+   travel). Included (scoped) by AreaMapView and by the map drawer's area
+   legend, so the legend's road samples are painted by the map's own rules.
+   Node glyphs live in MapNodeGlyph, the commission diamond in
+   MapCommissionGlyph. */
+.area-map__road line { fill: none; stroke-linecap: round; }
+.area-map__road-casing { stroke: #0c0b09; stroke-opacity: 0.85; stroke-width: 7; }
+.area-map__road-core { stroke: #b9aa86; stroke-width: 2.6; }
+.area-map__road.is-frontier .area-map__road-casing { stroke-width: 5; stroke-opacity: 0.6; }
+.area-map__road.is-frontier .area-map__road-core { stroke: #7a7162; stroke-width: 1.8; stroke-dasharray: 5 6; }
+.area-map__road.is-travel .area-map__road-core { stroke: var(--gold-400); }
+.area-map__road.is-travel.is-frontier .area-map__road-core { stroke: var(--gold-500); }

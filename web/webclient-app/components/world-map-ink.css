@@ -8,8 +8,8 @@
 /* lit ink: a warm vellum wash under terrain tints */
 .world-map__wash { fill: #4a4535; }
 
-/* unlit: diagonal hatching over the bare land */
-.world-map__hatch-line { stroke: #8a7f68; stroke-width: 1.1; stroke-opacity: 0.34; }
+/* unlit: diagonal hatching over the bare land (the pattern and its hatch
+   line are WorldHatchPattern's) */
 
 .world-map__district.is-lit { stroke: #d9c493; stroke-width: 1.1; stroke-opacity: 0.6; }
 .world-map__district.is-unlit { stroke: #7d7462; stroke-width: 1.1; stroke-dasharray: 1 4; stroke-linecap: round; stroke-opacity: 0.6; }

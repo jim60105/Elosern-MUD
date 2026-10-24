@@ -5,7 +5,7 @@
 // with the real admission rule (one in-flight request; the lock releases
 // only once the committed revision reaches the result's declared revision).
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
@@ -14,15 +14,29 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../../AppClient.vue";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
-import { LOCAL_MAP_WILDERNESS_METRIC_SAMPLE } from "../../stories/fixtures.js";
+import {
+  LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+  LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+  LOCAL_MAP_SAMPLE,
+  LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
+  LOCAL_MAP_WILDERNESS_RETURN_SAMPLE,
+  LOCAL_MAP_WILDERNESS_SAMPLE,
+  localMapModelFor,
+} from "../../stories/fixtures.js";
 import MapFixtures from "../../../static/webclient/js/tests/map_panel_fixtures.js";
 import MapDrawer from "../../components/MapDrawer.vue";
 import MapLattice from "../../components/MapLattice.vue";
+import MapNodeGlyph from "../../components/MapNodeGlyph.vue";
+import AreaMapView from "../../components/AreaMapView.vue";
+import WorldMapView from "../../components/WorldMapView.vue";
+import { AREA_CELL_GLYPH_SCALE, ISLAND_GLYPH_SCALE, gatePath } from "../../lib/map_marker_geometry.js";
+import { spanLimits, wildernessStops } from "../../lib/map_viewport.js";
+import { viewSignature } from "../../lib/area_map_view.js";
 import OverlayHost from "../../components/OverlayHost.vue";
 import { areaMemoryKey, scopeForLayer, useMapDrawer } from "../../composables/use-map-drawer.js";
 import { project, usableRect } from "../../lib/map_viewport.js";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
-import { TOWN_IDS, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
+import { TOWN_IDS, WILD_GATE_ID, dungeonArea, interiorArea, townArea, townFromEastArea, wildernessArea } from "../../stories/fixtures/area_map.js";
 import { QUEST_IDS, newLight, worldBase, worldNewLight } from "../../stories/fixtures/world_map.js";
 
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
@@ -987,6 +1001,23 @@ describe("the drawer current marker makes one truthful position claim", () => {
     expect(w.findAll(".area-map__nodes .map-glyph__here-ring")).toHaveLength(1);
   });
 
+  it("draws the island's current node with the same here-seal at the island scale", () => {
+    const w = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
+    wrappers.push(w);
+    const glows = w.findAll(".map-glyph__here-glow");
+    const rings = w.findAll(".map-glyph__here-ring");
+    const dots = w.findAll(".map-glyph__here-dot");
+    expect([glows.length, rings.length, dots.length]).toEqual([1, 1, 1]);
+    expect([glows[0], rings[0], dots[0]].map((c) => c.attributes("r"))).toEqual(["14", "10", "6"]);
+    // One glyph group, scaled as a whole by the island glyph scale; the ring
+    // keeps the island's current-marker hook and no second current shape.
+    const group = rings[0].element.parentElement;
+    expect(group.getAttribute("transform")).toBe(`scale(${ISLAND_GLYPH_SCALE})`);
+    expect(group.contains(glows[0].element) && group.contains(dots[0].element)).toBe(true);
+    expect(rings[0].classes()).toContain("local-map__marker--current");
+    expect(w.findAll(".local-map__marker--current")).toHaveLength(1);
+  });
+
   it("draws one current marker on the world map with no identity of its own", async () => {
     const { w } = mountDrawer({ tab: "world" });
     await tick();
@@ -994,5 +1025,273 @@ describe("the drawer current marker makes one truthful position claim", () => {
     expect(layer).toHaveLength(1);
     expect(layer[0].attributes("data-pick")).toBeUndefined();
     expect(layer[0].findAll("[data-pick]")).toHaveLength(0);
+  });
+});
+
+// ── shared glyph sources ────────────────────────────────────────────────
+
+const COMPONENTS = resolve(APP_DIR, "components");
+const source = (name) => readFileSync(resolve(COMPONENTS, name), "utf-8");
+const ownStyle = (sfc) => [...sfc.matchAll(/<style scoped>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n");
+
+// One glyph group's drawn shapes as a scale-free signature: tag, glyph
+// classes, radius and path data.
+function glyphSignature(group) {
+  return [...group.querySelectorAll("circle, path")].map((el) => ({
+    tag: el.tagName.toLowerCase(),
+    cls: [...el.classList].filter((c) => c.startsWith("map-glyph__") || c === "is-seen").sort().join(" "),
+    r: el.getAttribute("r"),
+    d: el.getAttribute("d"),
+  }));
+}
+
+// Glyph groups keyed by the state they draw (halo excluded from the key).
+function glyphsByKind(root) {
+  const out = new Map();
+  for (const group of root.querySelectorAll("g.map-glyph")) {
+    const shapes = glyphSignature(group);
+    const primary = shapes.find((sh) => sh.cls.includes("here-ring") || sh.cls.includes("gate") || sh.cls.includes("dot"));
+    const kind = [primary.cls, shapes.some((sh) => sh.cls.includes("halo")) ? "+travel" : ""].join("");
+    if (!out.has(kind)) out.set(kind, { shapes, transform: group.getAttribute("transform") });
+  }
+  return out;
+}
+
+function wildernessWithCornerQuest() {
+  const area = wildernessArea();
+  area.quest_markers = [
+    ...area.quest_markers,
+    { id: "q_story_here", title: "就地調查", tracked: false, destination: { kind: "node", node_id: area.current_node } },
+  ];
+  return area;
+}
+
+describe("every map surface draws a shared map concept from its one glyph source", () => {
+  it("scales a node glyph as one group around base-unit shapes", () => {
+    const host = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(host);
+    const w = mount(MapNodeGlyph, { props: { state: "current", travel: true, size: 0.5 }, attachTo: host });
+    wrappers.push(w);
+    const root = w.element;
+    expect(root.tagName.toLowerCase()).toBe("g");
+    expect(root.getAttribute("transform")).toBe("scale(0.5)");
+    expect([...root.querySelectorAll("circle")].map((c) => c.getAttribute("r"))).toEqual(["15", "14", "10", "6"]);
+    const gate = mount(MapNodeGlyph, { props: { state: "visited", gate: true, size: 0.5 }, attachTo: host });
+    wrappers.push(gate);
+    expect(gate.get(".map-glyph__gate").attributes("d")).toBe("M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z");
+    expect(gate.element.getAttribute("transform")).toBe("scale(0.5)");
+    // Strokes and dashes scale with the group: no shape opts out.
+    expect(source("MapNodeGlyph.vue")).not.toMatch(/vector-effect/);
+    expect(source("MapCommissionGlyph.vue")).not.toMatch(/vector-effect/);
+  });
+
+  it("draws the island's and the area map's node glyphs identically up to each surface's scale", async () => {
+    const island = new Map();
+    for (const sample of [
+      LOCAL_MAP_SAMPLE,
+      LOCAL_MAP_ALTORIA_PLAZA_SAMPLE,
+      LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE,
+      LOCAL_MAP_WILDERNESS_SAMPLE,
+      LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
+      LOCAL_MAP_WILDERNESS_RETURN_SAMPLE,
+    ]) {
+      const w = mount(MapLattice, { props: { localMap: localMapModelFor(sample) } });
+      wrappers.push(w);
+      for (const [kind, glyph] of glyphsByKind(w.element)) if (!island.has(kind)) island.set(kind, glyph);
+      // The island applies no paint of its own and draws no extra shape.
+      expect(w.findAll(".local-map__landmark")).toHaveLength(0);
+      for (const gateGlyph of w.findAll(".local-map__gate-glyph")) expect(gateGlyph.attributes("d")).toBe(gatePath());
+    }
+    const { w } = mountDrawer();
+    await tick();
+    const area = glyphsByKind(w.find(".area-map__nodes").element);
+    for (const kind of ["map-glyph__here-ring", "map-glyph__dot", "map-glyph__dot+travel", "is-seen map-glyph__gate+travel"]) {
+      expect(island.has(kind), `island draws ${kind}`).toBe(true);
+    }
+    let compared = 0;
+    for (const [kind, glyph] of island) {
+      expect(glyph.transform).toBe(`scale(${ISLAND_GLYPH_SCALE})`);
+      if (!area.has(kind)) continue;
+      expect(area.get(kind).transform).toBeNull();
+      expect(glyph.shapes).toEqual(area.get(kind).shapes);
+      compared += 1;
+    }
+    expect(compared).toBeGreaterThanOrEqual(3);
+  });
+
+  it("marks wilderness cells with the shared here-seal, gate arch and commission diamond", () => {
+    const area = validateAreaMapPanel(wildernessWithCornerQuest());
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    // The widest zoom the map allows: the 周邊 stop's span at the zoom-out
+    // limit, on the 960 × 600 fallback frame.
+    const span = spanLimits(wildernessStops({ width: 960, height: 600 })).max;
+    const here = area.nodes.find((n) => n.id === area.current_node);
+    const view = { signature: viewSignature(area), cx: here.x / area.cell_km, cy: here.y / area.cell_km, span };
+    const w = mount(AreaMapView, { props: { area, view }, attachTo: host });
+    wrappers.push(w);
+    const cellNode = (id) => w.findAll('[data-testid="area-map__node"]').find((n) => n.attributes("data-node-id") === id);
+    const current = cellNode(area.current_node);
+    const seal = current.get("g.map-glyph");
+    expect(seal.attributes("transform")).toBe(`scale(${AREA_CELL_GLYPH_SCALE})`);
+    expect(seal.findAll(".map-glyph__here-glow, .map-glyph__here-ring, .map-glyph__here-dot").map((c) => c.attributes("r"))).toEqual(["14", "10", "6"]);
+    // The commission beside the seal: the shared diamond at the cell scale,
+    // moved to the cell's corner.
+    const corner = current.get("g.map-commission");
+    expect(corner.attributes("transform")).toBe(`scale(${AREA_CELL_GLYPH_SCALE})`);
+    expect(corner.element.parentElement.getAttribute("transform")).toBe("translate(11 -11)");
+    expect(corner.get(".area-map__quest").attributes("d")).toBe("M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z");
+    const gate = cellNode(WILD_GATE_ID).get(".map-glyph__gate");
+    expect(gate.attributes("d")).toBe(gatePath());
+    expect(gate.classes()).toContain("is-seen");
+    expect(gate.element.parentElement.getAttribute("transform")).toBe(`scale(${AREA_CELL_GLYPH_SCALE})`);
+    const questCell = cellNode(area.quest_markers[0].destination.node_id);
+    expect(questCell.get("g.map-commission").attributes("transform")).toBe(`scale(${AREA_CELL_GLYPH_SCALE})`);
+    // No private cell seal, arch or pin remains.
+    expect(w.findAll('[class*="area-map__here-"], .area-map__gate')).toHaveLength(0);
+    for (const path of w.findAll("path")) expect(path.attributes("d")).not.toBe("M0 -9 L5.5 -2 L0 4 L-5.5 -2 Z");
+    // The scaled here-glow (14 × 0.875 = 12.25) fits half the smallest cell
+    // side even at the widest zoom.
+    const sides = w.findAll(".area-map__cell").flatMap((c) => [Number(c.attributes("width")), Number(c.attributes("height"))]);
+    expect(Math.min(...sides) / 2).toBeGreaterThanOrEqual(14 * AREA_CELL_GLYPH_SCALE);
+  });
+
+  it("paints the legend's road and commission samples with the area map's own sources", async () => {
+    const { w } = mountDrawer();
+    await tick();
+    const legend = w.get('[data-testid="map-drawer-legend"]');
+    for (const variant of ["is-walked", "is-frontier"]) {
+      const road = legend.get(`g.area-map__road.${variant}`);
+      expect(road.find(".area-map__road-casing").exists()).toBe(true);
+      expect(road.find(".area-map__road-core").exists()).toBe(true);
+    }
+    const commission = legend.get("g.map-commission .area-map__quest");
+    const onMap = w.find(".area-map__nodes .area-map__quest");
+    expect(commission.attributes("d")).toBe("M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z");
+    if (onMap.exists()) expect(onMap.attributes("d")).toBe(commission.attributes("d"));
+    // The drawer holds no road or commission paint values of its own; it
+    // includes the area map's ink instead.
+    const drawer = source("MapDrawer.vue");
+    expect(ownStyle(drawer)).not.toMatch(/area-map__road|area-map__quest|lg-road|lg-quest/);
+    expect(drawer).toContain('<style scoped src="./area-map-ink.css"></style>');
+    expect(source("AreaMapView.vue")).toContain('<style scoped src="./area-map-ink.css"></style>');
+  });
+
+  it("instantiates one hatch pattern definition on the world map and in its legend", async () => {
+    const { w } = mountDrawer({ tab: "world" });
+    await tick();
+    await w.find('[data-testid="map-drawer-legend-toggle"]').trigger("click");
+    const hatches = w.findAll("pattern").filter((p) => p.find(".world-map__hatch-line").exists());
+    expect(hatches).toHaveLength(2);
+    const ids = hatches.map((p) => p.attributes("id"));
+    expect(new Set(ids).size).toBe(2);
+    for (const p of hatches) {
+      expect(p.attributes("patternTransform")).toBe("rotate(45)");
+      expect([p.attributes("width"), p.attributes("height"), p.attributes("patternUnits")]).toEqual(["8", "8", "userSpaceOnUse"]);
+    }
+    const legend = w.get('[data-testid="map-drawer-legend"]');
+    const legendHatch = hatches.find((p) => legend.element.contains(p.element));
+    expect(legend.find(`[fill="url(#${legendHatch.attributes("id")})"]`).exists()).toBe(true);
+    const mapHatch = hatches.find((p) => p !== legendHatch);
+    expect(w.find(`[data-testid="world-map__hatch"][fill="url(#${mapHatch.attributes("id")})"]`).exists()).toBe(true);
+  });
+
+  it("scales the world map's point glyphs as a whole with the UI scale", async () => {
+    document.documentElement.style.setProperty("--ui-scale", "1.25");
+    try {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      const w = mount(WorldMapView, { props: { world: validateWorldMapPanel(worldBase()) }, attachTo: host });
+      wrappers.push(w);
+      await tick();
+      const groups = w.findAll('[data-testid="world-map__landmark"], [data-testid="world-map__place"], [data-testid="world-map__quest"], [data-layer="current"]');
+      expect(groups.length).toBeGreaterThan(3);
+      for (const g of groups) {
+        expect(g.attributes("transform")).toMatch(/scale\(1\.25\)$/);
+        expect(g.find("g.world-glyph").exists()).toBe(true);
+      }
+      // Glyph strokes scale with that group: no shape opts out.
+      expect(source("WorldMapGlyph.vue")).not.toMatch(/vector-effect/);
+    } finally {
+      document.documentElement.style.removeProperty("--ui-scale");
+    }
+  });
+
+  it("keeps each shared concept's geometry and paint in its one source", () => {
+    const files = readdirSync(COMPONENTS).filter((f) => f.endsWith(".vue") || f.endsWith(".css"));
+    const sources = Object.fromEntries(files.map((f) => [f, source(f)]));
+    const holders = (pattern) => files.filter((f) => pattern.test(sources[f])).sort();
+    // The unlit hatch pattern is declared only by WorldHatchPattern (other
+    // <pattern>s, the area dot field and the world swell, are not hatching).
+    expect(holders(/patternTransform="rotate\(45\)"/)).toEqual(["WorldHatchPattern.vue"]);
+    expect(holders(/world-map__hatch-line/)).toEqual(["WorldHatchPattern.vue"]);
+    // The gate arch comes only from gatePath(); no component spells an arch.
+    expect(holders(/A8 8 0 0 1|A7 7 0 0 1/)).toEqual([]);
+    expect(readFileSync(resolve(APP_DIR, "lib/map_marker_geometry.js"), "utf-8")).toMatch(/export function gatePath\(\)/);
+    // The commission diamond lives only in MapCommissionGlyph.
+    expect(holders(/M0 -7\.5 L5\.5 0/)).toEqual(["MapCommissionGlyph.vue"]);
+    // The road ink lives only in area-map-ink.css.
+    expect(holders(/\.area-map__road-casing\s*\{/)).toEqual(["area-map-ink.css"]);
+    // No approximation or private redraw remains anywhere.
+    expect(holders(/\.lg-road|\.lg-quest|lg-road__|\blg-quest\b|\.lg--|class="lg lg|area-map__here-|area-map__gate\b/)).toEqual([]);
+  });
+});
+
+describe("map legend samples are drawn by the map they explain", () => {
+  it("draws the area legend's samples with the area map's own glyphs", async () => {
+    const { w } = mountDrawer();
+    await tick();
+    const legend = w.get('[data-testid="map-drawer-legend"]');
+    const items = legend.findAll(".map-drawer__legend-list li");
+    expect(items.map((li) => li.text())).toEqual([
+      "目前位置", "到過的地點", "看過，尚未到訪", "相鄰，可前往", "城門與出入口", "走過的路", "看見但未走過的路", "委託目的地",
+    ]);
+    for (const li of items) {
+      expect(li.findAll("svg.lg-svg")).toHaveLength(1);
+      expect(li.get("svg.lg-svg").attributes("viewBox")).toBe("-16 -16 32 32");
+    }
+    expect(legend.findAll(".lg, [class*='lg-road'], .lg-quest")).toHaveLength(0);
+    // The gate sample is the map's very arch.
+    const mapGate = w.get(".area-map__nodes .map-glyph__gate");
+    expect(legend.get(".map-glyph__gate").attributes("d")).toBe(mapGate.attributes("d"));
+    expect(items[2].find(".map-glyph__dot.is-seen").exists()).toBe(true);
+    expect(items[3].find(".map-glyph__halo").exists()).toBe(true);
+    // Samples are drawn at the map's base glyph size (no group scale).
+    for (const g of legend.findAll("g.map-glyph")) expect(g.attributes("transform")).toBeUndefined();
+  });
+
+  it("draws the world legend's samples with the world map's glyphs and ink", async () => {
+    const { w } = mountDrawer({ tab: "world" });
+    await tick();
+    const legend = w.get('[data-testid="map-drawer-legend"]');
+    const items = legend.findAll(".map-drawer__legend-list li");
+    expect(items.map((li) => li.text())).toEqual([
+      "目前位置", "已探明的分區", "未探明的分區", "國界", "走過的足跡", "分區地標", "城鎮與地點", "委託目的地", "委託大致方位",
+    ]);
+    for (const li of items) expect(li.findAll("svg.lg-svg")).toHaveLength(1);
+    expect(legend.findAll(".lg, [class*='lg--']")).toHaveLength(0);
+    for (const cls of [
+      "here-ring", "wash", "land", "district.is-lit", "district.is-unlit", "nation-casing", "nation-border",
+      "trail-casing", "trail-line", "spire", "place-glyph", "quest-pin", "approx-ring",
+    ]) {
+      expect(legend.find(`.world-map__${cls}`).exists(), cls).toBe(true);
+    }
+    expect(legend.find("pattern .world-map__hatch-line").exists()).toBe(true);
+    const svg = w.get(".world-map__svg");
+    for (const cls of ["spire", "quest-pin"]) {
+      const onMap = svg.findAll(`.world-map__${cls}`).find((el) => !legend.element.contains(el.element));
+      expect(onMap, cls).toBeDefined();
+      expect(legend.get(`.world-map__${cls}`).attributes("d")).toBe(onMap.attributes("d"));
+    }
+    // The approximate ring fits the 32-unit sample with the map's paint.
+    expect(legend.get(".world-map__approx-ring").attributes("r")).toBe("14");
+    expect(legend.get(".world-map__approx-fill").attributes("r")).toBe("14");
+  });
+
+  it("sizes every sample box at 32 units times the UI scale", () => {
+    const style = ownStyle(source("MapDrawer.vue"));
+    const rule = /\.lg-svg\s*\{([^}]*)\}/.exec(style)[1];
+    expect(rule).toMatch(/width:\s*calc\(32px \* var\(--ui-scale\)\)/);
+    expect(rule).toMatch(/height:\s*calc\(32px \* var\(--ui-scale\)\)/);
   });
 });

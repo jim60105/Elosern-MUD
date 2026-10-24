@@ -33,6 +33,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AreaMapDetail from "./AreaMapDetail.vue";
 import MapNodeGlyph from "./MapNodeGlyph.vue";
+import MapCommissionGlyph from "./MapCommissionGlyph.vue";
+import { AREA_CELL_GLYPH_SCALE } from "../lib/map_marker_geometry.js";
 import {
   DETAIL_DRAWER_WIDTH,
   DRAG_THRESHOLD_PX,
@@ -770,14 +772,21 @@ onBeforeUnmount(() => {
                 :height="node.cell.height"
                 rx="2"
               />
+              <!-- The cell's marks are the shared glyphs at the cell scale:
+                   the here-seal or the gate arch (MapNodeGlyph), and the
+                   commission diamond, moved to the cell's corner beside
+                   either of them. The cell rect itself states travel. -->
               <g v-if="node.visibility === 'current' || node.gate || node.quest" :transform="`translate(${node.x} ${node.y})`">
-                <template v-if="node.visibility === 'current'">
-                  <circle class="area-map__here-glow" r="13" />
-                  <circle class="area-map__here-ring" r="9" />
-                  <circle class="area-map__here-dot" r="5" />
-                </template>
-                <path v-else-if="node.gate" class="area-map__gate" d="M-7 7 V-2 A7 7 0 0 1 7 -2 V7 Z" />
-                <path v-if="node.quest" class="area-map__quest" d="M0 -9 L5.5 -2 L0 4 L-5.5 -2 Z" :transform="node.visibility === 'current' || node.gate ? 'translate(11 -11)' : ''" />
+                <MapNodeGlyph
+                  v-if="node.visibility === 'current' || node.gate"
+                  :state="node.visibility"
+                  :gate="node.gate"
+                  :selected="node.selected"
+                  :size="AREA_CELL_GLYPH_SCALE"
+                />
+                <g v-if="node.quest" :transform="node.visibility === 'current' || node.gate ? 'translate(11 -11)' : null">
+                  <MapCommissionGlyph :size="AREA_CELL_GLYPH_SCALE" />
+                </g>
               </g>
             </template>
             <g v-else :transform="`translate(${node.x} ${node.y})`">
@@ -785,7 +794,7 @@ onBeforeUnmount(() => {
               <circle v-if="node.selected" class="area-map__selected-ring" r="13" />
               <MapNodeGlyph :state="node.visibility" :gate="node.gate" :travel="node.travel" :selected="node.selected" />
               <g v-if="node.questAt" :transform="`translate(${node.questAt.dx} ${node.questAt.dy})`">
-                <path class="area-map__quest" d="M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z" />
+                <MapCommissionGlyph />
               </g>
             </g>
           </g>
@@ -842,6 +851,8 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<style scoped src="./area-map-ink.css"></style>
+
 <style scoped>
 .area-map {
   position: relative;
@@ -881,39 +892,14 @@ onBeforeUnmount(() => {
 /* scale-true dot field */
 .area-map__dot { fill: var(--gold-400); fill-opacity: 0.26; }
 
-/* roads: a soot casing under a paper-ink core */
-.area-map__road line { fill: none; stroke-linecap: round; }
-.area-map__road-casing { stroke: #0c0b09; stroke-opacity: 0.85; stroke-width: 7; }
-.area-map__road-core { stroke: #b9aa86; stroke-width: 2.6; }
-.area-map__road.is-frontier .area-map__road-casing { stroke-width: 5; stroke-opacity: 0.6; }
-.area-map__road.is-frontier .area-map__road-core { stroke: #7a7162; stroke-width: 1.8; stroke-dasharray: 5 6; }
-.area-map__road.is-travel .area-map__road-core { stroke: var(--gold-400); }
-.area-map__road.is-travel.is-frontier .area-map__road-core { stroke: var(--gold-500); }
+/* roads: a soot casing under a paper-ink core (./area-map-ink.css, shared
+   with the map legend) */
 
 /* nodes */
 .area-map__node { cursor: pointer; outline: none; }
 .area-map__hit { fill: transparent; }
 .area-map__selected-ring { fill: none; stroke: var(--gold-300); stroke-width: 2.6; }
-.area-map__here-glow {
-  fill: rgba(165, 44, 49, 0.22);
-  stroke: none;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: area-map-here-breathe var(--motion-pulse) ease-in-out infinite;
-}
-@keyframes area-map-here-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(0.86); }
-  50% { opacity: 1; transform: scale(1.18); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .area-map__here-glow { animation: none; }
-}
-.area-map__here-ring { fill: none; stroke: var(--paper-50); stroke-width: 2; }
-.area-map__here-dot { fill: var(--seal-deep); stroke: #fff2e6; stroke-width: 1.5; }
-.area-map__gate { fill: #3a342a; stroke: var(--gold-400); stroke-width: 2; stroke-linejoin: round; }
-.area-map__node.is-seen .area-map__gate { fill: #26231d; stroke: var(--gold-500); }
-.area-map__node.is-selected .area-map__gate { stroke: var(--gold-300); stroke-width: 2.6; }
-.area-map__quest { fill: var(--seal-500); stroke: #fff2e6; stroke-width: 1.3; stroke-linejoin: round; }
+/* node glyphs: MapNodeGlyph; the commission diamond: MapCommissionGlyph */
 .area-map__node:focus-visible .area-map__hit,
 .area-map__node:focus-visible .area-map__cell {
   stroke: var(--gold-300);
