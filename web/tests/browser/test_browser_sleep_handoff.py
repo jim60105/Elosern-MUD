@@ -142,12 +142,11 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
 
         # Explicit release returns to the still-sleeping owner, so the same
         # no-possession view asks the owner-only question without spending time.
-        before_release = sent_action_count(page, "explore.possess_release")
         self._run_command(page, "unpossess")
+        card = self._card(page)
+        card.wait_for(state="visible", timeout=30000)
+        card.locator('[data-row-key="back"]').click()
         page.wait_for_selector('[data-testid="dream-question"]', timeout=30000)
-        self.assertGreaterEqual(
-            sent_action_count(page, "explore.possess_release"), before_release
-        )
         self.assertEqual(
             int(store_state(page)["panels"]["status"]["actor"]["identity"]),
             player_id,
