@@ -394,6 +394,52 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertRegex(result.stdout, r"Tests\s+\d+ passed \(\d+\)")
         self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
 
+    @covers_requirement(
+        "webclient-local-map::the-minimap-island-draws-the-area-map-s-node-glyphs",
+        "webclient-local-map::an-island-fallback-label-never-covers-its-own-node-glyph",
+    )
+    def test_island_shared_glyph_vitest_evidence_passes(self):
+        # The island draws MapNodeGlyph inside one group at the island glyph
+        # scale (lattice independent of markerScale, graph times it), its
+        # footprints, spreading, label clearance, stub start and aim ring
+        # follow that one constant, the current gate room wears the here
+        # seal, and a raster-fallback label never lands on its own marker.
+        suite = [
+            REPO_ROOT / "web/webclient-app/tests/world/map_lattice_renderer.test.js",
+            REPO_ROOT / "web/webclient-app/tests/world/local_map.test.js",
+            REPO_ROOT / "web/webclient-app/tests/minimap_projection.test.js",
+            REPO_ROOT / "web/webclient-app/tests/world/island_labels.test.js",
+        ]
+        for path in suite:
+            self.assertTrue(path.is_file(), f"missing Vitest file {path}")
+        result = subprocess.run(
+            ["npx", "--no-install", "vitest", "run", "--reporter=verbose", *(str(path) for path in suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=_VITEST_ENV,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "island shared-glyph Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertRegex(result.stdout, r"Test Files\s+4 passed \(4\)")
+        self.assertNotRegex(result.stdout, r"\d+ (skipped|todo)")
+        for name in (
+            "the minimap island draws the area map's node glyphs > draws the lattice glyph group at the island scale, whatever markerScale",
+            "the minimap island draws the area map's node glyphs > draws the graph glyph group at the island scale times markerScale",
+            "the minimap island draws the area map's node glyphs > starts a gateway stub at the scaled travel halo's edge",
+            "the minimap island draws the area map's node glyphs > keeps the aim ring's inner stroke edge outside the scaled travel halo",
+            "the minimap island draws the area map's node glyphs > rescales glyph, footprint, label clearance, stub start and aim ring from the one constant",
+            "the minimap island draws the area map's node glyphs > holds no island marker-ladder paint of its own",
+            "draws the current gate room's here seal, room name and 通往 line on the city side",
+            "scales the base footprints uniformly by the glyph size",
+            "an island fallback label never covers its own node glyph > skips a raster box inside its own footprint plus the label gap",
+        ):
+            self.assertIn(name, result.stdout)
+
     def _run_single_vitest_file(self, relative: str, label: str) -> None:
         suite = REPO_ROOT / relative
         self.assertTrue(suite.is_file(), f"missing Vitest file {suite}")
