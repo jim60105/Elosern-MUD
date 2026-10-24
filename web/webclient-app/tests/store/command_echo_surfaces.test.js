@@ -873,6 +873,24 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
 
   const gallerySubject = "portrait:character:t_gallery";
   const galleryCard = { subject_key: gallerySubject, image_id: "12345678-1234-1234-1234-123456789abc" };
+  for (const [actionId, payload, expected] of [
+    ["explore.sleep_party", {}, "sleep all"],
+    ["explore.sleep_continue", { sleep_id: "sleep-1", revision: 0 }, "sleep continue"],
+    ["explore.sleep_dream", { sleep_id: "sleep-1", revision: 0, decision: "decline" }, "dream decline"],
+  ]) {
+    SURFACES.push({
+      id: `accepted sleep handoff: ${actionId}`,
+      ids: [actionId],
+      expected,
+      prepare() {
+        openExploration();
+        store.dispatchAction(actionId, payload);
+        expect(sender.sent.actions).toHaveLength(1);
+        expect(lastEnvelope().action_id).toBe(actionId);
+        expect(lastEnvelope().payload).toEqual(payload);
+      },
+    });
+  }
   for (const [actionId, payload] of [
     ["gallery.subject.select", { subject_key: gallerySubject }],
     ["gallery.generate", { subject_key: gallerySubject, fields: ["appearance"], custom_prompt: "光影" }],
