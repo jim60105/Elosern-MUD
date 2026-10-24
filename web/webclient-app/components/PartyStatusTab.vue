@@ -25,6 +25,7 @@ import AvatarArtwork from "./AvatarArtwork.vue";
 import GradeGem from "./GradeGem.vue";
 import ListDetail from "./ListDetail.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
+import { formatDisplayNumber } from "../lib/display_number.js";
 import { portraitFor } from "./party-helpers.js";
 import { gaugePercent, panelReason } from "./party-window-model.js";
 import {
@@ -155,7 +156,9 @@ function onListKeydown(event) {
 
 function traitLabel(row) {
   const delta = signedDelta(row);
-  return delta ? `${row.label}，基礎 ${row.base}，有效 ${row.effective}（${delta}）` : `${row.label}，基礎 ${row.base}，有效 ${row.effective}`;
+  return delta
+    ? `${row.label}，基礎 ${formatDisplayNumber(row.base)}，有效 ${formatDisplayNumber(row.effective)}（${delta}）`
+    : `${row.label}，基礎 ${formatDisplayNumber(row.base)}，有效 ${formatDisplayNumber(row.effective)}`;
 }
 function remainingText(condition) {
   return formatRemaining(condition.remaining_seconds);
@@ -246,9 +249,9 @@ function summaryText(condition) {
                 @click="select('trait', row.key)"
               >
                 <span class="party-status-tab__row-name">{{ row.label }}<span v-if="row.layers.length" class="party-status-tab__layer-count" aria-hidden="true">{{ row.layers.length }} 層</span></span>
-                <span class="party-status-tab__base" :data-testid="`party-status-tab__base--${row.key}`">{{ row.base }}</span>
+                <span class="party-status-tab__base" :data-testid="`party-status-tab__base--${row.key}`">{{ formatDisplayNumber(row.base) }}</span>
                 <span class="party-status-tab__arrow" aria-hidden="true">→</span>
-                <span class="party-status-tab__eff" :data-testid="`party-status-tab__effective--${row.key}`">{{ row.effective }}</span>
+                <span class="party-status-tab__eff" :data-testid="`party-status-tab__effective--${row.key}`">{{ formatDisplayNumber(row.effective) }}</span>
                 <span class="party-status-tab__delta" :data-testid="`party-status-tab__delta--${row.key}`"><template v-if="signedDelta(row)">{{ TREND_GLYPHS[traitTrend(row)] }} {{ signedDelta(row) }}</template></span>
               </button>
             </div>
@@ -287,12 +290,12 @@ function summaryText(condition) {
       <template #detail>
         <template v-if="selectedTrait">
           <span class="party-status-tab__ribbon">屬性</span>
-          <h3 class="party-status-tab__detail-title" data-testid="party-status-tab__detail-title">{{ selectedTrait.label }} <b :class="`is-${traitTrend(selectedTrait)}`">{{ selectedTrait.effective }}</b></h3>
+          <h3 class="party-status-tab__detail-title" data-testid="party-status-tab__detail-title">{{ selectedTrait.label }} <b :class="`is-${traitTrend(selectedTrait)}`">{{ formatDisplayNumber(selectedTrait.effective) }}</b></h3>
           <ol class="party-status-tab__fall" aria-label="數值組成" data-testid="party-status-tab__waterfall">
             <li class="party-status-tab__step party-status-tab__step--base" data-testid="party-status-tab__step--base">
               <span class="party-status-tab__step-glyph" aria-hidden="true"></span>
               <span class="party-status-tab__step-name">基礎值</span>
-              <span class="party-status-tab__amt">{{ selectedTrait.base }}</span>
+              <span class="party-status-tab__amt">{{ formatDisplayNumber(selectedTrait.base) }}</span>
             </li>
             <li
               v-for="(layer, index) in selectedTrait.layers"
@@ -311,7 +314,7 @@ function summaryText(condition) {
             <li class="party-status-tab__step party-status-tab__step--total" data-testid="party-status-tab__step--total">
               <span class="party-status-tab__step-glyph" aria-hidden="true"></span>
               <span class="party-status-tab__step-name">有效值</span>
-              <span class="party-status-tab__amt">{{ selectedTrait.effective }}</span>
+              <span class="party-status-tab__amt">{{ formatDisplayNumber(selectedTrait.effective) }}</span>
             </li>
           </ol>
         </template>

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import PartyStatusTab from "../../components/PartyStatusTab.vue";
 import PartyWindow from "../../components/PartyWindow.vue";
 import { rememberPartyWindowTab, resetPartyWindowMemory } from "../../components/party-window-memory.js";
+import { formatDisplayNumber } from "../../lib/display_number.js";
 import {
   defaultSelection,
   formatLayerAmount,
@@ -207,6 +208,34 @@ describe("PartyStatusTab (webclient-party-status-tab)", () => {
     expect(signedDelta({ base: 12, effective: 14.5 })).toBe("+2.5");
     expect(formatLayerAmount("mult", -1.2)).toBe("×−1.2");
     expect(formatLayerAmount("flat", -2)).toBe("−2");
+  });
+
+  it("renders a percent-scaled total without binary float noise", () => {
+    // 6 × (1 − 5%) is 5.699999999999999 in IEEE-754; the row, the detail
+    // title and the waterfall all show the display value 5.7.
+    expect(formatDisplayNumber(5.699999999999999)).toBe("5.7");
+    expect(formatDisplayNumber(12.75)).toBe("12.75");
+    expect(formatDisplayNumber(12)).toBe("12");
+    const agility = {
+      key: "agility",
+      label: "敏捷",
+      base: 6,
+      current: 5.699999999999999,
+      max: null,
+      effective: 5.699999999999999,
+      layers: [{ source: "condition", name: "輕微疲勞敏捷度下降", kind: "pct", amount: -5 }],
+    };
+    const character = {
+      ...CHARACTER_STATUS_COMPANION_SAMPLE,
+      traits: CHARACTER_STATUS_COMPANION_SAMPLE.traits.map((row) => (row.key === "agility" ? agility : row)),
+    };
+    mountTab({ character });
+    expect(byTestId("party-status-tab__effective--agility").text()).toBe("5.7");
+    expect(byTestId("party-status-tab__delta--agility").text()).toBe("▼ −0.3");
+    expect(byTestId("party-status-tab__detail-title").text()).toBe("敏捷 5.7");
+    expect(byTestId("party-status-tab__step--base").text()).toContain("6");
+    expect(byTestId("party-status-tab__step--total").text()).toContain("5.7");
+    expect(byTestId("party-status-tab__trait--agility").attributes("aria-label")).toBe("敏捷，基礎 6，有效 5.7（−0.3）");
   });
 
   it("shows an active disguise as a labelled footer and keeps every true row", () => {

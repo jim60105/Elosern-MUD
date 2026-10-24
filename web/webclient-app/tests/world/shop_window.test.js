@@ -217,6 +217,23 @@ describe("ShopWindow (webclient-shop-window)", () => {
     expect(chips[1].text()).toContain("▼ 攻擊 −4");
   });
 
+  it("renders the recipient's current value without binary float noise", () => {
+    // A percentage fold (6 × (1 − 5%)) arrives as 5.699999999999999; the
+    // comparison prints the display value 5.7.
+    const noisy = {
+      ...SHOP_CHARACTER_SAMPLE,
+      traits: SHOP_CHARACTER_SAMPLE.traits.map((row) =>
+        row.key === "atk_phys"
+          ? { ...row, current: 5.699999999999999, effective: 5.699999999999999 }
+          : row
+      ),
+    };
+    mountWindow({ character: noisy });
+    const current = get("shop-window__current").text();
+    expect(current).toContain("攻擊5.7");
+    expect(current).not.toContain("5.699999");
+  });
+
   it("chips render only an item_holdings answer for exactly the shown item and recipient", async () => {
     mountWindow({ itemHoldings: { ...SHOP_HOLDINGS_EQUIPMENT, giver_id: SHOP_KAHN_ID } });
     expect(find("shop-window__idle").exists()).toBe(true);

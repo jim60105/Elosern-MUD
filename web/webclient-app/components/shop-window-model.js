@@ -5,6 +5,7 @@
 // server fact. The one client arithmetic is the display-only remaining purse
 // (one multiplication and one subtraction or addition of committed integers),
 // which the server's next snapshot always replaces.
+import { formatDisplayNumber } from "../lib/display_number.js";
 
 // The first-level tabs. `buy` lists the shelf for the recipient, `sell` the
 // seller's sellable rows; the member rail chooses who.
@@ -123,7 +124,8 @@ export function shopHoldings(holdings, memberId, itemKey) {
 // The recipient's committed effective value for each changed trait, read from
 // the `character` panel only while it describes that member; else null per
 // trait. Nothing is added up: the comparison shows the current values beside
-// the server's change lines.
+// the server's change lines. The value is formatted for display (a percentage
+// fold arrives as 5.699999999999999 on the wire and reads 5.7).
 export function currentTraitValues(character, memberId, changes) {
   const traits =
     character && character.available === true && character.member_id === memberId && Array.isArray(character.traits)
@@ -131,7 +133,10 @@ export function currentTraitValues(character, memberId, changes) {
       : [];
   return changes.map((change) => {
     const trait = traits.find((row) => row?.key === change.key);
-    const value = trait && typeof trait.effective === "number" && Number.isFinite(trait.effective) ? trait.effective : null;
+    const value =
+      trait && typeof trait.effective === "number" && Number.isFinite(trait.effective)
+        ? formatDisplayNumber(trait.effective)
+        : null;
     return { key: change.key, label: change.label, value };
   });
 }
