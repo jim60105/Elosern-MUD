@@ -1,0 +1,25 @@
+# Tasks: rename-reserve-to-energy
+
+Conventions: run Python tests with the Evennia test runner as `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb <label>`, where `<file>` is a scratch file containing the single line `MUD_TEST_SETTINGS=1`; run Vitest from the repo root as `npx --no-install vitest run <path>`; run the Node gate as `node --test <path>`. Replace only the exact strings listed. Do not touch code comments, docstrings, rulebook YAML comments, identifiers, `docs/development/`, `docs/superpowers/`, or `docs/design/`. Do not change any `covers_requirement(...)` string.
+
+## 1. Server strings
+
+- [ ] 1.1 In `world/rules/travel_cost.py`, change `DEPLETION_MESSAGE = "隊伍成員的精神儲備不足以支撐這趟旅行。"` to `DEPLETION_MESSAGE = "隊伍成員的精力不足以支撐這趟旅行。"`. In `world/rules/tests/test_movement.py`, in `test_a_non_distance_connector_refuses_exhaustion_before_arrival`, add `self.assertEqual(str(caught.exception), "隊伍成員的精力不足以支撐這趟旅行。")` right after the existing `caught.exception.reason` assertion. Verify: the label `world.rules.tests.test_movement` passes.
+- [ ] 1.2 In `world/rules/possession.py` `handoff_candidate_label`, change `f"（精神儲備 {candidate.reserve_percent}%）"` to `f"（精力 {candidate.reserve_percent}%）"`. In `world/rules/tests/test_possession.py`, change `self.assertIn("精神儲備", offer)` to `self.assertIn("精力", offer)` and add `self.assertNotIn("精神儲備", offer)`. In `commands/tests/test_handoff_command.py`, change the three expected strings to `"1. 回到自己的身體（精力 100%）"`, `f"2. 接手 清醒同伴（精力 100%）"`, and `"接手 清醒同伴（精力 100%）（不在同一地點）"`. Verify: the labels `world.rules.tests.test_possession` and `commands.tests.test_handoff_command` pass.
+
+## 2. Client string
+
+- [ ] 2.1 In `web/webclient-app/components/StatusPanel.vue`, change the fatigue row text `：精神儲備 {{ row.reserve_percent }}%` to `：精力 {{ row.reserve_percent }}%` (the rest of the line is unchanged). In `web/webclient-app/tests/data/status_panel.test.js`, change the two expectations to `"艾倫‧灰誓：精力 80%（測試充沛）"` and `"同行者：精力 2%（測試強制睡眠）"`. In `web/webclient-app/tests/app_client_sleep_handoff.test.js` and `web/static/webclient/js/tests/protocol_sleep_handoff.test.js`, replace every `精神儲備` in the fixture labels and expectations with `精力` (for example `"接手 同伴（精力 100%）"`, `"接手 沉睡者（精力 5%）"`). Verify: `npx --no-install vitest run web/webclient-app/tests/data/status_panel.test.js web/webclient-app/tests/app_client_sleep_handoff.test.js` and `node --test web/static/webclient/js/tests/protocol_sleep_handoff.test.js` pass.
+
+## 3. Player documentation
+
+- [ ] 3.1 In `docs/game/commands.md` and `docs/game/command-reference.md`, replace every `精神儲備` with `精力` and change nothing else (leave `滿儲備` and `精神恢復` as they are; see design.md Non-Goals). In `tests/test_command_docs.py`, in `test_status_and_cast_entries_document_protected_physiology`, change `self.assertIn("精神儲備", status_description)` to `self.assertIn("精力", status_description)` and add `self.assertNotIn("精神儲備", status_description)`. Verify: `rg -n "精神儲備" docs/game` prints nothing and the label `tests.test_command_docs` passes.
+
+## 4. Integration checks
+
+- [ ] 4.1 Run `rg -n "精神儲備" web/webclient-app/components web/webclient-app/tests web/static/webclient/js world/rules/travel_cost.py world/rules/possession.py world/rules/tests commands tests docs/game` and confirm it prints nothing. Then run `uv run --locked python -m tools.contract_gate` and `uv run --locked python -m tools.spec_traceability check`. Verify: no match and both commands pass.
+
+## Workflow follow-up
+
+- At archive, after the `mental-reserve` delta syncs, run `uv run --locked python -m tools.spec_traceability list` and add the generated identifier of "Player-facing text names the reserve 精力" to the `covers_requirement` of `test_a_non_distance_connector_refuses_exhaustion_before_arrival` (`world/rules/tests/test_movement.py`), `test_handoff_lists_fatigue_and_return_or_possess_meaning` (`commands/tests/test_handoff_command.py`), and `test_status_and_cast_entries_document_protected_physiology` (`tests/test_command_docs.py`), keeping their existing identifiers.
+- Archive the change after review.
