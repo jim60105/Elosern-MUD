@@ -4,10 +4,15 @@ import json
 
 from commands.command import Command
 
+_USAGE = (
+    "用法：dream [enter|decline|say <文字>|draft [故事方向]|"
+    "confirm [故事方向]|awaken]"
+)
+
 
 def render_state(state):
     if state is None:
-        return "目前沒有夢境。使用 sleep dream，在睡眠結束後進入夢境。"
+        return "目前沒有夢境。請先睡眠；主人未附身時會詢問是否進入夢境。"
     parts = [state["opening"], state["scene"], state["dialogue"],
              f"剩餘交流次數：{state['remaining']}。"]
     if state["pending"]:
@@ -53,17 +58,49 @@ class CmdDream(Command):
     aliases = ("夢境",)
 
     def func(self):
-        from server.dream_service import act, dream_state
+        from server.dream_service import (
+            act,
+            answer_sleep_dream,
+            dream_state,
+            pending_sleep_question,
+        )
+        from world.rules.time_skip import owner_sleep_view_state
+
         state = dream_state(self.caller)
         if not self.args.strip():
+            question = pending_sleep_question(self.caller)
+            if question is not None:
+                self.caller.msg(question)
+                return
             self.caller.msg(render_state(state))
             return
         action, _, text = self.args.strip().partition(" ")
+        if action in {"enter", "decline"}:
+            if text:
+                self.caller.msg(_USAGE)
+                return
+            view = owner_sleep_view_state(self.caller)
+            if view is None:
+                self.caller.msg("目前沒有等待回答的睡眠夢境問題。")
+                return
+            answer = answer_sleep_dream(
+                self.caller,
+                decision=action,
+                sleep_id=view["sleep_id"],
+                revision=view["revision"],
+                generation=view["generation"],
+                session=self.session,
+            )
+            self.caller.msg(answer["message"])
+            current = dream_state(self.caller)
+            if current is not None and current["open"]:
+                self.caller.msg(render_state(current))
+            return
         if state is None:
             self.caller.msg(render_state(None))
             return
         if action not in {"say", "draft", "confirm", "awaken"} or (action == "awaken" and text):
-            self.caller.msg("用法：dream [say <文字>|draft [故事方向]|confirm [故事方向]|awaken]")
+            self.caller.msg(_USAGE)
             return
         direction = text if action in {"draft", "confirm"} else ""
         if direction.lstrip().startswith("{"):

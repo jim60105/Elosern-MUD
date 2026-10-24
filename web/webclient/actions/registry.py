@@ -154,6 +154,9 @@ def build_production_action_registry() -> ActionRegistry:
         _party_leave_adapter,
         _possess_adapter,
         _possess_release_adapter,
+        _sleep_continue_adapter,
+        _sleep_dream_adapter,
+        _sleep_party_adapter,
         _talk_freeform_adapter,
         _talk_open_adapter,
         _talk_scripted_adapter,
@@ -168,6 +171,9 @@ def build_production_action_registry() -> ActionRegistry:
         validate_party_leave_payload,
         validate_possess_payload,
         validate_possess_release_payload,
+        validate_sleep_continue_payload,
+        validate_sleep_dream_payload,
+        validate_sleep_party_payload,
         validate_talk_freeform_payload,
         validate_talk_open_payload,
         validate_talk_scripted_payload,
@@ -596,6 +602,30 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_possess_release_payload,
             adapter=_possess_release_adapter,
             affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.sleep_party",
+            validate_payload=validate_sleep_party_payload,
+            adapter=_sleep_party_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.sleep_continue",
+            validate_payload=validate_sleep_continue_payload,
+            adapter=_sleep_continue_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.sleep_dream",
+            validate_payload=validate_sleep_dream_payload,
+            adapter=_sleep_dream_adapter,
+            affected_panels=("dream", "sleep_handoff", "status"),
         )
     )
     registry.register(

@@ -292,14 +292,6 @@ def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "explore.wait sleep must be the exact boolean true"
         )
     keys = set(payload)
-    if keys == {"sleep", "dream"}:
-        # The combined dream-and-sleep request remains the existing canonical
-        # recovery request until the dependent dream change retires it.
-        if payload["dream"] is not True:
-            raise ExplorationActionError(
-                "dream sleep requires exact boolean true choices"
-            )
-        return {"sleep": True, "dream": True}
     if not keys <= _SLEEP_WAIT_KEYS:
         raise ExplorationActionError(
             "explore.wait sleep carries an unknown field"
@@ -329,6 +321,55 @@ def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
     elif "seconds" in payload:
         raise ExplorationActionError("recovery sleep cannot carry seconds")
     return sleep
+
+
+def validate_sleep_party_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.sleep_party`` payload (an empty object)."""
+    if not isinstance(payload, dict) or payload:
+        raise ExplorationActionError("explore.sleep_party requires an empty object")
+    return {}
+
+
+def validate_sleep_continue_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact retained-continuation identity."""
+    if not isinstance(payload, dict) or set(payload) != {"sleep_id", "revision"}:
+        raise ExplorationActionError(
+            "explore.sleep_continue requires exactly sleep_id and revision"
+        )
+    sleep_id = payload["sleep_id"]
+    if not isinstance(sleep_id, str) or not 1 <= len(sleep_id) <= MAX_ITEM_KEY_CHARS:
+        raise ExplorationActionError("explore.sleep_continue sleep_id is invalid")
+    revision = payload["revision"]
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+        raise ExplorationActionError("explore.sleep_continue revision is invalid")
+    return {"sleep_id": sleep_id, "revision": revision}
+
+
+def validate_sleep_dream_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact owner-sleep dream answer identity."""
+    if not isinstance(payload, dict) or set(payload) != {
+        "sleep_id",
+        "revision",
+        "generation",
+        "decision",
+    }:
+        raise ExplorationActionError(
+            "explore.sleep_dream requires sleep_id, revision, generation and decision"
+        )
+    sleep_id = payload["sleep_id"]
+    if not isinstance(sleep_id, str) or not 1 <= len(sleep_id) <= MAX_ITEM_KEY_CHARS:
+        raise ExplorationActionError("explore.sleep_dream sleep_id is invalid")
+    if payload["decision"] not in ("enter", "decline"):
+        raise ExplorationActionError("explore.sleep_dream decision is invalid")
+    values = {"sleep_id": sleep_id, "decision": payload["decision"]}
+    for key in ("revision", "generation"):
+        value = payload[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ExplorationActionError(
+                f"explore.sleep_dream {key} is invalid"
+            )
+        values[key] = value
+    return values
 
 
 def validate_practice_payload(payload: Any) -> dict[str, Any]:
@@ -1025,20 +1066,105 @@ def _wait_adapter(
     # The summary already carries each committed unlock line; record the
     # session unread marks from the same committed events.
     deliver_unlocks(actor, notices_from_events(result.events), announce=False)
-    if payload.get("dream"):
-        from server.dream_service import enter_after_sleep
-        if result.voluntary and result.elapsed_seconds > 0:
-            clock = get_world_clock()
-            enter_after_sleep(
-                actor,
-                tick_from=int(clock.tick) - result.elapsed_seconds,
-                tick_to=int(clock.tick),
-                requested_seconds=result.requested_seconds,
-                elapsed_seconds=result.elapsed_seconds,
-                voluntary=result.voluntary,
-                events=result.events,
-            )
     return _success("skipped", message, AFFECTED_FULL)
+
+
+def _sleep_party_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Run the compensated all-party sleep choice; no time passes."""
+    del payload
+    from world.rules.sleep_control import begin_all_party_sleep
+    from world.rules.possession import PossessionGateError, PossessionWriteError
+
+    try:
+        outcome = begin_all_party_sleep(actor, session=session)
+    except PossessionGateError as error:
+        return _rejected(
+            error.reason, "目前無法選擇全員一起睡眠。"
+        )
+    except (SleepRefused, PossessionWriteError) as error:
+        return _rejected(
+            getattr(error, "code", "party_sleep_failed"),
+            getattr(error, "message", None) or "目前無法選擇全員一起睡眠。",
+        )
+    message = getattr(outcome, "message", None) or "在場成員已進入睡眠。"
+    actor.msg(message)
+    return _success("sleep_party", message, AFFECTED_FULL)
+
+
+def _sleep_continue_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Continue the exact offered sleep identity, owner or companion."""
+    del session
+    from world.rules.time_skip import (
+        continue_owner_sleep,
+        continue_sleep,
+        owner_sleep_view_state,
+    )
+
+    owner_state = owner_sleep_view_state(actor)
+    try:
+        if owner_state is not None:
+            if (
+                owner_state["sleep_id"] != payload["sleep_id"]
+                or owner_state["revision"] != int(payload["revision"])
+            ):
+                return _rejected(
+                    "stale_sleep", "這次睡眠已經更新，請重新查看。"
+                )
+            if owner_state["pending"]:
+                from server.dream_service import answer_sleep_dream
+
+                answer = answer_sleep_dream(
+                    actor,
+                    decision="decline",
+                    sleep_id=owner_state["sleep_id"],
+                    revision=owner_state["revision"],
+                    generation=owner_state["generation"],
+                )
+                if answer["outcome"] != "success":
+                    return answer
+                current = owner_sleep_view_state(actor)
+                if current is None:
+                    return answer
+            result = continue_owner_sleep(
+                actor,
+                sleep_id=payload["sleep_id"],
+                expected_generation=owner_state["generation"],
+            )
+        else:
+            result = continue_sleep(
+                actor,
+                expected_sleep_id=payload["sleep_id"],
+                expected_revision=int(payload["revision"]),
+            )
+    except SkipRefused as error:
+        return _rejected(
+            "unsafe_skip", rejection_message(error.reason) or "目前無法繼續睡眠。"
+        )
+    except SleepRefused as error:
+        return _rejected(error.code, error.message)
+    message = result.summary or "睡眠已繼續。"
+    actor.msg(message)
+    return _success("sleep_continued", message, AFFECTED_FULL)
+
+
+def _sleep_dream_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Answer the pending owner-sleep dream question through the one facade."""
+    from server.dream_service import answer_sleep_dream
+
+    return answer_sleep_dream(
+        actor,
+        decision=payload["decision"],
+        sleep_id=payload["sleep_id"],
+        revision=payload["revision"],
+        generation=payload["generation"],
+        session=session,
+    )
 
 
 def _perform_possess_transition(session: Any, player: Any, npc: Any) -> None:
@@ -1401,6 +1527,9 @@ __all__ = [
     "MAX_KEYWORD_ID_CHARS",
     "MAX_NODE_ID_CHARS",
     "MAX_SPEECH_CODE_POINTS",
+    "_sleep_continue_adapter",
+    "_sleep_dream_adapter",
+    "_sleep_party_adapter",
     "_talk_open_adapter",
     "validate_engage_payload",
     "validate_deliver_payload",
@@ -1410,6 +1539,9 @@ __all__ = [
     "validate_party_leave_payload",
     "validate_possess_payload",
     "validate_possess_release_payload",
+    "validate_sleep_continue_payload",
+    "validate_sleep_dream_payload",
+    "validate_sleep_party_payload",
     "validate_talk_freeform_payload",
     "validate_talk_open_payload",
     "validate_talk_scripted_payload",

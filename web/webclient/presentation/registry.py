@@ -529,4 +529,14 @@ def build_production_registry() -> PresentationRegistry:
         unavailable_reason=("dream_unavailable", "夢境目前無法顯示"),
         presenter=dream_presenter,
     ))
+    from web.webclient.presentation.sleep_handoff import (
+        SLEEP_HANDOFF_SCHEMA_VERSION,
+        sleep_handoff_presenter,
+    )
+    registry.register(PresenterSpec(
+        name="sleep_handoff",
+        schema_version=SLEEP_HANDOFF_SCHEMA_VERSION,
+        unavailable_reason=("not_sleeping", "目前沒有需要交接的睡眠"),
+        presenter=sleep_handoff_presenter,
+    ))
     return registry
