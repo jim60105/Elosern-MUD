@@ -200,9 +200,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                         const matrix = group && group.transform.baseVal.consolidate();
                         const pos = matrix ? { x: matrix.matrix.e, y: matrix.matrix.f } : null;
                         const r = marker.getBoundingClientRect();
-                        // The marker's own half-extent (r8 seal + stroke, the
-                        // largest marker) stays inside the window, so the
-                        // shape is shown whole rather than clipped.
+                        // The node glyph's own half-extent stays inside the
+                        // window, so the shape is shown whole rather than
+                        // clipped: the largest is the here-seal's glow (r14)
+                        // at the 0.75 island glyph scale, 10.5 units, with a
+                        // margin.
                         const INSET = 12;
                         const shownWhole = pos !== null &&
                           pos.x - vb.x >= INSET && pos.x - vb.x <= vb.width - INSET &&
