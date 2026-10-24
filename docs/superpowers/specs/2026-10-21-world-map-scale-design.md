@@ -270,7 +270,7 @@ Implementation acceptance includes the following consumer-visible scenarios:
 - Fatigue crossing a threshold inside a long segment changes only the remaining segment's speed; exhausting a member before the next node refuses with zero writes/time.
 - A gate approach is charged once across the scale boundary. A hidden point entrance does not block or redirect every neighboring wilderness route.
 - New local coordinates survive wire validation and actual map rendering without rank-equalized spacing. Verify the actual client surface in the implementation change.
-- A forced-sleeping member blocks all party exits; possession cannot move the sleeping body through an exit.
+- A sleeping member in any posture blocks all party exits; possession cannot move the sleeping body through an exit.
 - Inject a failure after follower/location or mental writes and prove durable and cached state rolls back with the clock.
 
 The design research verified polygon arithmetic, land-side anchor/port centers, 31 distinct settlement node positions, and compass octants for 35 roads. These calculations and the parser probe are design evidence, not a claim of implemented movement or browser verification.
