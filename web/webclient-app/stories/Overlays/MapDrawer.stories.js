@@ -237,6 +237,22 @@ export const A_AreaWilderness = {
     assertShell(canvasElement, "A_AreaWilderness", "area");
     if (!canvasElement.querySelector(".drawer-header__subtitle").textContent.includes("灰鬃荒原東麓")) fail("A_AreaWilderness", "caption names the district");
     if (!$$(canvasElement, "area-map__node").length) fail("A_AreaWilderness", "cells are drawn");
+    // The cell marks are the shared glyphs at the cell scale: the here-seal
+    // and gate arch (MapNodeGlyph) and the commission diamond.
+    const nodes = canvasElement.querySelector(".area-map__nodes");
+    const seal = nodes.querySelector(".area-map__node.is-current g.map-glyph");
+    if (!seal?.querySelector(".map-glyph__here-ring") || seal.getAttribute("transform") !== "scale(0.875)") {
+      fail("A_AreaWilderness", "the current cell wears the shared here-seal at the cell scale");
+    }
+    if (!nodes.querySelector(".area-map__node.is-gate g.map-glyph[transform='scale(0.875)'] .map-glyph__gate")) {
+      fail("A_AreaWilderness", "the gate cell wears the shared gate arch at the cell scale");
+    }
+    if (!nodes.querySelector("g.map-commission[transform='scale(0.875)'] .area-map__quest")) {
+      fail("A_AreaWilderness", "the commission cell wears the shared commission diamond");
+    }
+    if (nodes.querySelector('[class*="area-map__here-"], .area-map__gate')) {
+      fail("A_AreaWilderness", "no private cell seal or arch remains");
+    }
   },
 };
 
@@ -416,6 +432,20 @@ export const LegendAreaGlyphs = {
       fail("LegendAreaGlyphs", "the legend gate is the map's gate arch");
     }
     if (legend.querySelector("ul .lg")) fail("LegendAreaGlyphs", "no CSS-drawn approximation remains in the area legend");
+    // Roads and the commission come from the area map's own sources.
+    for (const variant of ["is-walked", "is-frontier"]) {
+      const road = legend.querySelector(`g.area-map__road.${variant}`);
+      if (!road?.querySelector(".area-map__road-casing") || !road.querySelector(".area-map__road-core")) {
+        fail("LegendAreaGlyphs", `the ${variant} road sample is the map's road ink`);
+      }
+    }
+    const legendCore = legend.querySelector(".area-map__road.is-walked .area-map__road-core");
+    const mapCore = canvasElement.querySelector(".area-map__roads .area-map__road.is-walked .area-map__road-core");
+    if (mapCore && getComputedStyle(legendCore).stroke !== getComputedStyle(mapCore).stroke) {
+      fail("LegendAreaGlyphs", "the walked road sample strokes like the map");
+    }
+    if (legend.querySelector("[class*='lg-road'], .lg-quest")) fail("LegendAreaGlyphs", "no copied road or commission paint remains");
+    if (!legend.querySelector("g.map-commission .area-map__quest")) fail("LegendAreaGlyphs", "the commission sample is the shared diamond");
   },
 };
 
@@ -453,6 +483,20 @@ export const LegendWorldGlyphs = {
       fail("LegendWorldGlyphs", "the lit district sample strokes like the map");
     }
     if (legend.querySelector("ul .lg")) fail("LegendWorldGlyphs", "no CSS-drawn approximation remains in the world legend");
+    // One hatch pattern definition, instantiated by the map and the legend.
+    const hatches = [...canvasElement.querySelectorAll("pattern")].filter((p) => p.querySelector(".world-map__hatch-line"));
+    if (hatches.length !== 2 || hatches.some((p) => p.getAttribute("patternTransform") !== "rotate(45)")) {
+      fail("LegendWorldGlyphs", "the map and the legend each place the shared hatch pattern");
+    }
+    const legendLine = legend.querySelector("pattern .world-map__hatch-line");
+    const mapLine = hatches.map((p) => p.querySelector(".world-map__hatch-line")).find((el) => !legend.contains(el));
+    if (!legendLine || !mapLine || getComputedStyle(legendLine).stroke !== getComputedStyle(mapLine).stroke) {
+      fail("LegendWorldGlyphs", "the legend hatch line strokes like the map's");
+    }
+    // World glyph strokes scale with the glyph group.
+    for (const shape of svg.querySelectorAll(".world-glyph path, .world-glyph circle")) {
+      if (getComputedStyle(shape).vectorEffect !== "none") fail("LegendWorldGlyphs", "world glyph strokes scale with the glyph");
+    }
   },
 };
 

@@ -349,7 +349,9 @@ export const MetricWilderness = {
 };
 
 // 南門 (gate room): the street exit 900 m north is drawn; the gate room
-// itself wears the gate arch with its 通往 line, and the gate's cross-layer
+// itself wears the here-seal (current wins over the gate, as on the area map)
+// with its 通往 line, every node glyph is the area map's glyph drawn at the
+// island glyph scale (0.75) as a whole, and the gate's cross-layer
 // wilderness target is never drawn as a node: it is an exit-ring stub whose
 // native button moves exactly once (label-minimap-exits-and-gateways).
 const southGateMoves = moveRecorder();
@@ -369,6 +371,29 @@ export const MetricAltoriaSouthGate = {
     const here = context.canvasElement.querySelector('[data-node="grid:capital_altoria:3050:150"]');
     if (!here?.querySelector(".map-glyph__here-ring") || here.querySelector('[data-testid="local-map__gate-glyph"]')) {
       throw new Error("MetricAltoriaSouthGate: the current gate room must draw the map's here seal");
+    }
+    // Every island glyph group carries the island glyph scale, and its shapes
+    // render at that fraction of the canvas scale, strokes included (no
+    // vector effect keeps a stroke at screen width).
+    const groups = [...context.canvasElement.querySelectorAll(".local-map__glyph > g.map-glyph")];
+    if (!groups.length || groups.some((g) => g.getAttribute("transform") !== "scale(0.75)")) {
+      throw new Error("MetricAltoriaSouthGate: every island glyph group must carry scale(0.75)");
+    }
+    const ring = here.querySelector(".map-glyph__here-ring");
+    const canvas = ring.ownerSVGElement.getScreenCTM();
+    const ratio = ring.getScreenCTM().a / canvas.a;
+    if (Math.abs(ratio - 0.75) > 1e-6) {
+      throw new Error(`MetricAltoriaSouthGate: the here ring renders at ${ratio} of the canvas scale, not 0.75`);
+    }
+    for (const shape of here.querySelectorAll("g.map-glyph circle, g.map-glyph path")) {
+      if (getComputedStyle(shape).vectorEffect !== "none") {
+        throw new Error("MetricAltoriaSouthGate: island glyph strokes must scale with the glyph group");
+      }
+    }
+    const box = ring.getBoundingClientRect();
+    const expected = 2 * 10 * 0.75 * canvas.a;
+    if (Math.abs(box.width - expected) > 1.5) {
+      throw new Error(`MetricAltoriaSouthGate: the here ring box is ${box.width} px wide, expected about ${expected}`);
     }
     await assertStubActivates(
       southGateMoves,

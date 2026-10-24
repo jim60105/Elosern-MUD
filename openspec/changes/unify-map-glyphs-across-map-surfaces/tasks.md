@@ -27,7 +27,7 @@ Tick a box only after its verification passes in the worktree.
   - Create `components/MapCommissionGlyph.vue`, holding the diamond `M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z` and its paint, and use it for AreaMapView's point-node commission.
   - Verify: `tests/world/area_map_view.test.js` passes, and no `.area-map__road*` or `.area-map__quest` paint rule remains in AreaMapView's own style block.
 - [ ] 1.5 [NEW] Create `components/WorldHatchPattern.vue` (8×8 `userSpaceOnUse`, `rotate(45)`, owning the hatch line and its rule). Use it in WorldMapView's `<defs>` with the uid-scoped id, and move the hatch-line rule out of `world-map-ink.css`.
-  - Verify: the world-map hatch tests pass, and WorldMapView declares no `<pattern>` geometry inline.
+  - Verify: the world-map hatch tests pass, and WorldMapView declares no hatch `<pattern>` geometry inline (its swell pattern is not hatching).
 
 ## 2. Minimap island uses the area map's glyphs at the island scale
 
@@ -97,7 +97,7 @@ Tick a box only after its verification passes in the worktree.
 
   Verify it passes.
 - [ ] 5.5 [NEW] Add a static single-source guard test, in Vitest reading the component sources. It asserts that:
-  - `<pattern` appears only in `WorldHatchPattern.vue`;
+  - the hatch pattern geometry (`patternTransform="rotate(45)"` and the `world-map__hatch-line` rule) appears only in `WorldHatchPattern.vue` (the area dot field and the world swell `<pattern>`s are not hatching);
   - the gate arch path is produced only by `gatePath()` in `lib/map_marker_geometry.js`, and no `.vue` file holds an arch path literal (`A8 8 0 0 1` or `A7 7 0 0 1`);
   - the diamond literal `M0 -7.5 L5.5 0` appears only in `MapCommissionGlyph.vue`;
   - no `.lg-road`, `.lg-quest`, `.lg--`, `area-map__here-` or `area-map__gate` rule or element remains in any component.
