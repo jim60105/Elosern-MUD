@@ -1207,6 +1207,9 @@ def continue_owner_sleep(
     """
     from world.rules.possession import current_possession
 
+    recorded = _recorded(operation_id)
+    if recorded is not None:
+        return recorded
     commander, receipt = _owner_sleep_receipt(actor)
     if sleep_id is not None and receipt.sleep_id != sleep_id:
         raise SleepRefused("stale_sleep", STALE_SLEEP_MESSAGE)
@@ -1312,7 +1315,7 @@ def continue_owner_sleep(
     if pause_message:
         summaries.append(pause_message)
     summary = " ".join(part for part in summaries if part)
-    return SkipResult(
+    result = SkipResult(
         operation_id=base_operation,
         requested_seconds=int(receipt.accepted_seconds),
         elapsed_seconds=total_elapsed,
@@ -1327,6 +1330,8 @@ def continue_owner_sleep(
         interrupted=interrupted,
         continuation=continuation,
     )
+    _record(result)
+    return result
 
 
 def _mark_owner_continuation(
