@@ -15,9 +15,9 @@ mechanism instead of bespoke inline ``get_world_clock().advance(...)`` calls
 The charge settles as one indivisible interval through
 ``WorldClock.advance_bounded``: a committed edge longer than the clock's
 one-day single-call bound is advanced in bounded pieces that share one
-full-window rollback snapshot rather than being clipped. Admission (forced
-sleepers, pre-destination depletion) runs before the flight waiver and before
-any time or location write.
+full-window rollback snapshot rather than being clipped. Admission (any
+sleeping member, voluntary or forced, and pre-destination depletion) runs
+before the flight waiver and before any time or location write.
 
 ``wilderness_move`` is retained only as the distinct wilderness travel context
 that carries the existing flight waiver. It is never a seconds authority: a
@@ -93,8 +93,8 @@ def charge_movement(
         )
     )
     # Admission precedes every early return, so a flight waiver can never carry
-    # a forced-sleeping present member and a direct charge call cannot bypass
-    # the exit lineages' preflight refusal.
+    # a sleeping present member (voluntary or forced) and a direct charge call
+    # cannot bypass the exit lineages' preflight refusal.
     refuse_sleeping_party(members)
     if (
         cost_key == "wilderness_move"

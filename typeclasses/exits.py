@@ -240,8 +240,10 @@ class MovementCostMixin:
         physical duration and every source-present traveller is captured, so
         the charge cannot drift from the party the follow step moves. An
         outdoor lineage whose authored geometry cannot be resolved is refused
-        before any write; a preflight eligibility refusal (a corrupt or
-        travel-forbidden member) is likewise a clean refusal.
+        before any write; a preflight eligibility refusal (a corrupt,
+        travel-forbidden or sleeping member in any posture) is likewise a
+        clean refusal, and it precedes the connector's non-distance return and
+        every traverse callback.
         """
         from world.rules.travel_cost import (
             MovementPreflightRefused,
