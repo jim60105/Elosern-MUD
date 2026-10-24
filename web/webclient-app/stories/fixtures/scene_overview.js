@@ -108,6 +108,21 @@ export function waitCardArgs({ locked = false } = {}) {
   return { rows, trailingIndex: rows.length - 1, caption: "等待", ariaLabel: "等待與休息", testId: "wait-card" };
 }
 
+// TimeChoiceCard args for the rest entry's first layer (redesign-rest-entry
+// design D9): the exact props the room actions' wiring passes — the clock
+// part of the committed world-time label and the controlled body's fatigue
+// row (`{reserve_percent, label}`), or null when the status panel carries
+// none.
+export function timeChoiceArgs({ locked = false, fatigue = true } = {}) {
+  return {
+    timeLabel: "22:40",
+    fatigue: fatigue ? { reserve_percent: 62, label: "輕度疲勞" } : null,
+    locked,
+    entrance: false,
+    autofocus: true,
+  };
+}
+
 export function suggestionsCardArgs(suggestions) {
   const items = ExplorationMenu.suggestionsMenu(suggestions).items.filter((item) => !item.goBack);
   const content = suggestionsCardContent({ status: suggestions.status, items });
