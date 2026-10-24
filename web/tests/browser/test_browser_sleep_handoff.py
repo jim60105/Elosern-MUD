@@ -155,9 +155,13 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         before_wake = int(store_state(page)["panels"]["status"]["actor"]["identity"])
         self.assertEqual(before_wake, player_id)
 
-        # Decline: every operable body sleeps, so the retained owner
-        # continuation finishes the same sleep to its own target.
+        # Decline with an awake companion present: no automatic fast-forward.
         answer_dream_question(page, False)
+        page.wait_for_timeout(500)
+        self.assertNotIn("時間經過", narrative_log_text(page))
+        # The explicit same-sleep continuation is still available and finishes
+        # the owner's accepted target.
+        self._run_command(page, "sleep continue")
         wait_for_store_state(page, self._all_awake, timeout=60000)
         self.assertIn("時間經過", narrative_log_text(page))
 
@@ -235,7 +239,18 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self._wait_panel(page, "party", lambda panel: panel.get("available"))
 
         activate_wait_row(page, "wait-sleep")
-        self._card(page).wait_for(state="visible", timeout=30000)
+        try:
+            self._card(page).wait_for(state="visible", timeout=30000)
+        except Exception as error:
+            state = store_state(page)
+            panels = state.get("panels") or {}
+            raise AssertionError(
+                {
+                    "narrative": narrative_log_text(page)[-2000:],
+                    "sleep_handoff": panels.get("sleep_handoff"),
+                    "fatigue": (panels.get("status") or {}).get("fatigue"),
+                }
+            ) from error
         party = page.locator('[data-testid="sleep-handoff-card"] [data-testid="sleep-handoff-party"]')
         party.wait_for(state="visible", timeout=30000)
         self.assertEqual(party.get_attribute("aria-disabled"), None)

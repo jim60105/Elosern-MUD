@@ -499,9 +499,10 @@ def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None
 def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 30000) -> None:
     """Activate one wait row through the wait card.
 
-    The sleep row opens the recovery/duration form. ``dream`` selects the
-    recovery entry, dismisses the contextual roster if it appears, and answers
-    the owner question 是; without it the authoritative surface is left for the
+    The sleep row opens the recovery/duration form. One hour of explicit
+    duration keeps the entry positive even on a fully restored fixture;
+    ``dream`` dismisses the contextual roster if it appears and answers the
+    owner question 是; without it the authoritative surface is left for the
     caller.
     """
     open_wait_card(page, timeout=timeout)
@@ -509,7 +510,8 @@ def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 
     if key == "wait-sleep":
         form = page.locator('[data-testid="sleep-form"]')
         form.wait_for(state="visible", timeout=timeout)
-        press_control(page, '[data-testid="sleep-form-recovery"]', timeout=timeout)
+        form.locator("input").fill("1")
+        form.locator('button[type="submit"]').click()
         if not dream:
             return
         page.wait_for_selector(

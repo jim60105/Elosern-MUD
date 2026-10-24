@@ -574,6 +574,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "combat_beats",
                     "dream",
                     "skill_use",
+                    "sleep_handoff",
                     "party_inventory",
                     "item_holdings",
                     "party_member",

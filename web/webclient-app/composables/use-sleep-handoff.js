@@ -81,7 +81,6 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
   // server's control-view identity, so a new view asks again while an
   // unchanged reconnect keeps the already-shown surface settled.
   const dismissedKey = ref(null);
-  const answeredKey = ref(null);
   const wasOpen = ref(false);
 
   const panel = computed(() => {
@@ -100,14 +99,6 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
   const dismissed = computed(
     () => viewKey.value !== null && dismissedKey.value === viewKey.value,
   );
-  const answerKey = computed(() => {
-    const owner = panel.value?.owner_sleep;
-    return owner ? `${owner.sleep_id}:${owner.generation}` : null;
-  });
-  const answered = computed(
-    () => answerKey.value !== null && answeredKey.value === answerKey.value,
-  );
-
   const dreamPending = computed(() => !!panel.value?.owner_sleep?.dream_pending);
   const selectionAvailable = computed(
     () => !!panel.value?.selection?.available,
@@ -128,7 +119,6 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
       !!panel.value &&
       !dreamOpen.value &&
       dreamPending.value &&
-      !answered.value &&
       (!selectionAvailable.value || dismissed.value),
   );
   const continuationOpen = computed(
@@ -214,7 +204,6 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
     if (!owner || skipDisabled.value) {
       return;
     }
-    answeredKey.value = answerKey.value;
     dispatchIntent("explore.sleep_dream", {
       sleep_id: owner.sleep_id,
       revision: owner.revision,
@@ -278,7 +267,6 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
   watch(viewKey, (value, previous) => {
     if (value !== previous) {
       dismissedKey.value = null;
-      answeredKey.value = null;
     }
   });
 

@@ -678,7 +678,13 @@ const rootStyle = computed(() => {
         :beat-playback="store.view.beatPlayback"
         :mode-change="modeChange"
         :beat-hold="beatHold"
-        :card-open="presenceCardOpen || roomCardOpen"
+        :card-open="
+          presenceCardOpen ||
+          roomCardOpen ||
+          sleepHandoffSelectionOpen ||
+          sleepHandoffQuestionOpen ||
+          sleepHandoffContinuationOpen
+        "
         :person-focus="personFocus"
         :formation="!!formation"
         :speaker="speaker"

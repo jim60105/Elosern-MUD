@@ -119,6 +119,9 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
     await mountWith();
     expect(card().exists()).toBe(true);
     expect(sender.sent.actions).toHaveLength(0);
+    expect(
+      wrapper.get('[data-testid="elosern-stage"]').attributes("data-card-open"),
+    ).toBe("true");
     const labels = rows().map((row) => row.text());
     expect(labels.some((text) => text.includes("接手 同伴（精神儲備 100%）"))).toBe(true);
     expect(
