@@ -505,13 +505,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         #    is pinned by the drawer and area-view suites.)
         #    The group's box spans its marker and its placed label, and the
         #    shared node glyph paints its travel halo beneath the state glyph
-        #    (the label is pointer-inert), so the topmost paint at the node's
-        #    centre is its marker: the journey clicks that marker — the
-        #    element a real pointer lands on, inside the same activating
-        #    group.
-        page.locator(
-            '[data-testid="local-map"] [data-testid="local-map__node--grid:metric:100:0"] .local-map__marker'
-        ).click()
+        #    (the label is pointer-inert). The halo is the larger hit target:
+        #    the journey clicks its ring area off the marker (Playwright
+        #    checks the halo is the element a real pointer lands on there),
+        #    inside the same activating group.
+        halo = page.locator(
+            '[data-testid="local-map"] [data-testid="local-map__node--grid:metric:100:0"] .local-map__actionable'
+        )
+        box = halo.bounding_box()
+        halo.click(position={"x": box["width"] / 2 + box["width"] * 0.36, "y": box["height"] / 2})
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:

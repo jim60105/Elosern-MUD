@@ -119,6 +119,7 @@ Tick a box only after its verification passes in the worktree.
 - [x] 7.1 [NEW] In `tests/test_map_client_contracts.py` `MapDrawerContracts`, add `covers_requirement` methods asserting that the 5.3 and 5.4 describe blocks passed. Copy the canonical IDs verbatim from `uv run --locked python -m tools.spec_traceability list` after sync; the slug turns an apostrophe into a hyphen. The expected IDs are `webclient-map-drawer::every-map-surface-draws-a-shared-map-concept-from-its-one-glyph-source` and `webclient-map-drawer::map-legend-samples-are-drawn-by-the-map-they-explain`.
 - [x] 7.2 [NEW] In `web/webclient/tests/test_node_suite_evidence.py`, add Vitest evidence annotated with the canonical IDs from the list command. The expected IDs are `webclient-local-map::the-minimap-island-draws-the-area-map-s-node-glyphs` and `webclient-local-map::an-island-fallback-label-never-covers-its-own-node-glyph`. The evidence runs the lattice, local-map, projection and island-label suites, and asserts the test names from groups 2 and 4.
   - Verify: `uv run --locked python -m tools.spec_traceability check` passes after the archive sync.
+  - Apply result: the IDs were confirmed with `list` in a disposable copy with the delta synced, where `check` passes with 0 errors. In the worktree, before archive, the real-root `check` (and so `tools.contract_gate`) reports these four IDs as `unknown-requirement-id`. That clears only with the archive sync.
 - [x] 7.3 [NEW] Browser tests.
   - Update `web/tests/browser/test_browser_local_map_rendering.py` near line 353 to assert the here-seal (`.map-glyph__here-ring`, no gate glyph) on the current gate room.
   - Revisit `INSET = 12` ("r8 seal") in `test_browser_local_map_geometry.py` for the scaled footprints.
@@ -139,6 +140,7 @@ Tick a box only after its verification passes in the worktree.
 
   Surfaces differ only by a uniform proportional scale, set by `ISLAND_GLYPH_SCALE` for the minimap. Legends draw the maps' own glyphs. A non-current gateway wears the filled gold arch, and a current one the here-seal. Verify that the text matches the delta specs.
 - [x] 7.5 [NEW] Run `pnpm test` from the repo root. Verify everything passes except the known pre-existing full-suite timeout ("opens with focus on the selected tab even when it is not the first", about 4.7 s on master), and that this test passes alone. Then run `openspec validate unify-map-glyphs-across-map-surfaces --strict`.
+  - Apply result: 2959 of 2961 pass. Two drawer tests time out under full-suite load: "opens with focus on the selected tab even when it is not the first" (the known one) and "cached reopen waits for its own silent fresh baseline (body-first)" (about 7.4 s alone). Both pass alone on this branch, and master's own full run times out on the same tests and one more. `openspec validate --strict` passes.
 
 ## Workflow follow-up
 
