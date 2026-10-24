@@ -74,6 +74,7 @@ var exotic = require("./panels/exotic.js");
 var combatBeats = require("./panels/combat_beats.js");
 var dream = require("./panels/dream.js");
 var skillUse = require("./panels/skill_use.js");
+var sleepHandoff = require("./panels/sleep_handoff.js");
 var mapPanels = require("./panels/map_panels.js");
 var mapParts = require("./map_parts.js");
 var MAP_PANEL_SCHEMAS = mapPanels.MAP_PANEL_SCHEMAS;
@@ -104,6 +105,7 @@ var PANEL_VALIDATORS = {
   combat_beats: combatBeats.validateCombatBeatsPanel,
   dream: dream.validateDreamPanel,
   skill_use: skillUse.validateSkillUsePanel,
+  sleep_handoff: sleepHandoff.validateSleepHandoffPanel,
 };
 
 

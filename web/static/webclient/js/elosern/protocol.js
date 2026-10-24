@@ -41,6 +41,7 @@ var itemHoldings = require("./protocol/panels/item_holdings.js");
 var exotic = require("./protocol/panels/exotic.js");
 var combat_beats = require("./protocol/panels/combat_beats.js");
 var skill_use = require("./protocol/panels/skill_use.js");
+var sleep_handoff = require("./protocol/panels/sleep_handoff.js");
 var map_panels = require("./protocol/panels/map_panels.js");
 var map_parts = require("./protocol/map_parts.js");
 
@@ -316,6 +317,9 @@ var map_parts = require("./protocol/map_parts.js");
     validateSkillUsePanel: skill_use.validateSkillUsePanel,
     SKILL_USE_SCHEMA_VERSION: skill_use.SKILL_USE_SCHEMA_VERSION,
     SKILL_USE_MAX_CHOICES: skill_use.SKILL_USE_MAX_CHOICES,
+    validateSleepHandoffPanel: sleep_handoff.validateSleepHandoffPanel,
+    SLEEP_HANDOFF_SCHEMA_VERSION: sleep_handoff.SLEEP_HANDOFF_SCHEMA_VERSION,
+    SLEEP_HANDOFF_MAX_ROWS: sleep_handoff.SLEEP_HANDOFF_MAX_ROWS,
     validatePanel: env.validatePanel,
     // On-demand map panels (define-map-panel-protocol).
     AREA_MAP_SCHEMA_VERSION: map_panels.AREA_MAP_SCHEMA_VERSION,
