@@ -1,28 +1,44 @@
 ## ADDED Requirements
 
 ### Requirement: The minimap island draws the area map's node glyphs
-The minimap island SHALL draw every in-canvas node with the shared map node glyph that the drawer's area map uses, scaled only by the island's uniform marker scale, and SHALL NOT keep a private marker ladder. A node with a move action SHALL show the area map's dashed travel halo under its glyph. A non-current gateway SHALL show the filled gate arch, and a current gateway SHALL show the here-seal. In-canvas landmark nodes SHALL carry no extra ring. The island's stable test hooks SHALL remain.
+The island SHALL draw every in-canvas node with the area map's shared node glyph, with no private marker ladder. It SHALL scale the whole glyph group, including strokes and dashes, by one island glyph scale that is defined once and is below 1 (0.75 by default). A move action SHALL add the travel halo. A non-current gateway SHALL show the gate arch and a current one the here-seal. In-canvas landmarks SHALL get no extra ring, and the stable test hooks SHALL remain.
 
 #### Scenario: Visibility maps to the shared glyph states
-- **WHEN** the island draws nodes of each visibility at marker scale 1
-- **THEN** each visibility draws the following glyph:
-  - `current`: the here-seal, a glow of radius 14, a ring of radius 10 and a seal dot of radius 6;
-  - `visible_visited`: the visited dot of radius 5.5;
+- **WHEN** the island draws nodes of each visibility
+- **THEN** each visibility draws the shared glyph state below, at the base geometry, inside a glyph group scaled by the island glyph scale:
+  - `current`: the here-seal (glow 14, ring 10, seal dot 6);
+  - `visible_visited`: the visited dot (5.5);
   - `visible_unvisited`: the seen dot, with a dark fill and a dashed outline;
   - `remembered`: a remembered node drawn in-canvas would use the visited dot, but the coordinate projection never draws one in-canvas.
+- **AND** each glyph's rendered radii, stroke widths and dash lengths are the base values times the island glyph scale
 - **AND** remembered places keep their rim diamonds as their non-colour distinction
 
+#### Scenario: The island differs from the area map only by its scale
+- **WHEN** the island and the area map draw the same node state
+- **THEN** after dividing out each surface's uniform scale, the shapes, path data, radii, fills, strokes, stroke widths and dash patterns are identical
+
 #### Scenario: A landmark carries no extra ring on the canvas
-- **WHEN** a wilderness island payload with a visited landmark node renders
-- **THEN** the node's primary shape is the radius-5.5 visited dot, no `.local-map__landmark` ring exists on any in-canvas node, the landmark's treatment is its landmark-gold label tier, and rim edge markers keep their own landmark ring
+- **WHEN** a wilderness island payload with a visited landmark node renders, including a landmark node that also carries a move action
+- **THEN** the node's primary shape is the visited dot, no `.local-map__landmark` ring exists on any in-canvas node, the landmark's treatment is its landmark-gold label tier, and rim edge markers keep their own landmark ring
 
-#### Scenario: A move action wears the travel halo
-- **WHEN** an adjacent node carries a move action
-- **THEN** its glyph group contains one dashed travel halo of radius 15 × marker scale carrying the `local-map__actionable` hook, drawn beneath the node's state glyph, and the compass aim ring around that node is concentric and lies outside the halo
+#### Scenario: A move action wears the travel halo inside the aim ring
+- **WHEN** an adjacent node carries a move action and the compass aims at it
+- **THEN** its glyph group contains one dashed travel halo (base radius 15) carrying the `local-map__actionable` hook, drawn beneath the node's state glyph
+- **AND** the compass aim ring is concentric with the node, and its inner stroke edge lies outside the halo's outer stroke edge at the island glyph scale
 
-#### Scenario: Painted footprints follow the shared glyph
-- **WHEN** the projection measures a node's painted footprint
-- **THEN** the footprint is the largest of the following that apply: 16 when the node carries a move action, 14 for current, √(9² + 9²) for a non-current gateway, and 6.5 for any other node. Overlap spreading and label clearance use these values. The here-glow's breathing animation, which peaks at about 1.18 × its radius, is decoration and is excluded from the footprint, as it is on the area map.
+#### Scenario: Painted footprints scale with the island glyph
+- **WHEN** the island measures a node's painted footprint
+- **THEN** the footprint is the island glyph scale times the largest base value that applies:
+  - 16 when the node carries a move action;
+  - 14 for current;
+  - √(9² + 9²) for a non-current gateway;
+  - 6.5 for any other node.
+- **AND** overlap spreading, label clearance, label-layout obstacles and the gateway stub's start radius all use these scaled values
+- **AND** the here-glow's breathing animation, which peaks at about 1.18 × its radius, is decoration and is excluded from the footprint, as it is on the area map
+
+#### Scenario: One constant rescales the whole island glyph system
+- **WHEN** the island glyph scale constant changes
+- **THEN** glyph size, footprints, label clearance, the stub start and the aim ring all follow it together, and no other island glyph size literal needs editing
 
 #### Scenario: Test hooks survive the shared glyph
 - **WHEN** island tests and the browser geometry audit query node shapes
@@ -46,7 +62,7 @@ When none of a label's eight candidate positions fits, the island tries the rast
 ## MODIFIED Requirements
 
 ### Requirement: Island projection handles sparse and coincident nodes deterministically
-No-exit, zero-distance and overlapping-exit inputs SHALL produce finite deterministic positions. Overlap handling SHALL account for the painted footprint of each node's shared map node glyph: the travel halo when the node carries a move action, the here-seal's glow for current, the filled gate arch's base corners for a non-current gateway, and otherwise the node dot with its stroke. Context SHALL use the same mapping, with off-canvas context omitted and remembered remote nodes retaining their existing edge-direction presentation.
+No-exit, zero-distance and overlapping-exit inputs SHALL produce finite deterministic positions. Overlap handling SHALL account for the painted footprint of each node's shared map node glyph at the island glyph scale. That footprint is the travel halo when the node carries a move action, the here-seal's glow for current, the filled gate arch's base corners for a non-current gateway, and otherwise the node dot with its stroke. Context SHALL use the same mapping, with off-canvas context omitted and remembered remote nodes retaining their existing edge-direction presentation.
 
 #### Scenario: No exits and no distance
 - **WHEN** a model has no exits
@@ -62,7 +78,7 @@ No-exit, zero-distance and overlapping-exit inputs SHALL produce finite determin
 
 #### Scenario: Gateway feet overlap despite separated marker centres
 - **WHEN** current is at grid coordinate (0,0) and two gateway exits at (-120,800) and (120,800) project at level 1000
-- **THEN** the painted footprints of both gateways receive clearance within the existing spread cap. These are their travel halos, which are wider than the arch, because both exits carry a move action. Current remains at (120,120), exit radii and distance order are unchanged, and every node and action retains its original identity.
+- **THEN** the painted footprints of both gateways receive clearance within the existing spread cap. These are their scaled travel halos, which are wider than the scaled arch, because both exits carry a move action. Current remains at (120,120), exit radii and distance order are unchanged, and every node and action retains its original identity.
 
 #### Scenario: Mixed exit footprints and unaffected bearings
 - **WHEN** gateway and ordinary exits include an overlapping pair that can be separated within the cap and a separate non-overlapping exit
@@ -101,7 +117,7 @@ The island SHALL draw a non-current gateway node with the area map's filled gate
 
 #### Scenario: A non-current gateway wears the area map's arch
 - **WHEN** a non-current same-layer gateway node is drawn on the island
-- **THEN** its primary shape is the filled arch whose path data, after the island's uniform marker scale is removed, equals the area map's gate arch `M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z`
+- **THEN** its primary shape is the filled arch with path data `M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z`, identical to the area map's gate arch, inside a glyph group scaled uniformly by the island glyph scale
 
 ### Requirement: Minimap presentation retains local knowledge and readable drawer disclosure
 The minimap SHALL retain the completed automatic projection, exit labels, gateway controls, graph layout, non-colour states, fixed canvas, token typography, remembered-name alternatives and single drawer-opening affordance. It SHALL render local_map only; the drawer SHALL use area_map/world_map rather than a shared legacy lattice. Unknown nodes SHALL stay absent and full permitted names SHALL remain readable through drawer text disclosure.

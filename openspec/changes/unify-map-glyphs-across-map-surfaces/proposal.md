@@ -1,37 +1,43 @@
 ## Why
 
-Each map surface drew its own version of the same icon (圖示). The minimap island had a private marker ladder: a seal-stroked r8 current circle, an ink r4.5 visited dot, a hollow unvisited dot, a gold landmark ring, a gold-glow actionable halo, and an open outline arch with feet around gateways. The map drawer's area map drew a different here-seal, dot and filled gate arch. Both `?` legends approximated the maps with CSS boxes, and the gate sample matched neither map. A player who learns a symbol on one surface cannot trust it on another, and each new surface would have drifted again. The goal is one shared icon set: every map surface that shows a concept draws it from that concept's single source.
+Each map surface drew its own version of the same icon (圖示).
+- The minimap island had a private marker ladder: a seal-stroked r8 current circle, an ink r4.5 visited dot, a hollow unvisited dot, a gold landmark ring, a gold-glow actionable halo, and an open outline arch with feet around gateways.
+- The map drawer's area map drew a different here-seal, dot and filled gate arch. Its wilderness cells drew yet another, smaller seal and gate.
+- Both `?` legends approximated the maps with CSS boxes or copied paint values, and the gate sample matched neither map.
+
+A player who learns a symbol on one surface cannot trust it on another, and every new surface drifts again. The goal is one shared icon set. Every map surface that shows a concept draws it from that concept's single source, with no exceptions. Surfaces may differ only by a uniform size scale.
 
 ## What Changes
 
-- Add one shared source for each family of map glyphs:
-  - `MapNodeGlyph.vue` paints every area-map and minimap node: the travel halo, the current here-seal, the visited dot, the dashed seen dot and the filled gate arch. Geometry comes from `lib/map_marker_geometry.js`.
-  - `WorldMapGlyph.vue` paints the world-map point glyphs: here, landmark spire, place by kind, and the commission pin with an optional tracked halo.
-  - `world-map-ink.css` holds the shared world ink: land, lit wash, hatching, district strokes, nation border, trail and approximate ring.
-- The minimap island now draws its nodes with `MapNodeGlyph`, the area map's own glyph. This replaces its private ladder:
-  - the gold landmark ring on in-canvas nodes is removed (the area map marks no landmark node);
-  - a current gateway shows the here-seal, as the area map does, and keeps its `通往 <leads_to>` line;
-  - the actionable halo becomes the area map's dashed travel halo (r15);
-  - the gateway outline arch with feet becomes the area map's filled arch.
-  Footprints, overlap spreading, the compass aim ring radius (10.5 to 17) and the current-glide/dissolve target follow the new glyph sizes. Test ids are kept.
-- The area map (non-cell nodes) and the world map render through the shared components. Their appearance does not change.
-- Both map-drawer legend tabs draw SVG samples at 1:1 map size × ui-scale:
-  - the area tab uses `MapNodeGlyph`;
-  - the world tab uses `WorldMapGlyph` and the `world-map-ink.css` classes.
-  All `.lg--*` CSS approximations are removed.
-- Fix an island label bug that the larger footprints exposed: the raster-fallback placement could put a label over its own node marker.
-- Storybook: add `LegendAreaGlyphs` and `LegendWorldGlyphs` to the MapDrawer stories. `MetricAltoriaSouthGate` now asserts that the current gate room shows the here-seal.
-- **BREAKING** (visual contract only, pre-release): the minimap's draft marker ladder (webclient-map-01-draft-chrome D2) and its gold landmark ring are gone. Minimap node paint is now the area map's paint, so it follows the area map's literal colours where the old ladder used island tokens.
+- **Shared sources, one per glyph family:**
+  - `MapNodeGlyph.vue` paints the area and minimap nodes: travel halo, current here-seal, visited dot, dashed seen dot and filled gate arch.
+  - A shared area ink source holds the road casing and core and the commission diamond. Its pattern follows `world-map-ink.css`: a scoped stylesheet plus a commission glyph.
+  - `WorldMapGlyph.vue` paints the world point glyphs: here, landmark spire, place by kind, and the commission pin with an optional tracked halo.
+  - `world-map-ink.css` holds the shared world ink.
+  - One hatch pattern definition is used by both the world map and the world legend.
+- **Proportional per-surface scale.** A surface may set one uniform scale for a glyph. That scale applies to the whole glyph group, including stroke widths and dash patterns. This replaces the radius-only `scale` prop, which left strokes fixed.
+- **Minimap.** It draws `MapNodeGlyph` at one island glyph scale constant, `ISLAND_GLYPH_SCALE`, 0.75 by default, so its icons are smaller than the area map's. The same factor also scales:
+  - the painted footprints used by projection spreading, label clearance, label-layout obstacles and the stub start;
+  - the compass aim ring radius, which stays just outside the scaled travel halo.
 
-- **Known goal gap**: some marks are still not single-source, and the spec lists them as named exceptions that must reproduce the map's exact values:
-  - the area map's wilderness-cell here-seal (r13/9/5) and 7-unit gate, so on a wilderness layer the island's r14 seal and 8-unit arch differ from the area tab's by about one unit;
-  - the area road strokes;
-  - the commission diamond;
-  - the world hatch pattern element.
+  The island's private ladder is gone:
+  - in-canvas landmark nodes no longer get a gold ring;
+  - a current gateway shows the here-seal and keeps its `通往 <leads_to>` line;
+  - nodes with a move action show the area map's dashed travel halo;
+  - non-current gateways show the area map's filled arch.
 
-  Closing these is a follow-up decision.
+  Test ids are kept.
+- **Area map.** Point nodes render through `MapNodeGlyph` at scale 1. The wilderness-cell branch also draws `MapNodeGlyph` and the shared commission diamond, at a single cell-layout scale. Its private r13/9/5 seal, 7-unit gate and cell diamond path are removed.
+- **World map.** It renders through `WorldMapGlyph` and the shared ink and hatch pattern. Its glyphs scale as a whole with the UI scale.
+- **Legends.** Both map-drawer legend tabs draw SVG samples from the shared sources, at base map size times the UI scale. All `.lg--*` approximations and the copied `.lg-road__*` and `.lg-quest` values are removed.
+- **Island label fix.** The raster-fallback placement could put a label over its own node marker. It no longer does.
+- **Storybook.** `LegendAreaGlyphs` and `LegendWorldGlyphs` are added. `MetricAltoriaSouthGate` now asserts the current gate's here-seal. The stories are extended for the removed exceptions and the island scale.
+- **BREAKING** (visual contract only, pre-release):
+  - The minimap's draft marker ladder (webclient-map-01-draft-chrome D2) and its gold landmark ring are gone.
+  - Minimap node paint is now the area map's paint, drawn at 0.75.
+  - World glyph strokes now scale with the UI scale.
 
-The implementation is already in the primary working tree, uncommitted under `web/webclient-app/`. This change describes it for `os-apply` to adopt, verify, and finish the remaining traceability and browser-test work.
+Part of the implementation is already in the primary working tree, uncommitted under `web/webclient-app/`: the shared node and world glyphs, the world ink, the island and legend cutover, and the label fix. The exception removals, proportional scaling, the island scale and footprint scaling are new work. `tasks.md` separates the two.
 
 ## Capabilities
 
@@ -41,12 +47,33 @@ The implementation is already in the primary working tree, uncommitted under `we
 
 ### Modified Capabilities
 
-- `webclient-map-drawer`: adds the cross-surface single-source glyph rule and the legend-samples-are-the-map's-glyphs rule. The current-marker requirement now has the island sharing the drawer's glyph instead of keeping its own.
-- `webclient-local-map`: the island draws the area map's node glyphs. Painted footprints, the gateway glyph and the current gateway's seal, the marker-ladder/no-colour and colour-source scenarios, and landmark treatment are restated for the shared glyph. Adds the rule that a fallback label never covers its own marker.
+- `webclient-map-drawer`:
+  - Adds the cross-surface single-source rule, with no exceptions and with a per-surface uniform proportional scale.
+  - Adds the rule that legend samples are drawn by the map they explain.
+  - The current-marker requirement has the island share the drawer's here-seal at its own scale.
+- `webclient-local-map`:
+  - The island draws the area map's node glyphs at one island glyph scale.
+  - Painted footprints, the gateway glyph and the current gateway's seal, the marker-ladder and colour-source scenarios, and the landmark treatment are restated for the shared, scaled glyph.
+  - Adds the rule that a fallback label never covers its own marker.
 
 ## Impact
 
-- Code (already present, uncommitted): `web/webclient-app/components/{MapNodeGlyph.vue,WorldMapGlyph.vue,world-map-ink.css}` (new), plus `MapLattice.vue`, `AreaMapView.vue`, `WorldMapView.vue`, `MapDrawer.vue`, `map-lattice.css`, `composables/use-island-dissolve.js`, `composables/use-map-lattice-geometry.js`, `lib/map_marker_geometry.js` and `lib/island_labels.js`.
-- Stories: `stories/Overlays/MapDrawer.stories.js` and `stories/World/LocalMap.stories.js`. The frozen showcase manifest is unchanged (no new titles).
-- Tests: five updated Vitest files. Still needed: new Vitest describe blocks with Python traceability wrappers in `tests/test_map_client_contracts.py`, and an update to `web/tests/browser/test_browser_local_map_rendering.py`, which still expects the arch on the current gate room.
+- **Code already present:**
+  - new: `components/MapNodeGlyph.vue`, `components/WorldMapGlyph.vue`, `components/world-map-ink.css`;
+  - modified: `MapLattice.vue`, `AreaMapView.vue` (point nodes), `WorldMapView.vue`, `MapDrawer.vue`, `map-lattice.css`, `composables/use-island-dissolve.js`, `composables/use-map-lattice-geometry.js`, `lib/map_marker_geometry.js`, `lib/island_labels.js`.
+- **Code still to change:**
+  - `MapNodeGlyph.vue` and `WorldMapGlyph.vue`: proportional group scale;
+  - `lib/map_marker_geometry.js`: the island scale and scaled footprints;
+  - `lib/minimap_projection.js`;
+  - `composables/use-map-lattice-geometry.js`: aim ring, label obstacles, stub;
+  - `MapLattice.vue`;
+  - `AreaMapView.vue`: the wilderness-cell branch and the shared area ink;
+  - new shared area ink and commission glyph;
+  - a new shared hatch pattern;
+  - `MapDrawer.vue` and `WorldMapView.vue`.
+- **Stories:** `stories/Overlays/MapDrawer.stories.js` and `stories/World/LocalMap.stories.js`. The frozen showcase manifest is unchanged.
+- **Tests:**
+  - Vitest updates for the new sizes, footprints and the removed exceptions;
+  - new Vitest describe blocks with Python traceability wrappers;
+  - browser test updates, including `test_browser_local_map_rendering.py` and the geometry audit inset.
 - No server, protocol or payload change.
