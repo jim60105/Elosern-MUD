@@ -47,7 +47,7 @@ Cancellation, disconnect and model failure SHALL preserve saved session progress
 
 ### Requirement: Valid confirmation closes the session without awaiting dispatch
 
-A valid explicit version confirmation SHALL atomically save the request, create/get its unique dispatch record, preserve source linkage and close the session as confirmed. The pump SHALL be notified only after commit as a wake-up hint. Waking response SHALL finish without a model await or clock advance; a rollback SHALL leave no confirmed session with missing request/work.
+A valid explicit version confirmation SHALL atomically save the request, create/get unique dispatch work, preserve source linkage and close as confirmed. The pump SHALL be notified only after commit. Narrative confirmation SHALL await no model and write no clock; its outer rules consumer SHALL then continue only the linked sleep receipt's uncommitted interval or publish a real interruption. Rollback SHALL leave no confirmed session with missing request/work.
 
 #### Scenario: Real confirmation with an unresolved model
 - **WHEN** confirmation uses the real dream surface while the injected background model response remains unresolved

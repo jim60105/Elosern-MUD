@@ -72,6 +72,7 @@
         "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades",
         "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_returns_control_and_survives_reload",
         "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_keyboard_sleep_handoff_transfers_to_an_awake_companion",
+        "web.tests.browser.test_browser_sleep_handoff.SleepHandoffBrowserTest.test_all_party_choice_declines_and_wakes_owner",
         "web.tests.browser.test_browser_sleep_handoff.TerminalSleepStatusBrowserTest.test_all_forced_sleep_engagement_settles_and_keeps_sleep_status"
       ],
       "files_b": [

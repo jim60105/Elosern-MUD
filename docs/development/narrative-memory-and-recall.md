@@ -214,7 +214,7 @@ DialogueEpoch 是只增不改的配對邊界，與目前目標會話分開。Dia
 
 ## 與睡眠連動的夢境呈現介面（W3）
 
-`commands.skip.CmdSleep` 接受 `sleep [dream]`；瀏覽器的 `explore.wait` 在一般睡眠之外，也接受精確的選擇加入載荷 `{"sleep": true, "dream": true}`。兩個介面卡都保留既有的安全性、時長、恢復與提名路徑，捕捉各自單次成功結算前後實際的時鐘 tick，接著呼叫 `server.dream_service.enter_after_sleep`。被受理的零秒睡眠有效，拒絕絕不會關聯會話。目前的時鐘是全有或全無，中斷結果的測試注入一筆較短的已提交時鐘結果，不另發明中斷引擎。
+睡眠本身只接受 `{"sleep": true}` 或精確的 `sleep_scope`／`sleep_mode`／`seconds` 語法；合併的 `{"sleep": true, "dream": true}` 與文字 `sleep dream` 都已移除。接受睡眠後，主人未附身且仍在睡眠時，文字端的 `dream enter`／`dream decline` 與瀏覽器的 `explore.sleep_dream` 都經過 `server.dream_service.answer_sleep_dream` 這一個受保護操作；它重新驗證主人、控制與已接受的睡眠紀錄，再呼叫 `world.narrative.dream_surface.enter_for_owner`。零秒睡眠有效，強制睡眠只能明確選擇，拒絕絕不會關聯會話。確認或醒來後，`server.dream_service` 以同一份睡眠紀錄授權 `world.rules.time_skip.continue_owner_sleep` 續完未結算的目標；草稿儲存不會授權恢復。
 
 `world.narrative.dream_surface` 擁有持久化的角色 Attribute `dream_surface`，內容包含已關聯的會話 id、實際睡眠 tick、請求時長、事件種類、最新通過驗證的場景與對話，以及玩家的方向。已關聯的開放會話優先於最新開放會話查詢；之後明確的睡眠會在延續該場討論的同時記錄一筆新結果。重新連線只讀取這份紀錄與以擁有者為範圍的持久生命週期。讀取模型與任何離開操作都不推進時間或身體特質。`resume_saved_session` 重新開啟明確再次進入、尚未確認的討論，不重置其交流計數；已確認的會話維持定案。醒來會在結束前把未完成的方向保存為草稿。
 

@@ -497,12 +497,29 @@ def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None
 
 
 def activate_wait_row(page: Page, key: str, dream: bool = False, timeout: int = 30000) -> None:
-    """Activate one wait row through the wait card; the sleep row answers the
-    dream question (``dream`` picks 是 or 否)."""
+    """Activate one wait row through the wait card.
+
+    The sleep row opens the recovery/duration form. ``dream`` selects the
+    recovery entry, dismisses the contextual roster if it appears, and answers
+    the owner question 是; without it the authoritative surface is left for the
+    caller.
+    """
     open_wait_card(page, timeout=timeout)
     activate_card_row(page, key, timeout=timeout, selector=WAIT_CARD_SELECTOR)
     if key == "wait-sleep":
-        answer_dream_question(page, dream, timeout=timeout)
+        form = page.locator('[data-testid="sleep-form"]')
+        form.wait_for(state="visible", timeout=timeout)
+        press_control(page, '[data-testid="sleep-form-recovery"]', timeout=timeout)
+        if not dream:
+            return
+        page.wait_for_selector(
+            '[data-testid="sleep-handoff-card"], [data-testid="dream-question"]',
+            timeout=timeout,
+        )
+        handoff = page.locator('[data-testid="sleep-handoff-card"]')
+        if handoff.count() > 0 and handoff.is_visible():
+            page.locator('[data-testid="sleep-handoff-card"] [data-row-key="back"]').click()
+        answer_dream_question(page, True, timeout=timeout)
 
 
 def suggestion_row_key(page: Page, builder_key: str) -> str:
