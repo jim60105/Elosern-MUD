@@ -12,8 +12,8 @@
 // Display-first (exploration-room-actions design D3): the card states the
 // place and the time, and only while `actionsEnabled` (exploration mode with
 // the exploration panel available) it carries two room actions — a 查看房間
-// magnifier button beside the heading and a 等待 hourglass button beside the
-// time. They emit `look-room` and `wait`; the card dispatches nothing itself.
+// magnifier button beside the heading and a 休息 hourglass button beside the
+// time (redesign-rest-entry; it opens the two-layer rest entry). They emit `look-room` and `wait`; the card dispatches nothing itself.
 // Each reports its readout content through `hover` (null when the pointer or
 // focus leaves) and Tab / Shift+Tab through `tab`, so the exploration screen
 // can chain its zones. In every other state the card has no control and no
@@ -112,7 +112,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" />
       </svg>
-      <span class="place-card__action-label">等待</span>
+      <span class="place-card__action-label">休息</span>
     </button>
   </section>
 </template>
@@ -185,7 +185,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 }
 
 /* The room actions (exploration-room-actions design D3): a second column
-   holds the 查看房間 magnifier beside the heading and the 等待 hourglass
+   holds the 查看房間 magnifier beside the heading and the 休息 hourglass
    beside the time. The heading and the time keep the first column, so the
    buttons never truncate the heading's accessible name (its ellipsis is the
    visible text only). Quiet outlined controls with the band's 3:1 rule. */

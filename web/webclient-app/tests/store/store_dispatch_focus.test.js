@@ -302,7 +302,8 @@ describe("store dispatch + focus", () => {
       expect(view.dockSource).toBe("exploration.root");
       expect(view.presenceEntries.map((entry) => entry.key)).toEqual(["target-7", "object-3"]);
       expect(view.roomLook.payload).toEqual({ room: true });
-      expect(view.waitRows.map((row) => row.key)).toEqual(["wait-dawn", "wait-sleep", "wait-rest"]);
+      // The rest entry renders tiles and forms, not rows (redesign-rest-entry).
+      expect(view.waitRows).toBeUndefined();
       // No arrow, Enter, or digit is claimed by a root row; Escape and Space
       // keep their frame-independent meaning, with no error and no frame change.
       for (const key of ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Enter"]) {
@@ -391,7 +392,7 @@ describe("store dispatch + focus", () => {
       expect(store.view.navigationItems.map((item) => item.key)).not.toContain("inventory");
     });
 
-    it("routes a wait card row through the single dispatch entry", () => {
+    it("routes a rest-entry sleep through the single dispatch entry", () => {
       openSession();
       store.receive(
         1,
@@ -399,11 +400,13 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      // The place card's 等待 opens the client-local wait card (no request),
-      // and its sleep row dispatches the exact `explore.wait` action.
+      // The place card's 休息 opens the client-local rest entry (no request),
+      // and its sleep form dispatches the exact `explore.wait` action through
+      // the single store entry.
       expect(store.openRoomCard("wait")).toBe(true);
       expect(sender.sent.actions.length).toBe(0);
-      expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: true });
+      expect(store.dispatchAction("explore.wait", { sleep: true })).toBe("session:1");
+      store.closeRoomCard();
       expect(sender.sent.actions.length).toBe(1);
       // `base_revision` is the committed revision at dispatch time (the
       // exploration update advanced it to 2).

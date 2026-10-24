@@ -252,7 +252,7 @@ defineExpose({ focusTile });
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+          <path d="M20 14.5a8 8 0 0 1-10.5-10.5 8 8 0 1 0 10.5 10.5z" />
           <path d="M16 3.5v3M14.5 5h3" />
         </svg>
         <span class="time-choice__label">{{ tile.label }}</span>

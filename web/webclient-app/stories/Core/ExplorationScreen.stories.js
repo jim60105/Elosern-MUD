@@ -7,6 +7,7 @@ import LocalMap from "../../components/LocalMap.vue";
 import PlaceCard from "../../components/PlaceCard.vue";
 import PresenceRail from "../../components/PresenceRail.vue";
 import QuestionCard from "../../components/QuestionCard.vue";
+import TimeChoiceCard from "../../components/TimeChoiceCard.vue";
 import StageActor from "../../components/StageActor.vue";
 import { idleReadout } from "../../components/exploration-readout.js";
 import { ART_PANEL_SAMPLE } from "../fixtures.js";
@@ -17,20 +18,20 @@ import {
   explorationPanelFixture,
   presenceArgs,
   suggestionsCardArgs,
+  timeChoiceArgs,
   verbCardArgs,
-  waitCardArgs,
 } from "../fixtures/scene_overview.js";
 
 // The exploration screen (exploration-presence-rail task 3.3; scene overview
 // redesign §2): the stage with the presence rail on its floor, the place
-// card with its 查看房間 and 等待 buttons and the minimap in the right-hand
+// card with its 查看房間 and 休息 buttons and the minimap in the right-hand
 // island column, and the command panel holding the exit compass beside the
 // 建議 pill and the shared readout (exploration-room-actions). `PersonFocus`
 // is the same room with the guild clerk in focus: the rail gone, the clerk's
 // standee in `actor-right`, the verb card centred, the map column stepped
-// away, and the command panel inert and dimmed. `WaitCard`, `DreamQuestion`,
-// and `SuggestionsCard` open the room cards and the sleep handoff question
-// over the stage. Every surface is bound to the real builders over one
+// away, and the command panel inert and dimmed. `WaitCard` (the rest entry's
+// first layer, TimeChoiceCard), `DreamQuestion`, and `SuggestionsCard` open
+// the room cards and the sleep handoff question over the stage. Every surface is bound to the real builders over one
 // synthesized room.
 
 const ROOM = explorationPanelFixture({
@@ -73,7 +74,7 @@ function centredCard(card, focus) {
     return h(ChoiceCard, { ...verbCardArgs(ROOM, 11), testId: "presence-card", trapFocus: true });
   }
   if (card === "wait") {
-    return h(ChoiceCard, { ...waitCardArgs(), trapFocus: true });
+    return h(TimeChoiceCard, timeChoiceArgs());
   }
   if (card === "dream") {
     return h(QuestionCard, {
@@ -148,7 +149,7 @@ export const PersonFocus = {
   args: { focus: true },
 };
 
-// 等待 on the place card: the wait card over the stage.
+// 休息 on the place card: the rest entry's first layer over the stage.
 export const WaitCard = {
   render: renderScreen,
   args: { focus: false, card: "wait" },

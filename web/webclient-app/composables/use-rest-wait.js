@@ -1,9 +1,9 @@
-// The rest/wait support (C4): the skip lock the wait card and the party
-// window 技能 tab's booking control share, and the skill-practice feedback. The wait card
-// itself and its sleep and rest forms live in use-room-actions.js (the owner
-// dream question is projected from the server sleep handoff in
-// use-sleep-handoff.js) (exploration-room-actions); no part of this group
-// follows the router.
+// The rest/wait support (C4): the skip lock the rest entry and the party
+// window 技能 tab's booking control share, and the skill-practice feedback.
+// The rest entry itself — its tiles and its wait and sleep forms — lives in
+// use-room-actions.js (the owner dream question is projected from the server
+// sleep handoff in use-sleep-handoff.js) (exploration-room-actions;
+// redesign-rest-entry); no part of this group follows the router.
 import { computed, ref, watch } from "vue";
 
 export function useRestWait(store, { dispatchIntent }) {

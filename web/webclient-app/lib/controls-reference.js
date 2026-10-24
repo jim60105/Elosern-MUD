@@ -173,7 +173,7 @@ export const CONTROLS_REFERENCE = [
         keys: ["←", "→"],
         label: "在場列中移動",
         detail:
-          "舞台右下方的在場列有焦點時，← → 在人物與物件之間循環移動；Tab 從出口羅盤依序來到在場列，再到地點卡的「查看房間」與「等待」，最後是「建議」。滑鼠移到項目上也會在訊息列說明。",
+          "舞台右下方的在場列有焦點時，← → 在人物與物件之間循環移動；Tab 從出口羅盤依序來到在場列，再到地點卡的「查看房間」與「休息」，最後是「建議」。滑鼠移到項目上也會在訊息列說明。",
       },
       {
         id: "rail-activate",
@@ -204,9 +204,9 @@ export const CONTROLS_REFERENCE = [
     ],
   },
   {
-    // The room actions (exploration-room-actions): the place card's two
-    // buttons, the 建議 pill, and the centred wait and suggestions cards they
-    // open, with the exploration screen's tab order across its zones.
+    // The room actions (exploration-room-actions; redesign-rest-entry): the
+    // place card's two buttons, the 建議 pill, and the centred rest entry and
+    // suggestions card they open, with the exploration screen's tab order across its zones.
     id: "room",
     title: "地點與建議",
     entries: [
@@ -215,7 +215,7 @@ export const CONTROLS_REFERENCE = [
         keys: ["Tab"],
         label: "在探索畫面的區塊間移動",
         detail:
-          "依序為出口羅盤、在場列、地點卡的「查看房間」、「等待」，最後是指令面板右上角的「建議」；Shift+Tab 反向。沒有顯示的區塊會跳過。",
+          "依序為出口羅盤、在場列、地點卡的「查看房間」、「休息」，最後是指令面板右上角的「建議」；Shift+Tab 反向。沒有顯示的區塊會跳過。",
       },
       {
         id: "place-look",
@@ -225,10 +225,10 @@ export const CONTROLS_REFERENCE = [
       },
       {
         id: "place-wait",
-        keys: ["等待"],
-        label: "讓時間流逝、休息或睡眠",
+        keys: ["休息"],
+        label: "保持清醒等待，或入睡恢復精力",
         detail:
-          "地點卡上時間旁的按鈕，打開等待卡片：等待直到黎明、睡眠至完全恢復、等待 N 小時。送出睡眠後會自動顯示伺服器提供的情境選單，列出每位同伴與「全員一起睡眠」；選單關閉後由同一份視圖詢問是否進入夢境協作。按右上角的關閉或 Esc 取消。",
+          "地點卡上時間旁的按鈕，打開休息卡片：先選「等待」或「睡眠」，再選等待直到黎明、睡眠至完全恢復，或指定時長。送出睡眠後會自動顯示伺服器提供的情境選單，列出每位同伴與「全員一起睡眠」；選單關閉後由同一份視圖詢問是否進入夢境協作。第一層按 ✕ 或 Esc 關閉；第二層左上角的 ‹ 或 Esc 回到上一層，右上角的 ✕ 關閉整張卡片。",
       },
       {
         id: "pill",
@@ -240,15 +240,15 @@ export const CONTROLS_REFERENCE = [
       {
         id: "room-card-keys",
         keys: ["↑", "↓", "1", "…", "9", "Enter"],
-        label: "等待與建議卡片",
+        label: "休息與建議卡片",
         detail:
-          "卡片開著時，↑ ↓ 循環移動、數字鍵選擇對應編號，Enter 或 Space 選定；行動進行中時選項暫時停用並說明原因。",
+          "卡片開著時，↑ ↓ 循環移動、數字鍵選擇對應編號，Enter 或 Space 選定；休息卡片第一層的 ← → 也能在「等待」與「睡眠」之間移動，Home／End 跳到第一或最後一項。行動進行中時選項暫時停用並說明原因。",
       },
       {
         id: "room-card-escape",
         keys: ["Esc"],
         label: "關閉卡片",
-        detail: "關閉等待或建議卡片（與「✕ 返回」相同），焦點回到「等待」或「建議」。",
+        detail: "關閉建議卡片（與「✕ 返回」相同）或休息卡片的第一層，焦點回到「建議」或「休息」；休息卡片第二層的 Esc 回到上一層。",
       },
     ],
   },
@@ -268,7 +268,7 @@ export const CONTROLS_REFERENCE = [
         keys: ["1", "…", "9"],
         label: "依位置執行",
         detail:
-          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。探索畫面中數字鍵改由在場列使用，出口改由出口羅盤操作，等待與建議卡片開著時由卡片使用。",
+          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。探索畫面中數字鍵改由在場列使用，出口改由出口羅盤操作，休息與建議卡片開著時由卡片使用。",
       },
       {
         id: "confirm",

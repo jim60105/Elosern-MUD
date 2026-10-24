@@ -1,20 +1,26 @@
-// The room actions' wiring (exploration-room-actions design D1/D3/D4/D5/D6):
-// the place card's 查看房間 and 等待, the 建議 pill, the wait and suggestions
-// cards through ChoiceCard, the wait card's sleep and rest forms, focus return
-// to the opener, the readout feed of the buttons and the pill, and the
-// exploration screen's Tab chain (compass → rail → 查看房間 → 等待 → 建議).
+// The room actions' wiring (exploration-room-actions design D1/D3/D4/D5/D6;
+// redesign-rest-entry design D1/D3/D5/D7): the place card's 查看房間 and 休息,
+// the 建議 pill, the suggestions card through ChoiceCard, the two-layer rest
+// entry (the TimeChoiceCard tiles, then the shared shell around the wait or
+// sleep form), focus return to the opener, the readout feed of the buttons
+// and the pill, and the exploration screen's Tab chain (compass → rail →
+// 查看房間 → 休息 → 建議).
 //
 // The open card is the store's client-local slice (`store.view.roomCard`, a
 // sibling of the presence card), so a commit can close it atomically and the
-// rail, the compass, and the digits all know a card is open. This composable
-// holds only what the view alone knows: which sub-view covers the wait card
-// (the question or the rest form) and which control opened the card.
+// rail, the compass, and the digits all know a card is open. The rest entry
+// is the room card kind "wait". This composable holds only what the view
+// alone knows: which layer of the rest entry shows (`waitStep`: null for the
+// tiles, "wait" or "sleep" for that second-layer form), the tile the player
+// came from (`lastTile`, focused again on a step back), whether the tiles are
+// being returned to (no replayed entrance), and which control opened the
+// card.
 import { computed, nextTick, ref, watch } from "vue";
 import { BACK_ROW } from "./use-person-focus.js";
 import { pillReadout } from "../components/exploration-readout.js";
 import stableStringify from "../lib/stable_stringify.js";
 
-// The one reason a locked wait row or dream answer states (a mutation in
+// The one reason the locked rest entry or dream answer states (a mutation in
 // flight or awaiting its declared revision, or the session not live).
 export const WAIT_LOCKED_REASON = "上一個行動尚未完成，請稍候。";
 
@@ -25,22 +31,6 @@ const DISMISS_ACTION = "options.dismiss";
 
 function digitBadge(index) {
   return index < 9 ? String(index + 1) : "·";
-}
-
-// The wait card's rows: the builder's rows (its own back row already
-// dropped), digit-badged, disabled with one reason while locked, then the
-// trailing `✕ 返回`.
-export function waitCardRows(items, locked) {
-  const rows = (items || []).map((item, index) => ({
-    key: item.key,
-    label: item.label,
-    badge: digitBadge(index),
-    kind: "verb",
-    enabled: !locked,
-    reason: locked ? WAIT_LOCKED_REASON : null,
-    testId: "wait-card-row",
-  }));
-  return [...rows, BACK_ROW];
 }
 
 // The suggestions card's content from the store's `suggestionsCard`
@@ -139,8 +129,12 @@ export function useRoomActions(
   { panelAvailable, dispatchIntent, skipDisabled, compassRef, onPlaceHover, onPillHover },
 ) {
   const roomCardRef = ref(null);
-  // The view-local sub-view over the wait card: null | "sleep" | "rest".
+  // The rest entry's layer: null (the tiles) | "wait" | "sleep" (that form).
   const waitStep = ref(null);
+  // The tile the current second layer was opened from: "wait" | "sleep".
+  const lastTile = ref("wait");
+  // The tiles are shown again after a step back: no replayed entrance.
+  const returning = ref(false);
   // Which control opened the open card: "wait" | "pill" | null.
   const opener = ref(null);
 
@@ -172,23 +166,38 @@ export function useRoomActions(
   );
   const pillLabel = computed(() => (pillCount.value > 0 ? `建議 ${pillCount.value}` : "建議"));
 
-  const waitRows = computed(() => waitCardRows(store.view.waitRows, skipDisabled.value));
-
-  const roomCardRows = computed(() => {
-    if (!roomCard.value) {
-      return [];
-    }
-    return roomCard.value.kind === "wait" ? waitRows.value : suggestions.value.rows;
-  });
+  // The suggestions card's rows; the rest entry renders no rows.
+  const roomCardRows = computed(() => (roomCard.value?.kind === "suggestions" ? suggestions.value.rows : []));
   const roomCardNotes = computed(() => (roomCard.value?.kind === "suggestions" ? suggestions.value.notes : []));
   const roomCardTrailing = computed(() =>
     roomCard.value?.kind === "suggestions" ? suggestions.value.trailingIndex : roomCardRows.value.length - 1,
   );
-  const roomCardCaption = computed(() => (roomCard.value?.kind === "wait" ? "等待" : roomCard.value ? "建議" : null));
-  const roomCardLabel = computed(() => (roomCard.value?.kind === "wait" ? "等待與休息" : "建議"));
-  const roomCardShown = computed(() => roomCardOpen.value && waitStep.value === null);
+  const roomCardCaption = computed(() => (roomCard.value?.kind === "suggestions" ? "建議" : null));
+  const roomCardLabel = computed(() => "建議");
+  // The suggestions card through ChoiceCard.
+  const roomCardShown = computed(() => roomCardOpen.value && roomCard.value.kind === "suggestions");
+  // The rest entry's layers: the tiles, the wait form, the sleep form.
+  const tilesShown = computed(() => roomCard.value?.kind === "wait" && waitStep.value === null);
+  const waitFormOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "wait");
   const sleepOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "sleep");
-  const restOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "rest");
+
+  // The tiles' context (redesign-rest-entry design D5): only what the client
+  // already holds. The 等待 tile reads the clock part of the committed
+  // world-time label; the 睡眠 tile the status panel's fatigue row for the
+  // controlled body (`actor.identity`, the possessed body under possession).
+  const waitTileTime = computed(() => {
+    const label = store.view.statusSlice && store.view.statusSlice.timeLabel;
+    return label ? label.split("‧").pop().trim() : null;
+  });
+  const sleepTileFatigue = computed(() => {
+    const status = store.view.panels && store.view.panels.status;
+    if (!status || status.available === false || !Array.isArray(status.fatigue) || !status.actor) {
+      return null;
+    }
+    const identity = String(status.actor.identity);
+    const row = status.fatigue.find((entry) => entry && String(entry.identity) === identity);
+    return row ? { reserve_percent: row.reserve_percent, label: row.label } : null;
+  });
 
   // --- activation -----------------------------------------------------------
 
@@ -209,17 +218,7 @@ export function useRoomActions(
   }
 
   function onRoomCardPick(key) {
-    if (!roomCard.value) {
-      return;
-    }
-    if (roomCard.value.kind === "wait") {
-      if (key === "wait-sleep") {
-        waitStep.value = "sleep";
-      } else if (key === "wait-rest") {
-        waitStep.value = "rest";
-      } else {
-        store.activateWaitRow(key);
-      }
+    if (roomCard.value?.kind !== "suggestions") {
       return;
     }
     const builderKey = suggestions.value.builderKeys[key];
@@ -232,19 +231,48 @@ export function useRoomActions(
     store.closeRoomCard();
   }
 
-  // Back to the wait card from the question or the form, its row active.
-  async function returnToWaitCard(rowKey) {
-    waitStep.value = null;
-    await nextTick();
-    const card = roomCardRef.value;
-    if (!card) {
+  // A tile opens its second-layer form (the form autofocuses its duration
+  // input). Nothing is opened while the submission gate is locked.
+  function onTilePick(key) {
+    if (skipDisabled.value || (key !== "wait" && key !== "sleep")) {
       return;
     }
-    const index = roomCardRows.value.findIndex((row) => row.key === rowKey);
-    if (index >= 0) {
-      card.setActive(index);
+    lastTile.value = key;
+    waitStep.value = key;
+  }
+
+  // `‹` or Escape on the second layer: back to the tiles, which remount and
+  // autofocus the tile the player came from (`initialTile` is `lastTile`).
+  function onStepBack() {
+    returning.value = true;
+    waitStep.value = null;
+  }
+
+  // `✕` on either layer: close the whole entry; the kind watcher returns
+  // focus to the place card's 休息.
+  function onStepClose() {
+    store.closeRoomCard();
+  }
+
+  // The wait form's two options (redesign-rest-entry design D3): the exact
+  // `explore.wait` payloads the retired rows sent, through the single store
+  // entry; the entry closes once sent.
+  function onWaitDawn() {
+    if (skipDisabled.value) {
+      return;
     }
-    card.focus();
+    if (dispatchIntent("explore.wait", { daypart: "dawn" }) !== null) {
+      store.closeRoomCard();
+    }
+  }
+
+  function onWaitSubmit(seconds) {
+    if (skipDisabled.value) {
+      return;
+    }
+    if (dispatchIntent("explore.wait", { seconds }) !== null) {
+      store.closeRoomCard();
+    }
   }
 
   function onSleepRecover() {
@@ -269,25 +297,6 @@ export function useRoomActions(
     ) {
       store.closeRoomCard();
     }
-  }
-
-  function onSleepClose() {
-    void returnToWaitCard("wait-sleep");
-  }
-
-  function onRestSubmit(seconds) {
-    if (skipDisabled.value) {
-      return;
-    }
-    // One dispatch through the single store entry (the bounded `explore.wait`
-    // payload the server validates); the form and the card close once sent.
-    if (dispatchIntent("explore.wait", { seconds }) !== null) {
-      store.closeRoomCard();
-    }
-  }
-
-  function onRestClose() {
-    void returnToWaitCard("wait-rest");
   }
 
   // --- focus ------------------------------------------------------------------
@@ -322,6 +331,8 @@ export function useRoomActions(
     () => roomCard.value?.kind ?? null,
     async (kind, previous) => {
       waitStep.value = null;
+      lastTile.value = "wait";
+      returning.value = false;
       if (kind || !previous) {
         return;
       }
@@ -344,6 +355,26 @@ export function useRoomActions(
         }
       }
       document.getElementById("action-dock")?.focus({ preventScroll: true });
+    },
+    { flush: "post" },
+  );
+
+  // A lock that disables the focused form control on the second layer would
+  // strand focus on a dead control (a disabled element receives no keys, so
+  // neither the shell's Tab trap nor the form's Escape would act): focus
+  // moves to the shell's `‹`, which is never disabled.
+  watch(
+    skipDisabled,
+    async (locked) => {
+      if (!locked || !(waitFormOpen.value || sleepOpen.value) || typeof document === "undefined") {
+        return;
+      }
+      await nextTick();
+      const active = document.activeElement;
+      if (active && active !== document.body && !active.disabled && active.isConnected) {
+        return;
+      }
+      document.querySelector('[data-anchor="choices"] [data-testid="rest-step-back"]')?.focus({ preventScroll: true });
     },
     { flush: "post" },
   );
@@ -430,8 +461,13 @@ export function useRoomActions(
     roomCardTrailing,
     roomCardCaption,
     roomCardLabel,
+    tilesShown,
+    waitFormOpen,
     sleepOpen,
-    restOpen,
+    lastTile,
+    returning,
+    waitTileTime,
+    sleepTileFatigue,
     placeActions,
     explorationRootLive,
     pillShown,
@@ -442,11 +478,13 @@ export function useRoomActions(
     onPill,
     onRoomCardPick,
     onRoomCardBack,
+    onTilePick,
+    onStepBack,
+    onStepClose,
+    onWaitDawn,
+    onWaitSubmit,
     onSleepRecover,
     onSleepSubmit,
-    onSleepClose,
-    onRestSubmit,
-    onRestClose,
     onPlaceHover: onPlaceHoverContent,
     onPillHoverChange,
     onCompassTab,

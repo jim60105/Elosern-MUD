@@ -2,7 +2,8 @@
 // D2): the stage's place card states the location and the world time — the
 // only surface that does — at the head of the `map` anchor, content-sized,
 // display-first, hidden in creation. exploration-room-actions (design D3):
-// only while `actionsEnabled` it carries the 查看房間 and 等待 buttons.
+// only while `actionsEnabled` it carries the 查看房間 and 休息 buttons
+// (redesign-rest-entry relabels 等待 to 休息).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mount } from "@vue/test-utils";
@@ -99,7 +100,7 @@ describe("PlaceCard", () => {
   });
 
   describe("room actions (exploration-room-actions)", () => {
-    it("renders 查看房間 and 等待 only while actions are enabled", async () => {
+    it("renders 查看房間 and 休息 only while actions are enabled", async () => {
       wrapper = mount(PlaceCard, { props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" } });
       expect(wrapper.findAll("button")).toHaveLength(0);
       await wrapper.setProps({ actionsEnabled: true });
@@ -107,7 +108,9 @@ describe("PlaceCard", () => {
       const wait = wrapper.get('[data-testid="place-card-wait"]');
       expect(look.attributes("aria-label")).toBe("查看房間");
       expect(look.find("svg").exists()).toBe(true);
-      expect(wait.text()).toBe("等待");
+      expect(wait.text()).toBe("休息");
+      expect(wait.classes()).toContain("place-card__action--wait");
+      expect(wrapper.text()).not.toContain("等待");
       expect(wait.find("svg").exists()).toBe(true);
       await wrapper.setProps({ actionsEnabled: false });
       expect(wrapper.element.querySelectorAll(FOCUSABLE)).toHaveLength(0);
@@ -122,7 +125,7 @@ describe("PlaceCard", () => {
       await wrapper.get('[data-testid="place-card-look"]').trigger("mouseenter");
       await wrapper.get('[data-testid="place-card-look"]').trigger("mouseleave");
       await wrapper.get('[data-testid="place-card-wait"]').trigger("focus");
-      expect(wrapper.emitted("hover").map(([content]) => content && content.lead)).toEqual(["查看房間", null, "等待"]);
+      expect(wrapper.emitted("hover").map(([content]) => content && content.lead)).toEqual(["查看房間", null, "休息"]);
     });
 
     it("keeps the heading's full accessible name beside the buttons", () => {

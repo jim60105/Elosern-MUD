@@ -127,14 +127,22 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     // exploration-room-actions: the help overlay documents the room actions.
     wrapper = mount(HelpOverlay);
     const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());
-    expect(rowText("tab-order")).toContain("出口羅盤、在場列、地點卡的「查看房間」、「等待」");
+    expect(rowText("tab-order")).toContain("出口羅盤、在場列、地點卡的「查看房間」、「休息」");
     expect(rowText("tab-order")).toContain("「建議」");
     expect(rowText("place-look")).toContain("重新查看目前所在的房間");
-    expect(rowText("place-wait")).toContain("等待直到黎明、睡眠至完全恢復、等待 N 小時");
+    expect(rowText("place-wait")).toContain("打開休息卡片：先選「等待」或「睡眠」，再選等待直到黎明、睡眠至完全恢復，或指定時長。");
+    expect(rowText("place-wait")).toContain("‹");
+    expect(rowText("place-wait")).toContain("✕");
+    expect(keys("place-wait")).toEqual(["休息"]);
     expect(rowText("place-wait")).toContain("夢境協作");
     expect(rowText("pill")).toContain("清除建議");
     expect(keys("room-card-keys")).toEqual(["↑", "↓", "1", "9", "Enter"]);
     expect(keys("room-card-escape")).toEqual(["Esc"]);
-    expect(rowText("room-card-escape")).toContain("焦點回到「等待」或「建議」");
+    expect(rowText("room-card-escape")).toContain("焦點回到「建議」或「休息」");
+    // No help entry calls the place card button 「等待」 or lists the
+    // retired row 等待 N 小時.
+    expect(wrapper.text()).not.toContain("等待 N 小時");
+    expect(wrapper.text()).not.toContain("地點卡的「查看房間」、「等待」");
+    expect(wrapper.text()).not.toContain("打開等待卡片");
   });
 });

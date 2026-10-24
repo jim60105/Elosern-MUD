@@ -95,7 +95,6 @@ describe("frame resolver — committed-state following and purity", () => {
     // design D2): no hidden model state participates.
     expect(second).toEqual({ items: [], focusKey: null, title: "場景" });
     // The room accessors are pure too.
-    expect(resolver.explorationWait()).toEqual(resolver.explorationWait());
     expect(resolver.explorationSuggestions()).toEqual(resolver.explorationSuggestions());
     expect(resolver.explorationRoomLook()).toEqual(resolver.explorationRoomLook());
   });
@@ -119,7 +118,7 @@ describe("frame resolver — committed-state following and purity", () => {
       reason: null,
     });
     expect(resolver.explorationRoomLook()).toBeNull();
-    expect(resolver.explorationWait()).toBeNull();
+    expect(resolver.explorationWait).toBeUndefined();
     expect(resolver.explorationSuggestions()).toBeNull();
     // The guard converts every call over the poisoned panel; deleting the
     // poison restores resolution (the marker is not sticky).
@@ -215,13 +214,12 @@ describe("frame resolver — the finite exploration table", () => {
     expect(verbMenu.items.map((i) => i.key)).toContain("look-target");
     expect(verbMenu.grid).toBeUndefined();
     // The room actions resolve through the shipped builders, outside the
-    // router (exploration-room-actions): the place card's room look row, the
-    // wait card's rows, and the suggestions card's rows, each without the
-    // builder's back row.
+    // router (exploration-room-actions): the place card's room look row and
+    // the suggestions card's rows, without the builder's back row (the rest
+    // entry reads no builder rows, redesign-rest-entry).
     expect(resolver.explorationRoomLook()).toEqual(
       ExplorationMenu.lookItems(state.panels.exploration).find((item) => item.key === "look-room"),
     );
-    expect(resolver.explorationWait()).toEqual(ExplorationMenu.waitItems().filter((item) => !item.goBack));
     const menu = ExplorationMenu.suggestionsMenu(state.panels.context_actions.suggestions);
     expect(resolver.explorationSuggestions()).toEqual({
       status: state.panels.context_actions.suggestions.status,
@@ -501,7 +499,6 @@ describe("frame resolver — the degradation marker", () => {
     // context_actions still carries a live envelope.
     const resolver = resolverFor(state);
     expect(resolver.explorationSuggestions()).toBeNull();
-    expect(resolver.explorationWait()).toBeNull();
     expect(resolver.explorationRoomLook()).toBeNull();
   });
 

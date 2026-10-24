@@ -6,7 +6,6 @@ import {
   overflowCardArgs,
   suggestionsCardArgs,
   verbCardArgs,
-  waitCardArgs,
 } from "../fixtures/scene_overview.js";
 
 // ChoiceCard: the one centred card shell (exploration-presence-rail design
@@ -74,19 +73,6 @@ const GUILD_HALL = explorationPanelFixture({
 export const Verbs = {
   render,
   args: { ...verbCardArgs(GUILD_HALL, 11), autofocus: true, trapFocus: true },
-};
-
-// The wait menu on the card: 等待直到黎明, 睡眠至完全恢復, 等待 N 小時.
-export const Wait = {
-  render,
-  args: { ...waitCardArgs(), autofocus: true, trapFocus: true },
-};
-
-// The wait card while another action is in flight: every row disabled with
-// one reason.
-export const WaitLocked = {
-  render,
-  args: { ...waitCardArgs({ locked: true }), autofocus: true, trapFocus: true },
 };
 
 // The suggestions card: the ready cards (one with its hint), 清除建議 with its

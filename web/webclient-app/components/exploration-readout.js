@@ -100,7 +100,7 @@ export function departedReadout(name) {
 
 // The place card's buttons (exploration-room-actions; redesign §5.3).
 export const PLACE_LOOK_READOUT = Object.freeze({ lead: "查看房間", text: "重新觀察四周", tone: "normal" });
-export const PLACE_WAIT_READOUT = Object.freeze({ lead: "等待", text: "讓時間流逝、休息或睡眠", tone: "normal" });
+export const PLACE_WAIT_READOUT = Object.freeze({ lead: "休息", text: "保持清醒等待，或入睡恢復精力", tone: "normal" });
 
 // The 建議 pill: how many next steps the card lists, or what it is doing.
 export function pillReadout(status, count) {
