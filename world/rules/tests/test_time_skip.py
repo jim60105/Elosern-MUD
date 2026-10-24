@@ -348,7 +348,7 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertEqual(first, second)
 
     @covers_requirement(
-        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"
     )
     def test_unsafe_wait_refuses_before_any_time(self):
         monster = self._monster()
@@ -434,7 +434,7 @@ class SkipHelperAdvanceTests(EvenniaTest):
         self.assertTrue(result.woke)
 
     @covers_requirement(
-        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"
     )
     def test_forced_sleeper_cannot_volunteer_but_recovers_by_waiting(self):
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)

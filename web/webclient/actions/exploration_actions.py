@@ -1079,11 +1079,11 @@ def _sleep_party_adapter(
 
     try:
         outcome = begin_all_party_sleep(actor, session=session)
-    except PossessionGateError as error:
+    except PossessionGateError as error:  # observability: ignore R2: the stable gate refusal IS the action result
         return _rejected(
             error.reason, "目前無法選擇全員一起睡眠。"
         )
-    except (SleepRefused, PossessionWriteError) as error:
+    except (SleepRefused, PossessionWriteError) as error:  # observability: ignore R2: the stable sleep/write refusal IS the action result
         return _rejected(
             getattr(error, "code", "party_sleep_failed"),
             getattr(error, "message", None) or "目前無法選擇全員一起睡眠。",
@@ -1140,11 +1140,11 @@ def _sleep_continue_adapter(
                 expected_sleep_id=payload["sleep_id"],
                 expected_revision=int(payload["revision"]),
             )
-    except SkipRefused as error:
+    except SkipRefused as error:  # observability: ignore R2: the stable safety refusal IS the action result
         return _rejected(
             "unsafe_skip", rejection_message(error.reason) or "目前無法繼續睡眠。"
         )
-    except SleepRefused as error:
+    except SleepRefused as error:  # observability: ignore R2: the stable sleep refusal IS the action result
         return _rejected(error.code, error.message)
     message = result.summary or "睡眠已繼續。"
     actor.msg(message)

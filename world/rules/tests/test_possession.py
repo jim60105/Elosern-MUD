@@ -718,7 +718,7 @@ class SleepHandoffTests(EvenniaTest):
 
     @covers_requirement(
         "companion-possession-core::entry-gates-are-deterministic-stable-coded-and-precede-all-generative-work",
-        "time-skip-commands::recovery-waiting-preserves-skip-safety",
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety",
     )
     @covers_requirement(
         "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"

@@ -217,6 +217,9 @@ class DreamSurfaceTests(EvenniaTest):
 
     @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     @covers_requirement("dream-sleep-surface::dream-collaboration-consumes-the-committed-elapsed-result")
+    @covers_requirement(
+        "dream-sleep-surface::explicit-dream-answers-have-browser-and-text-parity"
+    )
     def test_interrupted_committed_result_uses_actual_ticks_on_both_clients(self):
         for browser in (False, True):
             clock = get_world_clock()

@@ -863,7 +863,7 @@ class PossessionPresentationTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "time-skip-commands::recovery-waiting-preserves-skip-safety"
+        "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"
     )
     @covers_requirement(
         "webclient-possession-presentation::browser-and-text-expose-the-same-non-acting-handoff-choices"

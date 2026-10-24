@@ -242,7 +242,7 @@ def _party_status(commander: Any, *, actor: Any) -> tuple[bool, str | None]:
             has_awake = True
             try:
                 _party_member_eligible(member)
-            except SleepRefused as error:
+            except SleepRefused as error:  # observability: ignore R2: the stable refusal IS the party availability reason
                 return False, error.message
     if not has_awake:
         return False, REASON_NO_SLEEPER

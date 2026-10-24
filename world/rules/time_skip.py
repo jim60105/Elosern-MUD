@@ -1262,11 +1262,11 @@ def continue_owner_sleep(
                     "decision": base_decision,
                 },
             )
-        except SkipRefused as error:
+        except SkipRefused as error:  # observability: ignore R2: the stable safety refusal IS the continuation pause result
             continuation = CONTINUATION_PAUSED
             pause_message = rejection_message(error.reason)
             break
-        except SleepRefused as error:
+        except SleepRefused as error:  # observability: ignore R2: the stable sleep refusal IS the continuation pause result
             continuation = CONTINUATION_PAUSED
             pause_message = error.message
             break
