@@ -135,6 +135,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/DockMenu",
     "Action/DockMenuItem",
     "Action/RestForm",
+    "Action/WaitForm",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     # The 技能-tab casting flow's dock pane joined with
@@ -239,6 +240,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ExplorationScreen",
     # The wait card's 進入夢境協作？ question (exploration-room-actions).
     "Core/QuestionCard",
+    "Core/TimeChoiceCard",
     # The correspondence folio and the stage-transform drawer refroze the
     # manifest: World/LettersPanel and Overlays/GalleryStageTransformModal
     # joined the frozen set after this baseline was pinned.

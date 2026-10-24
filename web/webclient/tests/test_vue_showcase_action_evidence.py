@@ -146,7 +146,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/SceneBackdrop",
                 "Core/FullLogOverlay", "Core/HudDrawer", "Core/DrawerHeader", "Core/EmptyState",
                 *ACTION_FAMILY_KEYS,
-                "Action/RestForm", "Action/DockBreadcrumb",
+                "Action/RestForm", "Action/WaitForm", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",
                 # The 技能-tab casting flow's dock pane joined with
                 # skillbook-authoritative-casting.
@@ -272,6 +272,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The wait card's 進入夢境協作？ question joined with
                 # exploration-room-actions.
                 "Core/QuestionCard",
+                "Core/TimeChoiceCard",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
