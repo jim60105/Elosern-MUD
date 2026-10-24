@@ -13,13 +13,16 @@ The other hits are comments or developer docs: `world/rules/fatigue.py` (module 
 
 ## Goals / Non-Goals
 
-**Goals:** replace 精神儲備 with 精力 in every string listed above and in the tests that assert them.
+**Goals:** replace 精神儲備 with 精力 in every string listed above and in the tests that assert them, and make 精力 unambiguous (user decisions, added after the first review):
+
+- `滿儲備` in `docs/game/commands.md` line 63 and `docs/game/command-reference.md` line 190 would have no antecedent once 精神儲備 is gone, so it becomes 精力全滿, phrased `即使精力全滿，也不會…` so the clause reads naturally.
+- `world/rules/service_messages.py` line 250 (`exam_started_message`) says `恢復全部的體力、法力與精力`, where 精力 meant SP. SP's UI name is 耐力, so the sentence becomes `恢復全部的體力、法力與耐力`. The function is shared by the text command (`commands/combat.py`) and the browser action (`web/webclient/actions/service_actions.py`), so one edit covers both clients. The only test asserting the sentence is `world/rules/tests/test_phase4_integration.py` line 223; no doc or main spec quotes it.
 
 **Non-Goals:**
 
 - Comments, docstrings, rulebook comments, identifiers, developer docs, and design docs keep 精神儲備 (design doc §9).
 - Stage labels are unchanged.
-- The related word 儲備 on its own (for example `滿儲備` in `docs/game/commands.md` line 63 and `docs/game/command-reference.md` line 190) is left as is: it is not the term 精神儲備, and in that sentence it can refer to all recovering resources. Changing it would widen the approved scope.
+- Other uses of the word 精神 (for example `精神恢復` in the combat paragraphs) are unchanged.
 
 ## Decisions
 
