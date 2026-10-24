@@ -796,7 +796,8 @@ class CommandDocsContractTests(unittest.TestCase):
     def test_status_and_cast_entries_document_protected_physiology(self):
         """Physiological fatigue is presented and never cleansed away."""
         status_description = self.entries["狀態"]["說明"]
-        self.assertIn("精神儲備", status_description)
+        self.assertIn("精力", status_description)
+        self.assertNotIn("精神儲備", status_description)
         self.assertIn("疲勞階段", status_description)
         self.assertIn("無法行動", status_description)
         cast_description = self.entries["cast"]["說明"]
