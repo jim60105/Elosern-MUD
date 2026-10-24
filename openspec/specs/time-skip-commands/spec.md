@@ -177,35 +177,35 @@ sed: -e 表示式 #1，字元 2: 未預期的「,」
 Ordinary wait, sleep and eligible study SHALL stop at the earliest involved forced-sleep entry, natural wake target or registered interaction; only elapsed time SHALL commit and unperformed request time SHALL be discarded. The explicit owner-targeted automatic sleep continuation SHALL consume successive physiological boundaries under its retained authorization, stopping at the owner's target or a real interaction/safety interruption. Noninteractive stages SHALL preserve exact consumption.
 
 #### Scenario: First wake
-- **WHEN** a forced sleeper at zero is involved in a requested 10000-second safe wait
-- **THEN** exactly 6000 seconds commits, the undefeated sleeper wakes at 72000, control returns and 4000 seconds is discarded
+- **WHEN** a forced sleeper at zero is involved in an ordinary 10000-second safe wait
+- **THEN** exactly 6000 seconds commits, the undefeated sleeper wakes at 72000, control returns and 4000 seconds of that wait is discarded
 
 #### Scenario: First collapse
-- **WHEN** an awake companion has 2400 units during a requested 1200-second wait
-- **THEN** exactly 600 seconds commits, that companion enters forced sleep and the remainder is discarded
+- **WHEN** an awake companion has 2400 units during an ordinary requested 1200-second wait
+- **THEN** exactly 600 seconds commits, the companion enters forced sleep and the remainder of that wait is discarded
 
 #### Scenario: Registered event
-- **WHEN** an actual registered interactive event is due in 37 seconds before any physiological boundary
-- **THEN** exactly 37 seconds commits and the event is published without a random ambush roll
+- **WHEN** a real registered interactive event is due in 37 seconds before the next physiological boundary
+- **THEN** exactly 37 seconds commits and the event publishes without a random ambush roll; automatic continuation pauses too
 
 #### Scenario: No replay
-- **WHEN** a completed interrupted result is retried with the same accepted operation identity
-- **THEN** the committed interval is not replayed; any later advance requires a new explicit action
+- **WHEN** an interrupted result is retried with the same accepted interval identity
+- **THEN** that interval never replays; ordinary wait needs a new action and owner sleep recovery uses only its retained uncommitted target after interaction is resolved
 
 ### Requirement: Owner-targeted sleep continuation preserves skip safety
 If every operable present body sleeps, no companion is possessed and the player declines/closes dream entry, recovery SHALL automatically continue the same owner sleep to its duration deadline or declared recovery target. Earlier companion wake SHALL not stop it. Real interaction or combat/hostile safety SHALL interrupt without unsafe skips. A sleeping owner SHALL retain actionable status/recovery/handoff, without ordinary action authority.
 
 #### Scenario: Unsafe collapse
 - **WHEN** an accepted indivisible action collapses a body in a hostile room
-- **THEN** posture commits with the action but a later recovery wait is refused with existing unsafe reason and zero extra time
+- **THEN** posture commits with that action, automatic recovery adds no unsafe time and existing engagement/defeat policy remains available
 
 #### Scenario: Safe all asleep
-- **WHEN** the party has no awake eligible member in a safe room
+- **WHEN** all operable bodies sleep in safety and the unpossessed player declines or closes the owner dream prompt
 - **THEN** the server continues to the owner's accepted target without wait clicks or a nonacting dead end
 
 #### Scenario: Companion wakes earlier
-- **WHEN** all-asleep continuation targets the owner deadline at tick 7200 and a companion wakes at tick 100
-- **THEN** it reconciles that companion wake and subsequent awake consumption, then reaches tick 7200 unless a real interaction or safety boundary intervenes
+- **WHEN** all-asleep continuation targets owner deadline at tick 7200 and a companion wakes at tick 100
+- **THEN** it reconciles companion wake and subsequent awake consumption, then reaches tick 7200 unless a real interaction or safety boundary intervenes
 
 #### Scenario: Interruption recovery
 - **WHEN** an actual interactive event interrupts automatic recovery

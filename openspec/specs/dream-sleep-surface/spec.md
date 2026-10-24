@@ -6,7 +6,6 @@ Offers owner-only optional collaboration while one accepted sleep receipt still 
 ## Requirements
 
 ### Requirement: Optional collaboration follows one accepted sleep result
-
 Optional dream entry SHALL be asked while the authenticated owner still sleeps and no companion is possessed, before recovery completes. Accepted zero-time entry SHALL qualify without claiming completed sleep. Other companions SHALL need no sleeping prerequisite. Rejected sleep SHALL open no dream. Any sleep type SHALL require explicit opt-in; forced sleep SHALL never auto-enter. Confirmation SHALL revalidate owner, control and accepted receipt.
 
 #### Scenario: Fully restored entry
@@ -14,7 +13,7 @@ Optional dream entry SHALL be asked while the authenticated owner still sleeps a
 - **THEN** no elapsed sleep is invented and the reconciled awake owner has no dream offer; an accepted positive duration sleep can still offer while asleep
 
 #### Scenario: Unsafe sleep
-- **WHEN** the safety gate rejects sleep
+- **WHEN** the safety gate rejects voluntary sleep
 - **THEN** no dream opens and nothing settles
 
 #### Scenario: Ordinary sleep
@@ -34,16 +33,23 @@ Optional dream entry SHALL be asked while the authenticated owner still sleeps a
 - **THEN** confirmation rejects without dream or time writes and returns the current authoritative view
 
 ### Requirement: Dream departure never settles sleep again
-
 Exchanges and ordinary draft saves SHALL add no time/restoration; draft save SHALL keep the dream open. Explicit confirm/awaken departure, including after draft preservation or generation failure, SHALL continue the same accepted owner sleep using only uncommitted intervals, then reconcile wake. Reconnect/cancel SHALL never open a second sleep or replay settlement. Physical interruptions SHALL remain actionable offline; completion SHALL be durable and idempotent.
 
 #### Scenario: Offline departure
-- **WHEN** generation is unavailable after entry and the player saves a draft and awakens
+- **WHEN** generation is unavailable and the player saves a draft and awakens
 - **THEN** the same sleep continues safely to its owner target or a real interruption; no model call or independent dream-time charge occurs
 
 #### Scenario: Reconnect and depart
 - **WHEN** the client reconnects and ends the existing session
-- **THEN** original sleep is not replayed and six-exchange progress is retained
+- **THEN** its exchange progress and receipt persist and only uncommitted sleep time can advance
+
+#### Scenario: Duplicate departure
+- **WHEN** confirm, awaken or retry is repeated after owner sleep completion
+- **THEN** neither clock, restoration nor wake notifications repeat
+
+#### Scenario: Save and keep dreaming
+- **WHEN** the player invokes ordinary draft save through text, the keepsake row or edit sheet
+- **THEN** the draft persists while session remains open, owner remains asleep at the same tick and no recovery continuation is created
 
 ### Requirement: Public dream surface includes the approved presentation and deterministic escape
 
@@ -54,7 +60,6 @@ Both browser and text surfaces SHALL expose remaining exchanges, free text only 
 - **THEN** free text closes and confirm/draft/awaken choices remain usable offline
 
 ### Requirement: Confirmed dream handoff returns to playable waking surfaces
-
 Confirmation SHALL close dream interaction and acknowledge receipt distinct from arrangement. The same accepted sleep SHALL safely complete before ordinary owner actions are authorized. Dispatch and generation SHALL add no time or sleep settlement. Physical interruption SHALL expose status, lawful handoff and deterministic recovery without requiring generation; ordinary play SHALL remain available after wake while generation waits or fails.
 
 #### Scenario: Confirmation is a receipt
