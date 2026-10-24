@@ -647,8 +647,8 @@ def enter_sleep(
         if receipt is None:
             raise SleepRefused(MISSING_RECEIPT_CODE, MISSING_RECEIPT_MESSAGE)
         raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
-    snapshots = _sleep_surface_snapshot(member)
     tick = int(get_world_clock().tick)
+    snapshots = None
     try:
         with transaction.atomic():
             # Lock and re-read the authoritative posture before constructing
@@ -681,6 +681,10 @@ def enter_sleep(
                     partial=False,
                     receipt=None,
                 )
+            # Snapshot only after admission revalidation: a refusal that wrote
+            # nothing must never restore (and thereby erase) a competing
+            # committed plan.
+            snapshots = _sleep_surface_snapshot(member)
             sleep_id = uuid4().hex
             receipt = SleepReceipt(
                 sleep_id=sleep_id,
@@ -705,9 +709,10 @@ def enter_sleep(
             project_fatigue_status(member)
     except Exception:
         # The projection requires its caller to own the transaction; restore
-        # the durable and cached physiology so a failed entry leaves no
+        # the durable and cached physiology so a failed write leaves no
         # partially committed sleep posture or receipt behind.
-        _restore_sleep_surfaces(member, snapshots)
+        if snapshots is not None:
+            _restore_sleep_surfaces(member, snapshots)
         raise
     candidates = _handoff_candidates(member)
     return SleepEntry(
@@ -1054,15 +1059,12 @@ def enter_party_sleep(
     if not planned:
         raise SleepRefused("already_asleep", PARTY_SLEEP_NOTHING_MESSAGE)
     body_ids = [int(member.pk) for member, *_ in planned]
-    snapshots = {id(member): (member, _sleep_surface_snapshot(member)) for member in members}
-    snapshots[id(commander)] = (
-        commander,
-        _sleep_surface_snapshot(commander),
-    )
+    snapshots = None
     try:
         with transaction.atomic():
             _lock_members(members)
-            for member, receipt, _, _ in planned:
+            admission: list[tuple[Any, Any, Any, int, bool]] = []
+            for member, receipt, accepted, partial in planned:
                 current = read_optional_fatigue_state(member)
                 if current is None:  # pragma: no cover - preflight checked it
                     raise SleepRefused(
@@ -1074,14 +1076,28 @@ def enter_party_sleep(
                     raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
                 if current.posture is SleepPosture.FORCED:
                     raise SleepRefused("forced_sleep", FORCED_SLEEP_MESSAGE)
+                admission.append(
+                    (member, receipt, current.reserve_units, accepted, partial)
+                )
+            # Snapshot only after every admission revalidation: a refusal that
+            # wrote nothing must never restore a competing committed plan.
+            snapshots = {
+                id(member): (member, _sleep_surface_snapshot(member))
+                for member in members
+            }
+            snapshots[id(commander)] = (
+                commander,
+                _sleep_surface_snapshot(commander),
+            )
+            for member, receipt, reserve_units, _, _ in admission:
                 write_fatigue_state(
-                    member, current.reserve_units, SleepPosture.VOLUNTARY
+                    member, reserve_units, SleepPosture.VOLUNTARY
                 )
                 write_sleep_receipt(member, receipt)
                 project_fatigue_status(member)
             write_party_operation(commander, operation, body_ids)
     except Exception:
-        for member, member_snapshots in snapshots.values():
+        for member, member_snapshots in (snapshots or {}).values():
             _restore_sleep_surfaces(member, member_snapshots)
         raise
     entries = tuple(

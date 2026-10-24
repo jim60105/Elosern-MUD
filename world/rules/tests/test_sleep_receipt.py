@@ -20,6 +20,7 @@ from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.fatigue import (
     SleepPosture,
     read_fatigue_state,
+    read_optional_fatigue_state,
     write_fatigue_state,
 )
 from world.rules.party import join_party
@@ -272,6 +273,8 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(read_sleep_receipt(self.player).sleep_id, entry.sleep_id)
 
     def test_concurrent_entry_wins_over_a_stale_preflight(self):
+        from world.rules.fatigue import FatigueState
+
         receipt = SleepReceipt(
             sleep_id="competing-plan",
             body_id=int(self.player.pk),
@@ -288,25 +291,30 @@ class SleepEntryLifecycleTests(EvenniaTest):
             partial=False,
             entry_operation_id="competing-plan",
         )
+        write_fatigue_state(self.player, 180000, SleepPosture.VOLUNTARY)
+        write_sleep_receipt(self.player, receipt)
+        real_read = read_optional_fatigue_state
+        calls = {"count": 0}
 
-        def _competing(entities):
-            body = entities[0]
-            state = read_fatigue_state(body)
-            write_fatigue_state(
-                body, state.reserve_units, SleepPosture.VOLUNTARY
-            )
-            write_sleep_receipt(body, receipt)
+        def _stale_preflight(entity):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return FatigueState(180000, SleepPosture.AWAKE)
+            return real_read(entity)
 
         with patch(
-            "world.rules.time_skip._lock_members", side_effect=_competing
+            "world.rules.time_skip.read_optional_fatigue_state",
+            side_effect=_stale_preflight,
         ), self.assertRaises(SleepRefused) as ctx:
             enter_sleep(self.player, mode=MODE_DURATION, seconds=1800)
         self.assertEqual(ctx.exception.code, "already_asleep")
-        # This request wrote nothing: its pre-write snapshots restored the
-        # simulated interleaving, so no second plan survives from it.
-        self.assertIsNone(read_sleep_receipt(self.player))
+        # The losing request wrote and restored nothing: the committed plan
+        # keeps its identity and its sleeping posture.
+        stored = read_sleep_receipt(self.player)
+        self.assertEqual(stored.sleep_id, "competing-plan")
+        self.assertEqual(stored.target_tick, receipt.target_tick)
         self.assertIs(
-            read_fatigue_state(self.player).posture, SleepPosture.AWAKE
+            read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY
         )
 
     def test_owner_wakes_while_possessed_companion_waits(self):
