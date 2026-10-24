@@ -34,10 +34,12 @@ from world.rules.sleep_receipt import (
 )
 from world.rules.time_skip import (
     advance_wait,
+    authorize_owner_sleep_continuation,
     continue_owner_sleep,
     decline_owner_sleep_dream,
     enter_sleep,
     owner_sleep_view_state,
+    resume_pending_owner_continuation,
 )
 
 
@@ -229,6 +231,26 @@ class SleepControlViewTests(EvenniaTest):
         self.assertEqual(int(get_world_clock().tick), after)
         self.assertEqual(replay.elapsed_seconds, result.elapsed_seconds)
         self.assertEqual(after - before, 600)
+
+    @covers_requirement(
+        "dream-sleep-surface::dream-departure-never-settles-sleep-again"
+    )
+    def test_departure_intent_commits_without_time_then_resumes_once(self):
+        entry = enter_sleep(self.player, mode="duration", seconds=600)
+        before = int(get_world_clock().tick)
+        authorized = authorize_owner_sleep_continuation(
+            self.player,
+            sleep_id=entry.sleep_id,
+            revision=0,
+            generation=read_sleep_view_generation(self.player),
+        )
+        self.assertIsNotNone(authorized)
+        self.assertEqual(int(get_world_clock().tick), before)
+        resumed = resume_pending_owner_continuation(self.player)
+        self.assertIsNotNone(resumed)
+        self.assertEqual(int(get_world_clock().tick) - before, 600)
+        self.assertEqual(resumed.continuation, "complete")
+        self.assertIsNone(resume_pending_owner_continuation(self.player))
 
     @covers_requirement(
         "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
