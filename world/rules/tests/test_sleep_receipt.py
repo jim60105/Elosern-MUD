@@ -28,12 +28,14 @@ from world.rules.sleep_receipt import (
     MODE_DURATION,
     MODE_RECOVERY,
     RECEIPT_ATTRIBUTE,
+    SleepReceipt,
     SleepReceiptError,
     forced_wake_seconds,
     full_recovery_seconds,
     read_sleep_receipt,
     recovery_target_tick,
     validate_receipt,
+    write_sleep_receipt,
 )
 from world.rules.time_skip import (
     ALREADY_RECOVERED_MESSAGE,
@@ -269,6 +271,44 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(read_sleep_receipt(self.player).target_tick, target)
         self.assertEqual(read_sleep_receipt(self.player).sleep_id, entry.sleep_id)
 
+    def test_concurrent_entry_wins_over_a_stale_preflight(self):
+        receipt = SleepReceipt(
+            sleep_id="competing-plan",
+            body_id=int(self.player.pk),
+            owner_id=int(self.player.pk),
+            kind="voluntary",
+            mode=MODE_DURATION,
+            entry_tick=int(get_world_clock().tick),
+            target_tick=int(get_world_clock().tick) + 3600,
+            limit_tick=int(get_world_clock().tick) + 3600,
+            settled_through_tick=int(get_world_clock().tick),
+            revision=0,
+            state="sleeping",
+            accepted_seconds=3600,
+            partial=False,
+            entry_operation_id="competing-plan",
+        )
+
+        def _competing(entities):
+            body = entities[0]
+            state = read_fatigue_state(body)
+            write_fatigue_state(
+                body, state.reserve_units, SleepPosture.VOLUNTARY
+            )
+            write_sleep_receipt(body, receipt)
+
+        with patch(
+            "world.rules.time_skip._lock_members", side_effect=_competing
+        ), self.assertRaises(SleepRefused) as ctx:
+            enter_sleep(self.player, mode=MODE_DURATION, seconds=1800)
+        self.assertEqual(ctx.exception.code, "already_asleep")
+        # This request wrote nothing: its pre-write snapshots restored the
+        # simulated interleaving, so no second plan survives from it.
+        self.assertIsNone(read_sleep_receipt(self.player))
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.AWAKE
+        )
+
     def test_owner_wakes_while_possessed_companion_waits(self):
         companion = self._companion()
         entry = enter_sleep(self.player)
@@ -442,6 +482,36 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertEqual(read_fatigue_state(self.player).reserve_units, 335200)
         # The full action duration still settles the awake companion.
         self.assertEqual(read_fatigue_state(companion).reserve_units, 331200)
+
+    def test_indivisible_boundary_uses_pre_action_gauges(self):
+        from world.rules.mental_time import indivisible_plan
+
+        companion = self._companion(360000)
+        mp = self.player.traits.mp
+        mp.base = 1200
+        mp.current = 0
+        mp.rate = 1.0
+        write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
+        entry = enter_sleep(self.player)
+        self.assertEqual(entry.accepted_seconds, 1200)
+        from world.rules.sleep_receipt import next_sleep_offset
+
+        clock = get_world_clock()
+        self.assertEqual(
+            next_sleep_offset(self.player, read_sleep_receipt(self.player), clock.tick),
+            1200,
+        )
+        clock.advance(
+            1800,
+            AdvanceSource.SKIP,
+            (self.player, companion),
+            mental=indivisible_plan((self.player, companion)),
+        )
+        # The action's own gauge regeneration must not move the boundary: the
+        # body sleeps its accepted 1200 seconds and stays awake for 600.
+        self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
+        self.assertEqual(read_sleep_receipt(self.player).state, "completed")
+        self.assertEqual(read_fatigue_state(self.player).reserve_units, 357600)
 
     def test_real_sleep_command_accepts_an_explicit_duration(self):
         from commands.skip import CmdSleep

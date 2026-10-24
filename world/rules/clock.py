@@ -499,6 +499,35 @@ class MentalPlan:
 _RECEIPT_UNUSABLE = object()
 
 
+def _voluntary_sleep_offsets(
+    plan: MentalPlan | None, start_tick: int
+) -> dict[int, int]:
+    """Capture each sleeper's own boundary from pre-regeneration state.
+
+    The advance regenerates gauges for its full window before mental
+    settlement, so a recovery boundary read afterwards would see the action's
+    own regeneration and wake a gauge-limited sleeper at the start. This pure
+    read runs before any resource write and is the single boundary used by
+    both indivisible subdivision and practice accounting.
+    """
+    if plan is None:
+        return {}
+    offsets: dict[int, int] = {}
+    for entity in plan.scope:
+        if getattr(entity, "_is_deleted", False) or _is_dead(entity):
+            continue
+        state = _mental_state_or_none(entity)
+        if state is None or state.posture is not SleepPosture.VOLUNTARY:
+            continue
+        receipt = _receipt_state(entity, "boundary_capture")
+        if receipt is _RECEIPT_UNUSABLE or receipt is None or not receipt.sleeping:
+            continue
+        offset = next_sleep_offset(entity, receipt, start_tick)
+        if offset is not None:
+            offsets[id(entity)] = offset
+    return offsets
+
+
 def _receipt_state(entity: Any, stage: str) -> Any:
     """Read one receipt for settlement; a corrupt record fails closed locally."""
     try:
@@ -637,6 +666,7 @@ def _settle_indivisible_member(
     start_tick: int,
     receipt: Any,
     commits: list[Any],
+    voluntary_deadline: int | None = None,
 ) -> None:
     """Commit one member's indivisible interval, splitting only physiology.
 
@@ -646,8 +676,7 @@ def _settle_indivisible_member(
     effects, cost, full duration and atomicity are unchanged.
     """
     state = _mental_state_or_none(entity)
-    voluntary_deadline = None
-    if (
+    if voluntary_deadline is None and (
         isinstance(receipt, SleepReceipt)
         and receipt.sleeping
         and state.posture is SleepPosture.VOLUNTARY
@@ -692,46 +721,30 @@ def _settle_indivisible_member(
     awake_state = _mental_state_or_none(entity)
     if awake_state is None:
         return
-    cursor = start_tick + sleeping_seconds
-    for _ in range(16):
-        activity = plan.activity_for(entity)
-        prediction = predict_interval(
-            awake_state,
-            activity,
-            remaining,
-            completion=IntervalCompletion.INTERRUPTIBLE,
-        )
-        step = prediction.applicable_seconds
-        settlement = settle_fatigue_intervals(
-            (
-                FatigueInterval(
-                    entity,
-                    activity,
-                    step,
-                    awake_state,
-                    IntervalCompletion.INTERRUPTIBLE,
-                ),
+    # The awake remainder keeps the action's indivisible completion policy: a
+    # collapse inside it latches at completion and never earns recovery before
+    # the paid action ends.
+    settlement = settle_fatigue_intervals(
+        (
+            FatigueInterval(
+                entity,
+                plan.activity_for(entity),
+                remaining,
+                awake_state,
+                plan.completion,
             ),
-            context={"stage": "mental_settlement"},
-            start_tick=cursor,
-        )
-        commit = settlement.commits[0]
-        commits.append(commit)
-        awake_state = commit.end
-        cursor += step
-        remaining -= step
-        if remaining <= 0:
-            break
-        if step == 0 and _same_state(commit.end, commit.start):
-            raise RuntimeError(
-                "mental settlement made no progress at a zero-second boundary"
-            )
-    else:
-        raise RuntimeError("mental settlement exceeded its internal segment bound")
+        ),
+        context={"stage": "mental_settlement"},
+        start_tick=start_tick + sleeping_seconds,
+    )
+    commits.extend(settlement.commits)
 
 
 def _settle_mental(
-    seconds: int, plan: MentalPlan | None, start_tick: int = 0
+    seconds: int,
+    plan: MentalPlan | None,
+    start_tick: int = 0,
+    sleep_offsets: dict[int, int] | None = None,
 ) -> list[Any]:
     """Settle one present party's mental intervals inside the clock transaction.
 
@@ -765,7 +778,13 @@ def _settle_mental(
             receipt = None
         if plan.completion is not IntervalCompletion.INTERRUPTIBLE:
             _settle_indivisible_member(
-                entity, plan, seconds, start_tick, receipt, commits
+                entity,
+                plan,
+                seconds,
+                start_tick,
+                receipt,
+                commits,
+                (sleep_offsets or {}).get(id(entity)),
             )
         else:
             _settle_interruptible_member(entity, plan, seconds, start_tick, commits)
@@ -776,7 +795,10 @@ def _settle_mental(
 
 
 def _awake_practice_seconds(
-    plan: MentalPlan | None, seconds: int, start_tick: int
+    plan: MentalPlan | None,
+    seconds: int,
+    start_tick: int,
+    sleep_offsets: dict[int, int] | None = None,
 ) -> dict[int, int] | None:
     """The actual awake seconds each member may settle study over.
 
@@ -799,14 +821,12 @@ def _awake_practice_seconds(
             eligible[id(entity)] = seconds
             continue
         if state.posture is SleepPosture.VOLUNTARY:
-            receipt = _receipt_state(entity, "practice_eligibility")
-            if receipt is _RECEIPT_UNUSABLE or receipt is None:
+            offset = (sleep_offsets or {}).get(id(entity))
+            if offset is None:
                 continue
-            offset = next_sleep_offset(entity, receipt, start_tick)
-            if offset is not None:
-                awake_seconds = max(0, seconds - offset)
-                if awake_seconds > 0:
-                    eligible[id(entity)] = awake_seconds
+            awake_seconds = max(0, seconds - offset)
+            if awake_seconds > 0:
+                eligible[id(entity)] = awake_seconds
     return eligible
 
 
@@ -832,11 +852,14 @@ def _run_stages(
     entities: tuple[Any, ...],
     mental: MentalPlan | None = None,
 ) -> list[ScheduledEvent]:
-    practice_eligible = _awake_practice_seconds(mental, seconds, clock.tick)
+    sleep_offsets = _voluntary_sleep_offsets(mental, clock.tick)
+    practice_eligible = _awake_practice_seconds(
+        mental, seconds, clock.tick, sleep_offsets
+    )
     _settle_gauge_regen(entities, seconds)
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
-        _settle_mental(seconds, mental, clock.tick)
+        _settle_mental(seconds, mental, clock.tick, sleep_offsets)
         _settle_buffs_and_decay(entities, seconds, start_tick=clock.tick)
         events.extend(
             _practice_settlement(

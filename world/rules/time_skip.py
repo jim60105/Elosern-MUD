@@ -530,7 +530,7 @@ def _validate_sleep_request(mode: Any, seconds: Any) -> int | None:
     """Validate one declared sleep mode/seconds pair without touching state."""
     if mode not in (MODE_RECOVERY, MODE_DURATION):
         raise SleepRefused("invalid_mode", INVALID_SLEEP_MODE_MESSAGE)
-    if mode is MODE_DURATION:
+    if mode == MODE_DURATION:
         if seconds is None:
             raise SleepRefused("missing_duration", MISSING_DURATION_MESSAGE)
         if (
@@ -549,7 +549,7 @@ def _accepted_sleep_seconds(
     member: Any, mode: str, duration_seconds: int | None
 ) -> tuple[int, bool]:
     """Return ``(bounded accepted seconds, capped-partial flag)`` for one entry."""
-    if mode is MODE_DURATION:
+    if mode == MODE_DURATION:
         return int(duration_seconds or 0), False
     raw = _uncapped_recovery_seconds(member)
     return min(raw, MAX_SKIP_SECONDS), raw > MAX_SKIP_SECONDS
@@ -647,45 +647,60 @@ def enter_sleep(
         if receipt is None:
             raise SleepRefused(MISSING_RECEIPT_CODE, MISSING_RECEIPT_MESSAGE)
         raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
-    accepted, partial = _accepted_sleep_seconds(member, mode, duration)
-    tick = int(get_world_clock().tick)
-    if accepted <= 0:
-        # An already-met recovery target must not invent elapsed sleep or a
-        # sleeping posture that would re-enter a completed episode.
-        return SleepEntry(
-            operation_id=operation_id or uuid4().hex,
-            member=member,
-            requested_seconds=0,
-            handoff_offered=False,
-            sleep_id="",
-            mode=mode,
-            target_tick=tick,
-            accepted_seconds=0,
-            partial=False,
-            receipt=None,
-        )
-    sleep_id = uuid4().hex
-    receipt = SleepReceipt(
-        sleep_id=sleep_id,
-        body_id=int(member.pk),
-        owner_id=_owner_id_for(member),
-        kind=KIND_VOLUNTARY,
-        mode=mode,
-        entry_tick=tick,
-        target_tick=tick + accepted,
-        limit_tick=tick + accepted,
-        settled_through_tick=tick,
-        revision=0,
-        state=STATE_SLEEPING,
-        accepted_seconds=accepted,
-        partial=partial,
-        entry_operation_id=operation_id or sleep_id,
-    )
     snapshots = _sleep_surface_snapshot(member)
+    tick = int(get_world_clock().tick)
     try:
         with transaction.atomic():
+            # Lock and re-read the authoritative posture before constructing
+            # the receipt: a concurrent accepted entry must win, never be
+            # silently replaced by this request.
             _lock_members((member,))
-            write_fatigue_state(member, state.reserve_units, SleepPosture.VOLUNTARY)
+            current = read_optional_fatigue_state(member)
+            if current is None:
+                raise SleepRefused(
+                    "missing_physiology", MISSING_PHYSIOLOGY_MESSAGE
+                )
+            if current.posture is SleepPosture.FORCED:
+                raise SleepRefused("forced_sleep", FORCED_SLEEP_MESSAGE)
+            if current.posture is SleepPosture.VOLUNTARY:
+                _receipt_for(member)
+                raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
+            accepted, partial = _accepted_sleep_seconds(member, mode, duration)
+            if accepted <= 0:
+                # An already-met recovery target must not invent elapsed sleep
+                # or a sleeping posture that would re-enter a completed episode.
+                return SleepEntry(
+                    operation_id=operation_id or uuid4().hex,
+                    member=member,
+                    requested_seconds=0,
+                    handoff_offered=False,
+                    sleep_id="",
+                    mode=mode,
+                    target_tick=tick,
+                    accepted_seconds=0,
+                    partial=False,
+                    receipt=None,
+                )
+            sleep_id = uuid4().hex
+            receipt = SleepReceipt(
+                sleep_id=sleep_id,
+                body_id=int(member.pk),
+                owner_id=_owner_id_for(member),
+                kind=KIND_VOLUNTARY,
+                mode=mode,
+                entry_tick=tick,
+                target_tick=tick + accepted,
+                limit_tick=tick + accepted,
+                settled_through_tick=tick,
+                revision=0,
+                state=STATE_SLEEPING,
+                accepted_seconds=accepted,
+                partial=partial,
+                entry_operation_id=operation_id or sleep_id,
+            )
+            write_fatigue_state(
+                member, current.reserve_units, SleepPosture.VOLUNTARY
+            )
             write_sleep_receipt(member, receipt)
             project_fatigue_status(member)
     except Exception:
@@ -1053,6 +1068,12 @@ def enter_party_sleep(
                     raise SleepRefused(
                         "missing_physiology", MISSING_PHYSIOLOGY_MESSAGE
                     )
+                # Re-read under the lock: a sleep posture another request
+                # committed first keeps its own accepted identity.
+                if current.posture is SleepPosture.VOLUNTARY:
+                    raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
+                if current.posture is SleepPosture.FORCED:
+                    raise SleepRefused("forced_sleep", FORCED_SLEEP_MESSAGE)
                 write_fatigue_state(
                     member, current.reserve_units, SleepPosture.VOLUNTARY
                 )

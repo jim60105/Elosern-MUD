@@ -180,26 +180,18 @@ class ExplorationValidatorTests(unittest.TestCase):
     def test_wait_payload_exact(self):
         self.assertEqual(validate_wait_payload({"daypart": "dawn"}), {"daypart": "dawn"})
         self.assertEqual(validate_wait_payload({"seconds": 3600}), {"seconds": 3600})
-        recovery = {
-            "sleep": True,
-            "sleep_scope": "self",
-            "sleep_mode": "recovery",
-        }
-        self.assertEqual(validate_wait_payload({"sleep": True}), recovery)
+        # Scope and mode default to self/recovery at dispatch; absent fields
+        # stay absent so the adapter can tell an explicit request apart.
+        self.assertEqual(validate_wait_payload({"sleep": True}), {"sleep": True})
         self.assertEqual(
             validate_wait_payload({"sleep": True, "sleep_scope": "party"}),
-            {**recovery, "sleep_scope": "party"},
+            {"sleep": True, "sleep_scope": "party"},
         )
         self.assertEqual(
             validate_wait_payload(
                 {"sleep": True, "sleep_mode": "duration", "seconds": 7200}
             ),
-            {
-                "sleep": True,
-                "sleep_scope": "self",
-                "sleep_mode": "duration",
-                "seconds": 7200,
-            },
+            {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
         )
         # The combined dream-and-sleep form remains the canonical recovery
         # request until the dependent dream change retires it.

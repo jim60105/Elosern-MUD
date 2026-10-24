@@ -271,6 +271,49 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_sleep_receipt(self.player).state, "completed")
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    def test_wait_duration_sleep_accepts_a_json_decoded_payload(self):
+        import json
+
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        payload = json.loads(
+            json.dumps(
+                {"sleep": True, "sleep_mode": "duration", "seconds": 7200}
+            )
+        )
+        before = get_world_clock().tick
+        result = _wait_adapter(self.player, payload)
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick - before, 7200)
+
+    @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    def test_wait_explicit_sleep_never_replaces_an_active_plan(self):
+        from world.rules.fatigue import SleepPosture, write_fatigue_state
+        from world.rules.sleep_receipt import read_sleep_receipt
+        from world.rules.time_skip import enter_sleep
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        entry = enter_sleep(
+            self.player, mode="duration", seconds=7200
+        )
+        before = get_world_clock().tick
+        result = _wait_adapter(
+            self.player,
+            {"sleep": True, "sleep_mode": "duration", "seconds": 1800},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_asleep")
+        self.assertEqual(get_world_clock().tick, before)
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.sleep_id, entry.sleep_id)
+        self.assertEqual(receipt.target_tick, before + 7200)
+
+    @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_wait_party_recovery_enters_every_present_member_at_zero_time(self):
         from evennia.utils.create import create_object
 

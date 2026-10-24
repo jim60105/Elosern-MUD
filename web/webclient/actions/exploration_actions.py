@@ -310,11 +310,11 @@ def _validate_sleep_wait_payload(payload: dict[str, Any]) -> dict[str, Any]:
     mode = payload.get("sleep_mode", "recovery")
     if mode not in _SLEEP_MODES:
         raise ExplorationActionError("explore.wait sleep_mode is not a stable value")
-    sleep: dict[str, Any] = {
-        "sleep": True,
-        "sleep_scope": scope,
-        "sleep_mode": mode,
-    }
+    sleep: dict[str, Any] = {"sleep": True}
+    if "sleep_scope" in payload:
+        sleep["sleep_scope"] = scope
+    if "sleep_mode" in payload:
+        sleep["sleep_mode"] = mode
     if mode == "duration":
         if "seconds" not in payload:
             raise ExplorationActionError("duration sleep requires seconds")
@@ -986,11 +986,13 @@ def _wait_adapter(
         return _rejected("malformed_payload", "缺少等待時長。")
     try:
         if sleep:
+            explicit = "seconds" in payload or "sleep_mode" in payload
             outcome = begin_sleep(
                 actor,
                 mode=payload.get("sleep_mode", "recovery"),
                 seconds=payload.get("seconds"),
                 scope=payload.get("sleep_scope", "self"),
+                allow_continue=not explicit,
             )
         else:
             result = advance_wait(actor, seconds)
