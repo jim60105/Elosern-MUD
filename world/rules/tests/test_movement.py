@@ -729,7 +729,10 @@ class TerrainCalibrationTests(EvenniaTest):
         # Either leg alone is affordable; only the combined traversal is not.
         self.assertLess(plan_traversal(((40.0, "open_ground"),), [member]).seconds, 100)
 
-    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
+    @covers_requirement(
+        "movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion",
+        "mental-reserve::player-facing-text-names-the-reserve-精力",
+    )
     def test_a_non_distance_connector_refuses_exhaustion_before_arrival(self):
         from world.rules.fatigue import (
             SleepPosture,

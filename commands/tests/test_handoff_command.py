@@ -65,6 +65,9 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
+    @covers_requirement(
+        "mental-reserve::player-facing-text-names-the-reserve-精力"
+    )
     def test_handoff_lists_fatigue_and_return_or_possess_meaning(self):
         output = self._listing()
         self.assertIn("1. 回到自己的身體（精力 100%）", output)

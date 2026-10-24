@@ -793,6 +793,9 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("熟練度", overview_row)
 
     @covers_requirement("game-command-docs::accurate-command-details")
+    @covers_requirement(
+        "mental-reserve::player-facing-text-names-the-reserve-精力"
+    )
     def test_status_and_cast_entries_document_protected_physiology(self):
         """Physiological fatigue is presented and never cleansed away."""
         status_description = self.entries["狀態"]["說明"]
