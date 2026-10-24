@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Every map surface draws a shared map concept from its one glyph source
-The minimap island, the drawer's area map, its world map and both `?` legend tabs SHALL share one icon set. Each shared concept SHALL have exactly one glyph definition, which owns its geometry and paint. Every surface that shows the concept SHALL render it from that definition, scaling it only uniformly and setting only its state, selection and position. No surface SHALL keep a private redraw, restyle or approximation of a shared concept. A new surface SHALL reuse the same definition.
+All map surfaces (the island, the area and world maps, and both legend tabs) SHALL share one icon set. Each shared concept SHALL have exactly one glyph definition owning its geometry and paint, and every surface, including any new one, SHALL render the concept from it, changing only uniform scale, state, selection and position. No private redraw or approximation SHALL exist outside the named exceptions in the scenarios below, and each exception SHALL reproduce its map's exact values.
 
 #### Scenario: The shared concepts are enumerated
 - **WHEN** the shared icon set is listed
@@ -9,9 +9,17 @@ The minimap island, the drawer's area map, its world map and both `?` legend tab
 - **AND** the world point family is: player position, district landmark, place by kind (settlement, capital, harbour, hidden) and exact commission pin with its tracked halo
 - **AND** the world ink family is: land, lit wash, unlit hatching, lit and unlit district strokes, nation border with casing, walked trail with casing, and the approximate-commission ring
 
-#### Scenario: Marks without a shared definition yet are named, not duplicated freely
-- **WHEN** a surface shows an area wilderness-cell mark (the here-seal or gate inset in a wilderness cell rectangle), an area road stroke or the area commission diamond
-- **THEN** these are outside the shared families for now, and any legend sample of them reproduces the area map's exact path, stroke and fill values
+#### Scenario: The named exceptions are enumerated
+- **WHEN** the not-yet-unified marks are listed
+- **THEN** they are:
+  - the area map's wilderness-cell here-seal (r13/9/5) and 7-unit gate, which are inset in a wilderness cell rectangle;
+  - the area road casing and core strokes;
+  - the area commission diamond;
+  - the unlit hatch `<pattern>` element, which the world map and the world legend each declare around the shared hatch-line ink rule.
+
+#### Scenario: Named exceptions reproduce the map's exact values
+- **WHEN** the area legend draws its road and commission samples, or the world legend declares its hatch pattern
+- **THEN** each sample's path, stroke, fill and pattern geometry equal the map's own values for that mark
 
 #### Scenario: The minimap and the area map draw the same node
 - **WHEN** the minimap island and the drawer's area tab (outside a wilderness cell) both draw the current node, a visited node, an unvisited node, a node with a move action, and a non-current gateway node
@@ -24,7 +32,7 @@ The minimap island, the drawer's area map, its world map and both `?` legend tab
 
 #### Scenario: A changed glyph changes every surface at once
 - **WHEN** the single glyph definition of a shared concept changes, for example the gate arch path
-- **THEN** every map and legend that shows that concept renders the change with no second edit
+- **THEN** every map and legend that shows that concept outside the named exceptions renders the change with no second edit
 
 ### Requirement: Map legend samples are drawn by the map they explain
 Each map-drawer legend tab SHALL draw its node, world point and world ink samples with the same shared glyph definitions and ink rules as the map it explains. Its area road and commission samples SHALL use the area map's exact values. Samples SHALL be SVG at the map's 1:1 glyph size multiplied by the UI scale, beside their existing text labels. CSS boxes, borders, gradients or clip-paths that imitate a glyph SHALL NOT be used.
@@ -41,7 +49,7 @@ Each map-drawer legend tab SHALL draw its node, world point and world ink sample
   - 委託目的地 (the area commission diamond).
 
 #### Scenario: The area legend gate is the map's gate
-- **WHEN** the legend is open on the area tab while the area map shows a gateway node
+- **WHEN** the legend is open on the area tab while the area map shows a non-cell gateway node, for example in the Altoria settlement fixture
 - **THEN** the legend's gate sample has the same arch path data as the map's gate glyph, and no CSS-drawn legend icon remains
 
 #### Scenario: The world legend uses the world map's glyphs and ink

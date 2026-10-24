@@ -23,6 +23,14 @@ Each map surface drew its own version of the same icon (圖示). The minimap isl
 - Storybook: add `LegendAreaGlyphs` and `LegendWorldGlyphs` to the MapDrawer stories. `MetricAltoriaSouthGate` now asserts that the current gate room shows the here-seal.
 - **BREAKING** (visual contract only, pre-release): the minimap's draft marker ladder (webclient-map-01-draft-chrome D2) and its gold landmark ring are gone. Minimap node paint is now the area map's paint, so it follows the area map's literal colours where the old ladder used island tokens.
 
+- **Known goal gap**: some marks are still not single-source, and the spec lists them as named exceptions that must reproduce the map's exact values:
+  - the area map's wilderness-cell here-seal (r13/9/5) and 7-unit gate, so on a wilderness layer the island's r14 seal and 8-unit arch differ from the area tab's by about one unit;
+  - the area road strokes;
+  - the commission diamond;
+  - the world hatch pattern element.
+
+  Closing these is a follow-up decision.
+
 The implementation is already in the primary working tree, uncommitted under `web/webclient-app/`. This change describes it for `os-apply` to adopt, verify, and finish the remaining traceability and browser-test work.
 
 ## Capabilities

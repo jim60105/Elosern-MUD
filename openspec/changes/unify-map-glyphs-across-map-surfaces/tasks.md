@@ -45,7 +45,8 @@ The implementation for groups 1–5 already exists, uncommitted, under `web/webc
   - removal of every `.lg--*` rule.
 - [ ] 4.3 Add a Vitest describe block named exactly "every map surface draws a shared map concept from its one glyph source" to `tests/world/map_drawer.test.js`. It asserts:
   - island and area-map node shapes match (radii and gate path after the marker scale is removed);
-  - the island has no landmark ring or outline arch;
+  - the island has no landmark ring or outline arch, including for a node with `landmark: true` and a move action;
+  - `map-lattice.css` keeps no `.local-map__marker*`, `.local-map__actionable` or `.local-map__gate-glyph` paint rule;
   - world point glyphs come from the shared component.
 
   Verify it passes.
@@ -54,7 +55,8 @@ The implementation for groups 1–5 already exists, uncommitted, under `web/webc
   - the area gate sample `d` equals the map's;
   - the seen sample is `.map-glyph__dot.is-seen`;
   - the world samples carry the `world-map__*` ink and glyph classes;
-  - the approx ring is r14.
+  - the approx ring is r14;
+  - the named-exception samples (road casing/core, commission diamond, hatch pattern) equal the map's values.
 
   Verify it passes.
 - [ ] 4.5 In the existing "the drawer current marker makes one truthful position claim" block, add a case asserting that the island current node draws exactly one `map-glyph__here-glow/ring/dot` set at radii 14/10/6 × marker scale. Verify the block passes.
@@ -66,8 +68,8 @@ The implementation for groups 1–5 already exists, uncommitted, under `web/webc
 ## 6. Traceability, browser tests and docs
 
 - [ ] 6.1 In `tests/test_map_client_contracts.py` `MapDrawerContracts`, add `covers_requirement` methods for `webclient-map-drawer::every-map-surface-draws-a-shared-map-concept-from-its-one-glyph-source` and `webclient-map-drawer::map-legend-samples-are-drawn-by-the-map-they-explain`, each asserting the matching describe block from 4.3/4.4 passed. Take the IDs from `uv run --locked python -m tools.spec_traceability list` after sync. Verify both methods pass.
-- [ ] 6.2 In `web/webclient/tests/test_node_suite_evidence.py`, add Vitest evidence annotated `webclient-local-map::the-minimap-island-draws-the-area-maps-node-glyphs` and `webclient-local-map::an-island-fallback-label-never-covers-its-own-node-glyph`, using the canonical IDs from the list command. It runs the lattice, local-map and island-label suites and asserts the specific test names from 2.1–2.4 and 3.1. Verify `uv run --locked python -m tools.spec_traceability check` reports no uncovered requirement after archive sync.
-- [ ] 6.3 Update `web/tests/browser/test_browser_local_map_rendering.py` (around line 353), which still expects `local-map__gate-glyph` on the current gate room. Assert the here-seal (`.map-glyph__here-ring`, no gate glyph on the current node) instead. Then run the managed Playwright browser suites that touch the island and drawer: `test_browser_local_map_rendering.py`, `test_browser_local_map_geometry.py`, `test_browser_local_map_lattice.py`, `test_browser_local_map_layout_variants.py`, `test_browser_local_map_interaction.py`, `test_browser_contextual_hud_stage.py` and `test_map_drawer.py`. Verify they pass.
+- [ ] 6.2 In `web/webclient/tests/test_node_suite_evidence.py`, add Vitest evidence annotated `webclient-local-map::the-minimap-island-draws-the-area-map-s-node-glyphs` and `webclient-local-map::an-island-fallback-label-never-covers-its-own-node-glyph`, copying the canonical IDs verbatim from `uv run --locked python -m tools.spec_traceability list` after sync (the slug turns an apostrophe into a hyphen). It runs the lattice, local-map and island-label suites and asserts the specific test names from 2.1–2.4 and 3.1. Verify `uv run --locked python -m tools.spec_traceability check` reports no uncovered requirement after archive sync.
+- [ ] 6.3 Update `web/tests/browser/test_browser_local_map_rendering.py` (around line 353), which still expects `local-map__gate-glyph` on the current gate room. Assert the here-seal (`.map-glyph__here-ring`, no gate glyph on the current node) instead. Revisit the `INSET = 12` ("r8 seal") assumption in `test_browser_local_map_geometry.py` for the r14 here-glow and the r16 halo footprint. Then run the managed Playwright browser suites that touch the island and drawer: `test_browser_local_map_rendering.py`, `test_browser_local_map_geometry.py`, `test_browser_map_legibility.py`, `test_browser_scene_transitions.py` (FLIP glide now moves `.local-map__here`), `test_browser_exit_compass.py` (aim ring r17), `test_browser_local_map_lattice.py`, `test_browser_local_map_layout_variants.py`, `test_browser_local_map_interaction.py`, `test_browser_contextual_hud_stage.py` and `test_map_drawer.py`. Verify they pass.
 - [ ] 6.4 Update `web/webclient-app/AGENTS.md`. The minimap/map-drawer bullets must say that every map glyph has one shared source (`MapNodeGlyph` for area and minimap nodes; `WorldMapGlyph` plus `world-map-ink.css` for the world), that legends draw the maps' own glyphs, and that a non-current gateway wears the filled gold arch while a current gateway wears the here-seal. Verify the text matches the delta specs.
 - [ ] 6.5 Run `pnpm test` from the repo root. Verify every test passes except the known pre-existing full-suite timeout in `map_drawer.test.js` ("opens with focus on the selected tab even when it is not the first", about 4.7 s on master), and verify that test passes alone. Then run `openspec validate unify-map-glyphs-across-map-surfaces --strict`.
 

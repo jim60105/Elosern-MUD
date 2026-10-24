@@ -30,7 +30,8 @@ The implementation described here is already in the primary working tree, uncomm
 
 - The area map's wilderness-cell branch. Its inset here-seal (r13/9/5) and 7-unit gate inside a cell rectangle stay local to `AreaMapView.vue`, so on a wilderness layer the island and the area tab differ by one unit in those two marks.
 - The area road casing and core, and the commission diamond. They get no shared definition. The legend copies their exact values into `MapDrawer.vue` (`.lg-road__*`, `.lg-quest`).
-- Converting the shared glyph paint to design tokens. The area map's literal colours (for example `#15130f`, `#2b2924`, `#3a342a`) move unchanged into the shared components.
+- Converting the rest of the shared glyph paint to design tokens. The shared components mix tokens (`--gold-500`, `--paper-50`, `--seal-deep`) with the area map's hex literals (for example `#15130f`, `#2b2924`, `#3a342a`), and all of them move unchanged.
+- The hatch `<pattern>` element. It is declared in both WorldMapView and MapDrawer around the shared `world-map__hatch-line` rule, and the spec lists it as a named exception.
 - The pre-existing overlap of a rim edge-direction diamond with its rim name (for example 西部丘◆陵與谷地). It exists on master too.
 - Any server, payload or protocol change.
 

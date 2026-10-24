@@ -9,8 +9,8 @@ The minimap island SHALL draw every in-canvas node with the shared map node glyp
   - `current`: the here-seal, a glow of radius 14, a ring of radius 10 and a seal dot of radius 6;
   - `visible_visited`: the visited dot of radius 5.5;
   - `visible_unvisited`: the seen dot, with a dark fill and a dashed outline;
-  - an in-canvas `remembered` node, if any: the visited dot.
-- **AND** remembered places outside the canvas keep their rim diamonds
+  - `remembered`: a remembered node drawn in-canvas would use the visited dot, but the coordinate projection never draws one in-canvas.
+- **AND** remembered places keep their rim diamonds as their non-colour distinction
 
 #### Scenario: A landmark carries no extra ring on the canvas
 - **WHEN** a wilderness island payload with a visited landmark node renders
@@ -22,7 +22,7 @@ The minimap island SHALL draw every in-canvas node with the shared map node glyp
 
 #### Scenario: Painted footprints follow the shared glyph
 - **WHEN** the projection measures a node's painted footprint
-- **THEN** the footprint is the largest of the following that apply: 16 when the node carries a move action, 14 for current, √(9² + 9²) for a non-current gateway, and 6.5 for any other node. Overlap spreading and label clearance use these values.
+- **THEN** the footprint is the largest of the following that apply: 16 when the node carries a move action, 14 for current, √(9² + 9²) for a non-current gateway, and 6.5 for any other node. Overlap spreading and label clearance use these values. The here-glow's breathing animation, which peaks at about 1.18 × its radius, is decoration and is excluded from the footprint, as it is on the area map.
 
 #### Scenario: Test hooks survive the shared glyph
 - **WHEN** island tests and the browser geometry audit query node shapes
