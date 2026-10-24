@@ -29,6 +29,7 @@ from world.rules.time_skip import (
     advance_wait,
     begin_sleep,
     book_member_practice,
+    continue_sleep,
     parse_duration,
     preflight_practice_booking,
     rejection_message,
@@ -63,6 +64,10 @@ _REST_ARGS_RE = re.compile(
 
 _REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
 _NO_DREAM_MESSAGE = "身體已完全恢復，沒有進入夢境。"
+_SLEEP_USAGE = (
+    "用法：sleep [<時長>|until-recovered]、"
+    "sleep all [<時長>|until-recovered]、sleep continue"
+)
 
 # ``修煉 <技能> [= <成員>]``: one whitespace-free skill key plus an optional
 # member token naming a present party member (default: the caller).
@@ -132,15 +137,77 @@ class CmdSleep(Command):
     key = "sleep"
     aliases = ("睡眠",)
 
+    def _request(
+        self, tokens: list[str]
+    ) -> tuple[str, int | None, bool] | None:
+        """Parse the accepted sleep argument forms into ``(mode, seconds, explicit)``."""
+        from world.rules.sleep_receipt import MODE_DURATION, MODE_RECOVERY
+
+        if not tokens:
+            return MODE_RECOVERY, None, False
+        if len(tokens) != 1:
+            return None
+        token = tokens[0]
+        if token in ("until-recovered", "until_recovered"):
+            return MODE_RECOVERY, None, True
+        try:
+            seconds = parse_duration(token)
+        except DurationParseError:
+            return None
+        if seconds < 1:
+            return None
+        return MODE_DURATION, seconds, True
+
     def func(self) -> None:
         choice = self.args.strip()
-        if choice not in ("", "dream"):
-            self.caller.msg("用法：sleep [dream]")
+        tokens = choice.split()
+        scope = "self"
+        if tokens and tokens[0] == "all":
+            scope = "party"
+            tokens = tokens[1:]
+        if tokens == ["continue"]:
+            if scope == "party":
+                self.caller.msg(_SLEEP_USAGE)
+                return
+            try:
+                result = continue_sleep(self.caller)
+            except SkipRefused as error:
+                self.caller.msg(rejection_message(error.reason))
+                return
+            except SleepRefused as error:
+                self.caller.msg(error.message)
+                return
+            self.caller.msg(
+                _with_handoff_offer(
+                    self.caller,
+                    result.summary
+                    or _render_skip_summary(
+                        result.elapsed_seconds, list(result.events)
+                    ),
+                )
+            )
+            deliver_unlocks(
+                self.caller, notices_from_events(result.events), announce=False
+            )
+            return
+        legacy_dream = tokens == ["dream"] and scope == "self"
+        if legacy_dream:
+            tokens = []
+        request = self._request(tokens)
+        if request is None:
+            self.caller.msg(_SLEEP_USAGE)
             return
         if not _safe_to_skip(self.caller):
             return
+        mode, seconds, explicit = request
         try:
-            outcome = begin_sleep(self.caller)
+            outcome = begin_sleep(
+                self.caller,
+                mode=mode,
+                seconds=seconds,
+                scope=scope,
+                allow_continue=not explicit,
+            )
         except SkipRefused as error:
             self.caller.msg(rejection_message(error.reason))
             return
@@ -155,13 +222,16 @@ class CmdSleep(Command):
         self.caller.msg(
             _with_handoff_offer(
                 self.caller,
-                _render_skip_summary(result.elapsed_seconds, result.events),
+                result.summary
+                or _render_skip_summary(
+                    result.elapsed_seconds, list(result.events)
+                ),
             )
         )
         deliver_unlocks(
             self.caller, notices_from_events(result.events), announce=False
         )
-        if choice:
+        if legacy_dream:
             from commands.dream import render_state
             from server.dream_service import enter_after_sleep
 

@@ -249,6 +249,79 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    def test_wait_duration_sleep_uses_the_declared_deadline(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.sleep_receipt import read_sleep_receipt
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        result = _wait_adapter(
+            self.player,
+            {"sleep": True, "sleep_mode": "duration", "seconds": 7200},
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick - before, 7200)
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.AWAKE
+        )
+        self.assertEqual(read_sleep_receipt(self.player).state, "completed")
+
+    @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    def test_wait_party_recovery_enters_every_present_member_at_zero_time(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.npcs import NPC
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+        from world.rules.sleep_receipt import read_sleep_receipt
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        companion = create_object(NPC, key="同行同伴", location=self.room1)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        write_fatigue_state(companion, 180000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        result = _wait_adapter(
+            self.player,
+            {"sleep": True, "sleep_scope": "party", "sleep_mode": "recovery"},
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick, before)
+        for member in (self.player, companion):
+            self.assertIs(
+                read_fatigue_state(member).posture, SleepPosture.VOLUNTARY
+            )
+            self.assertIsNotNone(read_sleep_receipt(member))
+
+    @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    def test_ordinary_duration_wait_selects_nobody_for_sleep(self):
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.sleep_receipt import read_sleep_receipt
+
+        write_fatigue_state(self.player, 180000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        result = _wait_adapter(self.player, {"seconds": 300})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick - before, 300)
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.AWAKE
+        )
+        self.assertIsNone(read_sleep_receipt(self.player))
+
+    @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_unsafe_skip_rejects_before_any_clock_advance(self):
         monster = create_object(Monster, key="哥布林", location=self.room1)
         monster.threat_tier = "low"

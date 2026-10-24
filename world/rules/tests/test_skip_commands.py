@@ -21,6 +21,7 @@ from world.rules.time_skip import (
     SkipResult,
     SleepEntry,
     SleepOutcome,
+    SleepRefused,
     advance_wait,
     seconds_to_full_regen,
 )
@@ -133,6 +134,101 @@ class SkipCommandHelperTests(unittest.TestCase):
         ):
             command.func()
         caller.msg.assert_called_once_with("時間經過了 7 秒。")
+
+
+class SleepCommandGrammarTests(unittest.TestCase):
+    """Accepted sleep forms route to the shared rules operation."""
+
+    def _command(self, args):
+        caller = SimpleNamespace(msg=Mock(), db=SimpleNamespace())
+        command = CmdSleep()
+        command.caller = caller
+        command.args = args
+        return command, caller
+
+    def _run(self, args, outcome):
+        command, caller = self._command(args)
+        with patch("commands.skip._safe_to_skip", return_value=True), patch(
+            "commands.skip.begin_sleep", return_value=outcome
+        ) as op:
+            command.func()
+        return caller, op
+
+    def test_explicit_duration_routes_the_declared_mode(self):
+        caller = SimpleNamespace(msg=Mock(), db=SimpleNamespace())
+        entry = SleepEntry("synthetic-entry", caller, 7200, False)
+        caller_, op = self._run(
+            "2h", SleepOutcome(entry, _result(7200))
+        )
+        op.assert_called_once_with(
+            caller_,
+            mode="duration",
+            seconds=7200,
+            scope="self",
+            allow_continue=False,
+        )
+        caller_.msg.assert_called_once_with("時間經過了 7200 秒。")
+
+    def test_all_party_recovery_routes_the_party_scope(self):
+        caller, op = self._run(
+            "all until-recovered",
+            SleepOutcome(None, None, "在場成員已進入睡眠。"),
+        )
+        op.assert_called_once_with(
+            caller,
+            mode="recovery",
+            seconds=None,
+            scope="party",
+            allow_continue=False,
+        )
+        caller.msg.assert_called_once_with("在場成員已進入睡眠。")
+
+    def test_continue_routes_the_shared_continuation(self):
+        command, caller = self._command("continue")
+        with patch(
+            "commands.skip.continue_sleep", return_value=_result(60)
+        ) as op:
+            command.func()
+        op.assert_called_once_with(caller)
+        caller.msg.assert_called_once_with("時間經過了 60 秒。")
+
+    def test_malformed_or_contradictory_forms_reject_before_any_write(self):
+        for args in ("soon", "2h all", "all continue", "until-recovered 2h"):
+            command, caller = self._command(args)
+            with patch("commands.skip.begin_sleep") as op:
+                command.func()
+            op.assert_not_called()
+            caller.msg.assert_called_once()
+            self.assertIn("用法", caller.msg.call_args.args[0])
+
+    def test_active_plan_refuses_replacement_and_offers_continue(self):
+        command, caller = self._command("1h")
+        with patch("commands.skip._safe_to_skip", return_value=True), patch(
+            "commands.skip.begin_sleep",
+            side_effect=SleepRefused(
+                "already_asleep",
+                "你仍在自願睡眠中；若要繼續，請使用 sleep continue。",
+            ),
+        ):
+            command.func()
+        caller.msg.assert_called_once_with(
+            "你仍在自願睡眠中；若要繼續，請使用 sleep continue。"
+        )
+
+    def test_legacy_dream_form_still_routes_ordinary_sleep(self):
+        command, caller = self._command("dream")
+        with patch("commands.skip._safe_to_skip", return_value=True), patch(
+            "commands.skip.begin_sleep",
+            return_value=SleepOutcome(None, None, "已接受睡眠。"),
+        ) as op:
+            command.func()
+        op.assert_called_once_with(
+            caller,
+            mode="recovery",
+            seconds=None,
+            scope="self",
+            allow_continue=True,
+        )
 
 
 def _booking_caller(
