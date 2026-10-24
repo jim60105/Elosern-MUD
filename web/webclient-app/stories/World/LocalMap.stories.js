@@ -365,8 +365,10 @@ export const MetricAltoriaSouthGate = {
     if (context.canvasElement.querySelector('[data-node^="wild:"]')) {
       throw new Error("MetricAltoriaSouthGate: the cross-layer gate target must not draw as a node");
     }
-    if (!context.canvasElement.querySelector('[data-testid="local-map__gate-glyph"]')) {
-      throw new Error("MetricAltoriaSouthGate: the current gate room must draw its gate glyph");
+    // As on the area map, the current gate room wears the here seal, not the arch.
+    const here = context.canvasElement.querySelector('[data-node="grid:capital_altoria:3050:150"]');
+    if (!here?.querySelector(".map-glyph__here-ring") || here.querySelector('[data-testid="local-map__gate-glyph"]')) {
+      throw new Error("MetricAltoriaSouthGate: the current gate room must draw the map's here seal");
     }
     await assertStubActivates(
       southGateMoves,

@@ -32,6 +32,7 @@
 // requests no data and owns no drawer chrome.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AreaMapDetail from "./AreaMapDetail.vue";
+import MapNodeGlyph from "./MapNodeGlyph.vue";
 import {
   DETAIL_DRAWER_WIDTH,
   DRAG_THRESHOLD_PX,
@@ -781,15 +782,8 @@ onBeforeUnmount(() => {
             </template>
             <g v-else :transform="`translate(${node.x} ${node.y})`">
               <circle class="area-map__hit" r="20" />
-              <circle v-if="node.travel" class="area-map__halo" r="15" />
               <circle v-if="node.selected" class="area-map__selected-ring" r="13" />
-              <template v-if="node.visibility === 'current'">
-                <circle class="area-map__here-glow" r="14" />
-                <circle class="area-map__here-ring" r="10" />
-                <circle class="area-map__here-dot" r="6" />
-              </template>
-              <path v-else-if="node.gate" class="area-map__gate" d="M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z" />
-              <circle v-else class="area-map__dot-node" r="5.5" />
+              <MapNodeGlyph :state="node.visibility" :gate="node.gate" :travel="node.travel" :selected="node.selected" />
               <g v-if="node.questAt" :transform="`translate(${node.questAt.dx} ${node.questAt.dy})`">
                 <path class="area-map__quest" d="M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z" />
               </g>
@@ -899,19 +893,6 @@ onBeforeUnmount(() => {
 /* nodes */
 .area-map__node { cursor: pointer; outline: none; }
 .area-map__hit { fill: transparent; }
-.area-map__dot-node { fill: var(--paper-200); stroke: #15130f; stroke-width: 2; }
-.area-map__node.is-seen .area-map__dot-node {
-  fill: #2b2924;
-  stroke: #948b7b;
-  stroke-width: 1.6;
-  stroke-dasharray: 2.2 2;
-}
-.area-map__halo {
-  fill: rgba(228, 200, 142, 0.08);
-  stroke: var(--gold-500);
-  stroke-width: 1.2;
-  stroke-dasharray: 3 3;
-}
 .area-map__selected-ring { fill: none; stroke: var(--gold-300); stroke-width: 2.6; }
 .area-map__here-glow {
   fill: rgba(165, 44, 49, 0.22);
@@ -931,8 +912,7 @@ onBeforeUnmount(() => {
 .area-map__here-dot { fill: var(--seal-deep); stroke: #fff2e6; stroke-width: 1.5; }
 .area-map__gate { fill: #3a342a; stroke: var(--gold-400); stroke-width: 2; stroke-linejoin: round; }
 .area-map__node.is-seen .area-map__gate { fill: #26231d; stroke: var(--gold-500); }
-.area-map__node.is-selected .area-map__gate,
-.area-map__node.is-selected .area-map__dot-node { stroke: var(--gold-300); stroke-width: 2.6; }
+.area-map__node.is-selected .area-map__gate { stroke: var(--gold-300); stroke-width: 2.6; }
 .area-map__quest { fill: var(--seal-500); stroke: #fff2e6; stroke-width: 1.3; stroke-linejoin: round; }
 .area-map__node:focus-visible .area-map__hit,
 .area-map__node:focus-visible .area-map__cell {

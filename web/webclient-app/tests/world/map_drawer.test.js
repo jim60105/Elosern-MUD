@@ -973,7 +973,7 @@ describe("the drawer current marker makes one truthful position claim", () => {
     const current = w.findAll('[data-testid="area-map__node"]').filter((n) => n.attributes("aria-current") === "location");
     expect(current).toHaveLength(1);
     const group = current[0].find("g");
-    const rings = group.findAll(".area-map__here-glow, .area-map__here-ring, .area-map__here-dot");
+    const rings = group.findAll(".map-glyph__here-glow, .map-glyph__here-ring, .map-glyph__here-dot");
     expect(rings).toHaveLength(3);
     for (const ring of rings) {
       expect(ring.attributes("cx") ?? "0").toBe("0");
@@ -984,7 +984,7 @@ describe("the drawer current marker makes one truthful position claim", () => {
     // The connectors leave the current node's centre, outside its ring.
     const roads = w.findAll(".area-map__road-core");
     expect(roads.length).toBeGreaterThan(0);
-    expect(w.findAll(".area-map__here-ring")).toHaveLength(1);
+    expect(w.findAll(".area-map__nodes .map-glyph__here-ring")).toHaveLength(1);
   });
 
   it("draws one current marker on the world map with no identity of its own", async () => {

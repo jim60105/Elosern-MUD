@@ -755,7 +755,9 @@ describe("LocalMap island scale state (render-auto-scaled-minimap-island)", () =
     };
     const a = nodeCenter(wrapper, "grid:t_gate:-120:800");
     const b = nodeCenter(wrapper, "grid:t_gate:120:800");
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual((mixed ? Math.hypot(15, 10) + 0.8 + 11 : 2 * (Math.hypot(15, 10) + 0.8)) - 0.002);
+    // Both exits carry a move action, so each reserves its travel halo
+    // (r 15 plus 1), which is wider than the gate arch.
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (15 + 1) - 0.002);
     expect(nodeCenter(wrapper, "grid:t_gate:0:0")).toEqual({ x: 120, y: 120 });
     expect(nodeCenter(wrapper, "grid:t_gate:800:0")).toEqual({ x: 200, y: 120 });
     expect(wrapper.findAll(".local-map__gate-glyph")).toHaveLength(mixed ? 1 : 2);
@@ -838,18 +840,15 @@ describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)
     return boxes;
   }
 
-  it("draws the current gate room's arch, room name and 通往 line on the city side", () => {
+  it("draws the current gate room's here seal, room name and 通往 line on the city side", () => {
     const w = mountPayload(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE);
     const current = w.get('[data-node="grid:capital_altoria:3050:150"]');
-    expect(current.find('[data-testid="local-map__gate-glyph"]').exists()).toBe(true);
+    // As on the area map, the current glyph wins over the gate arch.
+    expect(current.find('[data-testid="local-map__gate-glyph"]').exists()).toBe(false);
     expect(current.find(".local-map__marker--current").exists()).toBe(true);
     const lines = current.findAll(".local-map__node-label tspan").map((t) => t.text());
     expect(lines).toEqual(["南門", "通往 西部丘陵與谷地"]);
     expect(current.findAll(".local-map__node-label tspan")[1].classes()).toContain("local-map__via");
-    // The gate glyph is decoration: never a marker or a label the audits pair.
-    const glyph = current.get('[data-testid="local-map__gate-glyph"]');
-    expect(glyph.classes()).not.toContain("local-map__marker");
-    expect(glyph.attributes("aria-hidden")).toBe("true");
   });
 
   it("draws the far side as a labelled exit-ring stub, never as a node", () => {
@@ -1025,7 +1024,7 @@ describe("LocalMap gateways and island labels (label-minimap-exits-and-gateways)
     // no neighbour covers it.
     const current = w.get(`[data-node="${payload.current_node}"]`);
     expect(current.get(".local-map__node-label tspan").text()).toBe("交易十字…");
-    expect(Number(current.get(".local-map__node-label tspan").attributes("y"))).toBeCloseTo(9 + 3 + 0.8 * 16, 6);
+    expect(Number(current.get(".local-map__node-label tspan").attributes("y"))).toBeCloseTo(14 + 3 + 0.8 * 16, 6);
     expect(w.findAll(".local-map__node").at(-1).attributes("data-node")).toBe(payload.current_node);
     // Every other label line stays in the square, clear of every drawn
     // exit and current marker's footprint; a label pushed out to a leader

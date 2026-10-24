@@ -86,7 +86,7 @@ function renameIds(root) {
 // Freeze every element that may be mid-transition (the pan groups, the
 // gliding current marker) at the transform and opacity it shows right now.
 function freezeInFlight(live, copy) {
-  const selector = ".map-lattice__pan, .map-lattice__pan .local-map__marker--current";
+  const selector = ".map-lattice__pan, .map-lattice__pan .local-map__here";
   const liveEls = [...live.querySelectorAll(selector)];
   const copyEls = [...copy.querySelectorAll(selector)];
   liveEls.forEach((el, i) => {

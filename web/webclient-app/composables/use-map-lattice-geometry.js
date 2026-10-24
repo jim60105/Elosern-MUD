@@ -17,12 +17,12 @@ import { HALO_R, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
 export const MARKER_DIAMOND_HALF = 9;
 export const LABEL_BASELINE_HALF = 11;
 // The compass aim ring's radius (exploration-exit-compass D6): a thin ring
-// concentric with the aimed node's marker, just outside the actionable halo.
-export const MARKER_CURRENT_RING_R = 10.5;
+// concentric with the aimed node's marker, just outside the travel halo.
+export const MARKER_CURRENT_RING_R = 17;
 
 // The island's remembered edge-direction diamonds (render-auto-scaled-minimap-
 // island): the fixed square has no gutter outside its 240 units, and the
-// projection's exit ring reaches R_MAX + HALO_R = 98 units from the centre, so
+// projection's exit ring reaches R_MAX + HALO_R = 103 units from the centre, so
 // the diamonds stand on the square's rim band, one diamond half-extent
 // smaller than the overlay's, at the point where the true bearing leaves the
 // square. Their names are laid out whole on the rim (layoutRimNames) before

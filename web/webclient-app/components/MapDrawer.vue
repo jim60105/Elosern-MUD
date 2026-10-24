@@ -30,6 +30,8 @@ import AreaMapView from "./AreaMapView.vue";
 import WorldMapView from "./WorldMapView.vue";
 import DrawerHeader from "./DrawerHeader.vue";
 import MapEdgePointers from "./MapEdgePointers.vue";
+import MapNodeGlyph from "./MapNodeGlyph.vue";
+import WorldMapGlyph from "./WorldMapGlyph.vue";
 import { DETAIL_DRAWER_WIDTH, centreOn, project, usableRect } from "../lib/map_viewport.js";
 import { placeNodes, viewSignature } from "../lib/area_map_view.js";
 import { WORLD_SIGNATURE } from "../lib/world_map_view.js";
@@ -600,26 +602,72 @@ defineExpose({ viewRef });
           role="group"
           aria-label="圖例"
         >
+          <!-- The area legend draws the area map's own glyphs (MapNodeGlyph,
+               the road casing and core, the commission pin) at the map's
+               size, so every sample is exactly what the map shows. -->
           <ul v-if="tab === 'area'" class="map-drawer__legend-list">
-            <li><i class="lg lg--here" aria-hidden="true"></i>目前位置</li>
-            <li><i class="lg lg--visited" aria-hidden="true"></i>到過的地點</li>
-            <li><i class="lg lg--seen" aria-hidden="true"></i>看過，尚未到訪</li>
-            <li><i class="lg lg--travel" aria-hidden="true"></i>相鄰，可前往</li>
-            <li><i class="lg lg--gate" aria-hidden="true"></i>城門與出入口</li>
-            <li><i class="lg lg--road" aria-hidden="true"></i>走過的路</li>
-            <li><i class="lg lg--frontier" aria-hidden="true"></i>看見但未走過的路</li>
-            <li><i class="lg lg--quest" aria-hidden="true"></i>委託目的地</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="current" /></svg>目前位置</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="visited" /></svg>到過的地點</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="seen" /></svg>看過，尚未到訪</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="visited" travel /></svg>相鄰，可前往</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><MapNodeGlyph state="visited" gate /></svg>城門與出入口</li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <line class="lg-road__casing" x1="-12" y1="0" x2="12" y2="0" />
+                <line class="lg-road__core" x1="-12" y1="0" x2="12" y2="0" />
+              </svg>走過的路
+            </li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <line class="lg-road__casing is-frontier" x1="-12" y1="0" x2="12" y2="0" />
+                <line class="lg-road__core is-frontier" x1="-12" y1="0" x2="12" y2="0" />
+              </svg>看見但未走過的路
+            </li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><path class="lg-quest" d="M0 -7.5 L5.5 0 L0 7.5 L-5.5 0 Z" /></svg>委託目的地</li>
           </ul>
+          <!-- The world legend likewise: the world map's own point glyphs
+               (WorldMapGlyph) and its shared ink (world-map-ink.css). -->
           <ul v-else class="map-drawer__legend-list">
-            <li><i class="lg lg--here" aria-hidden="true"></i>目前位置</li>
-            <li><i class="lg lg--lit" aria-hidden="true"></i>已探明的分區</li>
-            <li><i class="lg lg--unlit" aria-hidden="true"></i>未探明的分區</li>
-            <li><i class="lg lg--nation" aria-hidden="true"></i>國界</li>
-            <li><i class="lg lg--trail" aria-hidden="true"></i>走過的足跡</li>
-            <li><i class="lg lg--tower" aria-hidden="true"></i>分區地標</li>
-            <li><i class="lg lg--place" aria-hidden="true"></i>城鎮與地點</li>
-            <li><i class="lg lg--quest" aria-hidden="true"></i>委託目的地</li>
-            <li><i class="lg lg--approx" aria-hidden="true"></i>委託大致方位</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><WorldMapGlyph kind="here" /></svg>目前位置</li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <rect class="world-map__wash" x="-11" y="-8" width="22" height="16" />
+                <rect class="world-map__district is-lit" x="-11" y="-8" width="22" height="16" fill="none" />
+              </svg>已探明的分區
+            </li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <defs>
+                  <pattern :id="`${uid}-lg-hatch`" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                    <line class="world-map__hatch-line" x1="0" y1="0" x2="0" y2="8" />
+                  </pattern>
+                </defs>
+                <rect class="world-map__land" x="-11" y="-8" width="22" height="16" />
+                <rect x="-11" y="-8" width="22" height="16" :fill="`url(#${uid}-lg-hatch)`" />
+                <rect class="world-map__district is-unlit" x="-11" y="-8" width="22" height="16" fill="none" />
+              </svg>未探明的分區
+            </li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <line class="world-map__nation-casing" x1="-13" y1="0" x2="13" y2="0" />
+                <line class="world-map__nation-border" x1="-13" y1="0" x2="13" y2="0" />
+              </svg>國界
+            </li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <line class="world-map__trail-casing" x1="-11" y1="0" x2="11" y2="0" />
+                <line class="world-map__trail-line" x1="-11" y1="0" x2="11" y2="0" />
+              </svg>走過的足跡
+            </li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><WorldMapGlyph kind="landmark" /></svg>分區地標</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><WorldMapGlyph kind="place" /></svg>城鎮與地點</li>
+            <li><svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true"><g transform="translate(0 5)"><WorldMapGlyph kind="quest" /></g></svg>委託目的地</li>
+            <li>
+              <svg class="lg-svg" viewBox="-16 -16 32 32" aria-hidden="true">
+                <circle class="world-map__approx-fill" r="14" />
+                <circle class="world-map__approx-ring" r="14" />
+              </svg>委託大致方位
+            </li>
           </ul>
           <p class="map-drawer__legend-keys">
             <kbd>←↑→↓</kbd> 平移 <kbd>＋</kbd><kbd>－</kbd> 縮放 <kbd>C</kbd> 回到目前位置 <kbd>0</kbd> 全圖 <kbd>Esc</kbd> 返回
@@ -629,6 +677,8 @@ defineExpose({ viewRef });
     </div>
   </div>
 </template>
+
+<style scoped src="./world-map-ink.css"></style>
 
 <style scoped>
 .map-drawer {
@@ -944,28 +994,24 @@ defineExpose({ viewRef });
   border: 1px solid var(--ink-600);
   border-radius: calc(3px * var(--ui-scale));
 }
-.lg {
+/* Legend samples: the maps' own SVG at their 1:1 size (AreaMapView roads and
+   commission pin here, the world ink from world-map-ink.css; the glyph
+   components style themselves). */
+.lg-svg {
   flex: none;
-  display: inline-block;
-  box-sizing: border-box;
-  width: calc(22px * var(--ui-scale));
-  height: calc(14px * var(--ui-scale));
+  display: block;
+  width: calc(32px * var(--ui-scale));
+  height: calc(32px * var(--ui-scale));
+  margin: calc(-4px * var(--ui-scale)) calc(-5px * var(--ui-scale));
+  overflow: visible;
 }
-.lg--here { width: calc(14px * var(--ui-scale)); border-radius: 50%; background: var(--seal-deep); box-shadow: 0 0 0 2px #fff2e6, 0 0 0 5px rgba(165, 44, 49, 0.3); }
-.lg--visited { width: calc(12px * var(--ui-scale)); height: calc(12px * var(--ui-scale)); border-radius: 50%; background: var(--paper-200); border: 2px solid #15130f; }
-.lg--seen { width: calc(12px * var(--ui-scale)); height: calc(12px * var(--ui-scale)); border-radius: 50%; background: #2b2924; border: 1.5px dashed #948b7b; }
-.lg--travel { width: calc(16px * var(--ui-scale)); height: calc(16px * var(--ui-scale)); border-radius: 50%; background: rgba(228, 200, 142, 0.08); border: 1.2px dashed var(--gold-500); }
-.lg--gate { width: calc(14px * var(--ui-scale)); background: #3a342a; border: 2px solid var(--gold-400); border-bottom: 0; border-radius: calc(7px * var(--ui-scale)) calc(7px * var(--ui-scale)) 0 0; }
-.lg--road { height: 3px; background: #b9aa86; box-shadow: 0 0 0 2px rgba(12, 11, 9, 0.8); }
-.lg--frontier { height: 0; border-top: 2px dashed #7a7162; }
-.lg--quest { width: calc(12px * var(--ui-scale)); height: calc(16px * var(--ui-scale)); background: var(--seal-500); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.lg--lit { background: #4a4535; border: 1px solid #d9c493; }
-.lg--unlit { background: repeating-linear-gradient(45deg, rgba(138, 127, 104, 0.5) 0 1px, transparent 1px 6px), #1d1b17; border: 1px dotted #7d7462; }
-.lg--nation { height: 0; border-top: 2px dashed #c0645a; }
-.lg--trail { height: 3px; background: var(--gold-300); border-radius: 2px; }
-.lg--tower { width: calc(10px * var(--ui-scale)); background: var(--gold-400); clip-path: polygon(20% 100%, 30% 15%, 50% 0, 70% 15%, 80% 100%); }
-.lg--place { width: calc(12px * var(--ui-scale)); height: calc(12px * var(--ui-scale)); background: #e7e0d1; transform: rotate(45deg) scale(0.82); }
-.lg--approx { width: calc(18px * var(--ui-scale)); height: calc(18px * var(--ui-scale)); border-radius: 50%; border: 1.5px dashed var(--seal-400); background: rgba(207, 68, 68, 0.09); }
+.lg-road__casing,
+.lg-road__core { fill: none; stroke-linecap: round; }
+.lg-road__casing { stroke: #0c0b09; stroke-opacity: 0.85; stroke-width: 7; }
+.lg-road__core { stroke: #b9aa86; stroke-width: 2.6; }
+.lg-road__casing.is-frontier { stroke-width: 5; stroke-opacity: 0.6; }
+.lg-road__core.is-frontier { stroke: #7a7162; stroke-width: 1.8; stroke-dasharray: 5 6; }
+.lg-quest { fill: var(--seal-500); stroke: #fff2e6; stroke-width: 1.3; stroke-linejoin: round; }
 
 @media (prefers-reduced-motion: reduce) {
   .map-drawer__pill { transition: none; }

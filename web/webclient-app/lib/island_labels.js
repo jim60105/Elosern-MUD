@@ -300,6 +300,8 @@ export function placeIslandLabels({ requests, obstacles = [], size = 240, font =
           const nx = Math.min(Math.max(request.x, box.x0), box.x1);
           const ny = Math.min(Math.max(request.y, box.y0), box.y1);
           const reach = Math.hypot(nx - request.x, ny - request.y);
+          // Never over the label's own marker (not a blocker of its own).
+          if (reach < request.footprint + LABEL_GAP - 1e-9) continue;
           if (!nearest || reach < nearest.reach - 1e-9) nearest = { box, dir: ["raster"], reach };
         }
       }

@@ -96,9 +96,9 @@ describe("constants", () => {
 
   it("measures the exit footprint from the existing marker geometry", () => {
     expect(paintedMarkerFootprint({ action: move("exit") })).toBe(HALO_R + 1);
-    // The gate glyph's farthest painted point is the outer corner of a foot
-    // stroke: 15 units of reach and 10 units of drop, each plus the 0.8 cap.
-    expect(GATE_FOOTPRINT).toBeGreaterThanOrEqual(Math.hypot(15.8, 10.8) - 1e-9);
+    // The gate glyph's farthest painted point is a mitred base corner of the
+    // filled arch: 8 units out and 8 down, each plus the 1-unit half stroke.
+    expect(GATE_FOOTPRINT).toBeGreaterThanOrEqual(Math.hypot(9, 9) - 1e-9);
   });
 
   it("adjacent ladder levels differ by at most 1.67x", () => {
@@ -481,25 +481,25 @@ describe("overlap spreading", () => {
   });
 
   it("accepts an explicit footprint", () => {
-    // About 25 units apart: clear of the default 22, inside a 30 footprint.
+    // About 25 units apart: inside the default 32, clear of a 20 footprint.
     const model = gridModel(3000, 3000, [[0, 800], [250, 800]]);
-    expect(bearingOf(byId(projectIsland(model, null), gridId(3000, 3800)))).toBeCloseTo(0, 9);
-    const wide = projectIsland(model, null, { footprint: 30 });
-    expect(bearingOf(byId(wide, gridId(3000, 3800)))).not.toBeCloseTo(0, 3);
+    expect(bearingOf(byId(projectIsland(model, null), gridId(3000, 3800)))).not.toBeCloseTo(0, 3);
+    const narrow = projectIsland(model, null, { footprint: 20 });
+    expect(bearingOf(byId(narrow, gridId(3000, 3800)))).toBeCloseTo(0, 9);
   });
 
   it("groups overlapping exits even when another exit sits between them in bearing order", () => {
-    // A (~10°, r~40) and C (~12°, r~40) overlap; B (~11°, r~80) lies between
+    // A (~10°, r~50) and C (~12°, r~50) overlap; B (~11°, r~87) lies between
     // them by bearing but overlaps neither.
-    const model = gridModel(3000, 3000, [[69, 394], [153, 785], [83, 391]]);
+    const model = gridModel(3000, 3000, [[87, 492], [166, 854], [104, 489]]);
     const projection = projectIsland(model, null);
     expect(projection.mode).toBe("uniform");
     expect(projection.level).toBe(1000);
-    const a = byId(projection, gridId(3069, 3394));
-    const b = byId(projection, gridId(3153, 3785));
-    const c = byId(projection, gridId(3083, 3391));
+    const a = byId(projection, gridId(3087, 3492));
+    const b = byId(projection, gridId(3166, 3854));
+    const c = byId(projection, gridId(3104, 3489));
     expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) - 1e-6);
-    expect(bearingOf(b)).toBeCloseTo((Math.atan2(153, 785) * 180) / Math.PI, 9);
+    expect(bearingOf(b)).toBeCloseTo((Math.atan2(166, 854) * 180) / Math.PI, 9);
   });
 
   it("leaves a chained group that already spans the spread at exact bearings", () => {

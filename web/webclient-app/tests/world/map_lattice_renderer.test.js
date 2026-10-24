@@ -126,11 +126,11 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
     const a = centreOf(wrapper, payload.nodes[1].id);
     const b = centreOf(wrapper, payload.nodes[2].id);
-    expect(b.x - a.x).toBeGreaterThan(31.6);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (Math.hypot(15, 10) + 0.8) - 0.002);
+    // Each actionable gate reserves its travel halo (wider than the arch).
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (15 + 1) - 0.002);
     expect(wrapper.findAll(".local-map__gate-glyph")).toHaveLength(2);
-    expect(wrapper.get(".local-map__gate-glyph").attributes("d")).toContain("H 15");
-    expect(wrapper.get(".local-map__gate-glyph").attributes("stroke-width")).toBe("1.6");
+    // The full map's filled gate arch, unchanged.
+    expect(wrapper.get(".local-map__gate-glyph").attributes("d")).toBe("M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z");
   });
 
   it("draws the retained unit-distance background as a labelled 1 m ring", () => {

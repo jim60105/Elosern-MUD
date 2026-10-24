@@ -394,6 +394,68 @@ export const LegendEscape = {
   },
 };
 
+// The area legend draws the area map's own glyphs: every node sample is the
+// map's MapNodeGlyph, and the gate sample is the very arch the map paints.
+export const LegendAreaGlyphs = {
+  render,
+  args: { area: townArea(), world: worldBase() },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    $(canvasElement, "map-drawer-legend-toggle").click();
+    await frames();
+    const legend = $(canvasElement, "map-drawer-legend");
+    if (getComputedStyle(legend).display === "none") fail("LegendAreaGlyphs", "the legend opens");
+    for (const cls of ["here-glow", "here-ring", "here-dot", "dot", "halo", "gate"]) {
+      if (!legend.querySelector(`.map-glyph__${cls}`)) fail("LegendAreaGlyphs", `the legend draws the map's ${cls} glyph`);
+    }
+    if (!legend.querySelector(".map-glyph__dot.is-seen")) fail("LegendAreaGlyphs", "the seen sample is the dashed map dot");
+    const mapGate = canvasElement.querySelector(".area-map__nodes .map-glyph__gate");
+    const legendGate = legend.querySelector(".map-glyph__gate");
+    if (!mapGate || mapGate.getAttribute("d") !== legendGate.getAttribute("d")) {
+      fail("LegendAreaGlyphs", "the legend gate is the map's gate arch");
+    }
+    if (legend.querySelector("ul .lg")) fail("LegendAreaGlyphs", "no CSS-drawn approximation remains in the area legend");
+  },
+};
+
+// The world legend draws the world map's own point glyphs (WorldMapGlyph)
+// and its shared ink: the here seal, spire, place and pin are the map's very
+// shapes, and the border, trail and ring samples use the map's own classes.
+export const LegendWorldGlyphs = {
+  render,
+  args: { tab: "world", area: townArea(), world: worldBase(), span: 200, centre: nearestLit().landmark },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    $(canvasElement, "map-drawer-legend-toggle").click();
+    await frames();
+    const legend = $(canvasElement, "map-drawer-legend");
+    if (getComputedStyle(legend).display === "none") fail("LegendWorldGlyphs", "the legend opens");
+    for (const cls of [
+      "here-glow", "here-ring", "here-dot", "wash", "land", "hatch-line", "district.is-lit", "district.is-unlit",
+      "nation-casing", "nation-border", "trail-casing", "trail-line", "spire", "place-glyph", "quest-pin",
+      "approx-ring",
+    ]) {
+      if (!legend.querySelector(`.world-map__${cls}`)) fail("LegendWorldGlyphs", `the legend draws the map's ${cls}`);
+    }
+    const svg = canvasElement.querySelector(".world-map__svg");
+    for (const cls of ["spire", "quest-pin"]) {
+      const onMap = [...svg.querySelectorAll(`.world-map__${cls}`)].find((el) => !legend.contains(el));
+      const inLegend = legend.querySelector(`.world-map__${cls}`);
+      if (onMap && onMap.getAttribute("d") !== inLegend.getAttribute("d")) {
+        fail("LegendWorldGlyphs", `the legend ${cls} is the map's shape`);
+      }
+    }
+    const lit = legend.querySelector(".world-map__district.is-lit");
+    const mapLit = [...canvasElement.querySelectorAll(".world-map__district.is-lit")].find((el) => !legend.contains(el));
+    if (mapLit && getComputedStyle(lit).stroke !== getComputedStyle(mapLit).stroke) {
+      fail("LegendWorldGlyphs", "the lit district sample strokes like the map");
+    }
+    if (legend.querySelector("ul .lg")) fail("LegendWorldGlyphs", "no CSS-drawn approximation remains in the world legend");
+  },
+};
+
 // A district lit while the drawer is open, at reduced motion: no ink
 // spread, the district simply lights, and the discovery is announced once.
 export const ReducedMotionReveal = {
