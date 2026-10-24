@@ -30,7 +30,7 @@ Optional dream entry SHALL be asked while the authenticated owner still sleeps a
 - **THEN** confirmation rejects without dream or time writes and returns the current authoritative view
 
 ### Requirement: Dream departure never settles sleep again
-Dream exchanges SHALL add no independent time or restoration. Confirm, draft, awaken and failure departure SHALL resume or finish the same accepted owner sleep using only uncommitted clock intervals, then reconcile wake. Reconnect/cancel SHALL never open a second sleep or replay settlement. Receipt completion SHALL be durable and idempotent; physical interruptions SHALL remain truthful and actionable offline.
+Exchanges and ordinary draft saves SHALL add no time/restoration; draft save SHALL keep the dream open. Explicit confirm/awaken departure, including after draft preservation or generation failure, SHALL continue the same accepted owner sleep using only uncommitted intervals, then reconcile wake. Reconnect/cancel SHALL never open a second sleep or replay settlement. Physical interruptions SHALL remain actionable offline; completion SHALL be durable and idempotent.
 
 #### Scenario: Offline departure
 - **WHEN** generation is unavailable and the player saves a draft and awakens
@@ -43,6 +43,10 @@ Dream exchanges SHALL add no independent time or restoration. Confirm, draft, aw
 #### Scenario: Duplicate departure
 - **WHEN** confirm, awaken or retry is repeated after owner sleep completion
 - **THEN** neither clock, restoration nor wake notifications repeat
+
+#### Scenario: Save and keep dreaming
+- **WHEN** the player invokes ordinary draft save through text, the keepsake row or edit sheet
+- **THEN** the draft persists while session remains open, owner remains asleep at the same tick and no recovery continuation is created
 
 ### Requirement: Confirmed dream handoff returns to playable waking surfaces
 Confirmation SHALL close dream interaction and acknowledge receipt distinct from arrangement. The same accepted sleep SHALL safely complete before ordinary owner actions are authorized. Dispatch and generation SHALL add no time or sleep settlement. Physical interruption SHALL expose status, lawful handoff and deterministic recovery without requiring generation; ordinary play SHALL remain available after wake while generation waits or fails.

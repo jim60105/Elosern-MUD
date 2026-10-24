@@ -24,6 +24,7 @@ None.
 - `companion-possession-core`: automatic contextual complete companion list and return semantics.
 - `companion-possession-transition`: release preserves sleep and drives the resulting control view.
 - `dream-sleep-surface`: owner-bound pre-recovery prompt and single-receipt departure lifecycle.
+- `dream-session-lifecycle`: time-free narrative confirmation followed by separately owned same-sleep rules continuation.
 - `time-skip-commands`: owner-targeted automatic continuation after dream refusal.
 - `webclient-exploration-menu`: server-driven sleep/dream ordering and transport parity.
 
