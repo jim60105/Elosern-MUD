@@ -109,6 +109,20 @@ def associated_session(actor):
     return session
 
 
+def _raw_associated_session(actor):
+    """The recorded session without the current-view freshness check.
+
+    Entry uses this to resume an unconfirmed discussion across a later
+    explicit sleep; every read and action keeps the strict
+    :func:`associated_session` guard so a superseded control view is never
+    presented as current.
+    """
+    value = association(actor)
+    if value is None or owner_id(actor) is None:
+        return None
+    return lifecycle.get_session(value["session_id"], owner_id(actor))
+
+
 def enter_for_owner(
     actor,
     *,
@@ -189,7 +203,7 @@ def enter_for_owner(
     if receipt.last_result:
         event_kinds = tuple(receipt.last_result.get("event_kinds", ()))
     with transaction.atomic():
-        previous = associated_session(owner)
+        previous = _raw_associated_session(owner)
         if previous and previous.outcome != lifecycle.OUTCOME_CONFIRMED:
             session = lifecycle.resume_saved_session(previous.session_id, owner_id(actor), tick=int(tick_to))
         else:
