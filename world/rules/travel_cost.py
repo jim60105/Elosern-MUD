@@ -119,7 +119,7 @@ class TraversalStatus(StrEnum):
 SLEEPING_PARTY_MESSAGE = "同行成員正在沉睡，無法移動。"
 
 #: One refusal message for every pre-destination mental exhaustion.
-DEPLETION_MESSAGE = "隊伍成員的精神儲備不足以支撐這趟旅行。"
+DEPLETION_MESSAGE = "隊伍成員的精力不足以支撐這趟旅行。"
 
 
 def refuse_sleeping_party(members: Sequence[Any]) -> None:

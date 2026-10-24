@@ -732,4 +732,5 @@ class SleepHandoffTests(EvenniaTest):
         offer = accepted_wait_handoff_offer(sleeper)
         self.assertIsNotNone(offer)
         self.assertIn("回到自己的身體", offer)
-        self.assertIn("精神儲備", offer)
+        self.assertIn("精力", offer)
+        self.assertNotIn("精神儲備", offer)

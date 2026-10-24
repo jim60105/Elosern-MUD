@@ -65,10 +65,13 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "companion-possession-core::sleep-driven-handoff-is-contextual-and-requires-confirmation"
     )
+    @covers_requirement(
+        "mental-reserve::player-facing-text-names-the-reserve-精力"
+    )
     def test_handoff_lists_fatigue_and_return_or_possess_meaning(self):
         output = self._listing()
-        self.assertIn("1. 回到自己的身體（精神儲備 100%）", output)
-        self.assertIn(f"2. 接手 清醒同伴（精神儲備 100%）", output)
+        self.assertIn("1. 回到自己的身體（精力 100%）", output)
+        self.assertIn(f"2. 接手 清醒同伴（精力 100%）", output)
         self.assertIn("handoff <編號>", output)
         self.assertEqual(
             self.session.ndb.sleep_handoff_listing[1],
@@ -147,7 +150,7 @@ class HandoffCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("回到自己的身體", output)
         # The complete roster stays visible; the vanished candidate is listed
         # with its committed disabled reason instead of being substituted.
-        self.assertIn("接手 清醒同伴（精神儲備 100%）（不在同一地點）", output)
+        self.assertIn("接手 清醒同伴（精力 100%）（不在同一地點）", output)
         self.assertEqual(
             current_possession(self.player)["npc_dbid"], int(self.sleeper.pk)
         )

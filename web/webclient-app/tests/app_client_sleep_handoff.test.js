@@ -27,7 +27,7 @@ function sleepHandoffPanel(overrides = undefined) {
           name: "同伴",
           reserve_percent: 100,
           stage: "normal",
-          label: "接手 同伴（精神儲備 100%）",
+          label: "接手 同伴（精力 100%）",
           enabled: true,
           reason: null,
         },
@@ -37,7 +37,7 @@ function sleepHandoffPanel(overrides = undefined) {
           name: "沉睡者",
           reserve_percent: 5,
           stage: "sleeping",
-          label: "接手 沉睡者（精神儲備 5%）",
+          label: "接手 沉睡者（精力 5%）",
           enabled: false,
           reason: "沉睡中，無法行動",
         },
@@ -123,10 +123,10 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
       wrapper.get('[data-testid="elosern-stage"]').attributes("data-card-open"),
     ).toBe("true");
     const labels = rows().map((row) => row.text());
-    expect(labels.some((text) => text.includes("接手 同伴（精神儲備 100%）"))).toBe(true);
+    expect(labels.some((text) => text.includes("接手 同伴（精力 100%）"))).toBe(true);
     expect(
       labels.some((text) =>
-        text.includes("接手 沉睡者（精神儲備 5%）沉睡中，無法行動"),
+        text.includes("接手 沉睡者（精力 5%）沉睡中，無法行動"),
       ),
     ).toBe(true);
     expect(labels[labels.length - 1]).toContain("返回");
@@ -226,7 +226,7 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
             name: "沉睡者",
             reserve_percent: 5,
             stage: "sleeping",
-            label: "接手 沉睡者（精神儲備 5%）",
+            label: "接手 沉睡者（精力 5%）",
             enabled: false,
             reason: "沉睡中，無法行動",
           },
@@ -329,7 +329,7 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
             name: "同伴",
             reserve_percent: 100,
             stage: "sleeping",
-            label: "接手 同伴（精神儲備 100%）",
+            label: "接手 同伴（精力 100%）",
             enabled: false,
             reason: "沉睡中，無法行動",
           },

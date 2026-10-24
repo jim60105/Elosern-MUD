@@ -247,7 +247,7 @@ def exam_started_message(target_rank: str) -> str:
     """The started-simulation reply shared by the command and the WebClient."""
     return (
         f"升階考核（{target_rank}）開始。這是模擬戰，"
-        "雙方在開戰前與結束後都會恢復全部的體力、法力與精力。"
+        "雙方在開戰前與結束後都會恢復全部的體力、法力與耐力。"
     )
 
 
