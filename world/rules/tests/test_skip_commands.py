@@ -154,6 +154,10 @@ class SleepCommandGrammarTests(unittest.TestCase):
             command.func()
         return caller, op
 
+    @covers_requirement(
+        "time-skip-commands::sleep-transports-expose-declared-duration-and-"
+        "recovery-modes"
+    )
     def test_explicit_duration_routes_the_declared_mode(self):
         caller = SimpleNamespace(msg=Mock(), db=SimpleNamespace())
         entry = SleepEntry("synthetic-entry", caller, 7200, False)
@@ -169,6 +173,10 @@ class SleepCommandGrammarTests(unittest.TestCase):
         )
         caller_.msg.assert_called_once_with("時間經過了 7200 秒。")
 
+    @covers_requirement(
+        "time-skip-commands::sleep-transports-expose-declared-duration-and-"
+        "recovery-modes"
+    )
     def test_all_party_recovery_routes_the_party_scope(self):
         caller, op = self._run(
             "all until-recovered",
@@ -201,6 +209,10 @@ class SleepCommandGrammarTests(unittest.TestCase):
             caller.msg.assert_called_once()
             self.assertIn("用法", caller.msg.call_args.args[0])
 
+    @covers_requirement(
+        "time-skip-commands::sleep-transports-expose-declared-duration-and-"
+        "recovery-modes"
+    )
     def test_active_plan_refuses_replacement_and_offers_continue(self):
         command, caller = self._command("1h")
         with patch("commands.skip._safe_to_skip", return_value=True), patch(

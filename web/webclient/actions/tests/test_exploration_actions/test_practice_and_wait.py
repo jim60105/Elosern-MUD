@@ -249,6 +249,10 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    @covers_requirement(
+        "time-skip-commands::sleep-transports-expose-declared-duration-and-"
+        "recovery-modes"
+    )
     def test_wait_duration_sleep_uses_the_declared_deadline(self):
         from world.rules.fatigue import (
             SleepPosture,
@@ -314,6 +318,10 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(receipt.target_tick, before + 7200)
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
+    @covers_requirement(
+        "time-skip-commands::sleep-transports-expose-declared-duration-and-"
+        "recovery-modes"
+    )
     def test_wait_party_recovery_enters_every_present_member_at_zero_time(self):
         from evennia.utils.create import create_object
 

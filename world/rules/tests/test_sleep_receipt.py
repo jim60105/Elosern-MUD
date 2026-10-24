@@ -317,6 +317,13 @@ class SleepEntryLifecycleTests(EvenniaTest):
             read_fatigue_state(self.player).posture, SleepPosture.VOLUNTARY
         )
 
+    @covers_requirement(
+        "party-time-settlement::every-settled-sleeper-completes-its-own-"
+        "accepted-wake-plan"
+    )
+    @covers_requirement(
+        "time-skip-commands::accepted-sleep-identity-survives-control-changes"
+    )
     def test_owner_wakes_while_possessed_companion_waits(self):
         companion = self._companion()
         entry = enter_sleep(self.player)
@@ -353,6 +360,10 @@ class SleepEntryLifecycleTests(EvenniaTest):
             current_possession(self.player)["npc_dbid"], int(second.pk)
         )
 
+    @covers_requirement(
+        "party-time-settlement::every-settled-sleeper-completes-its-own-"
+        "accepted-wake-plan"
+    )
     def test_duration_sleeper_stays_asleep_while_reserve_saturates(self):
         companion = self._companion()
         write_fatigue_state(self.player, 359988, SleepPosture.AWAKE)
@@ -368,6 +379,9 @@ class SleepEntryLifecycleTests(EvenniaTest):
         self.assertIs(read_fatigue_state(self.player).posture, SleepPosture.AWAKE)
         self.assertEqual(read_sleep_receipt(self.player).state, "completed")
 
+    @covers_requirement(
+        "time-skip-commands::accepted-sleep-identity-survives-control-changes"
+    )
     def test_retry_after_reload_returns_the_committed_result(self):
         entry = enter_sleep(self.player)
         first = continue_sleep(
@@ -429,6 +443,10 @@ class SleepEntryLifecycleTests(EvenniaTest):
             continue_sleep(self.player)
         self.assertEqual(ctx.exception.code, "corrupt_sleep_receipt")
 
+    @covers_requirement(
+        "party-time-settlement::sleep-receipts-join-complete-party-advance-"
+        "compensation"
+    )
     def test_late_failure_restores_tick_reserve_posture_and_receipt(self):
         write_fatigue_state(self.player, 348000, SleepPosture.AWAKE)
         enter_sleep(self.player)
@@ -588,6 +606,10 @@ class PartySleepEntryTests(EvenniaTest):
             npc.location = room
         return npc
 
+    @covers_requirement(
+        "time-skip-commands::explicit-party-sleep-selects-present-effective-"
+        "bodies-atomically"
+    )
     def test_party_entry_commits_awake_bodies_and_retains_existing_plans(self):
         awake = self._member("清醒同伴")
         forced = self._member("強制沉睡", reserve=0, posture=SleepPosture.FORCED)
@@ -638,6 +660,10 @@ class PartySleepEntryTests(EvenniaTest):
         )
         self.assertIsNone(read_sleep_receipt(self.player))
 
+    @covers_requirement(
+        "time-skip-commands::explicit-party-sleep-selects-present-effective-"
+        "bodies-atomically"
+    )
     def test_late_member_write_failure_restores_every_body(self):
         companion = self._member("同伴")
         from world.rules import sleep_receipt as receipt_module
