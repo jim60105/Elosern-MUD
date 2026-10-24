@@ -94,10 +94,20 @@ prototypes; the real app differs too much for a prototype to be useful).
   priority (exits, then current, then context): remembered rim names are laid
   out first and always drawn whole; an exit label is never dropped (truncated
   with a leader line when crowded); context names appear only where room is
-  left. Gateways wear a gold arch with a `通往 <leads_to>` line, and a
+  left. A non-current gateway wears the area map's filled gold arch and a
+  current one the here-seal, each with a `通往 <leads_to>` line, and a
   cross-layer gate target is an exit-ring stub whose native button is named
   `往 <leads_to> 移動` (Space is stopped at the button so the shell's key
   routing cannot swallow it).
+- Every map glyph has one shared source, and surfaces differ only by a
+  uniform proportional scale applied to the whole glyph group (strokes and
+  dashes included): `MapNodeGlyph`, `MapCommissionGlyph` and
+  `area-map-ink.css` for the area map (wilderness cells at
+  `AREA_CELL_GLYPH_SCALE`) and the minimap island (at `ISLAND_GLYPH_SCALE`,
+  which its footprints, spreading, label clearance, stub start and aim ring
+  follow); `WorldMapGlyph`, `WorldHatchPattern` and `world-map-ink.css` for
+  the world map. Both map-drawer legend tabs draw the maps' own glyphs;
+  never redraw, copy or approximate a glyph in a host.
 - Island motion is scale-aware (`lib/map_pan.js` `islandMotion`): an
   unchanged projection mode and level pans the drawing with its
   world-anchored dot field; a changed one never pans. It dissolves an inert
