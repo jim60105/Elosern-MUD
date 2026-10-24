@@ -12,17 +12,22 @@ import LocalMap from "../lib/local_map.js";
 import { CELL_EM, charCells, textCells } from "../lib/mono_cells.js";
 import { CANVAS_SIZE, CENTRE, R_MAX, projectIsland } from "../lib/minimap_projection.js";
 import { ASCENT, DESCENT, placeIslandLabels } from "../lib/island_labels.js";
-import { HALO_R, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
+import { HALO_R, ISLAND_GLYPH_SCALE, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
 
 export const MARKER_DIAMOND_HALF = 9;
-export const LABEL_BASELINE_HALF = 11;
+// The graph variant's label baseline half-extent: the largest base footprint
+// (the travel halo plus its 1-unit stroke), multiplied by the glyph scale.
+export const LABEL_BASELINE_HALF = HALO_R + 1;
 // The compass aim ring's radius (exploration-exit-compass D6): a thin ring
-// concentric with the aimed node's marker, just outside the travel halo.
-export const MARKER_CURRENT_RING_R = 17;
+// concentric with the aimed node's marker, just outside the travel halo at
+// the island glyph scale (its 1.6 px non-scaling stroke's inner edge clears
+// the halo's outer edge, (HALO_R + 0.6) × the scale).
+export const MARKER_CURRENT_RING_R = HALO_R * ISLAND_GLYPH_SCALE + 2;
 
 // The island's remembered edge-direction diamonds (render-auto-scaled-minimap-
 // island): the fixed square has no gutter outside its 240 units, and the
-// projection's exit ring reaches R_MAX + HALO_R = 103 units from the centre, so
+// projection's exit ring reaches R_MAX + HALO_R × s units from the centre (s
+// the island glyph scale), so
 // the diamonds stand on the square's rim band, one diamond half-extent
 // smaller than the overlay's, at the point where the true bearing leaves the
 // square. Their names are laid out whole on the rim (layoutRimNames) before
@@ -101,6 +106,10 @@ export function useMapLatticeGeometry(props) {
   // projection; a bare mount projects statelessly (no previous level). The
   // graph island never projects.
   const isIsland = computed(() => !isGraph.value);
+  // The node glyph's uniform scale: the island glyph scale on the lattice
+  // (whose projected positions ignore markerScale), times markerScale on the
+  // graph variant (whose radial positions scale by it).
+  const glyphSize = computed(() => (isGraph.value ? ISLAND_GLYPH_SCALE * props.markerScale : ISLAND_GLYPH_SCALE));
   const projection = computed(() => {
     if (!isIsland.value) return null;
     return props.islandProjection ?? projectIsland(props.localMap, null);
@@ -317,7 +326,7 @@ export function useMapLatticeGeometry(props) {
   // its landmark ring.
   function nodeFootprint(node) {
     if (nodeTier(node) === "context") return CONTEXT_FOOTPRINT;
-    return paintedMarkerFootprint(node);
+    return paintedMarkerFootprint(node, glyphSize.value);
   }
 
   // The projection's cross-layer exit stubs, each at its target bearing on
@@ -571,7 +580,7 @@ export function useMapLatticeGeometry(props) {
       if (nodeTier(node) === "context") continue;
       const pos = nodePos(node);
       if (!pos) continue;
-      const r = Math.max(HALO_R, nodeFootprint(node));
+      const r = Math.max(HALO_R * glyphSize.value, nodeFootprint(node));
       taken.push({ x0: pos.x - r, x1: pos.x + r, y0: pos.y - r, y1: pos.y + r });
     }
     for (const stub of islandStubs.value) {
@@ -815,6 +824,7 @@ export function useMapLatticeGeometry(props) {
 
   return {
     isIsland,
+    glyphSize,
     projection,
     nodeTier,
     islandDots,

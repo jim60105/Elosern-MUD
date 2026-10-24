@@ -3,7 +3,10 @@
 // §6.4, §7): the pure helper in lib/island_labels.js.
 import { describe, expect, it } from "vitest";
 import {
+  ASCENT,
   CLEARANCE,
+  DESCENT,
+  LABEL_GAP,
   boxesClear,
   candidateOrder,
   clearestOrder,
@@ -194,5 +197,40 @@ describe("island label candidates", () => {
     expect(label.truncated).toBe(true);
     expect(label.box.x0).toBeGreaterThanOrEqual(3 - 1e-6);
     expect(label.box.x1).toBeLessThanOrEqual(237 + 1e-6);
+  });
+});
+
+describe("an island fallback label never covers its own node glyph", () => {
+  it("skips a raster box inside its own footprint plus the label gap", () => {
+    // Walls fill the square except a pocket around the exit's own marker:
+    // every candidate and leader position is taken, so the label falls
+    // through to the raster. The only raster box that fits (x0 = y0 = 111,
+    // on the 3 + 6k grid) contains the node centre itself.
+    const width = lineWidth("甲", FONT);
+    const height = (ASCENT + DESCENT) * FONT;
+    const pocket = { x0: 111 - CLEARANCE, y0: 111 - CLEARANCE, x1: 111 + width + CLEARANCE + 0.5, y1: 111 + height + CLEARANCE + 0.5 };
+    const obstacles = [
+      { x0: 0, y0: 0, x1: pocket.x0, y1: 240, owner: "wall" },
+      { x0: pocket.x1, y0: 0, x1: 240, y1: 240, owner: "wall" },
+      { x0: pocket.x0, y0: 0, x1: pocket.x1, y1: pocket.y0, owner: "wall" },
+      { x0: pocket.x0, y0: pocket.y1, x1: pocket.x1, y1: 240, owner: "wall" },
+      // The node's own marker never blocks its own label.
+      { x: 120, y: 120, r: 10, owner: "ex" },
+    ];
+    // Precondition: that pocket box is free and lies inside the footprint
+    // plus the gap, so a raster scan without the guard would take it.
+    const rasterBox = { x0: 111, y0: 111, x1: 111 + width, y1: 111 + height };
+    expect(rasterBox.x0 <= 120 && rasterBox.x1 >= 120 && rasterBox.y0 <= 120 && rasterBox.y1 >= 120).toBe(true);
+    for (const wall of obstacles.slice(0, 4)) expect(boxesClear(rasterBox, wall)).toBe(true);
+
+    const placed = placeIslandLabels({ requests: [request("ex", "exit", 120, 120, "甲")], obstacles });
+    const label = placed.get("ex");
+    expect(label).toBeDefined();
+    // The label never lands over its own marker: its box keeps at least the
+    // footprint plus the label gap from the node centre.
+    const nx = Math.min(Math.max(120, label.box.x0), label.box.x1);
+    const ny = Math.min(Math.max(120, label.box.y0), label.box.y1);
+    expect(Math.hypot(nx - 120, ny - 120)).toBeGreaterThanOrEqual(10 + LABEL_GAP - 1e-9);
+    expect(label.box).not.toEqual(rasterBox);
   });
 });

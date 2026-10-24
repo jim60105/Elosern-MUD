@@ -1,5 +1,7 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import MapLattice from "../../components/MapLattice.vue";
 import LocalMapModel from "../../lib/local_map.js";
 import { CELL_EM, textCells } from "../../lib/mono_cells.js";
@@ -13,8 +15,12 @@ import {
   LOCAL_MAP_CIARAN_PLAZA_SAMPLE,
   LOCAL_MAP_EXTREME_RATIO_SAMPLE,
   LOCAL_MAP_WILDERNESS_METRIC_SAMPLE,
+  LOCAL_MAP_CROWDED_LABELS_SAMPLE,
   localMapModelFor,
 } from "../../stories/fixtures.js";
+import { ISLAND_GLYPH_SCALE, HALO_R, gatePath } from "../../lib/map_marker_geometry.js";
+import { spreadExits } from "../../lib/minimap_projection.js";
+import { MARKER_CURRENT_RING_R } from "../../composables/use-map-lattice-geometry.js";
 import {
   mountLattice as mountLatticeShared,
 } from "./map_lattice_support.js";
@@ -126,8 +132,9 @@ describe("MapLattice island projection (render-auto-scaled-minimap-island)", () 
     wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(payload), ...ISLAND } });
     const a = centreOf(wrapper, payload.nodes[1].id);
     const b = centreOf(wrapper, payload.nodes[2].id);
-    // Each actionable gate reserves its travel halo (wider than the arch).
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (15 + 1) - 0.002);
+    // Each actionable gate reserves its travel halo (wider than the arch),
+    // at the 0.75 island glyph scale.
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * 16 * 0.75 - 0.002);
     expect(wrapper.findAll(".local-map__gate-glyph")).toHaveLength(2);
     // The full map's filled gate arch, unchanged.
     expect(wrapper.get(".local-map__gate-glyph").attributes("d")).toBe("M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z");
@@ -321,5 +328,142 @@ describe("MapLattice island rim markers (render-auto-scaled-minimap-island)", ()
     expect(w.find('[data-testid="local-map__rings"]').exists()).toBe(false);
     expect(w.find('[data-testid="local-map__dot-field"]').exists()).toBe(false);
     w.unmount();
+  });
+});
+
+// The island draws the area map's node glyphs (MapNodeGlyph) inside one
+// group scaled by the single island glyph scale; footprints, label
+// clearance, the stub start and the aim ring follow the same scale.
+describe("the minimap island draws the area map's node glyphs", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  const glyphScales = (w) => w.findAll(".local-map__glyph > g.map-glyph").map((g) => g.attributes("transform"));
+  const actionableId = (payload) => String(payload.nodes.find((n) => n.action && n.visibility !== "current").id);
+
+  it("draws the lattice glyph group at the island scale, whatever markerScale", () => {
+    expect(ISLAND_GLYPH_SCALE).toBe(0.75);
+    for (const markerScale of [1, 2]) {
+      wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE), markerScale } });
+      const scales = glyphScales(wrapper);
+      expect(scales.length).toBeGreaterThan(0);
+      for (const t of scales) expect(t).toBe("scale(0.75)");
+      wrapper.unmount();
+      wrapper = null;
+    }
+  });
+
+  it("draws the graph glyph group at the island scale times markerScale, with the label below the scaled footprint", () => {
+    for (const markerScale of [1, 2]) {
+      const model = localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE);
+      wrapper = mount(MapLattice, { props: { localMap: model, variant: model.layoutVariant, markerScale } });
+      expect(model.layoutVariant).toBe("graph");
+      for (const t of glyphScales(wrapper)) expect(t).toBe(`scale(${0.75 * markerScale})`);
+      // The graph label baseline: the largest base footprint (16) at the
+      // glyph scale, a 2-unit margin, then the 16-unit type step.
+      const label = wrapper.get(".local-map__node-label");
+      expect(Number(label.attributes("y"))).toBeCloseTo(16 * 0.75 * markerScale + 2 + 16, 9);
+      wrapper.unmount();
+      wrapper = null;
+    }
+  });
+
+  it("keeps base shapes inside the scaled group, identical to the area map's", () => {
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE) } });
+    const here = wrapper.get(".local-map__here > g.map-glyph");
+    expect(here.attributes("transform")).toBe("scale(0.75)");
+    expect(here.findAll(".map-glyph__here-glow, .map-glyph__here-ring, .map-glyph__here-dot").map((c) => c.attributes("r"))).toEqual(["14", "10", "6"]);
+    for (const halo of wrapper.findAll(".local-map__actionable")) expect(halo.attributes("r")).toBe("15");
+    expect(gatePath()).toBe("M-8 8 V-2 A8 8 0 0 1 8 -2 V8 Z");
+  });
+
+  it("starts a gateway stub at the scaled travel halo's edge", () => {
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE) } });
+    const line = wrapper.get(".local-map__stub .local-map__edge");
+    const r = Math.hypot(Number(line.attributes("x1")) - 120, Number(line.attributes("y1")) - 120);
+    expect(r).toBeCloseTo((HALO_R + 1) * 0.75, 9);
+    expect(r).toBeCloseTo(12, 9);
+  });
+
+  it("keeps the aim ring's inner stroke edge outside the scaled travel halo", () => {
+    expect(MARKER_CURRENT_RING_R).toBeCloseTo(HALO_R * 0.75 + 2, 12);
+    // The ring's 1.6 px stroke against the halo's 1.2 stroke at the scale.
+    expect(MARKER_CURRENT_RING_R - 0.8).toBeGreaterThan((15 + 0.6) * 0.75);
+    const id = actionableId(LOCAL_MAP_SAMPLE);
+    wrapper = mount(MapLattice, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE), aimedNode: id } });
+    const node = wrapper.get(`[data-testid="local-map__node--${id}"]`);
+    expect(Number(node.get('[data-testid="local-map__aim-ring"]').attributes("r"))).toBeCloseTo(13.25, 9);
+    expect(node.find(".local-map__actionable").exists()).toBe(true);
+  });
+
+  it("spreads exits by footprints at the island scale", () => {
+    // Two actionable exits at r 80 whose centres are 20 units apart: inside
+    // the scaled clearance 2 × 16 × 0.75 = 24, so they spread.
+    const theta = (2 * Math.asin(10 / 80) * 180) / Math.PI;
+    const exits = [
+      { bearing: 0, radius: 80, order: 0, node: { action: { kind: "move" } } },
+      { bearing: theta, radius: 80, order: 1, node: { action: { kind: "move" } } },
+    ];
+    spreadExits(exits);
+    const gap = ((((exits[1].bearing - exits[0].bearing) % 360) + 540) % 360) - 180;
+    expect(gap).toBeGreaterThan(theta + 1e-6);
+    // Spread to the scaled clearance: a chord of 24 at r 80.
+    expect(gap).toBeCloseTo((2 * Math.asin(12 / 80) * 180) / Math.PI, 6);
+  });
+
+  it("holds no island marker-ladder paint of its own", () => {
+    const css = readFileSync(resolve(process.cwd(), "web/webclient-app/components/map-lattice.css"), "utf-8");
+    expect(css).not.toMatch(/\.local-map__marker[\w-]*\s*[{,]/);
+    expect(css).not.toMatch(/\.local-map__actionable\s*[{,]/);
+    expect(css).not.toMatch(/\.local-map__gate-glyph\s*[{,]/);
+    expect(css).not.toMatch(/\.local-map__landmark\s*[{,]/);
+  });
+
+  it("rescales glyph, footprint, label clearance, stub start and aim ring from the one constant", async () => {
+    vi.resetModules();
+    vi.doMock("../../lib/map_marker_geometry.js", async (importOriginal) => ({
+      ...(await importOriginal()),
+      ISLAND_GLYPH_SCALE: 0.5,
+    }));
+    try {
+      const { default: Lattice } = await import("../../components/MapLattice.vue");
+      const { default: Island } = await import("../../components/LocalMap.vue");
+      const { spreadExits: spread } = await import("../../lib/minimap_projection.js");
+      const { MARKER_CURRENT_RING_R: ringR } = await import("../../composables/use-map-lattice-geometry.js");
+      const id = actionableId(LOCAL_MAP_SAMPLE);
+      wrapper = mount(Lattice, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE), aimedNode: id } });
+      for (const t of glyphScales(wrapper)) expect(t).toBe("scale(0.5)");
+      // Aim ring: HALO_R × 0.5 + 2.
+      expect(ringR).toBeCloseTo(9.5, 12);
+      expect(Number(wrapper.get('[data-testid="local-map__aim-ring"]').attributes("r"))).toBeCloseTo(9.5, 9);
+      wrapper.unmount();
+      // Stub start: (HALO_R + 1) × 0.5.
+      wrapper = mount(Lattice, { props: { localMap: localMapModelFor(LOCAL_MAP_ALTORIA_SOUTH_GATE_SAMPLE) } });
+      const line = wrapper.get(".local-map__stub .local-map__edge");
+      expect(Math.hypot(Number(line.attributes("x1")) - 120, Number(line.attributes("y1")) - 120)).toBeCloseTo(8, 9);
+      wrapper.unmount();
+      // Label clearance: the crowded current label's classic spot sits the
+      // current footprint (14 × 0.5) plus the gap below the marker.
+      wrapper = mount(Island, { props: { localMap: localMapModelFor(LOCAL_MAP_CROWDED_LABELS_SAMPLE) }, attachTo: document.body });
+      const current = wrapper.get(`[data-node="${LOCAL_MAP_CROWDED_LABELS_SAMPLE.current_node}"]`);
+      expect(Number(current.get(".local-map__node-label tspan").attributes("y"))).toBeCloseTo(14 * 0.5 + 3 + 0.8 * 16, 6);
+      // Footprints: the 20-unit pair that spreads at 0.75 clears 2 × 16 × 0.5.
+      const theta = (2 * Math.asin(10 / 80) * 180) / Math.PI;
+      const exits = [
+        { bearing: 0, radius: 80, order: 0, node: { action: { kind: "move" } } },
+        { bearing: theta, radius: 80, order: 1, node: { action: { kind: "move" } } },
+      ];
+      spread(exits);
+      expect(exits[0].bearing).toBe(0);
+      expect(exits[1].bearing).toBe(theta);
+    } finally {
+      vi.doUnmock("../../lib/map_marker_geometry.js");
+      vi.resetModules();
+    }
   });
 });

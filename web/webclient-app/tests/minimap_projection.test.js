@@ -20,7 +20,11 @@ import {
   rememberLevel,
   selectScale,
 } from "../lib/minimap_projection.js";
-import { HALO_R, GATE_FOOTPRINT, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
+import { HALO_R, GATE_FOOTPRINT, ISLAND_GLYPH_SCALE, NODE_DOT_R, HERE_GLOW_R, paintedMarkerFootprint } from "../lib/map_marker_geometry.js";
+
+// The island draws every node glyph at one uniform scale; its footprints and
+// spreading clearance are the base values times this scale.
+const S = ISLAND_GLYPH_SCALE;
 
 const Z = "testmap";
 
@@ -99,6 +103,25 @@ describe("constants", () => {
     // The gate glyph's farthest painted point is a mitred base corner of the
     // filled arch: 8 units out and 8 down, each plus the 1-unit half stroke.
     expect(GATE_FOOTPRINT).toBeGreaterThanOrEqual(Math.hypot(9, 9) - 1e-9);
+  });
+
+  it("scales the base footprints uniformly by the glyph size", () => {
+    const gateway = { leads_to: "Synthetic wilderness" };
+    // Base footprints: travel halo 16, current glow 14, gate corner
+    // hypot(9, 9), dot plus stroke 6.5.
+    expect(HALO_R + 1).toBe(16);
+    expect(HERE_GLOW_R).toBe(14);
+    expect(NODE_DOT_R + 1).toBe(6.5);
+    expect(paintedMarkerFootprint({ action: move("exit") })).toBe(16);
+    expect(paintedMarkerFootprint({ visibility: "current" })).toBe(14);
+    expect(paintedMarkerFootprint({ gateway })).toBeCloseTo(Math.hypot(9, 9), 12);
+    expect(paintedMarkerFootprint({ visibility: "visible_visited" })).toBe(6.5);
+    // The island's footprints are those values at the island glyph scale.
+    expect(S).toBe(0.75);
+    expect(paintedMarkerFootprint({ action: move("exit") }, S)).toBe(16 * 0.75);
+    expect(paintedMarkerFootprint({ visibility: "current" }, S)).toBe(14 * 0.75);
+    expect(paintedMarkerFootprint({ gateway }, S)).toBeCloseTo(Math.hypot(9, 9) * 0.75, 12);
+    expect(paintedMarkerFootprint({ visibility: "visible_visited" }, S)).toBe(6.5 * 0.75);
   });
 
   it("adjacent ladder levels differ by at most 1.67x", () => {
@@ -424,11 +447,11 @@ describe("overlap spreading", () => {
     expect(projection.level).toBe(1000);
     const a = byId(projection, gridId(-120, 800));
     const b = byId(projection, gridId(120, 800));
-    const clearance = GATE_FOOTPRINT + (secondGate ? GATE_FOOTPRINT : HALO_R + 1);
+    const clearance = S * (GATE_FOOTPRINT + (secondGate ? GATE_FOOTPRINT : HALO_R + 1));
     expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(clearance - 1e-8);
-    // The specified pair shares a horizontal baseline: both painted gate
-    // feet (15-unit reach plus 0.8 stroke cap) must have a positive gap.
-    if (secondGate) expect(b.x - 15.8 - (a.x + 15.8)).toBeGreaterThan(0);
+    // The specified pair shares a horizontal baseline: both scaled arch base
+    // corners (8 units out plus the 1-unit half stroke) keep a positive gap.
+    if (secondGate) expect(b.x - 9 * S - (a.x + 9 * S)).toBeGreaterThan(0);
     expect(radiusOf(a)).toBeCloseTo(Math.hypot(120, 800) / 10, 9);
     expect(radiusOf(b)).toBeCloseTo(radiusOf(a), 9);
     expect(byId(projection, model.currentNode)).toMatchObject({ x: 120, y: 120 });
@@ -448,7 +471,8 @@ describe("overlap spreading", () => {
     expect(ba + bb).toBeCloseTo(0, 6);
     expect(Math.abs(ba)).toBeLessThanOrEqual(MAX_SPREAD_DEG + 1e-9);
     expect(Math.abs(ba)).toBeGreaterThan(0);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) - 1e-6);
+    // The default clearance is both scaled travel halos: 2 × 16 × 0.75.
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * 16 * 0.75 - 1e-6);
     // Radii and the unaffected exit's bearing stay exact.
     expect(radiusOf(a)).toBeCloseTo(80, 9);
     expect(radiusOf(b)).toBeCloseTo(82, 9);
@@ -481,25 +505,26 @@ describe("overlap spreading", () => {
   });
 
   it("accepts an explicit footprint", () => {
-    // About 25 units apart: inside the default 32, clear of a 20 footprint.
-    const model = gridModel(3000, 3000, [[0, 800], [250, 800]]);
+    // About 22 units apart: inside the default 24 (2 × 16 × 0.75), clear of
+    // a 20 footprint.
+    const model = gridModel(3000, 3000, [[0, 800], [220, 800]]);
     expect(bearingOf(byId(projectIsland(model, null), gridId(3000, 3800)))).not.toBeCloseTo(0, 3);
     const narrow = projectIsland(model, null, { footprint: 20 });
     expect(bearingOf(byId(narrow, gridId(3000, 3800)))).toBeCloseTo(0, 9);
   });
 
   it("groups overlapping exits even when another exit sits between them in bearing order", () => {
-    // A (~10°, r~50) and C (~12°, r~50) overlap; B (~11°, r~87) lies between
+    // A (~10°, r~40) and C (~12°, r~40) overlap; B (~11°, r~80) lies between
     // them by bearing but overlaps neither.
-    const model = gridModel(3000, 3000, [[87, 492], [166, 854], [104, 489]]);
+    const model = gridModel(3000, 3000, [[69, 394], [153, 785], [83, 391]]);
     const projection = projectIsland(model, null);
     expect(projection.mode).toBe("uniform");
     expect(projection.level).toBe(1000);
-    const a = byId(projection, gridId(3087, 3492));
-    const b = byId(projection, gridId(3166, 3854));
-    const c = byId(projection, gridId(3104, 3489));
-    expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) - 1e-6);
-    expect(bearingOf(b)).toBeCloseTo((Math.atan2(166, 854) * 180) / Math.PI, 9);
+    const a = byId(projection, gridId(3069, 3394));
+    const b = byId(projection, gridId(3153, 3785));
+    const c = byId(projection, gridId(3083, 3391));
+    expect(Math.hypot(a.x - c.x, a.y - c.y)).toBeGreaterThanOrEqual(2 * (HALO_R + 1) * S - 1e-6);
+    expect(bearingOf(b)).toBeCloseTo((Math.atan2(153, 785) * 180) / Math.PI, 9);
   });
 
   it("leaves a chained group that already spans the spread at exact bearings", () => {

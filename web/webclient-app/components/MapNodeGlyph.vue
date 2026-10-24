@@ -2,8 +2,12 @@
 // MapNodeGlyph: the one painted node glyph of every map. The area map, the
 // minimap island and the map drawer's legend all draw it, so 目前位置, a
 // visited or seen place, a neighbour one road away and a gate read the same
-// wherever they appear. SVG children only (place it inside a translated <g>
-// or a legend <svg>); geometry comes from lib/map_marker_geometry.js.
+// wherever they appear. One <g> root (place it inside a translated <g> or a
+// legend <svg>); geometry comes from lib/map_marker_geometry.js.
+//
+// `size` is the surface's uniform scale: it lands on the root group as
+// `scale(size)` around base-unit shapes, so radii, stroke widths and dash
+// patterns all scale together. No shape opts out with a vector effect.
 //
 // The current glyph wins over a gate, and the travel halo sits under either.
 // `markerClass` lands on the state's primary shape (the here ring, the gate or
@@ -27,7 +31,7 @@ defineProps({
   gate: { type: Boolean, default: false },
   travel: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
-  scale: { type: Number, default: 1 },
+  size: { type: Number, default: 1 },
   markerClass: { type: [String, Array, Object], default: null },
   haloClass: { type: [String, Array, Object], default: null },
   testIds: { type: Object, default: () => ({}) },
@@ -35,28 +39,30 @@ defineProps({
 </script>
 
 <template>
-  <circle v-if="travel" class="map-glyph__halo" :class="haloClass" :data-testid="testIds.halo" :r="HALO_R * scale" aria-hidden="true" />
-  <template v-if="state === 'current'">
-    <circle class="map-glyph__here-glow" :r="HERE_GLOW_R * scale" aria-hidden="true" />
-    <circle class="map-glyph__here-ring" :class="markerClass" :data-testid="testIds.marker" :r="HERE_RING_R * scale" aria-hidden="true" />
-    <circle class="map-glyph__here-dot" :r="HERE_DOT_R * scale" aria-hidden="true" />
-  </template>
-  <path
-    v-else-if="gate"
-    class="map-glyph__gate"
-    :class="[markerClass, { 'is-seen': state === 'seen', 'is-selected': selected }]"
-    :data-testid="testIds.marker"
-    :d="gatePath(scale)"
-    aria-hidden="true"
-  />
-  <circle
-    v-else
-    class="map-glyph__dot"
-    :class="[markerClass, { 'is-seen': state === 'seen', 'is-selected': selected }]"
-    :data-testid="testIds.marker"
-    :r="NODE_DOT_R * scale"
-    aria-hidden="true"
-  />
+  <g class="map-glyph" :transform="size === 1 ? null : `scale(${size})`">
+    <circle v-if="travel" class="map-glyph__halo" :class="haloClass" :data-testid="testIds.halo" :r="HALO_R" aria-hidden="true" />
+    <template v-if="state === 'current'">
+      <circle class="map-glyph__here-glow" :r="HERE_GLOW_R" aria-hidden="true" />
+      <circle class="map-glyph__here-ring" :class="markerClass" :data-testid="testIds.marker" :r="HERE_RING_R" aria-hidden="true" />
+      <circle class="map-glyph__here-dot" :r="HERE_DOT_R" aria-hidden="true" />
+    </template>
+    <path
+      v-else-if="gate"
+      class="map-glyph__gate"
+      :class="[markerClass, { 'is-seen': state === 'seen', 'is-selected': selected }]"
+      :data-testid="testIds.marker"
+      :d="gatePath()"
+      aria-hidden="true"
+    />
+    <circle
+      v-else
+      class="map-glyph__dot"
+      :class="[markerClass, { 'is-seen': state === 'seen', 'is-selected': selected }]"
+      :data-testid="testIds.marker"
+      :r="NODE_DOT_R"
+      aria-hidden="true"
+    />
+  </g>
 </template>
 
 <style scoped>

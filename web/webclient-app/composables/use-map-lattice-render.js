@@ -110,8 +110,9 @@ export function useMapLatticeRender(props, emit, geometry) {
   });
 
   // The label baseline sits below the node origin: the marker footprint's
-  // reserved half at this scale (the actionable halo's 10-unit radius plus a
-  // 1-unit gap), the 2-unit model margin, then a full type step — so the
+  // reserved half at the glyph scale (the travel halo's base 15-unit radius
+  // plus its 1-unit stroke, times the scale), the 2-unit model margin, then a
+  // full type step — so the
   // label's box starts clear of its own node's widest drawn footprint and
   // grows with the declared label size. One rule for every surface: the
   // `labelFont === 11` branch that used to sit here existed only because the
@@ -119,7 +120,7 @@ export function useMapLatticeRender(props, emit, geometry) {
   // floor now (retarget-desktop-viewport-contract D7), so the sentinel is
   // gone.
   function labelY() {
-    return LABEL_BASELINE_HALF * props.markerScale + 2 + props.labelFont;
+    return LABEL_BASELINE_HALF * geometry.glyphSize.value + 2 + props.labelFont;
   }
 
   // Label tiers (draft label palette, webclient-map-01-draft-chrome): the

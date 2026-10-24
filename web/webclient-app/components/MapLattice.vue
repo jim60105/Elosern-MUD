@@ -127,6 +127,7 @@ const {
   visibleNodeLabel,
   nodePos,
   isIsland,
+  glyphSize,
   nodeTier,
   islandDots,
   islandRings,
@@ -668,7 +669,7 @@ onBeforeUnmount(() => {
         v-if="aimedNode !== null && String(node.id) === String(aimedNode)"
         class="local-map__aim-ring"
         data-testid="local-map__aim-ring"
-        :r="MARKER_CURRENT_RING_R * markerScale"
+        :r="MARKER_CURRENT_RING_R * (isGraph ? markerScale : 1)"
         aria-hidden="true"
       />
       <!-- The full map's own node glyph (MapNodeGlyph), so the minimap and the
@@ -682,7 +683,7 @@ onBeforeUnmount(() => {
           :state="glyphState(node)"
           :gate="isGateway(node)"
           :travel="!!node.action"
-          :scale="markerScale"
+          :size="glyphSize"
           :marker-class="['local-map__marker', `local-map__marker--${node.visibility}`,
             { 'local-map__gate-glyph': isGateway(node) && node.visibility !== 'current' }]"
           halo-class="local-map__actionable"
@@ -752,8 +753,8 @@ onBeforeUnmount(() => {
       <line
         class="local-map__edge"
         :class="stub.actionable ? 'local-map__edge--traversable' : 'local-map__edge--blocked'"
-        :x1="120 + (HALO_R + 1) * Math.sin((stub.bearing * Math.PI) / 180)"
-        :y1="120 - (HALO_R + 1) * Math.cos((stub.bearing * Math.PI) / 180)"
+        :x1="120 + (HALO_R + 1) * glyphSize * Math.sin((stub.bearing * Math.PI) / 180)"
+        :y1="120 - (HALO_R + 1) * glyphSize * Math.cos((stub.bearing * Math.PI) / 180)"
         :x2="120 + (88 - 6) * Math.sin((stub.bearing * Math.PI) / 180)"
         :y2="120 - (88 - 6) * Math.cos((stub.bearing * Math.PI) / 180)"
       />
