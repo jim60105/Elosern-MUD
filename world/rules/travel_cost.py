@@ -123,16 +123,22 @@ DEPLETION_MESSAGE = "隊伍成員的精神儲備不足以支撐這趟旅行。"
 
 
 def refuse_sleeping_party(members: Sequence[Any]) -> None:
-    """Refuse any travel whose source-present party includes a forced sleeper.
+    """Refuse any travel whose source-present party includes a sleeper.
 
-    The intended source-present follow scope is the same set the charge and
-    the follow step use, so an awake possessed member can neither carry nor
-    teleport a sleeping body. The refusal happens at preflight, before cost
-    resolution, waiver, relocation, time or location changes.
+    Every sleep posture -- voluntary and forced alike -- makes the party
+    stationary, so a full reserve is never evidence of being awake. The
+    intended source-present follow scope is the same set the charge and the
+    follow step use (the traverser plus the effective, co-located companions,
+    including the owner's own body while a companion is possessed), so an
+    awake possessed member can neither carry nor teleport a sleeping body and
+    a remote sleeper grants nothing. The refusal happens at preflight, before
+    cost resolution, skill waiver, relocation, destination creation, time or
+    location changes. A malformed state still fails closed through the
+    validating read rather than being treated as awake.
     """
     for member in members:
         state = read_optional_fatigue_state(member)
-        if state is not None and state.posture is SleepPosture.FORCED:
+        if state is not None and state.posture is not SleepPosture.AWAKE:
             raise MovementPreflightRefused("party_sleeping", SLEEPING_PARTY_MESSAGE)
 
 
@@ -359,15 +365,18 @@ def plan_traversal(
 ) -> TraversalPlan:
     """Integrate one traversal across ordered ``(distance_m, terrain)`` legs.
 
-    Every member's state is read once; the party speed is then recomputed at
-    each member threshold and each terrain boundary, and only the remaining
-    distance uses a changed speed. Segments are keyed by those authored
-    boundaries, never by meter or second. The exact segment durations are
-    summed before the traversal's single upward rounding, so prediction and
-    the whole-second fatigue settlement agree on the committed duration.
-    A member predicted to exhaust strictly before the final destination
-    refuses the departure; reaching exactly zero at arrival is accepted and
-    the external forced sleep applies there.
+    Every member's state is read once, so the actual initial posture is what
+    admission judges: any initial sleeper refuses the departure with the
+    stable sleeping-party reason before a distance is integrated, and neither
+    a full reserve nor a waiver can reconstruct an awake traveller. Only then
+    is the party speed recomputed at each member threshold and each terrain
+    boundary, and only the remaining distance uses a changed speed. Segments
+    are keyed by those authored boundaries, never by meter or second. The
+    exact segment durations are summed before the traversal's single upward
+    rounding, so prediction and the whole-second fatigue settlement agree on
+    the committed duration. A member predicted to exhaust strictly before the
+    final destination refuses the departure; reaching exactly zero at arrival
+    is accepted and the external forced sleep applies there.
     """
 
     if not members:
@@ -375,6 +384,13 @@ def plan_traversal(
             "no_travellers", "a distance-bearing traversal needs at least one traveller"
         )
     initial_states = tuple(_fatigue_state(member) for member in members)
+    if any(
+        state is not None and state.posture is not SleepPosture.AWAKE
+        for state in initial_states
+    ):
+        # Posture is carried through prediction, never inferred from reserve:
+        # a voluntary sleeper at full reserve is still stationary.
+        raise MovementPreflightRefused("party_sleeping", SLEEPING_PARTY_MESSAGE)
     initial_reserves = tuple(
         None if state is None else state.reserve_units for state in initial_states
     )

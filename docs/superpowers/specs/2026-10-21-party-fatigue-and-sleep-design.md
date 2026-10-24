@@ -193,9 +193,11 @@ This is outside-combat waiting. There is no all-sleeping combat observation mode
 
 ### 9.4 Stationary party
 
-If any present party member is in forced sleep, refuse all party travel, including settlement exits, wilderness steps and cross-layer gates. Possessing an awake member does not make sleeping bodies follow, teleport them, carry them, or permit that member to split off. Party members may interact, organize items, or fight at the current location through existing lawful operations.
+If any present effective party member is asleep in any sleep posture, whether voluntary or forced, refuse all party travel. The gate covers every real travel consumer: ordinary and interior connectors, settlement/grid edges, wilderness steps, grid-to-wilderness entry, wilderness-to-grid return, and any movement-cost waiver such as flight or flash step. It is evaluated against the canonical source-present effective travelling set that the charge and follow step share, including the owner's own body while a companion is possessed; a remote member grants no travelling membership and a stale or corrupt roster reference fails closed instead of being treated as awake. A full mental reserve is never evidence of being awake.
 
-A travel refusal at this gate advances no time or reserve and moves no entity. The player can voluntarily sleep before reaching zero. Leaving a sleeper behind, carrying them and remote recovery simulation are excluded.
+This user-approved amendment supersedes the earlier forced-only stationary wording: sleeping members of every posture make the party stationary, and no forced-only survivor remains. Possessing an awake member does not make sleeping bodies follow, teleport them, carry them, or permit that member to split off. Party members may interact, organize items, or fight at the current location through existing lawful operations; the gate adds no blanket party action lock.
+
+A travel refusal at this gate advances no time or reserve, moves no entity, consumes no resource, records no destination knowledge, creates no destination room and runs no arrival hook or home re-anchor. The player can voluntarily sleep before reaching zero. Leaving a sleeper behind, carrying them and remote recovery simulation are excluded.
 
 ## 10. Simplified combat integration
 
@@ -294,7 +296,7 @@ Required scenarios include:
 4. Split and unsplit intervals produce the same reserve under the same activities, including fractional percentage values and saturation at full reserve.
 5. Full HP/MP/SP with incomplete mental reserve still gives a nonzero voluntary sleep requirement; forced sleep stops at the minimum wake boundary without claiming full recovery.
 6. A sleeping member's practice booking is preserved and earns nothing for sleeping time; a different awake studying member can settle its own booking.
-7. Every party exit refuses with zero time/location changes while a present member is forcibly sleeping, including while controlling an awake companion.
+7. Every party exit family refuses with zero time, location, resource, reserve and knowledge changes while any present effective member is voluntarily or forcibly sleeping, including while controlling an awake companion and when a movement-cost waiver applies.
 8. A current-body sleep transition offers only valid co-located awake candidates, preserves owner identity, and revalidates a stale selection. Inject a transfer failure and prove the verified binding/session/cmdsets restore.
 9. An unselected companion sleeping does not steal control; a body waking does not automatically repuppet the owner.
 10. Waiting stops at the first relevant forced-sleep/wake/registered-event boundary and commits no requested remainder. Existing unsafe-wait rejection remains effective.

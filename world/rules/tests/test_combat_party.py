@@ -175,6 +175,31 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn(str(second.key), battlefield.roster)
         self.assertEqual(party_ids(self.player), [first.pk, second.pk])
 
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_sleeping_companion_leaves_local_engagement_available(self):
+        """Scenario: Local play -- no blanket party action lock."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+
+        sleeper = _companion(self.player, "沉睡者")
+        initialize_fatigue_state(sleeper)
+        write_fatigue_state(sleeper, 360000, SleepPosture.VOLUNTARY)
+        result = engage(self.player, self.monster)
+        # The sleeper stays a living allied participant: opening a local
+        # engagement is a lawful local action, not party travel.
+        self.assertEqual(
+            result["record"].player_ids, (self.player.pk, sleeper.pk)
+        )
+        self.assertEqual(
+            read_session(self.player).player_ids,
+            (self.player.pk, sleeper.pk),
+        )
+
     @covers_requirement("player-combat-session::engage-creates-one-persistent-local-combat-session")
     @covers_requirement("party-system::companions-fight-as-allies-in-the-player-s-combat-session")
     def test_distant_dead_or_knocked_out_companions_do_not_join(self):

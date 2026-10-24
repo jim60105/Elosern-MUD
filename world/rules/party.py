@@ -328,10 +328,10 @@ def follow_scope(
     resolution failure degrades to no followers rather than raising from a
     traversal hook.
 
-    A source-present forced sleeper stays in this scope: the movement
-    preflight refuses the whole departure from the same scope instead of
-    silently leaving the sleeper behind (fatigue-aware traversal). The
-    predicate is the one travel scope, speed, charge and follow step share.
+    A source-present sleeper stays in this scope: the movement preflight
+    refuses the whole departure from the same scope instead of silently
+    leaving the sleeper behind (fatigue-aware traversal). The predicate is the
+    one travel scope, speed, charge and follow step share.
     """
     from world.rules.party_scope import PartyScopeError, resolve_commander
 

@@ -170,8 +170,11 @@ class ChargeMovementTests(EvenniaTest):
         self._charge_wilderness_step()
         self.assertEqual(get_world_clock().tick, before)
 
-    @covers_requirement("movement-cost-charging::sparse-edge-admission-refuses-pre-destination-depletion")
-    def test_a_flight_waiver_never_carries_a_forced_sleeping_member(self):
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_flight_waiver_never_carries_a_sleeping_member(self):
+        """Scenario: Waiver cannot bypass sleep (every sleep posture)."""
         from world.rules.fatigue import (
             SleepPosture,
             initialize_fatigue_state,
@@ -180,23 +183,71 @@ class ChargeMovementTests(EvenniaTest):
         from world.rules.party import join_party
 
         self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                self.char1.location = self.room1
+                source, destination = wilderness_rooms()
+                companion = create_object(
+                    NPC, key="sleeping companion", location=self.room1
+                )
+                join_party(companion, self.char1)
+                # Register the follower at the pre-move wilderness cell
+                # without the contrib's receive hook (a pooled room needs the
+                # script).
+                companion.location = source
+                initialize_fatigue_state(companion)
+                write_fatigue_state(companion, reserve, posture)
+                self.char1.location = destination
+                before = get_world_clock().tick
+                # The waiver is an early return after admission, never before
+                # it -- and a full reserve is no proof of being awake.
+                with self.assertRaises(MovementPreflightRefused) as caught:
+                    charge_movement(
+                        self.char1, "wilderness_move", source_location=source
+                    )
+                self.assertEqual(caught.exception.reason, "party_sleeping")
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertIs(companion.location, source)
+                self.assertIs(self.char1.location, destination)
+                companion.delete()
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_waived_possessed_traverser_cannot_carry_a_sleeping_owner(self):
+        """Scenario: Waiver cannot bypass sleep (possessed owner body)."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+        from world.rules.possession import enter_possession
+
+        self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
+        self.npc.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
+        join_party(self.npc, self.char1)
         source, destination = wilderness_rooms()
-        companion = create_object(NPC, key="sleeping companion", location=self.room1)
-        join_party(companion, self.char1)
-        # Register the follower at the pre-move wilderness cell without the
-        # contrib's receive hook (a pooled room needs the script).
-        companion.location = source
-        initialize_fatigue_state(companion)
-        write_fatigue_state(companion, 0, SleepPosture.FORCED)
-        self.char1.location = destination
+        self.npc.location = source
+        self.char1.location = source
+        initialize_fatigue_state(self.char1)
+        write_fatigue_state(self.char1, 360000, SleepPosture.VOLUNTARY)
+        enter_possession(self.char1, self.npc)
+        before_state = read_fatigue_state(self.char1)
         before = get_world_clock().tick
-        # The waiver is an early return after admission, never before it.
         with self.assertRaises(MovementPreflightRefused) as caught:
-            charge_movement(
-                self.char1, "wilderness_move", source_location=source
-            )
+            charge_movement(self.npc, "wilderness_move", source_location=source)
         self.assertEqual(caught.exception.reason, "party_sleeping")
         self.assertEqual(get_world_clock().tick, before)
+        self.assertIs(self.char1.location, source)
+        self.assertIs(self.npc.location, source)
+        self.assertNotIn(self.char1, destination.contents)
+        self.assertNotIn(self.npc, destination.contents)
+        self.assertEqual(read_fatigue_state(self.char1), before_state)
 
     @covers_requirement(
         "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
@@ -390,6 +441,30 @@ class TerrainCalibrationTests(EvenniaTest):
         ).seconds / 3600
         self.assertAlmostEqual(hours, 266.67, delta=0.01)
         self.assertAlmostEqual(hours / 6, 44.44, delta=0.01)
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_prediction_refuses_a_full_reserve_voluntary_sleeper(self):
+        """Scenario: Reserve cannot erase posture."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+
+        sleeper = create_object(NPC, key="voluntary sleeper")
+        initialize_fatigue_state(sleeper)
+        write_fatigue_state(sleeper, 360000, SleepPosture.VOLUNTARY)
+        with self.assertRaises(MovementPreflightRefused) as caught:
+            plan_traversal(((4500.0, "settlement"),), [sleeper])
+        self.assertEqual(caught.exception.reason, "party_sleeping")
+        # The same independently known route is priced unchanged once awake:
+        # 4,500 m at the authored 4,500 m/h settlement speed is 3,600 s.
+        write_fatigue_state(sleeper, 360000, SleepPosture.AWAKE)
+        self.assertEqual(
+            plan_traversal(((4500.0, "settlement"),), [sleeper]).seconds, 3600
+        )
 
     @covers_requirement("movement-cost-charging::traversal-integrates-fatigue-over-remaining-distance")
     def test_a_threshold_inside_an_edge_slows_only_the_remaining_distance(self):

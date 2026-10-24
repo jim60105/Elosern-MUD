@@ -120,6 +120,34 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertTrue(is_companion(another, self.player))
         self.assertFalse(has_general_membership(another, self.player))
 
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_sleeping_temporary_escort_blocks_through_the_canonical_scope(self):
+        """Scenario: Exact presence and effective membership."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            initialize_fatigue_state,
+            write_fatigue_state,
+        )
+        from world.rules.travel_cost import (
+            MovementPreflightRefused,
+            refuse_sleeping_party,
+            source_present_members,
+        )
+
+        escorted = self._npc()
+        self._source(escorted)
+        initialize_fatigue_state(escorted)
+        write_fatigue_state(escorted, 360000, SleepPosture.VOLUNTARY)
+        members = source_present_members(self.player, self.room)
+        # The temporary-only escort is a real effective travelling member, so
+        # the same canonical scope the charge and follow step use refuses.
+        self.assertIn(escorted, members)
+        with self.assertRaises(MovementPreflightRefused) as caught:
+            refuse_sleeping_party(members)
+        self.assertEqual(caught.exception.reason, "party_sleeping")
+
     def test_leave_refuses_to_silently_detach_a_temporary_only_member(self):
         from commands.leave import CmdLeave
         from world.rules.party import ESCORT_BOUND_MESSAGE

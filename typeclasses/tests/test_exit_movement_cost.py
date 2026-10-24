@@ -249,6 +249,87 @@ class MovementCostMixinSourceTests(EvenniaTestCase):
         self.assertNotIn("after_successful_movement(", source)
 
 
+class SleepingPartyExitTests(EvenniaTest):
+    """A source-present sleeper of any posture makes party travel stationary."""
+
+    def setUp(self):
+        super().setUp()
+        from world.rules.party import join_party
+
+        self.room1.key = "Room1"
+        self.room2.key = "Room2"
+        self.room1.save()
+        self.room2.save()
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.companion = create_object(NPC, key="同伴", location=self.room1)
+        self.companion.race = "human"
+        self.companion.apply_race_baseline()
+        join_party(self.companion, self.char1)
+        self.exit_obj = create_object(
+            Exit, key="door", location=self.room1, destination=self.room2
+        )
+
+    def _gauges(self, entity):
+        return tuple(
+            getattr(entity.traits, key).current for key in ("hp", "mp", "sp")
+        )
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_every_sleep_posture_refuses_the_connector_before_any_write(self):
+        """Scenario: Ordinary connectors and both gate directions."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.fatigue import (
+            SleepPosture,
+            read_fatigue_state,
+            write_fatigue_state,
+        )
+
+        for posture, reserve in (
+            (SleepPosture.FORCED, 0),
+            (SleepPosture.VOLUNTARY, 360000),
+        ):
+            with self.subTest(posture=posture):
+                write_fatigue_state(self.companion, reserve, posture)
+                before_state = read_fatigue_state(self.companion)
+                before_gauges = self._gauges(self.char1)
+                before = get_world_clock().tick
+                with mock_patch(
+                    "world.rules.travel_cost.log_traversal_refusal"
+                ) as refusal:
+                    result = self.exit_obj.at_traverse(self.char1, self.room2)
+                self.assertIsNone(result)
+                refusal.assert_called_once()
+                self.assertEqual(refusal.call_args.args[2], "party_sleeping")
+                self.assertIs(self.char1.location, self.room1)
+                self.assertIs(self.companion.location, self.room1)
+                self.assertEqual(get_world_clock().tick, before)
+                self.assertEqual(self._gauges(self.char1), before_gauges)
+                self.assertEqual(
+                    read_fatigue_state(self.companion), before_state
+                )
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_an_all_awake_party_still_traverses_and_charges(self):
+        """Scenario: All awake behavior remains."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            write_fatigue_state,
+        )
+
+        write_fatigue_state(self.companion, 360000, SleepPosture.AWAKE)
+        before = get_world_clock().tick
+        self.exit_obj.at_traverse(self.char1, self.room2)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertIs(self.companion.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+
 class FlightRequiredExitTests(EvenniaTest):
     """Flight-required exits gate on ``flight``/``flash_step`` ownership."""
 
@@ -338,6 +419,80 @@ class FlightRequiredExitTests(EvenniaTest):
         before = get_world_clock().tick
         self._traverse_via_command(exit_obj, self.char1)
         self.assertIs(self.char1.location, self.room2)
+        self.assertEqual(get_world_clock().tick, before + MOVE)
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_a_lawful_waiver_owner_cannot_carry_a_sleeping_companion(self):
+        """Scenario: Waiver cannot bypass sleep."""
+        from unittest.mock import patch as mock_patch
+
+        from world.rules.fatigue import (
+            SleepPosture,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="同伴", location=self.room1)
+        join_party(companion, self.char1)
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        for owner_key in self.waiver_keys:
+            for posture, reserve in (
+                (SleepPosture.FORCED, 0),
+                (SleepPosture.VOLUNTARY, 360000),
+            ):
+                with self.subTest(owner_key=owner_key, posture=posture):
+                    self.char1.db.skills = {
+                        "active": [],
+                        "passive": [owner_key],
+                    }
+                    write_fatigue_state(companion, reserve, posture)
+                    # The waiver grants access; it never grants admission.
+                    self.assertTrue(exit_obj.access(self.char1, "traverse"))
+                    before = get_world_clock().tick
+                    with mock_patch(
+                        "world.rules.travel_cost.log_traversal_refusal"
+                    ) as refusal:
+                        self._traverse_via_command(exit_obj, self.char1)
+                    refusal.assert_called_once()
+                    self.assertEqual(
+                        refusal.call_args.args[2], "party_sleeping"
+                    )
+                    self.assertIs(self.char1.location, self.room1)
+                    self.assertIs(companion.location, self.room1)
+                    self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement(
+        "party-system::any-present-sleeper-makes-party-travel-stationary"
+    )
+    def test_an_all_awake_waiver_owner_still_traverses(self):
+        """Scenario: All awake behavior remains (waiver unchanged)."""
+        from world.rules.fatigue import (
+            SleepPosture,
+            write_fatigue_state,
+        )
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="同伴", location=self.room1)
+        join_party(companion, self.char1)
+        write_fatigue_state(companion, 360000, SleepPosture.AWAKE)
+        exit_obj = create_object(
+            FlightRequiredExit,
+            key="sky",
+            location=self.room1,
+            destination=self.room2,
+        )
+        self.char1.db.skills = {"active": [], "passive": [self.waiver_keys[0]]}
+        before = get_world_clock().tick
+        self._traverse_via_command(exit_obj, self.char1)
+        self.assertIs(self.char1.location, self.room2)
+        self.assertIs(companion.location, self.room2)
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
     @covers_requirement("movement-cost-charging::flight-required-exits-pass-only-for-flight-flash-step-owners")
