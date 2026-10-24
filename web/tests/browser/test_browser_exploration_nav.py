@@ -344,7 +344,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions",
-        "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
+        "webclient-room-actions::休息-opens-a-two-layer-rest-entry",
     )
     def test_keyboard_only_journey_walks_the_overview(self):
         """A pure arrows-and-Enter journey at 1451x790: the exit compass

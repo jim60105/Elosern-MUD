@@ -15,7 +15,8 @@ events/actions it emits, and its primary states.
   message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
   pending-action, and dialogue name-plate states, the place card's story with and without its room actions,
   the question card's story with its dream question and locked states, the choice card's story with its verbs,
-  wait, locked-wait, suggestions, generating, degraded-empty, and overflow states, the
+  suggestions, generating, degraded-empty, and overflow states, the time choice card's story with its
+  default, locked, no-fatigue-row, and narrow states, the wait form's story with its default and locked states, the
   presence rail's story with its default, overflow, no-portraits, and objects-only states, the
   exploration screen's story with its default, person-focus, wait-card, dream-question, and suggestions-card states, and the stage actor's story with its player, host-image,
   host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story

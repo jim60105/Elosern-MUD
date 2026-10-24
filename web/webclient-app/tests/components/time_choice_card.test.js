@@ -142,15 +142,15 @@ describe("TimeChoiceCard (redesign-rest-entry)", () => {
     expect(document.activeElement).toBe(tile("sleep").element);
   });
 
-  it("leaves Enter, Space, and modifier chords to bubble", () => {
+  it("preserves native Enter and Space defaults inside the card and lets modifier chords bubble", () => {
     mountCard();
     const outer = [];
     document.body.addEventListener("keydown", (event) => outer.push(event.key));
-    key(tile("wait").element, "Enter");
-    key(tile("wait").element, " ");
+    expect(key(tile("wait").element, "Enter").defaultPrevented).toBe(false);
+    expect(key(tile("wait").element, " ").defaultPrevented).toBe(false);
     key(tile("wait").element, "f", { ctrlKey: true });
     key(tile("wait").element, "p");
-    expect(outer).toEqual(["Enter", " ", "f"]);
+    expect(outer).toEqual(["f"]);
   });
 
   it("locked: both tiles stay focusable, carry the reason, and pick nothing", async () => {

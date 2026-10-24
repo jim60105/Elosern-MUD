@@ -140,7 +140,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.wait"), 2)
         self.assertEqual(store_state(page)["serverTime"], time_before)
 
-    @covers_requirement("webclient-room-actions::等待-opens-the-wait-card-through-choicecard")
+    @covers_requirement("webclient-room-actions::休息-opens-a-two-layer-rest-entry")
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_safe_wait_until_dawn_advances_the_clock(self):
         page = self.logged_in_page()
@@ -189,7 +189,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "a successful wait must advance the world clock",
         )
 
-    @covers_requirement("webclient-room-actions::等待-opens-the-wait-card-through-choicecard")
+    @covers_requirement(
+        "webclient-room-actions::休息-opens-a-two-layer-rest-entry",
+        "webclient-room-actions::the-rest-entry-steps-back-and-closes-with-defined-focus",
+        "webclient-room-actions::the-rest-entry-exposes-stable-test-hooks",
+    )
     def test_rest_entry_tile_form_dispatch_path(self):
         """redesign-rest-entry: the place card's 休息 → a tile → its form →
         one dispatch, for one wait action (等待直到黎明) and one sleep action
@@ -237,6 +241,37 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIsNone(store_state(page)["roomCard"])
         self.assertTrue(focused_on_rest_button(), "layer 2's ✕ returns focus to 休息")
         self.assertEqual(wait_payloads(), [], "closing either layer sends nothing")
+
+        # Native button activation must not reach the shell's Space handler.
+        press_control(page, PLACE_WAIT_SELECTOR)
+        page.keyboard.press("ArrowRight")
+        page.keyboard.press("Space")
+        shell.wait_for(state="visible", timeout=15000)
+        duration = shell.locator("input")
+        self.assertTrue(duration.evaluate("(el) => document.activeElement === el"))
+        page.keyboard.press("Shift+Tab")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.testid"),
+            "sleep-form-recovery",
+        )
+        page.keyboard.press("Shift+Tab")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.testid"),
+            "rest-step-close",
+        )
+        page.keyboard.press("Escape")
+        page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(page.evaluate("document.activeElement.dataset.tile"), "sleep")
+        page.keyboard.press("ArrowLeft")
+        page.keyboard.press("Enter")
+        wait_shell = page.locator('[data-testid="wait-form-card"]')
+        wait_shell.wait_for(state="visible", timeout=15000)
+        page.keyboard.press("Escape")
+        page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(page.evaluate("document.activeElement.dataset.tile"), "wait")
+        page.keyboard.press("Escape")
+        self.assertTrue(focused_on_rest_button())
+        self.assertEqual(wait_payloads(), [], "native tile keys only open forms")
 
         # One wait action: 休息 → 等待 → 等待直到黎明.
         activate_wait_row(page, "wait-dawn")

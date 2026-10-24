@@ -154,11 +154,9 @@ function onKeyDown(event) {
     list[next].focus({ preventScroll: true });
     return;
   }
-  // Enter / Space reach the focused button natively; every other key stays
-  // inside the card.
-  if (key !== "Enter" && key !== " ") {
-    event.stopPropagation();
-  }
+  // Preserve native button activation without letting the shell claim Space
+  // for message advancement or route Enter into the underlying dock.
+  event.stopPropagation();
 }
 
 function uiScale() {
@@ -299,14 +297,15 @@ defineExpose({ focusTile });
 }
 .time-choice__tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: calc(10px * var(--ui-scale));
 }
 .time-choice--stacked .time-choice__tiles {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 .time-choice__tile {
   position: relative;
+  min-width: 0;
   display: grid;
   grid-template-rows: auto auto 1fr;
   justify-items: center;
@@ -325,13 +324,13 @@ defineExpose({ focusTile });
     background var(--motion-fast) var(--ease-standard);
 }
 .time-choice--stacked .time-choice__tile {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto auto;
   justify-items: start;
   align-items: center;
   column-gap: calc(12px * var(--ui-scale));
   min-height: calc(76px * var(--ui-scale));
-  padding-right: calc(44px * var(--ui-scale));
+  padding-right: calc(40px * var(--ui-scale));
   text-align: left;
 }
 .time-choice--stacked .time-choice__icon {
@@ -383,6 +382,8 @@ defineExpose({ focusTile });
   color: var(--paper-50);
 }
 .time-choice__text {
+  min-width: 0;
+  max-width: 100%;
   display: grid;
   gap: calc(6px * var(--ui-scale));
   align-content: start;
@@ -399,6 +400,10 @@ defineExpose({ focusTile });
   font: var(--text-xs)/1.4 var(--f-mono);
   color: var(--gold-400);
   white-space: nowrap;
+  /* Only a card squeezed below the design's narrow width clips the line;
+     it never wraps. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .time-choice__stage {
   font-family: var(--f-sans);

@@ -329,7 +329,7 @@ document.
 
 #### Scenario: The exploration root carries the bare overview keys
 - **WHEN** the shell is in exploration mode
-- **THEN** the keyboard root is the exploration root frame, an empty menu: the room actions are the place card's 查看房間 and 等待 buttons and the 建議 pill (present whenever the committed `suggestions` envelope is not `unavailable`), each its own tab stop outside the router; exits are independent compass targets with no router key, and interact targets, look-only people, and objects are the presence rail's `target-<identity>`, `entity-<identity>`, and `object-<identity>` entries, also outside the router
+- **THEN** the keyboard root is the exploration root frame, an empty menu: the room actions are the place card's 查看房間 and 休息 buttons and the 建議 pill (present whenever the committed `suggestions` envelope is not `unavailable`), each its own tab stop outside the router; exits are independent compass targets with no router key, and interact targets, look-only people, and objects are the presence rail's `target-<identity>`, `entity-<identity>`, and `object-<identity>` entries, also outside the router
 
 #### Scenario: The exploration root omits the navigation-carried entries
 - **WHEN** the exploration keyboard root renders

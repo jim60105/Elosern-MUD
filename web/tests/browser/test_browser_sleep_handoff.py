@@ -226,7 +226,7 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         )
 
     @covers_requirement(
-        "webclient-exploration-menu::the-waiting-surface-offers-exactly-three-operations"
+        "webclient-exploration-menu::the-waiting-surface-offers-three-operations-through-two-layers"
     )
     @covers_requirement(
         "time-skip-commands::owner-targeted-sleep-continuation-preserves-skip-safety"

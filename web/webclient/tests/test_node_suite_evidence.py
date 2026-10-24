@@ -646,7 +646,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
 
     @covers_requirement(
         "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
-        "webclient-room-actions::the-place-card-carries-查看房間-and-等待-in-exploration-only",
+        "webclient-room-actions::the-place-card-carries-查看房間-and-休息-in-exploration-only",
     )
     def test_place_card_node_suite_passes(self):
         result = subprocess.run(
@@ -1113,7 +1113,7 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
     contracts; the Vitest files are their executed evidence."""
 
     @covers_requirement(
-        "webclient-exploration-menu::the-waiting-surface-offers-exactly-three-operations",
+        "webclient-exploration-menu::the-waiting-surface-offers-three-operations-through-two-layers",
     )
     def test_waiting_surface_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -1817,7 +1817,13 @@ class RoomActionsEvidenceTest(unittest.TestCase):
     the live client's geometry and the retired surfaces)."""
 
     @covers_requirement(
-        "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
+        "webclient-room-actions::休息-opens-a-two-layer-rest-entry",
+        "webclient-room-actions::the-rest-entry-steps-back-and-closes-with-defined-focus",
+        "webclient-room-actions::the-rest-entry-s-first-layer-presents-two-choice-tiles",
+        "webclient-room-actions::the-choice-tiles-show-only-client-known-context",
+        "webclient-room-actions::the-rest-entry-s-second-layer-shares-one-shell-around-the-wait-and-sleep-forms",
+        "webclient-room-actions::the-wait-form-mirrors-the-sleep-form",
+        "webclient-room-actions::the-rest-entry-exposes-stable-test-hooks",
     )
     def test_room_actions_wait_card_vitest_evidence_passes(self):
         result = subprocess.run(
