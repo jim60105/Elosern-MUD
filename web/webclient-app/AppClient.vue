@@ -21,6 +21,7 @@ import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapDrawer from "./components/MapDrawer.vue";
 import RestForm from "./components/RestForm.vue";
+import SleepForm from "./components/SleepForm.vue";
 import QuestDrawer from "./components/QuestDrawer.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
@@ -103,9 +104,13 @@ const {
   cardRows, cardKey, cardCaption, cardLabel, speaker,
   onRailActivate, onCardPick, onCardBack,
   roomCardRef, roomCard, roomCardOpen, roomCardShown, roomCardRows, roomCardNotes, roomCardTrailing,
-  roomCardCaption, roomCardLabel, dreamOpen, restOpen, placeActions, pillShown, pillCount, pillLabel,
-  onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack, onDreamAnswer, onDreamClose,
-  onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
+  roomCardCaption, roomCardLabel, sleepOpen, restOpen, placeActions, pillShown, pillCount, pillLabel,
+  onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack,
+  onSleepRecover, onSleepSubmit, onSleepClose, onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
+  sleepHandoffSelectionOpen, sleepHandoffQuestionOpen, sleepHandoffContinuationOpen,
+  sleepHandoffRows, sleepHandoffContinuationRows, sleepHandoffCaption, sleepHandoffQuestionCaption,
+  onSleepHandoffPick, onSleepContinuationPick,
+  onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The map drawer (redesign-map-drawer): the area/world tab, the per-tab
@@ -893,13 +898,60 @@ const rootStyle = computed(() => {
              available, once the line is fully read, and never while an
              action is in flight. -->
         <template #choices>
+          <!-- The server-owned contextual sleep-control surface
+               (align-sleep-handoff-and-owner-dream): the complete companion
+               list, the exact 全員一起睡眠 option, the owner-only dream
+               question and the retained continuation. One modal focus owner
+               at a time; the browser never derives eligibility or time. -->
+          <ChoiceCard
+            v-if="sleepHandoffSelectionOpen"
+            :key="`sleep-handoff:${sleepHandoffCaption}`"
+            test-id="sleep-handoff-card"
+            data-card-kind="sleep_handoff"
+            :rows="sleepHandoffRows"
+            :trailing-index="sleepHandoffRows.length - 1"
+            :caption="sleepHandoffCaption"
+            aria-label="睡眠與交接"
+            :entrance="!modeHydrating"
+            trap-focus
+            autofocus
+            @pick="onSleepHandoffPick"
+            @back="onSleepHandoffPick('back')"
+          />
+          <QuestionCard
+            v-else-if="sleepHandoffQuestionOpen"
+            test-id="dream-question"
+            question="進入夢境協作？"
+            :caption="sleepHandoffQuestionCaption"
+            close-label="不進入夢境，繼續睡眠"
+            :locked="skipDisabled"
+            reason="上一個行動尚未完成，請稍候。"
+            :entrance="!modeHydrating"
+            @yes="onSleepQuestionYes"
+            @no="onSleepQuestionNo"
+            @close="onSleepQuestionClose"
+          />
+          <ChoiceCard
+            v-else-if="sleepHandoffContinuationOpen"
+            test-id="sleep-continuation-card"
+            data-card-kind="sleep_continuation"
+            :rows="sleepHandoffContinuationRows"
+            :trailing-index="sleepHandoffContinuationRows.length - 1"
+            caption="睡眠進行中"
+            aria-label="繼續睡眠"
+            :entrance="!modeHydrating"
+            trap-focus
+            autofocus
+            @pick="onSleepContinuationPick"
+            @back="onSleepContinuationPick('back')"
+          />
           <!-- The room cards (exploration-room-actions design D1/D4/D5): the
                wait card the place card's 等待 opens and the suggestions card
                the 建議 pill opens, through the one card shell, trapping focus
                until they close. The wait card stays mounted (hidden) under
-               its 進入夢境協作？ question and its rest form, so it keeps its
-               active row for the return. -->
-          <template v-if="roomCardOpen">
+               its sleep and rest forms, so it keeps its active row for the
+               return. -->
+          <template v-else-if="roomCardOpen">
             <ChoiceCard
               v-show="roomCardShown"
               ref="roomCardRef"
@@ -917,18 +969,22 @@ const rootStyle = computed(() => {
               @pick="onRoomCardPick"
               @back="onRoomCardBack"
             />
-            <QuestionCard
-              v-if="dreamOpen"
-              test-id="dream-question"
-              question="進入夢境協作？"
-              close-label="取消睡眠"
-              :locked="skipDisabled"
-              reason="上一個行動尚未完成，請稍候。"
-              :entrance="!modeHydrating"
-              @yes="onDreamAnswer(true)"
-              @no="onDreamAnswer(false)"
-              @close="onDreamClose"
-            />
+            <section
+              v-if="sleepOpen"
+              class="choice-card rest-card"
+              role="dialog"
+              aria-label="睡眠模式"
+              data-testid="sleep-card"
+            >
+              <span class="choice-card__corners" aria-hidden="true"></span>
+              <div class="choice-card__caption" aria-hidden="true">睡眠模式</div>
+              <SleepForm
+                :disabled="skipDisabled"
+                @recover="onSleepRecover"
+                @submit="onSleepSubmit"
+                @close="onSleepClose"
+              />
+            </section>
             <section
               v-if="restOpen"
               class="choice-card rest-card"

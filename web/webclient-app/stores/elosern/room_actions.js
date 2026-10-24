@@ -92,11 +92,9 @@ export function applyRoomActions(ctx) {
     return true;
   };
 
-  // A wait row (design D5), re-resolved now. `dream` adds the dream flag to
-  // the sleep row's payload: the 進入夢境協作？ question's 是 (the server can
-  // only enter the dream as part of the same sleep request). The rest row
-  // opens the form in the view and is never submitted here.
-  ctx.activateWaitRow = function activateWaitRow(key, options = {}) {
+  // A wait row (design D5), re-resolved now. The sleep row opens the view's
+  // sleep form; the rest row opens the rest form. Neither is submitted here.
+  ctx.activateWaitRow = function activateWaitRow(key) {
     if (!ctx.roomCard || ctx.roomCard.kind !== "wait") {
       return { sent: false, handled: false, reason: "missing" };
     }
@@ -105,17 +103,13 @@ export function applyRoomActions(ctx) {
     if (!found || !found.actionId) {
       return { sent: false, handled: false, reason: "missing" };
     }
-    const row =
-      key === "wait-sleep" && options.dream === true
-        ? { ...found, payload: { ...(found.payload || {}), dream: true } }
-        : found;
-    const outcome = ctx.activateExplorationRow(row);
+    const outcome = ctx.activateExplorationRow(found);
     // A card row's action takes the surface over, so the card closes with its
     // dispatch; the dismiss row keeps the card exactly as last committed —
     // the committed `unavailable` envelope closes it (`settleRoomCard`), so a
     // stale/busy rejection never tears down a surface the commit still backs
     // (webclient-context-actions-suggestions' preserved dismiss invariant).
-    if (outcome.sent && row.actionId !== "options.dismiss") {
+    if (outcome.sent && found.actionId !== "options.dismiss") {
       ctx.closeRoomCard();
     }
     return outcome;

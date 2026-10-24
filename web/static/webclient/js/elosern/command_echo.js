@@ -257,6 +257,15 @@
     "explore.possess_release": function (payload, display) {
       return "unpossess";
     },
+    "explore.sleep_party": function () {
+      return "sleep all";
+    },
+    "explore.sleep_continue": function () {
+      return "sleep continue";
+    },
+    "explore.sleep_dream": function (payload) {
+      return payload && payload.decision === "enter" ? "dream enter" : "dream decline";
+    },
     "explore.engage": function (payload, display) {
       var target = label(display && display.targetLabel);
       return target === null ? null : join(["engage", target]);
@@ -270,7 +279,7 @@
     },
     "explore.wait": function (payload, display) {
       if (payload && payload.sleep) {
-        return payload.dream ? "sleep dream" : "sleep";
+        return "sleep";
       }
       if (isNonEmpty(payload && payload.daypart)) {
         return join(["wait until", payload.daypart]);
