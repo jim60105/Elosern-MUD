@@ -241,7 +241,9 @@ class CmdSleep(Command):
                 )
                 self.caller.msg(
                     _with_handoff_offer(
-                        self.caller, _SLEEP_ACCEPTED_MESSAGE
+                        self.caller,
+                        getattr(outcome, "message", None)
+                        or _SLEEP_ACCEPTED_MESSAGE,
                     )
                 )
                 return
