@@ -1811,10 +1811,10 @@ class PresenceRailEvidenceTest(unittest.TestCase):
 
 
 class RoomActionsEvidenceTest(unittest.TestCase):
-    """exploration-room-actions: the wait card and the suggestions card are the
-    AppClient's room-actions composition contract; the Vitest files are their
-    executed evidence (the browser journeys cover the live client's geometry
-    and the retired surfaces)."""
+    """exploration-room-actions; redesign-rest-entry: the rest entry and the
+    suggestions card are the AppClient's room-actions composition contract;
+    the Vitest files are their executed evidence (the browser journeys cover
+    the live client's geometry and the retired surfaces)."""
 
     @covers_requirement(
         "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
@@ -1828,6 +1828,11 @@ class RoomActionsEvidenceTest(unittest.TestCase):
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/app_client_room_actions.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/waiting_surface.test.js"),
+                # The rest entry's components (redesign-rest-entry): the
+                # first-layer tiles and the two second-layer forms.
+                str(REPO_ROOT / "web/webclient-app/tests/components/time_choice_card.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/components/wait_form.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/components/sleep_form.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
