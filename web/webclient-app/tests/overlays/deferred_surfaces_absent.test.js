@@ -218,7 +218,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       // (exploration-presence-rail).
       "Core/ChoiceCard",
       "Core/PresenceRail",
-      // The wait card's 進入夢境協作？ question (exploration-room-actions).
+      // The owner-only sleep-handoff dream question (align-sleep-handoff-and-owner-dream).
       "Core/QuestionCard",
     ]) {
       expect(manifest.required).toContain(title);

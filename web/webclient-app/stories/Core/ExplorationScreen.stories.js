@@ -29,8 +29,9 @@ import {
 // is the same room with the guild clerk in focus: the rail gone, the clerk's
 // standee in `actor-right`, the verb card centred, the map column stepped
 // away, and the command panel inert and dimmed. `WaitCard`, `DreamQuestion`,
-// and `SuggestionsCard` open the room cards over the stage. Every surface is
-// bound to the real builders over one synthesized room.
+// and `SuggestionsCard` open the room cards and the sleep handoff question
+// over the stage. Every surface is bound to the real builders over one
+// synthesized room.
 
 const ROOM = explorationPanelFixture({
   exits: [
@@ -75,7 +76,11 @@ function centredCard(card, focus) {
     return h(ChoiceCard, { ...waitCardArgs(), trapFocus: true });
   }
   if (card === "dream") {
-    return h(QuestionCard, { question: "進入夢境協作？", closeLabel: "取消睡眠", testId: "dream-question" });
+    return h(QuestionCard, {
+      question: "進入夢境協作？",
+      closeLabel: "不進入夢境，繼續睡眠",
+      testId: "dream-question",
+    });
   }
   if (card === "suggestions") {
     return h(ChoiceCard, { ...suggestionsCardArgs(SUGGESTIONS), trapFocus: true });
@@ -149,7 +154,7 @@ export const WaitCard = {
   args: { focus: false, card: "wait" },
 };
 
-// 睡眠至完全恢復 on the wait card: the dream question.
+// The accepted sleep view: the owner-only dream question.
 export const DreamQuestion = {
   render: renderScreen,
   args: { focus: false, card: "dream" },

@@ -1,8 +1,9 @@
 <script setup>
 // QuestionCard (exploration-room-actions design D5): a small modal yes/no
-// question in the centred card frame — the wait card's 進入夢境協作？ before
-// a sleep is sent. It wears ChoiceCard's frame (the `choice-card` block: the
-// gold frame, crest, corner brackets, and entrance) with its own two-button
+// question in the centred card frame — the owner-only 進入夢境協作？ the
+// server-driven sleep handoff asks after the sleep is accepted. It wears
+// ChoiceCard's frame (the `choice-card` block: the gold frame, crest, corner
+// brackets, and entrance) with its own two-button
 // layout and a ✕ close control at its top right.
 //
 // It is passive: 是 emits `yes`, 否 emits `no`, and the close control or

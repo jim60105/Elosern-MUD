@@ -2,7 +2,8 @@
 
 One journey with two real boots of a per-test isolated server, both with the
 shipped catalogs and the dream entered through the committed sleep surface (the
-wait card's 放棄／睡眠 row and the 進入夢境協作？ question):
+wait card's 睡眠 row, the server-owned sleep handoff, and the owner-only
+進入夢境協作？ question):
 
 * the operator root holds no preferred image, so the REQUIRED bundled dream
   illustration is what the stage presents — never the sleeper's own room

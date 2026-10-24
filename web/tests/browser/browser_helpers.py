@@ -365,8 +365,8 @@ PRESENCE_KEY_PREFIXES = ("target-", "entity-", "object-", "presence-more")
 RAIL_SELECTOR = '[data-anchor="presence"] [data-testid="presence-rail"]'
 CARD_SELECTOR = '[data-anchor="choices"] [data-testid="presence-card"]'
 # The room cards (exploration-room-actions): the wait card the place card's
-# 等待 opens, the suggestions card the 建議 pill opens, and the wait card's
-# 進入夢境協作？ question.
+# 等待 opens, the suggestions card the 建議 pill opens, and the owner-only
+# 進入夢境協作？ question the accepted sleep handoff asks.
 WAIT_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="wait-card"]'
 SUGGESTIONS_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="suggestions-card"]'
 DREAM_QUESTION_SELECTOR = '[data-anchor="choices"] [data-testid="dream-question"]'
@@ -489,7 +489,7 @@ def open_suggestions_card(page: Page, timeout: int = 30000) -> None:
 
 
 def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None:
-    """Answer the wait card's 進入夢境協作？ question: 是 (dream) or 否."""
+    """Answer the accepted sleep view's owner dream question: 是 or 否."""
     question = page.locator(DREAM_QUESTION_SELECTOR)
     question.wait_for(state="visible", timeout=timeout)
     answer = "question-card-yes" if dream else "question-card-no"
@@ -566,8 +566,9 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
     ``wait`` its 等待 (opening the wait card), and ``suggestions`` the 建議
     pill (opening the suggestions card); a wait row key (``wait-dawn``,
     ``wait-sleep``, ``wait-rest``) runs through the wait card, the sleep row
-    answering the dream question with 否; and while the suggestions card is
-    open a builder key (``action-<code>``, ``action-options.dismiss``) names
+    submitting its form and leaving the accepted sleep view to the caller; and
+    while the suggestions card is open a builder key (``action-<code>``,
+    ``action-options.dismiss``) names
     one of its rows. The exits are the exit compass's
     (``activate_compass_exit``), and the people and objects
     (``target-<identity>``, ``entity-<identity>``, ``object-<identity>``) are

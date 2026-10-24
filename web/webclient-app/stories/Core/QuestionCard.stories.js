@@ -5,9 +5,10 @@ import QuestionCard from "../../components/QuestionCard.vue";
 import "../../components/ChoiceCard.vue";
 
 // QuestionCard (exploration-room-actions design D5): the small modal yes/no
-// question in the centred card frame — the wait card's 進入夢境協作？ before
-// a sleep is sent. Props: question, yesLabel / noLabel, closeLabel (the ✕ at
-// its top right), locked (a mutation in flight or awaiting its revision:
+// question in the centred card frame — the owner-only 進入夢境協作？ the
+// sleep handoff asks after the sleep is accepted. Props: question, yesLabel /
+// noLabel, closeLabel (the ✕ at its top right), locked (a mutation in flight
+// or awaiting its revision:
 // 是 and 否 disabled, with `reason`), and entrance. Events: yes, no, close
 // (the ✕ or Escape). Focus is trapped inside it and starts on `initialFocus`
 // (是 by default). `tone="caution"` (with an optional `caption`) marks a
@@ -28,10 +29,10 @@ export default {
   component: QuestionCard,
 };
 
-// The dream question as the wait card opens it.
+// The owner dream question as the accepted sleep view opens it.
 export const DreamQuestion = {
   render,
-  args: { question: "進入夢境協作？", closeLabel: "取消睡眠", testId: "dream-question" },
+  args: { question: "進入夢境協作？", closeLabel: "不進入夢境，繼續睡眠", testId: "dream-question" },
 };
 
 // Another action is still in flight: 是 and 否 wait, with the wait rows' reason.
@@ -39,7 +40,7 @@ export const Locked = {
   render,
   args: {
     question: "進入夢境協作？",
-    closeLabel: "取消睡眠",
+    closeLabel: "不進入夢境，繼續睡眠",
     locked: true,
     reason: "上一個行動尚未完成，請稍候。",
     testId: "dream-question",

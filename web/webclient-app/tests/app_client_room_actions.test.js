@@ -1,6 +1,6 @@
 // exploration-room-actions: the AppClient composition contract for the room
-// actions — the place card's 查看房間 and 等待, the wait card and its
-// 進入夢境協作？ question, the 建議 pill and the suggestions card, focus return,
+// actions — the place card's 查看房間 and 等待, the wait card and its sleep and
+// rest forms, the 建議 pill and the suggestions card, focus return,
 // the readout feed, and the focus home (webclient-room-actions,
 // webclient-exploration-menu, webclient-context-actions-suggestions).
 import { mount } from "@vue/test-utils";

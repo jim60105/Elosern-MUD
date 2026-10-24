@@ -227,7 +227,7 @@ export function applyPresence(ctx) {
     // navigate row opened): those digits are not the card's and not claimed.
     if (ctx.roomCard !== null) {
       // A room card's digits are its own keydown's: the sleep row opens the
-      // view's dream question and the rest row the view's form, which the
+      // view's sleep form and the rest row the rest form, which the
       // store cannot. A stray digit is claimed and does nothing, so it never
       // reaches the rail beneath the card.
       return !(ctx.hudDrawer.value || ctx.hudOverlay.value);
