@@ -36,8 +36,8 @@ Action descriptors SHALL be validator-normalized. Authored topic descriptors SHA
   `{"daypart": "noon"}`, `explore.possess` `{"npc_id"}`, `explore.possess_release`
   `{"npc_id"}`, and `explore.deliver` `{"npc_id", "item_key"}`
 
-#### Scenario: Freeform retains its native composition exception
-- **WHEN** an `explore.talk_freeform` entry is considered
+#### Scenario: Freeform is the single validator exception
+- **WHEN** the native non-authored affordance vocabulary considers an `explore.talk_freeform` entry
 - **THEN** no registered full validator produces its shape without
   `speech` — so the full validator SHALL run only on the client-composed dispatch payload
   (`speech` = the label text) defined by the later suggestions slices
