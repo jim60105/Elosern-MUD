@@ -1,7 +1,7 @@
 # WebClient Incremental Synchronization and Event-Driven Alignment
 
 **Date:** 2026-10-25
-**Status:** Design sections approved; written specification awaiting user review.
+**Status:** Approved design; complete OpenSpec proposals prepared. Implementation not started by this design workflow.
 **Scope:** Per-session presentation publication, browser reduction, bounded multipart delivery, and functional verification. No implementation is included in this document commit.
 
 ## 1. Purpose and authority
@@ -173,4 +173,60 @@ No persistent game-state schema, player command syntax, generative authority, or
 
 Implementation must migrate every affected publisher, server/client validator, reducer consumer, protocol fixture, and relevant specification together. Keep protocol ownership explicit and modules focused; do not add a second presentation store or parallel publication owner. Preserve operational logging boundaries and update affected tests and documentation with the implementation.
 
-After review of this written specification, produce the implementation plan through the writing-plans workflow and honor the repository's specification-driven implementation gates. Design approval and this documentation commit do not authorize code implementation.
+The user subsequently selected the OpenSpec proposal workflow for implementation planning. The complete proposal set and scheduling contract are recorded below. Honor the repository's specification-driven implementation gates. Design approval and documentation edits do not authorize code implementation.
+
+## 13. Complete OpenSpec proposal inventory
+
+Each change lives under `openspec/changes/<change>/` and contains its proposal, technical design, delta specifications, and implementation tasks. These artifacts were prepared for **gpt-luna-level implementation workers**: shared interfaces, caller ownership, prerequisites, and functional verification are specified before apply. Performance measurements remain excluded.
+
+The shared wire contract, source-design traceability, detailed dependency/conflict matrix, and independent-review disposition are in [the delta-contract design](../../../openspec/changes/webclient-delta-contract/design.md). Use each change's CLI status and artifact paths at apply time; this inventory does not assert that any implementation is complete.
+
+| ID | Change | Implementation scope | Direct prerequisites |
+|---|---|---|---|
+| D | [webclient-delta-contract](../../../openspec/changes/webclient-delta-contract/proposal.md) | Exact-base delta envelopes, explicit removals, metadata-only updates, staged atomic admission, and producer/fixture migration | None |
+| B | [webclient-publication-baseline](../../../openspec/changes/webclient-publication-baseline/proposal.md) | Isolated JSON-aware candidate comparison, unchanged completion, one publication owner, always-Deferred receipts, and complete publisher cutover | D |
+| P | [webclient-publication-settlements](../../../openspec/changes/webclient-publication-settlements/proposal.md) | Causal synchronous commit groups, overlapping text/graphical ingress, and all-watcher callback ordering | B |
+| C | [webclient-publication-codec](../../../openspec/changes/webclient-publication-codec/proposal.md) | Bounded server multipart encoding, shared constants, and complete preflight before sending | B |
+| A | [webclient-publication-assembly](../../../openspec/changes/webclient-publication-assembly/proposal.md) | Atomic browser assembly, transport routing, bounded buffers, supersession, and lifecycle teardown | C |
+| R | [webclient-sync-recovery](../../../openspec/changes/webclient-sync-recovery/proposal.md) | Coalesced full recovery, action-result revision safety, mutation locking, and bounded recovery failure | A |
+| M | [webclient-movement-alignment](../../../openspec/changes/webclient-movement-alignment/proposal.md) | Authoritative area/instance identity and committed movement checkpoints through graphical/text paths | P |
+| S | [webclient-settlement-alignment](../../../openspec/changes/webclient-settlement-alignment/proposal.md) | Terminal combat and completed rest/sleep/explicit-skip checkpoints with causal grouping | M |
+| I | [webclient-immutable-adoption](../../../openspec/changes/webclient-immutable-adoption/proposal.md) | Immutable committed reads, unchanged reference retention, detached snapshot isolation, consumer migration, and local UI preservation | R |
+| F | [webclient-sync-functional-smoke](../../../openspec/changes/webclient-sync-functional-smoke/proposal.md) | Real socket/browser scenarios for incremental updates, checkpoints, oversized delivery, and forced recovery | S and I |
+
+### Panel inventory ownership
+
+B owns the publisher/candidate integration inventory. D owns update-envelope producer and fixture migration. I owns committed-data consumer and mutation auditing. The proposals do **not** separately promise a comprehensive audit of every panel's game-data dependencies. Do not interpret publisher coverage as proof that every affected-panel declaration is complete.
+
+At apply time, use the actual current registered panels and caller implementations. If another feature has changed a panel, reconcile that feature's registered schema, candidate dependencies, and consumers at the relevant owner above; do not restore an obsolete inventory from these proposals. This document update does not inspect, modify, or schedule the other feature.
+
+## 14. Parallel implementation batches
+
+### Scheduling policy
+
+The prerequisite graph permits two logical lanes after B: P/M/S and C/A/R/I. Shared files prevent unrestricted concurrent editing. In particular, P and C both change coordinator publication infrastructure; R also changes narrow ingress/dispatcher failure paths that overlap movement and settlement integration. The conservative batches below add scheduling barriers without changing the proposals' semantic prerequisite graph.
+
+Finish and integrate each batch before starting the next. A parallel row means separate apply workers and worktrees, not shared working-directory edits. Do not run apply now merely because the schedule exists.
+
+| Batch | Concurrent apply workers | Start condition | Conflict rationale |
+|---|---|---|---|
+| 1 | D | Existing feature integration constraints have been checked | Establish the shared protocol and migrate fixtures first |
+| 2 | B | D integrated | Publication API and every publisher must agree before downstream changes |
+| 3 | P | B integrated | Own causal-group infrastructure without C editing the coordinator concurrently |
+| 4 | C | P integrated | Add server codec against the integrated publication/grouping API |
+| 5 | **A + M** | C and P integrated | A owns browser assembly/routing; M owns server movement identity and checkpoint integration |
+| 6 | R | A and M integrated | Serialize ingress/dispatcher recovery edits after M and before S |
+| 7 | **S + I** | R and M integrated | S owns server combat/time settlement; I owns browser immutable adoption and consumers |
+| 8 | F | S and I integrated | Verify the integrated end-to-end behavior after both lanes complete |
+
+Maximum concurrency in this schedule is two implementation workers. A serial fallback is D, B, P, C, A, R, M, S, I, F when current edits or integration constraints make a parallel batch unsafe.
+
+### Apply and integration ownership
+
+For each change `<change>`, assign its apply worker the exact branch `feat/<change>` and worktree `.worktrees/<change>`. The worker reads the shared contract and its own proposal/design/specs/tasks, and implements only its assigned change. Completed prerequisites must be available in its starting baseline.
+
+Within a parallel batch, one integration owner serializes shared-file changes, especially `.github/evennia-shards.json`, `.github/browser-shards.json`, traceability registrations, synchronization documentation, and any shared helper or fixture discovered during implementation. Coordinate ownership before edits; defer a shared-file operation to integration or serialize the affected slice rather than letting workers independently rewrite it. Every completed change must still contain its required test ownership registrations and documentation before handoff/archive.
+
+Workers must not run builds, lints, tests, or formatters against half-finished shared edits. Run each change's prescribed focused functional verification after its owned edits are complete, and run the repository contract gate before handoff/archive. Integration must preserve the exact-base, causal-group, receipt, assembly, and immutable-consumer contracts. Passing checks in one isolated worktree does not establish that the other lane is integrated.
+
+Before launching a parallel row, check the current owned-file sets and active changes again. Newly overlapping files require serialized ownership; the batch table is not permission to overwrite another feature. Existing source-conflict details are recorded in the shared delta-contract design. No performance measurement, profiling, benchmark gate, or runtime compatibility shim is introduced by this schedule.
