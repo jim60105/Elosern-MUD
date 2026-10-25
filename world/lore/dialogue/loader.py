@@ -1,8 +1,17 @@
-"""Filesystem discovery and snapshot loading for authored static dialogue YAML."""
+"""Filesystem discovery and snapshot loading for authored static dialogue YAML.
+
+Static dialogue contract:
+- Files are discovered automatically from ``content/<profile_key>.yaml`` without manual registration.
+- The filename stem identifies an existing registered ``NpcProfile.key`` and establishes ownership.
+- Explicit owner fields (npc_id, profile_key, owner, dialogue_key) in source files are strictly rejected.
+- Bidirectional completeness between canonical bindings and discovered files is enforced atomically.
+- Production startup builds a deeply immutable snapshot once; no hot reload and no generated storage.
+"""
 
 from __future__ import annotations
 
 import os
+import stat
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -80,13 +89,14 @@ for forbidden_tag in (
 
 
 def _safe_read_file(path: Path) -> str:
-    """Read a regular file under size limit rejecting symlinks, returning decoded UTF-8 text."""
+    """Read a regular file under size limit rejecting symlinks, returning decoded UTF-8 text.
+    """
     # Check if entry itself is a symlink
     if path.is_symlink():
         raise DialogueSourceError(f"File {path.name!r} is a symlink", path=path)
 
-    # Use O_NOFOLLOW where available to prevent symlink races
-    flags = os.O_RDONLY
+    # Use O_NOFOLLOW and O_NONBLOCK where available to prevent symlink races and blocking FIFOs
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
 
@@ -96,18 +106,28 @@ def _safe_read_file(path: Path) -> str:
         raise DialogueSourceError(f"Cannot open file {path.name!r}: {exc}", path=path) from exc
 
     try:
-        stat_info = os.fstat(fd)
-        import stat
+        try:
+            stat_info = os.fstat(fd)
+        except OSError as exc:
+            raise DialogueSourceError(f"Cannot stat file {path.name!r}: {exc}", path=path) from exc
+
         if not stat.S_ISREG(stat_info.st_mode):
             raise DialogueSourceError(f"File {path.name!r} is not a regular file", path=path)
         if stat_info.st_size > MAX_DIALOGUE_FILE_BYTES:
             raise DialogueSourceError(
-                f"File {path.name!r} size {stat_info.st_size} exceeds maximum {MAX_DIALOGUE_FILE_BYTES} bytes",
+                f"File {path.name!r} size {stat_info.st_size} exceeds maximum "
+                f"{MAX_DIALOGUE_FILE_BYTES} bytes",
                 path=path,
             )
 
-        # Read up to MAX_DIALOGUE_FILE_BYTES + 1 to verify actual byte size
-        raw_bytes = os.read(fd, MAX_DIALOGUE_FILE_BYTES + 1)
+        # Read through fdopen to handle short reads safely
+        try:
+            with os.fdopen(fd, "rb", closefd=False) as f:
+                raw_bytes = f.read(MAX_DIALOGUE_FILE_BYTES + 1)
+        except OSError as exc:
+            raise DialogueSourceError(
+                f"Error reading file {path.name!r}: {exc}", path=path
+            ) from exc
         if len(raw_bytes) > MAX_DIALOGUE_FILE_BYTES:
             raise DialogueSourceError(
                 f"File {path.name!r} content exceeds maximum {MAX_DIALOGUE_FILE_BYTES} bytes",
@@ -119,7 +139,9 @@ def _safe_read_file(path: Path) -> str:
     try:
         return raw_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise DialogueSourceError(f"File {path.name!r} is not valid UTF-8: {exc}", path=path) from exc
+        raise DialogueSourceError(
+            f"File {path.name!r} is not valid UTF-8: {exc}", path=path
+        ) from exc
 
 
 def _parse_yaml_text(text: str, *, path: Path) -> Any:
@@ -135,8 +157,9 @@ def _parse_yaml_text(text: str, *, path: Path) -> Any:
             f"YAML parse error in file {path.name!r}: {exc}", path=path
         ) from exc
     except DialogueSourceError as exc:
-        exc.path = path
-        raise
+        raise DialogueSourceError(
+            f"YAML strictness error in file {path.name!r}: {exc}", path=path
+        ) from exc
 
 
 def load_dialogue_snapshot(
@@ -172,6 +195,12 @@ def load_dialogue_snapshot(
     # Validate bindings structure: dialogue_key -> profile_key must be unique per profile_key
     profile_to_dialogue: dict[str, str] = {}
     for diag_key, prof_key in bindings.items():
+        if prof_key not in profiles:
+            raise DialogueSourceError(
+                f"Canonical dialogue binding {diag_key!r} maps to unknown profile {prof_key!r}",
+                profile_key=prof_key,
+                dialogue_key=diag_key,
+            )
         if prof_key in profile_to_dialogue:
             raise DialogueSourceError(
                 f"Duplicate canonical binding for profile {prof_key!r}: bound to {profile_to_dialogue[prof_key]!r} and {diag_key!r}",
@@ -269,8 +298,8 @@ def load_dialogue_snapshot(
                     dialogue_key=diag_key,
                 )
 
-        identity = StaticDialogueIdentity(profile_key=stem, dialogue_key=diag_key)
         try:
+            identity = StaticDialogueIdentity(profile_key=stem, dialogue_key=diag_key)
             authored = parse_dialogue(payload, identity=identity, references=references)
         except (ValueError, TypeError) as exc:
             raise DialogueSourceError(

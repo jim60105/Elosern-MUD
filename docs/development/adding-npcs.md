@@ -149,8 +149,8 @@ ROWS = {
 
 靜態劇本對話支援由檔案系統自動探索，不需手動維護檔名索引或 Python 匯入清單：
 
-1. **檔名即擁有者身分**：對話檔案必須放置於 `world/lore/dialogue/content/<NpcProfile.key>.yaml`。檔名主體（stem）必須等於已登錄的 `NpcProfile.key`。內容中嚴禁宣告任何顯式 `npc_id`、`profile_key` 或 `owner` 欄位（違者整批拒收）。
-2. **雙向完整性與原子載入**：啟動時由載入器比對現行地點／服務中解析出的規範綁定（`dialogue_key -> profile_key`）。每一個綁定必須恰好對應一個探索到的檔案；每一個探索到的檔案也必須對應已登錄的 Profile 與綁定。任一檔案損壞、格式錯誤、包含未解析參照或孤立綁定時，載入器將拋出 `DialogueSourceError` 並拒絕發布整個快照，絕不允許局部載入或靜默退化。
+1. **檔名即擁有者身分**：對話檔案必須放置於 `world/lore/dialogue/content/<NpcProfile.key>.yaml`。檔名主體（stem）必須等於已登錄的 `NpcProfile.key`。內容中嚴禁宣告任何顯式 `npc_id`、`profile_key`、`owner` 或 `dialogue_key` 欄位（違者整批拒收）。
+2. **雙向完整性與原子載入**：啟動時由載入器比對現行地點／服務中解析出的規範綁定（`dialogue_key -> profile_key`；於後續 runtime 切換時接上正式啟動點）。每一個綁定必須恰好對應一個探索到的檔案；每一個探索到的檔案也必須對應已登錄的 Profile 與綁定。任一檔案損壞、格式錯誤、包含未解析參照或孤立綁定時，載入器將拋出 `DialogueSourceError` 並拒絕發布整個快照，絕不允許局部載入或靜默退化。
 3. **嚴格安全載入**：對話 YAML 檔案大小上限為 262,144 位元組（256 KiB），必須為嚴格 UTF-8 編碼。禁止符號連結（symlink）、多文件串流（`---`）、別名與錨點（`*` 與 `&`）、合併鍵（`<<`）、重複鍵（任一巢狀層級皆禁止）及不安全的物件標籤。
 
 ### Step 3.1 — 人物設定切片、名冊清單與啟動門禁

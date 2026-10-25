@@ -13,3 +13,10 @@ All tasks are future implementation, with Shared contract v2 fixed beforehand. T
 ## 3. Discoverability and handoff acceptance
 
 - [x] 3.1 Prove a new valid registered-profile file appears with no registration edit, equivalent YAML/JSON primitives share validation, and test-only reload does not introduce production hot reload. Register test ownership and run the focused commands in design.md plus contract_gate; no prose migration or runtime changes in this slice.
+
+## 4. Archive-time handoff
+
+- [ ] 4.1 At archive time, after `openspec archive` syncs delta requirements to main specs, annotate tests in `world/lore/tests/test_dialogue_loader.py` with `@covers_requirement`:
+  - `authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename`
+  - `authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot`
+  Confirm canonical IDs with `python -m tools.spec_traceability list` after sync.

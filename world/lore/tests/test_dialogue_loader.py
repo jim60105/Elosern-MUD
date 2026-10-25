@@ -122,7 +122,8 @@ class DialogueLoaderTests(unittest.TestCase):
                 references=self.references,
             )
 
-            # All keys are present and mapped to AuthoredDialogue
+            # Keys are returned in deterministic discovery order
+            self.assertEqual(list(snapshot.keys()), ["alpha_host_diag", "bravo_host_diag", "charlie_host_diag"])
             self.assertEqual(set(snapshot.keys()), {"alpha_host_diag", "bravo_host_diag", "charlie_host_diag"})
             for k in snapshot:
                 self.assertIsInstance(snapshot[k], AuthoredDialogue)
@@ -440,6 +441,22 @@ topics: []
                 )
             self.assertIn("no canonical dialogue binding", str(ctx.exception))
 
+    def test_binding_mapping_to_unregistered_profile_rejected(self) -> None:
+        """A binding mapping to a profile not in registered profiles is rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "known_profile.yaml").write_text(
+                _valid_dialogue_yaml("some_diag"), encoding="utf-8"
+            )
+            with self.assertRaises(DialogueSourceError) as ctx:
+                load_dialogue_snapshot(
+                    root,
+                    profiles=frozenset(["known_profile"]),
+                    bindings={"some_diag": "unknown_profile"},
+                    references=self.references,
+                )
+            self.assertIn("unknown profile 'unknown_profile'", str(ctx.exception))
+
     def test_duplicate_canonical_bindings_rejected(self) -> None:
         """Two dialogue keys bound to the same profile key reject."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -561,6 +578,21 @@ topics:
             dialogue = snapshot["immut_diag"]
             with self.assertRaises(FrozenInstanceError):
                 dialogue.greeting = "Mutated"  # type: ignore[misc]
+
+            # Nested tuple mutation is forbidden
+            self.assertIsInstance(dialogue.topics, tuple)
+            with self.assertRaises(AttributeError):
+                dialogue.topics.append(None)  # type: ignore[attr-defined]
+
+            # Multiple calls produce independent snapshots with no cross-call mutation or caching
+            snapshot_two = load_dialogue_snapshot(
+                root,
+                profiles=frozenset(["immut_host"]),
+                bindings={"immut_diag": "immut_host"},
+                references=self.references,
+            )
+            self.assertIsNot(snapshot, snapshot_two)
+            self.assertEqual(snapshot, snapshot_two)
 
     def test_unregistered_profile_with_no_file_and_no_binding_is_accepted(self) -> None:
         """Profiles that ship no dialogue table are not bindings and need no file."""
