@@ -610,6 +610,22 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"], "actor_equipment_malformed"
         )
 
+    def test_kit_exposure_accessory_crosses_the_bound_through_the_shipped_rulebook(self):
+        """The browser fixture's gear shifts the canonical read with no rule patching."""
+        accessory = next(
+            key
+            for key, row in SYNTH_ITEMS.items()
+            if row.equipment_slot is EquipmentSlot.ACCESSORY
+        )
+        condition = Exposure(minimum=_EXPOSURE_BOUND)
+        self.char1.db.sexual = {"exposure": _EXPOSURE_BASELINE}
+        self.char1.db.equipment = _empty_equipment()
+        self.assertFalse(evaluate_condition(condition, self._context()))
+
+        self.char1.db.equipment = {**_empty_equipment(), "accessories": [accessory]}
+        self.assertTrue(evaluate_condition(condition, self._context()))
+        self.assertNotIn("sexual", self.char1.__dict__)
+
     # -- combination, hints and variants ---------------------------------
 
     def test_all_any_combine_and_bound_the_tree(self):
