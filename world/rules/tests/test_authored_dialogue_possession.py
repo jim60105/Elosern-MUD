@@ -339,6 +339,44 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         self.assertFalse(freeform[0].enabled)
         self.assertEqual(freeform[0].disabled_reason[0], REASON_POSSESSED_TALK)
 
+    @covers_requirement(
+        "webclient-possession-presentation::shop-access-does-not-delegate-other-npc-services-during-possession"
+    )
+    def test_text_talk_guild_turnin_stays_refused_while_possessing(self):
+        """Guild 回報 keeps its player-only authority behind the possession refusal.
+
+        The service never receives the acting body, so no claim, reward or
+        ledger state can change; ordinary authored guild topics are covered by
+        the enabled authored path above.
+        """
+        from typeclasses.components import GuildStaff
+        from world.rules.dialogue import (
+            GUILD_STAFF_DIALOGUE_KEY,
+            GUILD_STAFF_TURNIN_KEYWORD,
+        )
+        from world.rules.possession import POSSESSED_REFUSAL_MESSAGES
+
+        staff = create_object(NPC, key="合成公會職員", location=self.room1)
+        staff.components.add(
+            GuildStaff.create(
+                staff, service_id="synth_staff", branch_key="synth_branch"
+            )
+        )
+        staff.components.add(
+            ScriptedDialogue.create(staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        )
+        wallet_before = self.char1.db.wallet
+
+        with patch("commands.talk.dialogue_turn_in") as turn_in:
+            output = self._run_talk(
+                f"{staff.key} {GUILD_STAFF_TURNIN_KEYWORD} synth-quest-1"
+            )
+
+        turn_in.assert_not_called()
+        self.assertEqual(output, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+        self.assertEqual(self.char1.db.wallet, wallet_before)
+        self.assertIsNone(self.companion.db.dialogue_session)
+
     # ------------------------------------------------------------------
     # Release and trade
     # ------------------------------------------------------------------

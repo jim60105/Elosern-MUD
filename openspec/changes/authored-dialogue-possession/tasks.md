@@ -18,5 +18,15 @@ Shared contract v2 is source-neutral. Test non-profile package-role contexts ope
 
 ## 4. Focused acceptance ownership
 
-- [ ] 4.1 Add possessed multi-line browser method to test_browser_exploration_dialogue.py and register browser/Python modules in ownership manifests; run focused tests and contract_gate. No freeform enablement or remote guild authority expansion.
+- [x] 4.1 Add possessed multi-line browser method to test_browser_exploration_dialogue.py and register browser/Python modules in ownership manifests; run focused tests and contract_gate. No freeform enablement or remote guild authority expansion.
+  - `test_possessed_companion_plays_an_authored_scene_with_its_own_portrait` is
+    written in `web/tests/browser/test_browser_exploration_dialogue.py` (real
+    possession through the party window, actor portrait, two played lines) and
+    registered in `.github/browser-shards.json`; the new Python module
+    `world.rules.tests.test_authored_dialogue_possession` is registered in
+    `.github/evennia-shards.json`. The focused Python suites and
+    `contract_gate` pass locally. The managed browser suite is CI-owned
+    (AGENTS.md), and the local harness failed at login for every browser test
+    including pre-existing methods, so the method's execution is owed to CI
+    rather than to this archive.
 
