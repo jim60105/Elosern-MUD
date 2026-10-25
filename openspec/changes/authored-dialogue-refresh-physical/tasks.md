@@ -1,5 +1,7 @@
 # Tasks
 
+All units follow Shared contract v2 source-neutral context discovery, including package-role hosts. Add synthetic generated scene cases proving the same hooks refresh eligibility without editing immutable packages/current wording or requiring static membership.
+
 Read design.md and the named dependency shared contracts first. All boxes are future implementation tasks; this proposal implements nothing. Each unit includes its own tests/documentation and is bounded to 45-120 minutes.
 
 ## 1. Narrow callback and owner discovery

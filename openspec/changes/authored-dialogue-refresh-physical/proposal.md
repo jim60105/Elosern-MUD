@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No static-only watcher filter, hot reload or new state writer. Committed physical-source refresh re-resolves every current scene source without exposing generated package payloads.
 
 ## Batch:
 
@@ -32,4 +32,4 @@ depends-on: authored-dialogue-availability
 
 Code conflicts: Extends dialogue_availability.py and physical writers only. Progression/lifecycle refresh follows to reuse callback/owner helpers. Shared manifests need serial integration; no gameplay arithmetic changes.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; generated-package integration reuses these exact commit hooks.
