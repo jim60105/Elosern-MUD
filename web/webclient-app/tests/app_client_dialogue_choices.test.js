@@ -300,7 +300,12 @@ describe("the dialogue choice list over the stage", () => {
       page().focus();
       await press();
       expect(pageText()).toBe("好。");
-      expect(sender.sent.actions).toHaveLength(0);
+      // The one formal finish submitted exactly one completion
+      // acknowledgement (authored-dialogue-reading-client) and no selection.
+      expect(sender.sent.actions.filter((action) => action.action_id === "explore.talk_scripted")).toHaveLength(0);
+      expect(
+        sender.sent.actions.filter((action) => action.action_id === "explore.dialogue_complete"),
+      ).toHaveLength(1);
     });
 
     it("plays without appending transcript and keeps auto-advance off for scenes", async () => {
@@ -574,7 +579,129 @@ describe("the dialogue choice list over the stage", () => {
       expect(list().exists()).toBe(true);
       expect(pickRows()).toHaveLength(5);
       expect(pickRows()[1].attributes("data-locked")).toBeUndefined();
-      expect(sender.sent.actions).toHaveLength(0);
+      // Only the formal finish's completion acknowledgement was submitted.
+      expect(
+        sender.sent.actions.filter((action) => action.action_id !== "explore.dialogue_complete"),
+      ).toHaveLength(0);
+    });
+  });
+
+  // authored-dialogue-reading-client: the formal finish is acknowledged once
+  // through the memory-only queue, the status is observable at the
+  // return-to-choices boundary, and a pre-delivered public successor may play
+  // before its predecessor's acknowledgement saved.
+  describe("the memory-only reading acknowledgement", () => {
+    const TWO_LINES = [speech("actor", "嗯？"), speech("host", "好。")];
+    const acks = () => sender.sent.actions.filter((action) => action.action_id === "explore.dialogue_complete");
+    const answer = (requestId, overrides = {}) =>
+      store.receive(
+        generation,
+        "ui_action_result",
+        [
+          fx.actionResult({
+            request_id: requestId,
+            presentation_revision: store.view.revision,
+            ...overrides,
+          }),
+        ],
+        {},
+      );
+
+    it("acknowledges one formal finish, reports pending, retries once, and never rereads", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(
+        scenePanel(TWO_LINES, { deliveryId: "dlv-read", topicId: "host.news", sceneId: "host.news_scene" }),
+      );
+      page().focus();
+      await press();
+      await press(); // the explicit finish
+
+      expect(acks()).toHaveLength(1);
+      expect(acks()[0].payload).toEqual({
+        npc_id: 7,
+        delivery_id: "dlv-read",
+        context_id: "ctx-1",
+        topic_id: "host.news",
+        scene_revision: "r1",
+      });
+      // No selection was repeated: the finish is not a reread.
+      expect(sender.sent.actions.filter((action) => action.action_id === "explore.talk_scripted")).toHaveLength(0);
+      const status = wrapper.get('[data-testid="dialogue-reading-status"]');
+      expect(status.attributes("data-state")).toBe("pending");
+      expect(wrapper.find('[data-testid="dialogue-reading-retry"]').exists()).toBe(false);
+      expect(pageText()).toBe("好。");
+
+      // A reply naming any other attempt never clears this entry.
+      answer("session:77", { code: "dialogue_completed" });
+      await settle();
+      expect(store.view.dialogueReading.pendingCount).toBe(1);
+
+      // An operational rejection leaves the entry unsaved and offers retry.
+      answer(acks()[0].request_id, { outcome: "rejected", code: "busy", message: "另一項操作正在進行中" });
+      await settle();
+      expect(store.view.dialogueReading.retryable).toBe(true);
+      expect(wrapper.get('[data-testid="dialogue-reading-status"]').attributes("data-state")).toBe("failed");
+      await wrapper.get('[data-testid="dialogue-reading-retry"]').trigger("click");
+      expect(acks()).toHaveLength(2);
+      expect(acks()[1].payload).toEqual(acks()[0].payload);
+      expect(acks()[1].request_id).not.toBe(acks()[0].request_id);
+
+      answer(acks()[1].request_id, { code: "dialogue_completed" });
+      await settle();
+      expect(store.view.dialogueReading.pendingCount).toBe(0);
+      expect(wrapper.find('[data-testid="dialogue-reading-status"]').exists()).toBe(false);
+      expect(list().exists()).toBe(true);
+      // The one finished line never reappeared: no replay, no reread.
+      expect(pageText()).toBe("好。");
+      expect(sender.sent.actions.filter((action) => action.action_id === "explore.talk_scripted")).toHaveLength(0);
+    });
+
+    it("plays a pre-delivered public successor and queues its acknowledgement behind the predecessor", async () => {
+      store.setTextSpeed?.("instant");
+      const root = sceneDelivery(TWO_LINES, {
+        deliveryId: "dlv-root",
+        topicId: "host.news",
+        sceneId: "host.news_scene",
+        revision: "r1",
+      });
+      const child = sceneDelivery([speech("actor", "再說？"), speech("host", "接續。")], {
+        deliveryId: "dlv-child",
+        topicId: "host.news_more",
+        sceneId: "host.news_more_scene",
+        revision: "r2",
+      });
+      const chain = [{ delivery: child, predecessors: ["host.news"] }];
+      await openDialogue(dialoguePanel({ delivery: root, pureChain: chain }));
+      page().focus();
+      await press();
+      await press(); // finish the root
+
+      expect(acks()).toHaveLength(1);
+      expect(acks()[0].payload.topic_id).toBe("host.news");
+      // The already-delivered successor plays from its first line.
+      expect(pageText()).toBe("再說？");
+      expect(list().exists()).toBe(false);
+
+      // A reading-revision-only update of the same delivery must not replace
+      // or restart the playing successor.
+      commit("dialogue", dialoguePanel({ delivery: root, pureChain: chain, readingRevision: 1 }));
+      await settle();
+      expect(pageText()).toBe("再說？");
+
+      await press(); // the successor's second line
+      await press(); // finish the successor
+      // Its acknowledgement waits for the unsaved predecessor.
+      expect(acks()).toHaveLength(1);
+      expect(store.view.dialogueReading.pendingCount).toBe(2);
+
+      answer(acks()[0].request_id, { code: "dialogue_completed" });
+      await settle();
+      expect(acks()).toHaveLength(2);
+      expect(acks()[1].payload).toMatchObject({
+        delivery_id: "dlv-child",
+        topic_id: "host.news_more",
+        scene_revision: "r2",
+      });
     });
   });
 });

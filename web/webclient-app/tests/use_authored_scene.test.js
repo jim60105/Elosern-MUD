@@ -28,6 +28,7 @@ function setup(overrides = {}) {
     generation: 1,
     contextId: "ctx-1",
     delivery: sceneDelivery(LINES),
+    npcId: 41,
     actorName: "旅人",
     hostName: "店長",
     bondStage: "熟識",
@@ -87,6 +88,7 @@ describe("useAuthoredScene", () => {
     expect(scene.advance()).toBe(false);
     expect(finished).toEqual([
       {
+        npc_id: 41,
         delivery_id: "dlv-1",
         context_id: "ctx-1",
         topic_id: "host.fare",

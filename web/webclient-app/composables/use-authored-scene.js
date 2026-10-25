@@ -69,7 +69,7 @@ export function lineSpeaker(line) {
 
 /**
  * @param {import("vue").Ref<{playable: boolean, generation: *, contextId: *,
- *   delivery: object|null, actorName: string, hostName: string,
+ *   delivery: object|null, npcId: number|null, actorName: string, hostName: string,
  *   bondStage: string|null}>} source — a computed over committed state.
  */
 export function useAuthoredScene(source) {
@@ -177,6 +177,10 @@ export function useAuthoredScene(source) {
     // The single finish event: locally usable now; the reading-client
     // slice wires it to persistence.
     const detail = {
+      // The host identity follows the committed conversation so the reading
+      // client can compose the exact five-field acknowledgement payload
+      // without re-deriving it (authored-dialogue-reading-client).
+      npc_id: source.value?.npcId ?? null,
       delivery_id: shown.delivery_id,
       context_id: shown.context_id,
       topic_id: shown.topic_id,

@@ -393,6 +393,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `avatar-artwork` + `avatar-artwork__<suffix>`（`avatar-artwork__face`、`avatar-artwork__initial`）（共用的微型頭像渲染器：根節點、其真實影像與字素首字備援；由 unified-avatar-rendering 變更加入，受管旅程 `test_browser_avatar_artwork.py` 首次鎖定。presence medallion 仍以自己的 face／initial 掛鉤轉發此渲染器的影像與首字，故該 family 不變） | unified-avatar-rendering | REMAP-TO-TESTID |
 | `dream-panel`、`dream-reply`、`dream-scene-art`、`dream-art-control`、`dream-art-failure`、`dream-art-view`、`dream-art-view-image`、`dream-art-view-failure`、`data-row`（夢境舞台：對話 modal 的根節點與其回覆列、舞台上唯一的畫面層、該畫面的全圖控制與在地狀態標記、全圖對話方塊與其中的影像／狀態，以及念頭列的列屬性識別——覺醒步驟以該屬性選擇器鎖定。前兩者與列屬性為既有掛鉤，受管旅程 `test_browser_dream_artwork.py` 首次鎖定；其餘由 unified-dream-rendering 隨共用場景載入整合一併加入） | unified-dream-rendering | REMAP-TO-TESTID |
 | `choice-card-lock`、`choice-card-tip`、`choice-card-tip-text`（對話選項卡上可見鎖定話題的掛鎖圖示、指標懸停或鍵盤焦點時顯示於卡片旁的伺服器需求提示框，以及以 aria-describedby 指向的隱藏提示文字；由 authored-dialogue-locked-ui 變更加入，受管旅程 `test_browser_exploration_dialogue.py` 首次鎖定） | authored-dialogue-locked-ui | REMAP-TO-TESTID |
+| `dialogue-reading-status`（選項清單上方、只在回到選項邊界顯示的閱讀同步狀態列，帶 data-state 屬性的 pending／failed 兩態）、`dialogue-reading-retry`（failed 狀態下唯一的明確重試控制；由 authored-dialogue-reading-client 變更加入，受管旅程 test_browser_exploration_dialogue.py 的 test_dialogue_completion_retry_without_rereading 與 test_dialogue_completion_reload_discards_pending 首次鎖定） | authored-dialogue-reading-client | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 

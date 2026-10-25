@@ -20,11 +20,19 @@ export const DIALOGUE_FREE_ROW_KEY = "dlg-free";
  * Derive the dialogue view model from a committed `dialogue` panel.
  *
  * @param {object|null} panel — the committed panel (either form).
+ * @param {object|null} reading — the memory-only reading slice
+ *   (`view.dialogueReading`): its transient pure-chain reveal, the saved
+ *   revision/completions and the pending acknowledgement status. The revealed
+ *   successor is already-delivered bytes the client may present before the
+ *   server has saved the predecessor; it never edits `picks`, so no qualified
+ *   row is ever unhidden by it.
  * @returns {{host: {identity: *, displayName: string, portraitRef: string|null},
- *     bondStage: string|null, line: string, picks: object[], freeRow: object}
+ *     bondStage: string|null, line: string, picks: object[], freeRow: object,
+ *     readingRevision: number, completedTopicIds: string[],
+ *     pureChain: object[], readingPending: number}
  *     | null} — null unless the panel is the available `dialogue` form.
  */
-export function dialogueViewModel(panel) {
+export function dialogueViewModel(panel, reading = null) {
   if (!panel || panel.available !== true || panel.kind !== "dialogue") {
     return null;
   }
@@ -68,6 +76,14 @@ export function dialogueViewModel(panel) {
     actionId: null,
   };
   const actor = panel.actor || null;
+  // The optimistic pure-chain reveal replaces the presented delivery while it
+  // is current; a different context (or a server-committed new delivery, which
+  // the store clears the reveal for) falls back to the canonical panel.
+  const revealed = reading && reading.revealed ? reading.revealed.delivery : null;
+  const delivery =
+    revealed && revealed.context_id === panel.context_id
+      ? revealed
+      : panel.delivery ?? null;
   return {
     host: {
       identity: host.identity,
@@ -83,8 +99,16 @@ export function dialogueViewModel(panel) {
     contextId: panel.context_id ?? null,
     // The stage NAME travels verbatim (the server never ships numbers).
     bondStage: panel.bond_stage ?? null,
-    line: panel.line ?? (panel.delivery?.lines?.[panel.delivery.lines.length - 1]?.text ?? ""),
-    delivery: panel.delivery ?? null,
+    line: panel.line ?? (delivery?.lines?.[delivery.lines.length - 1]?.text ?? ""),
+    delivery,
+    // The reading projection travels verbatim (Shared contract v2): the saved
+    // revision, the saved formal topics and the pre-delivered public chain.
+    readingRevision: Number.isInteger(panel.reading_revision) ? panel.reading_revision : 0,
+    completedTopicIds: Array.isArray(panel.completed_topic_ids)
+      ? panel.completed_topic_ids.slice(0, 16)
+      : [],
+    pureChain: Array.isArray(panel.pure_chain) ? panel.pure_chain : [],
+    readingPending: reading && Number.isInteger(reading.pendingCount) ? reading.pendingCount : 0,
     picks,
     freeRow,
   };

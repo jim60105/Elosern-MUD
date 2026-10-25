@@ -25,6 +25,7 @@ from web.webclient.actions.exploration_actions import (
     _dialogue_complete_adapter,
     validate_dialogue_complete_payload,
 )
+from world.lore.dialogue.codec import make_generated_topic_id
 from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic
 from world.lore.scenes import Scene, Speech
 from world.narrative.dialogue_reading import completed_topic_ids
@@ -149,6 +150,28 @@ class DialogueCompletionActionTests(EvenniaTest):
             validate_dialogue_complete_payload({**payload, "delivery_id": ""})
         with self.assertRaises(ExplorationActionError):
             validate_dialogue_complete_payload({**payload, "context_id": ""})
+
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-acknowledgements-use-the-same-memory-only-lifecycle"
+    )
+    def test_validator_admits_a_full_generated_topic_identity_verbatim(self):
+        # A generated completion is acknowledged through the same five-field
+        # payload as a static one, and its opaque package-role identity is
+        # admitted in full: no truncation and no source-specific branch.
+        topic_id = make_generated_topic_id(
+            "套" * 64, "r" * 64, "phase_1", "reading_client"
+        )
+        self.assertGreater(len(topic_id), 96)
+        self.assertLessEqual(len(topic_id), 2048)
+        payload = {
+            "npc_id": 4,
+            "delivery_id": "abc123",
+            "context_id": "ctx123",
+            "topic_id": topic_id,
+            "scene_revision": "r1",
+        }
+        self.assertEqual(validate_dialogue_complete_payload(payload), payload)
 
     # -- adapter ---------------------------------------------------------
 

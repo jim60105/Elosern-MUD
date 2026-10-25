@@ -44,6 +44,7 @@ import { applyInteraction } from "./elosern/interaction.js";
 import { applyPresence } from "./elosern/presence.js";
 import { applyRoomActions } from "./elosern/room_actions.js";
 import { applyTransport } from "./elosern/transport.js";
+import { applyDialogueReading } from "./elosern/dialogue_reading.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
 import { applySkillUse } from "./elosern/skill_use.js";
@@ -157,6 +158,9 @@ export const useElosernStore = defineStore("elosern", () => {
   applyRoomActions(ctx);
   applySkillUse(ctx);
   applyTransport(ctx);
+  // The memory-only dialogue completion queue (authored-dialogue-reading-
+  // client) sits on the transport seam and publishes into the view group.
+  applyDialogueReading(ctx);
   // The combat beat playback (webclient-combat-beat-queue, design D5) sits
   // between the transport (whose dispatch guard and lifecycle call its
   // entries) and the view (which publishes its projected slice).
@@ -203,6 +207,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // lock both gate.
     beatShown: ctx.beatShown,
     skipBeats: ctx.skipBeats,
+    // The memory-only reading completion queue (authored-dialogue-reading-
+    // client): the one finish admission and its explicit retry. No durable
+    // browser storage backs either.
+    finishDialogueDelivery: ctx.finishDialogueDelivery,
+    retryDialogueReading: ctx.retryDialogueReading,
     clearFreeformTarget: ctx.clearFreeformTarget,
     borrowDialogueCommand: ctx.borrowDialogueCommand,
     dispatchAction: ctx.dispatchAction,

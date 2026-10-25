@@ -178,6 +178,17 @@ export function applyTransport(ctx) {
 
   ctx.receive = function receive(messageGeneration, messageName, args, kwargs) {
     const result = ctx.reducer.receive(messageGeneration, messageName, args || [], kwargs || {});
+    // The memory-only completion queue (authored-dialogue-reading-client)
+    // settles only results the reducer accepted for the live sequence. The
+    // reducer publishes synchronously inside `receive`, so the queue's own
+    // reconciliation already ran; this hook then settles the attempt and
+    // republishes the status.
+    if (messageName === "ui_action_result" && result && result.accepted) {
+      const committed = ctx.reducer.getState().lastActionResult;
+      if (committed && typeof ctx.onDialogueReadingResult === "function") {
+        ctx.onDialogueReadingResult(committed);
+      }
+    }
     // Track presentation receive results. A genuine "cannot render" rejection
     // — a malformed `ui_snapshot` / `ui_update` the reducer refused to commit
     // (`reason === "invalid"`), or a transport-corruption missing-envelope
@@ -353,6 +364,10 @@ export function applyTransport(ctx) {
 
   ctx.dispatchAction = function dispatchAction(actionId, payload, display) {
     const v = ctx.view.value;
+    // A reading acknowledgement (authored-dialogue-reading-client) never
+    // blocks a player action here: the queue sends only while this lock is
+    // free, and a genuine race is arbitrated by the server (one action per
+    // session), whose `busy` rejection is visible rather than a silent drop.
     if (!v.connected || v.mutationsLocked || v.phase !== "active" || ctx.inFlight || ctx.beatLocked()) {
       return null;
     }

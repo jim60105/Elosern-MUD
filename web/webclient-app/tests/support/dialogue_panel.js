@@ -71,6 +71,9 @@ export function dialoguePanel({
   keywords = ["fare", "smell"],
   labels = null,
   choices = null,
+  pureChain = [],
+  readingRevision = 0,
+  completedTopicIds = [],
 } = {}) {
   return {
     schema_version: DIALOGUE_SCHEMA_VERSION,
@@ -86,9 +89,9 @@ export function dialoguePanel({
       keywords.map((keyword, index) =>
         choiceRow(keyword, { hostId, contextId, label: labels ? labels[index] : keyword }),
       ),
-    pure_chain: [],
-    reading_revision: 0,
-    completed_topic_ids: [],
+    pure_chain: pureChain,
+    reading_revision: readingRevision,
+    completed_topic_ids: completedTopicIds,
     unlock_batch: null,
   };
 }
