@@ -18,5 +18,23 @@ Implement Shared contract v2 once for both sources. Include package_role compani
 
 ## 4. Independent offline and browser acceptance
 
-- [ ] 4.1 Extend race-qualified possession and equipment variant fixture/method in test_browser_exploration_dialogue.py; update Python/browser ownership and dialogue author docs, run focused condition tests/browser method and contract_gate. No new effect/reward subsystem.
+- [x] 4.1 Extend race-qualified possession and equipment variant fixture/method in test_browser_exploration_dialogue.py; update Python/browser ownership and dialogue author docs, run focused condition tests/browser method and contract_gate. No new effect/reward subsystem.
+  - `test_possessed_companion_plays_an_authored_scene_with_its_own_portrait` now
+    plays the kit's conditioned table (`t_synth_conditioned`) behind
+    `ELOSERN_BROWSER_DIALOGUE_CONDITIONS=1`: the race-qualified topic must play
+    its `RaceIs` variant, and a fresh selection of the exposure topic must play
+    its `Exposure` variant, each asserted to differ from its fallback. The seed
+    writes the baseline one ordinal below the bound on every live companion and
+    wears the kit accessory whose borrowed shipped modifier carries a positive
+    exposure bias. The new Python modules
+    `world.rules.tests.test_dialogue_physical_conditions` and
+    `world.rules.tests.test_dialogue_references` are registered in
+    `.github/evennia-shards.json`; the browser method stays in its already
+    registered module. `docs/development/evennia-testing-guide.md` (browser
+    ownership) and `docs/development/adding-npcs.md` (dialogue authoring)
+    document the fixture and the condition rules. The focused Python suites and
+    `contract_gate` pass locally. The managed browser suite is CI-owned
+    (AGENTS.md), and the local harness fails at login for every browser test
+    including untouched pre-existing methods, so the method's execution is owed
+    to CI rather than to this archive.
 
