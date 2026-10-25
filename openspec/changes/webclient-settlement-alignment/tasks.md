@@ -9,7 +9,7 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 2. Integration and ownership
 
-- [ ] 2.1 Migrate combat_result/action normalization and sleep/dream refreshes to M tokens/facts without empty-scope forced snapshots. Assert nested movement/combat/skip reasons produce one final fresh snapshot instead of delta and result names its target, with text parity. Register test_settlement_alignment.py once, retain existing test_art_panel terminal no-partial assertions, and update traceability/checkpoint documentation.
+- [ ] 2.1 Enroll combat_result/action normalization and sleep/dream refreshes in P causal groups plus M facts without empty-scope forced snapshots; set private publication_group_id and attach terminal round context before drain. Assert nested movement/combat/skip reasons produce one final fresh snapshot for each watcher in both callback orders, its result names the actual receipt target and text/async no-ingress paths agree. Register test_settlement_alignment.py once, retain existing test_art_panel terminal no-partial assertions, and update traceability/checkpoint documentation.
 
 ## 3. Focused integrated verification
 
