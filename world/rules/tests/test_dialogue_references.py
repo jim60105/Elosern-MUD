@@ -158,6 +158,9 @@ class StaticDialogueReferencesTests(unittest.TestCase):
         }
         self.assertTrue(canonical_quests, "the canonical quest catalog is empty")
         quest_table = self.references.tables["quest"]
+        # The static family is exactly the canonical declaration set: compiled
+        # package definitions enter only through their own package scope.
+        self.assertEqual(dict(quest_table), canonical_quests)
         for key, label in canonical_quests.items():
             with self.subTest(quest=key):
                 self.assertEqual(quest_table[key], label)

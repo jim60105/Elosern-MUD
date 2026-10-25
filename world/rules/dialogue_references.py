@@ -32,11 +32,13 @@ ids and their authored display names come from ``rulebook/affinity.yaml``
 itself, while the evaluator still compares through the validated
 :func:`world.rules.affinity_config.get_config` boundary.
 
-The quest family is the canonical declaration tuple plus every definition the
-runtime has registered. The declaration tuple is always readable, so the
-import-time lore snapshot validates a shipped quest reference in a cold
-process (the registry is populated by the startup composition root); the live
-registry adds the compiled package definitions the runtime can resolve.
+The quest family is the canonical declaration tuple only. That tuple is always
+readable, so the import-time lore snapshot validates a shipped quest reference
+in a cold process (the live registry is populated by the startup composition
+root), and it is exactly the static publication permission set. A compiled
+package definition is admitted through the package's own ``package_quests``
+publication scope and through :func:`permitted_quest_definition`'s current
+package identity; a foreign package definition never enters the static family.
 """
 
 from __future__ import annotations
@@ -171,23 +173,43 @@ def _affinity_stage_table() -> dict[str, str]:
 
 
 def _quest_table() -> dict[str, str]:
-    """Return every canonical or currently registered quest key and display name."""
+    """Return the canonical quest declarations' keys and display names."""
     from world.quests.catalog import QUEST_CATALOG
+
+    return {definition.key: definition.display_name for definition in QUEST_CATALOG}
+
+
+def permitted_quest_definition(
+    definition_key: str, *, package_id: str | None = None
+) -> bool:
+    """Whether a quest reference is authorized for the current dialogue context.
+
+    Canonical declarations are always permitted. A definition registered by a
+    published scene package is permitted only for that exact current package
+    (a foreign package key grants nothing); a definition registered without any
+    package ownership is an ordinary runtime quest and stays permitted. The
+    package lookup is read-only and returns ``None`` for an unreadable package
+    payload, which fails the reference closed.
+    """
     from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 
-    table = {definition.key: definition.display_name for definition in QUEST_CATALOG}
-    table.update(
-        {
-            key: definition.display_name
-            for key, definition in QUEST_DEFINITION_REGISTRY.items()
-        }
+    if definition_key in _quest_table():
+        return True
+    if definition_key not in QUEST_DEFINITION_REGISTRY:
+        return False
+    try:
+        from world.quests import scene_store
+
+        owner = scene_store.package_for_definition(definition_key)
+    except Exception:  # observability: ignore R2: an unreadable package store cannot authorize a reference, so qualification fails closed
+        return False
+    if owner is None:
+        return True
+    return (
+        isinstance(package_id, str)
+        and bool(package_id)
+        and owner.package_id == package_id
     )
-    return table
-
-
-def permitted_quest_definition(definition_key: str) -> bool:
-    """Whether ``definition_key`` names a canonical or registered quest definition."""
-    return definition_key in _quest_table()
 
 
 def static_dialogue_references() -> "DialogueReferences":

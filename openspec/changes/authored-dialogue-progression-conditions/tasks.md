@@ -20,9 +20,10 @@ Shared contract v2 covers authorized package quest definitions through the same 
 ## 2. Quest lifecycle predicates
 
 - [x] 2.1 Implement definition-key matching over read_records and parse_reward_claims with explicit six-state semantics; add deterministic absence/in-progress/completed/claim/failed/invalidated/repeatable/corruption cases and no-write assertions.
-  - `QuestIs` resolves the key against the permitted catalog (canonical
-    declarations plus registered definitions), matches
-    `read_records(owner)` existentially, and reads
+  - `QuestIs` resolves the key against the permitted reference set (the
+    canonical declaration catalog, a registered non-package definition, or the
+    exact current package's compiled definition; a foreign package key fails
+    closed), matches `read_records(owner)` existentially, and reads
     `parse_reward_claims(owner)` only for `reward_claimed` (a completed record
     whose own quest_id is in the ledger). Fully malformed stored quest logs and
     claim ledgers (scalar, mapping, string) fail closed with one bounded
@@ -32,7 +33,9 @@ Shared contract v2 covers authorized package quest definitions through the same 
 ## 3. Complete condition selection acceptance
 
 - [x] 3.1 Test mixed physical/progression All/Any scenes through real selection offline, with a stale state change refusing without effects. Update condition author documentation, manifests and traceability; run focused condition tests and contract_gate.
-  - The behavior suite drives `select_authored_topic` through rank-, quest-,
+  - The behavior suite proves corrupt state dominates an `Any`/`All` tree in
+    every child order (children are all evaluated before combining), and drives
+    `select_authored_topic` through rank-, quest-,
     affinity-, mixed `All` and mixed `Any` synthetic topics, proves a lawful
     possession's own rank cannot qualify the owner, and shows a locked quest
     refusal grants no affinity or quest effect while a stale changed state

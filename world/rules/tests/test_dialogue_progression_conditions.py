@@ -461,29 +461,36 @@ class DialogueProgressionConditionTests(EvenniaTest):
         "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
     )
     def test_malformed_quest_state_fails_closed_and_dominates_an_any_sibling(self):
-        disqualifying = AnyCondition(
-            (
-                QuestIs(definition_key=_QUEST_KEY, state="not_accepted"),
-                RaceIs(race_key=_RACE_KEY),
-            )
+        corrupt_condition = QuestIs(
+            definition_key=_QUEST_KEY, state="not_accepted"
         )
-        for corrupt in (0, {"q": 1}, 7):
-            with self.subTest(corrupt=corrupt):
-                self.char1.db.quest_log = corrupt
+        matching = RaceIs(race_key=_RACE_KEY)
+        disqualifying = AnyCondition((corrupt_condition, matching))
+        disqualifying_matching_first = AnyCondition((matching, corrupt_condition))
+        nested = AnyCondition(
+            (All((RaceIs(race_key=_OTHER_RACE_KEY), corrupt_condition)), matching)
+        )
+        for stored in (0, {"q": 1}, 7):
+            with self.subTest(stored=stored):
+                self.char1.db.quest_log = stored
                 with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
                     self.assertFalse(
-                        evaluate_condition(
-                            QuestIs(definition_key=_QUEST_KEY, state="not_accepted"),
-                            self._context(),
-                        )
+                        evaluate_condition(corrupt_condition, self._context())
                     )
                 self.assertEqual(
                     log_warn.call_args.kwargs["context"]["reason"],
                     "owner_quest_log_malformed",
                 )
-                # The matching race branch must not rescue the corrupt tree.
+                # A matching sibling must not rescue the corrupt tree, whichever
+                # child order the declaration uses, including a nested group.
                 with patch("world.rules.dialogue_conditions.log_warn"):
                     self.assertFalse(evaluate_condition(disqualifying, self._context()))
+                    self.assertFalse(
+                        evaluate_condition(
+                            disqualifying_matching_first, self._context()
+                        )
+                    )
+                    self.assertFalse(evaluate_condition(nested, self._context()))
 
     @covers_requirement(
         "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
@@ -524,6 +531,41 @@ class DialogueProgressionConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"],
             "quest_definition_unpermitted",
         )
+
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
+    def test_foreign_package_quest_reference_grants_nothing(self):
+        foreign = SimpleNamespace(package_id="t_foreign_package")
+        with patch(
+            "world.quests.scene_store.package_for_definition",
+            return_value=foreign,
+        ):
+            self.assertFalse(permitted_quest_definition(_QUEST_KEY))
+            self.assertTrue(
+                permitted_quest_definition(
+                    _QUEST_KEY, package_id="t_foreign_package"
+                )
+            )
+            # Absence with an empty log must not turn a foreign key into a
+            # qualifying `not_accepted` reference.
+            self.char1.db.quest_log = []
+            with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
+                self.assertFalse(
+                    evaluate_condition(
+                        QuestIs(definition_key=_QUEST_KEY, state="not_accepted"),
+                        self._context(),
+                    )
+                )
+            self.assertEqual(
+                log_warn.call_args.kwargs["context"]["reason"],
+                "quest_definition_unpermitted",
+            )
+            with self.assertRaises(DialogueConditionError):
+                condition_hint(
+                    QuestIs(definition_key=_QUEST_KEY, state="completed"),
+                    self._context(),
+                )
 
     # -- host affinity ---------------------------------------------------
 
@@ -657,11 +699,10 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertLessEqual(frozenset(_RANKS), references.keys_for("guild_rank"))
         for key, row in _RANKS.items():
             self.assertEqual(references.label("guild_rank", key), row.display_name_zh)
-        self.assertIn(_QUEST_KEY, references.keys_for("quest"))
-        self.assertEqual(
-            references.label("quest", _QUEST_KEY),
-            SYNTH_QUESTS[_QUEST_KEY].display_name,
-        )
+        # The static quest family is the canonical declaration set; a runtime
+        # registered (non-package) definition is permitted but not statically
+        # referenceable, which keeps a foreign package key out of the catalog.
+        self.assertNotIn(_QUEST_KEY, references.keys_for("quest"))
         self.assertTrue(permitted_quest_definition(_QUEST_KEY))
         self.assertFalse(permitted_quest_definition("t_not_a_quest"))
         self.assertEqual(
@@ -675,14 +716,18 @@ class DialogueProgressionConditionTests(EvenniaTest):
         "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
     )
     def test_publication_rejects_unknown_and_foreign_progression_keys(self):
-        references = static_dialogue_references()
-        validate_condition(GuildRankAtLeast(rank_key=_RANK_HIGH), references)
-        validate_condition(
-            QuestIs(definition_key=_QUEST_KEY, state="reward_claimed"), references
-        )
-        validate_condition(
-            AffinityAtLeast(stage_key=self.stages[2].id), references
-        )
+        with patch(
+            "world.quests.catalog.QUEST_CATALOG", (SYNTH_QUESTS[_QUEST_KEY],)
+        ):
+            references = static_dialogue_references()
+            validate_condition(GuildRankAtLeast(rank_key=_RANK_HIGH), references)
+            validate_condition(
+                QuestIs(definition_key=_QUEST_KEY, state="reward_claimed"),
+                references,
+            )
+            validate_condition(
+                AffinityAtLeast(stage_key=self.stages[2].id), references
+            )
 
         for invalid in (
             GuildRankAtLeast(rank_key="t_unknown_rank"),

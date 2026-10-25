@@ -164,7 +164,7 @@ topics:
 
 話題可宣告 `requires` 與變體 `when`（同一套凍結的 `Condition` 型別），以及 `unavailable`／`refusal`。作者只需遵守下列規則：
 
-1. **參照鍵必須存在於許可目錄**：`world/rules/dialogue_references.py::static_dialogue_references()` 由既有正式註冊表組合出 `race`、`social_identity`、`item`、`skill`、`preset`、`profile`、`daypart`、`guild_rank`（`GUILD_RANK_REGISTRY` 的正式階級鍵）、`quest`（`world/quests/catalog.py` 的正式委託宣告，加上執行期已登錄的編譯委託）與 `affinity_stage`（`world/rules/rulebook/affinity.yaml` 的階段鍵）等家族。宣告未登錄的鍵（例如拼錯的種族、物品、技能、日段、階級、委託、好感階段或無法唯一對應公開名稱的 profile）會讓整個快照以 `DialogueSourceError` 拒收，錯誤會標明檔案、profile 與 dialogue_key。套件內的編譯委託只透過該套件自己的 `package_quests` 範圍取得許可；外來套件的同名委託不授予任何資格。
+1. **參照鍵必須存在於許可目錄**：`world/rules/dialogue_references.py::static_dialogue_references()` 由既有正式註冊表組合出 `race`、`social_identity`、`item`、`skill`、`preset`、`profile`、`daypart`、`guild_rank`（`GUILD_RANK_REGISTRY` 的正式階級鍵）、`quest`（`world/quests/catalog.py` 的正式委託宣告）與 `affinity_stage`（`world/rules/rulebook/affinity.yaml` 的階段鍵）等家族。宣告未登錄的鍵（例如拼錯的種族、物品、技能、日段、階級、委託、好感階段或無法唯一對應公開名稱的 profile）會讓整個快照以 `DialogueSourceError` 拒收，錯誤會標明檔案、profile 與 dialogue_key。靜態對話只能引用正式委託宣告；套件內的編譯委託只透過該套件自己的 `package_quests` 範圍與目前套件身分取得許可，外來套件的委託鍵在靜態目錄與執行期都不授予任何資格。
 2. **提示只看正式標籤**：鎖定話題顯示的需求提示由同一份目錄的公開標籤組成（種族／物品／技能／預設角色／地點主人或常駐冒險者名稱／時段用語／暴露程度用語／公會階級名稱／委託顯示名稱與生命週期用語／好感階段名稱），不讀取可編輯的顯示名稱或人物設定散文。好感提示只顯示階段名稱，永不顯示目前好感數值或門檻數字。`profile` 家族只收錄能唯一對應一個正式公開名稱的設定檔。
 3. **未達條件時的對外行為**：`unavailable: "hidden"` 與未知話題完全相同——不洩漏標籤、提示或內文；`unavailable: "locked"` 必須提供 `refusal`，玩家按下後播放該婉拒場景，不給好感或其他效果。`predecessors`（純接續話題）在讀取進度落地前一律拒絕選取。
 4. **變體選擇是確定的**：同一話題中合法且最高 `priority` 的變體會被選中，沒有命中時使用 `fallback`；已交付的場景在當前對話中不會因後續刷新而改變（重複的 `selection_id` 回傳已提交的交付）。宣告重複 `priority` 會被拒收。

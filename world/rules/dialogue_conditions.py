@@ -133,6 +133,12 @@ def _owner(context: Any) -> Any:
     return getattr(context, "owner", None)
 
 
+def _package_id(context: Any) -> str | None:
+    """The trusted current package identity of a generated dialogue source, if any."""
+    value = getattr(getattr(context, "source_identity", None), "package_id", None)
+    return value if isinstance(value, str) and value else None
+
+
 def evaluate_condition(condition: Condition, context: Any) -> bool:
     """Return whether ``condition`` currently holds for ``context``'s actor."""
     evaluation = _Evaluation(context)
@@ -191,18 +197,23 @@ def _evaluate(
     if isinstance(condition, All):
         if not _children_bounded(condition.children):
             return evaluation.fail(REASON_CHILDREN)
-        return all(
+        # Every bounded child is evaluated before combining, so corruption in
+        # any branch is discovered (and dominates) no matter the child order or
+        # whether an earlier child already decided the boolean answer.
+        results = [
             _evaluate(child, context, evaluation, depth=depth + 1)
             for child in condition.children
-        )
+        ]
+        return all(results)
 
     if isinstance(condition, AnyCondition):
         if not _children_bounded(condition.children):
             return evaluation.fail(REASON_CHILDREN)
-        return any(
+        results = [
             _evaluate(child, context, evaluation, depth=depth + 1)
             for child in condition.children
-        )
+        ]
+        return any(results)
 
     if isinstance(condition, RaceIs):
         return _race_matches(condition, context, evaluation)
@@ -664,7 +675,9 @@ def _quest_is(condition: QuestIs, context: Any, evaluation: _Evaluation) -> bool
     owner = _owner(context)
     if owner is None:
         return evaluation.fail(REASON_OWNER)
-    if not permitted_quest_definition(condition.definition_key):
+    if not permitted_quest_definition(
+        condition.definition_key, package_id=_package_id(context)
+    ):
         return evaluation.fail(REASON_QUEST_DEFINITION)
     db = getattr(owner, "db", None)
     if db is None:
@@ -822,7 +835,7 @@ def _hint(condition: Condition, context: Any, references: Any) -> str:
         )
 
     if isinstance(condition, QuestIs):
-        return _quest_hint(condition, references)
+        return _quest_hint(condition, context, references)
 
     if isinstance(condition, AffinityAtLeast):
         # The stage label is public wording; the current and threshold numeric
@@ -835,11 +848,11 @@ def _hint(condition: Condition, context: Any, references: Any) -> str:
     raise DialogueConditionError(f"Unknown condition node: {condition!r}")
 
 
-def _quest_hint(condition: QuestIs, references: Any) -> str:
+def _quest_hint(condition: QuestIs, context: Any, references: Any) -> str:
     """Render one quest requirement using the canonical definition and state labels."""
     from world.quests.describe import quest_state_label
 
-    label = _label(references, "quest", condition.definition_key)
+    label = _quest_label(condition, context, references)
     state_label = quest_state_label(condition.state)
     if state_label is None:
         raise DialogueConditionError(
@@ -848,6 +861,28 @@ def _quest_hint(condition: QuestIs, references: Any) -> str:
     if condition.state == "not_accepted":
         return f"需要尚未接取任務「{label}」"
     return f"需要任務「{label}」{state_label}"
+
+
+def _quest_label(
+    condition: QuestIs, context: Any, references: Any
+) -> str:
+    """Resolve the canonical definition name or the permitted current package's name."""
+    label = references.label("quest", condition.definition_key)
+    if label:
+        return label
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+    from world.rules.dialogue_references import permitted_quest_definition
+
+    definition = QUEST_DEFINITION_REGISTRY.get(condition.definition_key)
+    if definition is not None and permitted_quest_definition(
+        condition.definition_key, package_id=_package_id(context)
+    ):
+        return definition.display_name
+    raise DialogueConditionError(
+        f"Condition label for quest key {condition.definition_key!r} "
+        "is not in the permitted catalog"
+    )
 
 
 def _companion_label(
