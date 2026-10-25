@@ -25,7 +25,7 @@ Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwar
 - **WHEN** a non-exempt message exceeds the existing 65536-byte or other generic structural limits, or a world-map message exceeds its separately measured declared bounds, or a dialogue publication exceeds its 98304-byte whole-envelope, 24576-byte dialogue or 65536-byte dialogue-removed envelope bound
 - **THEN** both frame validators reject the oversized intact frame before dispatch/adoption; a general publication may instead use individually bounded parts, whose reassembled document keeps logical/schema/panel bounds without reapplying the generic frame ceiling
 
-#### Scenario: Field-specific limits stay within applicable enclosing bounds
+#### Scenario: Field-specific limits stay within global bounds
 - **WHEN** a registered field defines a field-specific limit
 - **THEN** it is no larger than its applicable enclosing bound, with specialized maps and v3 dialogue retaining their scoped panel limits, general reassembly using its finite logical aggregate limit, and unrelated panel budgets unchanged
 
