@@ -28,6 +28,8 @@ from world.lore.dialogue.loader import (
 )
 from world.lore.dialogue.shape import AuthoredDialogue
 
+from tools.spec_traceability import covers_requirement
+
 
 def _valid_dialogue_yaml(dialogue_key: str, *, greeting: str = "Welcome traveler.") -> str:
     """Return a minimal valid static dialogue YAML document."""
@@ -101,6 +103,7 @@ class DialogueLoaderTests(unittest.TestCase):
                     references=self.references,
                 )
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_sorted_discovery_order(self) -> None:
         """Files are discovered and processed in stable filename order."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -128,6 +131,7 @@ class DialogueLoaderTests(unittest.TestCase):
             for k in snapshot:
                 self.assertIsInstance(snapshot[k], AuthoredDialogue)
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_non_yaml_files_ignored(self) -> None:
         """Supporting files (e.g. .txt, .md, .json) in content_dir are ignored."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -149,6 +153,7 @@ class DialogueLoaderTests(unittest.TestCase):
             )
             self.assertEqual(list(snapshot.keys()), ["test_dialogue"])
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_symlink_file_rejected(self) -> None:
         """A .yaml entry that is a symlink is rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -186,6 +191,7 @@ class DialogueLoaderTests(unittest.TestCase):
                 )
             self.assertIn("not a regular file", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_file_size_limits(self) -> None:
         """File at exact 262144 bytes is accepted; 262145 bytes is rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -220,6 +226,7 @@ class DialogueLoaderTests(unittest.TestCase):
                 )
             self.assertIn("exceeds maximum", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_invalid_utf8_rejected(self) -> None:
         """Invalid UTF-8 byte sequences are rejected with an error naming the file."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -237,6 +244,7 @@ class DialogueLoaderTests(unittest.TestCase):
             self.assertIn("utf8_host.yaml", str(ctx.exception))
             self.assertIn("not valid utf-8", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_duplicate_mapping_keys_rejected(self) -> None:
         """Duplicate mapping keys at root or nested levels are strictly rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -284,6 +292,7 @@ topics:
                 )
             self.assertIn("duplicate mapping key", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_yaml_aliases_and_anchors_rejected(self) -> None:
         """YAML anchors (&) and aliases (*) are strictly rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -317,6 +326,7 @@ topics:
                 )
             self.assertIn("yaml aliases are forbidden", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_yaml_merge_keys_rejected(self) -> None:
         """YAML merge keys (<<) are strictly rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -335,6 +345,7 @@ topics: []
                 )
             self.assertIn("yaml merge keys", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_unsafe_tags_rejected(self) -> None:
         """Custom and object-construction YAML tags are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -353,6 +364,7 @@ topics: []
                 )
             self.assertIn("could not determine a constructor", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_multi_document_stream_rejected(self) -> None:
         """YAML files containing multiple documents are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -373,6 +385,7 @@ topics: []
                 )
             self.assertIn("expected a single document", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_filename_stem_not_in_registered_profiles_rejected(self) -> None:
         """Discovered file whose stem is not a registered NpcProfile.key rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -391,6 +404,7 @@ topics: []
             self.assertIn("unregistered_npc.yaml", str(ctx.exception))
             self.assertIn("not a registered profile key", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_filename_using_dialogue_key_or_display_name_rejected(self) -> None:
         """Filename using dialogue alias instead of profile key rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -409,6 +423,7 @@ topics: []
                 )
             self.assertIn("not a registered profile key", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_orphan_binding_without_file_rejected(self) -> None:
         """A canonical binding without a corresponding discovered file rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -424,6 +439,7 @@ topics: []
             self.assertIn("missing_diag", str(ctx.exception))
             self.assertIn("has no discovered file", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_discovered_file_without_binding_rejected(self) -> None:
         """A discovered file whose profile has no binding rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -441,6 +457,7 @@ topics: []
                 )
             self.assertIn("no canonical dialogue binding", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_binding_mapping_to_unregistered_profile_rejected(self) -> None:
         """A binding mapping to a profile not in registered profiles is rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -457,6 +474,7 @@ topics: []
                 )
             self.assertIn("unknown profile 'unknown_profile'", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_duplicate_canonical_bindings_rejected(self) -> None:
         """Two dialogue keys bound to the same profile key reject."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -474,6 +492,7 @@ topics: []
                 )
             self.assertIn("duplicate canonical binding", str(ctx.exception).lower())
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_forbidden_explicit_owner_field_rejected(self) -> None:
         """Explicit owner fields in YAML root (npc_id, profile_key, owner) are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -513,6 +532,7 @@ topics: []
                     )
                 self.assertIn("schema_version must be integer 1", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_all_or_nothing_snapshot_rejection(self) -> None:
         """One invalid neighbor rejects the entire load atomically."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -554,6 +574,7 @@ topics:
                 )
             self.assertIn("host_bad.yaml", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_snapshot_immutability(self) -> None:
         """Returned snapshot is a MappingProxyType and cannot be mutated."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -611,6 +632,7 @@ topics:
             )
             self.assertEqual(list(snapshot.keys()), ["active_diag"])
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_distinct_service_alias_and_profile_key_distinction(self) -> None:
         """Binding with distinct dialogue alias (e.g. service key) maps to profile key file."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -630,6 +652,7 @@ topics:
             self.assertNotIn("fixture_master", snapshot)
             self.assertEqual(snapshot["fixture_staff"].topics[0].topic_id, "fixture_staff.topic_01")
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_unknown_condition_reference_rejects(self) -> None:
         """A dialogue condition referencing an unknown key against DialogueReferences rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -666,6 +689,7 @@ topics:
             self.assertIn("ref_host.yaml", str(ctx.exception))
             self.assertIn("unknown_race", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_new_valid_registered_profile_discovered_with_no_file_index_edit(self) -> None:
         """Adding a new file for a new registered profile & binding succeeds dynamically."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -681,6 +705,7 @@ topics:
             )
             self.assertIn("new_diag", snapshot)
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
     def test_yaml_and_json_primitives_validation_parity(self) -> None:
         """Equivalent primitives from YAML and direct JSON-dict produce identical AuthoredDialogue."""
         diag_key = "parity_diag"

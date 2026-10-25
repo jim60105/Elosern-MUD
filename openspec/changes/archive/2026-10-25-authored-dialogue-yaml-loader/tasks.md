@@ -16,7 +16,7 @@ All tasks are future implementation, with Shared contract v2 fixed beforehand. T
 
 ## 4. Archive-time handoff
 
-- [ ] 4.1 At archive time, after `openspec archive` syncs delta requirements to main specs, annotate tests in `world/lore/tests/test_dialogue_loader.py` with `@covers_requirement`:
+- [x] 4.1 At archive time, after `openspec archive` syncs delta requirements to main specs, annotate tests in `world/lore/tests/test_dialogue_loader.py` with `@covers_requirement`:
   - `authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename`
   - `authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot`
   Confirm canonical IDs with `python -m tools.spec_traceability list` after sync.
