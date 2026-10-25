@@ -33,5 +33,5 @@ Loading SHALL reject duplicate mapping keys, unsafe YAML constructs, unknown pro
 - **THEN** they obey the same scene bounds, attribution, priorities and predecessor rules
 
 #### Scenario: A bound host cannot lose its file silently
-- **WHEN** a supplied canonical dialogue binding has no discovered file, or a discovered file names no registered profile
+- **WHEN** a supplied canonical dialogue binding has no discovered file, a discovered file names no registered profile, or a discovered file has no canonical binding
 - **THEN** the whole candidate rejects with the binding identity instead of publishing a host with no dialogue
