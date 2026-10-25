@@ -54,7 +54,7 @@
    | `quest_issuer` | `quest_issuer` | person | 私人委託發包人；身分隨人走，**不得**釘房 |
    | `attendant` | `scripted_dialogue` | place | 對話即服務的管事（旅店老闆、衛兵隊長、教官）；職業在 `host_title` 與對話表裡，不另設列 |
 
-3. **需要劇本對話嗎？** `dialogue_key` 必須是 `world/lore/dialogue/`（`altoria_{lower,middle,upper}.py`／`ciaran.py`／`guild.py` 依領域分檔）`DIALOGUE_ROWS` 已登錄的鍵；新對話要先加表列，見 Step 3。
+3. **需要劇本對話嗎？** 對話住在 `world/lore/dialogue/content/<profile_key>.yaml`，由載入器自動探索載入為不可變 `DIALOGUE_SNAPSHOT`。見 Step 3。
 4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入卡的職業藍圖只在列帶 `schedule_template` 時自動套排程（現行出貨列全為 `null`），其餘情況由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
 5. **數值來源在哪？** 設計文件與既有 rulebook。`stats` 是匯入卡路徑的字面基準值（永不預先乘技能倍率）；平衡數值由設計文件決定，卡作者不發明平衡表。
 6. **這是出貨的服務主人、常駐冒險者或同行夥伴嗎？** 服務主人與常駐冒險者必須在 `world/lore/npc_profiles/` 所屬切片登錄 `NpcProfile`，並在地點或 `world/lore/guild_adventurers.py` 的人物列填入引用鍵；同行夥伴則在夥伴預設卡填寫延伸欄位。所有出貨來源都必須登記於名冊清單，見 §3.1。
@@ -128,19 +128,26 @@ CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與�
 
 ### Step 3 — 劇本對話（需要時）
 
-對話是作者身份，表列住在 lore 封裝 `world/lore/dialogue/` 的領域分檔（`altoria_{lower,middle,upper}.py`、`ciaran.py`、`guild.py`），由 `__init__.py` 組出不可變 `DIALOGUE_ROWS`。新增一表：
+對話是作者身份，檔案放置於 `world/lore/dialogue/content/<profile_key>.yaml`，由 `load_dialogue_snapshot` 自動探索並載入為不可變 `DIALOGUE_SNAPSHOT`。新增一表：
 
-```python
-# world/lore/dialogue/<domain>.py（領域名為範例；實際放進對應領域分檔）
-ROWS = {
-    "ferry_attendant": DialogueDefinition(
-        greeting="老柏克靠在船篙旁：「要過河？講聲『過河』就知道價。」",
-        responses=(
-            KeywordResponse("過河", "「十銅板，綁好你的馬。」"),
-            KeywordResponse("渡口", "「上游鬧匪，船現在只走下游。」"),
-        ),
-    ),
-}
+```yaml
+# world/lore/dialogue/content/<profile_key>.yaml
+schema_version: 1
+greeting: "老柏克靠在船篙旁：「要過河？講聲『過河』就知道價。」"
+topics:
+  - topic_id: "ferry_attendant.topic_01"
+    keyword: "過河"
+    label: "過河"
+    fallback:
+      scene_id: "ferry_attendant.topic_01_scene"
+      revision: "r1"
+      lines:
+        - kind: "speech"
+          speaker: "actor"
+          text: "過河"
+        - kind: "speech"
+          speaker: "host"
+          text: "「十銅板，綁好你的馬。」"
 ```
 
 規則端 `world/rules/dialogue.py` 只是唯讀介面，`DIALOGUE_TABLE` 是唯讀包裝，`talk` 查不到鍵就回覆無理解行。`guild_staff` 表的 `回報` 關鍵詞是唯一例外，它經 `world/rules/guild.py` 解析可回報任務清單，屬規則行為，不要在自製表裡模仿。

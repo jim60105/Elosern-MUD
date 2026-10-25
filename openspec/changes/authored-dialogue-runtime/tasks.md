@@ -18,7 +18,7 @@ Remaining units implement Shared contract v2, including host_key/source identity
 
 ## 4. Native seams and documentation
 
-- [ ] 4.1 Keep freeform settled observer and world/quests/story_dialogue.py call paths native, test phase invalidation and guild listing/turn-in; update docs/game/commands.md and command-reference.md, replace full conflicting main-spec requirements in this change delta, and register new tests in manifests. Verify focused runtime/session/command/protocol tests and contract_gate.
+- [x] 4.1 Keep freeform settled observer and world/quests/story_dialogue.py call paths native, test phase invalidation and guild listing/turn-in; update docs/game/commands.md and command-reference.md, replace full conflicting main-spec requirements in this change delta, and register new tests in manifests. Verify focused runtime/session/command/protocol tests and contract_gate.
 
 ## 5. Dialogue publication budgets
 
