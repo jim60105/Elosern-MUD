@@ -24,14 +24,14 @@ No save migration, attributes deletion sweep or legacy package converter. Stored
 
 ### Active proposal amendment ownership
 
-The exact planning supersession and source-file conflict matrix lives in R's batch.md. At apply, amend materially affected still-active generated-packages schema/prompt/characterization references and each content batch's identity guidance to require display_name/persona without a title field. Preserve topic IDs, original baseline service semantics and narrative voice. Do not rewrite archived changes or the approved design source.
+The exact planning supersession and source-file conflict matrix lives in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. At apply, amend materially affected still-active generated-packages schema, prompt and characterization references and each content batch's identity guidance to require display_name and persona without a title field. Preserve topic IDs, original baseline service semantics and narrative voice. Do not rewrite archived changes or the approved design source.
 
 
 ## Risks / Trade-offs
 
 N follows D/S and authored-dialogue-generated-packages; it changes final generated schemas only after that active cutover. All ten authored-dialogue-content-* batches are prose-only identity consumers; if still active their no-title guidance is amended, without making optional literary work a prerequisite. Serialize places/prompts/templates/docs and traceability with their owners.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

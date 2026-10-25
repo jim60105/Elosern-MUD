@@ -39,4 +39,4 @@ depends-on: none
 
 code-conflicts: Shared components.py, profession vocabulary, guild_exams, service_actions tests and shard ownership with H/D/T/P. Serialize with authored-dialogue-refresh-lifecycle and webclient-settlement-alignment when editing guild_exams/service adapters; their mutation/publication logic is unchanged.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

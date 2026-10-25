@@ -37,4 +37,4 @@ depends-on: npc-examination-reception
 
 code-conflicts: H follows R because the managed vocabulary uses reception. D owns later input replacement; N/P/GM share guild_economy/identity/specs. Existing authored dialogue content uses profile identity unchanged; no topic/body edit is needed. Serialize deletion callback edits with authored-dialogue-refresh-lifecycle and webclient-publication-settlements.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

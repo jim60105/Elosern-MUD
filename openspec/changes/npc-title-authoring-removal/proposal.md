@@ -42,4 +42,4 @@ depends-on: authored-dialogue-generated-packages
 
 code-conflicts: N follows D/S and authored-dialogue-generated-packages; it changes final generated schemas only after that active cutover. All ten authored-dialogue-content-* batches are prose-only identity consumers; if still active their no-title guidance is amended, without making optional literary work a prerequisite. Serialize places/prompts/templates/docs and traceability with their owners.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

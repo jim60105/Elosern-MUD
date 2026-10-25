@@ -8,7 +8,7 @@
 
 - [ ] 1.3 Delete title end-to-end through generic/generated blueprint immutable carriers, canonical codecs, prompts/templates, characterization, compile and materialization. Exercise deterministic round trips and actual generated-package materialization with name/persona/age/portrait and no title.
 
-- [ ] 1.4 Update current delta specs and authoring guides docs/development/{adding-npcs,llm-scenarios}.md, docs/gm/characters.md, docs/game/npc-persona-editor.md and active proposal amendments listed in batch.md. Keep historical files untouched; update behavior-based tests and traceability ownership.
+- [ ] 1.4 Update current delta specs and authoring guides docs/development/{adding-npcs,llm-scenarios}.md, docs/gm/characters.md, docs/game/npc-persona-editor.md and the active proposal amendments listed in section 11.4 of docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md. Keep historical files untouched; update behavior-based tests and traceability ownership.
 
 ## Handoff evidence
 

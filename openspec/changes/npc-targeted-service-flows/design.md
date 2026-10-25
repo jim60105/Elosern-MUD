@@ -35,7 +35,7 @@ Before the new interaction card exists, the existing guild/shop drawers work thr
 
 T follows R and active webclient-settlement-alignment to preserve its service exam causal receipt; shares service_view/actions/protocol/constants/frame resolvers with P/U and active publication/immutable work. No change to protocol envelope E/R/B or publication queue ownership. Serialize shared service fixtures and schema registry.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

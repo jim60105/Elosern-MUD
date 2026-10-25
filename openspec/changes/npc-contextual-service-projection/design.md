@@ -46,7 +46,7 @@ The existing flat verb builder appends every new service route, including a real
 
 P follows D/T plus authored-dialogue-generated-packages and content-guild because it adds source services against their final codecs/topic IDs. All other nine content slices remain independent of P but share authoring docs/codecs test inventory; their prose cannot imply a service. Serialize constants/presenters/frame-resolvers with active publication and immutable-adoption work. U follows P.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

@@ -40,4 +40,4 @@ depends-on: npc-service-text-parity
 
 code-conflicts: U follows P/X/S and active reading-client/unread-notices/immutable-adoption. Shared use-person-focus, presence.js, ChoiceCard, AppClient, frame-resolvers and tests must be serialized; preserve source-aware reading receipts, notice timing, getCommittedState immutable reads and exact-base publication. Prototype remains unmodified evidence.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

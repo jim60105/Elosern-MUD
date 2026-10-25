@@ -46,4 +46,4 @@ depends-on: authored-dialogue-generated-packages
 
 code-conflicts: D follows H to avoid losing reuse identity when blueprints disappear. Shares places/imports/guild_config/core specs with title-authoring N; N follows D. Content batches keep profile/topic identity and may run before D; serialize docs and lore fixture changes. No active content prose is reauthored.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

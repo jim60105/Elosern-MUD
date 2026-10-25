@@ -36,4 +36,4 @@ depends-on: npc-contextual-service-projection
 
 code-conflicts: X follows P; U follows X so church command routing is real when advertised. Shares command docs/manifest and church/guild/commerce parser fixtures with R/T. No semantic dependency on unrelated authored prose or publication receiver internals.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

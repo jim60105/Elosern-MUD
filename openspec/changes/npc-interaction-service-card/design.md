@@ -39,7 +39,7 @@ Use the prototype's ten states as scenario coverage only. Its CSS generated head
 
 U follows P/X/S and active reading-client/unread-notices/immutable-adoption. Shared use-person-focus, presence.js, ChoiceCard, AppClient, frame-resolvers and tests must be serialized; preserve source-aware reading receipts, notice timing, getCommittedState immutable reads and exact-base publication. Prototype remains unmodified evidence.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

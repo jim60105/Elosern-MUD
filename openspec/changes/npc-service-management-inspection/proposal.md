@@ -35,4 +35,4 @@ depends-on: npc-contextual-service-projection
 
 code-conflicts: G follows N/P (therefore S) and shares GM reader/tests/docs with S/D; no game Vue import or publication protocol work is permitted. Current active authored dialogue content may share reference docs only; serialize those documentation edits.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

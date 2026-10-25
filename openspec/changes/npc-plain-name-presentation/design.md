@@ -33,7 +33,7 @@ Seed db.npc_title with sentinel text, malformed objects and raising accessors; a
 
 Follows H so removing npc_title_value does not leave a convergence reader. Shares dialogue.py with generated-packages, AppClient/editor fixtures with reading-client and GM readers with G. Serialize shared files; preserve source-aware dialogue IDs and publication semantics. N deletes remaining authoring after this completed slice.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

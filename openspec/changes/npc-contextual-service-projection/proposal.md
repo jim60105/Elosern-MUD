@@ -41,4 +41,4 @@ depends-on: authored-dialogue-content-guild
 
 code-conflicts: P follows D/T plus authored-dialogue-generated-packages and content-guild because it adds source services against their final codecs/topic IDs. All other nine content slices remain independent of P but share authoring docs/codecs test inventory; their prose cannot imply a service. Serialize constants/presenters/frame-resolvers with active publication and immutable-adoption work. U follows P.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

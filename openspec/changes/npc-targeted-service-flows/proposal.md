@@ -36,4 +36,4 @@ depends-on: webclient-settlement-alignment
 
 code-conflicts: T follows R and active webclient-settlement-alignment to preserve its service exam causal receipt; shares service_view/actions/protocol/constants/frame resolvers with P/U and active publication/immutable work. No change to protocol envelope E/R/B or publication queue ownership. Serialize shared service fixtures and schema registry.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

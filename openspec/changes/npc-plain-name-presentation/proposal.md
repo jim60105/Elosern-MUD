@@ -37,4 +37,4 @@ depends-on: npc-service-host-identity
 
 code-conflicts: Follows H so removing npc_title_value does not leave a convergence reader. Shares dialogue.py with generated-packages, AppClient/editor fixtures with reading-client and GM readers with G. Serialize shared files; preserve source-aware dialogue IDs and publication semantics. N deletes remaining authoring after this completed slice.
 
-The complete new-new and relevant active-change matrix and amendment ownership are in `../npc-examination-reception/batch.md`. The approved source remains unchanged.
+The complete new-new and relevant active-change matrix and amendment ownership are in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md`. The approved source remains unchanged.

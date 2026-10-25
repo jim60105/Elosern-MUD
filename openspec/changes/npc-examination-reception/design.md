@@ -29,7 +29,7 @@ The rulebook still exists and expands the renamed type; imports and sync remain 
 
 Shared components.py, profession vocabulary, guild_exams, service_actions tests and shard ownership with H/D/T/P. Serialize with authored-dialogue-refresh-lifecycle and webclient-settlement-alignment when editing guild_exams/service adapters; their mutation/publication logic is unchanged.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

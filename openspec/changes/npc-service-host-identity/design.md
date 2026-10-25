@@ -35,7 +35,7 @@ Source-managed set removal is covered separately from whole-row retirement: chan
 
 H follows R because the managed vocabulary uses reception. D owns later input replacement; N/P/GM share guild_economy/identity/specs. Existing authored dialogue content uses profile identity unchanged; no topic/body edit is needed. Serialize deletion callback edits with authored-dialogue-refresh-lifecycle and webclient-publication-settlements.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 

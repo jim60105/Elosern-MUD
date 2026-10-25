@@ -27,7 +27,7 @@ Render using web/admin-app's existing RuntimeLedger/RuntimeTable primitives and 
 
 G follows N/P (therefore S) and shares GM reader/tests/docs with S/D; no game Vue import or publication protocol work is permitted. Current active authored dialogue content may share reference docs only; serialize those documentation edits.
 
-The root-level batch contract in `../npc-examination-reception/batch.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
+The batch contract in section 11 of `docs/superpowers/specs/2026-10-25-npc-capabilities-and-services-design.md` defines sequential cutover, active proposal amendment ownership, source conflicts and approved-scope traceability. New test files named below are proposed additions, not claims that they already exist. Existing focused labels were researched from current source.
 
 ## Worker execution contract
 
