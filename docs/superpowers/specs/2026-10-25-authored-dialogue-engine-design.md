@@ -109,39 +109,56 @@ row is one engineer-day of implementation, owns the listed artifacts only, and
 carries its own tests and documentation. The authoritative interfaces are in
 `openspec/changes/authored-dialogue-contracts/design.md`, Shared contract v2.
 
-| # | Change | Direct prerequisites | Owned scope | Planning commit |
-|---|---|---|---|---|
-| 1 | `authored-dialogue-contracts` | none | Immutable scenes, typed topic declarations, identity encoding, shared reference catalog | `6e676db8` |
-| 2 | `authored-dialogue-yaml-loader` | 1 | Sorted safe `content/<NpcProfile.key>.yaml` scan, whole-candidate rejection, immutable snapshot | `940cd538` |
-| 3 | `authored-dialogue-runtime` | 1, 2 | Static YAML cutover, source-neutral selection, version-3 protocol | `eef542a3` |
-| 4 | `authored-dialogue-playback` | 3 | Shared manual Vue scene player and synchronized stage attribution | `893cec1a` |
-| 5 | `authored-dialogue-possession` | 3, 4 | Lawful possessed conversations, acting body versus owning player | `8f1681d5` |
-| 6 | `authored-dialogue-social-identity` | 1 | Typed social identity, never parsed persona prose | `eb614701` |
-| 7 | `authored-dialogue-physical-conditions` | 3, 5, 6 | Race, items, present companion, in-world time, skills, exposure; reference catalog builder | `30df1917` |
-| 8 | `authored-dialogue-progression-conditions` | 7 | Owner guild rank, quest lifecycle, host-to-owner affinity | `133fd60f` |
-| 9 | `authored-dialogue-availability` | 8 | Server-qualified hidden/locked/open projection and disclosure | `5d2e5952` |
-| 10 | `authored-dialogue-locked-ui` | 9, 4 | Selectable locked refusal and canonical requirement hints | `5f21ee7d` |
-| 11 | `authored-dialogue-reading-server` | 9 | Narrative-owned formal reading, delivery receipts, pure-chain sync | `bfab4510` |
-| 12 | `authored-dialogue-reading-client` | 11, 10 | Memory-only completion retry and chain progression | `5151ade5` |
-| 13 | `authored-dialogue-unread-notices` | 12, 15 | Persistent unread markers and deferred deduplicated unlock batches | `d4d857a1` |
-| 14 | `authored-dialogue-refresh-physical` | 9 | Committed physical-source availability refresh | `09bab719` |
-| 15 | `authored-dialogue-refresh-lifecycle` | 14 | Committed progression, presence, clock and control refresh | `fbf7dcc6` |
-| 16 | `authored-dialogue-generated-packages` | 13 | Dream producer, scene schema, immutable DB publication, generated provider/effect cutover | `f0195978` |
-| 17 | `authored-dialogue-content-guild` | 13 | `guild_staff` -> `content/altoria_guild_master.yaml` | `f67a76f6` |
-| 18 | `authored-dialogue-content-lower-hospitality` | 13 | Eatery, tavern, lodging | `bfc52191` |
-| 19 | `authored-dialogue-content-lower-civic` | 13 | Bathhouse, guardhouse | `d4fdbaef` |
-| 20 | `authored-dialogue-content-middle-tools` | 13 | General store, forge, tailor | `d99425a4` |
-| 21 | `authored-dialogue-content-middle-exchange` | 13 | Jeweller, alchemist, merchant hall | `7ced2465` |
-| 22 | `authored-dialogue-content-upper-faith` | 13 | Temple, sanctum | `9c547f00` |
-| 23 | `authored-dialogue-content-upper-civic` | 13 | Noble watch, drill yard, academy | `53ded8b8` |
-| 24 | `authored-dialogue-content-ciaran-crafts` | 13 | Ciaran hailiel, vethiel, gwenaera | `02dede6f` |
-| 25 | `authored-dialogue-content-ciaran-fare` | 13 | Ciaran lareneth, nireth, valwyn | `8b3617e7` |
-| 26 | `authored-dialogue-content-ciaran-commons` | 13 | Ciaran elenis, teliel | `067e73f1` |
+| # | Change | Work | Direct prerequisites | Owned scope | Planning commit |
+|---|---|---|---|---|---|
+| 1 | `authored-dialogue-contracts` | engine | none | Immutable scenes, typed topic declarations, identity encoding, shared reference catalog | `6e676db8` |
+| 2 | `authored-dialogue-yaml-loader` | engine | 1 | Sorted safe `content/<NpcProfile.key>.yaml` scan, whole-candidate rejection, immutable snapshot | `940cd538` |
+| 3 | `authored-dialogue-runtime` | engine | 1, 2 | Static YAML cutover, source-neutral selection, version-3 protocol | `eef542a3` |
+| 4 | `authored-dialogue-playback` | **V** | 3 | Shared manual Vue scene player and synchronized stage attribution | `893cec1a` |
+| 5 | `authored-dialogue-possession` | engine | 3, 4 | Lawful possessed conversations, acting body versus owning player | `8f1681d5` |
+| 6 | `authored-dialogue-social-identity` | engine | 1 | Typed social identity, never parsed persona prose | `eb614701` |
+| 7 | `authored-dialogue-physical-conditions` | engine | 3, 5, 6 | Race, items, present companion, in-world time, skills, exposure; reference catalog builder | `30df1917` |
+| 8 | `authored-dialogue-progression-conditions` | engine | 7 | Owner guild rank, quest lifecycle, host-to-owner affinity | `133fd60f` |
+| 9 | `authored-dialogue-availability` | engine | 8 | Server-qualified hidden/locked/open projection and disclosure | `5d2e5952` |
+| 10 | `authored-dialogue-locked-ui` | **V** | 9, 4 | Selectable locked refusal and canonical requirement hints | `5f21ee7d` |
+| 11 | `authored-dialogue-reading-server` | engine | 9 | Narrative-owned formal reading, delivery receipts, pure-chain sync | `bfab4510` |
+| 12 | `authored-dialogue-reading-client` | engine | 11, 10 | Memory-only completion retry and chain progression | `5151ade5` |
+| 13 | `authored-dialogue-unread-notices` | **V** | 12, 15 | Persistent unread markers and deferred deduplicated unlock batches | `d4d857a1` |
+| 14 | `authored-dialogue-refresh-physical` | engine | 9 | Committed physical-source availability refresh | `09bab719` |
+| 15 | `authored-dialogue-refresh-lifecycle` | engine | 14 | Committed progression, presence, clock and control refresh | `fbf7dcc6` |
+| 16 | `authored-dialogue-generated-packages` | engine | 13 | Dream producer, scene schema, immutable DB publication, generated provider/effect cutover | `f0195978` |
+| 17 | `authored-dialogue-content-guild` | **C** | 13 | `guild_staff` -> `content/altoria_guild_master.yaml` | `f67a76f6` |
+| 18 | `authored-dialogue-content-lower-hospitality` | **C** | 13 | Eatery, tavern, lodging | `bfc52191` |
+| 19 | `authored-dialogue-content-lower-civic` | **C** | 13 | Bathhouse, guardhouse | `d4fdbaef` |
+| 20 | `authored-dialogue-content-middle-tools` | **C** | 13 | General store, forge, tailor | `d99425a4` |
+| 21 | `authored-dialogue-content-middle-exchange` | **C** | 13 | Jeweller, alchemist, merchant hall | `7ced2465` |
+| 22 | `authored-dialogue-content-upper-faith` | **C** | 13 | Temple, sanctum | `9c547f00` |
+| 23 | `authored-dialogue-content-upper-civic` | **C** | 13 | Noble watch, drill yard, academy | `53ded8b8` |
+| 24 | `authored-dialogue-content-ciaran-crafts` | **C** | 13 | Ciaran hailiel, vethiel, gwenaera | `02dede6f` |
+| 25 | `authored-dialogue-content-ciaran-fare` | **C** | 13 | Ciaran lareneth, nireth, valwyn | `8b3617e7` |
+| 26 | `authored-dialogue-content-ciaran-commons` | **C** | 13 | Ciaran elenis, teliel | `067e73f1` |
 
-Content rows 17-26 each own disjoint `world/lore/dialogue/content/<NpcProfile.key>.yaml`
-files plus their exclusive test and review files. No content row edits runtime code,
-another slice's YAML, or `NPC_PROFILE_REGISTRY`. The exact file mapping is in the
-Shared contract v2 coverage table.
+**Work markers.** `V` is visual and interaction design work: the slice owns
+rendered markup, stylesheet or token usage, accessible visuals, focus behavior and
+Storybook/browser acceptance. `C` is authored content work: the slice owns only
+its NPC YAML, its data-contract test and its line-by-line review document.
+`engine` covers protocol, rules, persistence, pipeline and loader slices.
+
+**Visual obligations.** Rows 4, 10 and 13 are the only visual slices. Only
+`authored-dialogue-locked-ui` edits `styles/app-shell.css`; the other two reuse
+existing classes, `--ui-scale`, `--text` and `--motion` tokens. Playback keeps the
+desktop 16:9 target and introduces no mobile or gamepad redesign. Each V slice
+requires real browser acceptance in addition to component tests, and its worker
+reads `web/webclient-app/AGENTS.md` and `skill://ui` first.
+
+**Content obligations.** Rows 17-26 are the only authored content slices. Each
+one rewrites every owned topic scene, variant, refusal and opening in its own
+YAML, with writer and reviewer both completing the mandatory world-source gate
+before composing or reviewing prose. Each owns disjoint
+`world/lore/dialogue/content/<NpcProfile.key>.yaml` files plus its exclusive test
+and review files. Content slices never edit runtime code, profiles, place
+bindings, another slice's YAML, or shared manifest entries beyond their own. The
+exact file mapping is in the Shared contract v2 coverage table.
 
 ## Parallel implementation batch
 
