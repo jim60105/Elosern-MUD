@@ -87,13 +87,49 @@ out to that body's live watchers through the existing epoch-guarded pusher. Noth
 persisted; a failed push is isolated to one `dialogue_availability_refresh_failed` event
 and recovers on the next canonical sync. A rolled-back owning write schedules nothing.
 
+Canonical mutation writers call the companion
+`world/rules/dialogue_availability.py::queue_dialogue_refresh(owners, *, cause)` with the
+owner objects they captured **before** any destructive membership or control write. It
+deduplicates the lawful owner identities, registers one commit callback per write, and
+re-resolves each owner row, acting body, host binding and published generated phase
+inside that callback. Pre-commit eligibility is never used, several callbacks from one
+outer operation may each re-evaluate the final committed state, and an outer rollback
+discards them all. `affected_dialogue_owners(entity, *, prior_owner=None)` is the
+discovery half: a persistent player owns itself; any other body contributes its lawful
+party-bound owner and its currently lawful possession owner; a caller detaching a body
+passes the pre-detach owner as `prior_owner`. It never returns an account-wide sibling
+character and never creates a conversation, session or selection. Refresh is
+source-neutral: it re-reads the current static snapshot or published generated
+binding/phase, so no static membership filter or immutable-package edit is involved,
+and the already-delivered scene keeps its selected wording.
+
 An already delivered scene keeps its chosen variant/scene revision across a refresh: the
 session stores the committed delivery, and only the projected choices are recomputed.
 Context invalidation, phase change, movement, combat and host cleanup keep their existing
 owners.
 
-Production mutation hooks are owned by `authored-dialogue-refresh-physical` and
-`authored-dialogue-refresh-lifecycle`; completion-to-refresh
+### Canonical physical source matrix
+
+These are the exact commit hooks `authored-dialogue-refresh-physical` owns. Every row
+captures its owner(s) before the write, registers only after the successful write, and
+therefore publishes nothing when the owning transaction rolls back.
+
+| Condition source | Exact commit hook | Captured owner(s) | Committed acceptance |
+|---|---|---|---|
+| Carried item, including use/trade/transfer | `world/rules/equipment.py::apply_inventory_plan`, after the inventory + ACQUIRE writes inside the caller transaction | `affected_dialogue_owners(plan.entity)`; each transfer plan captures its own owner | Telnet, another web connection and a no-session call all refresh; an outer rollback publishes nothing |
+| Worn exposure bias | `world/rules/equipment.py::toggle_equipment`, after the final equipment/gauge write | `affected_dialogue_owners(entity)` | Wearing/unequipping changes the threshold choice while the delivered variant stays unchanged |
+| Base exposure transition | `world/rules/sexual_transitions.py::apply_event`, after the converged cascade | owner captured before the operation | Threshold crossing refreshes once the final committed state is visible; a later fault cancels the callbacks |
+| Structured social identity | `world/rules/social_identity.py::set_social_identities`, after the validated write | `affected_dialogue_owners(entity)`; construction with no lawful owner is a no-op | Tag add/remove refreshes a live possessed actor; persona prose is not a source and has no effect |
+| Skill ownership and proficiency | `world/rules/progression/_gates.py::award_practice_xp` after the stored XP assignment; `world/rules/progression/_lineage.py::apply_lineage_auto_seed` after the ownership/proficiency assignment; `world/rules/cross_lineage_unlock.py::grant_owned_skill` immediately after the ownership write, only on a new grant | affected learner owner | Passive/active ownership and proficiency thresholds refresh from any origin (study, another session, a scheduled tick) |
+| Race | existing construction/import establishes race before any dialogue; opening and selection always re-read the acting body's race | no speculative new race writer | A new body's race is honored; control refresh owns changing actor identity |
+
+The cross-lineage hook is exactly `grant_owned_skill`, not `clause_satisfied` and not a
+second call in `evaluate_cross_lineage_unlocks`; no new skill mutation API is
+introduced. A raw GM console Attribute repair stays outside ordinary gameplay
+publication and its next canonical sync re-evaluates state.
+
+The lifecycle slice (`authored-dialogue-refresh-lifecycle`) extends the same two helpers
+for quest, world-time, companion-presence and control sources; completion-to-refresh
 (`cause="reading_completed"`) belongs to `authored-dialogue-reading-server`. Command and
 presentation observers are not a substitute: a committed writer with no live session
 (Telnet, a scripted clock tick, another actor's change, or an offline character) never

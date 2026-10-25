@@ -105,10 +105,21 @@ def apply_lineage_auto_seed(entity: Any) -> None:
     then stores the fixed-point seeded proficiency map (explicit stored
     entries win). Called inside the caller's all-or-nothing transaction, so
     a rejected import leaves nothing behind, seed included.
+
+    The committed ownership/proficiency assignment refreshes the seeded
+    body's dialogue availability (authored-dialogue-refresh-physical). A body
+    with no lawful dialogue owner (ordinary NPC construction) registers
+    nothing, and a rolled-back import publishes nothing.
     """
     raw = entity.db.skills or {}
     active = list(raw.get("active", []))
     passive = list(raw.get("passive", []))
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    dialogue_owners = affected_dialogue_owners(entity)
     add_active, add_passive = lineage_ownership_closure([*active, *passive])
     if add_active or add_passive:
         entity.db.skills = {
@@ -119,6 +130,7 @@ def apply_lineage_auto_seed(entity: Any) -> None:
         [*active, *add_active, *passive, *add_passive],
         entity.db.skill_proficiency,
     )
+    queue_dialogue_refresh(dialogue_owners, cause="lineage_seed")
 
 
 def normalize_lineage_record(record: dict[str, Any]) -> dict[str, Any]:

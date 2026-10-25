@@ -276,13 +276,27 @@ def apply_event(
     max_passes: int = 50,
     **event_context: Any,
 ) -> dict[str, str]:
-    """Apply the event-driven rule table until it reaches a fixed point."""
+    """Apply the event-driven rule table until it reaches a fixed point.
+
+    A converged cascade that actually changed a field refreshes the changed
+    body's dialogue availability from the committed state
+    (authored-dialogue-refresh-physical): the owner is captured before the
+    first write and the fan-out is registered on the caller's transaction, so
+    an exposure threshold crossing is published once the final committed
+    state is visible and a later fault in the outer operation cancels it.
+    """
     if max_passes <= 0:
         raise ValueError("max_passes must be positive")
     collisions = _RESERVED_CONTEXT_KEYS & set(event_context)
     if collisions:
         names = ", ".join(sorted(collisions))
         raise ValueError(f"event context overrides reserved keys: {names}")
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    dialogue_owners = affected_dialogue_owners(entity)
     rng = rng or random
     changed_this_pass: dict[str, str] = {}
     all_changes: dict[str, str] = {}
@@ -301,6 +315,10 @@ def apply_event(
                     changed_this_pass[field] = direction
                     all_changes[field] = direction
         if not changed_this_pass:
+            if all_changes:
+                queue_dialogue_refresh(
+                    dialogue_owners, cause="sexual_transition"
+                )
             return all_changes
         current_event = None
     raise RuleConvergenceError(

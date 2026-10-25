@@ -418,6 +418,11 @@ def grant_owned_skill(
     character panel and the import round-trip. Append-if-absent makes the
     write idempotent: an already-owned key — from an earlier rule, a preset,
     or an import — is left untouched. Proficiency is never written.
+
+    A NEW grant refreshes the learner's dialogue availability from the
+    committed state (authored-dialogue-refresh-physical): ownership-only
+    topics qualify while proficiency-gated ones do not, and the already-owned
+    path writes nothing and therefore registers nothing.
     """
     definition = registry.get(skill_key)
     if definition is None:
@@ -434,6 +439,14 @@ def grant_owned_skill(
     owned.append(skill_key)
     stored[list_name] = owned
     entity.db.skills = stored
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(
+        affected_dialogue_owners(entity), cause="skill_ownership"
+    )
     return True
 
 

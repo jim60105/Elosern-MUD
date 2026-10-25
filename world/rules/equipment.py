@@ -176,8 +176,20 @@ def apply_inventory_plan(plan: InventoryPlan) -> None:
     contract), so a failure restores the settlement's payout too. For the same
     reason it covers ``title_collection`` and ``title_equipped``: that
     settlement also banks the completion's quest-completed fixed titles.
+
+    Owner-carrying dialogue availability is refreshed from this committed
+    inventory/ACQUIRE write (authored-dialogue-refresh-physical): the plan's
+    entity owners are captured before the write and the fan-out is registered
+    on the caller's transaction, so a later outer rollback publishes nothing
+    and both transfer plans capture their own owner independently.
     """
     entity = plan.entity
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    dialogue_owners = affected_dialogue_owners(entity)
     inventory_snapshot = attribute_snapshot(entity, "inventory")
     wallet_snapshot = attribute_snapshot(entity, "wallet")
     claims_snapshot = attribute_snapshot(entity, "guild_reward_claims")
@@ -197,6 +209,7 @@ def apply_inventory_plan(plan: InventoryPlan) -> None:
         with transaction.atomic():
             entity.db.inventory = list(plan.after)
             _apply_acquire(plan)
+            queue_dialogue_refresh(dialogue_owners, cause="inventory")
     except Exception:
         from world.rules.surfaces import restore_attribute_best_effort
 
@@ -591,8 +604,18 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
     assignment-restore leaves live handler reads consistent with storage.
     Snapshots are captured before the one outer transaction and every surface
     is restored in snapshot order.
+
+    The committed equipment/gauge write refreshes the changed actor's dialogue
+    availability (authored-dialogue-refresh-physical): the owner is captured
+    before the transaction and the fan-out is registered on the caller's
+    transaction, so wearing/unequipping can change a threshold choice while a
+    rolled-back toggle publishes nothing.
     """
     from world.rules.buffs import apply_buff, _remove_buff_keys
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
     from world.rules.equipment_effects import attached_buff_instances
 
     preflight = preflight_equipment_toggle(entity, item_key)
@@ -601,6 +624,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
             outcome="rejected", reason=preflight.reason
         )
     plan = preflight.plan
+    dialogue_owners = affected_dialogue_owners(entity)
     snapshot = attribute_snapshot(entity, "equipment")
     traits_snapshot = snapshot_traits(entity)
     buffs_snapshot = attribute_snapshot(entity, "buffs")
@@ -633,6 +657,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
                 commander = bound_owner_of(entity)
             if commander is not None:
                 _persist_draft_increment(commander)
+            queue_dialogue_refresh(dialogue_owners, cause="equipment")
     except Exception:
         restore_attribute_best_effort(entity, "buffs", buffs_snapshot)
         restore_attribute_best_effort(entity, "equipment", snapshot)
