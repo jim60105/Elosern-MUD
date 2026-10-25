@@ -26,7 +26,7 @@ Read design.md for exact production owners, all affected caller families, verifi
 
 ## Batch:
 
-depends-on: webclient-publication-baseline
+depends-on: webclient-publication-settlements
 
 Code conflicts: Serializes dispatcher.py, ingress.py, server/conf/inputfuncs.py and movement_settlement.py with baseline/settlement. Active authored-dialogue-refresh-lifecycle owns clock/control/NPC callbacks, which remain separate; this slice must not replace their availability refresh.
 

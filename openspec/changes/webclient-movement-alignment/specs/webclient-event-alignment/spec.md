@@ -44,9 +44,9 @@ Graphical actions and WebClient text settlements SHALL classify committed facts 
 - **WHEN** a canonical eager field changes while its candidate is omitted before a later checkpoint
 - **THEN** the checkpoint freshly renders and restores that field instead of resending baseline data
 
-#### Scenario: Retired token cannot publish
+#### Scenario: Retired causal group cannot publish
 - **WHEN** a Deferred command or action from an old puppet settles after replacement
-- **THEN** its token emits no state or result into the new epoch
+- **THEN** its captured old-epoch group emits no state or result into the new epoch
 
 #### Scenario: Alignment retains on-demand lifecycle
 - **WHEN** a boundary alignment occurs while area_map/world_map were never opened
