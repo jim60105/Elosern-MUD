@@ -14,8 +14,8 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **THEN** it presents its committed catalog entry under the same complete-image, grounded-silhouette and display-name-placeholder rule
 
 #### Scenario: Speaking follows dispatch state, never prose
-- **WHEN** the committed mode is dialogue and a native generated/freeform response is presented
-- **THEN** native line speaking follows existing dispatch-state behavior, never prose; authored scenes instead follow their explicit line attribution as the separate authored-scene scenario defines
+- **WHEN** the committed mode is dialogue and a native freeform response is presented
+- **THEN** native freeform speaking follows existing dispatch-state behavior, never prose; static/generated scenes follow their explicit line attribution
 
 #### Scenario: Companions listen unless they are the host
 - **WHEN** a companion's identity does, or does not, match the active host
@@ -122,7 +122,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: A pick dispatches the scripted keyword
 - **WHEN** the player activates pick 2 through pointer, Enter, or the `2` key
-- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and that row's source-correct stable topic or generated keyword payload is submitted, the list is removed while the request is in flight, focus is on the message window's page surface, and the list returns after the scene final fully visible page receives a further activation (native line responses retain existing behavior)
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after the scene's final fully visible page receives a further activation
 
 #### Scenario: Free dialogue borrows the command line
 - **WHEN** the player activates `⌨ 自由對話`
@@ -193,7 +193,7 @@ The narrative SHALL render as a message window filling the bottom band's message
 
 #### Scenario: The dialogue name plate names the host truthfully
 - **WHEN** the committed mode is `dialogue` and the committed `dialogue` panel is available
-- **THEN** the window carries a name plate above its text area, naming the current explicit actor or host speaker, with host bond-stage suffix only for host speech; narration has no speaker plate; native generated/freeform responses retain host-name behavior; below the plate the text area presents the current response's pages — the current attributed scene line or native response, paged and typed without altering its text, with no separate reply box, no rows, no avatar, and no text removed or rewritten from the narrative lines; the window carries no choice, free-dialogue, or exit row: those are the dialogue choice list's
+- **THEN** the window plate names the current explicit actor or host, with bond-stage suffix only for host speech; narration has no speaker plate; native freeform retains host-name behavior; the text area pages/types the current attributed scene line or native response unchanged, with no separate reply box, rows, avatar or rewritten narrative; choices remain in the dialogue choice list
 
 #### Scenario: A transient panel shows no plate, and reader state drives the choice list
 - **WHEN** mode is `dialogue` but the panel is unavailable (the transient window between a clear seam and its commit)

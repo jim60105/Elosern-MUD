@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No separate generated scene player, executable scripts, new effects or freeform authority changes. Shared playback accepts static and generated SceneDelivery equally; content authoring retains its mandatory source prerequisite.
 
 ## Batch:
 
@@ -32,4 +32,4 @@ depends-on: authored-dialogue-runtime
 
 Code conflicts: Conflicts with reading-client and availability UI in AppClient, use-dialogue-choices and dialogue-view; those depend on this slice. Combat behavior must remain unchanged.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; authored-dialogue-generated-packages exercises this same player with actual persisted generated content.

@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Reusable playback state
 
+Shared contract v2 applies every unit equally to static/generated deliveries. Include long opaque generated IDs in player/view fixtures; production package browser coverage belongs to generated-packages. No generated one-line exception.
+
 - [ ] 1.1 Implement the composable over MessageWindow page events, including explicit final activation and no timer auto-advance; add synthetic Vitest state/page tests with same-speaker and narration transitions and docstrings describing event ownership.
 
 ## 2. Stage and focus integration

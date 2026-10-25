@@ -6,6 +6,13 @@ Provide shared manual vue scene player and synchronized stage attribution throug
 
 ## ADDED Requirements
 
+### Requirement: One player renders both static and generated scenes
+Static and generated deliveries SHALL share manual page/line progression, speaker attribution, narration, replay and invalidation. Source type SHALL neither select a separate renderer nor reduce a generated formal scene to one response line.
+
+#### Scenario: Generated attribution changes synchronously
+- **WHEN** a generated scene moves from actor speech to host speech and narration
+- **THEN** text, name and portrait emphasis change together under the same manual controls used for static scenes
+
 ### Requirement: Manual playback synchronizes every line boundary
 Authored scenes SHALL advance only by explicit surface click or focused Space/Enter. Completing typing SHALL not advance a page. Text, displayed speaker and portrait emphasis SHALL change together at each line start; narration SHALL emphasize neither participant.
 

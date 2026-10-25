@@ -12,7 +12,9 @@ Observed MessageWindow already measures pages, supports typewriter, surface clic
 
 ## Decisions
 
-Use Shared contract v1; reuse MessageWindow pagination/typewriter and portrait catalog/artwork lifecycle. Add useAuthoredScene(delivery, context) exposing lineIndex, line, speaker, readingComplete, advance(), retire(), and a single scene-finished event. The composable is presentation-only, has no store dispatch/effect imports, and never changes the server clock. AppClient binds active line text/name and stage speaker in the same synchronous state transition. actor portrait/name always come from panel.actor, so possession needs no second renderer.
+Use Shared contract v2 for both static and generated SceneDelivery. No source-based single-line conversion, static-profile predicate or separate generated player. Canonical generated topic/scene IDs <=2048 bytes stay opaque through view admission, replay and transcript dedup; aggregate byte budgets apply unchanged. The shared player rules below apply to both sources.
+
+Reuse MessageWindow pagination/typewriter and portrait catalog/artwork lifecycle. Add useAuthoredScene(delivery, context) exposing lineIndex, line, speaker, readingComplete, advance(), retire(), and a single scene-finished event. The composable is presentation-only, has no store dispatch/effect imports, and never changes the server clock. AppClient binds active line text/name and stage speaker synchronously. Actor portrait/name come from panel.actor, so possession needs no second renderer.
 
 While typing, activation finishes the current page; next activation advances page then line. The last fully visible page still requires a further activation to finish. Long-line pages keep speaker. Narration has no name and neither portrait emphasized. Two consecutive same-speaker lines remain separate reading steps. Never arm combat beat auto-page timers for authored scenes. Reuse text speed/reduced motion; reduced motion may reveal text at once but must not auto-advance. Keyboard only consumes unmodified nonrepeated Space/Enter on the focused message surface; selection, links, buttons, command entry and overlays keep existing behavior.
 
