@@ -1,6 +1,14 @@
 {
   "contract": [
     {
+      "path": "world/rules/tests/test_authored_dialogue_runtime.py",
+      "reason": "authored dialogue runtime selection and transactional session delivery"
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_sources.py",
+      "reason": "shipped dialogue source inventory and profile service distinction"
+    },
+    {
       "path": "web/webclient/presentation/tests/test_world_map_measurement.py",
       "reason": "the shipped continental geography fits the measured world-map bound."
     },

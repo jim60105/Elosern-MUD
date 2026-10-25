@@ -1,4 +1,4 @@
-"""Unit tests for world/rules/dialogue_sources.py.
+"""Data-contract test: shipped dialogue source inventory and profile service distinction
 
 Covers:
 - Complete 25-table static inventory resolution.

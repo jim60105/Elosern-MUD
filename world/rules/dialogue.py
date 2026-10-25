@@ -39,6 +39,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
+import uuid
+
+from world.lore.dialogue.codec import GeneratedDialogueIdentity, StaticDialogueIdentity
+from world.lore.scenes import Narration, Scene, Speech
 
 from typeclasses.components import ScriptedDialogue
 
@@ -84,6 +88,79 @@ def resolve_dialogue_component(npc: Any) -> Any | None:
     if components.has(ScriptedDialogue.name):
         return components.get(ScriptedDialogue.get_component_slot())
     return None
+
+
+class DialogueRuntimeError(Exception):
+    """Base error for dialogue runtime selection and session failures."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class StaleContextError(DialogueRuntimeError):
+    """Context ID does not match the active session."""
+
+
+class StaleSelectionError(DialogueRuntimeError):
+    """Selection request is stale or replayed after intervening selection."""
+
+
+class DuplicateSelectionError(DialogueRuntimeError):
+    """Selection ID was already used for a different topic."""
+
+
+class TopicLockedError(DialogueRuntimeError):
+    """Topic is locked or requires conditions that are not yet permitted."""
+
+
+class TopicNotFoundError(DialogueRuntimeError):
+    """Topic was not found in the host's current definition."""
+
+
+class DialogueSourceUnavailableError(DialogueRuntimeError):
+    """Host has no conversable dialogue source."""
+
+
+@dataclass(frozen=True)
+class SceneDelivery:
+    """One delivered authored or generated scene snapshot."""
+
+    delivery_id: str
+    selection_id: str
+    context_id: str
+    actor_id: int
+    owner_id: int
+    host_id: int
+    topic_id: str | None
+    scene_id: str
+    scene_revision: str
+    phase_revision: int | str | None
+    kind: str  # formal | refusal | opening | service
+    lines: tuple[Speech | Narration, ...]
+    updated_tick: int | None
+
+
+def delivery_to_wire(delivery: SceneDelivery | None) -> dict[str, Any] | None:
+    """Serialize SceneDelivery to wire form (omitting server-only identities)."""
+    if delivery is None:
+        return None
+    return {
+        "delivery_id": delivery.delivery_id,
+        "context_id": delivery.context_id,
+        "topic_id": delivery.topic_id,
+        "scene_id": delivery.scene_id,
+        "scene_revision": delivery.scene_revision,
+        "phase_revision": delivery.phase_revision,
+        "kind": delivery.kind,
+        "lines": [
+            {"kind": "speech", "speaker": l.speaker, "text": l.text}
+            if isinstance(l, Speech)
+            else {"kind": "narration", "text": l.text}
+            for l in delivery.lines
+        ],
+    }
 
 
 @dataclass(frozen=True)
@@ -492,8 +569,73 @@ class DialogueSession:
     """
 
     npc_id: int
-    line: str
+    line: str | None
     updated_tick: int | None
+    kind: str = "line"
+    schema_version: int = 1
+    host_key: str = ""
+    source_identity: Any = None
+    context_id: str = ""
+    actor_id: int = 0
+    owner_id: int = 0
+    control_key: str = ""
+    phase_revision: int | str | None = None
+    line_delivery_id: str | None = None
+    delivery: SceneDelivery | None = None
+    selection_receipts: tuple[dict[str, Any], ...] = ()
+    completion_receipts: tuple[dict[str, Any], ...] = ()
+
+
+def _parse_delivery(raw: Any) -> SceneDelivery | None:
+    """Parse stored delivery dictionary back to SceneDelivery."""
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        lines = []
+        for item in raw.get("lines", ()):
+            if not isinstance(item, Mapping):
+                return None
+            kind = item.get("kind")
+            if kind == "speech":
+                lines.append(Speech(speaker=item.get("speaker"), text=item.get("text")))
+            elif kind == "narration":
+                lines.append(Narration(text=item.get("text")))
+            else:
+                return None
+        return SceneDelivery(
+            delivery_id=str(raw["delivery_id"]),
+            selection_id=str(raw["selection_id"]),
+            context_id=str(raw["context_id"]),
+            actor_id=int(raw["actor_id"]),
+            owner_id=int(raw["owner_id"]),
+            host_id=int(raw["host_id"]),
+            topic_id=str(raw["topic_id"]) if raw.get("topic_id") is not None else None,
+            scene_id=str(raw["scene_id"]),
+            scene_revision=str(raw["scene_revision"]),
+            phase_revision=raw.get("phase_revision"),
+            kind=str(raw["kind"]),
+            lines=tuple(lines),
+            updated_tick=raw.get("updated_tick"),
+        )
+    except Exception:  # observability: ignore R2: corrupt delivery payload degrades to None
+        return None
+
+
+def _delivery_to_storage(delivery: SceneDelivery) -> dict[str, Any]:
+    """Serialize SceneDelivery to a JSON-safe dictionary for storage."""
+    wire = delivery_to_wire(delivery)
+    if wire is None:
+        return {}
+    wire.update(
+        {
+            "actor_id": delivery.actor_id,
+            "owner_id": delivery.owner_id,
+            "host_id": delivery.host_id,
+            "selection_id": delivery.selection_id,
+            "updated_tick": delivery.updated_tick,
+        }
+    )
+    return wire
 
 
 def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
@@ -509,11 +651,19 @@ def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
     if not isinstance(raw, Mapping):
         return None
     npc_id = raw.get("npc_id")
+    kind = raw.get("kind", "line")
+    delivery_raw = raw.get("delivery")
     line = raw.get("line")
     updated_tick = raw.get("updated_tick")
+    delivery = None
+
     if not isinstance(npc_id, int) or isinstance(npc_id, bool) or npc_id <= 0:
         return None
-    if not isinstance(line, str):
+    if kind == "scene":
+        delivery = _parse_delivery(delivery_raw)
+        if delivery is None:
+            return None
+    elif not isinstance(line, str):
         return None
     # A stored line beyond the write bound or carrying unpaired surrogate code
     # points is corruption (webclient-align-10): the write path truncates and
@@ -521,15 +671,68 @@ def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
     # storage. Corrupt state is "not live" here, which makes the dialogue
     # panel degrade through its REGISTERED unavailable form instead of
     # failing available-form validation as an internal presenter error.
-    if len(line) > MAX_DIALOGUE_SESSION_LINE_CODE_POINTS:
-        return None
-    if any(0xD800 <= ord(char) <= 0xDFFF for char in line):
-        return None
+    if line is not None:
+        if len(line) > MAX_DIALOGUE_SESSION_LINE_CODE_POINTS:
+            return None
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in line):
+            return None
     if updated_tick is not None and (
         not isinstance(updated_tick, int) or isinstance(updated_tick, bool)
     ):
         return None
-    return DialogueSession(npc_id=npc_id, line=line, updated_tick=updated_tick)
+
+    sel_receipts = []
+    for r in raw.get("selection_receipts", ()):
+        if isinstance(r, Mapping):
+            deliv = r.get("delivery")
+            parsed_d = _parse_delivery(deliv) if isinstance(deliv, Mapping) else None
+            sel_receipts.append(
+                {
+                    "topic_id": r.get("topic_id"),
+                    "selection_id": r.get("selection_id"),
+                    "delivery_id": r.get("delivery_id"),
+                    "delivery": parsed_d,
+                }
+            )
+
+    comp_receipts = []
+    for c in raw.get("completion_receipts", ()):
+        if isinstance(c, Mapping):
+            comp_receipts.append(dict(c))
+
+    raw_src = raw.get("source_identity")
+    source_id = None
+    if isinstance(raw_src, Mapping):
+        if "package_id" in raw_src:
+            source_id = GeneratedDialogueIdentity(
+                raw_src["package_id"],
+                raw_src["role_id"],
+                raw_src["phase_id"],
+            )
+        elif "dialogue_key" in raw_src:
+            source_id = StaticDialogueIdentity(
+                raw_src["profile_key"],
+                raw_src["dialogue_key"],
+            )
+
+    return DialogueSession(
+        npc_id=npc_id,
+        line=line if kind == "line" else None,
+        updated_tick=updated_tick,
+        kind=kind,
+        schema_version=raw.get("schema_version", 1),
+        host_key=str(raw.get("host_key", "")),
+        source_identity=source_id,
+        context_id=str(raw.get("context_id", "")),
+        actor_id=int(raw.get("actor_id", 0)),
+        owner_id=int(raw.get("owner_id", 0)),
+        control_key=str(raw.get("control_key", "")),
+        phase_revision=raw.get("phase_revision"),
+        line_delivery_id=raw.get("line_delivery_id"),
+        delivery=delivery,
+        selection_receipts=tuple(sel_receipts),
+        completion_receipts=tuple(comp_receipts),
+    )
 
 
 def _session_updated_tick() -> int | None:
@@ -565,31 +768,261 @@ def refresh_dialogue_phase(character: Any, npc: Any) -> str | None:
     return greeting
 
 
-def open_or_refresh_dialogue(character: Any, npc: Any, line: str) -> DialogueSession:
-    """Record one delivered server-authored line as the character's session.
+def open_or_refresh_dialogue(
+    character: Any,
+    npc: Any,
+    line: str | None = None,
+    *,
+    delivery: SceneDelivery | None = None,
+    context: Any = None,
+    selection_receipt: dict[str, Any] | None = None,
+    completion_receipts: Any = (),
+) -> DialogueSession:
+    """Record one delivered server-authored line or scene delivery as character's session.
 
     The ONLY opener: called from the deterministic-core success paths (the
     ``explore.talk_open`` opener, the scripted adapter/command branches, and
-    the freeform settled observer). The line is truncated to
-    ``MAX_DIALOGUE_SESSION_LINE_CODE_POINTS`` at write, so the stored value is
-    always within the bound no producer can exceed it. Refreshing replaces the
-    value in place (one session per character).
+    the freeform settled observer). Refreshing replaces the value in place
+    (one session per character).
     """
+    from world.rules.dialogue_context import resolve_dialogue_context
+
+    existing = live_dialogue_session(character)
+    npc_pk = int(getattr(npc, "pk", 0))
+
+    if context is not None and getattr(context, "context_id", None):
+        context_id = str(context.context_id)
+        host_key = str(context.host_key)
+        source_id = context.source_identity
+        phase_rev = context.phase_revision
+    elif existing is not None and existing.npc_id == npc_pk and existing.context_id:
+        context_id = existing.context_id
+        host_key = existing.host_key
+        source_id = existing.source_identity
+        phase_rev = existing.phase_revision
+    else:
+        ctx = resolve_dialogue_context(character, npc)
+        context_id = uuid.uuid4().hex[:16]
+        host_key = ctx.host_key
+        source_id = ctx.source_identity
+        phase_rev = ctx.phase_revision
+
+    if existing is not None and existing.npc_id == npc_pk and existing.context_id == context_id:
+        sel_receipts = list(existing.selection_receipts)
+        comp_receipts = list(existing.completion_receipts)
+    else:
+        sel_receipts = []
+        comp_receipts = []
+
+    if selection_receipt is not None:
+        t_id = selection_receipt.get("topic_id")
+        replaced = False
+        for idx, item in enumerate(sel_receipts):
+            if item.get("topic_id") == t_id:
+                sel_receipts[idx] = selection_receipt
+                replaced = True
+                break
+        if not replaced:
+            sel_receipts.append(selection_receipt)
+        if len(sel_receipts) > 16:
+            sel_receipts.pop(0)
+
+    for c in completion_receipts:
+        comp_receipts.append(c)
+    if len(comp_receipts) > 32:
+        comp_receipts = comp_receipts[-32:]
+
+    kind = "scene" if delivery is not None else "line"
+    stored_line = str(line)[:MAX_DIALOGUE_SESSION_LINE_CODE_POINTS] if line is not None else None
+    line_delivery_id = uuid.uuid4().hex[:16] if kind == "line" else None
+    actor_id = int(getattr(character, "pk", 0))
+    owner_id = int(getattr(character, "pk", 0))
+    control_key = f"{owner_id}:{actor_id}"
+    updated_tick = _session_updated_tick()
+
     session = DialogueSession(
-        npc_id=int(npc.pk),
-        line=str(line)[:MAX_DIALOGUE_SESSION_LINE_CODE_POINTS],
-        updated_tick=_session_updated_tick(),
+        npc_id=npc_pk,
+        line=stored_line,
+        updated_tick=updated_tick,
+        kind=kind,
+        schema_version=1,
+        host_key=host_key,
+        source_identity=source_id,
+        context_id=context_id,
+        actor_id=actor_id,
+        owner_id=owner_id,
+        control_key=control_key,
+        phase_revision=phase_rev,
+        line_delivery_id=line_delivery_id,
+        delivery=delivery,
+        selection_receipts=tuple(sel_receipts),
+        completion_receipts=tuple(comp_receipts),
     )
+
+    serialized_source = None
+    if isinstance(source_id, StaticDialogueIdentity):
+        serialized_source = {
+            "profile_key": source_id.profile_key,
+            "dialogue_key": source_id.dialogue_key,
+        }
+    elif isinstance(source_id, GeneratedDialogueIdentity):
+        serialized_source = {
+            "package_id": source_id.package_id,
+            "role_id": source_id.role_id,
+            "phase_id": source_id.phase_id,
+        }
+
     character.db.dialogue_session = {
-        "npc_id": session.npc_id,
-        "line": session.line,
-        "updated_tick": session.updated_tick,
+        "schema_version": 1,
+        "kind": kind,
+        "npc_id": npc_pk,
+        "host_key": host_key,
+        "source_identity": serialized_source,
+        "context_id": context_id,
+        "actor_id": actor_id,
+        "owner_id": owner_id,
+        "control_key": control_key,
+        "phase_revision": phase_rev,
+        "line": stored_line,
+        "line_delivery_id": line_delivery_id,
+        "delivery": _delivery_to_storage(delivery) if delivery else None,
+        "selection_receipts": [
+            {
+                "topic_id": r.get("topic_id"),
+                "selection_id": r.get("selection_id"),
+                "delivery_id": r.get("delivery_id"),
+                "delivery": _delivery_to_storage(r["delivery"])
+                if isinstance(r.get("delivery"), SceneDelivery)
+                else r.get("delivery"),
+            }
+            for r in sel_receipts
+        ],
+        "completion_receipts": list(comp_receipts),
+        "updated_tick": updated_tick,
     }
     log_info(
         "dialogue_session_open",
         context={"char": str(getattr(character, "pk", "?")), "npc": str(session.npc_id)},
     )
     return session
+
+
+def select_authored_topic(
+    actor: Any,
+    host: Any,
+    topic_id: str,
+    *,
+    selection_id: str,
+    expected_context_id: str | None,
+    session: DialogueSession | None = None,
+) -> SceneDelivery:
+    """Select an authored topic and publish complete scene delivery atomically."""
+    from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.dialogue_context import DialogueContext, resolve_dialogue_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
+    from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+
+    context = resolve_dialogue_context(actor, host, session=session)
+
+    # Context validation
+    if expected_context_id is not None:
+        if context.context_id is None or expected_context_id != context.context_id:
+            raise StaleContextError("stale_context", "對話情境已過期。")
+        target_context_id = context.context_id
+    else:
+        if context.context_id is not None:
+            raise StaleContextError("stale_context", "已有進行中的對話。")
+        target_context_id = uuid.uuid4().hex[:16]
+
+    # Request dedup
+    current_sess = session if session is not None else live_dialogue_session(actor)
+    if (
+        current_sess is not None
+        and current_sess.npc_id == int(getattr(host, "pk", 0))
+        and current_sess.context_id == target_context_id
+    ):
+        for receipt in current_sess.selection_receipts:
+            if receipt.get("selection_id") == selection_id:
+                if receipt.get("topic_id") != topic_id:
+                    raise DuplicateSelectionError(
+                        "selection_id_reused", "此選取識別碼已被用於不同話題。"
+                    )
+                if (
+                    current_sess.delivery is not None
+                    and current_sess.delivery.delivery_id == receipt.get("delivery_id")
+                ):
+                    return current_sess.delivery
+                raise StaleSelectionError("stale_selection", "選取請求已過期。")
+
+    source = resolve_dialogue_source(context)
+    if source is None:
+        raise DialogueSourceUnavailableError("no_source", "對方目前無法交談。")
+
+    matched_topic = None
+    for t in source.dialogue.topics:
+        if t.topic_id == topic_id:
+            matched_topic = t
+            break
+    if matched_topic is None:
+        raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
+
+    if matched_topic.requires is not None or matched_topic.predecessors:
+        raise TopicLockedError("topic_locked", "此話題目前無法選取。")
+
+    owner = context.owner
+    relations_snapshot = attribute_snapshot(host, "relations_data")
+    session_snapshot = attribute_snapshot(owner, "dialogue_session")
+
+    scene = matched_topic.fallback
+    delivery_id = uuid.uuid4().hex[:16]
+    delivery = SceneDelivery(
+        delivery_id=delivery_id,
+        selection_id=selection_id,
+        context_id=target_context_id,
+        actor_id=int(getattr(actor, "pk", 0)),
+        owner_id=int(getattr(owner, "pk", 0)),
+        host_id=int(getattr(host, "pk", 0)),
+        topic_id=matched_topic.topic_id,
+        scene_id=scene.scene_id,
+        scene_revision=scene.revision,
+        phase_revision=context.phase_revision,
+        kind="formal",
+        lines=scene.lines,
+        updated_tick=_session_updated_tick(),
+    )
+    context_with_id = DialogueContext(
+        actor=context.actor,
+        owner=context.owner,
+        host=context.host,
+        host_key=context.host_key,
+        source_identity=context.source_identity,
+        context_id=target_context_id,
+        phase_revision=context.phase_revision,
+    )
+
+    try:
+        from django.db import transaction
+
+        with transaction.atomic():
+            apply_affinity_change(host, owner, AffinitySource.TALK, 1)
+            open_or_refresh_dialogue(
+                owner,
+                host,
+                delivery=delivery,
+                context=context_with_id,
+                selection_receipt={
+                    "topic_id": matched_topic.topic_id,
+                    "selection_id": selection_id,
+                    "delivery_id": delivery_id,
+                    "delivery": delivery,
+                },
+            )
+    except Exception:
+        restore_attribute_best_effort(host, "relations_data", relations_snapshot)
+        restore_attribute_best_effort(owner, "dialogue_session", session_snapshot)
+        raise
+
+    return delivery
 
 
 def clear_dialogue_session(character: Any, npc: Any | None = None) -> bool:

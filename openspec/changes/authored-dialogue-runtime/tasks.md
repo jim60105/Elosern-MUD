@@ -10,7 +10,7 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 Remaining units implement Shared contract v2, including host_key/source identity in context/session and static <=96/generated <=2048 IDs in all Python/UMD/Vue action, panel, receipt, completion and predecessor validators. Add worst valid ID and aggregate UTF-8 budget tests; generated-packages supplies the production provider later.
 
-- [ ] 2.1 Implement resolve_dialogue_context for the ordinary player and select_authored_topic/session forms with request dedup and rollback compensation. Add world/rules/tests/test_authored_dialogue_runtime.py covering stale envelope, duplicate after intervening topic, session-write failure, no time advancement and snapshot replay.
+- [x] 2.1 Implement resolve_dialogue_context for the ordinary player and select_authored_topic/session forms with request dedup and rollback compensation. Add world/rules/tests/test_authored_dialogue_runtime.py covering stale envelope, duplicate after intervening topic, session-write failure, no time advancement and snapshot replay.
 
 ## 3. Transport and protocol cutover
 
