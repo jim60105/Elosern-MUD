@@ -42,19 +42,25 @@ import { QUEST_IDS, newLight, worldBase, worldNewLight } from "../../stories/fix
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
 const APP_DIR = resolve(__dirname, "../..");
 
-// The live-store journeys below mount the whole shell and drive real protocol
-// commits, so one test's mount/teardown/repaint cost exceeds Vitest's default
-// 5 s budget on a loaded CI worker: the file carries the same explicit
-// headroom the project's other mount-heavy AppClient suites declare.
-vi.setConfig({ testTimeout: 20000 });
+// Importing AppClient puts the whole component library's stylesheets in jsdom
+// (93 here, against 16 without it), so one computed-style read costs ~31 ms
+// instead of ~2 ms. The drawer's focus trap takes one per candidate control,
+// which makes a single mount plus its teardown cost ~4.6 s on a developer
+// machine and put this file at 175-194 s on a CI worker (a ~4.8x ratio taken
+// from this run's file totals). The budget below is that environment's cost,
+// not a relaxed assertion, and follows the explicit headroom the project's
+// other mount-heavy suites declare.
+vi.setConfig({ testTimeout: 60000 });
 
 let wrappers = [];
+// The teardown unmounts the whole shell, so it states its own budget: a hook
+// captures the timeout when it is registered.
 afterEach(() => {
   for (const w of wrappers) w.unmount();
   wrappers = [];
   document.body.innerHTML = "";
   document.documentElement.style.removeProperty("--motion-district-reveal");
-});
+}, 60000);
 
 // ── fake store ──────────────────────────────────────────────────────────
 
