@@ -48,3 +48,7 @@
 #### Scenario: Greeting keys follow the editor privacy rule
 - **WHEN** a read returns either greeting key
 - **THEN** both greeting keys are editor data under the existing privacy rule: only the requesting session's result carries them, ordinary snapshots do not, and no card or greeting prose enters logs or narrative output
+
+#### Scenario: A read returns the seven-key snapshot
+- **WHEN** a co-located NPC has persona version 3 and stored/table greetings
+- **THEN** the title-free result has exactly six fields: npc_id, display_name, persona_version, persona, offline_greeting and default_greeting; version/private identity/greetings retain their actual canonical values

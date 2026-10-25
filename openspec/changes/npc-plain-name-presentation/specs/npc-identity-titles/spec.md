@@ -26,6 +26,14 @@ NPC dialogue context SHALL carry name, description and location without an indep
 - **WHEN** a player with an equipped title builds its existing context
 - **THEN** its current title information is unchanged
 
+#### Scenario: A titled NPC exposes its title to the dialogue context
+- **WHEN** an NPC with historical title data builds context
+- **THEN** the title is neither read nor emitted; ordinary name/description/location remain
+
+#### Scenario: An untitled NPC exposes an empty title and an unchanged prompt
+- **WHEN** an NPC without title data builds context
+- **THEN** the same title-free context is emitted without creating an attribute
+
 ### Requirement: Command and search targeting matches the plain NPC key only
 
 Player command and object-search targeting SHALL continue to resolve NPCs by their plain `key`. The title SHALL NOT be written into the key, registered as an alias, or added to any search index, so a player never has to type a title to address an NPC.
