@@ -12,7 +12,7 @@ Observed narrative owns deterministic persistent state and uses explicit service
 
 ## Decisions
 
-Implement Shared contract v1 reading APIs using an owner Attribute, not ORM schema/migrations. The lock discipline must match world.rules.npc_persona._lock_npc_row: first SQL inside atomic is a no-op guarded UPDATE on owner ObjectDB, then raw Attribute through-table read. select_for_update alone is insufficient on SQLite. Re-read authoritative storage under that lock, merge one host/topic completion, increment root revision only for a change, assign fresh JSON-safe containers and restore cached Attribute surfaces on write failure. Pure reading_for never materializes storage. Emit dialogue_reading_completed info on commit with owner/actor/host/topic/delivery/context/revision and no scene text.
+Implement Shared contract v2 reading on owner Attribute, keyed by stable host_key, never physical dbid. Static s:profile and generated g:package-role share the same lock/merge schema; accept complete source-aware IDs. First SQL inside atomic is guarded owner ObjectDB UPDATE, then raw Attribute read; select_for_update alone is insufficient on SQLite. Merge one host/topic, increment only on change, assign fresh containers and compensate caches on failure. reading_for never creates storage. Completion validates retained receipt/current package-role/phase context without static membership. Same-phase return/save/reload preserve reading; phase change retires receipts only. Log existing-facade identifiers without prose/private values.
 
 A current context holds server delivery receipts independently from the latest scene snapshot. Store one receipt per topic for the most recently issued formal/pure-chain delivery; on repeated delivery of the same topic retain the prior receipt until its acknowledgement or context retirement (bounded 2 receipts per topic, at most 32 for <=16 topics). Older acknowledged completion may return already_saved only after validating it is in the current receipt set; foreign/undelivered claims never succeed. Re-selecting the same topic more than twice retires superseded unacknowledged receipts; client treats that receipt rejection as authoritative, while read completion is monotonic. Across different topics, delayed valid receipts survive later selections. A stale phase/context/control receipt cannot mark new content read. Reconnect republishes the latest stored scene unchanged, retains current valid receipt set and starts presentation at line one.
 
@@ -39,12 +39,18 @@ Boundary events use the existing world.observability facade with available owner
 - `web/webclient/presentation/dialogue.py`
 - `web/webclient/presentation/dialogue_push.py`
 - `web/webclient/presentation/watchers.py`
+- `web/webclient/presentation/affordances.py (ACTION_CODE_ALLOWLIST entry)`
+- `web/webclient/presentation/options.py (_ACTION_PAYLOAD_VALIDATORS lockstep entry)`
+- `web/webclient/actions/registry.py (ActionSpec registration)`
+- `web/static/webclient/js/elosern/protocol/constants.js (CONTEXT_ACTIONS_ACTION_CODES entry)`
 
 ## Risks / Trade-offs
 
 The complete review-resolved session and wire schemas in the shared contract govern receipt storage, pure_chain entries and completed_topic_ids. Reading-server creates the entire narrative Attribute shape, including initialized false and pending_batch null; observation remains owned by unread-notices. Saved completed_topic_ids accompanies reading_revision so a second connection can suppress already-read notices without interpreting unread flags. Public successor delivery and retained receipts must pass the shared aggregate UTF-8 budget. Reconnect preserves opening line_delivery_id and context, and delayed topic A completion uses receipts independent of latest topic B playback.
 
 Owns narrative Attribute and backend receipt/pusher changes. UI locked change is independent code-wise but reading-client depends on both. Notification slice extends same Attribute after this. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
+
+The new action is exactly `explore.dialogue_complete` with exact composed payload `{npc_id,delivery_id,context_id,topic_id,scene_revision}`, validated by `web/webclient/actions/exploration_actions.py::validate_dialogue_complete_payload` and registered in the same five lockstep points every other exploration action uses. A successful completion commits reading and then queues `refresh_dialogue_availability(owner, cause="reading_completed")` on commit, so a qualified successor that just became eligible is projected without waiting for an unrelated state change; a rejected claim queues nothing.
 
 ## Focused verification at implementation time
 

@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Persistent narrative API and locking
 
+Shared contract v2 uses stable host_key/source-aware topic IDs for both providers. Test equal local IDs in different package roles, dbid rematerialization, save/reload and phase-return completion; preserve receipt/byte budgets without a static membership check.
+
 - [ ] 1.1 Implement pure reader, locked raw-read/merge writer, revision and cache compensation in dialogue_reading.py. Add world/narrative/tests/test_dialogue_reading.py for host/owner keys, same-topic duplicates, concurrent merge and rollback; document SQLite guarded-lock ownership.
 
 ## 2. Receipts completion and pure-chain delivery

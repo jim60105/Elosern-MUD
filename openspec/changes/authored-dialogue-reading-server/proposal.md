@@ -25,7 +25,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No model-generated reading writes, filesystem persistence, static-only completion gate or effect authorization from reading receipts. Both scene sources share stable owner/host_key/topic persistence.
 
 ## Batch:
 
@@ -33,4 +33,4 @@ depends-on: authored-dialogue-availability
 
 Code conflicts: Owns narrative Attribute and backend receipt/pusher changes. UI locked change is independent code-wise but reading-client depends on both. Notification slice extends same Attribute after this.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; generated phase invalidation retires receipts while stable package-role/phase-topic reading survives save/reload.

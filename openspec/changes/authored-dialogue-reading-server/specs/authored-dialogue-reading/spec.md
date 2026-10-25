@@ -6,6 +6,13 @@ Provide narrative-owned formal reading, delivered receipts and pure-chain synchr
 
 ## ADDED Requirements
 
+### Requirement: Generated reading persists by logical package-role identity
+Reading SHALL use the owning player, stable logical host and source-aware topic identity for both providers. Generated phase/binding retirement SHALL invalidate receipts without erasing saved completion. Physical role dbid changes or save/reload SHALL not reset logical reading.
+
+#### Scenario: Role rematerialization retains completion
+- **WHEN** a published package role with saved reading resolves to a new physical dbid
+- **THEN** its same-phase topics retain completion while old physical-context receipts reject
+
 ### Requirement: Formal reading is persistent owner-shared narrative state
 Formal completion SHALL persist by owning player, host and stable topic identity and synchronize to that owner current connections. Refusal, opening, abandoned and failed text-emission playback SHALL not complete a formal topic. Variant changes and relocking SHALL not erase completion.
 
