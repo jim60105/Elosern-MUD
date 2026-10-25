@@ -4,7 +4,7 @@
 
 - [ ] 1.1 Add services <npc> with alias 服務 to the existing character cmdset and append the same projection to 看 <NPC>. Use existing visible target resolution and print none/unreadable/paused states distinctly without materializing state; include stable key and route guidance.
 
-- [ ] 1.2 Extend provider-dependent existing shop list/buy/sell, guild register/list/accept/turnin and combat exam parsers with terminal @#<positive dbid> target. Explicit input uses require_service_target and never falls back; omitted suffix keeps established unambiguous text behavior. Keep guild abandon/track and personal commands host-independent.
+- [ ] 1.2 Extend actual CmdShopStock (shop stock), CmdBuy/CmdSell (buy/sell), guild register/list/accept/turnin/ordinary-abandon and CmdGuildExam (guild exam) parsers with terminal @#<positive dbid>. Explicit input uses require_service_target without fallback; omission keeps implicit ambiguity behavior. Keep private escort abandonment, tracking and personal commands host-independent. Preserve all existing aliases; do not invent shop list or combat exam.
 
 - [ ] 1.3 Regress the church join <npc> explicit-target syntax and command-input-only handoff already completed by P; preserve enrollment/arousal/permission rules. Test that opening a command route sends nothing until the player submits, including stale target refusal with a second clergy present.
 

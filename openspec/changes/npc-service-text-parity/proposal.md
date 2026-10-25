@@ -21,6 +21,8 @@ None.
 ### Modified Capabilities
 
 - `game-command-docs`: amend the affected current behavior and remove superseded contracts as specified by this change's delta.
+- `guild-quest-board`: distinguish explicit selected-provider commands from implicit room discovery.
+- `shop-economy`: distinguish targeted stock/trade commands from implicit unambiguous merchant discovery.
 
 ## Impact
 
