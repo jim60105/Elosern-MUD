@@ -10,7 +10,7 @@ from web.webclient.presentation.registry import build_production_registry
 
 
 
-class OptionsSnapshotFactoryTests(unittest.TestCase):
+class OptionsSnapshotFactoryTests(EvenniaTestCase):
     """Read-side options_snapshot factory (task 1.5; review hardening)."""
 
     def test_absent_state_yields_none(self):

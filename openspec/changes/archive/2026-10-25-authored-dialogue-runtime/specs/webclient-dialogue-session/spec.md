@@ -27,7 +27,7 @@ The version-3 dialogue panel SHALL carry bounded host and acting-body identity/p
 - **WHEN** a viewer with a live dialogue session against a bonded table host receives a snapshot
 - **THEN** `dialogue` is available with the host's identity, display name, and the host's art
   catalog key as `portrait_ref`, the bond stage name, the recorded native line or complete scene delivery, and all at most sixteen
-  topic choices in declaration order as `{npc_id,topic_id,context_id}`, with no affinity numeral and no keyword field present
+  topic choices in declaration order carrying their topic identity, keyword, label, availability, requirement hint, unread marker, predecessors, and `{npc_id,topic_id,context_id}` action payload, with no affinity numeral present
 
 #### Scenario: The host's portrait reference matches the art catalog
 - **WHEN** a viewer with a live session against a scripted host receives one snapshot carrying

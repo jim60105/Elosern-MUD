@@ -5,7 +5,7 @@ Versioned WebSocket OOB envelopes, epoch/revision ordering, authenticated synchr
 ## Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-Each Elosern OOB message SHALL be exactly one JSON object in the first positional argument of Evennia's command/args/kwargs triple. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Envelopes SHALL reject unknown fields, invalid scalars and non-finite numbers. world_map SHALL have its own size exception; other panels keep their bounds. Transport SHALL deliver one complete replacement or parts reassembled atomically.
+Each Elosern OOB message SHALL be one JSON object in Evennia's command/args/kwargs first positional argument. Version 1 SHALL define ui_sync, ui_action, ui_snapshot, ui_update, ui_action_result and ui_protocol_error. Envelopes SHALL reject unknown fields, invalid scalars and non-finite numbers. world_map and v3 dialogue publications SHALL use only their declared finite scoped allowances; unrelated panels keep their bounds. Transport SHALL deliver one complete replacement or atomic reassembly.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
@@ -24,12 +24,16 @@ Each Elosern OOB message SHALL be exactly one JSON object in the first positiona
 - **THEN** the envelope is rejected before dispatch or adoption
 
 #### Scenario: Global structural bounds reject oversized envelopes
-- **WHEN** a non-exempt message exceeds the existing 65536-byte or other generic structural limits, or a world-map message exceeds its separately measured declared bounds
+- **WHEN** a non-exempt message exceeds the existing 65536-byte or other generic structural limits, or a world-map message exceeds its separately measured declared bounds, or a dialogue publication exceeds its 98304-byte whole-envelope, 24576-byte dialogue or 65536-byte dialogue-removed envelope bound
 - **THEN** both validators reject it before dispatch/adoption, retaining all non-size scalar safety rules and panel-local bounds
 
 #### Scenario: Field-specific limits stay within global bounds
 - **WHEN** a registered field defines a field-specific limit
-- **THEN** it is no larger than its applicable enclosing bound, with world_map and reassembled area_map using only their explicitly scoped finite logical bounds, and unrelated panel budgets unchanged
+- **THEN** it is no larger than its applicable enclosing bound, with world_map, reassembled area_map and v3 dialogue publications using only their explicitly scoped finite logical bounds, and unrelated panel budgets unchanged
+
+#### Scenario: Multilingual chain fits the real outer transport
+- **WHEN** a maximum valid CJK primary scene and public successor are published then replayed after reconnect
+- **THEN** both production validators and protocol-store admission accept the same bounded complete frame, while any over-budget body rejects before effect/session publication
 
 ### Requirement: Full snapshots and updates have registered replacement semantics
 A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included eager update panel SHALL completely replace its prior value. On-demand map bodies SHALL be omitted from eager snapshots, kept separately within an epoch, and cleared on a new epoch. No JSON Patch is used.

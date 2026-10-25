@@ -132,6 +132,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting")
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
+    @covers_requirement(
+        "authored-dialogue-selection::text-and-browser-resolve-the-same-authored-topic"
+    )
     def test_scripted_keyword_dialogue_completes(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

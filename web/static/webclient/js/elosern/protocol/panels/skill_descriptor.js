@@ -117,11 +117,17 @@ function validateContextActionsAffordanceParams(actionId, params) {
     return params;
   }
   if (actionId === "explore.talk_scripted") {
-    requireExactFields(params, "talk_scripted params", ["npc_id", "keyword_id"], []);
+    requireExactFields(params, "talk_scripted params", ["npc_id", "topic_id", "context_id"], []);
     requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
-    var keywordId = requireString(params.keyword_id, "keyword_id", CONTEXT_ACTIONS_MAX_KEYWORD_ID);
-    if (!keywordId.trim()) {
-      throw new Error("keyword_id must be non-empty");
+    var topicId = requireString(params.topic_id, "topic_id", 2048);
+    if (!topicId.trim()) {
+      throw new Error("topic_id must be non-empty");
+    }
+    if (params.context_id !== null) {
+      var contextId = requireString(params.context_id, "context_id", 64);
+      if (!contextId.trim()) {
+        throw new Error("context_id must be non-empty when present");
+      }
     }
     return params;
   }

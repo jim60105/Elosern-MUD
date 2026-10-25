@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 海莉爾‧斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下你的手：「來看刀吧。砧邊那對剛打好，可以拿起來試。先讓我瞧一下你平常怎麼握刀。」
+topics:
+- topic_id: ciaran_hailiel_home.topic_01
+  keyword: 鍛刀
+  label: 鍛刀
+  fallback:
+    scene_id: ciaran_hailiel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 鍛刀
+    - kind: speech
+      speaker: host
+      text: 「谷底的鐵砂性子烈，要反覆鍛打，打到鋼性均勻才叫暗影鋼。砧邊那對暗影鋼刀剛完成。外人難得來，你要是真用得上，拿銅幣來換，我也肯割愛。」
+- topic_id: ciaran_hailiel_home.topic_02
+  keyword: 影刀
+  label: 影刀
+  fallback:
+    scene_id: ciaran_hailiel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 影刀
+    - kind: speech
+      speaker: host
+      text: 「暗影鋼刀‧影是副手刀，跟主手刀成對打。刃身淬過谷底的第一道霜，靜止時看起來一片黑，揮起來才看得到那道影子。我一次只做一對，砧邊還有沒有，你自己去瞧吧。」
+- topic_id: ciaran_hailiel_home.topic_03
+  keyword: 鐵料
+  label: 鐵料
+  fallback:
+    scene_id: ciaran_hailiel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 鐵料
+    - kind: speech
+      speaker: host
+      text: 「鐵料就不用了，鐵砂我自己去谷底挖。我打的刀用舊了、用不到了，拿回來給我，還能用的我收下。」
+- topic_id: ciaran_hailiel_home.topic_04
+  keyword: 用刀
+  label: 用刀
+  fallback:
+    scene_id: ciaran_hailiel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 用刀
+    - kind: speech
+      speaker: host
+      text: 「打獵有打獵的刀，剝皮有剝皮的刀，別想拿一把刀應付所有事。暗影鋼刀當主手，影刀當副手，兩把一起用最順。合不合你的手，我會直說。」

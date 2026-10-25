@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 爐火旅店的溫弗蕾德‧古林從櫃檯後站起來，腰間的鑰匙叮噹作響：「歡迎啊，孩子，一路辛苦了吧。樓上有房間，每間都有門閂。想歇一下，樓下火塘邊有椅子；想睡個好覺，床單我才剛換過。要是想趁安靜練個劍、溫習一下咒文，房裡也很安靜喔。」
+topics:
+- topic_id: altoria_lodging.topic_01
+  keyword: 房間
+  label: 房間
+  fallback:
+    scene_id: altoria_lodging.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 房間
+    - kind: speech
+      speaker: host
+      text: 「房間在樓上，一張床、一個臉盆，門閂一拉，裡面就是你自己的地方了。要歇一下，在房裡或樓下火塘邊都行。我這裡沒什麼了不起，就是牆厚、門關得緊。」
+- topic_id: altoria_lodging.topic_02
+  keyword: 過夜
+  label: 過夜
+  fallback:
+    scene_id: altoria_lodging.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 過夜
+    - kind: speech
+      speaker: host
+      text: 「累壞了吧？那就上樓睡個好覺。樓下也有人靠著火塘打瞌睡，不過聽我一句，上樓睡，安靜多了。睡路邊跟睡床上，隔天起來的精神差很多呢。」
+- topic_id: altoria_lodging.topic_03
+  keyword: 修煉
+  label: 修煉
+  fallback:
+    scene_id: altoria_lodging.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 修煉
+    - kind: speech
+      speaker: host
+      text: 「光坐著發呆多可惜呀。很多冒險者會待在房裡，一邊歇一邊練劍、溫習咒文，我這裡夠安靜，不會有人吵你。先想一下要練哪樣吧。」
+- topic_id: altoria_lodging.topic_04
+  keyword: 澡堂
+  label: 澡堂
+  fallback:
+    scene_id: altoria_lodging.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 澡堂
+    - kind: speech
+      speaker: host
+      text: 「浴場啊？出了巷子往東走就到了，伊莎貝爾在顧。男女分兩邊，池子燒的是河水。睡覺的事找我，洗澡的事找她。洗乾淨再回來睡，床單也比較乾淨嘛。」

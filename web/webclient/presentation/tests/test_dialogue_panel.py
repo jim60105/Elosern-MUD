@@ -12,6 +12,9 @@ establishing tests (landed with the change's spec-sync commit).
 
 from copy import deepcopy
 from types import SimpleNamespace
+import json
+from pathlib import Path
+import subprocess
 import unittest
 from unittest import mock
 
@@ -44,7 +47,16 @@ from web.webclient.presentation.dialogue import (
     validate_dialogue,
 )
 from web.webclient.presentation.protocol import (
+    DIALOGUE_BUNDLE_MAX_BYTES,
+    DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES,
+    DIALOGUE_ENVELOPE_MAX_BYTES,
+    DIALOGUE_PANEL_MAX_BYTES,
+    DIALOGUE_SCENE_MAX_BYTES,
+    JSONSafetyError,
+    MAX_CANONICAL_JSON_BYTES,
     ProtocolValidationError,
+    check_envelope,
+    json_byte_size,
     validate_ui_snapshot,
 )
 from web.webclient.presentation.registry import build_production_registry
@@ -61,6 +73,7 @@ from world.rules.dialogue import (
     DialogueDefinition,
     KeywordResponse,
     clear_dialogue_session,
+    live_dialogue_session,
     open_or_refresh_dialogue,
 )
 from world.rules.movement_settlement import settle_movement
@@ -114,7 +127,7 @@ _T_OVER_CAP_ROW = DialogueDefinition(
     greeting="櫃檯後的人抬起眼：「有事說一聲就好。」",
     responses=tuple(
         KeywordResponse(f"合成關鍵詞{index}", f"「合成回應{index}。」")
-        for index in range(6)
+        for index in range(18)
     ),
 )
 
@@ -133,7 +146,16 @@ class _RecordingSession:
 
 
 def _choice(keyword):
-    return {"keyword_id": keyword, "label": keyword}
+    return {
+        "topic_id": f"guild_staff.{keyword}",
+        "keyword_id": keyword,
+        "label": keyword,
+        "availability": "open",
+        "requirement_hint": None,
+        "unread": False,
+        "predecessors": [],
+        "action_payload": {"npc_id": 41, "topic_id": f"guild_staff.{keyword}", "context_id": "ctx-1"},
+    }
 
 
 def _available(**overrides):
@@ -146,9 +168,19 @@ def _available(**overrides):
             "display_name": "公會職員",
             "portrait_ref": None,
         },
+        "actor": {
+            "identity": 1,
+            "display_name": "測試者",
+            "portrait_ref": None,
+        },
         "bond_stage": "熟人",
-        "line": "歡迎來到冒險者公會。",
+        "context_id": "ctx-1",
+        "delivery": None,
         "choices": [_choice("公會"), _choice("任務")],
+        "pure_chain": [],
+        "reading_revision": 0,
+        "completed_topic_ids": [],
+        "unlock_batch": None,
     }
     payload.update(overrides)
     return payload
@@ -171,7 +203,7 @@ class DialoguePresenterTests(EvenniaTest):
         return self.registry.render("dialogue", self.context)
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_available_form_is_exact_vocabulary_for_a_bonded_host(self):
         apply_affinity_change(
@@ -183,7 +215,21 @@ class DialoguePresenterTests(EvenniaTest):
         payload = self._render()
         self.assertEqual(
             set(payload),
-            {"schema_version", "available", "kind", "host", "bond_stage", "line", "choices"},
+            {
+                "schema_version",
+                "available",
+                "kind",
+                "host",
+                "actor",
+                "bond_stage",
+                "context_id",
+                "delivery",
+                "choices",
+                "pure_chain",
+                "reading_revision",
+                "completed_topic_ids",
+                "unlock_batch",
+            },
         )
         self.assertEqual(payload["schema_version"], DIALOGUE_SCHEMA_VERSION)
         self.assertIs(payload["available"], True)
@@ -199,12 +245,14 @@ class DialoguePresenterTests(EvenniaTest):
             },
         )
         self.assertEqual(payload["bond_stage"], self.host.relations.stage_for(self.player).name)
-        self.assertEqual(payload["line"], "任務板在右側。")
+        self.assertEqual(payload["delivery"]["lines"][0]["text"], "任務板在右側。")
         # Same vocabulary owner as the interact target descriptor, table order,
         # truncated to the panel's own bound (align-11).
         self.assertEqual(
             payload["choices"],
-            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+            _scripted_keyword_descriptors(self.host, context_id=live_dialogue_session(self.player).context_id)[
+                :DIALOGUE_MAX_CHOICES
+            ],
         )
         self.assertTrue(payload["choices"])
         # The shipped guild_staff row authors exactly the panel's pressable
@@ -214,7 +262,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(affinity_value, payload.values())
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_host_portrait_reference_matches_the_art_catalog(self):
         # One registry and one context, so the dialogue key is checked against
@@ -240,7 +288,7 @@ class DialoguePresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_generative_host_outside_the_art_view_carries_a_null_reference(self):
         # An LLMNPC is conversable (explore.talk_open accepts it) but carries
@@ -257,7 +305,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(portrait_catalog_key(bard.pk), art["portrait_catalog"])
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_catalog_cap_drop_carries_a_null_reference(self):
         # design.md's named risk: the art view keeps the first
@@ -282,7 +330,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(portrait_catalog_key(host.pk), catalog)
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_unbuildable_art_view_carries_a_null_reference(self):
         # A combat actor with no session record is the reachable ArtViewError:
@@ -318,13 +366,16 @@ class DialoguePresenterTests(EvenniaTest):
         host = _host_with_key(self.room, _T_OVER_CAP_KEY, key="合成對話主")
         open_or_refresh_dialogue(self.player, host, "歡迎。")
         full_pool = _scripted_keyword_descriptors(host)
-        self.assertEqual(len(full_pool), 6)
+        self.assertEqual(len(full_pool), 16)
         payload = self._render()
         self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)
-        self.assertEqual(payload["choices"], full_pool[:DIALOGUE_MAX_CHOICES])
+        expected_choices = _scripted_keyword_descriptors(
+            host, context_id=live_dialogue_session(self.player).context_id
+        )[:DIALOGUE_MAX_CHOICES]
+        self.assertEqual(payload["choices"], expected_choices)
         self.assertEqual(
             [row["keyword_id"] for row in payload["choices"]],
-            [row["keyword_id"] for row in full_pool[:DIALOGUE_MAX_CHOICES]],
+            [row["keyword_id"] for row in expected_choices],
         )
 
     def test_no_session_renders_the_registered_unavailable_form(self):
@@ -391,7 +442,7 @@ class DialoguePresenterTests(EvenniaTest):
         open_or_refresh_dialogue(self.player, self.host, "第二句。")
         second = self._render()
         self.assertIs(second["available"], True)
-        self.assertEqual(second["line"], "第二句。")
+        self.assertEqual(second["delivery"]["lines"][0]["text"], "第二句。")
         self.assertEqual(second["host"], first["host"])
         self.assertEqual(second["choices"], first["choices"])
 
@@ -428,8 +479,6 @@ class DialogueValidatorTests(unittest.TestCase):
             host={"identity": 41, "display_name": "公會職員", "portrait_ref": "42"}
         )
         self.assertEqual(validate_dialogue(keyed), keyed)
-        # Paired astral code points are legal text.
-        self.assertEqual(validate_dialogue(_available(line="歡迎\U0001F600。"))["line"], "歡迎\U0001F600。")
 
     def test_portrait_reference_bound_matches_the_combat_participant_bound(self):
         self.assertEqual(MAX_DIALOGUE_PORTRAIT_REF, MAX_PARTICIPANT_REF)
@@ -448,7 +497,7 @@ class DialogueValidatorTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_drift_rejects(self):
         bad_payloads = [
@@ -458,7 +507,7 @@ class DialogueValidatorTests(unittest.TestCase):
             {k: v for k, v in _available().items() if k != "choices"},
             # schema drift
             _available(schema_version=1),
-            _available(schema_version=3),
+            _available(schema_version=2),
             # the unavailable form is the registry's, not the validator's
             dict(UNAVAILABLE_PAYLOAD),
             _available(available=False),
@@ -609,7 +658,7 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
             "request_id": "d1",
             "base_revision": coordinator.revision,
             "action_id": "explore.talk_scripted",
-            "payload": {"npc_id": int(self.host.pk), "keyword_id": "公會"},
+            "payload": {"npc_id": int(self.host.pk), "topic_id": "guild_staff.topic_03", "context_id": None},
         }
         handle_ui_action(
             session, self.player, envelope, self.action_registry, self.registry
@@ -628,14 +677,16 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         # published panel already carries the authored reply.
         self.assertEqual(committed["mode"], "dialogue")
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
-        self.assertEqual(
-            committed["panels"]["dialogue"]["line"],
-            self.player.db.dialogue_session["line"],
+        self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
+        self.assertIn(
+            "冒險者公會",
+            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
         )
-        self.assertIn("冒險者公會", committed["panels"]["dialogue"]["line"])
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
-            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+            _scripted_keyword_descriptors(
+                self.host, context_id=committed["panels"]["dialogue"]["context_id"]
+            )[:DIALOGUE_MAX_CHOICES],
         )
         # End-to-end: the portrait reference the wire carries is a key of the
         # art catalog committed in the same envelope (design §8.2 — the client
@@ -838,10 +889,224 @@ class DialogueTextCommandSettlementTests(BattlefieldIsolation, EvenniaTest):
         # mode and the available dialogue panel commit in one envelope.
         self.assertEqual(committed["mode"], "dialogue")
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
-        self.assertEqual(
-            committed["panels"]["dialogue"]["line"],
-            self.player.db.dialogue_session["line"],
+        self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
+        self.assertIn(
+            "登記很簡單",
+            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
         )
+
+
+
+class DialoguePublicationBudgetTests(unittest.TestCase):
+    """Canonical UTF-8 dialogue budgets and conditional 98304 envelope rules."""
+
+    def _sample_dialogue_panel(self, delivery_lines=None):
+        lines = delivery_lines or [
+            {"kind": "speech", "speaker": "actor", "text": "公會"},
+            {"kind": "speech", "speaker": "host", "text": "歡迎來到冒險者公會。"},
+        ]
+        return {
+            "schema_version": 3,
+            "available": True,
+            "kind": "dialogue",
+            "host": {"identity": 41, "display_name": "公會職員", "portrait_ref": None},
+            "actor": {"identity": 1, "display_name": "測試者", "portrait_ref": None},
+            "bond_stage": "熟人",
+            "context_id": "ctx-1",
+            "delivery": {
+                "delivery_id": "deliv-1",
+                "context_id": "ctx-1",
+                "topic_id": "guild_staff.topic_01",
+                "scene_id": "guild_staff.topic_01_scene",
+                "scene_revision": "r1",
+                "phase_revision": None,
+                "kind": "formal",
+                "lines": lines,
+            },
+            "choices": [
+                {
+                    "topic_id": "guild_staff.topic_01",
+                    "keyword_id": "公會",
+                    "label": "公會",
+                    "availability": "open",
+                    "requirement_hint": None,
+                    "unread": False,
+                    "predecessors": [],
+                    "action_payload": {
+                        "npc_id": 41,
+                        "topic_id": "guild_staff.topic_01",
+                        "context_id": "ctx-1",
+                    },
+                }
+            ],
+            "pure_chain": [],
+            "reading_revision": 0,
+            "completed_topic_ids": [],
+            "unlock_batch": None,
+        }
+
+    def _envelope(self, panels, revision=1):
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": "e" * 22,
+            "revision": revision,
+            "mode": "dialogue",
+            "panels": panels,
+            "layout_version": 1,
+            "server_time": {
+                "year": 1204,
+                "season_index": 2,
+                "season_label": "仲夏",
+                "day_in_season": 17,
+                "hour": 14,
+                "minute": 30,
+                "second": 5,
+            },
+        }
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_dialogue_envelope_conditional_allowance_accepts_up_to_98304(self):
+        cjk_lines = [
+            {
+                "kind": "speech",
+                "speaker": "host" if i % 2 else "actor",
+                "text": f"冒險者公會的大廳內聚集了來自各地的傭兵與行商，空氣中瀰漫著舊羊皮紙與麥酒的香氣。（行次{i}）" * 3,
+            }
+            for i in range(16)
+        ]
+        dialogue = self._sample_dialogue_panel(delivery_lines=cjk_lines)
+        self.assertLessEqual(json_byte_size(dialogue), DIALOGUE_PANEL_MAX_BYTES)
+
+        padding = {f"pad_{i}": "文字內容測試" * 90 for i in range(36)}
+        status = {
+            "schema_version": 4,
+            "available": True,
+            "name": "影行者",
+            "identity": "42",
+            "resources": {"hp": {"current": 80, "maximum": 100}, "mp": {"current": 30, "maximum": 50}, "sp": {"current": 12, "maximum": 40}},
+            "conditions": [],
+            "fatigue": [],
+            "disguise_active": False,
+            "combat": None,
+            **padding,
+        }
+        envelope = self._envelope({"dialogue": dialogue, "status": status})
+        size = json_byte_size(envelope)
+        stripped = {**envelope, "panels": {"status": status}}
+        stripped_size = json_byte_size(stripped)
+
+        self.assertGreater(size, MAX_CANONICAL_JSON_BYTES)
+        self.assertLessEqual(size, DIALOGUE_ENVELOPE_MAX_BYTES)
+        self.assertLessEqual(stripped_size, MAX_CANONICAL_JSON_BYTES)
+
+        check_envelope(envelope)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_dialogue_envelope_exceeding_98304_rejected(self):
+        dialogue = self._sample_dialogue_panel()
+        padding = {f"pad_{i}": "超限字串填充內容" * 100 for i in range(45)}
+        status = {"schema_version": 4, "available": True, "name": "影行者", **padding}
+        envelope = self._envelope({"dialogue": dialogue, "status": status})
+        self.assertGreater(json_byte_size(envelope), DIALOGUE_ENVELOPE_MAX_BYTES)
+        with self.assertRaises(JSONSafetyError):
+            check_envelope(envelope)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_dialogue_panel_exceeding_24576_rejected(self):
+        heavy_lines = [
+            {"kind": "speech", "speaker": "host", "text": "超限文本內容段落" * 50}
+            for _ in range(20)
+        ]
+        oversized_dialogue = self._sample_dialogue_panel(delivery_lines=heavy_lines)
+        self.assertGreater(json_byte_size(oversized_dialogue), DIALOGUE_PANEL_MAX_BYTES)
+        envelope = self._envelope({"dialogue": oversized_dialogue})
+        with self.assertRaises(JSONSafetyError):
+            check_envelope(envelope)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_dialogue_removed_envelope_exceeding_65536_rejected(self):
+        dialogue = self._sample_dialogue_panel()
+        padding = {f"pad_{i}": "側面板填充文本" * 100 for i in range(35)}
+        status = {"schema_version": 4, "available": True, "name": "影行者", **padding}
+        envelope = self._envelope({"dialogue": dialogue, "status": status})
+        stripped = {**envelope, "panels": {"status": status}}
+        self.assertGreater(json_byte_size(stripped), MAX_CANONICAL_JSON_BYTES)
+        self.assertLessEqual(json_byte_size(envelope), DIALOGUE_ENVELOPE_MAX_BYTES)
+        with self.assertRaises(JSONSafetyError):
+            check_envelope(envelope)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_unrelated_envelope_keeps_65536_bound(self):
+        padding = {f"pad_{i}": "非對話信封填充" * 100 for i in range(35)}
+        status = {"schema_version": 4, "available": True, "name": "影行者", **padding}
+        envelope = self._envelope({"status": status})
+        self.assertGreater(json_byte_size(envelope), MAX_CANONICAL_JSON_BYTES)
+        with self.assertRaises(JSONSafetyError):
+            check_envelope(envelope)
+
+    @covers_requirement("webclient-oob-protocol::elosern-oob-messages-use-exact-versioned-envelopes")
+    def test_python_node_protocol_store_parity(self):
+        cjk_lines = [
+            {
+                "kind": "speech",
+                "speaker": "host" if i % 2 else "actor",
+                "text": f"冒險者公會的大廳內聚集了來自各地的傭兵與行商，空氣中瀰漫著舊羊皮紙與麥酒的香氣。（行次{i}）" * 2,
+            }
+            for i in range(12)
+        ]
+        dialogue = self._sample_dialogue_panel(delivery_lines=cjk_lines)
+        padding = {f"pad_{i}": "文字內容測試" * 80 for i in range(25)}
+        status = {"schema_version": 4, "available": True, "name": "影行者", **padding}
+        valid_envelope = self._envelope({"dialogue": dialogue, "status": status})
+
+        over_padding = {f"pad_{i}": "超限字串填充內容" * 100 for i in range(45)}
+        over_98k = self._envelope({"dialogue": dialogue, "status": {"schema_version": 4, "available": True, **over_padding}})
+
+        heavy_lines = [{"kind": "speech", "speaker": "host", "text": "超限文本內容段落" * 50} for _ in range(20)]
+        over_panel = self._envelope({"dialogue": self._sample_dialogue_panel(delivery_lines=heavy_lines)})
+
+        stripped_padding = {f"pad_{i}": "側面板填充文本" * 100 for i in range(35)}
+        over_stripped = self._envelope({"dialogue": dialogue, "status": {"schema_version": 4, "available": True, **stripped_padding}})
+
+        normal_env = self._envelope({"status": {"schema_version": 4, "available": True, "name": "影行者"}})
+
+        frames = [valid_envelope, over_98k, over_panel, over_stripped, normal_env]
+
+        py_results = []
+        for f in frames:
+            try:
+                check_envelope(f)
+                py_results.append(True)
+            except Exception:
+                py_results.append(False)
+
+        worktree_root = Path(__file__).resolve().parents[4]
+        script = """
+const fs = require('node:fs');
+const P = require('./web/static/webclient/js/elosern/protocol.js');
+const frames = JSON.parse(fs.readFileSync(0, 'utf8'));
+const results = frames.map(frame => {
+    try {
+        P.checkEnvelope(frame);
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+process.stdout.write(JSON.stringify(results));
+"""
+        proc = subprocess.run(
+            ["node", "-e", script],
+            input=json.dumps(frames, ensure_ascii=False),
+            text=True,
+            capture_output=True,
+            cwd=str(worktree_root),
+            check=True,
+        )
+        node_results = json.loads(proc.stdout)
+
+        self.assertEqual(py_results, [True, False, False, False, True])
+        self.assertEqual(node_results, py_results, "Python and Node check_envelope decisions must match with 100% parity")
 
 
 if __name__ == "__main__":

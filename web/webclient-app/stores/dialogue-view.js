@@ -30,11 +30,11 @@ export function dialogueViewModel(panel) {
   }
   const host = panel.host || {};
   const picks = (Array.isArray(panel.choices) ? panel.choices : []).map((choice) => ({
-    key: `dlg-kw-${choice.keyword_id}`,
+    key: `dlg-kw-${choice.keyword_id || choice.topic_id}`,
     label: choice.label,
-    enabled: true,
+    enabled: choice.availability ? choice.availability === "open" : true,
     actionId: "explore.talk_scripted",
-    payload: { npc_id: host.identity, keyword_id: choice.keyword_id },
+    payload: choice.action_payload || { npc_id: host.identity, topic_id: choice.topic_id, context_id: panel.context_id },
     commandDisplay: { npcLabel: host.display_name, keywordLabel: choice.label },
   }));
   const freeRow = {
@@ -53,7 +53,8 @@ export function dialogueViewModel(panel) {
     },
     // The stage NAME travels verbatim (the server never ships numbers).
     bondStage: panel.bond_stage ?? null,
-    line: panel.line,
+    line: panel.line ?? (panel.delivery?.lines?.[panel.delivery.lines.length - 1]?.text ?? ""),
+    delivery: panel.delivery ?? null,
     picks,
     freeRow,
   };

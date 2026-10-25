@@ -177,3 +177,16 @@ class AuthoredDialogue:
             if t.topic_id in topic_ids:
                 raise ValueError(f"Duplicate topic_id {t.topic_id!r} in AuthoredDialogue")
             topic_ids.add(t.topic_id)
+
+    @property
+    def responses(self) -> tuple[KeywordResponse, ...]:
+        """Backward-compatibility view exposing topics as KeywordResponse pairs."""
+        resps = []
+        for t in self.topics:
+            host_text = ""
+            for line in t.fallback.lines:
+                if getattr(line, "speaker", None) == "host":
+                    host_text = line.text
+                    break
+            resps.append(KeywordResponse(keyword=t.keyword, response=host_text))
+        return tuple(resps)

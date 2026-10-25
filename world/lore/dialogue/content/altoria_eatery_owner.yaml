@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 餐館老闆西格瑪‧庫柏用圍裙擦著手，從灶後探出頭來：「喔，客人！吃飯了沒？湯還熱著喔，麵包跟帶出城的乾糧也都有。今天有什麼、還剩幾份，櫃檯上的單子都寫著，看中哪樣跟我說一聲就好。外面打到什麼好肉，也可以拿來給我瞧一下啦。來，先坐。」
+topics:
+- topic_id: altoria_eatery.topic_01
+  keyword: 餐點
+  label: 餐點
+  fallback:
+    scene_id: altoria_eatery.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 餐點
+    - kind: speech
+      speaker: host
+      text: 「最基本的就是一碗熱湯配麵包，吃完保證有力氣。黑麥硬麵包很耐放，攜行口糧放進背包剛好。今天有什麼，看單子就知道，要什麼跟我講。」
+- topic_id: altoria_eatery.topic_02
+  keyword: 招牌
+  label: 招牌
+  fallback:
+    scene_id: altoria_eatery.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 招牌
+    - kind: speech
+      speaker: host
+      text: 「招牌喔？當然是龍蝦濃湯啊！做法是港灣來的老船工教我，我熬了二十年都沒改過。想吃甜的就拿帝國的蜜漬果乾，精靈的蜜漬花蕊有時候也有，有沒有貨看單子吧。」
+- topic_id: altoria_eatery.topic_03
+  keyword: 乾糧
+  label: 乾糧
+  fallback:
+    scene_id: altoria_eatery.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 乾糧
+    - kind: speech
+      speaker: host
+      text: 「要出城？那攜行口糧跟燻肉乾一定要帶幾份。肉乾鹹是鹹了點，放好幾天都不會壞。等肚子餓了才想到要吃，就來不及囉。要幾份先算好，我一次幫你包起來。」
+- topic_id: altoria_eatery.topic_04
+  keyword: 收食
+  label: 收食
+  fallback:
+    scene_id: altoria_eatery.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 收食
+    - kind: speech
+      speaker: host
+      text: 「打到的肉、採到的東西，拿來讓我瞧一下嘛。乾淨新鮮的我就收，價錢照我店裡的規矩算。臭掉或說不出是哪來，我可不收，誰拿來都一樣。」

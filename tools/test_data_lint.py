@@ -166,6 +166,8 @@ def _harvest_display(value: Any, seen: set[int], out: set[str]) -> None:
     if id(value) in seen:
         return
     seen.add(id(value))
+    if type(value).__name__ in ("AuthoredDialogue", "AuthoredTopic"):
+        return
     if isinstance(value, (dict, MappingProxyType)):
         for key, item in value.items():
             if isinstance(key, str) and key in DISPLAY_FIELDS and isinstance(item, str) and item:

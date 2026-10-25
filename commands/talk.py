@@ -6,6 +6,7 @@ On a ``guild_staff`` dialogue host the keyword ``回報`` is an action keyword:
 ``dialogue_turn_in`` service. Every other keyword resolves exactly as before.
 """
 
+import uuid
 from commands.command import Command
 
 from typeclasses.components import GuildStaff
@@ -18,14 +19,22 @@ from world.rules.dialogue import (
     escape_evennia_greeting,
     is_dialogue_host,
     open_or_refresh_dialogue,
+    live_dialogue_session,
+    select_authored_topic,
     resolve_greeting,
     run_scripted_talk,
+    table_response,
+    TopicLockedError,
 )
+from world.rules.dialogue_context import resolve_dialogue_context
+from world.rules.dialogue_sources import resolve_dialogue_source
+from world.lore.scenes import Speech
 from world.rules.guild import (
     GuildDataError,
     GuildServiceError,
     RewardClaimError,
     dialogue_turn_in,
+    reportable_quest_summary,
 )
 from world.rules.npc_schedules import interaction_reason
 
@@ -106,20 +115,94 @@ class CmdsTalk(Command):
             ):
                 self._turn_in_quest(npc, quest_id)
                 return
-            try:
-                result = run_scripted_talk(npc, self.caller, keyword)
-            except (RewardClaimError, GuildDataError) as error:
-                self.caller.msg(f"無法回報任務：{error}")
-                return
-            if result is None:
+            if (
+                action_keyword == GUILD_STAFF_TURNIN_KEYWORD
+                and dialogue_key_for(npc) == GUILD_STAFF_DIALOGUE_KEY
+                and getattr(npc, "components", None) is not None
+                and npc.components.has(GuildStaff.name)
+            ):
+                try:
+                    summary = reportable_quest_summary(self.caller, npc)
+                except (RewardClaimError, GuildDataError) as error:
+                    self.caller.msg(f"無法回報任務：{error}")
+                    return
+                if summary is not None:
+                    self.caller.msg(f"{npc.key}說：{summary}")
+                    return
+
+            diag_key = dialogue_key_for(npc)
+            if diag_key is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
-            # The delivered authored line opens/refreshes the deterministic
-            # dialogue session (webclient-align-07); the greeting/no-keyword
-            # and turnin-listing paths below never touch the session seam.
-            open_or_refresh_dialogue(self.caller, npc, result.response)
-            hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
-            self.caller.msg(f"{npc.key}說：{result.response}{hint}")
+
+            if diag_key.startswith("scene_role:"):
+                try:
+                    result = run_scripted_talk(npc, self.caller, keyword)
+                except (RewardClaimError, GuildDataError) as error:
+                    self.caller.msg(f"無法回報任務：{error}")
+                    return
+                if result is None:
+                    self.caller.msg(_NO_RESPONSE)
+                    return
+                open_or_refresh_dialogue(self.caller, npc, result.response)
+                hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
+                self.caller.msg(f"{npc.key}說：{result.response}{hint}")
+                return
+
+            # Static authored dialogue
+            context = resolve_dialogue_context(self.caller, npc)
+            source = resolve_dialogue_source(context)
+            if source is None:
+                self.caller.msg(_NO_RESPONSE)
+                return
+
+            matched_topic = None
+            for t in source.dialogue.topics:
+                if t.keyword == keyword or t.topic_id == keyword:
+                    matched_topic = t
+                    break
+            if matched_topic is None:
+                # Unknown keyword: no session write, no state change
+                line = table_response(diag_key, keyword, npc=npc)
+                self.caller.msg(f"{npc.key}說：{line}")
+                return
+
+            session = live_dialogue_session(self.caller)
+            expected_context_id = (
+                session.context_id
+                if (session is not None and session.npc_id == int(getattr(npc, "pk", 0)))
+                else None
+            )
+            selection_id = uuid.uuid4().hex[:16]
+            try:
+                delivery = select_authored_topic(
+                    self.caller,
+                    npc,
+                    matched_topic.topic_id,
+                    selection_id=selection_id,
+                    expected_context_id=expected_context_id,
+                )
+            except TopicLockedError:
+                line = table_response(diag_key, keyword, npc=npc)
+                self.caller.msg(f"{npc.key}說：{line}")
+                return
+            except Exception:
+                self.caller.msg(_NO_RESPONSE)
+                return
+
+            for line in delivery.lines:
+                if isinstance(line, Speech):
+                    if line.speaker == "actor":
+                        self.caller.msg(f"你說：{line.text}")
+                    else:
+                        self.caller.msg(f"{npc.key}說：{line.text}")
+                else:
+                    self.caller.msg(line.text)
+            if delivery.affinity_budget_capped:
+                # The authored selection attempted the same +1 talk affinity
+                # the scripted writer grants; a budget-blocked gain still owes
+                # the fixed non-numeric hint (affinity-system).
+                self.caller.msg(AFFINITY_DAILY_CAP_HINT)
             return
 
         if is_dialogue_host(npc):

@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 場邊的木刀排成一列，泰莉爾‧菲溫德剛收完最後一組動作，額上的汗還沒乾。她看了一眼你的站姿：「來看練刀？場子在這裡，木刀在門邊。我這裡沒有東西要給你，也沒有捷徑。」
+topics:
+- topic_id: ciaran_teliel_home.topic_01
+  keyword: 刀術
+  label: 刀術
+  fallback:
+    scene_id: ciaran_teliel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 刀術
+    - kind: speech
+      speaker: host
+      text: 「基亞蘭的孩子先認刀柄，再認刀鋒。刀是谷裡人說話的另一種方式，多半用來守護。看好林邊樹幹上的刀痕，一代人留一片。」
+- topic_id: ciaran_teliel_home.topic_02
+  keyword: 練習
+  label: 練習
+  fallback:
+    scene_id: ciaran_teliel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 練習
+    - kind: speech
+      speaker: host
+      text: 「谷裡沒有誰會手把手教你，刀得自己練熟。想練就來場上，練到手記得為止。腳站穩。肩放鬆。」
+- topic_id: ciaran_teliel_home.topic_03
+  keyword: 練刀場
+  label: 練刀場
+  fallback:
+    scene_id: ciaran_teliel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 練刀場
+    - kind: speech
+      speaker: host
+      text: 「場子日夜都在。孩子們從清晨練到日暮，入夜以後，誰想練就自己來。木刀擱在門邊，借還都不用說。要真刀，去找場子另一頭的海莉爾。」
+- topic_id: ciaran_teliel_home.topic_04
+  keyword: 比劃
+  label: 比劃
+  fallback:
+    scene_id: ciaran_teliel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 比劃
+    - kind: speech
+      speaker: host
+      text: 「谷裡沒有人陪外人對打，我也不陪。孩子們練的時候，我在旁邊看著。想試自己的刀路，對著林邊的樹幹練。」

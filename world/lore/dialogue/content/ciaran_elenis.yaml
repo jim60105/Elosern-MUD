@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 長老古樹下的坐石曬得微溫，艾莉妮斯‧達恩斯特瑞德爾抬眼看你，膝上擱著一縷剛剝下的樹皮：「是啊，坐吧，小傢伙。老人家這裡沒有東西可以給你，也沒有事情要你辦。想聽村子的事、林子的事，還是這一族為什麼愛刀？記得的我就說。」
+topics:
+- topic_id: ciaran_elenis_home.topic_01
+  keyword: 村子
+  label: 村子
+  fallback:
+    scene_id: ciaran_elenis_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 村子
+    - kind: speech
+      speaker: host
+      text: 「嗯……這村子早年不在這裡。古樹長穩了、溪水改了道，族人才跟著搬過來，一棵樹接一棵樹地認熟。你問村子的來歷，我能說的都是這種小事。精靈不寫史書，往事都記在記得的人心裡，還有那幾棵老樹下。」
+- topic_id: ciaran_elenis_home.topic_02
+  keyword: 基亞蘭
+  label: 基亞蘭
+  fallback:
+    scene_id: ciaran_elenis_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 基亞蘭
+    - kind: speech
+      speaker: host
+      text: 「是啊，基亞蘭這一支愛刀。外頭說我們脾氣硬，我們自己覺得是記性長。刀柄上刻的名字一代比一代多，刀柄磨舊了，名字還在。那對黑髮的雙生子也在這裡長大，悠花在練刀場從雨季待到天晴，泰莉爾說，那孩子一握上木刀，整個場子都安靜下來。」
+- topic_id: ciaran_elenis_home.topic_03
+  keyword: 森林
+  label: 森林
+  fallback:
+    scene_id: ciaran_elenis_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 森林
+    - kind: speech
+      speaker: host
+      text: 「林子認得村裡每一雙腳。打獵有打獵的路，採集有採集的時節，哪片坡哪一年該讓它歇著，族裡的老一輩都記得。你要進林子，記住一句就夠，帶走多少，就還回去多少。森林不計較，可是它會記得。」
+- topic_id: ciaran_elenis_home.topic_04
+  keyword: 往事
+  label: 往事
+  fallback:
+    scene_id: ciaran_elenis_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 往事
+    - kind: speech
+      speaker: host
+      text: 「往事啊……有一年冬天溪水結了冰，孩子們跑到冰上練刀，摔得滿身是雪，笑聲一路傳到古樹這裡。族裡的往事多半是這樣的小事，已經很多年沒有什麼『重要的事』了。常有人來找我做主，可是我不管事，也沒有什麼能准你或攔你。」

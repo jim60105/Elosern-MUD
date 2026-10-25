@@ -74,3 +74,4 @@
   - [GM 執行期狀態檢視](/development/gm-portal-runtime-inspection)
   - [GM 世界資料瀏覽](/development/gm-portal-world-data)
   - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)
+  - [對話協定與發布預算](/development/dialogue-panel-protocol)

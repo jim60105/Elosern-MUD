@@ -514,14 +514,14 @@ The production action registry SHALL register `explore.look`, whose payload SHAL
 - **THEN** the adapter rejects with a stable code and message
 
 ### Requirement: explore.talk_scripted invokes the deterministic dialogue API with keyword buttons
-The production action registry SHALL register `explore.talk_scripted`, whose payload SHALL accept exactly `npc_id` (a positive integer) and `keyword_id` (a 1..64-character non-empty string). The adapter SHALL re-resolve the NPC from present contents of the actor's current location, re-verify presence, a resolved dialogue component, and the keyword's presence in the host's dialogue table, and call the read-only `world.rules.dialogue` response API.
+The scripted-talk action SHALL accept the common static/generated topic/context/request-derived selection payload. It SHALL resolve trusted host source, presence, binding/phase and qualification before deterministic effects/delivery. Text SHALL use that same selection path. Stale, unknown, old keyword-only and mismatched source payloads SHALL reject without mutation.
 
 #### Scenario: Scripted keyword buttons match authored behavior
-- **WHEN** an actor submits `explore.talk_scripted` for a present dialogue host with a registered keyword
+- **WHEN** an actor submits the common stable topic payload for a present static or generated host
 - **THEN** the player receives the authored response exactly as `talk` would produce it
 
 #### Scenario: An unregistered keyword rejects without writing
-- **WHEN** an actor submits a `keyword_id` absent from the host's dialogue table
+- **WHEN** an actor submits an unknown topic_id or source-inappropriate keyword_id
 - **THEN** the adapter rejects with a stable reason, no response is fabricated, and no state is written
 
 #### Scenario: A no-longer-present NPC rejects before any dialogue API
@@ -530,7 +530,7 @@ The production action registry SHALL register `explore.talk_scripted`, whose pay
 
 #### Scenario: A scripted reply opens the dialogue session
 - **WHEN** an actor submits a valid `explore.talk_scripted` for a present host
-- **THEN** the character's dialogue session names that NPC with the authored response line,
+- **THEN** the character's dialogue session names that NPC with the complete attributed static/generated scene,
   recorded before the adapter's response is delivered
 
 #### Scenario: Target resolution never trusts stale or remote references
@@ -539,7 +539,7 @@ The production action registry SHALL register `explore.talk_scripted`, whose pay
 
 #### Scenario: Scripted answers run the same seam as the talk command
 - **WHEN** the adapter calls the dialogue response API
-- **THEN** it uses the same deterministic seam the `talk` command uses, so a `ScriptedDialogue` host answers through the authored tables with the same state effects as the command path
+- **THEN** it uses the same deterministic seam the `talk` command uses, so an authored `ScriptedDialogue` host answers through stable topic selection with the same state effects as the command path
 - **AND** the adapter obtains the actor from the authenticated session
 
 #### Scenario: A successful exchange is recorded through the session seam

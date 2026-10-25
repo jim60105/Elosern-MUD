@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 裡廳櫃檯後的羅海西亞‧芬威克執事把帳頁翻了個面，抬頭笑了笑：「歡迎喔！是自己用，還是要送人呢？聖水、禮器、貼身用的都有，價錢寫在櫃邊的牌子上，隨意挑。聖所那邊的安排，也可以問我。」
+topics:
+- topic_id: altoria_sanctum.topic_01
+  keyword: 賣什麼
+  label: 賣什麼
+  fallback:
+    scene_id: altoria_sanctum.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 賣什麼
+    - kind: speech
+      speaker: host
+      text: 「架上分兩邊喔。戴在身上的有花蒂銀夾、暖蜜魔導珠、恆溫魔法卵、尖銳觸感之飾；貼身藏著的有恆振晶；拿來用的有催情浴鹽、女神之吻聖霧、情欲香爐、史萊姆潤滑凝膠、熱吻藥水，還有纏枝魔藤和微電跳蛋糖。受洗聖水也在這裡。看上哪樣，拿到櫃上來就好。」
+- topic_id: altoria_sanctum.topic_02
+  keyword: 聖水
+  label: 聖水
+  fallback:
+    scene_id: altoria_sanctum.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 聖水
+    - kind: speech
+      speaker: host
+      text: 「受洗聖水是主祭親自祝禱過的水，能洗淨身上沾的邪氣，用法寫在瓶標上喔。要的話，拿到櫃上來就好。」
+- topic_id: altoria_sanctum.topic_03
+  keyword: 禮器
+  label: 禮器
+  fallback:
+    scene_id: altoria_sanctum.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 禮器
+    - kind: speech
+      speaker: host
+      text: 「香爐、聖霧、祝禱掛飾這些，是禮儀正經用的東西，信眾買回家自己用，拿來送禮也很體面呢。用料寫在籤上，價錢看牌子。櫃上有的東西，用舊了洗乾淨拿來，我也收。」
+- topic_id: altoria_sanctum.topic_04
+  keyword: 聖所事務
+  label: 聖所事務
+  fallback:
+    scene_id: altoria_sanctum.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 聖所事務
+    - kind: speech
+      speaker: host
+      text: 「聖所的事呀，進門左轉就有修女接待。房間、時段、你想要什麼樣的服事，都當面講好，雙方都願意才開始。要祝禱就回大殿找艾莉安娜主祭，要買東西就留在我這兒。」

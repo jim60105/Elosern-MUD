@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 溪畔小徑旁的屋裡飄著糖漬花的甜香，拉瑞內斯‧妮特布倫從醃甕後抬起臉，先遞給你一片葉子，上面擺著一顆蜜漬花蕊：「遠來的客人……先嚐一口吧。嚐過了，我們再聊。」
+topics:
+- topic_id: ciaran_lareneth_home.topic_01
+  keyword: 花饌
+  label: 花饌
+  fallback:
+    scene_id: ciaran_lareneth_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 花饌
+    - kind: speech
+      speaker: host
+      text: 「這是春末收的花蕊，用谷裡採的蜜漬上三個月才封罐……甜，可是不膩口吧？想帶幾罐上路，拿銅幣來換就好。比乾糧好吃，也比鮮果耐放。」
+- topic_id: ciaran_lareneth_home.topic_02
+  keyword: 山產
+  label: 山產
+  fallback:
+    scene_id: ciaran_lareneth_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 山產
+    - kind: speech
+      speaker: host
+      text: 「谷裡每一季都有好東西……雨季有菌子，秋天有果子，春末有花。我做點心只用自己採的料，哪一季採到什麼，就做什麼。我漬的花蕊要是吃不完，原封不動拿回來，我收下就是。」
+- topic_id: ciaran_lareneth_home.topic_03
+  keyword: 茶點
+  label: 茶點
+  fallback:
+    scene_id: ciaran_lareneth_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 茶點
+    - kind: speech
+      speaker: host
+      text: 「走累了先坐下吧，花茶請你喝……今天的茶點擺在窗邊的矮凳上，路過的人都能拿。想帶花蕊上路，跟我說一聲，我用兩層葉子幫你包好。」
+- topic_id: ciaran_lareneth_home.topic_04
+  keyword: 口味
+  label: 口味
+  fallback:
+    scene_id: ciaran_lareneth_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 口味
+    - kind: speech
+      speaker: host
+      text: 「谷裡的口味清淡，甜多鹹少……想吃重口味，大概要到外頭的大城去了吧。我連蜜都不敢多放，怕蓋住花香。喜歡甜，就挑蜜漬花蕊吧。」

@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 校場的伊沃‧高丘從練習樁那頭走回來，小臂上還沾著土：「來看熱鬧，還是來練的啦？話說在前頭，我這裡沒有捷徑，只有這片土、那排樁子，還有幾句練法。」
+topics:
+- topic_id: altoria_drill_yard.topic_01
+  keyword: 修煉
+  label: 修煉
+  fallback:
+    scene_id: altoria_drill_yard.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 修煉
+    - kind: speech
+      speaker: host
+      text: 「想練本事哪？場子隨你用，樁子隨你打，練不練在你啦。我這場子的好處就兩樣，打樁沒人嫌吵；旁邊有人在練，你看得到別人練到什麼程度。」
+- topic_id: altoria_drill_yard.topic_02
+  keyword: 考核
+  label: 考核
+  fallback:
+    scene_id: altoria_drill_yard.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 考核
+    - kind: speech
+      speaker: host
+      text: 「想升階哪？那是公會的事啦，考官會當面試你的本事，報名要去公會大廳。我這裡不代考，也不保證你過。底子練紮實了再去，比較不丟臉。」
+- topic_id: altoria_drill_yard.topic_03
+  keyword: 切磋
+  label: 切磋
+  fallback:
+    scene_id: altoria_drill_yard.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 切磋
+    - kind: speech
+      speaker: host
+      text: 「想找人對打？我這裡沒有陪練的人，我也不替你拉人。真要動手，城外多的是魔物，那可是會要命的事。這片場子的好處只有一樣，摔下去是軟土，不會摔在街石上啦。」
+- topic_id: altoria_drill_yard.topic_04
+  keyword: 教頭
+  label: 教頭
+  fallback:
+    scene_id: altoria_drill_yard.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 教頭
+    - kind: speech
+      speaker: host
+      text: 「教頭？我沒有什麼特別的訣竅好教，也不發證書啦。你會什麼、練到哪裡，你自己心裡有數。我能給的就這片場子跟一句話，每天都要練，站在場中羨慕樁子上的刀痕，一點用也沒有。」

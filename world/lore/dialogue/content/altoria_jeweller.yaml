@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 首飾坊的艾蓮娜‧鴉丘放下鹿皮布，目光先停在你的衣領上：「歡迎。你身上那件……算了，先不提。請隨意看吧，喜歡哪一件，我拿出來讓你對著光瞧。」
+topics:
+- topic_id: altoria_jeweller.topic_01
+  keyword: 飾品
+  label: 飾品
+  fallback:
+    scene_id: altoria_jeweller.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 飾品
+    - kind: speech
+      speaker: host
+      text: 「這一櫃全是隨身戴的飾品。銀髮簪是平原的老手藝，狼牙項鍊是獸王國部族的樣式，朝聖者銅符，走聖階的信眾幾乎都戴一枚。防禦戒指鑲著一顆結晶，難得一見。身上別掛太多，挑幾件真用得上的就好。」
+- topic_id: altoria_jeweller.topic_02
+  keyword: 鑲工
+  label: 鑲工
+  fallback:
+    scene_id: altoria_jeweller.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 鑲工
+    - kind: speech
+      speaker: host
+      text: 「看鑲工要看爪，別看光。這枚淨化吊墜的銀用聖水反覆洗過，聽說擋得住瘴氣；無懼胸針用赤鐵打成，是獵魔人戴的東西。光輝聖徽的徽面用整塊料雕成，你摸一下邊緣就知道了。」
+- topic_id: altoria_jeweller.topic_03
+  keyword: 奇物
+  label: 奇物
+  fallback:
+    scene_id: altoria_jeweller.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 奇物
+    - kind: speech
+      speaker: host
+      text: 「儲物袋是帝國那邊的空間魔法，袋子不大，裡頭卻比看起來大得多。滑翔斗篷用蛛絲織成，從高處跳下去能托住人。這兩件都難得，價錢在櫃上的小牌子，我就不唸了。」
+- topic_id: altoria_jeweller.topic_04
+  keyword: 收飾
+  label: 收飾
+  fallback:
+    scene_id: altoria_jeweller.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 收飾
+    - kind: speech
+      speaker: host
+      text: 「舊飾件可以拿來，我櫃上有的樣式都收。缺爪、斷鏈也請先說一聲。藥師珠串、迷情絲頸環這類有點來歷，我會多問兩句從哪裡來，別介意。」

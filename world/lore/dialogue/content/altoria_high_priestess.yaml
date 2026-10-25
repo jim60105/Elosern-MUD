@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她背後的高窗落進大殿：「願平安與你同在，旅人。日課、祝禱，或是想問的事，都可以在這裡說。這座神殿同時是禮拜堂、聖所與聖所的商店，三處都敞開著，你想問哪一處，我都會回答。」
+topics:
+- topic_id: altoria_temple.topic_01
+  keyword: 禮拜
+  label: 禮拜
+  fallback:
+    scene_id: altoria_temple.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 禮拜
+    - kind: speech
+      speaker: host
+      text: 「日課在晨鐘之後與日落之前，都在講台前舉行，任何人都有座位。不必受洗，也不必報上身家，進門坐下就算參與。想聽講道，就留到鐘響；想單獨說話，光明聽得見，我也聽得見。」
+- topic_id: altoria_temple.topic_02
+  keyword: 祝禱
+  label: 祝禱
+  fallback:
+    scene_id: altoria_temple.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 祝禱
+    - kind: speech
+      speaker: host
+      text: 「祝禱、祝福，為遠行的人祈求平安，都在講台邊進行，不收分文。若身上沾了邪氣，可以用受洗聖水洗淨，聖水擺在聖所的櫃上，由執事經手。想正式入教的人，也可以在這裡向我請求入教儀式。」
+- topic_id: altoria_temple.topic_03
+  keyword: 聖所
+  label: 聖所
+  fallback:
+    scene_id: altoria_temple.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 聖所
+    - kind: speech
+      speaker: host
+      text: 「聖所就在這棟建築裡，左手邊，同一片屋頂、同一排窗。本會以性愛為修道之途，聖所公開服事，這件事在大陸上無人不知，和酒館供酒一樣平常。禮拜、聖所與商店是同一份信仰生活的三處櫃檯，你想問哪一處，我都照實回答。」
+- topic_id: altoria_temple.topic_04
+  keyword: 商店
+  label: 商店
+  fallback:
+    scene_id: altoria_temple.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 商店
+    - kind: speech
+      speaker: host
+      text: 「商店在裡廳，由聖所執事羅海西亞‧芬威克看管。受洗聖水、禮儀器物與修道用的物件，都在她的櫃上。挑選物品請問她，祝禱的事再回來問我。」

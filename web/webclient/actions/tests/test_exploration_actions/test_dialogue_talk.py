@@ -239,6 +239,20 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             )
         self.assertEqual(result["code"], "no_response")
 
+    def test_talk_scripted_budget_exceeded_rejects_with_specific_code(self):
+        from world.rules.dialogue import DialogueBudgetExceededError
+
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
+        with patch(
+            "web.webclient.actions.exploration_actions.select_authored_topic",
+            side_effect=DialogueBudgetExceededError("dialogue_scene_oversized", "超限"),
+        ):
+            result = _talk_scripted_adapter(
+                self.player, {"npc_id": int(host.pk), "topic_id": f"{_T_DIALOGUE}.topic_01"}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "dialogue_budget_exceeded")
 
 
     # ------------------------------------------------------------------

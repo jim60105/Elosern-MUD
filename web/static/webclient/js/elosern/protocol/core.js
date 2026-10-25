@@ -8,6 +8,8 @@ var MAX_LIST_ITEMS = C.MAX_LIST_ITEMS;
 var MAX_STRING_CODE_POINTS = C.MAX_STRING_CODE_POINTS;
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
+var DIALOGUE_PANEL_MAX_BYTES = C.DIALOGUE_PANEL_MAX_BYTES;
+var DIALOGUE_ENVELOPE_MAX_BYTES = C.DIALOGUE_ENVELOPE_MAX_BYTES;
 var MAX_MESSAGE_CODE_POINTS = C.MAX_MESSAGE_CODE_POINTS;
 var MAX_RETIRED_EPOCHS = C.MAX_RETIRED_EPOCHS;
 var MAX_RESULT_DATA_FIELDS = C.MAX_RESULT_DATA_FIELDS;
@@ -167,10 +169,57 @@ function checkGlobalSafety(value, depth) {
   }
 }
 
+function carriesAvailableDialogue(payload) {
+  if (!isPlainObject(payload)) {
+    return false;
+  }
+  var panels = payload.panels;
+  if (!isPlainObject(panels)) {
+    return false;
+  }
+  var dialogue = panels.dialogue;
+  if (!isPlainObject(dialogue)) {
+    return false;
+  }
+  var schemaVersion = dialogue.schema_version;
+  if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion) || schemaVersion !== 3) {
+    return false;
+  }
+  return dialogue.available === true && dialogue.kind === "dialogue";
+}
+
 function checkEnvelope(value) {
   checkGlobalSafety(value);
-  if (jsonByteSize(value) > MAX_CANONICAL_JSON_BYTES) {
-    throw new Error("canonical JSON exceeds " + MAX_CANONICAL_JSON_BYTES + " bytes");
+  if (carriesAvailableDialogue(value)) {
+    if (jsonByteSize(value) > DIALOGUE_ENVELOPE_MAX_BYTES) {
+      throw new Error(
+        "canonical JSON exceeds " + DIALOGUE_ENVELOPE_MAX_BYTES + " bytes"
+      );
+    }
+    var dialogue = value.panels.dialogue;
+    if (jsonByteSize(dialogue) > DIALOGUE_PANEL_MAX_BYTES) {
+      throw new Error(
+        "dialogue panel canonical JSON exceeds " + DIALOGUE_PANEL_MAX_BYTES + " bytes"
+      );
+    }
+    var strippedPanels = Object.create(null);
+    var keys = Object.keys(value.panels);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k !== "dialogue") {
+        strippedPanels[k] = value.panels[k];
+      }
+    }
+    var strippedEnvelope = Object.assign({}, value, { panels: strippedPanels });
+    if (jsonByteSize(strippedEnvelope) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error(
+        "dialogue-removed envelope canonical JSON exceeds " + MAX_CANONICAL_JSON_BYTES + " bytes"
+      );
+    }
+  } else {
+    if (jsonByteSize(value) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("canonical JSON exceeds " + MAX_CANONICAL_JSON_BYTES + " bytes");
+    }
   }
 }
 
@@ -514,6 +563,7 @@ module.exports = {
   jsonByteSize: jsonByteSize,
   checkGlobalSafety: checkGlobalSafety,
   checkEnvelope: checkEnvelope,
+  carriesAvailableDialogue: carriesAvailableDialogue,
   requireExactFields: requireExactFields,
   validateCombatResultData: validateCombatResultData,
   validatePartyExitPromptData: validatePartyExitPromptData,

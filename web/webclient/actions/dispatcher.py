@@ -25,7 +25,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 import json
 import secrets
-from typing import Any
+from typing import Any, Mapping
 
 from twisted.internet.defer import Deferred
 
@@ -231,8 +231,15 @@ def handle_ui_action(
         _send_rejected(session, coordinator, request_id, _UNKNOWN_ACTION_CODE, _UNKNOWN_ACTION_MESSAGE)
         return
 
+    action_payload = action.get("payload")
+    if action["action_id"] == "explore.talk_scripted":
+        if not isinstance(action_payload, Mapping) or "selection_id" in action_payload:
+            _send_rejected(session, coordinator, request_id, _MALFORMED_PAYLOAD_CODE, _MALFORMED_PAYLOAD_MESSAGE)
+            return
+        action_payload = {**action_payload, "selection_id": request_id}
+
     try:
-        normalized = spec.validate_payload(action["payload"])
+        normalized = spec.validate_payload(action_payload)
     except Exception:  # observability: ignore R2: a payload failing the action's schema is answered with the malformed-payload rejection envelope; the rejection IS the report
         _send_rejected(session, coordinator, request_id, _MALFORMED_PAYLOAD_CODE, _MALFORMED_PAYLOAD_MESSAGE)
         return

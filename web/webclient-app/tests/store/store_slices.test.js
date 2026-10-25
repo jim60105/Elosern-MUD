@@ -58,16 +58,40 @@ describe("store view slices", () => {
   it("accepts a dialogue-mode snapshot and commits the dialogue panel", () => {
     openActiveSession(store);
     const dialoguePanel = {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "dialogue",
       host: { identity: 41, display_name: "公會職員", portrait_ref: null },
+      actor: { identity: 1, display_name: "冒險者", portrait_ref: null },
       bond_stage: "熟人",
-      line: "歡迎來到冒險者公會。",
+      context_id: "ctx-1",
+      delivery: null,
       choices: [
-        { keyword_id: "公會", label: "公會" },
-        { keyword_id: "任務", label: "任務" },
+        {
+          topic_id: "guild_staff.topic_01",
+          keyword_id: "公會",
+          label: "公會",
+          availability: "open",
+          requirement_hint: null,
+          unread: false,
+          predecessors: [],
+          action_payload: { npc_id: 41, topic_id: "guild_staff.topic_01", context_id: "ctx-1" },
+        },
+        {
+          topic_id: "guild_staff.topic_02",
+          keyword_id: "任務",
+          label: "任務",
+          availability: "open",
+          requirement_hint: null,
+          unread: false,
+          predecessors: [],
+          action_payload: { npc_id: 41, topic_id: "guild_staff.topic_02", context_id: "ctx-1" },
+        },
       ],
+      pure_chain: [],
+      reading_revision: 0,
+      completed_topic_ids: [],
+      unlock_batch: null,
     };
     const result = store.receive(
       1,
@@ -217,7 +241,7 @@ describe("store view slices", () => {
         kind: "known_action",
         action_code: "explore.talk_scripted",
         label: "與灰婆婆交談",
-        params: { npc_id: 7, keyword_id: "問候" },
+        params: { npc_id: 7, topic_id: "host.greeting", context_id: null },
       },
     ];
     store.receive(

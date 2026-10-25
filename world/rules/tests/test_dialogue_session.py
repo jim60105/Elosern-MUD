@@ -31,6 +31,8 @@ from world.rules.dialogue import (
     open_or_refresh_dialogue,
     table_response,
 )
+from world.rules.dialogue_context import resolve_dialogue_context
+from world.rules.dialogue_sources import resolve_dialogue_source
 from world.rules.movement_settlement import settle_movement
 from world.rules.party import follow_companions, join_party, leave_party
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -276,17 +278,29 @@ class TalkCommandSessionWriterTests(EvenniaCommandTestMixin, EvenniaTest):
             ScriptedDialogue.create(self.staff, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
 
-    def test_scripted_keyword_records_the_delivered_authored_line(self):
+    def _authored_topic(self, keyword):
+        """The migrated snapshot's topic for ``keyword`` on the staff host."""
+        source = resolve_dialogue_source(
+            resolve_dialogue_context(self.char1, self.staff)
+        )
+        return next(item for item in source.dialogue.topics if item.keyword == keyword)
+
+    def test_scripted_keyword_records_the_delivered_authored_scene(self):
         from commands.talk import CmdsTalk
 
+        topic = self._authored_topic("公會")
         output = self.call(CmdsTalk(), "公會職員 公會")
         stored = self.char1.db.dialogue_session
         self.assertIsNotNone(stored)
         self.assertEqual(stored["npc_id"], int(self.staff.pk))
+        self.assertEqual(stored["kind"], "scene")
+        self.assertIsNone(stored["line"])
+        self.assertEqual(stored["delivery"]["topic_id"], topic.topic_id)
         self.assertEqual(
-            stored["line"], table_response(GUILD_STAFF_DIALOGUE_KEY, "公會")
+            [line["text"] for line in stored["delivery"]["lines"]],
+            [line.text for line in topic.fallback.lines],
         )
-        self.assertIn(stored["line"], output)
+        self.assertIn(table_response(GUILD_STAFF_DIALOGUE_KEY, "公會"), output)
 
     def test_greeting_path_never_touches_the_session(self):
         from commands.talk import CmdsTalk
@@ -308,7 +322,12 @@ class TalkCommandSessionWriterTests(EvenniaCommandTestMixin, EvenniaTest):
             self.call(CmdsTalk(), "公會職員 任務")
             refreshed = self.char1.db.dialogue_session
             self.assertEqual(refreshed["npc_id"], int(self.staff.pk))
-            self.assertNotEqual(refreshed["line"], first["line"])
+            # The second keyword refreshes the same one session in place with
+            # the newly delivered authored scene.
+            self.assertEqual(refreshed["context_id"], first["context_id"])
+            self.assertNotEqual(
+                refreshed["delivery"]["topic_id"], first["delivery"]["topic_id"]
+            )
             settle_movement(
                 self.char1,
                 self.hall,

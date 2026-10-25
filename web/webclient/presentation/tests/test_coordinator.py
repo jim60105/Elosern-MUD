@@ -144,6 +144,33 @@ class CoordinatorBasicsTests(unittest.TestCase):
         )
         self.assertEqual(envelope["server_time"]["day_in_season"], 17)
 
+    @covers_requirement(
+        "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
+    )
+    def test_over_budget_envelope_rejects_before_revision_consumption_or_send(self):
+        from web.webclient.presentation.protocol import JSONSafetyError
+
+        session = FakeSession()
+        over_spec = PresenterSpec(
+            name="status",
+            schema_version=1,
+            unavailable_reason=("missing_data", "無法讀取角色資料"),
+            presenter=lambda context: {"available": True, **{f"pad_{i}": "x" * 1500 for i in range(50)}},
+        )
+        coordinator = _coordinator(session, _registry(over_spec))
+        self.assertEqual(coordinator.revision, 0)
+        with self.assertRaises(JSONSafetyError):
+            coordinator.full_snapshot(_context())
+        self.assertEqual(coordinator.revision, 0)
+        self.assertEqual(len(session.sent), 0)
+
+        with self.assertRaises(JSONSafetyError):
+            coordinator.panel_update(
+                _context(), {"status": {f"pad_{i}": "x" * 1500 for i in range(50)}}
+            )
+        self.assertEqual(coordinator.revision, 0)
+        self.assertEqual(len(session.sent), 0)
+
     def test_mode_derivation_uses_injected_provider(self):
         context = _context()
         session = FakeSession()

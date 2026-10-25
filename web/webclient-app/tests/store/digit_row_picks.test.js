@@ -296,7 +296,16 @@ describe("dock digit row picks (1–9)", () => {
   it("a dialogue-mode digit is unclaimed and the collapsed dock never moves", () => {
     openSession();
     const choices = ["fare", "smell", "chest", "silence"].map(
-      (keyword_id) => ({ keyword_id, label: `「${keyword_id}」` }),
+      (keyword_id) => ({
+        topic_id: `host.${keyword_id}`,
+        keyword_id,
+        label: `「${keyword_id}」`,
+        availability: "open",
+        requirement_hint: null,
+        unread: false,
+        predecessors: [],
+        action_payload: { npc_id: 41, topic_id: `host.${keyword_id}`, context_id: "ctx-1" },
+      }),
     );
     store.receive(
       1,
@@ -310,13 +319,19 @@ describe("dock digit row picks (1–9)", () => {
             exploration: fx.explorationPanel(),
             local_map: fx.localMapPanel(),
             dialogue: {
-              schema_version: 2,
+              schema_version: 3,
               available: true,
               kind: "dialogue",
               host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
+              actor: { identity: 1, display_name: "測試者", portrait_ref: null },
               bond_stage: "親睦",
-              line: "「渡河要五枚銅板。」",
+              context_id: "ctx-1",
+              delivery: null,
               choices,
+              pure_chain: [],
+              reading_revision: 0,
+              completed_topic_ids: [],
+              unlock_batch: null,
             },
           },
         }),
