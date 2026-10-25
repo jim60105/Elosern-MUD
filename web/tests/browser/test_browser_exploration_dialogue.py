@@ -1136,6 +1136,22 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         tip.wait_for(state="visible", timeout=5000)
         self.assertEqual(tip.get_attribute("data-tip-source"), "pointer")
         self.assertEqual(tip.inner_text().strip(), hint)
+        # The tooltip and the rows settle (entrance and placement) before the
+        # geometry is read: two consecutive frames agree.
+        page.wait_for_function(
+            """() => new Promise((resolve) => {
+              const read = () => {
+                const tip = document.querySelector('[data-testid="choice-card-tip"]');
+                const row = document.querySelector('[data-testid="dialogue-pick"][data-locked="true"]');
+                return tip && row && tip.dataset.placed === 'true'
+                  ? `${tip.getBoundingClientRect().top}|${row.getBoundingClientRect().top}`
+                  : null;
+              };
+              const first = read();
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve(first !== null && read() === first)));
+            })""",
+            timeout=5000,
+        )
         card_box = card.bounding_box()
         tip_box = tip.bounding_box()
         row_box = locked.bounding_box()
@@ -1146,8 +1162,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_timeout(120)
         self.assertTrue(tip.is_visible(), "the tooltip is hoverable")
         page.mouse.move(4, 400)
-        page.wait_for_timeout(120)
-        self.assertEqual(tip.count(), 0)
+        tip.wait_for(state="detached", timeout=5000)
 
         # Keyboard focus: the active locked row shows and describes the hint.
         card.focus()

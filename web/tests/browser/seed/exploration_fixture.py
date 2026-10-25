@@ -143,7 +143,10 @@ def _exploration_fixture(character) -> None:
     if synth and os.environ.get("ELOSERN_BROWSER_DIALOGUE_LOCKED") == "1":
         # The locked-topic UI journey (authored-dialogue-locked-ui): the
         # gatekeeper table's second topic stays visibly locked because the
-        # player carries neither required kit item.
+        # player carries neither required kit item. The Carries condition
+        # reads the strict inventory list (worn items stay listed there), so
+        # stripping both keys here keeps the topic locked even if the
+        # preset's default loadout ever starts with either item.
         host_dialogue_key = SYNTH_LOCKED_DIALOGUE_TABLE_KEY
         character.db.inventory = [
             key

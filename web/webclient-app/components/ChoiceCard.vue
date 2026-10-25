@@ -59,7 +59,7 @@
 // without closing it, and Escape dismisses it (a keyboard-shown tip
 // consumes that Escape; a pointer-shown one lets Escape keep its meaning).
 // An empty hint renders no tooltip and no description at all.
-import { computed, nextTick, onMounted, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 
 const props = defineProps({
   // [{key, label, hint, badge, kind, enabled, reason, back, icon, testId,
@@ -149,7 +149,7 @@ const hoverKey = ref(null);
 const cardFocused = ref(false);
 // The tip Escape dismissed, until its target changes.
 const tipDismissed = ref(null);
-const tipPlace = ref({ top: 0, side: "right", room: null });
+const tipPlace = ref({ top: 0, side: "right", room: null, placed: false });
 
 const tipTarget = computed(() => {
   if (hoverKey.value !== null) {
@@ -182,41 +182,79 @@ watch(
   },
 );
 
-// Beside the card, top-aligned with its row and kept inside the card's
-// height; it takes the side with room (right first) and never grows past
-// the room that side has.
+// Beside the card, top-aligned with its row (clamped into the scroller's
+// visible span and the card's height); it takes the side with room (right
+// first) and never grows past the room that side has. Each placement first
+// measures the tip at its natural width (no stale room from a previous
+// placement), and the tip stays invisible until its first placement lands,
+// so it never shows a frame at a provisional position.
 const TIP_MARGIN = 8;
+let placing = 0;
 async function placeTip() {
-  const shown = tipShown.value;
-  const card = listRef.value;
-  if (!shown || !card) {
+  const ticket = ++placing;
+  if (!tipShown.value || !listRef.value) {
     return;
   }
-  const rowEl = document.getElementById(rowId(shown.index));
+  tipPlace.value = { ...tipPlace.value, room: null };
+  await nextTick();
+  const shown = tipShown.value;
+  const card = listRef.value;
+  if (ticket !== placing || !shown || !card) {
+    return;
+  }
   const cardBox = card.getBoundingClientRect();
   const viewport = window.innerWidth || document.documentElement.clientWidth || 0;
   const desired = tipRef.value ? tipRef.value.offsetWidth : 0;
   const roomRight = viewport - cardBox.right - TIP_MARGIN * 3;
   const roomLeft = cardBox.left - TIP_MARGIN * 3;
   const side = roomRight >= desired || roomRight >= roomLeft ? "right" : "left";
-  const room = Math.max(0, Math.floor(side === "right" ? roomRight : roomLeft));
-  tipPlace.value = { ...tipPlace.value, side, room: viewport ? room : null };
+  const room = viewport ? Math.max(0, Math.floor(side === "right" ? roomRight : roomLeft)) : null;
+  tipPlace.value = { ...tipPlace.value, side, room };
   await nextTick();
+  if (ticket !== placing || !tipShown.value) {
+    return;
+  }
+  // The tip is positioned from the card's padding box.
+  const originTop = cardBox.top + (card.clientTop || 0);
+  const rowEl = document.getElementById(rowId(shown.index));
+  let rowTop = rowEl ? rowEl.getBoundingClientRect().top - originTop : 0;
+  const scroller = scrollRef.value;
+  if (scroller) {
+    const span = scroller.getBoundingClientRect();
+    rowTop = Math.max(span.top - originTop, Math.min(rowTop, span.bottom - originTop));
+  }
   const tipHeight = tipRef.value ? tipRef.value.offsetHeight : 0;
-  const rowTop = rowEl ? rowEl.getBoundingClientRect().top - cardBox.top : 0;
-  const top = Math.max(0, Math.min(rowTop, cardBox.height - tipHeight));
-  tipPlace.value = { side, room: viewport ? room : null, top: Math.round(top) };
+  const top = Math.max(0, Math.min(rowTop, card.clientHeight - tipHeight));
+  tipPlace.value = { side, room, top: Math.round(top), placed: true };
 }
 
 watch(
   () => (tipShown.value ? `${tipShown.value.id}|${tipShown.value.index}|${tipShown.value.text}` : null),
   (shown) => {
     if (shown !== null) {
+      tipPlace.value = { ...tipPlace.value, placed: false };
       void placeTip();
     }
   },
   { flush: "post" },
 );
+
+// A viewport resize (or a ui-scale change that follows it) re-places an
+// open tip; the listener lives only while a tip is shown.
+function onWindowResize() {
+  void placeTip();
+}
+watch(
+  () => !!tipShown.value,
+  (open) => {
+    if (open) {
+      window.addEventListener("resize", onWindowResize);
+    } else {
+      window.removeEventListener("resize", onWindowResize);
+    }
+  },
+);
+onBeforeUnmount(() => window.removeEventListener("resize", onWindowResize));
 
 // A scroll of the rows, or the end of a row's entrance rise (a tip opened
 // while the rows still travel), places the tip on its row again.
@@ -505,8 +543,10 @@ defineExpose({ focus, setActive });
     </div>
     </div>
     <!-- The accessible copies of the rows' hints: descriptions, outside every
-         menu item so they never join a row's name. -->
-    <div v-if="rows.some((row) => row.tip)" :class="cls('__sr')">
+         menu item so they never join a row's name. The pool itself is hidden
+         from the accessibility tree (no stray menu children); a hidden node
+         still describes the row that references it directly. -->
+    <div v-if="rows.some((row) => row.tip)" :class="cls('__sr')" aria-hidden="true">
       <template v-for="(row, index) in rows" :key="`tip-${viewKey}-${row.key}`">
         <span v-if="row.tip" :id="tipId(index)" data-testid="choice-card-tip-text">{{ row.tip }}</span>
       </template>
@@ -518,6 +558,7 @@ defineExpose({ focus, setActive });
       :class="[cls('__tip'), cls(`__tip--${tipPlace.side}`)]"
       data-testid="choice-card-tip"
       :data-tip-source="tipShown.source"
+      :data-placed="tipPlace.placed ? 'true' : 'false'"
       :data-tip-row="rows[tipShown.index]?.key"
       aria-hidden="true"
       :style="{ top: `${tipPlace.top}px`, '--choice-tip-room': tipPlace.room === null ? null : `${tipPlace.room}px` }"
@@ -1006,6 +1047,11 @@ defineExpose({ focus, setActive });
   overflow-wrap: anywhere;
   pointer-events: auto;
   animation: elosern-choice-card-in var(--motion-fast) var(--ease-standard) backwards;
+}
+
+/* Invisible until its first placement lands. */
+.choice-card__tip[data-placed="false"] {
+  visibility: hidden;
 }
 
 .choice-card__tip--left {

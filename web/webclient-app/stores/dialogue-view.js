@@ -40,11 +40,11 @@ export function dialogueViewModel(panel) {
   // is opaque and keys the row so focus follows it across refreshes.
   const picks = (Array.isArray(panel.choices) ? panel.choices : [])
     .filter((choice) => (choice.availability ?? "open") === "open" || choice.availability === "locked")
-    .map((choice) => {
+    .map((choice, index) => {
       const locked = choice.availability === "locked";
       const hint = locked && typeof choice.requirement_hint === "string" ? choice.requirement_hint.trim() : "";
       return {
-        key: `dlg-topic-${choice.topic_id ?? choice.keyword_id}`,
+        key: `dlg-topic-${choice.topic_id ?? choice.keyword_id ?? `#${index}`}`,
         label: choice.label,
         enabled: true,
         availability: locked ? "locked" : "open",
