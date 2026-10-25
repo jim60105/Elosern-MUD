@@ -15,6 +15,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.lore.dialogue.codec import make_generated_host_key, make_static_host_key
 from world.narrative.dialogue_reading import (
@@ -83,6 +84,10 @@ class DialogueReadingStorageTests(EvenniaTest):
         self.assertEqual(reading.completed_topic_ids(), (_TOPIC_A,))
         self.assertFalse(reading.is_completed(_TOPIC_B))
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_revision_increments_only_on_change(self):
         self._complete()
         duplicate = self._complete()
@@ -116,6 +121,10 @@ class DialogueReadingStorageTests(EvenniaTest):
         self.assertEqual(completed_topic_ids(other, _STATIC_HOST), ())
         self.assertEqual(reading_revision(other), 0)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-reading-persists-by-logical-package-role-identity"
+    )
     def test_equal_local_ids_in_different_package_roles_stay_separate(self):
         self._complete(host_key=_PACKAGE_A_ROLE, topic=_LOCAL_TOPIC)
         self.assertEqual(
@@ -139,6 +148,10 @@ class DialogueReadingStorageTests(EvenniaTest):
             {_TOPIC_A, _TOPIC_B},
         )
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-reading-persists-by-logical-package-role-identity"
+    )
     def test_save_reload_and_rematerialized_owner_keep_reading(self):
         self._complete()
         self.player.attributes.reset_cache()
@@ -148,6 +161,10 @@ class DialogueReadingStorageTests(EvenniaTest):
         self.assertTrue(reading.is_completed(_TOPIC_A))
         self.assertEqual(read_reading(reloaded).revision, 1)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-reading-persists-by-logical-package-role-identity"
+    )
     def test_phase_return_keeps_completion(self):
         phase_topic = "g-phase.topic_01"
         self._complete(host_key=_PACKAGE_A_ROLE, topic=phase_topic)

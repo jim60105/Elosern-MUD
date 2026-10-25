@@ -15,6 +15,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from commands.talk import CmdsTalk
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -162,6 +163,10 @@ class DialogueCompletionActionTests(EvenniaTest):
         repeated = _dialogue_complete_adapter(self.player, self._payload(delivery))
         self.assertEqual(repeated["outcome"], "success")
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "completion-accepts-only-delivered-context-bound-content"
+    )
     def test_adapter_rejects_forged_claims_without_state(self):
         delivery = self._select()
         forged = {**self._payload(delivery), "delivery_id": "0000000000000000"}
@@ -193,6 +198,10 @@ class DialogueCompletionActionTests(EvenniaTest):
             command.func()
         return "\n".join(messages)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "public-reading-chains-never-authorize-protected-content"
+    )
     def test_text_full_emission_completes_the_chain(self):
         output = self._run_talk(f"{self.host.key} 合成起頭")
         self.assertIn("合成起頭內文", output)
@@ -201,6 +210,10 @@ class DialogueCompletionActionTests(EvenniaTest):
             completed_topic_ids(self.player, self._host_key()), (_ROOT, _CHILD)
         )
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_text_partial_emission_marks_nothing(self):
         calls: list[str] = []
 

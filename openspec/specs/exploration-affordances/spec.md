@@ -267,7 +267,7 @@ emission rules are scenario-pinned.
 - **WHEN** any vocabulary is serialized
 - **THEN** every action entry carries exactly `action_id`, `label`, `params`, `freeform`,
   `navigation` (false), `enabled`, and nullable `disabled_reason`, with `action_id` one member of
-  `ACTION_CODE_ALLOWLIST`, which contains exactly `explore.move`, `explore.look`,
+  `ACTION_CODE_ALLOWLIST`, which contains exactly the exploration verbs listed here plus the in-conversation acknowledgement action `explore.dialogue_complete`: `explore.move`, `explore.look`,
   `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`,
   `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.possess`,
   `explore.possess_release`, and `explore.deliver`; and every navigation entry carries exactly
@@ -347,6 +347,10 @@ emission rules are scenario-pinned.
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
   possession gates, while the `context_actions` form, suggestion eligibility, and the deterministic
   fallback keep consuming the per-keyword and free-form entries unchanged
+
+#### Scenario: Completion is not a topic suggestion
+- **WHEN** action registries and exploration targets are projected
+- **THEN** explore.dialogue_complete is registered only for exact context-bound acknowledgement payloads and is never emitted as a suggestible or interact-target action
 
 #### Scenario: The possessed actor's talk entries stay visible disabled
 - **WHEN** the possessed actor is offered native freeform talk outside the authorized authored conversation surface

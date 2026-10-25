@@ -11,12 +11,14 @@ queues the availability refresh.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -24,7 +26,7 @@ from typeclasses.rooms import Room
 from world.lore.dialogue.conditions import RaceIs
 from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic
 from world.lore.scenes import Scene, Speech
-from world.narrative.dialogue_reading import completed_topic_ids
+from world.narrative.dialogue_reading import completed_topic_ids, reading_revision
 from world.rules.dialogue import (
     COMPLETION_CLOSED,
     COMPLETION_PREDECESSOR_UNREAD,
@@ -116,6 +118,33 @@ def _dialogue() -> AuthoredDialogue:
     )
 
 
+def _relocked_dialogue() -> AuthoredDialogue:
+    """The same table with the root relocked and its scene revision changed."""
+    base = _dialogue()
+    return AuthoredDialogue(
+        greeting=base.greeting,
+        topics=tuple(
+            replace(
+                topic,
+                fallback=Scene(
+                    scene_id="t_reading_root_v2",
+                    revision="r2",
+                    lines=(
+                        Speech(speaker="actor", text="合成問句。"),
+                        Speech(speaker="host", text="合成改版內文"),
+                    ),
+                ),
+                requires=RaceIs(race_key=_OTHER_RACE),
+                unavailable="locked",
+                refusal=_scene("t_reading_root_relock_refusal", "合成改版婉拒。"),
+            )
+            if topic.topic_id == _ROOT
+            else topic
+            for topic in base.topics
+        ),
+    )
+
+
 class DialogueReadingCompletionTests(EvenniaTest):
     """Receipt issuance, completion acceptance and rejection."""
 
@@ -175,6 +204,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
 
     # -- issuance --------------------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "public-reading-chains-never-authorize-protected-content"
+    )
     def test_formal_selection_issues_a_receipt_and_a_refusal_does_not(self):
         delivery = self._select(_ROOT)
         session = live_dialogue_session(self.player)
@@ -201,6 +234,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
 
     # -- acceptance and idempotency --------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_duplicate_acks_from_two_connection_snapshots_are_monotonic(self):
         delivery = self._select(_ROOT)
         stored = self.player.db.dialogue_session
@@ -219,6 +256,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
             completed_topic_ids(self.player, self._host_key()), (_ROOT,)
         )
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "completion-accepts-only-delivered-context-bound-content"
+    )
     def test_already_saved_requires_the_receipt_in_the_current_set(self):
         delivery = self._select(_ROOT)
         self._ack(delivery)
@@ -231,6 +272,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
 
     # -- rejection -------------------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "completion-accepts-only-delivered-context-bound-content"
+    )
     def test_unknown_and_forged_claims_write_nothing(self):
         delivery = self._select(_ROOT)
         for overrides, code in (
@@ -247,6 +292,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
         # The unmodified claim still succeeds afterwards.
         self.assertEqual(self._ack(delivery).status, "saved")
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_refusal_delivery_never_holds_an_acknowledgeable_receipt(self):
         refusal = self._select(_LOCKED)
         with self.assertRaises(DialogueCompletionError) as caught:
@@ -254,6 +303,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
         self.assertEqual(caught.exception.code, COMPLETION_RECEIPT_UNKNOWN)
         self.assertNotEqual(caught.exception.code, COMPLETION_RECEIPT_KIND)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "public-reading-chains-never-authorize-protected-content"
+    )
     def test_successor_ack_before_its_predecessor_is_refused(self):
         delivery = self._select(_ROOT)
         session = live_dialogue_session(self.player)
@@ -271,6 +324,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
 
     # -- delayed completion and control ----------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "completion-accepts-only-delivered-context-bound-content"
+    )
     def test_delayed_topic_a_completion_keeps_topic_b_playing(self):
         topic_a = self._select(_ROOT, selection_id="sel-a")
         topic_b = self._select(_LOCKED, selection_id="sel-b")
@@ -287,6 +344,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
             completed_topic_ids(self.player, self._host_key()), (_ROOT,)
         )
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_possession_completion_belongs_to_the_owner(self):
         # The EvenniaTest account character owns a lawful possession: the
         # companion acts, the owner's reading record changes.
@@ -323,6 +384,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
         clear_dialogue_session(owner)
         self.assertEqual(completed_topic_ids(owner, self._host_key()), (_ROOT,))
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-reading-persists-by-logical-package-role-identity"
+    )
     def test_rematerialized_host_keeps_the_logical_record(self):
         delivery = self._select(_ROOT)
         self._ack(delivery)
@@ -335,6 +400,41 @@ class DialogueReadingCompletionTests(EvenniaTest):
         # The new physical host starts a new context; the old receipt is gone.
         with self.assertRaises(DialogueCompletionError):
             self._ack(delivery)
+
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
+    def test_abandoned_playback_never_completes(self):
+        """Ending the conversation before acknowledgement reads nothing."""
+        delivery = self._select(_ROOT)
+        clear_dialogue_session(self.player)
+        with self.assertRaises(DialogueCompletionError) as caught:
+            self._ack(delivery)
+        self.assertEqual(caught.exception.code, COMPLETION_CLOSED)
+        self.assertEqual(completed_topic_ids(self.player, self._host_key()), ())
+
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
+    def test_relock_and_variant_change_keep_saved_completion(self):
+        """A relocked topic or a new scene revision never erases saved reading."""
+        delivery = self._select(_ROOT)
+        self._ack(delivery)
+        host_key = self._host_key()
+
+        # The authored table changes under the same logical host key: the root
+        # is relocked and its scene revision is new. Reading is keyed by
+        # logical identity only, so the saved completion survives while the
+        # changed scene is refused.
+        with synthetic_registries(
+            "dialogue", extra={"dialogue": {_TABLE_KEY: _relocked_dialogue()}}
+        ):
+            refusal = self._select(_ROOT, selection_id="sel-relocked")
+            self.assertEqual(refusal.kind, "refusal")
+            self.assertEqual(completed_topic_ids(self.player, host_key), (_ROOT,))
+            self.assertEqual(reading_revision(self.player), 1)
 
     def test_receipt_set_stays_bounded_and_retires_the_oldest(self):
         deliveries = [
@@ -365,6 +465,10 @@ class DialogueReadingCompletionTests(EvenniaTest):
             refresh.assert_called_once()
             self.assertEqual(refresh.call_args.kwargs["cause"], "reading_completed")
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "public-reading-chains-never-authorize-protected-content"
+    )
     def test_ack_does_not_settle_effects_or_eligibility_again(self):
         delivery = self._select(_ROOT)
         affinity_before = self.host.relations.affinity_for(self.player)

@@ -18,6 +18,7 @@ from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -192,6 +193,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
 
     # -- projection ------------------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_panel_reports_revision_completions_and_unread(self):
         self._select()
         panel = self._panel()
@@ -244,6 +249,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
         # even though it is reachable from the playing root.
         self.assertNotIn(_QUALIFIED, choices)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_reading_is_owner_shared_across_the_same_host(self):
         self._select()
         record_completion(
@@ -255,6 +264,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
         self.assertEqual(panel["completed_topic_ids"], [_ROOT])
         self.assertEqual(panel["reading_revision"], 1)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_delayed_completion_leaves_the_other_connection_scene_intact(self):
         first = self._select(_ROOT, selection_id="sel-a")
         second = self._select(_ROOT, selection_id="sel-b")
@@ -271,6 +284,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
 
     # -- fan-out ---------------------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "formal-reading-is-persistent-owner-shared-narrative-state"
+    )
     def test_fan_out_reaches_one_owner_controls_only(self):
         self._select()
         first, first_output = self._register_watcher(self.owner, 971)
@@ -306,6 +323,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
         )
         self.assertIsNotNone(first)
 
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "public-reading-chains-never-authorize-protected-content"
+    )
     def test_chain_derivation_is_pure_and_bounded(self):
         delivery = self._select()
         from world.rules.dialogue import live_dialogue_session
