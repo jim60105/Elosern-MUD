@@ -334,20 +334,25 @@ def _owner_identity(entity: Any) -> int | None:
 def _possession_owner(body: Any) -> Any:
     """The player lawfully possessing ``body`` right now, or ``None``.
 
-    Both directions must hold: the body names the player as its possessor and
-    the player's own possession binding names this body. A one-sided or
-    forged mirror resolves no owner.
+    Both directions of the stored possession mirror must agree AND the body
+    must still be bound to that player through the canonical party binding, so
+    a body whose party binding was removed (or whose possession mirror was
+    forged) resolves no possession owner even while the mirror references
+    still agree. The bound party owner remains the separate owner category.
     """
     holder = getattr(getattr(body, "db", None), "possessed_by", None)
     if isinstance(holder, bool) or not isinstance(holder, int) or holder <= 0:
         return None
     from evennia.objects.objects import ObjectDB
 
+    from world.rules.party import bound_owner_of
+    from world.rules.possession import current_possession
+
     player = ObjectDB.objects.filter(id=holder).first()
     if _owner_identity(player) is None:
         return None
-    from world.rules.possession import current_possession
-
+    if bound_owner_of(body) is not player:
+        return None
     binding = current_possession(player)
     if binding is None or binding["npc_dbid"] != int(getattr(body, "pk", 0) or 0):
         return None
@@ -428,9 +433,16 @@ def _fan_out_availability(owner: Any, cause: str) -> None:
 
 
 def _acting_body(owner: Any) -> Any:
-    """The body currently acting for ``owner``: its possessed companion or itself."""
+    """The body currently acting for ``owner``: its possessed companion or itself.
+
+    The stored possession mirror is only a locator: the companion must still
+    name ``owner`` as its possessor AND remain bound to that owner through the
+    canonical party binding, so a possession whose binding was removed between
+    scheduling and this callback never receives the owner's refresh instead.
+    """
     from evennia.objects.objects import ObjectDB
 
+    from world.rules.party import bound_owner_of
     from world.rules.possession import current_possession
 
     possession = current_possession(owner)
@@ -442,6 +454,8 @@ def _acting_body(owner: Any) -> Any:
     if getattr(getattr(body, "db", None), "possessed_by", None) != int(
         getattr(owner, "pk", 0)
     ):
+        return owner
+    if bound_owner_of(body) is not owner:
         return owner
     return body
 

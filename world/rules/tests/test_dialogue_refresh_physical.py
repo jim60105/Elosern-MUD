@@ -464,12 +464,12 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         self.assertNotIn(_OWNED_TOPIC, self._choices(recorded))
         self.assertNotIn(_PROFICIENT_TOPIC, self._choices(recorded))
 
-        from world.skills.registry import SKILL_REGISTRY
-
-        definition = SKILL_REGISTRY[_SKILL_KEY]
+        definition = SYNTH_SKILLS[_SKILL_KEY]
         self.assertTrue(skill_identity_eligible(self.player, definition))
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            self.assertTrue(grant_owned_skill(self.player, _SKILL_KEY, SKILL_REGISTRY))
+            self.assertTrue(
+                grant_owned_skill(self.player, _SKILL_KEY, SYNTH_SKILLS)
+            )
         self.assertEqual(len(list(callbacks)), 1)
         choices = self._choices(recorded)
         self.assertEqual(choices[_OWNED_TOPIC]["availability"], TOPIC_OPEN)
@@ -478,7 +478,7 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         # A repeated grant writes nothing and schedules nothing.
         with self.captureOnCommitCallbacks(execute=True) as repeat_callbacks:
             self.assertFalse(
-                grant_owned_skill(self.player, _SKILL_KEY, SKILL_REGISTRY)
+                grant_owned_skill(self.player, _SKILL_KEY, SYNTH_SKILLS)
             )
         self.assertEqual(list(repeat_callbacks), [])
 
@@ -545,8 +545,33 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
                     queue_dialogue_refresh((owner,), cause="party_change")
         push.assert_called_once_with(self.player)
 
+    def test_stale_possession_mirror_without_a_binding_resolves_no_owner(self):
+        """Matching mirror references never substitute for a lawful binding."""
+        companion = create_object(NPC, key="合成偽造同伴", location=self.room)
+        companion.db.possessed_by = int(self.player.pk)
+        self.player.db.possession = {
+            "npc_dbid": int(companion.pk),
+            "since_tick": 0,
+        }
+        self.addCleanup(setattr, self.player.db, "possession", None)
+        self.addCleanup(setattr, companion.db, "possessed_by", None)
+
+        self.assertEqual(affected_dialogue_owners(companion), ())
+        # The owner's refresh must not be redirected to the unbound body.
+        with patch(
+            "web.webclient.presentation.dialogue_push.push_dialogue_update"
+        ) as push:
+            with self.captureOnCommitCallbacks(execute=True):
+                queue_dialogue_refresh((self.player,), cause="control")
+        push.assert_called_once_with(self.player)
+
     def test_generated_binding_phase_is_resolved_at_callback_time(self):
-        """The callback re-resolves the published generated phase and host binding."""
+        """The callback re-resolves the generated phase and host binding.
+
+        The generated provider seam is replaced here, so this is provider-seam
+        coverage of the source-neutral callback contract; production published
+        package acceptance belongs to ``authored-dialogue-generated-packages``.
+        """
         generated = create_object(NPC, key="合成生成刷新角色", location=self.room)
         generated.components.add(
             ScriptedDialogue.create(
