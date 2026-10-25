@@ -41,7 +41,7 @@
 - **WHEN** the `guild_staff` row is read
 - **THEN** it mirrors the guild-hall host component tuple that sync attaches
 
-#### Scenario: The guild_exam_reception blueprint is a prescribed reusable subset
+#### Scenario: The guild_examiner blueprint is a prescribed reusable subset
 - **WHEN** the `guild_exam_reception` row is read
 - **THEN** it is the prescribed examiner/dialogue blueprint (a reusable subset; sync attaches no examiner-only host today)
 
