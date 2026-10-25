@@ -111,7 +111,8 @@
         "world.rules.tests.test_social_identity",
         "world.rules.tests.test_confirmed_surrender",
         "world.rules.tests.test_dialogue_physical_conditions",
-        "world.rules.tests.test_dialogue_references"
+        "world.rules.tests.test_dialogue_references",
+        "world.rules.tests.test_dialogue_progression_conditions"
       ]
     },
     {

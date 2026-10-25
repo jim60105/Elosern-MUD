@@ -24,6 +24,7 @@ from unittest.mock import patch
 import yaml
 
 from tools.spec_traceability import covers_requirement
+from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
@@ -31,9 +32,12 @@ from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY, place_is_hostless
 from world.lore.social_identities import SOCIAL_IDENTITY_REGISTRY
+from world.quests.catalog import QUEST_CATALOG
 from world.rules.dialogue_references import (
+    AFFINITY_RULEBOOK_PATH,
     CLOCK_RULEBOOK_PATH,
     DAYPART_LABELS,
+    permitted_quest_definition,
     static_dialogue_references,
 )
 from world.skills.registry import SKILL_REGISTRY
@@ -127,6 +131,9 @@ class StaticDialogueReferencesTests(unittest.TestCase):
             "preset",
             "profile",
             "daypart",
+            "guild_rank",
+            "quest",
+            "affinity_stage",
         ):
             table = self.references.tables[family]
             self.assertTrue(table, f"the shipped {family} family is empty")
@@ -137,10 +144,35 @@ class StaticDialogueReferencesTests(unittest.TestCase):
                     self.assertLessEqual(len(label), LABEL_MAX_CODE_POINTS)
                     self.assertNotIn("\n", label)
 
-    def test_progression_families_stay_empty_until_their_slice(self):
-        for family in ("guild_rank", "quest", "affinity_stage"):
-            with self.subTest(family=family):
-                self.assertFalse(self.references.keys_for(family))
+    def test_progression_families_come_from_their_canonical_sources(self):
+        self.assertEqual(
+            self.references.keys_for("guild_rank"), frozenset(GUILD_RANK_REGISTRY)
+        )
+        for key, row in GUILD_RANK_REGISTRY.items():
+            self.assertEqual(
+                self.references.label("guild_rank", key), row.display_name_zh
+            )
+
+        canonical_quests = {
+            definition.key: definition.display_name for definition in QUEST_CATALOG
+        }
+        self.assertTrue(canonical_quests, "the canonical quest catalog is empty")
+        quest_table = self.references.tables["quest"]
+        for key, label in canonical_quests.items():
+            with self.subTest(quest=key):
+                self.assertEqual(quest_table[key], label)
+                self.assertTrue(permitted_quest_definition(key))
+        self.assertFalse(permitted_quest_definition("not_a_quest_definition"))
+
+        document = yaml.safe_load(
+            AFFINITY_RULEBOOK_PATH.read_text(encoding="utf-8")
+        )
+        expected_stages = {
+            stage["id"]: stage["name"] for stage in document["stages"]
+        }
+        self.assertEqual(
+            dict(self.references.tables["affinity_stage"]), expected_stages
+        )
 
     def test_catalog_is_immutable_and_rebuilt_from_live_registries(self):
         with self.assertRaises(TypeError):
@@ -163,6 +195,10 @@ class StaticDialogueReferencesTests(unittest.TestCase):
             print(json.dumps({{
                 "tables": sorted(DIALOGUE_SNAPSHOT),
                 "races": sorted(static_dialogue_references().keys_for("race")),
+                "quests": sorted(static_dialogue_references().keys_for("quest")),
+                "stages": sorted(
+                    static_dialogue_references().keys_for("affinity_stage")
+                ),
             }}))
             """
         )
@@ -196,6 +232,10 @@ class StaticDialogueReferencesTests(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
         self.assertTrue(outputs[0]["tables"], "no dialogue table loaded")
         self.assertTrue(outputs[0]["races"], "no race reference loaded")
+        # The canonical quest declarations and affinity stages are readable
+        # before any startup registration runs.
+        self.assertTrue(outputs[0]["quests"], "no quest reference loaded")
+        self.assertTrue(outputs[0]["stages"], "no affinity stage loaded")
 
 
 if __name__ == "__main__":  # pragma: no cover - direct invocation
