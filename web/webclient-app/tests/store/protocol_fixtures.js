@@ -343,7 +343,7 @@ export function protocolError(overrides = undefined) {
 }
 
 export function createFakeSender() {
-  const sent = { actions: [], texts: [] };
+  const sent = { actions: [], texts: [], syncs: 0 };
   return {
     sent,
     sendAction(envelope) {
@@ -351,6 +351,9 @@ export function createFakeSender() {
     },
     sendText(text) {
       sent.texts.push(text);
+    },
+    sendSync() {
+      sent.syncs += 1;
     },
   };
 }

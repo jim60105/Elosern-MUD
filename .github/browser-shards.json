@@ -238,6 +238,8 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_exit_row_moves_with_the_committed_exit_payload",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_presence_rail_and_verb_card_hold_at_both_reference_viewports",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_authored_scene_plays_line_by_line_with_synchronized_portraits",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_retry_without_rereading",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_reload_discards_pending",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_possessed_companion_plays_an_authored_scene_with_its_own_portrait",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_locked_topic_shows_its_hint_and_plays_its_refusal",
         "web.tests.browser.test_harness.PortAllocationTests"

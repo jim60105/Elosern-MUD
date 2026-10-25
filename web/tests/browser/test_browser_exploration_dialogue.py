@@ -74,7 +74,13 @@ def _shipped_first_answer() -> str:
 
 
 #: Methods that boot the synthetic catalogs with the authored-scene table.
-AUTHORED_SCENE_METHODS = ("test_authored_scene_plays_line_by_line_with_synchronized_portraits",)
+AUTHORED_SCENE_METHODS = (
+    "test_authored_scene_plays_line_by_line_with_synchronized_portraits",
+    # authored-dialogue-reading-client: the completion acknowledgement journeys
+    # play a complete formal scene from the kit's storyteller table.
+    "test_dialogue_completion_retry_without_rereading",
+    "test_dialogue_completion_reload_discards_pending",
+)
 #: The possessed authored-dialogue journey: kit catalogs, the scene table and
 #: one bound companion with an admitted portrait.
 POSSESSED_DIALOGUE_METHOD = (
@@ -115,6 +121,45 @@ def _scene_frame(page) -> dict:
           };
         }"""
     )
+
+
+def _intercept_first_completion(page) -> None:
+    """Fail the first ``explore.dialogue_complete`` envelope synchronously.
+
+    Deterministic transport interception, never a real outage: the client's
+    sender raises instead of writing to the socket, so the store keeps the
+    entry unsaved and offers the explicit retry. The intercepted attempt never
+    reaches the recorder, which therefore counts only envelopes that actually
+    crossed the wire. Later attempts pass through untouched.
+    """
+    page.evaluate(
+        """() => {
+          if (window.__completionInterceptInstalled) { return; }
+          window.__completionInterceptInstalled = true;
+          window.__completionFailures = 0;
+          window.__completionFailedOnce = false;
+          var original = Evennia.msg.bind(Evennia);
+          Evennia.msg = function (cmdname, args, kwargs, callback) {
+            var envelope = args && args[0];
+            if (
+              cmdname === "ui_action" &&
+              envelope &&
+              envelope.action_id === "explore.dialogue_complete" &&
+              !window.__completionFailedOnce
+            ) {
+              window.__completionFailedOnce = true;
+              window.__completionFailures += 1;
+              throw new Error("simulated completion transport failure");
+            }
+            return original(cmdname, args, kwargs, callback);
+          };
+        }"""
+    )
+
+
+def _completion_failures(page) -> int:
+    """How many completion attempts the interception rejected."""
+    return page.evaluate("window.__completionFailures || 0")
 
 
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -951,6 +996,150 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         open_dialogue_choices(page)
         self.assertEqual(sent_action_count(page), 0, "the replay selected nothing again")
+
+    def _open_and_finish_storyteller_scene(self, page) -> str:
+        """Open the kit storyteller, pick 故事 and play to the explicit finish.
+
+        Returns the delivered formal topic id. The fixture's scene is the
+        complete multi-line authored scene, so the finish is the single event
+        the reading client acknowledges (authored-dialogue-reading-client).
+        """
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        _press(page, "1")  # 故事 -> explore.talk_scripted
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        delivery = store_state(page)["panels"]["dialogue"]["delivery"]
+        for _ in range(14):
+            if _scene_frame(page)["choices"]:
+                return delivery["topic_id"]
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+        raise AssertionError("the authored scene never reached its explicit finish")
+
+    # The delta requirement
+    # (authored-dialogue-reading::frontend-completion-retries-remain-memory-only)
+    # receives its covers_requirement annotation at delta sync, when the main
+    # spec gains the requirement (authored-dialogue-locked-ui precedent: the
+    # traceability gate only recognizes the synced requirement text).
+    def test_dialogue_completion_retry_without_rereading(self):
+        """authored-dialogue-reading-client 3.1: one ack, failed then retried.
+
+        The first completion acknowledgement fails synchronously on the
+        transport (deterministic interception, no real outage). The client
+        keeps the entry unsaved, shows the pending status beside the choices,
+        never repeats the selection or re-reads the scene, and the explicit
+        重試 sends the exact same payload once. The server then saves the
+        reading and the canonical ``completed_topic_ids`` carries the topic.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        _intercept_first_completion(page)
+        topic_id = self._open_and_finish_storyteller_scene(page)
+
+        status = page.locator('[data-testid="dialogue-reading-status"]')
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dialogueReading") or {}).get("retryable") is True,
+        )
+        status.wait_for(state="visible", timeout=10000)
+        self.assertEqual(status.get_attribute("data-state"), "failed")
+        self.assertEqual(_completion_failures(page), 1)
+        self.assertEqual(
+            sent_action_count(page, "explore.dialogue_complete"),
+            0,
+            "the failed attempt never crossed the wire",
+        )
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        read_text = page.locator('[data-testid="message-page"]').inner_text()
+
+        page.locator('[data-testid="dialogue-reading-retry"]').click()
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dialogueReading") or {}).get("pendingCount") == 0,
+        )
+        self.assertEqual(sent_action_count(page, "explore.dialogue_complete"), 1)
+        wait_for_store_state(
+            page,
+            lambda s: topic_id
+            in (((s.get("panels") or {}).get("dialogue") or {}).get("completed_topic_ids") or []),
+        )
+        self.assertEqual(
+            page.locator('[data-testid="message-page"]').inner_text(),
+            read_text,
+            "the retry never replays or re-reads the scene",
+        )
+        self.assertEqual(
+            sent_action_count(page, "explore.talk_scripted"),
+            1,
+            "the retry never selects the topic again",
+        )
+        self.assertEqual(status.count(), 0, "saved progress shows no pending status")
+
+    # Delta requirement annotation lands at delta sync (see the retry method).
+    def test_dialogue_completion_reload_discards_pending(self):
+        """authored-dialogue-reading-client 3.1: a fresh reload has no pending.
+
+        The acknowledgement fails before it reaches the server. Reloading the
+        page discards the memory-only pending entry: the fresh mount sends no
+        completion, the server's unread/predecessor state wins, and the latest
+        valid delivery replays at line one.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        _intercept_first_completion(page)
+        topic_id = self._open_and_finish_storyteller_scene(page)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dialogueReading") or {}).get("retryable") is True,
+        )
+        self.assertEqual(_completion_failures(page), 1)
+
+        page.reload()
+        wait_for_shell_active(page)
+        install_outbound_recorder(page)
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dialogueReading") or {}).get("pendingCount") == 0
+            and (s.get("dialogueReading") or {}).get("savedTopicIds") == [],
+        )
+        self.assertEqual(
+            page.locator('[data-testid="dialogue-reading-status"]').count(),
+            0,
+            "a fresh mount has no pending memory",
+        )
+        self.assertEqual(sent_action_count(page, "explore.dialogue_complete"), 0)
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
+        # The server wins: the topic is still unread and the delivered scene
+        # replays from line one.
+        self.assertNotIn(
+            topic_id,
+            store_state(page)["panels"]["dialogue"].get("completed_topic_ids") or [],
+        )
+        page.wait_for_function(
+            """() => {
+              const surface = document.querySelector('[data-testid="message-page"]');
+              return !!surface && surface.innerText.includes('說個故事吧。');
+            }""",
+            timeout=30000,
+        )
 
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
