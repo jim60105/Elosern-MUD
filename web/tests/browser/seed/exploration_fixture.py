@@ -163,18 +163,29 @@ def _exploration_fixture(character) -> None:
                 synth_exposure_baseline_label,
             )
             from world.rules.equipment import toggle_equipment
+            from world.rules.party import live_companions
 
             # The stored baseline sits exactly one ordinal below the authored
             # exposure variant bound; the worn accessory's borrowed shipped
             # exposure bias crosses it. The fixture writes only the persisted
-            # baseline record and never mounts the sexual handler.
-            possessed.db.sexual = {"exposure": synth_exposure_baseline_label()}
-            possessed.db.inventory = [SYNTH_EXPOSURE_ITEM_KEY]
-            worn = toggle_equipment(possessed, SYNTH_EXPOSURE_ITEM_KEY)
-            if getattr(worn, "outcome", None) == "rejected":
-                raise RuntimeError(
-                    "dialogue conditions fixture: exposure accessory was rejected"
-                )
+            # baseline record and never mounts the sexual handler. The journey
+            # possesses whichever companion row the party panel lists first
+            # (the preset's own starting companion precedes this one), so
+            # every live companion stands with the player and carries the same
+            # baseline and gear.
+            baseline = synth_exposure_baseline_label()
+            for member in live_companions(character):
+                member.location = south_gate
+                member.db.sexual = {"exposure": baseline}
+                member.db.inventory = [
+                    SYNTH_EXPOSURE_ITEM_KEY,
+                    *(member.db.inventory or []),
+                ]
+                worn = toggle_equipment(member, SYNTH_EXPOSURE_ITEM_KEY)
+                if getattr(worn, "outcome", None) == "rejected":
+                    raise RuntimeError(
+                        "dialogue conditions fixture: exposure accessory was rejected"
+                    )
 
     if os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1":
         from world.rules.party import PARTY_MAX_COMPANIONS, join_party, party_size
