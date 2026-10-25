@@ -81,3 +81,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 #### Scenario: Disabled common talk for plain NPC
 - **WHEN** a visible NPC has no supported conversation
 - **THEN** its server-authored talk descriptor is disabled with an inline not-conversable reason, preserving common slot 1 without granting talk authority
+
+#### Scenario: Selected-provider services replace coarse navigation
+- **WHEN** an NPC has supported services
+- **THEN** the services field derives all route entries for that selected host; guild/shop navigate affordances remain removed and another same-class bystander does not hide its entries

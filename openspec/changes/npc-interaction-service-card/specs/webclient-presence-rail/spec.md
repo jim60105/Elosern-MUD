@@ -151,15 +151,15 @@ Each verb row SHALL submit exactly the payload the former popover row submitted:
 - **THEN** real labeled group headings are nonselectable, every disabled row remains focusable with aria-disabled and inline described reasons, End selects return, and activation sends nothing
 
 ### Requirement: A departed person closes the card
-When presence is available and submission is unlocked, a missing focused interact identity SHALL close its card in that commit, restore the rail and flash `<name> 已經離開了。`; otherwise closure SHALL await normal settlement. Missing committed targets SHALL immediately lose derived standee/focus emphasis. A committed location change SHALL close the card regardless of that departure gate.
+Committed loss of the focused interact identity or its readable availability SHALL immediately retire the card and pending service correlation regardless of submission locks. Actual departure SHALL restore the existing presence fallback and flash its departure message once. Unreadable presence SHALL close without claiming departure. A committed location change SHALL also close the card.
 
 #### Scenario: The focused person leaves
-- **WHEN** the verb card is open and a commit removes that person from the room while presence is available and submission is unlocked
+- **WHEN** the verb card is open and a committed readable presence update removes that person, including while submission is locked
 - **THEN** the card closes in that commit and the readout flashes `<name> 已經離開了。`
 
 #### Scenario: A locked departure waits for normal settlement
-- **WHEN** the committed target disappears while submission is locked or presence entries are unavailable, then an available unlocked commit still lacks that target
-- **THEN** the first commit removes derived actor-right focus or lineup emphasis without prematurely closing the card or flashing departure; the later normal settlement closes the card, restores the rail and flashes the departure message once
+- **WHEN** the target disappears or presence becomes unreadable while a service read or mutation is pending
+- **THEN** that first committed availability loss closes the card and removes correlation/emphasis immediately; late responses cannot reopen it, and later settlement does not flash a duplicate departure message
 
 #### Scenario: Companion focus leaves no stale elevation
 - **WHEN** the normal committed presence settlement closes a companion card after departure, or a committed movement closes the card
