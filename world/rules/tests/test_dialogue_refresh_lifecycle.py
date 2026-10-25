@@ -77,6 +77,7 @@ from world.quests.tests._scene_package_fixtures import (
     package as package_payload,
 )
 from world.quests.transitions import apply_quest_log_delta
+from world.rules import dialogue_availability as availability
 from world.rules.affinity import AffinitySource, apply_affinity_change, seed_affinity
 from world.rules.affinity_config import get_config
 from world.rules.clock import AdvanceSource, get_world_clock
@@ -89,8 +90,6 @@ from world.rules.dialogue import (
 )
 from world.rules.dialogue_availability import (
     TOPIC_OPEN,
-    affected_dialogue_owners,
-    queue_dialogue_refresh,
     session_bearing_dialogue_bodies,
     session_bearing_dialogue_owners,
 )
@@ -103,7 +102,7 @@ from world.rules.guild_exams import (
     settle_exam_outcome,
     to_storage as exam_to_storage,
 )
-from world.rules.party import join_party, leave_party
+from world.rules.party import join_party, leave_party, purge_npc_memberships
 from world.rules.possession import enter_possession, release_possession
 from world.tests.synthetic_data import SYNTH_RACES, synthetic_registries
 from world.tests.synthetic_data.data_presets_quests import (
@@ -422,8 +421,20 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
         _real, recorded = self._register_watcher(self.player)
         self.assertNotIn(_RANK_TOPIC, self._choices(recorded))
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        real_queue = availability.queue_dialogue_refresh
+        causes: list[str] = []
+
+        def queue_spy(owners, *, cause):
+            causes.append(cause)
+            return real_queue(owners, cause=cause)
+
+        with patch.object(
+            availability, "queue_dialogue_refresh", side_effect=queue_spy
+        ), self.captureOnCommitCallbacks(execute=True) as callbacks:
             register_adventurer(self.player, staff=self.host)
+        # Registration's own guild-rank hook is scheduled exactly once, not
+        # merely satisfied by the social-identity/affinity hooks it also runs.
+        self.assertEqual(causes.count("guild_rank"), 1)
         self.assertGreaterEqual(len(list(callbacks)), 1)
         self.assertEqual(
             self._choices(recorded)[_RANK_TOPIC]["availability"], TOPIC_OPEN
@@ -497,26 +508,57 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
         _real, recorded = self._register_watcher(self.player)
         self.assertNotIn(_QUEST_TOPIC, self._choices(recorded))
 
+        panels_before = len(self._panels(recorded))
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             with transaction.atomic():
                 apply_quest_log_delta(
                     self.player, [_quest_record(QuestState.IN_PROGRESS)]
                 )
         self.assertGreaterEqual(len(list(callbacks)), 1)
+        self.assertGreater(len(self._panels(recorded)), panels_before)
         self.assertEqual(
             self._choices(recorded)[_QUEST_TOPIC]["availability"], TOPIC_OPEN
         )
 
+        panels_before = len(self._panels(recorded))
         with self.captureOnCommitCallbacks(execute=True):
             with transaction.atomic():
                 apply_quest_log_delta(
                     self.player, [_quest_record(QuestState.FAILED)]
                 )
+        self.assertGreater(len(self._panels(recorded)), panels_before)
         self.assertNotIn(_QUEST_TOPIC, self._choices(recorded))
 
+        # Reopen, then invalidate: every lifecycle state refreshes the same
+        # canonical projection.
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                apply_quest_log_delta(
+                    self.player, [_quest_record(QuestState.IN_PROGRESS)]
+                )
+        self.assertIn(_QUEST_TOPIC, self._choices(recorded))
+        panels_before = len(self._panels(recorded))
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                apply_quest_log_delta(
+                    self.player, [_quest_record(QuestState.INVALIDATED)]
+                )
+        self.assertGreater(len(self._panels(recorded)), panels_before)
+        self.assertNotIn(_QUEST_TOPIC, self._choices(recorded))
+
+        # Absence (the record removed) starts from a visible topic, so the
+        # removal-specific refresh is observable rather than already-hidden.
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                apply_quest_log_delta(
+                    self.player, [_quest_record(QuestState.IN_PROGRESS)]
+                )
+        self.assertIn(_QUEST_TOPIC, self._choices(recorded))
+        panels_before = len(self._panels(recorded))
         with self.captureOnCommitCallbacks(execute=True):
             with transaction.atomic():
                 apply_quest_log_delta(self.player, [])
+        self.assertGreater(len(self._panels(recorded)), panels_before)
         self.assertNotIn(_QUEST_TOPIC, self._choices(recorded))
 
     @covers_requirement(
@@ -531,19 +573,33 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
         other.location = self.room
         self.assertIsNone(live_dialogue_session(other))
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        real_queue = availability.queue_dialogue_refresh
+        registered: list[str] = []
+
+        def queue_spy(owners, *, cause):
+            registered.append(cause)
+            return real_queue(owners, cause=cause)
+
+        with patch.object(
+            availability, "queue_dialogue_refresh", side_effect=queue_spy
+        ), patch(
+            "web.webclient.presentation.dialogue_push.push_dialogue_reading"
+        ) as pushed, self.captureOnCommitCallbacks(
+            execute=True
+        ) as callbacks:
             try:
                 with transaction.atomic():
                     apply_quest_log_delta(
                         other, [_quest_record(QuestState.IN_PROGRESS)]
                     )
-                    queue_dialogue_refresh(
-                        affected_dialogue_owners(other), cause="quest_state"
-                    )
                     raise RuntimeError("owning operation rolled back")
             except RuntimeError:
                 pass
+        # The real writer registered its callback inside the savepoint, then
+        # the rollback discarded it: no publication ran.
+        self.assertIn("quest_state", registered)
         self.assertEqual(list(callbacks), [])
+        pushed.assert_not_called()
         self.assertIsNone(live_dialogue_session(other))
         self.assertEqual(tuple(watchers.watchers_for(other)), ())
 
@@ -661,12 +717,41 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
         )
 
         companion_pk = int(companion.pk)
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+        real_queue = availability.queue_dialogue_refresh
+        causes: list[str] = []
+
+        def queue_spy(owners, *, cause):
+            causes.append(cause)
+            return real_queue(owners, cause=cause)
+
+        with patch.object(
+            availability, "queue_dialogue_refresh", side_effect=queue_spy
+        ), self.captureOnCommitCallbacks(execute=True) as callbacks:
             companion.delete()
+        # The membership purge and the typeclass delete hook each schedule the
+        # owner refresh; the pre-existing party push cannot satisfy this.
+        self.assertGreaterEqual(causes.count("companion_presence"), 2)
         self.assertGreaterEqual(len(list(callbacks)), 1)
         self.assertNotIn(_COMPANION_TOPIC, self._choices(recorded))
         self.assertEqual(completed_topic_ids(self.player, host_key), (_OPEN_TOPIC,))
         self.assertFalse(ObjectDB.objects.filter(pk=companion_pk).exists())
+
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
+    def test_membership_purge_refreshes_without_an_object_delete(self):
+        companion = self._companion()
+        self._open_line_session()
+        _real, recorded = self._register_watcher(self.player)
+        self.assertEqual(
+            self._choices(recorded)[_COMPANION_TOPIC]["availability"], TOPIC_OPEN
+        )
+        panels_before = len(self._panels(recorded))
+        with self.captureOnCommitCallbacks(execute=True):
+            purge_npc_memberships(companion)
+        self.assertGreater(len(self._panels(recorded)), panels_before)
+        self.assertNotIn(_COMPANION_TOPIC, self._choices(recorded))
 
     # -- world time ------------------------------------------------------
 
@@ -751,6 +836,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
             with self.captureOnCommitCallbacks(execute=True):
                 release_possession(player, companion, "handback")
             self.assertIsNone(live_dialogue_session(companion))
+            self.assertIsNone(companion.db.dialogue_session)
             self.assertIsNone(live_dialogue_session(player))
             pushed.assert_called_with(player)
             # The new body republishes its own empty conversation; the
