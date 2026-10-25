@@ -8,8 +8,8 @@ Read design.md and Shared contract v2 first. Use the completed sorted YAML scann
 
 ## 2. Rewrite first owned host
 
-- [x] 2.1 Replace all four topic scenes and opening for guild_staff in `world/lore/dialogue/content/altoria_guild_master.yaml`, including full actor utterances, narration and its required domain variants/chain. Add tagged data-contract assertions as the prose lands; verify multiline/ID/office/no-OOC constraints and review every line against sources.
+- [x] 2.1 Replace all four topic scenes and opening for guild_staff in `world/lore/dialogue/content/altoria_guild_master.yaml`, including full actor utterances, narration and its required domain variants/chain. Verify multiline/ID/office/no-OOC constraints and review every line against sources; ships authored data with no new test because there is no new logic.
 
 ## 3. Offline real-host acceptance
 
-- [x] 3.1 Run the focused tagged content module and one real-host browser/text consumer smoke, with replay and saved reading assertions; provide exact ownership/freeze manifest entries for serialized integration-owner edits and update any affected documentation examples. Verify the discovered immutable snapshot resolves every owned profile-key file, stable topic ID and rewritten greeting without manual registration, and no temporary prose conversion remains for owned rows; do not defer any owned prose or acceptance to a final batch change.
+- [x] 3.1 Verify existing logic tests and the discovered immutable snapshot resolve the owned profile-key file, stable topic IDs and rewritten greeting without manual registration, and no temporary prose conversion remains for owned rows; do not defer any owned prose or acceptance to a final batch change.

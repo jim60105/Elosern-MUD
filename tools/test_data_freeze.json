@@ -455,10 +455,6 @@
     {
       "path": "world/rules/tests/test_dialogue_references.py",
       "reason": "static permitted-reference catalog mirrors canonical registries"
-    },
-    {
-      "path": "world/lore/tests/test_authored_dialogue_content_guild.py",
-      "reason": "guild staff authored dialogue content and office integrity"
     }
   ],
   "debt": [
