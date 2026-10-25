@@ -263,12 +263,24 @@ export default {
       return sceneBlockCache.blocks;
     }
 
-    // The display a scripted pick froze while it awaits its reply.
+    // Scene bookkeeping: the clear group on screen, whether a scene line is
+    // on screen, and the narrative response the scene covered (settled, not
+    // re-typed, when the scene retires).
+    let shownGroup = null;
+    let shownScene = false;
+    let sceneCoveredKey = null;
+
+    // The display a pick froze while it awaits its reply. While held, the
+    // transcript arriving for the reply is not counted as read; when the
+    // hold releases onto a (new) scene, that transcript is the scene's own.
     const heldDisplay = shallowRef(null);
     watch(
       () => props.sceneHold,
-      (hold) => {
+      (hold, before) => {
         heldDisplay.value = hold ? (props.scene ? null : narrativeDisplay.value) : null;
+        if (!hold && before && props.scene && shownScene) {
+          sceneCoveredKey = narrativeDisplay.value.key;
+        }
       },
       { flush: "sync", immediate: true },
     );
@@ -380,12 +392,6 @@ export default {
     // the mount pass; `undefined` when no such pass ran.
     let provisionalKey;
     let generation = 0;
-    // Scene bookkeeping: the clear group on screen, whether a scene line is
-    // on screen, and the narrative response the scene covered (settled, not
-    // re-typed, when the scene retires).
-    let shownGroup = null;
-    let shownScene = false;
-    let sceneCoveredKey = null;
 
     function fragmentText(fragment) {
       let text = "";
@@ -937,7 +943,7 @@ export default {
     watch(
       () => narrativeDisplay.value.key,
       (key) => {
-        if (shownScene && props.scene) {
+        if (shownScene && props.scene && !props.sceneHold) {
           sceneCoveredKey = key;
         }
       },
@@ -1687,6 +1693,10 @@ export default {
   color: var(--paper-500);
   font-family: var(--f-sans);
   font-size: max(var(--text-xs), 0.46em);
+  /* The sans suffix sits inside the name's line box, so a host plate is
+     exactly as tall as the acting body's plate and the narration spacer:
+     the page below never re-measures between speakers. */
+  line-height: 1;
   letter-spacing: 0.12em;
 }
 </style>

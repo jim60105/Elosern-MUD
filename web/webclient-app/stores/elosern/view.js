@@ -462,6 +462,10 @@ export function applyView(ctx) {
 
       dispatch: {
         inFlight: ctx.inFlight ? { requestId: ctx.inFlight.requestId, presentationRevision: ctx.inFlight.presentationRevision } : null,
+        // The in-flight action's id, so the authored-scene player can hold
+        // the message window while a dialogue pick awaits its reply
+        // (authored-dialogue-playback).
+        inFlightActionId: ctx.inFlight ? ctx.inFlight.actionId ?? null : null,
         uncertain: ctx.uncertain,
         submittedRequestId: ctx.lastSubmittedRequestId,
         // True while a combat round plays by itself: the command panel's

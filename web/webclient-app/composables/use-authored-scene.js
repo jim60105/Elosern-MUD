@@ -185,7 +185,15 @@ export function useAuthoredScene(source) {
       kind: shown.kind,
     };
     for (const handler of [...finishedHandlers]) {
-      handler(detail);
+      try {
+        handler(detail);
+      } catch (error) {
+        // One failing listener never starves the others or the reader's
+        // key handler; the error still surfaces, outside this activation.
+        queueMicrotask(() => {
+          throw error;
+        });
+      }
     }
     return true;
   }

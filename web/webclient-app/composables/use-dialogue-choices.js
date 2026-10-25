@@ -45,12 +45,17 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
   }
 
   // A scripted topic pick awaiting its reply holds the window, so its
-  // transcript never types before the scene delivery commits.
-  const sceneHold = computed(
-    () =>
-      store.view.mode === "dialogue" &&
-      store.view.dispatch.inFlight?.actionId === "explore.talk_scripted",
-  );
+  // transcript never types before the scene delivery commits; so does a
+  // freeform line sent over a scene, so its reply is read as new text when
+  // the reply's commit retires the scene. The dispatch lock releases in the
+  // same commit that carries the reply's panel.
+  const sceneHold = computed(() => {
+    if (store.view.mode !== "dialogue") {
+      return false;
+    }
+    const actionId = store.view.dispatch.inFlightActionId;
+    return actionId === "explore.talk_scripted" || (actionId === "explore.talk_freeform" && scene.active.value);
+  });
 
   // The stage speaker: "actor" | "host" | null (narration), or null outside
   // an available conversation. A native freeform line in flight lights the

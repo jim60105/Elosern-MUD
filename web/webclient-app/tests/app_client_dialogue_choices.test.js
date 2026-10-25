@@ -391,6 +391,55 @@ describe("the dialogue choice list over the stage", () => {
       expect(typing()).toBe("false");
     });
 
+    it("holds the window while a pick awaits its scene, and types a rejection once it is handled", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue();
+      await press();
+      list().element.focus();
+      list().element.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true, cancelable: true }));
+      const requestId = sender.sent.actions[0].request_id;
+      await settle();
+      const held = pageText();
+      // An echo reaches the log while the pick is out: the window holds.
+      store.appendText("in", "talk 店長 最近有什麼消息？");
+      await settle();
+      expect(pageText()).toBe(held);
+      // The pick is refused (no scene, no transcript): the lock releases and
+      // the refusal reads as new text.
+      store.receive(
+        generation,
+        "ui_action_result",
+        [fx.actionResult({ request_id: requestId, outcome: "rejected", code: "stale_context", message: "對話情境已過期。", presentation_revision: revision - 1 })],
+        {},
+      );
+      store.appendText("err", "對話情境已過期。");
+      await settle();
+      expect(store.view.dispatch.inFlight).toBe(null);
+      expect(pageText()).toBe("對話情境已過期。");
+    });
+
+    it("types a freeform reply whose lines arrive before the commit that retires the scene", async () => {
+      store.setTextSpeed?.("normal");
+      await openDialogue(scenePanel([speech("actor", "嗯？")]));
+      page().focus();
+      await press(); // complete
+      await press(); // finish
+      expect(list().exists()).toBe(true);
+      const requestId = store.dispatchAction("explore.talk_freeform", { npc_id: 7, speech: "你好。" }, null);
+      expect(requestId).not.toBe(null);
+      await settle();
+      store.appendText("in", "say 你好。");
+      store.appendText("out", "店長說：你好啊，旅人。");
+      await settle();
+      expect(pageText()).toBe("嗯？");
+      store.receive(generation, "ui_action_result", [fx.actionResult({ request_id: requestId, presentation_revision: revision })], {});
+      commit("dialogue", dialoguePanel({ line: "你好啊，旅人。" }));
+      await settle();
+      expect(win().attributes("data-scene")).toBeUndefined();
+      expect(pageText()).toBe("店長說：你好啊，旅人。");
+      expect(typing()).toBe("true");
+    });
+
     it("does not take focus from an open drawer when the finished scene returns the choices", async () => {
       store.setTextSpeed?.("instant");
       await openDialogue(scenePanel([speech("actor", "嗯？")]));
