@@ -579,6 +579,76 @@ topics:
             )
             self.assertEqual(list(snapshot.keys()), ["active_diag"])
 
+    def test_distinct_service_alias_and_profile_key_distinction(self) -> None:
+        """Binding with distinct dialogue alias (e.g. service key) maps to profile key file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            # Profile is fixture_master, bound to dialogue_key fixture_staff
+            (root / "fixture_master.yaml").write_text(
+                _valid_dialogue_yaml("fixture_staff"), encoding="utf-8"
+            )
+
+            snapshot = load_dialogue_snapshot(
+                root,
+                profiles=frozenset(["fixture_master"]),
+                bindings={"fixture_staff": "fixture_master"},
+                references=self.references,
+            )
+            self.assertIn("fixture_staff", snapshot)
+            self.assertNotIn("fixture_master", snapshot)
+            self.assertEqual(snapshot["fixture_staff"].topics[0].topic_id, "fixture_staff.topic_01")
+
+    def test_unknown_condition_reference_rejects(self) -> None:
+        """A dialogue condition referencing an unknown key against DialogueReferences rejects."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            # File with a condition referencing unknown race
+            content = """schema_version: 1
+greeting: "Greetings"
+topics:
+  - topic_id: "ref_diag.topic_01"
+    keyword: "secret"
+    label: "Secret Talk"
+    requires:
+      kind: "race_is"
+      race_key: "unknown_race"
+    fallback:
+      scene_id: "secret_scene"
+      revision: "rev1"
+      lines:
+        - kind: "speech"
+          speaker: "actor"
+          text: "Tell me secrets."
+        - kind: "speech"
+          speaker: "host"
+          text: "Only to elves."
+"""
+            (root / "ref_host.yaml").write_text(content, encoding="utf-8")
+            with self.assertRaises(DialogueSourceError) as ctx:
+                load_dialogue_snapshot(
+                    root,
+                    profiles=frozenset(["ref_host"]),
+                    bindings={"ref_diag": "ref_host"},
+                    references=DialogueReferences.empty(),
+                )
+            self.assertIn("ref_host.yaml", str(ctx.exception))
+            self.assertIn("unknown_race", str(ctx.exception))
+
+    def test_new_valid_registered_profile_discovered_with_no_file_index_edit(self) -> None:
+        """Adding a new file for a new registered profile & binding succeeds dynamically."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "new_npc.yaml").write_text(
+                _valid_dialogue_yaml("new_diag"), encoding="utf-8"
+            )
+            snapshot = load_dialogue_snapshot(
+                root,
+                profiles=frozenset(["new_npc"]),
+                bindings={"new_diag": "new_npc"},
+                references=self.references,
+            )
+            self.assertIn("new_diag", snapshot)
+
     def test_yaml_and_json_primitives_validation_parity(self) -> None:
         """Equivalent primitives from YAML and direct JSON-dict produce identical AuthoredDialogue."""
         diag_key = "parity_diag"

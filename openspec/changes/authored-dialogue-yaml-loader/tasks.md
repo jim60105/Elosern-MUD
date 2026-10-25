@@ -8,8 +8,8 @@ All tasks are future implementation, with Shared contract v2 fixed beforehand. T
 
 ## 2. Common validation and atomic snapshot
 
-- [ ] 2.1 Derive existing canonical profile/dialogue binding, parse through the common codec/reference catalog and freeze the whole candidate before returning one read-only snapshot. Test guild_staff/profile-key distinction, invalid-neighbor all-or-nothing behavior, duplicate bindings, unknown profile/reference and attempted nested mutation; document failure ownership and generated DB exclusion.
+- [x] 2.1 Derive existing canonical profile/dialogue binding, parse through the common codec/reference catalog and freeze the whole candidate before returning one read-only snapshot. Test guild_staff/profile-key distinction, invalid-neighbor all-or-nothing behavior, duplicate bindings, unknown profile/reference and attempted nested mutation; document failure ownership and generated DB exclusion.
 
 ## 3. Discoverability and handoff acceptance
 
-- [ ] 3.1 Prove a new valid registered-profile file appears with no registration edit, equivalent YAML/JSON primitives share validation, and test-only reload does not introduce production hot reload. Register test ownership and run the focused commands in design.md plus contract_gate; no prose migration or runtime changes in this slice.
+- [x] 3.1 Prove a new valid registered-profile file appears with no registration edit, equivalent YAML/JSON primitives share validation, and test-only reload does not introduce production hot reload. Register test ownership and run the focused commands in design.md plus contract_gate; no prose migration or runtime changes in this slice.
