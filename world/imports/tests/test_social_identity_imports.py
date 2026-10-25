@@ -1,4 +1,4 @@
-"""Tests for import schema, validation, loader, and profile social identity producers."""
+"""Data-contract test: import schema, validation, loader, and profile social identity producers."""
 
 import json
 import tempfile

@@ -133,3 +133,24 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
         npc.attributes.has.return_value = False
         # Reading social identity must be empty despite noble persona/title/elf race
         self.assertEqual(read_social_identities(npc), frozenset())
+
+    def test_guild_registration_union_and_rollback(self):
+        """Guild registration adds adventurer to existing identities, rolls back on error."""
+        from world.rules.guild import _registration_snapshot, _restore_registration
+        actor = MagicMock()
+        stored = {"social_identities": ("noble",)}
+        actor.attributes.has.side_effect = lambda k, **kw: k in stored
+        actor.attributes.get.side_effect = lambda k, **kw: stored.get(k)
+        actor.attributes.add.side_effect = lambda k, v, **kw: stored.update({k: v})
+        actor.db = SimpleNamespace(social_identities=("noble",))
+        staff = MagicMock()
+
+        snapshot = _registration_snapshot(actor, staff)
+        # Perform union
+        set_social_identities(actor, read_social_identities(actor) | {"adventurer"})
+        self.assertEqual(read_social_identities(actor), frozenset({"noble", "adventurer"}))
+
+        # Restore rollback
+        _restore_registration(actor, staff, snapshot)
+        actor.attributes.get.side_effect = lambda k, **kw: stored.get(k)
+        self.assertEqual(read_social_identities(actor), frozenset({"noble"}))

@@ -144,6 +144,7 @@ def _registration_snapshot(actor: Any, staff: Any) -> dict[str, Any]:
         "title_collection": attribute_snapshot(actor, "title_collection"),
         "title_equipped": attribute_snapshot(actor, "title_equipped"),
         "staff_relations": attribute_snapshot(staff, "relations_data"),
+        "social_identities": attribute_snapshot(actor, "social_identities"),
     }
 
 
@@ -157,6 +158,7 @@ def _restore_registration(actor: Any, staff: Any, snapshot: dict[str, Any]) -> N
     )
     restore_attribute_best_effort(actor, "title_equipped", snapshot["title_equipped"])
     restore_attribute_best_effort(staff, "relations_data", snapshot["staff_relations"])
+    restore_attribute_best_effort(actor, "social_identities", snapshot["social_identities"])
     try:
         actor.attributes.reset_cache()
     except Exception:
@@ -239,6 +241,9 @@ def register_adventurer(
                 },
             }
             actor.guild_rank = "F"
+            from world.rules.social_identity import read_social_identities, set_social_identities
+            set_social_identities(actor, read_social_identities(actor) | {"adventurer"})
+
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
             apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)

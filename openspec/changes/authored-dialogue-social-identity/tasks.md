@@ -14,5 +14,5 @@ Shared contract v2 uses this reader for both sources. Test empty/typed identity 
 
 ## 3. Player and guild construction integration
 
-- [ ] 3.1 Thread explicit preset tags and empty custom baseline through character creation snapshots, and adventurer union through existing successful guild registration atomic. Add rollback tests, register tests and update traceability/manifests. Verify focused import/creation/social tests and contract_gate.
+- [x] 3.1 Thread explicit preset tags and empty custom baseline through character creation snapshots, and adventurer union through existing successful guild registration atomic. Add rollback tests, register tests and update traceability/manifests. Verify focused import/creation/social tests and contract_gate.
 
