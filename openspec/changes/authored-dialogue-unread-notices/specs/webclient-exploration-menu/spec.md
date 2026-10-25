@@ -67,3 +67,15 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 #### Scenario: The session line comes from the greeting or fallback
 - **WHEN** a successful `explore.talk_open` resolves its session line
 - **THEN** it takes the session line from the host's resolved offline greeting, else one fixed server-authored fallback line naming the host, delivers the line, and records the session
+
+#### Scenario: A possessed actor cannot open a conversation
+- **WHEN** a possessed actor has invalid mirrors, membership or authenticated control
+- **THEN** opening rejects before any dialogue or narrative state change
+
+#### Scenario: Opening a conversation touches nothing but the session
+- **WHEN** a native generated/freeform-only host without authored topics opens with all model profiles disabled
+- **THEN** native opening writes only its session and changes no gameplay or authored-reading observation state
+
+#### Scenario: talk_open touches no state beyond the session
+- **WHEN** a native generated/freeform-only conversation opens without an authored topic registry
+- **THEN** no authored observation is written, no model or action-options generation runs, and only the native session changes; authored hosts use the explicit narrative-observation scenario
