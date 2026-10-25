@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from world.lore.anchors import Anchor, AnchorKind
-from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic
+from world.lore.dialogue.conditions import Exposure, RaceIs
+from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic, SceneVariant
 from world.lore.scenes import Narration, Scene, Speech
 from world.lore.anchor_placement import AnchorPlacement
 from world.lore.guild import GuildBranch, GuildRank
@@ -350,6 +351,79 @@ SYNTH_DIALOGUE: MappingProxyType = MappingProxyType(
                             Speech(speaker="host", text="「你可得聽到最後。」"),
                             Speech(speaker="host", text='「那年冬天，苔徑上的雪積得比門檻還高，驛站裡只剩一盞油燈。旅人們圍著爐火，一個接一個說起自己走過的路：有人說北岸的霧會吞掉腳印，有人說雲杉林深處有座無人看守的石橋，橋下的水從不結冰。我在櫃檯後聽了整整一夜，把每一段路都記在帳本的背面，直到天亮時才發現，那些故事拼起來，正好是一張從這裡通往山口的地圖。後來帳本被雨水泡爛了，地圖也只剩我記得的那一半。春天來的時候，有個年輕的獵人在門口停下，問我山口的路怎麼走。我把記得的那一半說給他聽，他點點頭，背起弓就往苔徑上去了。那之後我每年冬天都會在爐火邊等，想聽他回來說另一半的路，可是雪化了又積，積了又化，門口的腳印換了一批又一批，就是沒有他的。所以呀，如果你哪天走到山口，記得替我看看那座石橋還在不在。」'),
                             Narration(text="爐火劈啪一響，說書人的影子在牆上晃了晃。"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # The authored-dialogue physical-conditions fixture: two complete
+        # topics whose variants are keyed on the acting body's race and its
+        # canonical effective exposure. The possessed browser journey opts in
+        # to this table, wears the kit's exposure-bias accessory and asserts a
+        # qualified variant rather than the fallback; every other journey
+        # keeps its own table and prose.
+        "t_synth_conditioned": AuthoredDialogue(
+            greeting="簾後的合成商人壓低聲音：「問吧，我只說一遍。」",
+            topics=(
+                AuthoredTopic(
+                    topic_id="t_synth_conditioned.lineage",
+                    keyword="簾後",
+                    label="簾後",
+                    fallback=Scene(
+                        scene_id="t_synth_conditioned.lineage_scene",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="簾後是誰？"),
+                            Speech(speaker="host", text="「簾後只是個做買賣的人。」"),
+                        ),
+                    ),
+                    variants=(
+                        SceneVariant(
+                            variant_id="duskborn_lineage",
+                            priority=10,
+                            when=RaceIs(race_key="t_duskmari"),
+                            scene=Scene(
+                                scene_id="t_synth_conditioned.lineage_variant_scene",
+                                revision="r1",
+                                lines=(
+                                    Speech(speaker="actor", text="簾後是誰？"),
+                                    Speech(
+                                        speaker="host",
+                                        text="「暮民的眼睛瞞不過我，坐下說話。」",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                AuthoredTopic(
+                    topic_id="t_synth_conditioned.attire",
+                    keyword="紗影",
+                    label="紗影",
+                    fallback=Scene(
+                        scene_id="t_synth_conditioned.attire_scene",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="這身裝束如何？"),
+                            Speech(speaker="host", text="「行人打扮，沒什麼好說的。」"),
+                        ),
+                    ),
+                    variants=(
+                        SceneVariant(
+                            variant_id="veiled_attire",
+                            priority=10,
+                            when=Exposure(minimum=2),
+                            scene=Scene(
+                                scene_id="t_synth_conditioned.attire_variant_scene",
+                                revision="r1",
+                                lines=(
+                                    Speech(speaker="actor", text="這身裝束如何？"),
+                                    Speech(
+                                        speaker="host",
+                                        text="「這層薄紗…你倒是很敢穿。」",
+                                    ),
+                                ),
+                            ),
                         ),
                     ),
                 ),

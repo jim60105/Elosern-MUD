@@ -129,6 +129,55 @@ SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"
 #: multi-line scene (actor, two host lines, a paged host line, narration).
 SYNTH_SCENE_DIALOGUE_TABLE_KEY = "t_synth_storyteller"
 
+#: Kit dialogue table of the possessed authored-dialogue physical-conditions
+#: journey: one race-qualified topic and one effective-exposure topic, each
+#: with a fallback scene the journey must never see when the variant qualifies.
+SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY = "t_synth_conditioned"
+
+#: Kit accessory the same journey wears: its borrowed shipped modifier member
+#: carries a positive exposure bias, so the canonical effective-exposure
+#: overlay crosses the authored variant bound only while it is worn.
+SYNTH_EXPOSURE_ITEM_KEY = "t_veil_charm"
+
+
+def _synth_conditioned_topic(topic_suffix: str):
+    from world.tests.synthetic_data import SYNTH_DIALOGUE
+
+    dialogue = SYNTH_DIALOGUE[SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY]
+    return next(
+        topic
+        for topic in dialogue.topics
+        if topic.topic_id.endswith("." + topic_suffix)
+    )
+
+
+def synth_conditioned_variant_host_line(topic_suffix: str) -> str:
+    """The authored host line of one conditioned fixture variant."""
+    variant = _synth_conditioned_topic(topic_suffix).variants[0]
+    return next(
+        line.text
+        for line in variant.scene.lines
+        if getattr(line, "speaker", None) == "host"
+    )
+
+
+def synth_conditioned_fallback_host_line(topic_suffix: str) -> str:
+    """The authored host line of one conditioned fixture topic's fallback."""
+    fallback = _synth_conditioned_topic(topic_suffix).fallback
+    return next(
+        line.text
+        for line in fallback.lines
+        if getattr(line, "speaker", None) == "host"
+    )
+
+
+def synth_exposure_baseline_label() -> str:
+    """The stored exposure label exactly one ordinal below the authored bound."""
+    from world.lore.sexual_vocab import EXPOSURE_LEVELS
+
+    condition = _synth_conditioned_topic("attire").variants[0].when
+    return EXPOSURE_LEVELS[condition.minimum - 1]
+
 #: The kit quest the guild-board modes offer/accept.
 SYNTH_GUILD_OFFER_QUEST_KEY = "t_ember_cull"
 

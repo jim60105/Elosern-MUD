@@ -109,7 +109,9 @@
         "world.rules.tests.test_skill_hit_dependencies",
         "world.rules.tests.test_saintess_vessel_trickle",
         "world.rules.tests.test_social_identity",
-        "world.rules.tests.test_confirmed_surrender"
+        "world.rules.tests.test_confirmed_surrender",
+        "world.rules.tests.test_dialogue_physical_conditions",
+        "world.rules.tests.test_dialogue_references"
       ]
     },
     {

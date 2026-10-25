@@ -1032,11 +1032,34 @@ def select_authored_topic(
     if matched_topic is None:
         raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
 
-    if matched_topic.requires is not None or matched_topic.predecessors:
+    # Predecessor-gated (pure-chain) topics still fail closed: reading
+    # persistence does not exist yet, so a predecessor gate genuinely cannot
+    # resolve and never delivers a protected body here.
+    if matched_topic.predecessors:
         raise TopicLockedError("topic_locked", "此話題目前無法選取。")
 
+    from world.rules.dialogue_conditions import (
+        evaluate_condition,
+        select_scene_variant,
+    )
+
+    qualified = matched_topic.requires is None or evaluate_condition(
+        matched_topic.requires, context
+    )
+    if qualified:
+        kind = "formal"
+        scene = select_scene_variant(matched_topic, context)
+    elif matched_topic.unavailable == "locked" and matched_topic.refusal is not None:
+        # A visibly locked topic stays selectable and plays its authored
+        # refusal; it grants no effect and never exposes the formal body.
+        kind = "refusal"
+        scene = matched_topic.refusal
+    else:
+        # A hidden topic behaves exactly like an unknown one: no label, hint
+        # or body leaks through an explicit ID.
+        raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
+
     owner = context.owner
-    scene = matched_topic.fallback
     from web.webclient.presentation.protocol import json_byte_size
 
     # 1. Scene canonical UTF-8 JSON bytes check
@@ -1101,7 +1124,7 @@ def select_authored_topic(
         scene_id=scene.scene_id,
         scene_revision=scene.revision,
         phase_revision=context.phase_revision,
-        kind="formal",
+        kind=kind,
         lines=scene.lines,
         updated_tick=_session_updated_tick(),
     )
@@ -1168,7 +1191,7 @@ def select_authored_topic(
                 and getattr(context.source_identity, "dialogue_key", "") == GUILD_STAFF_DIALOGUE_KEY
                 and (matched_topic.keyword == GUILD_STAFF_TURNIN_KEYWORD or matched_topic.topic_id.endswith(".topic_04"))
             )
-            if not (is_guild_staff and is_turnin):
+            if kind == "formal" and not (is_guild_staff and is_turnin):
                 outcome = apply_affinity_change(host, owner, AffinitySource.TALK, 1)
                 if outcome.budget_capped:
                     delivery = replace(delivery, affinity_budget_capped=True)

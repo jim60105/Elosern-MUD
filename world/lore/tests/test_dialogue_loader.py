@@ -689,6 +689,114 @@ topics:
             self.assertIn("ref_host.yaml", str(ctx.exception))
             self.assertIn("unknown_race", str(ctx.exception))
 
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    def test_catalog_backed_reference_publishes_and_unknown_key_names_its_identity(self):
+        """A real catalog key publishes; an unlisted one rejects naming profile and dialog."""
+        references = DialogueReferences.empty().child(
+            "race", {"t_known_race": "合成種族"}
+        )
+        topic = """topics:
+  - topic_id: "{key}.topic_01"
+    keyword: "who"
+    label: "Who"
+    requires:
+      kind: "race_is"
+      race_key: "{race}"
+    fallback:
+      scene_id: "who_scene"
+      revision: "rev1"
+      lines:
+        - kind: "speech"
+          speaker: "actor"
+          text: "Who goes there?"
+        - kind: "speech"
+          speaker: "host"
+          text: "A traveler."
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "catalog_host.yaml").write_text(
+                'schema_version: 1\ngreeting: "Hello"\n'
+                + topic.format(key="catalog_diag", race="t_known_race"),
+                encoding="utf-8",
+            )
+            snapshot = load_dialogue_snapshot(
+                root,
+                profiles=frozenset(["catalog_host"]),
+                bindings={"catalog_diag": "catalog_host"},
+                references=references,
+            )
+            self.assertEqual(
+                snapshot["catalog_diag"].topics[0].requires.race_key, "t_known_race"
+            )
+
+            (root / "catalog_host.yaml").write_text(
+                'schema_version: 1\ngreeting: "Hello"\n'
+                + topic.format(key="catalog_diag", race="t_unlisted_race"),
+                encoding="utf-8",
+            )
+            with self.assertRaises(DialogueSourceError) as ctx:
+                load_dialogue_snapshot(
+                    root,
+                    profiles=frozenset(["catalog_host"]),
+                    bindings={"catalog_diag": "catalog_host"},
+                    references=references,
+                )
+            self.assertEqual(ctx.exception.profile_key, "catalog_host")
+            self.assertEqual(ctx.exception.dialogue_key, "catalog_diag")
+            self.assertIn("t_unlisted_race", str(ctx.exception))
+
+    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    def test_out_of_range_exposure_bound_rejects_before_publication(self):
+        """An exposure ordinal outside the canonical vocabulary rejects the candidate."""
+        from world.lore.sexual_vocab import EXPOSURE_LEVELS
+
+        content = f"""schema_version: 1
+greeting: "Hello"
+topics:
+  - topic_id: "bound_diag.topic_01"
+    keyword: "dress"
+    label: "Dress"
+    fallback:
+      scene_id: "dress_scene"
+      revision: "rev1"
+      lines:
+        - kind: "speech"
+          speaker: "actor"
+          text: "How does this look?"
+        - kind: "speech"
+          speaker: "host"
+          text: "Boldly."
+    variants:
+      - variant_id: "out_of_range"
+        priority: 10
+        when:
+          kind: "exposure"
+          minimum: {len(EXPOSURE_LEVELS)}
+        scene:
+          scene_id: "dress_variant_scene"
+          revision: "rev1"
+          lines:
+            - kind: "speech"
+              speaker: "actor"
+              text: "Well?"
+            - kind: "speech"
+              speaker: "host"
+              text: "Very."
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "bound_host.yaml").write_text(content, encoding="utf-8")
+            with self.assertRaises(DialogueSourceError) as ctx:
+                load_dialogue_snapshot(
+                    root,
+                    profiles=frozenset(["bound_host"]),
+                    bindings={"bound_diag": "bound_host"},
+                    references=DialogueReferences.empty(),
+                )
+            self.assertEqual(ctx.exception.profile_key, "bound_host")
+            self.assertIn("EXPOSURE_LEVELS", str(ctx.exception))
+
     @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
     def test_new_valid_registered_profile_discovered_with_no_file_index_edit(self) -> None:
         """Adding a new file for a new registered profile & binding succeeds dynamically."""

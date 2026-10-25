@@ -127,6 +127,8 @@ from web.browser_support.browser_fixtures_data.fixture_values import (
     SYNTH_DIALOGUE_HOST_KEY,
     SYNTH_DIALOGUE_TABLE_KEY,
     SYNTH_SCENE_DIALOGUE_TABLE_KEY,
+    SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY,
+    SYNTH_EXPOSURE_ITEM_KEY,
     SYNTH_EMPTY_GROUND_KEY,
     SYNTH_GUILD_OFFER_QUEST_KEY,
     SYNTH_HOSTILE_MONSTER_KEY,
@@ -146,6 +148,9 @@ from web.browser_support.browser_fixtures_data.fixture_values import (
     guild_offer_quest_key,
     guild_offer_reward_copper,
     hud_combat_fixture_values,
+    synth_conditioned_fallback_host_line,
+    synth_conditioned_variant_host_line,
+    synth_exposure_baseline_label,
 )
 
 from web.browser_support.browser_fixtures_data.store_bag import (

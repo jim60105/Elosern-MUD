@@ -21,7 +21,10 @@ from world.rules.item_effects import (
     ItemTargetScope,
 )
 
-from world.tests.synthetic_data.vocab import _first_equipment_modifier_key
+from world.tests.synthetic_data.vocab import (
+    _exposure_bias_modifier_key,
+    _first_equipment_modifier_key,
+)
 
 # ---------------------------------------------------------------------------
 # Catalogs (design D1): a few representative entries each, real dataclasses.
@@ -132,6 +135,25 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             rarity=ItemRarity.COMMON,
             summary_zh="外殼如冷燼的合成素材果實。",
         ),
+    ),
+    # The authored-dialogue physical-conditions fixture gear: one accessory
+    # whose borrowed modifier member carries a positive shipped exposure bias,
+    # so wearing it shifts the canonical effective-exposure overlay. Nothing
+    # else in the kit binds this row; the synthetic key itself stays unbound
+    # in the shipped rulebook.
+    "t_veil_charm": ItemDefinition(
+        key="t_veil_charm",
+        display_name_zh="薄霧紗飾",
+        price_table_key="t_ironbite_steel",
+        sellable=False,
+        presentation=ItemPresentation(
+            kind=ItemKind.ACCESSORY,
+            icon_key=ItemIconKey.ACCESSORY,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="繫在腰際、透著薄霧光澤的合成飾物。",
+        ),
+        equipment_slot=EquipmentSlot.ACCESSORY,
+        modifier_key=_exposure_bias_modifier_key(),
     ),
 }
 

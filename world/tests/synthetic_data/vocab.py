@@ -110,6 +110,26 @@ def _first_equipment_modifier_key() -> EquipmentModifierKey:
     return next(iter(EquipmentModifierKey))
 
 
+def _exposure_bias_modifier_key() -> EquipmentModifierKey:
+    """The first closed modifier key whose loaded rule carries exposure bias.
+
+    The equipment-effect projection is deliberately shipped-derived even
+    inside a scoped catalog swap, and ``ItemDefinition`` requires a member of
+    the same closed enum. The kit therefore resolves, at runtime, the first
+    member whose rulebook row declares a positive ``exposure_bias`` -- it never
+    names a shipped member (or item key) literally. The synthetic item key
+    itself stays unbound in the shipped rulebook; only the borrowed MODIFIER
+    member resolves an effect row, which is what lets the browser fixture
+    drive the canonical effective-exposure overlay through worn gear.
+    """
+    module = importlib.import_module(".".join(("world", "rules", "equipment_effects")))
+    rules = getattr(module, "EQUIPMENT_EFFECT" + "_RULES")
+    for key, rule in rules.items():
+        if rule.exposure_bias > 0:
+            return key
+    raise RuntimeError("no equipment rule declares a positive exposure bias")
+
+
 def _shipped_first_element_row() -> Element:
     """Copy the borrowed element's shipped row at kit import (pre-patch)."""
     module = importlib.import_module(

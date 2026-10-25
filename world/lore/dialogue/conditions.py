@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
+from world.lore.sexual_vocab import EXPOSURE_LEVELS
+
 REFERENCE_FAMILIES = (
     "profile",
     "preset",
@@ -478,6 +480,15 @@ def validate_condition(
         return
 
     if isinstance(condition, Exposure):
+        for bound_name, bound in (
+            ("minimum", condition.minimum),
+            ("maximum", condition.maximum),
+        ):
+            if bound is not None and not 0 <= bound < len(EXPOSURE_LEVELS):
+                raise ValueError(
+                    f"Exposure {bound_name} {bound} is outside EXPOSURE_LEVELS "
+                    f"(0..{len(EXPOSURE_LEVELS) - 1})"
+                )
         return
 
     raise TypeError(f"Unknown condition node: {condition!r}")
