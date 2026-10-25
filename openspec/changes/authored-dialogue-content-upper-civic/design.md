@@ -12,7 +12,21 @@ Observed domain file world/lore/dialogue/altoria_upper.py contains these existin
 
 ## Decisions
 
-Use Shared contract v1 in ../authored-dialogue-contracts/design.md, with condition/disclosure/reading/notice behavior supplied by prerequisites. This is an independently runnable content replacement for `altoria_noble_watch`, `altoria_drill_yard`, `altoria_academy`, exactly the existing registry ownership listed below. No production runtime changes except correcting this slice's explicit declaration metadata.
+Use Shared contract v2 in ../authored-dialogue-contracts/design.md, with condition/disclosure/reading/notice behavior supplied by prerequisites. This is an independently runnable content replacement for `altoria_noble_watch`, `altoria_drill_yard`, `altoria_academy`, exactly the existing registry ownership listed below. No production runtime or profile-source changes; author declarations only in the exclusively owned YAML files.
+
+### Per-NPC YAML ownership and discovery
+
+The table below resolves existing dialogue rows through canonical place `host_profile_key` bindings to existing `NpcProfile.key` values. The filename derives the owner; neither display names nor database IDs identify files. Existing topic IDs retain their dialogue-key prefix, including `guild_staff`. Each content slice edits only its own YAML plus its unique test/review files. Profiles, place definitions and old region modules are read-only inputs here; the runtime prerequisite owns their format cutover and deletion of obsolete dialogue modules.
+
+| Existing dialogue row / topic prefix | Existing profile key | Exclusive content file |
+| --- | --- | --- |
+| `altoria_noble_watch` | `altoria_noble_watch_captain` | `world/lore/dialogue/content/altoria_noble_watch_captain.yaml` |
+| `altoria_drill_yard` | `altoria_drill_instructor` | `world/lore/dialogue/content/altoria_drill_instructor.yaml` |
+| `altoria_academy` | `altoria_academy_dean` | `world/lore/dialogue/content/altoria_academy_dean.yaml` |
+
+Use Shared contract v2 without a local schema fork. Each YAML root is exactly `schema_version: 1`, `greeting` (string or null), and `topics` (list). Required topic fields are `topic_id`, `keyword`, `label`, `fallback`; optional fields are `variants`, `requires`, `unavailable`, `refusal`, `predecessors`, and `disclosure`, with shared defaults. A scene has `scene_id`, `revision`, `lines`; a speech line has `kind: speech`, `speaker: actor|host`, `text`, while narration has `kind: narration`, `text`. A variant has `variant_id`, `priority`, `when`, `scene`. Conditions use the shared tagged snake_case union and authorized canonical references. No YAML owner field, effect field or executable instruction is permitted. Put the rewritten opening in `greeting`; runtime precedence consumes it without editing profile voice data.
+
+The `authored-dialogue-yaml-loader` prerequisite discovers all flat-directory YAML files in sorted order with safe parsing, duplicate mapping-key/unsafe-tag rejection, filename-profile binding checks, and common immutable scene/topic validation. It rejects unknown profile IDs and schema/reference errors before publishing the complete immutable snapshot. Adding these files requires no manual registration and creates no hot-reload behavior. Data-contract tests exercise the discovered snapshot, including the exact owner-file binding. Generated/private package content never belongs in these static files or their global registry; its owner publishes validated immutable database packages separately.
 
 ### Mandatory authoring and review gate
 
@@ -24,7 +38,7 @@ BEFORE composing or reviewing ANY dialogue prose, both writer and reviewer MUST 
 - `altoria_drill_yard.topic_01` through `altoria_drill_yard.topic_04`: rewrite all four formal topics, all variants/refusals, and the host opening.
 - `altoria_academy.topic_01` through `altoria_academy.topic_04`: rewrite all four formal topics, all variants/refusals, and the host opening.
 
-The runtime mechanical conversion assigns these stable topic IDs once in existing order. Retain them even when rewriting labels/questions/composition. No old response sentence, label-derived runtime actor prompt, temporary old-speech wrapper or prior greeting paragraph survives as authored scene prose. Labels/keywords may stay recognizable for text discoverability; all four topic scene bodies per host are newly written natural exchanges. Every topic fallback/variant has 3..8 meaningful authored lines starting with a complete actor utterance, at least one actual host response, and no invented player purchase, allegiance, quest acceptance, identity claim or consent. Opening greeting remains a bounded greeting string through existing precedence; replace it too. Include narration in at least one scene per host and consecutive same-speaker lines in at least one scene in this slice, using explicit line kinds. No LLM rewriting or runtime interpolation from persona.
+The runtime mechanical conversion assigns these stable topic IDs once in existing order. Retain them even when rewriting labels/questions/composition. No old response sentence, label-derived runtime actor prompt, temporary old-speech wrapper or prior greeting paragraph survives as authored scene prose. Labels/keywords may stay recognizable for text discoverability; all four topic scene bodies per host are newly written natural exchanges. Every topic fallback/variant has 3..8 meaningful authored lines starting with a complete actor utterance, at least one actual host response, and no invented player purchase, allegiance, quest acceptance, identity claim or consent. Opening greeting remains a bounded string through the shared runtime precedence; replace it in this owner YAML `greeting` field, leaving profile voice definitions unchanged. Include narration in at least one scene per host and consecutive same-speaker lines in at least one scene in this slice, using explicit line kinds. No LLM rewriting or runtime interpolation from persona.
 
 ### Domain-specific acceptance
 
@@ -34,9 +48,9 @@ Use conditions only with concrete existing canonical keys reviewed at implementa
 
 ### Validation ownership
 
-Add tagged `world/lore/tests/test_authored_dialogue_content_upper_civic.py` data-contract tests naming ONLY owned host keys; register in tools/test_data_freeze.json and .github/evennia-shards.json. Keep mechanism tests synthetic. Assertions cover complete topic inventory, stable IDs, actor-first multi-line attribution, all declaration references/bounds/fallbacks, no OOC/backticks/commands/mechanic names, host-specific canonical office/assortment facts and no old speech-only conversion. Do not freeze exact prose in behavior assertions or add a duplicate mutable balance table. Editorial review must check every line and record line-specific findings; green schema tests alone cannot establish in-character quality or mandatory-source fidelity.
+Add tagged `world/lore/tests/test_authored_dialogue_content_upper_civic.py` data-contract tests naming ONLY owned host keys; supply the exact test label/tag entries to the integration owner for serialized updates to tools/test_data_freeze.json and .github/evennia-shards.json; do not edit shared manifests in the parallel content worktree. Keep mechanism tests synthetic. Assertions cover complete topic inventory, stable IDs, actor-first multi-line attribution, all declaration references/bounds/fallbacks, no OOC/backticks/commands/mechanic names, host-specific canonical office/assortment facts and no old speech-only conversion. Do not freeze exact prose in behavior assertions or add a duplicate mutable balance table. Editorial review must check every line and record line-specific findings; green schema tests alone cannot establish in-character quality or mandatory-source fidelity.
 
-Exercise one real constructed owned host through browser manual playback and the identical topic offline via CmdTalk, comparing scene identity/attribution and deterministic effect counts, not exact prose echo. Existing shared synthetic browser mechanics stay in owning engine changes; use a per-slice data-contract smoke/test so simultaneous content workers do not edit the shared browser fixture. Ensure replay gives no second effect and text emission records formal read. Update affected docs/lore review/authoring notes and any command-topic examples changed; preserve command syntax and service settlement. Full batch is complete only after every row in all five domain files has passed its owning rewrite, with no catch-all follow-up left to replace prose.
+Exercise one real constructed owned host through browser manual playback and the identical topic offline via CmdTalk, comparing scene identity/attribution and deterministic effect counts, not exact prose echo. Existing shared synthetic browser mechanics stay in owning engine changes; use a per-slice data-contract smoke/test so simultaneous content workers do not edit the shared browser fixture. Ensure replay gives no second effect and text emission records formal read. Update affected docs/lore review/authoring notes and any command-topic examples changed; preserve command syntax and service settlement. This slice completes only after every owned YAML contains all four rewritten baseline topics, all declared variants/refusals and its rewritten opening. Across the ten slices, acceptance covers all 25 hosts, 100 baseline topics and all 25 openings; no catch-all final prose replacement is deferred.
 
 ## Implementation handoff constraints
 
@@ -47,14 +61,19 @@ Boundary events use the existing world.observability facade with available owner
 
 ## Exact target files
 
-- `world/lore/dialogue/altoria_upper.py (only owned ROWS/response constants)`
-- `world/lore/npc_profiles/altoria_upper.py`
+- `world/lore/dialogue/content/altoria_noble_watch_captain.yaml` (exclusive content ownership)
+- `world/lore/dialogue/content/altoria_drill_instructor.yaml` (exclusive content ownership)
+- `world/lore/dialogue/content/altoria_academy_dean.yaml` (exclusive content ownership)
 - `world/lore/tests/test_authored_dialogue_content_upper_civic.py (new)`
 - `docs/lore/upper-civic-dialogue-review.md (new)`
 
+Canonical npc_profiles and settlement sources listed above are read-only authoring prerequisites. Shared manifests are integration-owned as described under validation ownership.
+
+This slice registers its own new test module label in `.github/evennia-shards.json` (one label added inside one existing shard's `labels` list) and its own tagged entries in `tools/test_data_freeze.json`, in the same commit as the new test module, touching no other change's entries; that is what makes `contract_gate` pass here. Where the tasks speak of handing manifest entries to the integration owner, this paragraph is authoritative: edit only your own one-entry hunks, and the integration owner serializes their merge when slices land in parallel worktrees. No other shared-manifest edit belongs to this slice.
+
 ## Risks / Trade-offs
 
-Same-domain siblings share world/lore/dialogue/altoria_upper.py and profile source modules; apply serially or coordinate disjoint host hunks. New content test/review files are exclusive. All content changes share manifest append entries and the authored-dialogue-content main spec at archive; supervisor serializes manifest integration/archive, never edits sibling-owned hosts. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
+Content slices exclusively own their per-NPC YAML files and unique test/review files; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. The integration owner serializes test-manifest entries in tools/test_data_freeze.json and .github/evennia-shards.json, runs the combined gate, and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
 
 ## Focused verification at implementation time
 
