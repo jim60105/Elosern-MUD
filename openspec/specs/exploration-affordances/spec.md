@@ -297,7 +297,7 @@ emission rules are scenario-pinned.
 #### Scenario: Talk entries track hosts, keywords, and NPCs
 - **WHEN** a present dialogue host with a resolved `ScriptedDialogue` component and a present
   `LLMNPC` are enumerated
-- **THEN** `explore.talk_scripted` is emitted once per authored keyword of the dialogue host and
+- **THEN** `explore.talk_scripted` is emitted once per disclosed permitted authored topic (hidden topics absent; locked topics expose refusal descriptors only) and
   `explore.talk_freeform` once per present `LLMNPC`
 
 #### Scenario: Party entries follow the existing binding rules
@@ -343,7 +343,7 @@ emission rules are scenario-pinned.
 
 #### Scenario: The panel serializes host talk entries as one 交談 affordance
 - **WHEN** the `exploration` panel serializes a conversable host's talk entries
-- **THEN** it renders its per-keyword `explore.talk_scripted` entries and its `explore.talk_freeform`
+- **THEN** it renders its server-qualified topic `explore.talk_scripted` descriptors and its `explore.talk_freeform`
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
   possession gates, while the `context_actions` form, suggestion eligibility, and the deterministic
   fallback keep consuming the per-keyword and free-form entries unchanged

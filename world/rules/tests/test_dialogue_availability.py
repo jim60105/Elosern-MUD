@@ -46,12 +46,18 @@ from world.lore.scenes import Scene, Speech
 from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestRecord, QuestState, to_storage
 from world.rules.dialogue import (
+    DialogueSourceUnavailableError,
     TopicNotFoundError,
     clear_dialogue_session,
     live_dialogue_session,
     select_authored_topic,
 )
 from world.rules.dialogue_conditions import condition_hint
+from world.lore.dialogue.codec import (
+    GeneratedDialogueIdentity,
+    make_generated_host_key,
+)
+from world.rules.dialogue_sources import ResolvedDialogueSource
 from world.rules.dialogue_availability import (
     TOPIC_LOCKED,
     TOPIC_OPEN,
@@ -99,6 +105,22 @@ _SENTINEL_FALLBACK = "SENTINEL-VARIED-FALLBACK"
 _SENTINEL_PRIVATE = "SENTINEL-PRIVATE-VARIANT"
 _SENTINEL_QUEST_FORMAL = "SENTINEL-QUEST-FORMAL"
 _SENTINEL_QUEST_REFUSAL = "SENTINEL-QUEST-REFUSAL"
+#: Bodies of one generated package phase. The generated provider seam is
+#: deferred, so these must never reach a payload by any path in this slice.
+_SENTINEL_GENERATED_OPEN = "SENTINEL-GENERATED-OPEN"
+_SENTINEL_GENERATED_FORMAL = "SENTINEL-GENERATED-FORMAL"
+_SENTINEL_GENERATED_REFUSAL = "SENTINEL-GENERATED-REFUSAL"
+_SENTINEL_GENERATED_PRIVATE = "SENTINEL-GENERATED-PRIVATE-PHASE"
+_SENTINEL_GENERATED_VARIANT = "SENTINEL-GENERATED-VARIANT"
+_SENTINEL_GENERATED_SUCCESSOR = "SENTINEL-GENERATED-SUCCESSOR"
+_GENERATED_SENTINELS = (
+    _SENTINEL_GENERATED_OPEN,
+    _SENTINEL_GENERATED_FORMAL,
+    _SENTINEL_GENERATED_REFUSAL,
+    _SENTINEL_GENERATED_PRIVATE,
+    _SENTINEL_GENERATED_VARIANT,
+    _SENTINEL_GENERATED_SUCCESSOR,
+)
 _ALL_SENTINELS = (
     _SENTINEL_OPEN,
     _SENTINEL_LOCKED_FORMAL,
@@ -110,6 +132,7 @@ _ALL_SENTINELS = (
     _SENTINEL_PRIVATE,
     _SENTINEL_QUEST_FORMAL,
     _SENTINEL_QUEST_REFUSAL,
+    *_GENERATED_SENTINELS,
 )
 
 CALENDAR = SimpleNamespace(
@@ -243,6 +266,60 @@ def _body_sentinels(payload) -> list[str]:
     ]
 
 
+def _generated_dialogue() -> AuthoredDialogue:
+    """One generated package phase: a locked, a hidden and an open topic."""
+    return AuthoredDialogue(
+        greeting="生成角色低聲：「別多問。」",
+        topics=(
+            AuthoredTopic(
+                topic_id="phase_1.open",
+                keyword="生成公開",
+                label="生成公開",
+                fallback=_scene("t_generated_open", _SENTINEL_GENERATED_OPEN),
+                variants=(
+                    SceneVariant(
+                        variant_id="carries_item",
+                        priority=10,
+                        when=Carries(item_key=_ITEM_KEY),
+                        scene=_scene(
+                            "t_generated_open_variant", _SENTINEL_GENERATED_VARIANT
+                        ),
+                    ),
+                ),
+            ),
+            AuthoredTopic(
+                topic_id="phase_1.locked",
+                keyword="生成鎖定",
+                label="生成鎖定",
+                fallback=_scene("t_generated_locked_formal", _SENTINEL_GENERATED_FORMAL),
+                requires=Carries(item_key=_ITEM_KEY),
+                unavailable="locked",
+                refusal=_scene(
+                    "t_generated_locked_refusal", _SENTINEL_GENERATED_REFUSAL
+                ),
+            ),
+            AuthoredTopic(
+                topic_id="phase_1.private",
+                keyword="生成私密",
+                label="生成私密",
+                fallback=_scene("t_generated_private", _SENTINEL_GENERATED_PRIVATE),
+                requires=RaceIs(race_key=_OTHER_RACE_KEY),
+                unavailable="hidden",
+            ),
+            AuthoredTopic(
+                topic_id="phase_1.successor",
+                keyword="生成接續",
+                label="生成接續",
+                fallback=_scene(
+                    "t_generated_successor", _SENTINEL_GENERATED_SUCCESSOR
+                ),
+                predecessors=("phase_1.open",),
+                disclosure="pure_chain",
+            ),
+        ),
+    )
+
+
 class DialogueAvailabilityTests(EvenniaTest):
     """Projection, selection refusal, committed-state recheck and refresh."""
 
@@ -335,6 +412,9 @@ class DialogueAvailabilityTests(EvenniaTest):
     @covers_requirement(
         "authored-dialogue-selection::text-and-browser-resolve-the-same-authored-topic"
     )
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
+    )
     def test_projection_is_the_only_disclosure_view(self):
         rows = self._rows()
         self.assertEqual(
@@ -380,6 +460,9 @@ class DialogueAvailabilityTests(EvenniaTest):
     @covers_requirement(
         "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
     )
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
+    )
     def test_hidden_and_predecessor_topics_are_absent(self):
         rows = self._rows()
         self.assertNotIn(_HIDDEN_TOPIC, rows)
@@ -392,6 +475,9 @@ class DialogueAvailabilityTests(EvenniaTest):
         self.assertIsNone(self.player.db.dialogue_session)
 
     @covers_requirement("exploration-affordances::affordance-params-are-validator-normalized")
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
+    )
     def test_affordance_and_panel_carry_descriptors_only(self):
         entries = [view.as_dict() for view in _scripted_entries(self.host, actor=self.player)]
         self.assertEqual(
@@ -432,10 +518,106 @@ class DialogueAvailabilityTests(EvenniaTest):
             _body_sentinels({"entries": entries, "choices": choices}), []
         )
 
+    @covers_requirement(
+        "authored-dialogue-availability::generated-disclosure-uses-the-same-protected-qualification"
+    )
+    def test_generated_disclosure_shares_the_protected_qualification(self):
+        generated = create_object(NPC, key="合成生成角色", location=self.room)
+        generated.components.add(
+            ScriptedDialogue.create(
+                generated, dialogue_key="scene_role:pkg_synth:elder"
+            )
+        )
+        context = availability_context(self.player, generated)
+        # The identity names exactly the currently permitted phase, so a phase
+        # change can never leave the old phase's topics addressable.
+        self.assertEqual(
+            context.source_identity,
+            GeneratedDialogueIdentity("pkg_synth", "elder", "phase_1"),
+        )
+        self.assertEqual(
+            context.host_key, make_generated_host_key("pkg_synth", "elder")
+        )
+
+        # The generated provider seam is deferred, so this slice discloses
+        # nothing for a generated host: no surface may invent a row, and no
+        # selection may read a body before qualification and delivery exist.
+        self.assertEqual(project_topics(context), ())
+        self.assertEqual(_scripted_entries(generated, actor=self.player), [])
+        self.assertEqual(
+            _scripted_keyword_descriptors(
+                generated, actor=self.player, context_id=None
+            ),
+            [],
+        )
+        with self.assertRaises(DialogueSourceUnavailableError):
+            select_authored_topic(
+                self.player,
+                generated,
+                "phase_1.locked",
+                selection_id="sel-generated",
+                expected_context_id=None,
+            )
+        self.assertIsNone(live_dialogue_session(self.player))
+
+        # Fed the permitted phase, the same projection classifies generated
+        # topics exactly like static ones: hidden and predecessor-gated topics
+        # are absent, a locked topic carries only label/lock/hint/descriptor,
+        # and an open topic carries its descriptor only.
+        source = ResolvedDialogueSource(
+            identity=context.source_identity,
+            host_key=context.host_key,
+            dialogue=_generated_dialogue(),
+            phase_revision=1,
+        )
+        with patch(
+            "world.rules.dialogue_sources.resolve_dialogue_source",
+            return_value=source,
+        ):
+            rows = {
+                row.topic_id: row
+                for row in project_topics(context, context_id="ctx-generated")
+            }
+        self.assertEqual(set(rows), {"phase_1.open", "phase_1.locked"})
+        locked = rows["phase_1.locked"]
+        self.assertEqual(locked.availability, TOPIC_LOCKED)
+        self.assertEqual(locked.label, "生成鎖定")
+        self.assertIsInstance(locked.requirement_hint, str)
+        self.assertEqual(
+            locked.descriptor,
+            {
+                "npc_id": int(generated.pk),
+                "topic_id": "phase_1.locked",
+                "context_id": "ctx-generated",
+            },
+        )
+        self.assertEqual(rows["phase_1.open"].availability, TOPIC_OPEN)
+        self.assertIsNone(rows["phase_1.open"].requirement_hint)
+        for row in rows.values():
+            # Never a formal body, a variant, a successor bundle or
+            # another phase's private text.
+            self.assertEqual(
+                set(row.__dict__),
+                {
+                    "topic_id",
+                    "keyword",
+                    "label",
+                    "availability",
+                    "requirement_hint",
+                    "descriptor",
+                },
+            )
+        self.assertEqual(
+            _body_sentinels([row.__dict__ for row in rows.values()]), []
+        )
+
     # -- selection -------------------------------------------------------
 
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
+    )
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
     )
     def test_locked_selection_plays_the_refusal_with_zero_effects(self):
         affinity_before = self.host.relations.affinity_for(self.player)
@@ -467,6 +649,9 @@ class DialogueAvailabilityTests(EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
     )
     def test_committed_equipment_change_invalidates_a_listed_choice(self):
         self.player.db.inventory = [_ITEM_KEY]
@@ -622,6 +807,9 @@ class DialogueAvailabilityTests(EvenniaTest):
         return "\n".join(messages)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    @covers_requirement(
+        "authored-dialogue-availability::qualified-topic-disclosure-is-server-owned"
+    )
     def test_text_listing_uses_the_projection(self):
         hidden = self._run_talk(f"{self.host.key} {_HIDDEN_KEYWORD}")
         self.assertEqual(_body_sentinels(hidden), [])
