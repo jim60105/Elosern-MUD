@@ -31,6 +31,7 @@ from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -325,6 +326,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
 
     # -- source matrix ---------------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_inventory_writer_refreshes_without_any_session_context(self):
         """Carried item: a no-session write reaches both live connections."""
         self._open_line_session()
@@ -355,6 +360,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         self.assertIsNone(live_dialogue_session(self.player))
         self.assertEqual(tuple(watchers.watchers_for(self.player)), ())
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_outer_rollback_publishes_nothing(self):
         """Inventory and skill writes inside a failed transaction refresh nothing."""
         self._open_line_session()
@@ -377,6 +386,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         self.assertEqual(len(self._panels(recorded)), 1)
         self.assertNotIn(_IDENTITY_TOPIC, self._choices(recorded))
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_worn_equipment_crosses_the_threshold_and_keeps_the_delivery(self):
         """Worn exposure bias re-projects choices; delivered wording survives."""
         self._open_line_session()
@@ -406,6 +419,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
             self._choices(recorded)[_EXPOSURE_TOPIC]["availability"], TOPIC_LOCKED
         )
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_base_exposure_transition_refreshes_once_after_commit(self):
         """``apply_event`` publishes the converged exposure exactly once."""
         self._open_line_session()
@@ -426,6 +443,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         )
         self.assertEqual(self._delivery(recorded)["delivery_id"], delivery.delivery_id)
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_identity_tag_change_refreshes_but_persona_prose_does_not(self):
         """Structured identities are the source; persona prose is not."""
         self._open_line_session()
@@ -456,6 +477,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
             set_social_identities(self.player, [])
         self.assertNotIn(_IDENTITY_TOPIC, self._choices(recorded))
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_skill_ownership_and_proficiency_flips_are_separate(self):
         """Ownership and proficiency cross their own thresholds independently."""
         self._open_line_session()
@@ -489,6 +514,10 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
             self._choices(recorded)[_PROFICIENT_TOPIC]["availability"], TOPIC_OPEN
         )
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+    )
     def test_lineage_seed_refreshes_the_owned_player_and_skips_unowned_bodies(self):
         """The auto-seed hook refreshes a player and stays silent on an NPC."""
         self._open_line_session()
@@ -626,6 +655,84 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         choices = self._choices(recorded)
         self.assertEqual(set(choices), {"phase.open_b"})
         self.assertEqual(self._delivery(recorded)["lines"][-1]["text"], "生成招呼。")
+
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "physical-refresh-includes-generated-scene-contexts"
+    )
+    def test_generated_context_qualification_refreshes_through_the_equipment_hook(
+        self,
+    ):
+        """A generated topic's exposure qualification refreshes after commit.
+
+        The source comes from the published generated binding, never from a
+        static dialogue-registry entry, and the immutable authored package
+        payload is exactly what it was before the refresh.
+        """
+        generated = create_object(NPC, key="合成生成衣著角色", location=self.room)
+        generated.components.add(
+            ScriptedDialogue.create(
+                generated, dialogue_key="scene_role:pkg_synth:elder"
+            )
+        )
+        open_or_refresh_dialogue(self.player, generated, "生成招呼。")
+        authored = AuthoredDialogue(
+            greeting="生成招呼。",
+            topics=(
+                AuthoredTopic(
+                    topic_id="scene.generated_exposure",
+                    keyword="生成衣著",
+                    label="生成衣著",
+                    fallback=_scene(
+                        "t_generated_exposure_formal", "生成衣著答覆。"
+                    ),
+                    requires=Exposure(minimum=_EXPOSURE_THRESHOLD),
+                    unavailable="locked",
+                    refusal=_scene(
+                        "t_generated_exposure_refusal", _SENTINEL_REFUSAL
+                    ),
+                ),
+            ),
+        )
+
+        def _source(context):
+            return ResolvedDialogueSource(
+                identity=context.source_identity,
+                host_key=context.host_key,
+                dialogue=authored,
+                phase_revision=1,
+            )
+
+        self.player.db.inventory = [_ACCESSORY_KEY]
+        with patch(
+            "world.rules.dialogue.generated_dialogue_for",
+            return_value=SimpleNamespace(revision=1),
+        ), patch(
+            "world.rules.dialogue_sources.resolve_dialogue_source",
+            side_effect=_source,
+        ):
+            _real, recorded = self._register_watcher(self.player)
+            self.assertEqual(
+                self._choices(recorded)["scene.generated_exposure"][
+                    "availability"
+                ],
+                TOPIC_LOCKED,
+            )
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                result = toggle_equipment(self.player, _ACCESSORY_KEY)
+            self.assertEqual(result.outcome, "success")
+            self.assertEqual(len(list(callbacks)), 1)
+
+        choices = self._choices(recorded)
+        self.assertEqual(
+            choices["scene.generated_exposure"]["availability"], TOPIC_OPEN
+        )
+        self.assertIsNone(choices["scene.generated_exposure"]["requirement_hint"])
+        # The refresh projects the package; it never rewrites it.
+        self.assertEqual(
+            authored.topics[0].requires, Exposure(minimum=_EXPOSURE_THRESHOLD)
+        )
+        self.assertEqual(authored.greeting, "生成招呼。")
 
     def test_queue_validates_its_inputs_and_never_creates_state(self):
         with self.assertRaises(ValueError):
