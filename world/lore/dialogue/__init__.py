@@ -10,7 +10,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
 
-from world.lore.dialogue.conditions import DialogueReferences
 from world.lore.dialogue.loader import load_dialogue_snapshot
 from world.lore.dialogue.shape import (
     AuthoredDialogue,
@@ -40,13 +39,20 @@ def canonical_dialogue_bindings() -> dict[str, str]:
 
 
 def _load_snapshot() -> Mapping[str, AuthoredDialogue]:
+    # Function-local import (the guild.py/names.py/shops.py precedent): lore
+    # stays import-light, and the catalog is composed from the canonical
+    # registries by its rules-side owner. The builder itself imports nothing
+    # from ``world.lore`` at module scope, so this call is also safe when
+    # ``world.rules.dialogue_references`` was imported first.
+    from world.rules.dialogue_references import static_dialogue_references
+
     bindings = canonical_dialogue_bindings()
     profiles = frozenset(NPC_PROFILE_REGISTRY.keys())
     return load_dialogue_snapshot(
         CONTENT_DIR,
         profiles=profiles,
         bindings=bindings,
-        references=DialogueReferences.empty(),
+        references=static_dialogue_references(),
     )
 
 
