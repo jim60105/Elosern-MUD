@@ -537,19 +537,22 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         self.assertEqual(list(npc_callbacks), [])
 
     def test_skill_write_on_a_possessed_body_refreshes_the_acting_body(self):
-        """A possession-origin write refreshes the body the player is acting as."""
+        """A possession-origin write schedules the owner-scoped acting-body refresh."""
         companion = create_object(NPC, key="合成刷新同伴", location=self.room)
         join_party(companion, self.player)
         enter_possession(self.player, companion)
         self.addCleanup(release_possession, self.player, companion, "handback")
         self.assertEqual(affected_dialogue_owners(companion), (self.player,))
 
+        # The fan-out is owner-scoped: it receives the owning player and
+        # resolves the possession body itself, so another character of the
+        # same account is never refreshed instead.
         with patch(
-            "web.webclient.presentation.dialogue_push.push_dialogue_update"
+            "web.webclient.presentation.dialogue_push.push_dialogue_reading"
         ) as push:
             with self.captureOnCommitCallbacks(execute=True):
                 award_practice_xp(companion, _SKILL_KEY, 1)
-        push.assert_called_once_with(companion)
+        push.assert_called_once_with(self.player)
 
     def test_prior_owner_is_refreshed_after_a_detach(self):
         """A pre-detach owner capture still refreshes the owner that lost a body."""
@@ -567,7 +570,7 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         # or a party read.
         self.assertNotIn(self.char2, affected_dialogue_owners(self.player))
         with patch(
-            "web.webclient.presentation.dialogue_push.push_dialogue_update"
+            "web.webclient.presentation.dialogue_push.push_dialogue_reading"
         ) as push:
             with self.captureOnCommitCallbacks(execute=True):
                 for owner in affected:
@@ -588,7 +591,7 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
         self.assertEqual(affected_dialogue_owners(companion), ())
         # The owner's refresh must not be redirected to the unbound body.
         with patch(
-            "web.webclient.presentation.dialogue_push.push_dialogue_update"
+            "web.webclient.presentation.dialogue_push.push_dialogue_reading"
         ) as push:
             with self.captureOnCommitCallbacks(execute=True):
                 queue_dialogue_refresh((self.player,), cause="control")
