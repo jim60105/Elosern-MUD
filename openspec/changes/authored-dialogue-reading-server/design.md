@@ -42,6 +42,8 @@ Boundary events use the existing world.observability facade with available owner
 
 ## Risks / Trade-offs
 
+The complete review-resolved session and wire schemas in the shared contract govern receipt storage, pure_chain entries and completed_topic_ids. Reading-server creates the entire narrative Attribute shape, including initialized false and pending_batch null; observation remains owned by unread-notices. Saved completed_topic_ids accompanies reading_revision so a second connection can suppress already-read notices without interpreting unread flags. Public successor delivery and retained receipts must pass the shared aggregate UTF-8 budget. Reconnect preserves opening line_delivery_id and context, and delayed topic A completion uses receipts independent of latest topic B playback.
+
 Owns narrative Attribute and backend receipt/pusher changes. UI locked change is independent code-wise but reading-client depends on both. Notification slice extends same Attribute after this. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
 
 ## Focused verification at implementation time

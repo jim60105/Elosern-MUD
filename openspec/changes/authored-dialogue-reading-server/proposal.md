@@ -16,6 +16,7 @@ The approved authored-dialogue design requires narrative-owned formal reading, d
 - `authored-dialogue-reading`: Narrative-owned formal reading, delivered receipts and pure-chain synchronization.
 
 ### Modified Capabilities
+- `exploration-affordances`: amend the complete affected contract for this slice, preserving unrelated scenarios.
 - None.
 
 ## Impact
