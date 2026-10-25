@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Identity inventory and companion readers
 
+Implement Shared contract v2 once for both sources. Include package_role companion references using authorized package role_id/current binding, safe labels and foreign/cancelled/detached/remote rejection in focused tests.
+
 - [ ] 1.1 Implement RaceIs, SocialIdentityIs, Carries and CompanionPresent against explicit sources; add world/rules/tests/test_dialogue_physical_conditions.py with owner/actor asymmetry, no consumption and stale/co-location controls. Document each source and fail-closed behavior.
 
 ## 2. Clock skills and exposure boundaries

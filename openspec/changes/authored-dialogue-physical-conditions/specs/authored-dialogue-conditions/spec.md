@@ -6,6 +6,13 @@ Provide actor identity, inventory, present companion, time, skills and exposure 
 
 ## ADDED Requirements
 
+### Requirement: Generated physical references retain canonical and package scope
+Every physical condition SHALL apply equally to static/generated scenes. Package-role companion references SHALL resolve only a permitted role in the current package and require authoritative current membership and actor-local presence. Foreign, detached, cancelled or remote role bindings SHALL fail closed.
+
+#### Scenario: Same role ID in a foreign package grants nothing
+- **WHEN** a different package has a present companion with the same local role ID
+- **THEN** it cannot satisfy the current package-scoped companion condition
+
 ### Requirement: Physical conditions use the acting body and canonical readers
 Race, social identity, carried item, skill and exposure conditions SHALL use the acting body. Companion conditions SHALL require current owner membership and actor-local presence. Time conditions SHALL use in-world daypart bounds. Evaluation SHALL be read-only and SHALL fail closed on invalid authoritative state.
 

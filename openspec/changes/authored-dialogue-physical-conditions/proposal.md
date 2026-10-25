@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No duplicate generated predicate evaluator, new game effects or source-specific social hierarchy. Both static YAML and generated JSON use the same conditions and canonical/package-permitted reference catalog.
 
 ## Batch:
 
@@ -34,4 +34,4 @@ depends-on: authored-dialogue-social-identity
 
 Code conflicts: Owns new condition evaluator. Progression slice extends same files after this. Shared browser fixture and dialogue.py are serialized; equipment/progression sources stay read-only.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; package-role companion references use captured package_id+role_id and current authoritative binding.
