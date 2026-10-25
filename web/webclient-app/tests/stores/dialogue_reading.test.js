@@ -6,9 +6,10 @@
 // beforeunload exists here or in the module, and a fresh store instance has no
 // pending state (the AppClient/browser reload scenario covers the user
 // journey).
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { useElosernStore } from "../../stores/elosern.js";
+import { DIALOGUE_ACK_TIMEOUT_MS } from "../../stores/elosern/dialogue_reading.js";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
 import * as fx from "../store/protocol_fixtures.js";
 import {
@@ -106,15 +107,13 @@ function harness() {
     revision = 1;
   }
 
-  function respond(overrides = {}) {
-    const envelope = sender.sent.actions[sender.sent.actions.length - 1];
-    expect(envelope, "an acknowledgement must be on the wire").toBeTruthy();
+  function respondTo(requestId, overrides = {}) {
     const response = store.receive(
       generation,
       "ui_action_result",
       [
         fx.actionResult({
-          request_id: envelope.request_id,
+          request_id: requestId,
           presentation_epoch: epoch,
           presentation_revision: store.view.revision,
           ...overrides,
@@ -123,6 +122,12 @@ function harness() {
       {},
     );
     expect(response.accepted, JSON.stringify(response)).toBe(true);
+  }
+
+  function respond(overrides = {}) {
+    const envelope = sender.sent.actions[sender.sent.actions.length - 1];
+    expect(envelope, "an acknowledgement must be on the wire").toBeTruthy();
+    respondTo(envelope.request_id, overrides);
     return envelope;
   }
 
@@ -132,6 +137,7 @@ function harness() {
     commit,
     reconnect,
     respond,
+    respondTo,
     get generation() {
       return generation;
     },
@@ -554,5 +560,120 @@ describe("the memory-only dialogue completion queue", () => {
     const after = dialogueViewModel(h.store.view.panels.dialogue, h.store.view.dialogueReading);
     expect(after.picks).toEqual(before.picks);
     expect(after.picks[1]).toMatchObject({ locked: true, hint: "需要好感階段至少為熟識" });
+  });
+
+  it("sends the queued acknowledgement when one publication settles a result and releases the player lock", () => {
+    // A player action owns the single-mutation lock when the scene finishes.
+    const dispatchId = h.store.dispatchAction("explore.look", { target: "room" });
+    expect(dispatchId).not.toBeNull();
+    const dispatchEnvelope = h.sender.sent.actions[0];
+    h.store.finishDialogueDelivery(detail(formal()));
+    expect(actions(h.sender)).toHaveLength(1);
+    expect(h.store.view.dialogueReading.pendingCount).toBe(1);
+
+    // The result names the already-committed revision, so the very same
+    // publication releases the lock (view.js flushes after `releaseIfReady`);
+    // the queued acknowledgement must still go out in that publish.
+    h.respondTo(dispatchEnvelope.request_id);
+    expect(h.store.view.dispatch.inFlight).toBe(null);
+    expect(h.store.view.dialogueReading.sending).toBe(true);
+    expect(actions(h.sender)).toHaveLength(2);
+    expect(actions(h.sender)[1].action_id).toBe("explore.dialogue_complete");
+    expect(actions(h.sender)[1].payload.topic_id).toBe("host.news");
+    h.respond({ code: "dialogue_completed" });
+    expect(h.store.view.dialogueReading.pendingCount).toBe(0);
+  });
+
+  it("retries a transport-failed acknowledgement on same-context restoration, never an operational rejection", () => {
+    let failNext = true;
+    const original = h.sender.sendAction;
+    h.sender.sendAction = (envelope) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("socket closed");
+      }
+      original(envelope);
+    };
+    h.store.finishDialogueDelivery(detail(formal()));
+    expect(h.store.view.dialogueReading.retryable).toBe(true);
+    expect(actions(h.sender)).toHaveLength(0);
+
+    // Same-context restoration retries the transport failure by itself.
+    h.reconnect();
+    h.commit("dialogue", panel());
+    expect(actions(h.sender)).toHaveLength(1);
+
+    // An operational server rejection is NOT retried by a plain reconnect.
+    h.respond({ outcome: "rejected", code: "busy", message: "另一項操作正在進行中" });
+    expect(h.store.view.dialogueReading.retryable).toBe(true);
+    h.reconnect(fx.EPOCH_C);
+    h.commit("dialogue", panel());
+    expect(actions(h.sender)).toHaveLength(1);
+    // The explicit retry still works.
+    h.store.retryDialogueReading();
+    expect(actions(h.sender)).toHaveLength(2);
+  });
+
+  it("discards pending memory and reveal on authoritative detachment and ignores a late saved answer", () => {
+    const root = formal();
+    const child = formal([speech("host", "接續。")], { deliveryId: "dlv-child", topicId: "t.child" });
+    h.commit("dialogue", panel({ delivery: root, pureChain: [{ delivery: child, predecessors: ["host.news"] }] }));
+    h.store.finishDialogueDelivery(detail(root));
+    const envelope = actions(h.sender)[0];
+    expect(h.store.view.dialogueReading.revealed).not.toBeNull();
+
+    // `ui_protocol_error: no_puppet` is the authoritative character exit.
+    h.store.receive(h.generation, "ui_protocol_error", [fx.protocolError()], {});
+    expect(h.store.view.phase).toBe("detached");
+    expect(h.store.view.dialogueReading.pendingCount).toBe(0);
+    expect(h.store.view.dialogueReading.revealed).toBeNull();
+    expect(h.store.view.dialogueReading.savedTopicIds).toEqual([]);
+
+    // A late success (the server accepted it before the reap) must not settle
+    // into the next character's state.
+    h.respondTo(envelope.request_id, { code: "dialogue_completed" });
+    expect(h.store.view.dialogueReading.pendingCount).toBe(0);
+    expect(h.store.view.dialogueReading.savedTopicIds).toEqual([]);
+  });
+
+  it("settles a saved answer that arrives after the acknowledgement timeout", () => {
+    vi.useFakeTimers();
+    try {
+      h.store.finishDialogueDelivery(detail(formal()));
+      const envelope = actions(h.sender)[0];
+      vi.advanceTimersByTime(DIALOGUE_ACK_TIMEOUT_MS + 10);
+      expect(h.store.view.dialogueReading.retryable).toBe(true);
+      expect(h.store.view.dialogueReading.sending).toBe(false);
+      // The retained correlation lets the late saved answer settle the entry.
+      h.respondTo(envelope.request_id, { code: "dialogue_completed" });
+      expect(h.store.view.dialogueReading.pendingCount).toBe(0);
+      expect(h.store.view.dialogueReading.savedTopicIds).toEqual(["host.news"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never lets a superseded attempt's late failure clear the newer attempt", () => {
+    h.store.finishDialogueDelivery(detail(formal()));
+    const first = actions(h.sender)[0];
+    h.respond({ outcome: "rejected", code: "busy", message: "另一項操作正在進行中" });
+    h.store.retryDialogueReading();
+    const second = actions(h.sender)[1];
+    expect(second.request_id).not.toBe(first.request_id);
+    expect(h.store.view.dialogueReading.pending[0].status).toBe("sending");
+
+    // The superseded attempt's late rejection must not fail or drop the new
+    // attempt.
+    h.respondTo(first.request_id, {
+      outcome: "rejected",
+      code: "dialogue_receipt_stale",
+      message: "對話情境已過期。",
+    });
+    expect(h.store.view.dialogueReading.pendingCount).toBe(1);
+    expect(h.store.view.dialogueReading.pending[0].status).toBe("sending");
+
+    h.respondTo(second.request_id, { code: "dialogue_completed" });
+    expect(h.store.view.dialogueReading.pendingCount).toBe(0);
+    expect(h.store.view.dialogueReading.savedTopicIds).toEqual(["host.news"]);
   });
 });

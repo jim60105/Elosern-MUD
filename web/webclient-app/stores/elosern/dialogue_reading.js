@@ -42,6 +42,10 @@ const MAX_FINISHED_TOPICS = 64;
 // an unsaved entry with an explicit retry. A live transport answers in one
 // round trip; this only bounds a silently lost send.
 export const DIALOGUE_ACK_TIMEOUT_MS = 5000;
+// Retained request -> entry correlation after a timeout/retry. Bounded: an
+// acknowledgement answered long after its timeout may still settle the entry
+// (the server did commit), but the map never grows without bound.
+const MAX_RETAINED_REQUESTS = 64;
 
 // Stable rejection codes that make the acknowledgement itself meaningless
 // (Shared contract v2): the receipt is gone, foreign, retired or was never a
@@ -185,11 +189,13 @@ export function applyDialogueReading(ctx) {
   }
 
   function releaseWire(entry) {
-    if (entry && entry.requestId) {
-      // Only retire the mapping this attempt owns (a newer attempt may have
-      // replaced it after a restoration).
-      if (memory.requests.get(entry.requestId) === entry.key) {
-        memory.requests.delete(entry.requestId);
+    if (entry) {
+      // Retire every retained mapping for this entry, including the attempts a
+      // timeout/retry left behind; a newer attempt shares the same entry key.
+      for (const [requestId, key] of memory.requests) {
+        if (key === entry.key) {
+          memory.requests.delete(requestId);
+        }
       }
       entry.requestId = null;
     }
@@ -211,11 +217,6 @@ export function applyDialogueReading(ctx) {
   }
 
   function discardAll() {
-    for (const entry of memory.pending) {
-      if (entry.requestId) {
-        memory.requests.delete(entry.requestId);
-      }
-    }
     memory.pending = [];
     memory.requests.clear();
     memory.sending = null;
@@ -315,15 +316,24 @@ export function applyDialogueReading(ctx) {
     // The attempt is recorded BEFORE the send: a synchronous sender failure
     // (or a fake that answers inline) must never leave an unowned attempt.
     entry.status = "sending";
+    entry.failure = null;
     entry.requestId = requestId;
     memory.requests.set(requestId, entry.key);
+    while (memory.requests.size > MAX_RETAINED_REQUESTS) {
+      memory.requests.delete(memory.requests.keys().next().value);
+    }
     memory.sending = entry;
     clearTimer();
     memory.timer = setTimeout(() => {
-      // A lost acknowledgement is an unsaved entry, never a durable claim.
+      // A lost acknowledgement is an unsaved entry, never a durable claim. The
+      // request mapping is retained: a late saved answer can still settle it,
+      // while a retry supersedes it by storing a newer request id.
       if (memory.sending === entry && entry.requestId === requestId) {
-        releaseWire(entry);
+        memory.sending = null;
+        clearTimer();
+        entry.requestId = null;
         entry.status = "failed";
+        entry.failure = "transport";
         publishSnapshot();
         ctx.publishView();
       }
@@ -334,6 +344,7 @@ export function applyDialogueReading(ctx) {
     } catch (error) {
       releaseWire(entry);
       entry.status = "failed";
+      entry.failure = "transport";
       return false;
     }
   }
@@ -567,6 +578,7 @@ export function applyDialogueReading(ctx) {
     for (const entry of memory.pending) {
       if (entry.status === "failed" || entry.status === "waiting") {
         entry.status = "queued";
+        entry.failure = null;
         changed = true;
       }
     }
@@ -595,16 +607,29 @@ export function applyDialogueReading(ctx) {
     if (prev && prev.generation !== rs.generation) {
       // A new transport generation: the old attempt can never answer (the
       // reducer discards old-generation messages). Keep the exact payloads
-      // and retry on the same-context restoration.
+      // and retry on the same-context restoration. A transport failure (a
+      // throw or a timed-out send) is retried automatically; an operational
+      // server rejection stays failed until the explicit retry.
       for (const entry of memory.pending) {
-        if (entry.status === "sending") {
+        if (entry.status === "sending" || (entry.status === "failed" && entry.failure === "transport")) {
           entry.status = "queued";
+          entry.failure = null;
         }
       }
       memory.requests.clear();
       memory.sending = null;
       clearTimer();
       memory.settleRevision = 0;
+    }
+    if (rs.phase === "detached") {
+      // Authoritative detachment (a `no_puppet` protocol error: the character
+      // is gone). The pending memory and the transient reveal die with it; a
+      // late answer must not settle into the next character's state.
+      if (memory.pending.length > 0 || memory.saved.size > 0 || memory.reveal || memory.requests.size > 0) {
+        discardAll();
+      }
+      publishSnapshot();
+      return;
     }
     if (rs.phase !== "active" || rs.mode == null) {
       // Suspended (reset/bootstrap): never discard on the reset itself.
@@ -700,17 +725,34 @@ export function applyDialogueReading(ctx) {
       // A foreign, superseded or already-settled attempt.
       return false;
     }
-    memory.requests.delete(requestId);
     const entry = entryByKey(key);
-    if (memory.sending !== null && memory.sending.key === key) {
-      memory.sending = null;
-      clearTimer();
+    const success = result.outcome === "success" && result.code === "dialogue_completed";
+    // A retry (or the timeout's retained mapping) may leave an older attempt
+    // in flight on paper. A late SUCCESS may still settle the entry — the
+    // server did commit — but a late failure belongs to the superseded
+    // attempt and must never clear, fail or re-send the newer one.
+    const superseded =
+      !!entry &&
+      memory.sending === entry &&
+      entry.requestId !== null &&
+      entry.requestId !== requestId;
+    if (superseded && !success) {
+      memory.requests.delete(requestId);
+      publishSnapshot();
+      return true;
     }
+    memory.requests.delete(requestId);
     if (!entry) {
       publishSnapshot();
       return true;
     }
-    entry.requestId = null;
+    if (memory.sending === entry && (success || entry.requestId === requestId)) {
+      memory.sending = null;
+      clearTimer();
+    }
+    if (entry.requestId === requestId) {
+      entry.requestId = null;
+    }
     const wireRevision = result.presentationRevision ?? result.presentation_revision;
     const revision = Number.isInteger(wireRevision)
       ? wireRevision
@@ -718,11 +760,12 @@ export function applyDialogueReading(ctx) {
     if (typeof revision === "number" && revision > memory.settleRevision) {
       memory.settleRevision = revision;
     }
-    if (result.outcome === "success" && result.code === "dialogue_completed") {
+    if (success) {
       save(entry);
     } else if (result.outcome === "rejected" && result.code === WAITING_CODE) {
       // The predecessor is not saved yet: keep the entry queued behind it.
       entry.status = "waiting";
+      entry.failure = null;
       entry.waitingEpoch = memory.saveEpoch;
     } else if (result.outcome === "rejected" && DISCARD_CODES.has(result.code)) {
       discardEntry(entry);
@@ -731,13 +774,16 @@ export function applyDialogueReading(ctx) {
       refreshCanonicalState();
     } else if (result.outcome === "rejected" && RETRYABLE_CODES.has(result.code)) {
       entry.status = "failed";
+      entry.failure = "server";
     } else if (result.outcome === "stale" || result.outcome === "error") {
       entry.status = "failed";
+      entry.failure = "server";
     } else {
       // Every matched terminal result settles the attempt; an unknown
       // rejection is an unsaved entry with an explicit retry, never a stuck
       // queue.
       entry.status = "failed";
+      entry.failure = "server";
     }
     publishSnapshot();
     ctx.publishView();

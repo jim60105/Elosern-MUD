@@ -507,11 +507,6 @@ export function applyView(ctx) {
     const rs = ctx.reducer.getState();
     ctx.handleTransportLifecycle(prev, rs);
     ctx.handleActionResult(rs);
-    // Reconcile the memory-only reading queue with this committed state
-    // (discard on context/character exit, suspend across a reset, retry the
-    // same-context restoration). It runs before the view is built so the
-    // publication already carries the settled status.
-    ctx.syncDialogueReading(prev, rs);
     // The in-flight record is captured before the release: the round's
     // completing publication can carry the declared revision, so
     // `releaseIfReady` may clear `inFlight` in this same pass, and the record
@@ -519,6 +514,13 @@ export function applyView(ctx) {
     // panel (webclient-combat-beat-queue D5).
     const flight = ctx.inFlight;
     ctx.releaseIfReady(rs);
+    // Reconcile the memory-only reading queue with this committed state
+    // (discard on context/character exit, suspend across a reset, retry the
+    // same-context restoration). It runs AFTER the player-action lock release:
+    // a publication that both delivers a result and releases the lock must
+    // still send the queued acknowledgement, and it runs before the view is
+    // built so the publication already carries the settled status.
+    ctx.syncDialogueReading(prev, rs);
     ctx.syncBeatRound(prev, rs, flight);
     ctx.rebuildCreationDock(prev, rs);
     ctx.syncRouterGates();
