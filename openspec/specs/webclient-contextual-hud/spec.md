@@ -2098,7 +2098,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: Picks and exits dispatch their exact intents
 - **WHEN** the player activates a pick row, or an enabled exit row
-- **THEN** a pick dispatches `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` through the single dispatch entry, and an enabled exit row dispatches the unchanged `explore.move` payload of its committed move row
+- **THEN** a pick dispatches `explore.talk_scripted` with the committed source-correct action payload plus its dispatcher selection identity through the single dispatch entry, and an enabled exit row dispatches the unchanged `explore.move` payload of its committed move row
 
 #### Scenario: The free-form and exit rows dispatch nothing themselves
 - **WHEN** the player activates `⌨ 自由對話`, or `✕ 結束對話`
@@ -2146,7 +2146,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: A pick dispatches the scripted keyword
 - **WHEN** the player activates pick 2 through pointer, Enter, or the `2` key
-- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and that row's `keyword_id` is submitted, the list is removed while the request is in flight, focus is on the message window's page surface, and the list returns once the reply's last page is fully shown
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after scene reading finishes
 
 #### Scenario: Free dialogue borrows the command line
 - **WHEN** the player activates `⌨ 自由對話`

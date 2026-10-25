@@ -32,7 +32,10 @@ from world.rules.dialogue_sources import (
 class DialogueSourcesTests(unittest.TestCase):
     """Tests for ResolvedDialogueSource and resolve_dialogue_source."""
 
-    @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
+    @covers_requirement(
+        "scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed",
+        "authored-dialogue-selection::scene-selection-is-independent-of-content-provider",
+    )
     def test_complete_inventory_of_25_tables(self):
         bindings = canonical_dialogue_bindings()
         self.assertEqual(len(bindings), 25)
@@ -89,7 +92,10 @@ class DialogueSourcesTests(unittest.TestCase):
         )
         self.assertIsNone(resolve_dialogue_source(ctx))
 
-    @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
+    @covers_requirement(
+        "scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed",
+        "authored-dialogue-selection::scene-selection-is-independent-of-content-provider",
+    )
     def test_generated_identity_returns_none_until_generated_packages(self):
         ctx = SimpleNamespace(
             source_identity=GeneratedDialogueIdentity("pkg1", "role1", "phase1"),

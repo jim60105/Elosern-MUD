@@ -10,8 +10,7 @@ causes no state change.
 ## Requirements
 
 ### Requirement: Scripted dialogue hosts answer authored talk lines
-
-Scripted hosts SHALL answer known permitted keywords with their fixed responses and unknown keywords with the no-understanding line. Authored known-keyword affinity SHALL remain, while unknown/no-keyword paths SHALL change no state beyond an opened session. Generated greetings and informational topics SHALL run without a model, and their registered effect declarations SHALL be rechecked for presence, knowledge, phase and commission scope; stale or unauthorized choices SHALL apply no effect.
+Scripted hosts SHALL answer permitted authored topics with complete attributed scenes and unknown keywords with the no-understanding line. Known formal selections SHALL retain existing affinity; unknown, refusal and replay SHALL grant none. Generated effects SHALL retain current authority checks, and guild reporting SHALL retain its deterministic service exception.
 
 #### Scenario: Informational generated topic works offline
 - **WHEN** model services are disabled and a player opens a generated conversation and selects an informational topic
@@ -27,7 +26,7 @@ Scripted hosts SHALL answer known permitted keywords with their fixed responses 
 
 #### Scenario: Guild staff answers a known keyword
 - **WHEN** the player talks to the guild master with a keyword such as 公會 or 任務
-- **THEN** the guild master answers with the authored response for that keyword, the host's
+- **THEN** the guild master delivers the complete attributed scene for that keyword, the host's
   affinity value rises by 1, and no other state changes
 
 #### Scenario: No-keyword talk presents the host's greeting
@@ -36,7 +35,7 @@ Scripted hosts SHALL answer known permitted keywords with their fixed responses 
 
 #### Scenario: An author-set offline greeting overrides the table greeting
 - **WHEN** an author has saved a non-empty offline-greeting field on a table-backed host and the player runs `talk <host>` without a keyword
-- **THEN** the host presents the field's text literally instead of its table greeting, and a known-keyword answer is still the authored table response
+- **THEN** the host presents the field's text literally instead of its table greeting, and a known-keyword answer is still the authored topic scene
 
 #### Scenario: Missing greeting falls back to the no-response line
 - **WHEN** the player runs `talk <scripted-host>` without a keyword, the host
@@ -104,7 +103,7 @@ Scripted hosts SHALL answer known permitted keywords with their fixed responses 
 
 #### Scenario: Card edits do not rewrite scripted lines
 - **WHEN** a profiled scripted host's runtime card is edited and the player then uses a known keyword, no keyword, and an unknown keyword
-- **THEN** the authored response, table greeting, and profile misunderstanding reply are returned unchanged
+- **THEN** the authored scene, table greeting, and profile misunderstanding reply are returned unchanged
 
 #### Scenario: The no-understanding line resolves through persona provenance
 - **WHEN** the no-understanding line is needed for a scripted host
@@ -183,20 +182,19 @@ A non-empty per-instance offline greeting SHALL be plain text on all no-keyword 
 - **THEN** known keywords and misunderstanding replies remain authored-only
 
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
-
-Authored dialogue tables SHALL remain immutable keyed frozen definitions with greetings and ordered keyword responses. One shared resolver SHALL serve authored rows and validated generated current-phase definitions without mutating the authored registry; greetings, keyword responses, topic affordances, action validation and text SHALL consume it. Missing definitions SHALL retain the no-greeting/no-understanding fallback, and authored guild topics SHALL keep their bounded in-character vocabulary.
+Static/generated dialogue SHALL use immutable stable topic identities and complete linear scenes with greetings. Source-aware resolution SHALL read scanner-published static YAML or permitted immutable DB phases without global registry mutation. Every permitted topic up to sixteen SHALL be reachable, preserving guild, greeting, fallback and command-discovery semantics.
 
 #### Scenario: Authored table behavior remains unchanged
 - **WHEN** an authored guild host is queried through the resolver
-- **THEN** its ordered existing greeting and topics remain available and the table is unchanged
+- **THEN** its ordered authored greeting and topics remain available and the table is unchanged
 
 #### Scenario: Generated topics use the existing conversation vocabulary
 - **WHEN** a generated conversable host's current phase is queried by text, presentation, and action-validation consumers
-- **THEN** they resolve the same permitted greeting, ordered topic identities and fixed responses without a model call or runtime registry mutation
+- **THEN** they resolve the same permitted greeting, ordered stable topic IDs and complete generated scenes without a model call, static profile requirement or global registry mutation
 
 #### Scenario: guild_staff definition registers and answers command guidance
 - **WHEN** the `guild_staff` dialogue definition is registered and queried
-- **THEN** its greeting and keyword responses describe registering, taking a
+- **THEN** its greeting and topic scenes describe registering, taking a
   commission from the board and reporting it back at the counter, and none of
   them contains a backticked token or a `guild` command name
 
@@ -215,7 +213,7 @@ Authored dialogue tables SHALL remain immutable keyed frozen definitions with gr
 - **THEN** it is read-only at runtime
 
 #### Scenario: guild_staff prose is in-world only
-- **WHEN** the `guild_staff` greeting and keyword responses are authored
+- **WHEN** the `guild_staff` greeting and topic scenes are authored
 - **THEN** they are spoken in character, telling in the host's own in-world voice what the guild
   counter is for; registering as an adventurer, taking commissions from the board, reporting
   finished work back at the counter with the commission's number, giving up a commission, and

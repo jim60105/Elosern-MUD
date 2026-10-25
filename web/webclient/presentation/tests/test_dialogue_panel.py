@@ -203,7 +203,7 @@ class DialoguePresenterTests(EvenniaTest):
         return self.registry.render("dialogue", self.context)
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_available_form_is_exact_vocabulary_for_a_bonded_host(self):
         apply_affinity_change(
@@ -262,7 +262,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(affinity_value, payload.values())
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_host_portrait_reference_matches_the_art_catalog(self):
         # One registry and one context, so the dialogue key is checked against
@@ -288,7 +288,7 @@ class DialoguePresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_generative_host_outside_the_art_view_carries_a_null_reference(self):
         # An LLMNPC is conversable (explore.talk_open accepts it) but carries
@@ -305,7 +305,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(portrait_catalog_key(bard.pk), art["portrait_catalog"])
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_catalog_cap_drop_carries_a_null_reference(self):
         # design.md's named risk: the art view keeps the first
@@ -330,7 +330,7 @@ class DialoguePresenterTests(EvenniaTest):
         self.assertNotIn(portrait_catalog_key(host.pk), catalog)
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_unbuildable_art_view_carries_a_null_reference(self):
         # A combat actor with no session record is the reachable ArtViewError:
@@ -497,7 +497,7 @@ class DialogueValidatorTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
     def test_drift_rejects(self):
         bad_payloads = [

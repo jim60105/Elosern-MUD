@@ -40,6 +40,8 @@ from world.rules.guild import (
 )
 from world.tests.synthetic_data import SYNTH_ITEMS
 
+from tools.spec_traceability import covers_requirement
+
 _NO_RESPONSE = "對方沒有理會你。"
 
 
@@ -184,6 +186,9 @@ class TalkTurnInBranchTests(EvenniaCommandTestMixin, EvenniaTest):
             output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}")
         self.assertIn("無法回報任務：malformed_claims", output)
 
+    @covers_requirement(
+        "authored-dialogue-selection::text-and-browser-resolve-the-same-authored-topic"
+    )
     def test_other_keywords_are_untouched(self):
         topic = self._authored_topic("公會")
         with patch("commands.talk.dialogue_turn_in") as turnin:

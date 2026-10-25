@@ -58,7 +58,10 @@ class AuthoredDialogueRuntimeTests(EvenniaTest):
         clear_dialogue_session(self.char1)
         super().tearDown()
 
-    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    @covers_requirement(
+        "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically",
+    )
     def test_selection_delivers_complete_scene_and_updates_session(self):
         context = resolve_dialogue_context(self.char1, self.host)
         # Direct entry (no live context)
@@ -134,7 +137,10 @@ class AuthoredDialogueRuntimeTests(EvenniaTest):
         self.assertEqual(delivery1.delivery_id, delivery2.delivery_id)
         self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_after_first)
 
-    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    @covers_requirement(
+        "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically",
+    )
     def test_duplicate_request_after_intervening_topic_is_rejected(self):
         delivery_a = select_authored_topic(
             self.char1,
@@ -167,7 +173,10 @@ class AuthoredDialogueRuntimeTests(EvenniaTest):
             )
         self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_after_b)
 
-    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    @covers_requirement(
+        "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically",
+    )
     def test_session_write_failure_rolls_back_relations_and_session(self):
         affinity_before = self.host.relations.affinity_for(self.char1)
         session_before = self.char1.db.dialogue_session
@@ -186,7 +195,10 @@ class AuthoredDialogueRuntimeTests(EvenniaTest):
         self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_before)
         self.assertEqual(self.char1.db.dialogue_session, session_before)
 
-    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    @covers_requirement(
+        "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically",
+    )
     def test_no_time_advancement_on_selection_or_replay(self):
         clock = get_world_clock()
         tick_before = clock.tick
