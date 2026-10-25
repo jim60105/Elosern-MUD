@@ -44,7 +44,6 @@ from world.ai.npc_dialogue import register_npc_dialogue
 import unittest
 from ._support import (
     _T_DIALOGUE,
-    _T_LODGE_KEYWORD,
     _reset_guardrail,
     _t_dialogue_scope,
 )
@@ -78,7 +77,13 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def _open_session(self) -> None:
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(self.host.pk), "keyword_id": _T_LODGE_KEYWORD}
+            self.player,
+            {
+                "npc_id": int(self.host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_01",
+                "context_id": None,
+                "selection_id": "sel-leave-open",
+            },
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIsNotNone(self.player.db.dialogue_session)

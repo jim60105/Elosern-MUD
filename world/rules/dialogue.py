@@ -112,10 +112,6 @@ class DuplicateSelectionError(DialogueRuntimeError):
     """Selection ID was already used for a different topic."""
 
 
-class TopicLockedError(DialogueRuntimeError):
-    """Topic is locked or requires conditions that are not yet permitted."""
-
-
 class TopicNotFoundError(DialogueRuntimeError):
     """Topic was not found in the host's current definition."""
 
@@ -961,6 +957,12 @@ def open_or_refresh_dialogue(
         "dialogue_session_open",
         context={"char": str(getattr(character, "pk", "?")), "npc": str(session.npc_id)},
     )
+    # Every successful open or selection re-projects and refreshes availability
+    # after commit (the one non-mutation cause this slice adds). Committed
+    # mutation sources call the same API from their owning writers.
+    from world.rules.dialogue_availability import refresh_dialogue_availability
+
+    refresh_dialogue_availability(owner, cause="open")
     return session
 
 
@@ -973,7 +975,50 @@ def select_authored_topic(
     expected_context_id: str | None,
     session: DialogueSession | None = None,
 ) -> SceneDelivery:
-    """Select an authored topic and publish complete scene delivery atomically."""
+    """Select an authored topic and publish complete scene delivery atomically.
+
+    The projection is the single availability authority: an absent (hidden)
+    row behaves exactly like an unknown topic, a locked row delivers its
+    authored refusal with zero effects, and an open row delivers the currently
+    authorized scene. Every rejection is reported once through the boundary
+    event with identifiers only.
+    """
+    from world.rules.dialogue_context import DialogueContextError
+
+    try:
+        return _select_authored_topic(
+            actor,
+            host,
+            topic_id,
+            selection_id=selection_id,
+            expected_context_id=expected_context_id,
+            session=session,
+        )
+    except (DialogueRuntimeError, DialogueContextError) as error:
+        log_info(
+            "dialogue_selection_rejected",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "actor": str(getattr(actor, "pk", "?")),
+                "npc": str(getattr(host, "pk", "?")),
+                "topic": str(topic_id),
+                "context": str(expected_context_id or "?"),
+                "reason": str(getattr(error, "code", None) or getattr(error, "reason", "?")),
+            },
+        )
+        raise
+
+
+def _select_authored_topic(
+    actor: Any,
+    host: Any,
+    topic_id: str,
+    *,
+    selection_id: str,
+    expected_context_id: str | None,
+    session: DialogueSession | None = None,
+) -> SceneDelivery:
+    """The selection body behind the reported :func:`select_authored_topic`."""
     from world.rules.affinity import AffinitySource, apply_affinity_change
     from world.rules.dialogue_context import DialogueContext, resolve_dialogue_context
     from world.rules.dialogue_sources import resolve_dialogue_source
@@ -1032,32 +1077,28 @@ def select_authored_topic(
     if matched_topic is None:
         raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
 
-    # Predecessor-gated (pure-chain) topics still fail closed: reading
-    # persistence does not exist yet, so a predecessor gate genuinely cannot
-    # resolve and never delivers a protected body here.
-    if matched_topic.predecessors:
-        raise TopicLockedError("topic_locked", "此話題目前無法選取。")
+    # The shared projection is the ONLY availability authority: the same rows
+    # the panel and the affordance vocabulary published decide this selection,
+    # re-read against current canonical state. A hidden row is indistinguishable
+    # from an unknown topic; a locked row plays its authored refusal.
+    from world.rules.dialogue_availability import TOPIC_LOCKED, project_topics
+    from world.rules.dialogue_conditions import select_scene_variant
 
-    from world.rules.dialogue_conditions import (
-        evaluate_condition,
-        select_scene_variant,
-    )
-
-    qualified = matched_topic.requires is None or evaluate_condition(
-        matched_topic.requires, context
-    )
-    if qualified:
-        kind = "formal"
-        scene = select_scene_variant(matched_topic, context)
-    elif matched_topic.unavailable == "locked" and matched_topic.refusal is not None:
+    projected = {
+        row.topic_id: row
+        for row in project_topics(context, context_id=target_context_id)
+    }
+    row = projected.get(matched_topic.topic_id)
+    if row is None:
+        raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
+    if row.availability == TOPIC_LOCKED:
         # A visibly locked topic stays selectable and plays its authored
         # refusal; it grants no effect and never exposes the formal body.
         kind = "refusal"
         scene = matched_topic.refusal
     else:
-        # A hidden topic behaves exactly like an unknown one: no label, hint
-        # or body leaks through an explicit ID.
-        raise TopicNotFoundError("unknown_topic", "對方不明白這個話題。")
+        kind = "formal"
+        scene = select_scene_variant(matched_topic, context)
 
     owner = context.owner
     from web.webclient.presentation.protocol import json_byte_size
@@ -1074,43 +1115,49 @@ def select_authored_topic(
             f"Scene {getattr(scene, 'scene_id', '')} ({scene_bytes} bytes) exceeds limit of {DIALOGUE_SCENE_MAX_BYTES}",
         )
 
-    # 2. Delivery plus public pure_chain successors bundle check
-    successors_map: dict[str, list[str]] = {t.topic_id: [] for t in source.dialogue.topics}
-    for t in source.dialogue.topics:
-        for p in getattr(t, "predecessors", ()):
-            if p in successors_map:
-                successors_map[p].append(t.topic_id)
+    # 2. Delivery plus public pure_chain successors bundle check. A refusal is
+    # not a chain delivery and reveals no successor, so only a formal selection
+    # is measured with its reachable public bundle: an undelivered successor's
+    # protected size never blocks the permitted refusal.
+    if kind == "formal":
+        successors_map: dict[str, list[str]] = {
+            t.topic_id: [] for t in source.dialogue.topics
+        }
+        for t in source.dialogue.topics:
+            for p in getattr(t, "predecessors", ()):
+                if p in successors_map:
+                    successors_map[p].append(t.topic_id)
 
-    topic_map = {t.topic_id: t for t in source.dialogue.topics}
-    reachable_pure: set[str] = set()
-    to_visit = [
-        succ
-        for succ in successors_map.get(matched_topic.topic_id, [])
-        if topic_map.get(succ) and getattr(topic_map[succ], "disclosure", "") == "pure_chain"
-    ]
-    while to_visit:
-        curr = to_visit.pop(0)
-        if curr not in reachable_pure:
-            reachable_pure.add(curr)
-            for nxt in successors_map.get(curr, []):
-                if topic_map.get(nxt) and getattr(topic_map[nxt], "disclosure", "") == "pure_chain":
-                    to_visit.append(nxt)
+        topic_map = {t.topic_id: t for t in source.dialogue.topics}
+        reachable_pure: set[str] = set()
+        to_visit = [
+            succ
+            for succ in successors_map.get(matched_topic.topic_id, [])
+            if topic_map.get(succ) and getattr(topic_map[succ], "disclosure", "") == "pure_chain"
+        ]
+        while to_visit:
+            curr = to_visit.pop(0)
+            if curr not in reachable_pure:
+                reachable_pure.add(curr)
+                for nxt in successors_map.get(curr, []):
+                    if topic_map.get(nxt) and getattr(topic_map[nxt], "disclosure", "") == "pure_chain":
+                        to_visit.append(nxt)
 
-    bundle_bytes = scene_bytes
-    for succ_id in reachable_pure:
-        succ_topic = topic_map[succ_id]
-        succ_scenes = [succ_topic.fallback] + [v.scene for v in getattr(succ_topic, "variants", ())]
-        max_succ_scene = max(
-            (scene_canonical_bytes(s) if hasattr(s, "lines") else json_byte_size(s))
-            for s in succ_scenes
-        )
-        bundle_bytes += max_succ_scene
+        bundle_bytes = scene_bytes
+        for succ_id in reachable_pure:
+            succ_topic = topic_map[succ_id]
+            succ_scenes = [succ_topic.fallback] + [v.scene for v in getattr(succ_topic, "variants", ())]
+            max_succ_scene = max(
+                (scene_canonical_bytes(s) if hasattr(s, "lines") else json_byte_size(s))
+                for s in succ_scenes
+            )
+            bundle_bytes += max_succ_scene
 
-    if bundle_bytes > DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES:
-        raise DialogueBudgetExceededError(
-            "dialogue_bundle_oversized",
-            f"Selected delivery bundle ({bundle_bytes} bytes) exceeds limit of {DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES}",
-        )
+        if bundle_bytes > DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES:
+            raise DialogueBudgetExceededError(
+                "dialogue_bundle_oversized",
+                f"Selected delivery bundle ({bundle_bytes} bytes) exceeds limit of {DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES}",
+            )
 
     delivery_id = uuid.uuid4().hex[:16]
     delivery = SceneDelivery(
@@ -1134,7 +1181,9 @@ def select_authored_topic(
     from web.webclient.presentation.dialogue import DIALOGUE_MAX_CHOICES
     from world.rules.npc_identity import npc_display_name
 
-    choices = _scripted_keyword_descriptors(host, context_id=target_context_id)[:DIALOGUE_MAX_CHOICES]
+    choices = _scripted_keyword_descriptors(
+        host, actor=actor, context_id=target_context_id
+    )[:DIALOGUE_MAX_CHOICES]
     preview_panel = {
         "schema_version": 3,
         "available": True,

@@ -50,7 +50,6 @@ from ._support import (
     _HeldClient,
     _T_DIALOGUE,
     _T_LODGE_GREETING,
-    _T_LODGE_KEYWORD,
     _T_LODGE_LINE,
     _raw,
     _reply_text,
@@ -94,20 +93,37 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
+            self.player,
+            {
+                "npc_id": int(host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_01",
+                "context_id": None,
+                "selection_id": "sel-record",
+            },
         )
         self.assertEqual(result["outcome"], "success")
         stored = self.player.db.dialogue_session
         self.assertIsNotNone(stored)
         self.assertEqual(stored["npc_id"], int(host.pk))
-        self.assertIn(_T_LODGE_LINE, stored["line"])
-        self.assertIn(stored["line"], result["message"])
+        # The common scene delivery, not a native line, is what the composed
+        # topic selection records and what the action result summarizes.
+        self.assertEqual(stored["kind"], "scene")
+        self.assertIsNone(stored["line"])
+        delivered = [line["text"] for line in stored["delivery"]["lines"]]
+        self.assertTrue(any(_T_LODGE_LINE in text for text in delivered))
+        self.assertIn(_T_LODGE_LINE, result["message"])
 
     def test_scripted_rejections_record_nothing(self):
         host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
+            self.player,
+            {
+                "npc_id": int(host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_99",
+                "context_id": None,
+                "selection_id": "sel-reject",
+            },
         )
         self.assertEqual(result["code"], "unregistered_keyword")
         self.assertIsNone(self.player.db.dialogue_session)

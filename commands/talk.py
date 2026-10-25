@@ -18,13 +18,12 @@ from world.rules.dialogue import (
     dialogue_key_for,
     escape_evennia_greeting,
     is_dialogue_host,
+    misunderstood_line_for,
     open_or_refresh_dialogue,
     live_dialogue_session,
     select_authored_topic,
     resolve_greeting,
     run_scripted_talk,
-    table_response,
-    TopicLockedError,
 )
 from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
 from world.rules.dialogue_sources import resolve_dialogue_source
@@ -187,18 +186,27 @@ class CmdsTalk(Command):
                 self.caller.msg(_NO_RESPONSE)
                 return
 
-            matched_topic = None
-            for t in source.dialogue.topics:
-                if t.keyword == keyword or t.topic_id == keyword:
-                    matched_topic = t
-                    break
-            if matched_topic is None:
-                # Unknown keyword: no session write, no state change
+            # The text surface lists topics through the same disclosure
+            # projection as the panel: hidden and locked rows are decided
+            # here, never from the raw declaration.
+            from world.rules.dialogue_availability import project_topics
+
+            rows = project_topics(context, context_id=context.context_id)
+            matched_row = next(
+                (
+                    row
+                    for row in rows
+                    if row.keyword == keyword or row.topic_id == keyword
+                ),
+                None,
+            )
+            if matched_row is None:
+                # Unknown or hidden keyword: no session write, no state change,
+                # and no formal prose through the legacy response view.
                 if possessed:
                     self.caller.msg(_NO_RESPONSE)
                     return
-                line = table_response(diag_key, keyword, npc=npc)
-                self.caller.msg(f"{npc.key}說：{line}")
+                self.caller.msg(f"{npc.key}說：{misunderstood_line_for(npc)}")
                 return
 
             session = live_dialogue_session(self.caller)
@@ -212,14 +220,10 @@ class CmdsTalk(Command):
                 delivery = select_authored_topic(
                     self.caller,
                     npc,
-                    matched_topic.topic_id,
+                    matched_row.topic_id,
                     selection_id=selection_id,
                     expected_context_id=expected_context_id,
                 )
-            except TopicLockedError:
-                line = table_response(diag_key, keyword, npc=npc)
-                self.caller.msg(f"{npc.key}說：{line}")
-                return
             except Exception:
                 self.caller.msg(_NO_RESPONSE)
                 return

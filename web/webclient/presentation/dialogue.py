@@ -384,7 +384,9 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
         }
     else:
         delivery_wire = None
-    choices = _scripted_keyword_descriptors(npc, context_id=session.context_id)[:DIALOGUE_MAX_CHOICES]
+    choices = _scripted_keyword_descriptors(
+        npc, actor=actor, context_id=session.context_id
+    )[:DIALOGUE_MAX_CHOICES]
 
     return validate_dialogue(
         {

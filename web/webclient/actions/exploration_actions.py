@@ -22,29 +22,23 @@ from twisted.internet.defer import Deferred
 from web.webclient.actions.node_ids import node_id_for_location
 from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.observability import log_error, log_warn
-from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
 from world.rules.dialogue import (
-    DIALOGUE_TABLE,
     DuplicateSelectionError,
     StaleContextError,
     StaleSelectionError,
-    TopicLockedError,
     TopicNotFoundError,
     DialogueSourceUnavailableError,
     DialogueBudgetExceededError,
     clear_dialogue_session,
-    dialogue_key_for,
     escape_evennia_greeting,
     is_dialogue_host,
     live_dialogue_session,
     open_or_refresh_dialogue,
     resolve_greeting,
     opens_dialogue,
-    run_scripted_talk,
     select_authored_topic,
-    table_response,
 )
 from world.rules.dialogue_context import DialogueContextError
 from world.lore.scenes import Speech
@@ -615,7 +609,7 @@ def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
 
 
 def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Re-verify the host and keyword, then call the deterministic dialogue API."""
+    """Re-verify the host and topic, then call the deterministic dialogue API."""
     del session
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -652,9 +646,6 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
 
     if not is_dialogue_host(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
-    dialogue_key = dialogue_key_for(npc)
-    if dialogue_key is None:
-        return _rejected("not_dialogue_host", "對方無法交談。")
 
     if topic_id is not None:
         context_id = payload.get("context_id")
@@ -679,8 +670,6 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
             return _rejected("stale_selection", "選取請求已過期。")
         except DuplicateSelectionError:  # observability: ignore R2: rejected response is the contract report
             return _rejected("duplicate_selection", "選取請求重複。")
-        except TopicLockedError:  # observability: ignore R2: rejected response is the contract report
-            return _rejected("topic_locked", "此話題目前無法選取。")
         except TopicNotFoundError:  # observability: ignore R2: rejected response is the contract report
             return _rejected("unregistered_keyword", "對方不明白這個話題。")
         except DialogueSourceUnavailableError:  # observability: ignore R2: rejected response is the contract report
@@ -707,28 +696,10 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
                 break
         summary = f"{npc.key}說：{last_host_line}" if last_host_line else f"{npc.key}與你交談。"
         return _success("talked", summary, AFFECTED_FULL)
-
-    keyword = payload.get("keyword_id", "")
-    definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
-    keyword_ids = (
-        [response.keyword for response in definition.responses]
-        if definition is not None
-        else []
-    )
-    if keyword not in keyword_ids:
-        return _rejected("unregistered_keyword", "對方不明白這個話題。")
-    try:
-        result = run_scripted_talk(npc, actor, keyword)
-    except Exception as exc:
-        log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "keyword": keyword}, exc=exc)
-        return _rejected("dialogue_failed", "交談失敗。")
-    if result is None:
-        return _rejected("no_response", "對方沒有理會你。")
-    open_or_refresh_dialogue(actor, npc, result.response)
-    hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
-    message = f"{npc.key}說：{result.response}{hint}"
-    actor.msg(message)
-    return _success("talked", message, AFFECTED_FULL)
+    # The composed ``explore.talk_scripted`` payload always names a topic ID
+    # (the exact validator rejects a keyword-only payload), so there is no
+    # second, body-copying keyword delivery path here.
+    return _rejected("unregistered_keyword", "對方不明白這個話題。")
 
 
 def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:

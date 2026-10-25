@@ -80,7 +80,14 @@ from world.rules.movement_settlement import settle_movement
 from world.rules.npc_identity import npc_display_name
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.catalog import register_catalog
-from world.tests.synthetic_data import synthetic_registries
+from world.lore.dialogue.conditions import Carries, RaceIs
+from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic
+from world.lore.scenes import Scene, Speech
+from world.tests.synthetic_data import (
+    SYNTH_ITEMS,
+    SYNTH_RACES,
+    synthetic_registries,
+)
 
 UNAVAILABLE_PAYLOAD = {
     "schema_version": DIALOGUE_SCHEMA_VERSION,
@@ -116,6 +123,95 @@ def _host_with_key(room, dialogue_key, key="公會職員"):
         ScriptedDialogue.create(npc, dialogue_key=dialogue_key)
     )
     return npc
+
+
+# A synthetic availability table: one openly qualified topic, one visibly
+# locked topic with an authored refusal, and one race-hidden topic. Every
+# scene carries a unique sentinel so "no protected body before selection" is
+# a recursive string search, not a field-shape guess.
+_PANEL_AVAILABILITY_KEY = "t_panel_availability"
+_PANEL_OPEN = f"{_PANEL_AVAILABILITY_KEY}.open"
+_PANEL_LOCKED = f"{_PANEL_AVAILABILITY_KEY}.locked"
+_PANEL_HIDDEN = f"{_PANEL_AVAILABILITY_KEY}.hidden"
+_PANEL_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_PANEL_RACE = next(iter(SYNTH_RACES))
+_PANEL_OTHER_RACE = next(key for key in SYNTH_RACES if key != _PANEL_RACE)
+
+_PANEL_SENTINEL_OPEN = "PANEL-OPEN-BODY"
+_PANEL_SENTINEL_LOCKED = "PANEL-LOCKED-FORMAL"
+_PANEL_SENTINEL_REFUSAL = "PANEL-LOCKED-REFUSAL"
+_PANEL_SENTINEL_HIDDEN = "PANEL-HIDDEN-BODY"
+_PANEL_SENTINELS = (
+    _PANEL_SENTINEL_OPEN,
+    _PANEL_SENTINEL_LOCKED,
+    _PANEL_SENTINEL_REFUSAL,
+    _PANEL_SENTINEL_HIDDEN,
+)
+
+
+def _panel_scene(scene_id: str, host_text: str) -> Scene:
+    return Scene(
+        scene_id=scene_id,
+        revision="r1",
+        lines=(
+            Speech(speaker="actor", text="合成問句。"),
+            Speech(speaker="host", text=host_text),
+        ),
+    )
+
+
+def _panel_availability_dialogue() -> AuthoredDialogue:
+    return AuthoredDialogue(
+        greeting="合成職員抬眼：「有事就問。」",
+        topics=(
+            AuthoredTopic(
+                topic_id=_PANEL_OPEN,
+                keyword="合成公開",
+                label="合成公開",
+                fallback=_panel_scene("t_panel_availability_open", _PANEL_SENTINEL_OPEN),
+            ),
+            AuthoredTopic(
+                topic_id=_PANEL_LOCKED,
+                keyword="合成鎖定",
+                label="合成鎖定",
+                fallback=_panel_scene(
+                    "t_panel_availability_locked_formal", _PANEL_SENTINEL_LOCKED
+                ),
+                requires=Carries(item_key=_PANEL_ITEM),
+                unavailable="locked",
+                refusal=_panel_scene(
+                    "t_panel_availability_locked_refusal", _PANEL_SENTINEL_REFUSAL
+                ),
+            ),
+            AuthoredTopic(
+                topic_id=_PANEL_HIDDEN,
+                keyword="合成隱藏",
+                label="合成隱藏",
+                fallback=_panel_scene("t_panel_availability_hidden", _PANEL_SENTINEL_HIDDEN),
+                requires=RaceIs(race_key=_PANEL_OTHER_RACE),
+                unavailable="hidden",
+            ),
+        ),
+    )
+
+
+def _panel_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _panel_strings(item)
+    elif isinstance(value, (list, tuple, set, frozenset)):
+        for item in value:
+            yield from _panel_strings(item)
+
+
+def _panel_body_sentinels(payload) -> list[str]:
+    return [
+        text
+        for text in _panel_strings(payload)
+        if any(sentinel in text for sentinel in _PANEL_SENTINELS)
+    ]
 
 
 # File-local six-keyword dialogue row: the panel-cap decoupling below is a
@@ -250,9 +346,11 @@ class DialoguePresenterTests(EvenniaTest):
         # truncated to the panel's own bound (align-11).
         self.assertEqual(
             payload["choices"],
-            _scripted_keyword_descriptors(self.host, context_id=live_dialogue_session(self.player).context_id)[
-                :DIALOGUE_MAX_CHOICES
-            ],
+            _scripted_keyword_descriptors(
+                self.host,
+                actor=self.player,
+                context_id=live_dialogue_session(self.player).context_id,
+            )[:DIALOGUE_MAX_CHOICES],
         )
         self.assertTrue(payload["choices"])
         # The shipped guild_staff row authors exactly the panel's pressable
@@ -365,12 +463,14 @@ class DialoguePresenterTests(EvenniaTest):
         # (webclient-align-11 decoupling).
         host = _host_with_key(self.room, _T_OVER_CAP_KEY, key="合成對話主")
         open_or_refresh_dialogue(self.player, host, "歡迎。")
-        full_pool = _scripted_keyword_descriptors(host)
+        full_pool = _scripted_keyword_descriptors(host, actor=self.player)
         self.assertEqual(len(full_pool), 16)
         payload = self._render()
         self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)
         expected_choices = _scripted_keyword_descriptors(
-            host, context_id=live_dialogue_session(self.player).context_id
+            host,
+            actor=self.player,
+            context_id=live_dialogue_session(self.player).context_id,
         )[:DIALOGUE_MAX_CHOICES]
         self.assertEqual(payload["choices"], expected_choices)
         self.assertEqual(
@@ -685,7 +785,9 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
             _scripted_keyword_descriptors(
-                self.host, context_id=committed["panels"]["dialogue"]["context_id"]
+                self.host,
+                actor=self.player,
+                context_id=committed["panels"]["dialogue"]["context_id"],
             )[:DIALOGUE_MAX_CHOICES],
         )
         # End-to-end: the portrait reference the wire carries is a key of the
@@ -893,6 +995,193 @@ class DialogueTextCommandSettlementTests(BattlefieldIsolation, EvenniaTest):
         self.assertIn(
             "登記很簡單",
             committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
+        )
+
+
+class DialogueAvailabilityPanelTests(BattlefieldIsolation, EvenniaTest):
+    """Server-qualified disclosure reaches the panel and the action payload."""
+
+    @property
+    def sessionhandler(self):
+        import evennia
+
+        return evennia.SESSION_HANDLER
+
+    def setUp(self):
+        super().setUp()
+        # The affinity rulebook's cap breaks resolve their quest keys.
+        register_catalog()
+        self.scope = synthetic_registries(
+            "races",
+            "items",
+            "dialogue",
+            extra={"dialogue": {_PANEL_AVAILABILITY_KEY: _panel_availability_dialogue()}},
+        )
+        self.scope.__enter__()
+        self.addCleanup(self.scope.__exit__, None, None, None)
+        watchers.clear_watchers()
+        self.addCleanup(watchers.clear_watchers)
+
+        self.room = create_object(Room, key="合成可用性大廳")
+        self.host = create_object(NPC, key="合成可用性職員", location=self.room)
+        self.host.components.add(
+            ScriptedDialogue.create(self.host, dialogue_key=_PANEL_AVAILABILITY_KEY)
+        )
+        self.player = create_object(PlayerCharacter, key="合成可用性面板者")
+        self.player.race = _PANEL_RACE
+        self.player.apply_race_baseline()
+        self.player.db.inventory = []
+        self.player.location = self.room
+        self.registry = build_production_registry()
+        self.action_registry = build_production_action_registry()
+        self.context = PresentationContext(actor=self.player, protocol_version=1)
+
+    def _coordinator(self):
+        session = _RecordingSession(self.player)
+        coordinator = PresentationCoordinator(
+            session, self.registry, calendar_provider=lambda: CALENDAR
+        )
+        session.ndb.elosern_coordinator = coordinator
+        return session, coordinator
+
+    def _open(self):
+        open_or_refresh_dialogue(self.player, self.host, "合成招呼。")
+        return live_dialogue_session(self.player)
+
+    def _dispatch(self, session, payload, request_id="avail-1"):
+        envelope = {
+            "protocol_version": 1,
+            "presentation_epoch": session.ndb.elosern_coordinator.epoch,
+            "request_id": request_id,
+            "base_revision": session.ndb.elosern_coordinator.revision,
+            "action_id": "explore.talk_scripted",
+            "payload": payload,
+        }
+        handle_ui_action(
+            session, self.player, envelope, self.action_registry, self.registry
+        )
+        results = [
+            call["ui_action_result"][0][0]
+            for call in session.sent
+            if "ui_action_result" in call
+        ]
+        return results[-1]
+
+    def _last_committed_panel(self, session):
+        snapshots = [
+            call["ui_snapshot"][0][0] for call in session.sent if "ui_snapshot" in call
+        ]
+        updates = [call["ui_update"][0][0] for call in session.sent if "ui_update" in call]
+        return (snapshots or updates)[-1]["panels"]["dialogue"]
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
+    )
+    def test_hidden_choice_is_absent_and_no_body_ships_before_selection(self):
+        session, coordinator = self._coordinator()
+        self._open()
+        snapshot = coordinator.full_snapshot(self.context)
+        panel = snapshot["panels"]["dialogue"]
+        self.assertIs(panel["available"], True)
+
+        self.assertEqual(
+            [choice["topic_id"] for choice in panel["choices"]],
+            [_PANEL_OPEN, _PANEL_LOCKED],
+        )
+        locked = panel["choices"][1]
+        self.assertEqual(locked["availability"], "locked")
+        self.assertIsInstance(locked["requirement_hint"], str)
+        self.assertTrue(locked["requirement_hint"])
+        self.assertEqual(
+            set(locked["action_payload"]), {"npc_id", "topic_id", "context_id"}
+        )
+        self.assertEqual(locked["action_payload"]["topic_id"], _PANEL_LOCKED)
+        # The whole committed snapshot — panel, exploration vocabulary and
+        # every other panel — carries no scene body.
+        self.assertEqual(_panel_body_sentinels(snapshot), [])
+        validate_ui_snapshot(snapshot, known_panels=set(self.registry.panel_names))
+
+    @covers_requirement(
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
+    )
+    def test_locked_selection_plays_the_refusal_with_no_effects(self):
+        session, _coordinator = self._coordinator()
+        live = self._open()
+        affinity_before = self.host.relations.affinity_for(self.player)
+
+        result = self._dispatch(
+            session,
+            {
+                "npc_id": int(self.host.pk),
+                "topic_id": _PANEL_LOCKED,
+                "context_id": live.context_id,
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(self.host.relations.affinity_for(self.player), affinity_before)
+        delivery = self._last_committed_panel(session)["delivery"]
+        self.assertEqual(delivery["kind"], "refusal")
+        texts = [line["text"] for line in delivery["lines"]]
+        self.assertIn(_PANEL_SENTINEL_REFUSAL, texts)
+        self.assertNotIn(_PANEL_SENTINEL_LOCKED, texts)
+
+    @covers_requirement(
+        "exploration-affordances::affordance-params-are-validator-normalized"
+    )
+    def test_a_client_supplied_availability_flag_is_rejected(self):
+        session, _coordinator = self._coordinator()
+        live = self._open()
+        result = self._dispatch(
+            session,
+            {
+                "npc_id": int(self.host.pk),
+                "topic_id": _PANEL_OPEN,
+                "context_id": live.context_id,
+                "availability": "open",
+            },
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "malformed_payload")
+        self.assertEqual(
+            live_dialogue_session(self.player).context_id, live.context_id
+        )
+        self.assertEqual(
+            [call for call in session.sent if "ui_snapshot" in call],
+            [],
+            "a malformed payload must not publish or mutate presentation",
+        )
+
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
+    def test_stale_locked_choice_refuses_after_a_committed_change(self):
+        session, coordinator = self._coordinator()
+        self.player.db.inventory = [_PANEL_ITEM]
+        live = self._open()
+        listed = coordinator.full_snapshot(self.context)["panels"]["dialogue"]
+        choice = next(
+            item for item in listed["choices"] if item["topic_id"] == _PANEL_LOCKED
+        )
+        self.assertEqual(choice["availability"], "open")
+
+        # Committed canonical change between projection and selection.
+        self.player.db.inventory = []
+        affinity_before = self.host.relations.affinity_for(self.player)
+        result = self._dispatch(
+            session,
+            {
+                "npc_id": int(self.host.pk),
+                "topic_id": _PANEL_LOCKED,
+                "context_id": live.context_id,
+            },
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(self.host.relations.affinity_for(self.player), affinity_before)
+        delivery = self._last_committed_panel(session)["delivery"]
+        self.assertEqual(delivery["kind"], "refusal")
+        self.assertEqual(delivery["scene_id"], "t_panel_availability_locked_refusal")
+        self.assertNotIn(
+            _PANEL_SENTINEL_LOCKED, [line["text"] for line in delivery["lines"]]
         )
 
 
