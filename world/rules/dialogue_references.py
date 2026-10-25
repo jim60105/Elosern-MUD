@@ -2,11 +2,11 @@
 
 ``static_dialogue_references()`` is the ONE place that composes a
 :class:`world.lore.dialogue.conditions.DialogueReferences` from the canonical
-lore registries plus the world-clock daypart vocabulary. Every family this
-slice evaluates (``race``, ``social_identity``, ``item``, ``skill``, ``preset``,
-``profile`` and ``daypart``) is built here; the progression slice extends this
-same builder with ``guild_rank``, ``quest`` and ``affinity_stage``. No slice
-keeps a second hand-written key copy.
+lore registries plus the world-clock daypart vocabulary and the affinity
+rulebook's stage table. Every family this slice evaluates (``race``,
+``social_identity``, ``item``, ``skill``, ``preset``, ``profile``, ``daypart``,
+``guild_rank``, ``quest`` and ``affinity_stage``) is built here. No slice keeps
+a second hand-written key copy.
 
 The catalog is rebuilt on every call rather than cached, because a canonical
 registry is read-only game data that the synthetic test-data kit swaps per
@@ -26,6 +26,17 @@ instead of importing :mod:`world.rules.clock`: the clock module pulls the
 Evennia/Django settlement stack, which must not load while the lore snapshot
 is being built. The keys stay the clock rulebook's own, so there is no second
 hand-written key copy; only their player-facing labels live here.
+
+The affinity-stage family follows the same rule for the same reason: the stage
+ids and their authored display names come from ``rulebook/affinity.yaml``
+itself, while the evaluator still compares through the validated
+:func:`world.rules.affinity_config.get_config` boundary.
+
+The quest family is the canonical declaration tuple plus every definition the
+runtime has registered. The declaration tuple is always readable, so the
+import-time lore snapshot validates a shipped quest reference in a cold
+process (the registry is populated by the startup composition root); the live
+registry adds the compiled package definitions the runtime can resolve.
 """
 
 from __future__ import annotations
@@ -37,6 +48,9 @@ from types import MappingProxyType
 import yaml
 
 CLOCK_RULEBOOK_PATH = Path(__file__).resolve().parent / "rulebook" / "clock.yaml"
+AFFINITY_RULEBOOK_PATH = (
+    Path(__file__).resolve().parent / "rulebook" / "affinity.yaml"
+)
 
 #: The player-facing daypart wording the time-skip surfaces use. These are the
 #: canonical labels requirement hints render; a clock rulebook daypart without
@@ -126,9 +140,60 @@ def _profile_table(registry_keys: Mapping[str, object]) -> dict[str, str]:
     return table
 
 
+def _affinity_stage_table() -> dict[str, str]:
+    """Return the affinity rulebook's stage ids mapped to their display names."""
+    document = yaml.safe_load(AFFINITY_RULEBOOK_PATH.read_text(encoding="utf-8"))
+    stages = document.get("stages") if isinstance(document, Mapping) else None
+    if not isinstance(stages, list) or not stages:
+        raise ValueError(
+            f"affinity rulebook {AFFINITY_RULEBOOK_PATH} declares no stages list"
+        )
+    table: dict[str, str] = {}
+    for position, entry in enumerate(stages, start=1):
+        if not isinstance(entry, Mapping):
+            raise ValueError(
+                f"affinity rulebook stage {position} must be a mapping"
+            )
+        stage_id = entry.get("id")
+        name = entry.get("name")
+        if not isinstance(stage_id, str) or not stage_id:
+            raise ValueError(
+                f"affinity rulebook stage {position} id must be a nonempty string"
+            )
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(
+                f"affinity rulebook stage {stage_id!r} name must be a nonempty string"
+            )
+        if stage_id in table:
+            raise ValueError(f"affinity rulebook stage id {stage_id!r} is duplicated")
+        table[stage_id] = name
+    return table
+
+
+def _quest_table() -> dict[str, str]:
+    """Return every canonical or currently registered quest key and display name."""
+    from world.quests.catalog import QUEST_CATALOG
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+    table = {definition.key: definition.display_name for definition in QUEST_CATALOG}
+    table.update(
+        {
+            key: definition.display_name
+            for key, definition in QUEST_DEFINITION_REGISTRY.items()
+        }
+    )
+    return table
+
+
+def permitted_quest_definition(definition_key: str) -> bool:
+    """Whether ``definition_key`` names a canonical or registered quest definition."""
+    return definition_key in _quest_table()
+
+
 def static_dialogue_references() -> "DialogueReferences":
     """Compose the static permitted-reference catalog from canonical registries."""
     from world.lore.dialogue.conditions import DialogueReferences
+    from world.lore.guild import GUILD_RANK_REGISTRY
     from world.lore.items import ITEM_REGISTRY
     from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
     from world.lore.player_presets import PLAYER_PRESET_REGISTRY
@@ -155,11 +220,19 @@ def static_dialogue_references() -> "DialogueReferences":
     )
     catalog = catalog.child("profile", _profile_table(NPC_PROFILE_REGISTRY))
     catalog = catalog.child("daypart", _daypart_table())
+    catalog = catalog.child(
+        "guild_rank",
+        {key: row.display_name_zh for key, row in GUILD_RANK_REGISTRY.items()},
+    )
+    catalog = catalog.child("quest", _quest_table())
+    catalog = catalog.child("affinity_stage", _affinity_stage_table())
     return catalog
 
 
 __all__ = [
+    "AFFINITY_RULEBOOK_PATH",
     "CLOCK_RULEBOOK_PATH",
     "DAYPART_LABELS",
+    "permitted_quest_definition",
     "static_dialogue_references",
 ]

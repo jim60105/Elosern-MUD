@@ -30,13 +30,17 @@ MAX_CONDITION_CHILDREN = 16
 MAX_CONDITION_DEPTH = 4
 
 COMPANION_SOURCE_KINDS = ("preset", "profile", "package_role")
+#: The six ``QuestIs`` states. The four stored record states come from
+#: ``world.quests.runtime.QuestState``; ``not_accepted`` is the absence of any
+#: matching record and ``reward_claimed`` joins a completed record with the
+#: authoritative reward-claim ledger.
 QUEST_STATES = (
-    "unstarted",
-    "active",
+    "not_accepted",
+    "in_progress",
     "completed",
+    "reward_claimed",
     "failed",
-    "abandoned",
-    "claimed",
+    "invalidated",
 )
 
 
