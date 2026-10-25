@@ -943,6 +943,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
     )
+    @covers_requirement(
+        "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
+    )
     def test_possessed_companion_plays_an_authored_scene_with_its_own_portrait(self):
         """A lawful possessed companion opens and plays an authored scene.
 

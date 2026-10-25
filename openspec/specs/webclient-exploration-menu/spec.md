@@ -95,7 +95,7 @@ The production presentation registry SHALL register panel name `exploration` at 
 - **THEN** only version 4 is accepted, including its non-null reference fields, and no dual-version conversion is performed
 
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
-The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: a possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
+The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: an unlawful possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
 
 #### Scenario: A scripted host opens with its greeting
 - **WHEN** an actor submits `explore.talk_open` for a present scripted host whose authored table carries a greeting and two keywords
@@ -117,9 +117,13 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **WHEN** an actor submits `explore.talk_open` for a present host inside its talk-blocked schedule window
 - **THEN** the adapter rejects with `schedule_blocked` and the schedule gate's message, and no session is written
 
-#### Scenario: A possessed actor cannot open a conversation
+#### Scenario: A lawful possessed actor can open authored conversation
 - **WHEN** the puppeted actor is a possessed NPC and submits `explore.talk_open`
-- **THEN** the adapter rejects with the possession-refusal code before resolving the host
+- **THEN** the adapter validates actor/owner/host context and opens authored dialogue using the companion body, without enabling generated commissions or freeform talk
+
+#### Scenario: A possessed actor cannot open a conversation
+- **WHEN** a possessed actor has mismatched mirrors, invalid membership or no authenticated lawful control
+- **THEN** conversation opening rejects before session, affinity or narrative effects
 
 #### Scenario: Opening a conversation touches nothing but the session
 - **WHEN** a successful `explore.talk_open` settles with every LLM profile disabled

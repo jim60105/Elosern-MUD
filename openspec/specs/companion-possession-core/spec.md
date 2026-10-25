@@ -162,7 +162,7 @@ The character cmdset SHALL mount `possess` (aliases `附身`, English alias reta
   keeping `tests/test_command_docs.py` green
 
 ### Requirement: A possessed NPC is autonomy-silent and unreachable by dialogue
-An NPC with `db.possessed_by` set SHALL be autonomy-silent: `world/rules/service_gate.py::schedule_silenced(npc)` SHALL return true for it as the predicate's OR-ed second trigger, so `settle_npc_schedules` moves or re-states nothing for it; `LLMNPC.at_talked_to` (and the freeform dialogue seam behind it) SHALL refuse the possessed self with the fixed 「他現在無法回應你。」line and write no dialogue, memory, or affinity state.
+An NPC with `db.possessed_by` set SHALL be autonomy-silent through the single service-gate silence predicate, so schedule settlement moves or re-states nothing for it. Freeform dialogue to the possessed self SHALL be refused with the fixed 「他現在無法回應你。」 line and write no dialogue, memory, or affinity state. That refusal SHALL NOT prohibit lawful authored conversations with a different present host, which follow `authored-dialogue-possession`.
 
 #### Scenario: The possessed companion's schedule stays silent
 - **WHEN** a possessed guard-type companion crosses a full authored shift window
@@ -185,6 +185,10 @@ An NPC with `db.possessed_by` set SHALL be autonomy-silent: `world/rules/service
 - **WHEN** a possessed companion produces exploration results
 - **THEN** they keep crediting the owning player's quests exactly as for any bound companion —
   a ratified feature: possession moves the camera, not the ownership
+
+#### Scenario: Authored conversation with another host remains lawful
+- **WHEN** a lawfully controlled possessed companion selects an authored topic of a different present host
+- **THEN** the complete scene plays with the companion's name and portrait, host affinity changes only for the owning player, and the freeform self-dialogue refusal above stays in force
 
 ### Requirement: Sleep-driven handoff is contextual and requires confirmation
 Committed sleep of the controlled body SHALL automatically open contextual browser selection with text parity. Every effective companion SHALL remain visible with reserve/fatigue and availability/reason; choices SHALL distinguish possession and lawful awake-owner return. The final companion-list option SHALL be exactly `全員一起睡眠`. No candidate SHALL be auto-selected; choice/cancel SHALL cost no time or alter commander/combat draft.

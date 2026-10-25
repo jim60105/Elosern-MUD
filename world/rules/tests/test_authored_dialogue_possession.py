@@ -110,6 +110,9 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
     )
+    @covers_requirement(
+        "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
+    )
     def test_lawful_possession_keeps_the_session_on_the_actor_and_affinity_on_the_owner(self):
         context = resolve_dialogue_context(self.companion, self.host)
         self.assertIs(context.owner, self.char1)
@@ -163,6 +166,12 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
+    )
+    @covers_requirement(
+        "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
+    )
+    @covers_requirement(
+        "authored-dialogue-possession::possessed-shopping-and-unrelated-restrictions-remain-unchanged"
     )
     def test_forged_mirrors_and_illegal_hosts_reject_without_state(self):
         selection_arguments = {
@@ -250,6 +259,9 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
     @covers_requirement(
         "authored-dialogue-selection::text-and-browser-resolve-the-same-authored-topic"
     )
+    @covers_requirement(
+        "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
+    )
     def test_web_open_select_and_leave_use_the_actor_body(self):
         owner_before = self._owner_affinity()
         open_result = _talk_open_adapter(self.companion, {"npc_id": int(self.host.pk)})
@@ -318,6 +330,9 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
     @covers_requirement(
         "exploration-affordances::the-shared-read-only-affordance-vocabulary-supports-possessed-shop-access"
     )
+    @covers_requirement(
+        "authored-dialogue-possession::possessed-shopping-and-unrelated-restrictions-remain-unchanged"
+    )
     def test_vocabulary_enables_lawful_authored_talk_and_keeps_freeform_refused(self):
         freeform_host = create_object(LLMNPC, key="合成吟遊詩人", location=self.room1)
         entries = exploration_affordances(self.companion)
@@ -377,6 +392,56 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         self.assertEqual(self.char1.db.wallet, wallet_before)
         self.assertIsNone(self.companion.db.dialogue_session)
 
+    @covers_requirement(
+        "authored-dialogue-possession::possessed-informational-dialogue-covers-generated-roles"
+    )
+    def test_possessed_generated_host_authorizes_by_package_role_binding(self):
+        """A generated role needs no static profile to authorize a possessed body.
+
+        The scene provider for generated phases stays the deferred generated
+        seam, so this slice owns the source-neutral authorization: the acted
+        context resolves the package/role identity with actor/owner separation,
+        while generated service/commission keywords stay refused and deliver no
+        protected success body or session.
+        """
+        from world.lore.dialogue.codec import (
+            GeneratedDialogueIdentity,
+            make_generated_host_key,
+        )
+        from world.rules.dialogue_sources import resolve_dialogue_source
+        from world.rules.possession import POSSESSED_REFUSAL_MESSAGES
+
+        generated = create_object(NPC, key="生成角色", location=self.room1)
+        generated.components.add(
+            ScriptedDialogue.create(
+                generated, dialogue_key="scene_role:pkg_synth:elder"
+            )
+        )
+
+        context = resolve_dialogue_context(self.companion, generated)
+        self.assertIs(context.actor, self.companion)
+        self.assertIs(context.owner, self.char1)
+        self.assertEqual(
+            context.source_identity,
+            GeneratedDialogueIdentity("pkg_synth", "elder", "phase_1"),
+        )
+        self.assertEqual(
+            context.host_key, make_generated_host_key("pkg_synth", "elder")
+        )
+        # The provider seam, not a static profile, is the only source.
+        self.assertIsNone(resolve_dialogue_source(context))
+
+        refusal = _talk_scripted_adapter(
+            self.companion,
+            {"npc_id": int(generated.pk), "keyword_id": "委託"},
+        )
+        self.assertEqual(refusal["outcome"], "rejected")
+        self.assertEqual(refusal["code"], REASON_POSSESSED_TALK)
+        self.assertEqual(
+            refusal["message"], POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
+        )
+        self.assertIsNone(self.companion.db.dialogue_session)
+
     # ------------------------------------------------------------------
     # Release and trade
     # ------------------------------------------------------------------
@@ -429,6 +494,9 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
 
     @covers_requirement(
         "shop-economy::possessed-trades-use-the-named-bag-and-the-party-purse"
+    )
+    @covers_requirement(
+        "authored-dialogue-possession::possessed-shopping-and-unrelated-restrictions-remain-unchanged"
     )
     def test_trade_after_an_authored_scene_keeps_the_commander_purse_and_member_bag(self):
         from world.rules.tests._combat_session_helpers import open_synthetic_scope

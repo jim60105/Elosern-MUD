@@ -96,10 +96,10 @@ banner.
 - **THEN** `explore.possess`/`explore.possess_release` never appear (their absence from `SUGGESTIBLE_ACTION_IDS` is the mechanism; no new filter)
 
 ### Requirement: The dispatcher preserves talk and engage refusals during possession
-While the session actor is a possessed NPC, dispatches of `explore.talk_scripted`, `explore.talk_freeform`, and `explore.engage` SHALL be rejected by the adapters with outcome `rejected`, the corresponding stable `possessed_talk` or `possessed_engage` code and fixed Traditional Chinese message, before any service-scoped state read or dialogue/combat mutation. `shop.buy` and `shop.sell` SHALL instead follow normal party-scoped trade rules.
+Lawful possessed authored talk open, selection and leave SHALL use the acting-body/owning-player context. Freeform talk and combat engage SHALL retain stable possession refusals and epoch guards. Shop buy/sell SHALL retain ordinary commander-purse/member-bag rules without a new prohibition.
 
 #### Scenario: Talk and engage attempts move nothing
-- **WHEN** a possessing client dispatches scripted talk, freeform talk, or combat engage against a normally eligible local target
+- **WHEN** a possessing client dispatches freeform talk or combat engage against a normally eligible local target
 - **THEN** the result is rejected with the corresponding `possessed_talk` or `possessed_engage` code and fixed line, and dialogue sessions, combat sessions, affinity and all other canonical state remain unchanged
 
 #### Scenario: The refusal still respects the epoch guard
@@ -114,8 +114,12 @@ While the session actor is a possessed NPC, dispatches of `explore.talk_scripted
 - **WHEN** a possessing client renders a room containing a guild host
 - **THEN** no guild navigation opener or guild service section is rendered, no guild action is dispatched, and no synthetic possession-refusal message is displayed for the omitted surface
 
+#### Scenario: Authored talk is enabled
+- **WHEN** a lawful controlled companion selects a present authored host
+- **THEN** the actor speaks through a complete scene, with host-to-owning-player affinity and owner reading identity
+
 ### Requirement: Shop access does not delegate other NPC services during possession
-While possessing a companion, guild register/board/quests/turnin/merit, guild exam, church join/pray/offer/redeem/merit, talk and freeform talk, combat engage, and quest-issuer commissions SHALL retain their existing unavailable or refused behavior. Guild and church commands SHALL remain absent from the possessed cmdset. Their actions SHALL NOT gain commander delegation or new possession-specific handling.
+While possessing a companion, guild register/board/quests/turnin/merit, guild exam, church join/pray/offer/redeem/merit, freeform talk, combat engage, and generated quest-issuer commissions SHALL retain their existing unavailable or refused behavior. Guild and church commands SHALL remain absent from the possessed cmdset. Their actions SHALL NOT gain commander delegation or new possession-specific handling.
 
 #### Scenario: Guild and church stay outside the possessed command surface
 - **WHEN** the active command set is built for a possessed companion
@@ -126,8 +130,16 @@ While possessing a companion, guild register/board/quests/turnin/merit, guild ex
 - **THEN** existing admission or domain authorization prevents the service and changes no registration, guild/church merit, wallet, offering, quest, reward, or exam state; the companion is never substituted with the commander to enable it
 
 #### Scenario: Conversation opening stays refused
-- **WHEN** a possessing client attempts `explore.talk_open` against a normally eligible host
-- **THEN** the existing `possessed_talk` refusal remains, no dialogue opens, and no quest-issuer commission is made available through it
+- **WHEN** a possessing client attempts to open a generated quest-issuer commission or a non-authored conversation outside the newly authorized authored surface
+- **THEN** its existing possession refusal remains and no commission, reward or generated service delegation is introduced
+
+#### Scenario: Authored conversation opening is enabled
+- **WHEN** a lawful possessing client opens an authored host
+- **THEN** conversation opens with actor/owner separation while generated quest-issuer commission authority remains unchanged
+
+#### Scenario: Authored service prose grants no delegation
+- **WHEN** a possessed actor selects the guild reporting topic or addresses a generated issuer
+- **THEN** existing domain-local authority still refuses unsupported service mutation; no registration, reward, quest or wallet authority is invented by the dialogue engine
 
 ### Requirement: Browser and text expose the same non-acting handoff choices
 Authenticated browser and text clients SHALL expose lawful sleep-driven handoff, cancel, status and recovery waiting even when the controlled body cannot act. Candidate fatigue and return/possess meaning SHALL be textual. Existing focus/selection conventions and epoch stale-response protection SHALL apply without a new visual redesign.
