@@ -43,6 +43,15 @@ These were settled during design. Do not relitigate them inside a change.
 | D7 | **Sexual state is a mechanic, persona is material.** `sexual_baseline` is typed and simulated; `persona` is opaque and only ever injected into prompts. | The engine models what it must compute and stores the rest verbatim. |
 | D8 | **Sexual state feeds the combat modifier table.** High arousal degrades agility and accuracy; climax-in-progress zeroes actions. | Explicitly requested. Shares one modifier pipeline with poison and paralysis — no special-case branches. |
 | D9 | **`world/lore/` is Python; `world/rules/rulebook/` is YAML.** | Lore is a versioned single source of truth that deserves code review. Balance numbers are data that should be tunable without touching Python. |
+
+> **Amended 2026-10-25, authored-dialogue planning.** Static dialogue prose has a bounded
+> YAML exception at `world/lore/dialogue/content/<NpcProfile.key>.yaml`. Sorted safe scanning
+> discovers files without manual registration, validates the entire candidate through the common
+> pure scene/topic validator, then publishes one immutable read-only snapshot. Other lore stays
+> Python. Generated dream-collaboration dialogue uses the same scene model and features, but its
+> immutable payload remains in the existing world/quests scene-package database under deterministic
+> publication authority. Generated/private content never writes source files or enters the static
+> registry. The approved dialogue design and Shared contract v2 define the exact boundaries.
 | D10 | **Generated scene art is keyed by archetype; authored rooms may override it with official artwork.** Resolution uses room official art, archetype generated art, archetype official art, then a declared town/forest terminal image. Every scene type has bundled official artwork. | GPU cost still scales with scene *kinds*, while authored locations can have distinct official art and remain illustrated offline. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
 

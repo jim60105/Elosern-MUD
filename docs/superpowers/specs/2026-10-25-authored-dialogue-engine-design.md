@@ -1,11 +1,11 @@
 # Authored Dialogue Engine Design
 
 Date: 2026-10-25
-Status: Design approved in conversation; written specification awaiting user review.
+Status: Design and YAML/generated revisions approved in conversation; planning only.
 
 ## Goal and scope
 
-Replace fixed single-response topics with authored AVG-style conversations. Deliver a reusable declarative scene player, conditional dialogue, possessed-companion conversations, topic chains, server-persisted reading state, and unread notifications. No LLM is required. All existing authored fixed-topic dialogue is replaced in this change set, not retained as a compatibility path.
+Replace fixed single-response topics with AVG-style conversations across static NPC dialogue and generated dream-collaboration NPCs. Deliver a shared declarative scene player, conditional dialogue, possessed-companion conversations, topic chains, server-persisted reading and unread notifications. Playing published content requires no LLM. All existing static fixed-topic dialogue and the generated PhaseTopic response representation are replaced without compatibility paths or migrations.
 
 The user explicitly authorizes discarding all existing fixed dialogue prose: it contains no important narrative that must survive. Preserve functional service and deterministic effect contracts, not old wording or informational composition. Rewrite every existing authored topic as a natural multi-line scene. Do not make unintended commitments on behalf of the player.
 
@@ -22,6 +22,16 @@ Use a declarative scene engine, not an executable scripting language. Reusable s
 Alternatives considered were a dialogue-only line list and a server-stepped or fully executable script engine. The selected design adds reusable presentation and condition selection without network round trips for every line or resumable script execution.
 
 ## Ownership and control
+
+### Approved static YAML and generated DB source architecture
+
+Static dialogue content lives in the flat `world/lore/dialogue/content/<NpcProfile.key>.yaml` directory. The existing stable profile key supplies filename ownership, independently of dbid, display name or service/dialogue key. The YAML contains no duplicate npc_id owner field. Sorted safe scanning discovers each file without manual registration, rejects duplicate mapping keys/unsafe tags/unknown profiles/schema or reference errors, validates the complete candidate, then publishes one immutable snapshot once at startup. No hot reload. This is a dialogue-specific exception to the architecture source's D9 Python-lore decision; unrelated lore remains Python.
+
+YAML primitives and generated JSON use one pure immutable scene/topic parser and validator. Static profile existence is checked by the static provider only. Generated identities use package_id+role_id plus permitted phase and local topic/scene ID, never a static profile or global registry insertion. Exact collision-free identity encoding, source-aware ID bounds, primitive schema and wire/storage APIs are fixed in `openspec/changes/authored-dialogue-contracts/design.md`, Shared contract v2.
+
+Generated content remains in existing immutable world/quests scene-package DB payloads. The production dream dispatch -> scene-specific ScenarioDirector prompt/schema -> deterministic package validation/publication path must produce complete actor-first scenes, variants, qualification/refusals and predecessors. PhaseTopic(keyword,response,effect_verb,effect_reference) and the resolver's topic.response extraction are explicitly cut over; generated NPCs have no permanent one-line exception. LLM output proposes data only. No git/source-directory writes, generated YAML, model-owned effects or private/generated entries in the static registry.
+
+Both providers feed the same scene selection, all condition families, hidden/locked/open gates, safe hints, pure/qualified chains, possessed acting-body/owner semantics, manual playback, reading/completion and notifications. Runtime references must be canonical permitted or package-scoped. Existing world/quests publication, role binding, phase revision, knowledge and guarded escort/reunion authority remain deterministic. Existing effect allowlists/domain gates remain unchanged; qualification and effect authorization precede formal success body delivery. Freeform generation keeps its selected phase's permitted context and never receives locked formal bodies or unrelated private phases.
 
 Keep generative and presentation layers non-authoritative. `world/lore/` owns immutable authored registries; `world/rules/` owns dialogue eligibility and session writes. Persistent narrative reading records belong to the authorized narrative subsystem, through explicit deterministic APIs. Existing quest, equipment, affinity, and other domain owners retain their writes.
 
@@ -67,7 +77,7 @@ Hide topic choices while the scene is being read. Retain text-speed and reduced-
 
 ## Reading state and notifications
 
-Persist reading and pure-chain progress on the server, keyed by owning player, host NPC, and stable topic identity. Possession shares this state. Track formal-topic completion separately from refusal playback. Reading a refusal neither reads the protected topic nor satisfies a formal-topic predecessor.
+Persist reading and pure-chain progress by owning player, stable logical host and topic identity. Static hosts use profile identity; generated hosts use immutable package-role identity with phase-scoped topic IDs. Physical dbids remain presence/wire identities. Possession, save/reload and rematerialized bindings share the logical record. Phase changes retire deliveries/receipts without erasing reading when that same phase later returns. Track formal completion separately from refusal, opening and service playback. Refusal never reads protected content or satisfies formal predecessors.
 
 Initially available unread topics show an unread marker. Locked topics show the lock rather than an unread marker. Newly unlocked formal content becomes unread even if the refusal was read. Changing only a scene's tone/identity variant does not reset topic completion. Relocking and reopening an already read topic does not repeatedly mark it unread.
 
@@ -93,6 +103,6 @@ Verify complete-versus-refusal reading, server synchronization, pure-chain order
 
 ## Delivery decomposition
 
-Design the complete contract together, then plan dependent implementation slices: declarative scene model and shared playback; possessed dialogue and condition evaluation; persistent reading/availability synchronization and notifications; complete authored-content replacement and end-to-end verification. Split content slices by existing registry domains if needed for one-workday OpenSpec changes. Every approved condition and all existing authored topics remain in scope across the full change set; this is sequencing, not a partial delivery.
+The 26 bounded planning changes comprise the original 24 revised proposals plus `authored-dialogue-yaml-loader` and `authored-dialogue-generated-packages`. Loader follows contracts and precedes runtime's 25-file static cutover/module deletion. Every engine feature is source-neutral from its owning slice. Generated-packages follows completed unread-notices and owns real producer/schema/publication/provider/effect cutover plus production-path acceptance. Ten content slices rewrite disjoint profile-key YAML files after runtime/notification prerequisites; they own no registry registration or runtime code. The exact dependency/conflict map is in Shared contract v2. Every condition and all existing authored topics remain in scope.
 
-Before proposals or implementation, obtain user review of this written specification. The next brainstorming step is the writing-plans skill, subject to the repository's specification-driven OpenSpec workflow. No implementation is authorized merely by committing this document.
+The user approved these planning revisions. Parent review and planning validation precede commits. No implementation, apply, worktree or archive is authorized by this document.
