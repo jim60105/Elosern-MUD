@@ -1194,6 +1194,13 @@ runtime state），它維持原本的 late-import 語義，scope 結束時由 la
 完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。
 預設 off，shipped 行為不變。
 
+**Authored scene 播放 fixture**：`authored-dialogue-playback` 的瀏覽器驗收另加開關
+`ELOSERN_BROWSER_AUTHORED_SCENE=1`，必須與 `ELOSERN_BROWSER_EXPLORATION=1`、
+`ELOSERN_BROWSER_SYNTH_CATALOGS=1` 併用。開啟後，探索 fixture 的對話對象改用 kit 的
+`t_synth_storyteller` 表（`SYNTH_SCENE_DIALOGUE_TABLE_KEY`）：唯一話題 `故事` 是一段
+完整的多行 scene，依序為行動者台詞、兩句連續的對話對象台詞、一句長到會分頁的對話
+對象台詞，最後一句旁白。未開合成 catalog 時此開關不生效，shipped 行為不變。
+
 ### 專用派對管理驗收 fixture
 
 `party-acceptance-deterministic-fixture` 為 `party-management-acceptance` 的實際 UI
