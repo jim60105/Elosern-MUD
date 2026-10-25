@@ -212,6 +212,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // browser storage backs either.
     finishDialogueDelivery: ctx.finishDialogueDelivery,
     retryDialogueReading: ctx.retryDialogueReading,
+    // The deferred unlock notices (authored-dialogue-unread-notices): the
+    // choices wiring releases them once the list is back on screen.
+    releaseDialogueUnlocks: ctx.releaseDialogueUnlocks,
     clearFreeformTarget: ctx.clearFreeformTarget,
     borrowDialogueCommand: ctx.borrowDialogueCommand,
     dispatchAction: ctx.dispatchAction,

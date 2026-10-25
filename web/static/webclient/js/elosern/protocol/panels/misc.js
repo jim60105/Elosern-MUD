@@ -510,7 +510,48 @@ function validateDialoguePanel(payload) {
     throw new Error("completed_topic_ids must be a list of at most 16 entries");
   }
   if (payload.unlock_batch !== null) {
-    requireExactFields(payload.unlock_batch, "unlock_batch", ["batch_id", "host_id", "context_id", "topic_ids"], []);
+    // One live watcher's wrapped unlock batch (authored-dialogue-unread-
+    // notices): this panel's own host and context, 1..16 unique open choice
+    // topic ids in declaration order. Snapshots always carry null.
+    var batch = payload.unlock_batch;
+    requireExactFields(batch, "unlock_batch", ["batch_id", "host_id", "context_id", "topic_ids"], []);
+    var batchId = requireString(batch.batch_id, "batch_id", 64);
+    if (!batchId || !/^[\x00-\x7f]+$/.test(batchId)) {
+      throw new Error("unlock_batch batch_id must be non-empty ASCII");
+    }
+    requireInt(batch.host_id, "host_id", 1, MAX_SAFE_INTEGER);
+    if (batch.host_id !== payload.host.identity) {
+      throw new Error("unlock_batch host_id must be this panel's host");
+    }
+    if (batch.context_id !== payload.context_id) {
+      throw new Error("unlock_batch context_id must be this panel's context");
+    }
+    if (!Array.isArray(batch.topic_ids) || batch.topic_ids.length < 1 || batch.topic_ids.length > 16) {
+      throw new Error("unlock_batch topic_ids must hold 1..16 entries");
+    }
+    var openOrder = [];
+    for (var oi = 0; oi < choices.length; oi++) {
+      if (choices[oi].availability === "open") {
+        openOrder.push(choices[oi].topic_id);
+      }
+    }
+    var lastPosition = -1;
+    var batchSeen = Object.create(null);
+    for (var bi = 0; bi < batch.topic_ids.length; bi++) {
+      var batchTopic = batch.topic_ids[bi];
+      if (typeof batchTopic !== "string" || Object.prototype.hasOwnProperty.call(batchSeen, batchTopic)) {
+        throw new Error("unlock_batch topic_ids must be unique strings");
+      }
+      batchSeen[batchTopic] = true;
+      var position = openOrder.indexOf(batchTopic);
+      if (position === -1) {
+        throw new Error("unlock_batch topic_ids must be open choices");
+      }
+      if (position < lastPosition) {
+        throw new Error("unlock_batch topic_ids must keep declaration order");
+      }
+      lastPosition = position;
+    }
   }
 
   if (jsonByteSize(payload) > 24576) {

@@ -121,13 +121,9 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **WHEN** the puppeted actor is a possessed NPC and submits `explore.talk_open`
 - **THEN** the adapter validates actor/owner/host context and opens authored dialogue using the companion body, without enabling generated commissions or freeform talk
 
-#### Scenario: A possessed actor cannot open a conversation
-- **WHEN** a possessed actor has mismatched mirrors, invalid membership or no authenticated lawful control
-- **THEN** conversation opening rejects before session, affinity or narrative effects
-
-#### Scenario: Opening a conversation touches nothing but the session
+#### Scenario: Opening a conversation changes only dialogue and narrative observation
 - **WHEN** a successful `explore.talk_open` settles with every LLM profile disabled
-- **THEN** no network request is made, the world clock tick, affinity records, memories, and party bindings are byte-identical to before the action, and only `db.dialogue_session` changed
+- **THEN** no network request is made, the world clock tick, affinity records, memories, and party bindings are byte-identical to before the action; only the dialogue session and narrative-owned availability observation may change
 
 #### Scenario: A payload with extra or wrong fields is malformed
 - **WHEN** a client submits `explore.talk_open` with `keyword_id`, `speech`, a missing `npc_id`, or a non-positive `npc_id`
@@ -147,9 +143,9 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **THEN** a greeting is prefixed by the host's name and `說：`, and the fallback line is delivered verbatim
 - **AND** the deterministic success result publishes a full snapshot at one newer revision, so the committed mode `dialogue` and the available `dialogue` panel — carrying that line and the host's authored choices — arrive atomically
 
-#### Scenario: talk_open touches no state beyond the session
+#### Scenario: talk_open changes only the session and narrative observation
 - **WHEN** a successful `explore.talk_open` runs
-- **THEN** the adapter makes no LLM or network request, does not advance the world clock, does not change affinity, memory, party, quest, inventory, or any other state beyond the session, and does not schedule an action-options generation
+- **THEN** the adapter makes no LLM or network request, does not advance world time or change affinity, memory, party, quest or inventory, and writes only session state plus deterministic narrative availability observation without action-options generation
 
 #### Scenario: talk_open is allowlisted but never suggestible
 - **WHEN** the shared action-code registries are consulted
@@ -163,6 +159,18 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 #### Scenario: The session line comes from the greeting or fallback
 - **WHEN** a successful `explore.talk_open` resolves its session line
 - **THEN** it takes the session line from the host's resolved offline greeting, else one fixed server-authored fallback line naming the host, delivers the line, and records the session
+
+#### Scenario: A possessed actor cannot open a conversation
+- **WHEN** a possessed actor has invalid mirrors, membership or authenticated control
+- **THEN** opening rejects before any dialogue or narrative state change
+
+#### Scenario: Opening a conversation touches nothing but the session
+- **WHEN** a freeform-only host without scene topics opens with all model profiles disabled
+- **THEN** native opening writes only its session and changes no gameplay or authored-reading observation state
+
+#### Scenario: talk_open touches no state beyond the session
+- **WHEN** a freeform-only conversation opens without a scene topic definition
+- **THEN** no scene observation is written, no model/action-options generation runs and only its session changes; static/generated scene hosts use the shared observation path
 
 ### Requirement: Exploration affordances are server-authored, never inferred from prose
 Existing exploration affordances SHALL remain server-authored. Party invite SHALL use general identity and its separate four-member quota; same-owner temporary-only members SHALL remain normally recruitable. Party leave SHALL address source-aware general removal or selected private escort abandonment through the existing mission drawer, never detach a valid escort reason directly. Other conversation/service/combat/editor gates SHALL remain.

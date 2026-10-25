@@ -59,6 +59,15 @@
 // without closing it, and Escape dismisses it (a keyboard-shown tip
 // consumes that Escape; a pointer-shown one lets Escape keep its meaning).
 // An empty hint renders no tooltip and no description at all.
+//
+// Unread rows (authored-dialogue-unread-notices): a row may carry `unread`
+// (an open formal topic the owner has not read yet, straight from the
+// server's choice row). It draws a small gold diamond pip in the row's
+// trailing status slot — the slot the padlock uses, so the two never stack
+// and a locked row keeps only its lock — lifts its label a step brighter,
+// and names the state in text (（未讀）) for assistive technology. The pip
+// glows once as the card enters and then rests; it never pulses, so a list
+// of new topics does not compete with the scene for attention.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 
 const props = defineProps({
@@ -451,6 +460,7 @@ defineExpose({ focus, setActive });
         index === activeIndex ? cls('__row--active') : [],
         index === trailingIndex ? cls('__row--trailing') : [],
         row.lock ? cls('__row--locked') : [],
+        row.unread && !row.lock ? cls('__row--unread') : [],
       ]"
       role="menuitem"
       :data-testid="row.testId || 'choice-card-row'"
@@ -458,6 +468,7 @@ defineExpose({ focus, setActive });
       :data-keyword-id="row.keywordId"
       :data-active="index === activeIndex ? 'true' : 'false'"
       :data-locked="row.lock ? 'true' : null"
+      :data-unread="row.unread && !row.lock ? 'true' : null"
       :style="{ '--row-index': index }"
       :aria-disabled="row.enabled === false ? 'true' : null"
       :aria-describedby="describedBy(row, index)"
@@ -524,7 +535,15 @@ defineExpose({ focus, setActive });
         >{{ row.reason }}</span>
         <!-- A locked topic says so in text, not only by its padlock. -->
         <span v-if="row.lock" :class="cls('__sr')">（尚未解鎖）</span>
+        <!-- An unread topic says so in text, not only by its pip. -->
+        <span v-else-if="row.unread" :class="cls('__sr')">（未讀）</span>
       </span>
+      <span
+        v-if="row.unread && !row.lock"
+        :class="cls('__unread')"
+        data-testid="choice-card-unread"
+        aria-hidden="true"
+      ></span>
       <svg
         v-if="row.lock"
         :class="cls('__lock')"
@@ -1004,6 +1023,56 @@ defineExpose({ focus, setActive });
 .choice-card:focus .choice-card__row--active .choice-card__lock {
   color: var(--gold-300);
   opacity: 1;
+}
+
+/* Unread topics (authored-dialogue-unread-notices). A small gold diamond
+   pip sits in the trailing status slot (the padlock's slot: a locked row
+   never shows both) and the label reads one step brighter. The pip carries a
+   soft halo and glows once as the row enters, then rests; shape and text
+   carry the state as well as colour. */
+.choice-card__row--unread .choice-card__label {
+  color: var(--paper-50);
+}
+
+.choice-card__unread {
+  flex: none;
+  margin-left: auto;
+  width: calc(8px * var(--ui-scale));
+  height: calc(8px * var(--ui-scale));
+  margin-right: calc(4px * var(--ui-scale));
+  background: var(--gold-400);
+  transform: rotate(45deg);
+  border-radius: calc(1px * var(--ui-scale));
+  box-shadow:
+    0 0 0 calc(2px * var(--ui-scale)) rgba(228, 200, 142, 0.16),
+    0 0 calc(6px * var(--ui-scale)) rgba(238, 221, 180, 0.55);
+  animation: elosern-choice-unread-glint calc(var(--motion-slow) * 2) ease-out both;
+  animation-delay: calc(var(--motion-stagger) * var(--row-index, 0));
+}
+
+.choice-card--still .choice-card__unread,
+.choice-card--rows-still .choice-card__unread {
+  animation: none;
+}
+
+.choice-card:focus .choice-card__row--active .choice-card__unread {
+  background: var(--gold-300);
+}
+
+@keyframes elosern-choice-unread-glint {
+  0% {
+    opacity: 0;
+    box-shadow: 0 0 0 0 rgba(228, 200, 142, 0);
+  }
+  40% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 calc(4px * var(--ui-scale)) rgba(228, 200, 142, 0.28),
+      0 0 calc(12px * var(--ui-scale)) rgba(238, 221, 180, 0.8);
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Text for assistive technology only: clipped, never `display: none`, so

@@ -661,6 +661,47 @@ class DialogueValidatorTests(unittest.TestCase):
     def test_error_is_a_protocol_validation_error(self):
         self.assertTrue(issubclass(DialoguePanelError, ProtocolValidationError))
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-3-presentation-panel"
+    )
+    def test_unlock_batch_is_this_panels_own_open_topics(self):
+        """authored-dialogue-unread-notices: one watcher's wrapped batch."""
+        locked = {
+            **_choice("密談"),
+            "availability": "locked",
+            "requirement_hint": "需要信物",
+        }
+        choices = [_choice("公會"), _choice("任務"), locked]
+
+        def batch(**overrides):
+            value = {
+                "batch_id": "a" * 32,
+                "host_id": 41,
+                "context_id": "ctx-1",
+                "topic_ids": ["guild_staff.公會", "guild_staff.任務"],
+            }
+            value.update(overrides)
+            return _available(choices=choices, unlock_batch=value)
+
+        self.assertEqual(validate_dialogue(batch()), batch())
+        for bad in (
+            batch(batch_id=""),
+            batch(batch_id="x" * 65),
+            batch(batch_id="批次"),
+            batch(host_id=42),
+            batch(host_id=True),
+            batch(context_id="ctx-2"),
+            batch(topic_ids=[]),
+            batch(topic_ids=["guild_staff.公會", "guild_staff.公會"]),
+            batch(topic_ids=["guild_staff.密談"]),
+            batch(topic_ids=["guild_staff.不存在"]),
+            batch(topic_ids=["guild_staff.任務", "guild_staff.公會"]),
+            batch(extra=1),
+        ):
+            with self.subTest(batch=repr(bad["unlock_batch"])[:60]):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_dialogue(bad)
+
 
 class DialogueModeResolutionTests(BattlefieldIsolation, EvenniaTest):
     """The committed mode matrix: creation > combat > dialogue-live > exploration."""

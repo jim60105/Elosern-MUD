@@ -36,6 +36,38 @@ export const WithSubtitle = {
   },
 };
 
+// The dialogue unlock notice (authored-dialogue-unread-notices): a quiet
+// status (never an alert) shown once the conversation's choices return. The
+// spark-in-ring glyph and the diamond pips echo the choice list's unread
+// marker; each newly opened topic rides as a small framed chip.
+export const UnlockNotice = {
+  render: renderQueue,
+  args: {
+    toasts: [
+      {
+        id: 1,
+        title: "新的話題",
+        sub: "可以和霧門守門人聊聊了",
+        chips: ["霧門後的舊渡口", "守門人的燈"],
+        tone: "unlock",
+      },
+    ],
+  },
+};
+
+// Two rapid separate refreshes keep one notice per server batch, beside an
+// ordinary info entry.
+export const UnlockNoticeStack = {
+  render: renderQueue,
+  args: {
+    toasts: [
+      { id: 1, title: "新的話題", sub: "可以和霧門守門人聊聊了", chips: ["霧門後的舊渡口"], tone: "unlock" },
+      { id: 2, title: "新的話題", sub: "可以和霧門守門人聊聊了", chips: ["守門人的燈", "夢裡的約定", "渡口的規矩"], tone: "unlock" },
+      { id: 3, title: "已進入霧骨渡口", tone: "info" },
+    ],
+  },
+};
+
 // The queue cap: at most four entries are alive at once (FIFO eviction).
 export const FullQueue = {
   render: renderQueue,

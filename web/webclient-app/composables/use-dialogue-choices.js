@@ -132,6 +132,22 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
     { flush: "post" },
   );
 
+  // Deferred unlock notices (authored-dialogue-unread-notices): a batch that
+  // arrives while a scene plays (or a pick awaits its reply) waits; the
+  // moment the list is back — the scene's explicit finish, nothing in flight
+  // — the store turns each pending batch into one toast. A batch that arrives
+  // while the list is already shown is released at once. The toast is a
+  // status region and never takes focus.
+  watch(
+    [choicesShown, () => store.view.dialogueReading?.unlockPending ?? 0],
+    ([shown, pending]) => {
+      if (shown && pending > 0) {
+        store.releaseDialogueUnlocks?.();
+      }
+    },
+    { flush: "post" },
+  );
+
   // The committed exit rows (exploration-exit-compass design D9): the
   // `moveItems` rows the exit compass also reads, sourced independently of
   // the router's root frame (which carries no exit item).

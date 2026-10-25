@@ -316,7 +316,8 @@
         "world.narrative.tests.test_dream_dispatch_smoke",
         "world.ai",
         "world.lore",
-        "world.narrative.tests.test_dialogue_reading"
+        "world.narrative.tests.test_dialogue_reading",
+        "world.narrative.tests.test_dialogue_unread"
       ]
     },
     {

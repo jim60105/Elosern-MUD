@@ -74,6 +74,7 @@ export function dialoguePanel({
   pureChain = [],
   readingRevision = 0,
   completedTopicIds = [],
+  unlockBatch = null,
 } = {}) {
   return {
     schema_version: DIALOGUE_SCHEMA_VERSION,
@@ -92,7 +93,7 @@ export function dialoguePanel({
     pure_chain: pureChain,
     reading_revision: readingRevision,
     completed_topic_ids: completedTopicIds,
-    unlock_batch: null,
+    unlock_batch: unlockBatch,
   };
 }
 

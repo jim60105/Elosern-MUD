@@ -95,6 +95,24 @@ describe("action-feedback toast queue", () => {
     expect(warn).toHaveBeenCalledTimes(4);
   });
 
+  // authored-dialogue-unread-notices: the dialogue unlock notice tone carries
+  // its topic labels as a bounded chip list; blank chips are dropped.
+  it("accepts the unlock tone with bounded, non-blank topic chips", () => {
+    openSession();
+    const id = store.pushToast({
+      title: "新的話題",
+      sub: "可以和店長聊聊了",
+      tone: "unlock",
+      chips: ["霧門後", "  ", 3, ...Array.from({ length: 20 }, (_, n) => `話題${n}`)],
+    });
+    const [toast] = store.view.toasts;
+    expect(toast).toMatchObject({ id, title: "新的話題", tone: "unlock" });
+    expect(toast.chips[0]).toBe("霧門後");
+    expect(toast.chips).toHaveLength(16);
+    store.pushToast({ title: "無話題", tone: "unlock", chips: ["  "] });
+    expect("chips" in store.view.toasts[1]).toBe(false);
+  });
+
   it("caps the queue at four with FIFO eviction", () => {
     openSession();
     const ids = [1, 2, 3, 4, 5].map((n) => store.pushToast({ title: `t${n}`, tone: "info" }));

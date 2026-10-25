@@ -73,10 +73,19 @@ committed writer with no live session (Telnet, a scripted clock tick, an
 offline character, or another actor's state change) never walks a command,
 panel render or action path, so only the owning writer can schedule the
 refresh. Reading-completion refresh (``cause="reading_completed"``) belongs to
-``authored-dialogue-reading-server``; narrative first-observation and unlock
-batches belong to ``authored-dialogue-unread-notices``, which extends this
-callable with ``observe_availability``/``initial``. The only non-mutation cause
-this slice adds is ``"open"`` from the successful open/selection path.
+``authored-dialogue-reading-server``. The only non-mutation cause is
+``"open"`` from the successful open/selection path.
+
+Unread observation (``authored-dialogue-unread-notices``): every committed
+fan-out, before it pushes, observes the acting body's live authored
+conversation through ``world.narrative.dialogue_reading.observe_availability``
+(declared IDs of the current source/phase plus the currently open projection)
+and, when that leaves a pending announcement, claims it with
+``claim_unlock_batch`` under the owner lock. Only a claimed batch reaches
+``push_dialogue_reading``, which wraps it separately for each current watcher.
+The claim happens with or without a watcher, so no failure or disconnect can
+replay it later, while the durable unread markers stay. Observation never runs
+in a presenter and is skipped for a freeform-only host (no scene source).
 """
 
 from __future__ import annotations
@@ -97,6 +106,8 @@ MAX_CAUSE_CHARS = 64
 
 AVAILABILITY_REFRESHED_EVENT = "dialogue_availability_refreshed"
 AVAILABILITY_REFRESH_FAILED_EVENT = "dialogue_availability_refresh_failed"
+UNLOCK_BATCH_CLAIMED_EVENT = "dialogue_unlock_batch_claimed"
+UNLOCK_OBSERVATION_FAILED_EVENT = "dialogue_unlock_observation_failed"
 
 
 @dataclass(frozen=True)
@@ -527,16 +538,124 @@ def _fan_out_availability(owner: Any, cause: str) -> None:
                 "cause": cause,
             },
         )
+        claimed = (
+            _observe_unlocks(owner, body, session, cause)
+            if session is not None
+            else None
+        )
         # Every CURRENT connection of the owning player receives its OWN
         # re-rendered panel: another character of the same account is excluded
-        # and no connection's locally playing scene is replaced.
-        push_dialogue_reading(owner)
+        # and no connection's locally playing scene is replaced. A claimed
+        # unlock batch rides only this live push, never a snapshot.
+        if claimed is None:
+            push_dialogue_reading(owner)
+        else:
+            push_dialogue_reading(owner, unlock_batch=claimed)
     except Exception as error:
         log_warn(
             AVAILABILITY_REFRESH_FAILED_EVENT,
             context={"char": owner_id, "cause": cause},
             exc=error,
         )
+
+
+def _observe_unlocks(owner: Any, body: Any, session: Any, cause: str) -> Any:
+    """Observe the live conversation and claim its pending batch, or ``None``.
+
+    Failure-isolated: an observation or claim failure is reported once and the
+    refresh still pushes the current panel (its unread markers are derived
+    from saved reading, never from this observation).
+    """
+    from evennia.objects.objects import ObjectDB
+
+    from world.narrative.dialogue_reading import (
+        claim_unlock_batch,
+        observe_availability,
+    )
+    from world.rules.dialogue_context import (
+        DialogueContextError,
+        resolve_dialogue_context,
+    )
+    from world.rules.dialogue_sources import resolve_dialogue_source
+
+    owner_id = str(getattr(owner, "pk", "?"))
+    try:
+        host = ObjectDB.objects.filter(id=session.npc_id).first()
+        if host is None:
+            return None
+        try:
+            context = resolve_dialogue_context(body, host)
+        except DialogueContextError:  # observability: ignore R2: a non-lawful context observes nothing; the push degrades on its own
+            return None
+        if context.owner is None or not context.host_key:
+            return None
+        if int(getattr(context.owner, "pk", 0) or 0) != int(getattr(owner, "pk", 0) or 0):
+            # The reading row and the recipients must belong to one player:
+            # never observe or claim for an owner whose watchers differ.
+            log_warn(
+                UNLOCK_OBSERVATION_FAILED_EVENT,
+                context={
+                    "char": owner_id,
+                    "cause": cause,
+                    "reason": "owner_mismatch",
+                    "owner": str(getattr(context.owner, "pk", "?")),
+                },
+            )
+            return None
+        source = resolve_dialogue_source(context)
+        if source is None:
+            # A freeform-only host has no scene topics to observe.
+            return None
+        topics = tuple(source.dialogue.topics)
+        declared = tuple(topic.topic_id for topic in topics)
+        open_ids = tuple(
+            row.topic_id
+            for row in project_topics(context, context_id=session.context_id)
+            if row.availability == TOPIC_OPEN
+        )
+        # A public chain successor gated only by its predecessors opens by
+        # being read, not by a state change: no unlock notice for it.
+        quiet = tuple(
+            topic.topic_id
+            for topic in topics
+            if getattr(topic, "disclosure", "qualified") == "pure_chain"
+            and getattr(topic, "requires", None) is None
+        )
+        pending = observe_availability(
+            context.owner,
+            context.host_key,
+            open_ids,
+            declared_topic_ids=declared,
+            initial=cause == "open",
+            context_id=session.context_id,
+            quiet_topic_ids=quiet,
+        )
+        if pending is None:
+            return None
+        claimed = claim_unlock_batch(context.owner, pending.batch_id)
+        if claimed is None:
+            return None
+        log_info(
+            UNLOCK_BATCH_CLAIMED_EVENT,
+            context={
+                "char": owner_id,
+                "actor": str(getattr(body, "pk", "?")),
+                "npc": str(session.npc_id),
+                "host": claimed.host_key,
+                "batch": claimed.batch_id,
+                "topics": len(claimed.topic_ids),
+                "context": str(session.context_id),
+                "cause": cause,
+            },
+        )
+        return claimed
+    except Exception as error:
+        log_warn(
+            UNLOCK_OBSERVATION_FAILED_EVENT,
+            context={"char": owner_id, "cause": cause},
+            exc=error,
+        )
+        return None
 
 
 def _acting_body(owner: Any) -> Any:
@@ -574,6 +693,7 @@ __all__ = [
     "MAX_TOPIC_ID_CHARS",
     "TOPIC_LOCKED",
     "TOPIC_OPEN",
+    "UNLOCK_BATCH_CLAIMED_EVENT",
     "TopicProjection",
     "affected_dialogue_owners",
     "availability_context",

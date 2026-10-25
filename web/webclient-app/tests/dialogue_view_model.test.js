@@ -127,8 +127,9 @@ describe("dialogue view model", () => {
       expect(generated.topicId).toHaveLength(2048);
       expect(generated.payload.topic_id).toBe(LONG_ID);
       expect(generated.key).toBe(`dlg-topic-${LONG_ID}`);
-      // The declared unread field rides along untouched for its later owner.
-      expect(generated.unread).toBe(true);
+      // The lock marker wins over unread (authored-dialogue-unread-notices):
+      // a locked row never carries the unread marker, even if flagged.
+      expect(generated.unread).toBe(false);
     });
   });
 });
