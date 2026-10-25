@@ -6,6 +6,13 @@ Provide typed social identity source without parsing persona prose through deter
 
 ## ADDED Requirements
 
+### Requirement: Social qualification has identical meaning across sources
+Static and generated scenes SHALL read the same explicit acting-body identities. Generated persona or scene prose SHALL confer no social membership or write authority, and a generated role SHALL require no static NPC profile.
+
+#### Scenario: Generated prose cannot invent noble membership
+- **WHEN** a generated actor is described as noble but has no typed noble identity
+- **THEN** noble qualification fails with the same result as an equivalent static actor
+
 ### Requirement: Social identity is explicit typed state
 Dialogue social identity SHALL read registered explicit identity tags on the acting body. Persona text, racial ancestry, displayed titles and missing storage SHALL never imply membership or an ordered social hierarchy.
 

@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Canonical tag model and read/write API
 
+Shared contract v2 uses this reader for both sources. Test empty/typed identity without profile membership and prove generated persona prose grants no tags; no model-owned writer.
+
 - [ ] 1.1 Implement registry and pure reader/sole writer with <=8 registered keys and fail-closed corrupt-state behavior; add world/rules/tests/test_social_identity.py and module docs, verifying persona/title/race never grant identity.
 
 ## 2. Import and profile producers

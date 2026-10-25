@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No persona parsing, invented hierarchy, implicit model-authored identity writes or new freeform authority. Both scene sources read the same acting-body typed identity; generated-package publication retains deterministic construction ownership.
 
 ## Batch:
 
@@ -32,4 +32,4 @@ depends-on: authored-dialogue-contracts
 
 Code conflicts: Shares profile shape/application and creation/import paths with later explicit content metadata only. Independent of runtime/player; physical conditions depend on this. Guild.py overlap with progression integration is serialized by dependency.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation. This source API is independent of dialogue content storage.
