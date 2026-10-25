@@ -6,6 +6,13 @@ Provide lawful possessed authored conversations with owner-correct relationships
 
 ## ADDED Requirements
 
+### Requirement: Possessed informational dialogue covers generated roles
+Lawful possessed actors SHALL use shared scene features with generated informational hosts without a static profile requirement. Existing commission, service and freeform authority restrictions SHALL remain in force.
+
+#### Scenario: Generated host with no profile
+- **WHEN** a lawful possessed actor addresses a published generated role with informational scenes and a commission
+- **THEN** informational dialogue uses actor/owner separation while unsupported commission mutation refuses without a protected formal success body
+
 ### Requirement: Lawful possession can initiate authored dialogue
 A lawfully controlled bound companion SHALL initiate and leave authored conversations using its body and portrait. Guild, quest and affinity ownership SHALL remain with the owning player. Invalid possession or self-host contexts SHALL reject before any effect or content delivery.
 

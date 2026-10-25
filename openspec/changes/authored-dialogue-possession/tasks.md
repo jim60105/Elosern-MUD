@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Context ownership and single-writer routing
 
+Shared contract v2 is source-neutral. Test non-profile package-role contexts opening informational scenes with owner reading, while existing commission/service/freeform authority still refuses unsupported mutation.
+
 - [ ] 1.1 Extend resolver with complete party_scope authorization, owner relationship routing and actor session ownership; add world/rules/tests/test_authored_dialogue_possession.py for asymmetric races, dual relation records and malformed mirrors. Document actor/owner/host boundaries in resolver.
 
 ## 2. Enable every authored entry surface
