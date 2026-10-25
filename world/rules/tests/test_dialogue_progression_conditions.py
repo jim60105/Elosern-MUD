@@ -316,7 +316,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- guild rank ------------------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_guild_rank_reads_the_owner_and_the_canonical_order(self):
         condition = GuildRankAtLeast(rank_key=_RANK_HIGH)
@@ -340,7 +340,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_missing_rank_or_registration_fails_closed(self):
         condition = GuildRankAtLeast(rank_key=_RANK_HIGH)
@@ -361,7 +361,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertFalse(self.char2.attributes.has("guild_rank"))
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_corrupt_registration_and_unknown_rank_emit_one_integrity_event(self):
         condition = GuildRankAtLeast(rank_key=_RANK_HIGH)
@@ -390,7 +390,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- quest lifecycle -------------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::quest-predicates-distinguish-lifecycle-and-reward-claims",
     )
     def test_quest_states_distinguish_lifecycle_and_claim_receipts(self):
         def state_condition(state: str) -> QuestIs:
@@ -436,7 +436,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertFalse(evaluate_condition(state_condition("failed"), self._context()))
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::quest-predicates-distinguish-lifecycle-and-reward-claims",
     )
     def test_repeatable_records_match_existentially_and_ignore_unrelated_claims(self):
         self.char1.db.quest_log = [
@@ -458,7 +458,8 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertFalse(evaluate_condition(state_condition("not_accepted"), self._context()))
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::quest-predicates-distinguish-lifecycle-and-reward-claims",
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
     )
     def test_malformed_quest_state_fails_closed_and_dominates_an_any_sibling(self):
         corrupt_condition = QuestIs(
@@ -493,7 +494,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
                     self.assertFalse(evaluate_condition(nested, self._context()))
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::quest-predicates-distinguish-lifecycle-and-reward-claims",
     )
     def test_corrupt_reward_claims_fail_closed(self):
         self.char1.db.quest_log = [
@@ -517,7 +518,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
                 )
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::generated-progression-references-use-the-shared-owner-semantics",
     )
     def test_unpermitted_quest_definition_fails_closed(self):
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -533,7 +534,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::generated-progression-references-use-the-shared-owner-semantics",
     )
     def test_foreign_package_quest_reference_grants_nothing(self):
         row = SimpleNamespace(
@@ -593,7 +594,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- host affinity ---------------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_affinity_reads_the_host_relationship_toward_the_owner_only(self):
         stage = self.stages[2]
@@ -615,7 +616,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertFalse(evaluate_condition(condition, self._context()))
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_unknown_stage_or_missing_relationship_fails_closed(self):
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -642,7 +643,8 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- hints -----------------------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_hints_use_canonical_labels_without_private_values(self):
         rank_hint = condition_hint(
@@ -670,7 +672,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertNotIn(str(stage.floor), affinity_hint)
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
     )
     def test_hint_for_an_unpermitted_label_raises(self):
         with self.assertRaises(DialogueConditionError):
@@ -688,7 +690,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- read-only discipline --------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers",
     )
     def test_evaluation_and_hints_never_write_owner_or_host_state(self):
         self._register(self.char1, _RANK_HIGH)
@@ -715,7 +717,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- reference catalog and publication -------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+        "authored-dialogue-conditions::generated-progression-references-use-the-shared-owner-semantics",
     )
     def test_reference_catalog_exposes_the_progression_families(self):
         references = static_dialogue_references()
@@ -736,7 +738,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
             self.assertEqual(references.label("affinity_stage", stage.id), stage.name)
 
     @covers_requirement(
-        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+        "authored-dialogue-conditions::generated-progression-references-use-the-shared-owner-semantics",
     )
     def test_publication_rejects_unknown_and_foreign_progression_keys(self):
         with patch(
@@ -783,7 +785,8 @@ class DialogueProgressionConditionTests(EvenniaTest):
     # -- real selection --------------------------------------------------
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_rank_qualified_topic_opens_only_for_the_qualifying_owner(self):
         self._register(self.char1, _RANK_HIGH)
@@ -797,7 +800,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertIsNone(self.char2.db.dialogue_session)
 
     @covers_requirement(
-        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_possessed_actor_rank_cannot_substitute_for_the_owner(self):
         self.companion = create_object(
@@ -825,7 +828,8 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertEqual(delivery.owner_id, int(self.char1.pk))
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
+        "authored-dialogue-conditions::progression-conditions-resolve-the-owner-and-host-relationship",
     )
     def test_mixed_physical_and_progression_scenes_select_on_owner_state(self):
         self._register(self.char1, _RANK_HIGH)
@@ -854,7 +858,8 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertEqual(delivery.kind, "formal")
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
+        "authored-dialogue-conditions::quest-predicates-distinguish-lifecycle-and-reward-claims",
     )
     def test_locked_quest_refusal_applies_no_affinity_or_quest_effect(self):
         self.char1.db.quest_log = [
@@ -890,7 +895,7 @@ class DialogueProgressionConditionTests(EvenniaTest):
         self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_before + 1)
 
     @covers_requirement(
-        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations",
     )
     def test_stale_changed_state_refuses_a_fresh_selection_without_effects(self):
         self.char1.db.quest_log = [
