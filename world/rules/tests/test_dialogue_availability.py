@@ -51,6 +51,7 @@ from world.rules.dialogue import (
     live_dialogue_session,
     select_authored_topic,
 )
+from world.rules.dialogue_conditions import condition_hint
 from world.rules.dialogue_availability import (
     TOPIC_LOCKED,
     TOPIC_OPEN,
@@ -59,6 +60,7 @@ from world.rules.dialogue_availability import (
     refresh_dialogue_availability,
 )
 from world.rules.affinity_config import get_config
+from world.rules.dialogue_references import static_dialogue_references
 from world.rules.party import join_party
 from world.rules.possession import enter_possession, release_possession
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_RACES, synthetic_registries
@@ -346,9 +348,19 @@ class DialogueAvailabilityTests(EvenniaTest):
 
         locked = rows[_LOCKED_TOPIC]
         self.assertEqual(locked.availability, TOPIC_LOCKED)
-        # The canonical hint names the requirement label, never a body.
-        self.assertIsInstance(locked.requirement_hint, str)
-        self.assertTrue(locked.requirement_hint)
+        # The canonical hint is the SAME declaration render, and it names the
+        # requirement's canonical label, never a body or a numeric value.
+        declaration = next(
+            topic for topic in _dialogue().topics if topic.topic_id == _LOCKED_TOPIC
+        )
+        self.assertEqual(
+            locked.requirement_hint,
+            condition_hint(declaration.requires, self._context()),
+        )
+        self.assertIn(
+            static_dialogue_references().label("item", _ITEM_KEY),
+            locked.requirement_hint,
+        )
         self.assertEqual(locked.keyword, _LOCKED_KEYWORD)
         self.assertEqual(locked.label, "合成鎖定")
         self.assertEqual(
@@ -506,6 +518,7 @@ class DialogueAvailabilityTests(EvenniaTest):
         panel = updates[-1]["panels"]["dialogue"]
         self.assertIs(panel["available"], True)
         # The already delivered scene keeps its authored wording...
+        self.assertEqual(panel["delivery"]["delivery_id"], delivery.delivery_id)
         self.assertEqual(panel["delivery"]["scene_id"], "t_availability_varied_variant")
         self.assertEqual(
             [line["text"] for line in panel["delivery"]["lines"]],
