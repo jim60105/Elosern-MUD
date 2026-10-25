@@ -161,3 +161,7 @@ emission rules are scenario-pinned.
 #### Scenario: Completion is not a topic suggestion
 - **WHEN** action registries and exploration targets are projected
 - **THEN** explore.dialogue_complete is registered only for exact context-bound acknowledgement payloads and is never emitted as a suggestible or interact-target action
+
+#### Scenario: The possessed actor's talk entries stay visible disabled
+- **WHEN** the possessed actor is offered native freeform talk outside the authorized authored conversation surface
+- **THEN** that freeform entry keeps its existing stable visible-disabled possession refusal; lawful authored talk follows the separate enabled-context case
