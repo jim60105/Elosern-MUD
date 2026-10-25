@@ -6,11 +6,11 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 Shared contract v2 observes stable host_key and first-seen topic ID for both sources. Test new-phase initial observation without popup, phase-return history and permitted-current-phase-only batches; no static registry gate.
 
-- [ ] 1.1 Implement narrative observe_availability with initialized/ever_open/announced fields under reading-server lock discipline; add world/narrative/tests/test_dialogue_unread.py for initial open, hidden/locked, refusal, completion and relock/variant cases. Document no presenter writes.
+- [x] 1.1 Implement narrative observe_availability with initialized/ever_open/announced fields under reading-server lock discipline; add world/narrative/tests/test_dialogue_unread.py for initial open, hidden/locked, refusal, completion and relock/variant cases. Document no presenter writes.
 
 ## 2. Claim and post-commit live delivery
 
-- [ ] 2.1 Implement persisted bounded batch claim and ephemeral owner/current-context pusher, suppress all snapshots/reconnect popups and handle no-watcher/failure without replay. Add two-connection, rollback and duplicate-refresh tests with facade boundary event dialogue_unlock_batch_claimed.
+- [x] 2.1 Implement persisted bounded batch claim and ephemeral owner/current-context pusher, suppress all snapshots/reconnect popups and handle no-watcher/failure without replay. Add two-connection, rollback and duplicate-refresh tests with facade boundary event dialogue_unlock_batch_claimed.
 
 ## 3. Deferred frontend notice and markers
 
