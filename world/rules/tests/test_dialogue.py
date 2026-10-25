@@ -64,10 +64,11 @@ def _staff_answer(keyword):
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
-        # Register the quest catalog in this class's own setup: scripted talk
-        # reaches the affinity rulebook load (through ``run_scripted_talk``),
-        # which resolves ``introductory_hunt`` from the definition registry,
-        # so this class must not depend on an earlier test to have registered
+        # Register the quest catalog in this class's own setup: a formal
+        # informational selection (``select_authored_topic`` after the
+        # availability projection) still loads the affinity rulebook, which
+        # resolves ``introductory_hunt`` from the definition registry. This
+        # class therefore must not depend on an earlier test having registered
         # it.
         from world.quests.catalog import register_catalog
 

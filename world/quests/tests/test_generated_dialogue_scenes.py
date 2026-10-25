@@ -927,3 +927,191 @@ class GeneratedUnicodeIdentityTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(completed_topic_ids(player, host_key), (topic_id,))
         restored = live_dialogue_session(player)
         self.assertEqual(restored.delivery.topic_id, topic_id)
+
+
+class GeneratedEscortEffectRollbackTests(RegistryIsolationMixin, EvenniaTest):
+    """A dynamically enlisted escort scope survives a late session failure."""
+
+    def _escort_package(self, owner):
+        from world.quests.compile.compiler import compile_blueprint_core
+        from world.quests.tests._scene_package_fixtures import (
+            dialogue as _dialogue,
+            phase as _phase,
+            quest_payload,
+        )
+
+        quest = quest_payload(issuer="issuer")
+        quest["quest_type"] = "護衛"
+        quest["stages"] = [
+            {
+                "index": 0,
+                "objective": {
+                    "kind": "escort",
+                    "quantity": 1,
+                    "completion": "rendezvous",
+                    "protected_role_refs": ["protected"],
+                    "meeting_role_refs": ["meeting"],
+                },
+                "location_req": None,
+                "npc_req": [],
+            }
+        ]
+        definition_key = compile_blueprint_core(
+            quest,
+            package_roles=frozenset({"issuer", "protected", "meeting"}),
+        ).definition.key
+        payload = _package(
+            quest=quest,
+            roles=[
+                role("issuer"),
+                role("protected", conversable=False),
+                role("meeting", conversable=False),
+            ],
+            relationships=[],
+            knowledge=[],
+            encounters=[
+                {
+                    "scene_id": "gate",
+                    "role_ids": ["issuer"],
+                    "locator": anchor_locator(),
+                    "prerequisites": [],
+                }
+            ],
+            commissions=[
+                {"role_id": "issuer", "issuer_content_key": "story_issuer"}
+            ],
+            dialogue=[
+                {
+                    "role_id": "issuer",
+                    "initial_phase": "offer",
+                    "phases": [
+                        _phase(
+                            "offer",
+                            [{"default": True}],
+                            topics=[
+                                _topic(
+                                    "offer",
+                                    "委託",
+                                    "她把一張揉皺的紙條遞給你。",
+                                    requires={
+                                        "kind": "quest_is",
+                                        "definition_key": definition_key,
+                                        "state": "not_accepted",
+                                    },
+                                    refusal=_topic_scene(
+                                        "offer_refusal",
+                                        "她收回紙條，搖了搖頭。",
+                                        actor_line="還有別的事需要幫忙嗎？",
+                                    ),
+                                )
+                            ],
+                        )
+                    ],
+                }
+            ],
+        )
+        payload["dialogue"][0]["phases"][0]["topic_effects"] = [
+            {
+                "topic_id": "offer",
+                "verb": "offer_commission",
+                "reference": definition_key,
+            }
+        ]
+        published = publish_scene_package(
+            payload, owner=str(owner.pk), source_id="escort-rollback"
+        )
+        return published, definition_key
+
+    def test_a_scope_enlisted_during_acceptance_rolls_back_after_a_late_failure(
+        self,
+    ):
+        from evennia.objects.models import ObjectDB
+        from world.quests.runtime import read_records
+        from world.quests.escort_events import refresh_escort_scope
+        from world.rules.party import party_ids
+        from world.rules.quest_issuance import (
+            QuestIssuance,
+            Settlement,
+            provision_scoped_issuer,
+            register_quest_issuance,
+        )
+        from world.rules.guild_offers import QuestReward
+
+        register_catalog_once()
+        owner = create_object(PlayerCharacter, key="護衛委託人", location=self.room1)
+        issuer = create_object(NPC, key="委託人", location=self.room1)
+        protected = create_object(NPC, key="被護衛者", location=self.room1)
+        meeting = create_object(NPC, key="會合者", location=self.room1)
+        for actor in (issuer, protected, meeting):
+            actor.race = "human"
+            actor.apply_race_baseline()
+        published, definition_key = self._escort_package(owner)
+        row = scene_store.read_package(published.package_id)
+        for role_id, actor in (
+            ("issuer", issuer),
+            ("protected", protected),
+            ("meeting", meeting),
+        ):
+            scene_store.bind_role(row, role_id, int(actor.pk))
+        issuer.components.add(
+            ScriptedDialogue.create(
+                issuer, dialogue_key=f"scene_role:{published.package_id}:issuer"
+            )
+        )
+        issuer_key = provision_scoped_issuer(issuer, content_key="story_issuer")
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=definition_key,
+                issuer_key=issuer_key,
+                reward=QuestReward(copper=1, items=(), merit=0),
+                settlement=Settlement.AUTO,
+            )
+        )
+        scene_store.assign_grant_actor(
+            row, "issuer", definition_key, int(issuer.pk)
+        )
+        scene_store.set_grant_registered(row, "issuer", definition_key, True)
+        scene_store.set_dialogue_phase(row, "issuer", "offer")
+
+        source = dialogue_source_for_host(issuer)
+        topic_id = next(
+            topic.topic_id for topic in source.dialogue.topics if topic.keyword == "委託"
+        )
+        packages_before = len(scene_store.list_packages())
+        roster_before = party_ids(owner)
+        metadata_before = dict(owner.db.party_meta or {})
+        protected_member_before = protected.db.party_member
+
+        with patch(
+            "world.quests.escort_events.refresh_escort_scope",
+            wraps=refresh_escort_scope,
+        ) as refreshed, patch(
+            "world.rules.story_effects.log_warn",
+        ) as refused, patch(
+            "world.rules.dialogue.open_or_refresh_dialogue",
+            side_effect=RuntimeError("session failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                select_authored_topic(
+                    owner,
+                    issuer,
+                    topic_id,
+                    selection_id="escort-failure",
+                    expected_context_id=None,
+                )
+        # The acceptance reached its dynamic scope refresh, so this is the
+        # fault path the outer compensation must cover.
+        self.assertFalse(refused.called, refused.call_args)
+        self.assertTrue(refreshed.called)
+        self.assertEqual(len(scene_store.list_packages()), packages_before)
+        self.assertEqual(read_records(owner), [])
+        owner.attributes.reset_cache()
+        protected.attributes.reset_cache()
+        self.assertEqual(read_records(owner), [])
+        self.assertEqual(party_ids(owner), roster_before)
+        self.assertEqual(dict(owner.db.party_meta or {}), metadata_before)
+        self.assertEqual(protected.db.party_member, protected_member_before)
+        self.assertEqual(
+            ObjectDB.objects.filter(pk=protected.pk).first().db.party_member,
+            protected_member_before,
+        )

@@ -1512,11 +1512,16 @@ def _select_authored_topic(
     session_snapshot = attribute_snapshot(actor, "dialogue_session")
     quest_snapshot = None
     escort_effect = False
+    escort_actors: tuple[Any, ...] = ()
     if requested_effect is not None:
         from world.quests.transitions import snapshot_quest_log
 
         quest_snapshot = snapshot_quest_log(owner)
         escort_effect = _is_escort_effect(requested_effect.reference)
+        if escort_effect:
+            escort_actors = _escort_effect_actors(
+                requested_effect.reference, context.source_identity
+            )
 
     context_with_id = DialogueContext(
         actor=context.actor,
@@ -1528,17 +1533,29 @@ def _select_authored_topic(
         phase_revision=phase_revision,
     )
 
-    from contextlib import nullcontext
+    from contextlib import ExitStack
 
-    compensation = nullcontext()
+    compensation = ExitStack()
     if escort_effect:
-        # The same shared receipt covers every scope the acceptance enlists,
-        # including scopes discovered after the effect call, for the complete
-        # selection transaction. Its compensation stack therefore stays active
-        # through the session write instead of ending at acceptance.
-        from world.quests.escort_events import escort_event_boundary
+        # The shared receipt owns one compensation stack for the complete
+        # selection transaction, so a later session-write failure restores every
+        # scope acceptance touched. The accepting package scope is enlisted
+        # BEFORE acceptance performs any write (a later enlistment would
+        # snapshot already-mutated state), and the new protected actors are
+        # captured explicitly because they are not yet in any record.
+        from world.quests.escort_events import (
+            enlist_escort_scope,
+            escort_event_boundary,
+        )
 
-        compensation = escort_event_boundary((owner,))
+        compensation.enter_context(escort_event_boundary((owner,)))
+        package_id = getattr(context.source_identity, "package_id", None)
+        if isinstance(package_id, str) and package_id:
+            enlist_escort_scope(owner, package_id)
+        if escort_actors:
+            from world.quests.escort_lifecycle import escort_compensation
+
+            compensation.enter_context(escort_compensation(owner, escort_actors))
 
     try:
         from django.db import transaction
@@ -1628,6 +1645,40 @@ def _is_escort_effect(definition_key: str) -> bool:
         stage.objective.kind is ObjectiveKind.ESCORT
         for stage in definition.stages
     )
+
+
+def _escort_effect_actors(
+    definition_key: str, source_identity: Any
+) -> tuple[Any, ...]:
+    """The live protected actors of an escort commission, for rollback capture."""
+    from world.quests import scene_store
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY, ObjectiveKind
+
+    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
+    package_id = getattr(source_identity, "package_id", None)
+    if definition is None or not isinstance(package_id, str) or not package_id:
+        return ()
+    refs = tuple(
+        dict.fromkeys(
+            role
+            for stage in definition.stages
+            if stage.objective.kind is ObjectiveKind.ESCORT
+            for role in stage.objective.protected_role_refs
+        )
+    )
+    if not refs:
+        return ()
+    from evennia.objects.models import ObjectDB
+
+    actors: list[Any] = []
+    for role_id in refs:
+        binding = scene_store.get_role_binding(package_id, role_id)
+        if binding is None:
+            continue
+        actor = ObjectDB.objects.filter(id=int(binding.npc_id)).first()
+        if actor is not None:
+            actors.append(actor)
+    return tuple(actors)
 
 
 def complete_dialogue_delivery(
