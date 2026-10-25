@@ -131,6 +131,11 @@ class CmdsTalk(Command):
                 and npc.components.has(GuildStaff.name)
                 and quest_id
             ):
+                if possessed:
+                    # Guild turn-in keeps its own player-only authority; a
+                    # possessed body never substitutes for the commander.
+                    self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+                    return
                 self._turn_in_quest(npc, quest_id)
                 return
             if (
