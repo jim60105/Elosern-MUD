@@ -817,6 +817,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
     )
+    @covers_requirement("authored-scene-playback::one-player-renders-both-static-and-generated-scenes")
+    @covers_requirement("authored-scene-playback::manual-playback-synchronizes-every-line-boundary")
+    @covers_requirement("authored-scene-playback::playback-recovery-preserves-presentation-boundaries")
     def test_authored_scene_plays_line_by_line_with_synchronized_portraits(self):
         """authored-dialogue-playback 4.1: the shared manual scene player.
 

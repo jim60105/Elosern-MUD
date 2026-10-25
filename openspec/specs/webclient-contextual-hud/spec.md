@@ -396,11 +396,11 @@ The narrative SHALL render as a message window filling the bottom band's message
 
 #### Scenario: The dialogue name plate names the host truthfully
 - **WHEN** the committed mode is `dialogue` and the committed `dialogue` panel is available
-- **THEN** the window carries a name plate above its text area, naming the host with the panel's `display_name` plus ` ‧ 羈絆 <stage>` only when `bond_stage` is non-null; below the plate the text area presents the current response's pages — the session line as the narrative delivered it, paged and typed like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten from the narrative lines; the window carries no choice, free-dialogue, or exit row: those are the dialogue choice list's
+- **THEN** the window plate names the current explicit actor or host, with bond-stage suffix only for host speech; narration has no speaker plate; native freeform retains host-name behavior; the text area pages/types the current attributed scene line or native response unchanged, with no separate reply box, rows, avatar or rewritten narrative; choices remain in the dialogue choice list
 
 #### Scenario: A transient panel shows no plate, and reader state drives the choice list
 - **WHEN** mode is `dialogue` but the panel is unavailable (the transient window between a clear seam and its commit)
-- **THEN** the window renders no name plate, and the window makes known to the shell, from its own reader state and never from narrative prose, whether the current response's last page is on screen, fully shown, with no pending action mark — the moment the dialogue choice list waits for
+- **THEN** the window renders no name plate, and the window makes known to the shell, from its own reader state and never from narrative prose, whether an authored scene has received its final explicit finish activation, or a native response last page is fully shown, with no pending action mark
 
 #### Scenario: The window keeps the message region's box
 - **WHEN** the current response holds more text than one page and new lines keep arriving
@@ -447,12 +447,16 @@ The narrative SHALL render as a message window filling the bottom band's message
 - **THEN** the window spans the whole band, shows the name plate `灰婆婆 ‧ 羈絆 親睦`, types page 1 with no marker until it is fully shown, shows `▼`, advances on Enter on the page surface to page 2, and shows `■` once page 2 is fully shown, with no choice row inside the window at any point
 
 #### Scenario: An unbonded host's plate names only the host
-- **WHEN** mode `dialogue` commits with `bond_stage` `null`
-- **THEN** the name plate reads the host's `display_name` alone and carries no `羈絆` text
+- **WHEN** mode dialogue presents host speech with bond_stage null
+- **THEN** host speech names the host alone, actor speech names the acting body alone, and narration has no speaker plate or bond text
 
 #### Scenario: A transiently unavailable panel shows no plate
 - **WHEN** mode is `dialogue` but the committed panel is the unavailable form
 - **THEN** no name plate renders and the window shows the current response's pages with their page marker
+
+#### Scenario: Narration and actor plate change with text
+- **WHEN** an actor speech begins after a host line and then narration begins
+- **THEN** text/name/portrait transition synchronously to actor and then to no speaker, with no host plate retained for narration
 
 ### Requirement: An open drawer or overlay dims the stage behind it
 When a drawer or a full-screen overlay is open, the shell SHALL mark the stage so the surfaces behind
@@ -1958,11 +1962,15 @@ The settings surface's reading section SHALL offer a text-speed control with the
 - **WHEN** the client loads with no stored preferences, and the player then turns on `自動翻頁`
   and reloads
 - **THEN** auto-advance is off on the first load, and after the reload the toggle is on and a fully
-  shown page with a next page advances on its own
+  shown native prose page with a next page advances on its own; authored scenes remain manual at every line/page including their final finish activation
 
 #### Scenario: An invalid stored speed falls back to the default
 - **WHEN** the stored wrapper carries a text speed outside the four steps
 - **THEN** the client loads with the `normal` speed, and the other stored preferences still apply
+
+#### Scenario: Stored auto advance never drives authored scenes
+- **WHEN** auto-advance is on and an authored scene is playing at any motion level
+- **THEN** typing may be accelerated or instantaneous but no page, line or finish activation occurs automatically
 
 ### Requirement: A fixed-column dock pane stays inside the command region
 When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count SHALL govern only which cell each row occupies. Changing a row's rendered width SHALL NOT change which row occupies which cell.
@@ -2042,8 +2050,8 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **THEN** it presents its committed catalog entry under the same complete-image, grounded-silhouette and display-name-placeholder rule
 
 #### Scenario: Speaking follows dispatch state, never prose
-- **WHEN** the committed mode is dialogue and the available host renders
-- **THEN** stage actors carry a speaking state — the speaker at full brightness, listeners dimmed to 60% through the shared dim token; the host speaks except while an `explore.talk_scripted` or `explore.talk_freeform` action submitted by the player is in flight (from dispatch until its result is handled and declared presentation revision accepted, or until rejection), when the player speaks; the state derives from dispatch state, committed mode and panel availability, never prose
+- **WHEN** the committed mode is dialogue and a native freeform response is presented
+- **THEN** native freeform speaking follows existing dispatch-state behavior, never prose; static/generated scenes follow their explicit line attribution
 
 #### Scenario: Companions listen unless they are the host
 - **WHEN** a companion's identity does, or does not, match the active host
@@ -2055,7 +2063,7 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 
 #### Scenario: The speaking cue is never colour-only or disruptive
 - **WHEN** a speaking state is active
-- **THEN** the dim is not the only speaking cue — the name plate names the host and each actor exposes its speaking data attribute; actors remain decorative, with no focusable element; motion owns transitions; and no other dialogue behavior changes: the name plate, pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts
+- **THEN** the dim is not the only speaking cue — the name plate names the current explicit speaker (none for narration) and each actor exposes its speaking data attribute; actors remain decorative, with no focusable element; motion owns transitions; and no other dialogue behavior changes: the name plate, pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts
 
 #### Scenario: The host portrait comes from the art catalog
 - **WHEN** a non-party host's dialogue panel names ref `"41"` and its catalog entry carries an image and face rectangle
@@ -2070,7 +2078,7 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **THEN** the host renders lit with `data-speaking="true"` and the player dimmed with `data-speaking="false"`; a companion host appears only in its raised existing slot
 
 #### Scenario: The player is lit until the reply commits
-- **WHEN** the player's scripted pick remains in flight until its reply revision is accepted
+- **WHEN** the player's native freeform speech remains in flight until its reply revision is accepted
 - **THEN** the player is lit and the host dim until that revision, then the host is lit and the player dim again
 
 #### Scenario: A rejected choice returns the light to the host
@@ -2085,8 +2093,12 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **WHEN** dialogue host identity joins to a committed party or controlled lineup figure
 - **THEN** that identity has exactly one standing figure in actor-left, actor-right has no duplicate host, and the name plate, pagination and focus retain their existing behavior
 
+#### Scenario: Consecutive actor and host lines
+- **WHEN** a complete scene has actor speech followed by two host lines and narration
+- **THEN** speaker emphasis changes with each line, both host lines remain separately advanceable and narration removes emphasis
+
 ### Requirement: Dialogue choices appear centred over the stage after the line is fully read
-While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere else. The list SHALL render only while the message window reports that the current response's last page is on screen, fully shown, with no pending action mark, and while no action the player dispatched is in flight.
+While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere else. The list SHALL render only while the message window reports that a native response last page is fully shown or an authored scene has received its explicit final-page finish activation, with no pending action mark, and while no action the player dispatched is in flight.
 
 #### Scenario: Any unread or in-flight moment hides the list
 - **WHEN** a page is still typing, a further page is not yet read, or a pick or free-form speech awaits its reply
@@ -2146,7 +2158,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: A pick dispatches the scripted keyword
 - **WHEN** the player activates pick 2 through pointer, Enter, or the `2` key
-- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after scene reading finishes
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after the scene's final fully visible page receives a further activation
 
 #### Scenario: Free dialogue borrows the command line
 - **WHEN** the player activates `⌨ 自由對話`
@@ -2170,7 +2182,11 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: The choices never show beside unread text
 - **WHEN** a reply's first page is on screen and further lines of the same response arrive
-- **THEN** the list stays unrendered until the response's last page is fully shown
+- **THEN** the list stays unrendered until the authored scene explicit finish activation, or the native response last page is fully shown
+
+#### Scenario: Reconnect replays scene from first line
+- **WHEN** the client reconnects to the same valid delivered scene
+- **THEN** choices stay hidden until that replay finishes explicitly and replay submits no new selection/effect
 
 ### Requirement: The motion level is a client-local preference that governs every client animation
 The client SHALL have exactly three motion levels: `full`, `reduced`, and `off`. The settings surface SHALL offer them as one `動態效果` control with the three buttons `完整`, `減少`, and `關閉`. The pressed button SHALL be the effective level, marked by an indicator that does not rely on colour alone. Selecting a button SHALL store that level.
