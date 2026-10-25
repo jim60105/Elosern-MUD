@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Locked row presentation
 
+Shared contract v2 treats source-aware IDs as opaque. Include generated-style IDs/refusal in existing tests, with no static membership predicate or separate generated player.
+
 - [ ] 1.1 Map server availability/action descriptors into ChoiceCard with selectable lock glyph and aria-describedby hover/focus hint. Add synthetic Vitest tests distinguishing locked-refusal from disabled in-flight; document this distinction in component contract comments.
 
 ## 2. Playback and focus refresh
