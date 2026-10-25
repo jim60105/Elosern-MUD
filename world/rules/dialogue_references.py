@@ -179,6 +179,34 @@ def _quest_table() -> dict[str, str]:
     return {definition.key: definition.display_name for definition in QUEST_CATALOG}
 
 
+#: Marker for stored package provenance that cannot be established at all.
+_UNRESOLVED_PROVENANCE = object()
+
+
+def _package_definition_owner(definition_key: str) -> str | None | object:
+    """The package id that owns ``definition_key``, ``None`` when provably unowned.
+
+    Ownership is read from every stored package row regardless of publication
+    status: a definition registered by a package before it was cancelled is
+    still package-scoped and must never become a global reference. A row whose
+    stored payload no longer validates makes ownership unresolvable, so the
+    reference is denied instead of being treated as an ordinary runtime quest.
+    """
+    try:
+        from world.quests import scene_store
+        from world.quests.scene_package import validated_package
+
+        for row in scene_store.list_packages():
+            definition = validated_package(row.package_id, row.payload)
+            if definition is None:
+                return _UNRESOLVED_PROVENANCE
+            if definition.quest.definition.key == definition_key:
+                return row.package_id
+    except Exception:  # observability: ignore R2: an unreadable package store cannot authorize a reference, so qualification fails closed
+        return _UNRESOLVED_PROVENANCE
+    return None
+
+
 def permitted_quest_definition(
     definition_key: str, *, package_id: str | None = None
 ) -> bool:
@@ -188,8 +216,8 @@ def permitted_quest_definition(
     published scene package is permitted only for that exact current package
     (a foreign package key grants nothing); a definition registered without any
     package ownership is an ordinary runtime quest and stays permitted. The
-    package lookup is read-only and returns ``None`` for an unreadable package
-    payload, which fails the reference closed.
+    package lookup is read-only; a stored package whose ownership cannot be
+    resolved fails the reference closed.
     """
     from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 
@@ -197,19 +225,12 @@ def permitted_quest_definition(
         return True
     if definition_key not in QUEST_DEFINITION_REGISTRY:
         return False
-    try:
-        from world.quests import scene_store
-
-        owner = scene_store.package_for_definition(definition_key)
-    except Exception:  # observability: ignore R2: an unreadable package store cannot authorize a reference, so qualification fails closed
+    owner = _package_definition_owner(definition_key)
+    if owner is _UNRESOLVED_PROVENANCE:
         return False
     if owner is None:
         return True
-    return (
-        isinstance(package_id, str)
-        and bool(package_id)
-        and owner.package_id == package_id
-    )
+    return isinstance(package_id, str) and bool(package_id) and owner == package_id
 
 
 def static_dialogue_references() -> "DialogueReferences":

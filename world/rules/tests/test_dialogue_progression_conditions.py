@@ -536,11 +536,21 @@ class DialogueProgressionConditionTests(EvenniaTest):
         "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
     )
     def test_foreign_package_quest_reference_grants_nothing(self):
-        foreign = SimpleNamespace(package_id="t_foreign_package")
+        row = SimpleNamespace(
+            package_id="t_foreign_package",
+            payload={"synthetic": True},
+            status="cancelled",
+        )
+        definition = SimpleNamespace(
+            quest=SimpleNamespace(definition=SimpleNamespace(key=_QUEST_KEY))
+        )
         with patch(
-            "world.quests.scene_store.package_for_definition",
-            return_value=foreign,
+            "world.quests.scene_store.list_packages", return_value=[row]
+        ), patch(
+            "world.quests.scene_package.validated_package",
+            return_value=definition,
         ):
+            # Package ownership survives cancellation: the key stays scoped.
             self.assertFalse(permitted_quest_definition(_QUEST_KEY))
             self.assertTrue(
                 permitted_quest_definition(
@@ -566,6 +576,19 @@ class DialogueProgressionConditionTests(EvenniaTest):
                     QuestIs(definition_key=_QUEST_KEY, state="completed"),
                     self._context(),
                 )
+        # A stored package whose payload no longer validates makes ownership
+        # unresolvable, which denies the reference instead of granting it.
+        with patch(
+            "world.quests.scene_store.list_packages", return_value=[row]
+        ), patch(
+            "world.quests.scene_package.validated_package", return_value=None
+        ):
+            self.assertFalse(permitted_quest_definition(_QUEST_KEY))
+            self.assertFalse(
+                permitted_quest_definition(
+                    _QUEST_KEY, package_id="t_foreign_package"
+                )
+            )
 
     # -- host affinity ---------------------------------------------------
 
