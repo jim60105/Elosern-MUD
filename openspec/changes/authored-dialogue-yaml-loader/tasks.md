@@ -4,7 +4,7 @@ All tasks are future implementation, with Shared contract v2 fixed beforehand. T
 
 ## 1. Safe sorted discovery
 
-- [ ] 1.1 Implement loader.py safe direct-file scan and duplicate-key/tag/alias/document/path/UTF-8/size rejection. Add synthetic temp-directory tests for each rejecting input and sorted discovery; document the filename ownership/no-registration contract in the module and existing author docs.
+- [x] 1.1 Implement loader.py safe direct-file scan and duplicate-key/tag/alias/document/path/UTF-8/size rejection. Add synthetic temp-directory tests for each rejecting input and sorted discovery; document the filename ownership/no-registration contract in the module and existing author docs.
 
 ## 2. Common validation and atomic snapshot
 
