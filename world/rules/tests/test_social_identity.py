@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from evennia.utils.test_resources import EvenniaTestCase
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.lore.social_identities import (
@@ -43,6 +44,7 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             SocialIdentity(123, "標籤")  # type: ignore
 
+    @covers_requirement("social-identity::social-identity-is-explicit-typed-state")
     def test_read_missing_or_empty_is_empty_frozenset(self):
         """Missing or uninitialized social identity reads as empty frozenset, not commoner."""
         npc = MagicMock()
@@ -86,6 +88,7 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
         self.assertEqual(stored["social_identities"], ())
         self.assertEqual(read_social_identities(char), frozenset())
 
+    @covers_requirement("social-identity::identity-writes-follow-deterministic-construction")
     def test_set_rejects_invalid_inputs(self):
         """set_social_identities rejects unknown keys, non-strings, strings directly, non-iterables."""
         char = MagicMock()
@@ -121,6 +124,10 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
             char.attributes.get.return_value = bad
             self.assertEqual(read_social_identities(char), frozenset())
 
+    @covers_requirement(
+        "social-identity::social-qualification-has-identical-meaning-across-sources"
+    )
+    @covers_requirement("social-identity::social-identity-is-explicit-typed-state")
     def test_persona_title_and_race_never_grant_identity(self):
         """Persona prose describing noble or title/race alone never implies social identity."""
         npc = MagicMock(spec=NPC)
@@ -134,6 +141,7 @@ class SocialIdentityTagModelTests(EvenniaTestCase):
         # Reading social identity must be empty despite noble persona/title/elf race
         self.assertEqual(read_social_identities(npc), frozenset())
 
+    @covers_requirement("social-identity::identity-writes-follow-deterministic-construction")
     def test_guild_registration_union_and_rollback(self):
         """Guild registration adds adventurer to existing identities, rolls back on error."""
         from world.rules.guild import _registration_snapshot, _restore_registration

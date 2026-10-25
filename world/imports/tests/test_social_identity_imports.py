@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 from evennia.utils.test_resources import EvenniaTestCase
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from world.imports.loader import load_batch
 from world.imports.validate import validate_character
@@ -59,6 +60,7 @@ class ImportSocialIdentitiesTests(EvenniaTestCase):
         report = validate_character(record, typeclass=NPC)
         self.assertTrue(report.is_valid, report.rejections)
 
+    @covers_requirement("social-identity::identity-writes-follow-deterministic-construction")
     def test_import_validation_rejects_unknown_keys(self):
         """Unknown social identity key causes validation rejection."""
         record = self._sample_valid_record(social_identities=["clergy", "invented_king"])
@@ -84,6 +86,7 @@ class ImportSocialIdentitiesTests(EvenniaTestCase):
         report_bool = validate_character(record_bool, typeclass=NPC)
         self.assertFalse(report_bool.is_valid)
 
+    @covers_requirement("social-identity::social-identity-is-explicit-typed-state")
     def test_loader_instantiates_and_persists_social_identities(self):
         """Imported social_identities are persisted into entity.db.social_identities and readable."""
         record = self._sample_valid_record(
@@ -98,6 +101,7 @@ class ImportSocialIdentitiesTests(EvenniaTestCase):
             created = created_entities[0]
             self.assertEqual(read_social_identities(created), frozenset({"clergy"}))
 
+    @covers_requirement("social-identity::social-identity-is-explicit-typed-state")
     def test_profile_shape_validation_and_producer_mapping(self):
         """NpcProfile validates social_identities and shipped producers have typed identities."""
         from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
