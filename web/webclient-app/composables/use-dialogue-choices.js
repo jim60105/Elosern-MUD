@@ -10,7 +10,7 @@
 // stage speaker follows each line's explicit attribution; native lines
 // (the opening greeting, a freeform reply) keep the window's reader state
 // and the dispatch-state speaker.
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onScopeDispose, ref, watch } from "vue";
 import { useAuthoredScene } from "./use-authored-scene.js";
 
 export function useDialogueChoices(store, shellRef, dialogueVM) {
@@ -33,6 +33,7 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
       generation: store.view.generation,
       contextId: vm?.contextId ?? null,
       delivery: vm?.delivery ?? null,
+      npcId: vm?.host?.identity ?? null,
       actorName: vm?.actor?.displayName ?? "",
       hostName: vm?.host?.displayName ?? "",
       bondStage: vm?.bondStage ?? null,
@@ -58,6 +59,15 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
       }
     });
   }
+
+  // The reading client (authored-dialogue-reading-client): every formal
+  // finish becomes one memory-only completion acknowledgement; a refusal
+  // never reaches this hook. The store owns dedup, ordering, retry and
+  // discard, so this wiring only forwards the delivered identity.
+  const stopFormalFinish = onFormalSceneFinished((detail) => {
+    store.finishDialogueDelivery?.(detail);
+  });
+  onScopeDispose(stopFormalFinish);
 
   // A scripted topic pick awaiting its reply holds the window, so its
   // transcript never types before the scene delivery commits; so does a
@@ -93,7 +103,9 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
   // Design D4: the list shows only in dialogue with the panel available,
   // once the line is fully read — an authored scene once its final page
   // received the explicit finish activation — and never while an action is
-  // in flight (a pick or free speech awaiting its reply).
+  // in flight (a pick or free speech awaiting its reply). The reading
+  // acknowledgement is background synchronization and never closes the list;
+  // the server arbitrates a genuine overlap with a visible rejection.
   const choicesShown = computed(
     () =>
       store.view.mode === "dialogue" &&

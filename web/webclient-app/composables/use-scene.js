@@ -13,7 +13,9 @@ export function useScene(store, { panel, panelAvailable, dispatchIntent }) {
   // over the stage is its ONLY choice presentation — the dock has no
   // dialogue form) — the client never keeps a second copy of the picks.
   const dialogueVM = computed(() =>
-    store.view.mode === "dialogue" ? dialogueViewModel(panel("dialogue")) : null,
+    store.view.mode === "dialogue"
+      ? dialogueViewModel(panel("dialogue"), store.view.dialogueReading)
+      : null,
   );
   // The dialogue choice list's activations share the dock's dispatch
   // contract (the store owns the single dispatch entry and the freeform-

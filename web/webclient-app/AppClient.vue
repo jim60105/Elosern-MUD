@@ -196,6 +196,21 @@ const hostPortrait = computed(() => {
 // The speaking state (design D3): only a conversation with its host on the
 // stage dims anyone (a transiently unavailable panel leaves the player lit).
 const inDialogue = computed(() => store.view.mode === "dialogue");
+// The memory-only reading status (authored-dialogue-reading-client): shown at
+// the return-to-choices boundary only, so a scene that is still playing (or a
+// chain successor being revealed) is never covered by it. `failed` means the
+// acknowledgement did not save and the explicit retry is reachable; `pending`
+// is a queued successor waiting behind an unsaved predecessor.
+const readingStatus = computed(() => {
+  const reading = store.view.dialogueReading;
+  if (!reading || !(reading.pendingCount > 0)) {
+    return null;
+  }
+  return {
+    state: reading.retryable ? "failed" : "pending",
+    count: reading.pendingCount,
+  };
+});
 // The host's entrance and exit (webclient-mode-transitions D3) animate only
 // on a live mode change: at `off` there is no CSS phase (a CSS phase would
 // outlive the commit by a double frame even at 0s), and across a reconnect
@@ -1160,6 +1175,34 @@ const rootStyle = computed(() => {
             @move="onDialogueMove"
             @leave="onDialogueLeave"
           />
+          <!-- The reading status (authored-dialogue-reading-client): shown at
+               the return-to-choices boundary only. A saved acknowledgement
+               shows nothing; a pending one says so, and a failed one offers
+               the one explicit retry (same-context transport restoration also
+               retries by itself). Nothing here claims durable progress. -->
+          <p
+            v-if="choicesShown && readingStatus"
+            class="dialogue-reading-status"
+            data-testid="dialogue-reading-status"
+            :data-state="readingStatus.state"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="dialogue-reading-status__text">{{
+              readingStatus.state === "failed"
+                ? "閱讀進度尚未同步。"
+                : "閱讀進度待同步…"
+            }}</span>
+            <button
+              v-if="readingStatus.state === 'failed'"
+              type="button"
+              class="dialogue-reading-status__retry"
+              data-testid="dialogue-reading-retry"
+              @click="store.retryDialogueReading()"
+            >
+              重試
+            </button>
+          </p>
         </template>
         <!-- The presence rail (exploration-presence-rail design D4): the
              room's people and objects on the stage floor. It stays mounted
@@ -1965,6 +2008,40 @@ const rootStyle = computed(() => {
 .rest-step__close:hover,
 .rest-step__close:focus-visible {
   border-color: var(--gold-500);
+  color: var(--paper-50);
+  outline: none;
+}
+/* The reading status (authored-dialogue-reading-client) sits just above the
+   choice card in the same centred column: quiet paper text, gold only on the
+   explicit retry. It takes pointer events while the anchor does not. */
+.dialogue-reading-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10px * var(--ui-scale));
+  margin: 0 0 calc(10px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--paper-300);
+  font: var(--text-xs) var(--f-sans);
+  pointer-events: auto;
+}
+.dialogue-reading-status[data-state="failed"] {
+  color: var(--paper-100);
+}
+.dialogue-reading-status__retry {
+  padding: calc(2px * var(--ui-scale)) calc(10px * var(--ui-scale));
+  border: 1px solid var(--gold-500);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gold-300, var(--gold-500));
+  font: inherit;
+  cursor: pointer;
+}
+.dialogue-reading-status__retry:hover,
+.dialogue-reading-status__retry:focus-visible {
   color: var(--paper-50);
   outline: none;
 }
