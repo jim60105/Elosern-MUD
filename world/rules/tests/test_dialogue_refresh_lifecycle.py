@@ -414,7 +414,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_registration_and_rank_promotion_refresh_independently(self):
         self._open_line_session()
@@ -481,7 +481,9 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation",
+        "authored-dialogue-availability::"
+        "committed-state-changes-refresh-eligibility-without-rewriting-playback",
     )
     def test_reward_claim_writer_refreshes_after_commit(self):
         delivery = None
@@ -501,7 +503,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_quest_lifecycle_states_refresh_without_a_completion_observer(self):
         self._open_line_session()
@@ -563,7 +565,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "committed-state-changes-refresh-eligibility-without-rewriting-playback"
     )
     def test_outer_rollback_and_no_session_writes_publish_nothing(self):
         other = create_object(PlayerCharacter, key="合成無對話玩家")
@@ -617,7 +619,9 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation",
+        "authored-dialogue-availability::"
+        "committed-state-changes-refresh-eligibility-without-rewriting-playback",
     )
     def test_affinity_seed_and_change_refresh_the_other_connection(self):
         stage_floor = self.stages[2].floor
@@ -649,6 +653,10 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
             delivery.delivery_id,
         )
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
+    )
     def test_affinity_seed_is_a_source_on_its_own(self):
         self._open_line_session()
         _real, recorded = self._register_watcher(self.player)
@@ -664,7 +672,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_companion_leave_and_return_refresh_another_host_conversation(self):
         companion = self._companion()
@@ -698,7 +706,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_companion_deletion_refreshes_the_prior_owner_and_keeps_reading(self):
         companion = self._companion()
@@ -738,7 +746,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_membership_purge_refreshes_without_an_object_delete(self):
         companion = self._companion()
@@ -757,7 +765,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_daypart_boundary_reaches_an_idle_owner_outside_the_action(self):
         self._open_line_session()
@@ -782,6 +790,10 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
             self._choices(recorded)[_TIME_TOPIC]["availability"], TOPIC_OPEN
         )
 
+    @covers_requirement(
+        "authored-dialogue-availability::"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
+    )
     def test_session_owner_discovery_returns_only_live_sessions(self):
         self.assertEqual(session_bearing_dialogue_bodies(), ())
         self._open_line_session()
@@ -796,7 +808,7 @@ class DialogueRefreshLifecycleTests(_WatcherMixin, EvenniaTest):
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-condition-mutations-refresh-live-dialogue-after-commit"
+        "progression-and-world-lifecycle-refresh-every-relevant-conversation"
     )
     def test_possession_release_republishes_the_new_body_without_copying_content(self):
         # A real account-backed player is required for lawful possession.
@@ -883,7 +895,7 @@ class DialogueRefreshPhaseTests(RegistryIsolationMixin, _WatcherMixin, EvenniaTe
 
     @covers_requirement(
         "authored-dialogue-availability::"
-        "physical-refresh-includes-generated-scene-contexts"
+        "generated-lifecycle-retirement-preserves-deterministic-phase-authority"
     )
     def test_phase_transition_refreshes_live_playback_and_keeps_reading(self):
         record_completion(
