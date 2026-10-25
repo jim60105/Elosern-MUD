@@ -36,7 +36,7 @@ cleanup, and the ``explore.dialogue_leave`` adapter's explicit exit
 never touches ``db`` itself.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Any
@@ -124,9 +124,38 @@ class DialogueBudgetExceededError(DialogueRuntimeError):
     """Payload exceeds canonical UTF-8 JSON scene, bundle, or panel limits."""
 
 
+class DialogueCompletionError(DialogueRuntimeError):
+    """A formal reading acknowledgement cannot be accepted.
+
+    ``code`` is the stable refusal identity: ``dialogue_context_closed`` (no
+    live authenticated conversation), ``dialogue_receipt_unknown`` (the
+    delivery was never issued in the current context set),
+    ``dialogue_receipt_foreign`` (another owner/actor or host binding),
+    ``dialogue_receipt_stale`` (context, topic, phase or exact scene revision
+    no longer match), ``dialogue_receipt_kind`` (not a formal delivery) and
+    ``dialogue_predecessor_unread`` (a public successor whose predecessor
+    reading is not saved yet). None of them writes reading or gameplay state.
+    """
+
+
 DIALOGUE_SCENE_MAX_BYTES = 8192
 DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES = 16384
 DIALOGUE_PANEL_MAX_BYTES = 24576
+
+# Server-issued completion receipts (Shared contract v2): one formal receipt
+# per topic for the most recently issued delivery, keeping the latest and
+# previous delivery per topic inside a <=32 row context bound.
+MAX_COMPLETION_RECEIPTS = 32
+MAX_RECEIPTS_PER_TOPIC = 2
+MAX_COMPLETION_PREDECESSORS = 16
+MAX_CHAIN_SUCCESSORS = 15
+
+COMPLETION_CLOSED = "dialogue_context_closed"
+COMPLETION_RECEIPT_UNKNOWN = "dialogue_receipt_unknown"
+COMPLETION_RECEIPT_FOREIGN = "dialogue_receipt_foreign"
+COMPLETION_RECEIPT_STALE = "dialogue_receipt_stale"
+COMPLETION_RECEIPT_KIND = "dialogue_receipt_kind"
+COMPLETION_PREDECESSOR_UNREAD = "dialogue_predecessor_unread"
 
 
 @dataclass(frozen=True)
@@ -173,6 +202,282 @@ def delivery_to_wire(delivery: SceneDelivery | None) -> dict[str, Any] | None:
             for l in delivery.lines
         ],
     }
+
+
+@dataclass(frozen=True)
+class PureChainNode:
+    """One pre-delivered public successor: its delivered scene and gates."""
+
+    delivery: SceneDelivery
+    predecessors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CompletionOutcome:
+    """The accepted acknowledgement's status and the owner's reading revision."""
+
+    status: str
+    reading_revision: int
+
+
+def _receipt_for(
+    delivery: SceneDelivery, predecessors: Any = ()
+) -> dict[str, Any]:
+    """The exact completion receipt row for one formal delivered scene.
+
+    Owner/body/host/control are inherited from the parent session, so the row
+    carries only what completion must match: the delivery identity, the context
+    and topic it was issued in, the exact authored scene revision, the phase it
+    was issued under, and the public-chain gates it must satisfy.
+    """
+    bounded: list[str] = []
+    for predecessor in predecessors or ():
+        if (
+            isinstance(predecessor, str)
+            and predecessor
+            and len(predecessor) <= 2048
+            and predecessor not in bounded
+        ):
+            bounded.append(predecessor)
+    return {
+        "delivery_id": delivery.delivery_id,
+        "context_id": delivery.context_id,
+        "topic_id": delivery.topic_id,
+        "scene_revision": delivery.scene_revision,
+        "phase_revision": delivery.phase_revision,
+        "kind": delivery.kind,
+        "predecessors": bounded[:MAX_COMPLETION_PREDECESSORS],
+    }
+
+
+def _normalize_completion_receipt(raw: Any) -> dict[str, Any] | None:
+    """One stored receipt row in exact bounded form, or ``None`` when invalid."""
+    if not isinstance(raw, Mapping):
+        return None
+    delivery_id = raw.get("delivery_id")
+    context_id = raw.get("context_id")
+    topic_id = raw.get("topic_id")
+    scene_revision = raw.get("scene_revision")
+    for value, maximum in (
+        (delivery_id, 64),
+        (context_id, 64),
+        (topic_id, 2048),
+        (scene_revision, 64),
+    ):
+        if not isinstance(value, str) or not value or len(value) > maximum:
+            return None
+    if raw.get("kind") != "formal":
+        # Refusal, opening and service deliveries never hold a receipt.
+        return None
+    phase_revision = raw.get("phase_revision")
+    if phase_revision is not None and (
+        isinstance(phase_revision, bool) or not isinstance(phase_revision, (int, str))
+    ):
+        return None
+    raw_preds = raw.get("predecessors", ())
+    # Evennia persists lists as ``_SaverList`` (a MutableSequence, not a list
+    # subclass), so the stored value is classified by the sequence protocol.
+    if isinstance(raw_preds, (str, bytes)) or not isinstance(raw_preds, Sequence):
+        return None
+    predecessors: list[str] = []
+    for predecessor in raw_preds:
+        if (
+            not isinstance(predecessor, str)
+            or not predecessor
+            or len(predecessor) > 2048
+        ):
+            return None
+        if predecessor not in predecessors:
+            predecessors.append(predecessor)
+    if len(predecessors) > MAX_COMPLETION_PREDECESSORS:
+        return None
+    return {
+        "delivery_id": delivery_id,
+        "context_id": context_id,
+        "topic_id": topic_id,
+        "scene_revision": scene_revision,
+        "phase_revision": phase_revision,
+        "kind": "formal",
+        "predecessors": predecessors,
+    }
+
+
+def _merge_completion_receipts(existing: Any, new: Any = ()) -> list[dict[str, Any]]:
+    """Append receipts under the bounded per-topic and total contract.
+
+    Malformed rows are dropped, a repeated delivery identity replaces its row,
+    a third receipt for one topic retires that topic's oldest receipt, and the
+    whole set keeps its insertion order up to the total bound. The stored row
+    keeps the previous delivery of the same topic acknowledgeable until it is
+    superseded, so a delayed completion from another topic stays valid.
+    """
+    merged: list[dict[str, Any]] = []
+    for raw in list(existing or ()) + list(new or ()):
+        receipt = _normalize_completion_receipt(raw)
+        if receipt is None:
+            continue
+        for index, item in enumerate(merged):
+            if item["delivery_id"] == receipt["delivery_id"]:
+                merged[index] = receipt
+                break
+        else:
+            merged.append(receipt)
+        same_topic = [
+            index
+            for index, item in enumerate(merged)
+            if item["topic_id"] == receipt["topic_id"]
+        ]
+        if len(same_topic) > MAX_RECEIPTS_PER_TOPIC:
+            del merged[same_topic[0]]
+        if len(merged) > MAX_COMPLETION_RECEIPTS:
+            del merged[: len(merged) - MAX_COMPLETION_RECEIPTS]
+    return merged
+
+
+def _public_chain_topics(source: Any, root_id: str) -> tuple[Any, ...]:
+    """The eligible public successor closure of ``root_id``, predecessor-first.
+
+    A candidate qualifies only when it is declared ``pure_chain``, declares no
+    ``requires`` (a public node is effect-free and unqualified) and EVERY one of
+    its predecessors is the root or an already-qualified node. Traversal
+    therefore stops at a qualification boundary: a qualified topic is never
+    added to the eligible set, so nothing behind it can be bundled, and a node
+    that needs an out-of-chain predecessor is omitted together with its
+    dependents. Declaration order breaks ties, making the order deterministic.
+    """
+    eligible = {root_id}
+    ordered: list[Any] = []
+    changed = True
+    while changed and len(ordered) < MAX_CHAIN_SUCCESSORS:
+        changed = False
+        for topic in source.dialogue.topics:
+            if topic.topic_id in eligible:
+                continue
+            if getattr(topic, "disclosure", "qualified") != "pure_chain":
+                continue
+            if getattr(topic, "requires", None) is not None:
+                continue
+            predecessors = tuple(getattr(topic, "predecessors", ()) or ())
+            if not predecessors or not all(p in eligible for p in predecessors):
+                continue
+            ordered.append(topic)
+            eligible.add(topic.topic_id)
+            changed = True
+            if len(ordered) >= MAX_CHAIN_SUCCESSORS:
+                break
+    return tuple(ordered)
+
+
+def _chain_scene(topic: Any, revision: str, context: Any) -> Any | None:
+    """The candidate scene of ``topic`` whose exact revision is ``revision``."""
+    from world.rules.dialogue_conditions import select_scene_variant
+
+    selected = select_scene_variant(topic, context)
+    if selected.revision == revision:
+        return selected
+    candidates = [topic.fallback] + [
+        variant.scene for variant in getattr(topic, "variants", ())
+    ]
+    for candidate in candidates:
+        if candidate.revision == revision:
+            return candidate
+    return None
+
+
+def chain_deliveries(
+    session: "DialogueSession", host: Any, *, actor: Any = None
+) -> tuple[PureChainNode, ...]:
+    """Re-derive the current delivery's public chain from retained receipts.
+
+    The chain is anchored to the session's CURRENT scene delivery: only nodes
+    reachable from that root through retained receipt rows appear, so a
+    predecessor delivered by an earlier selection can never make old playback
+    current again while its receipt still serves a delayed acknowledgement.
+    Each node keeps the exact authored bytes by requiring the receipt's scene
+    revision, omits its dependents when that body no longer resolves, and is
+    emitted in predecessor order. Pure: no selection, receipt or reading write.
+    """
+    delivery = session.delivery
+    if session.kind != "scene" or delivery is None or delivery.kind != "formal":
+        return ()
+    root = delivery.topic_id
+    if not root:
+        return ()
+    from world.rules.dialogue_availability import availability_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
+
+    context = availability_context(actor, host)
+    source = resolve_dialogue_source(context)
+    if source is None:
+        return ()
+    latest: dict[str, dict[str, Any]] = {}
+    for raw in session.completion_receipts:
+        receipt = _normalize_completion_receipt(raw)
+        if receipt is None or not receipt["predecessors"]:
+            continue
+        if receipt["context_id"] != session.context_id:
+            continue
+        if receipt["phase_revision"] != session.phase_revision:
+            continue
+        latest[receipt["topic_id"]] = receipt
+    selected = {root}
+    nodes: list[PureChainNode] = []
+    changed = True
+    while changed and len(nodes) < MAX_CHAIN_SUCCESSORS:
+        changed = False
+        for raw in session.completion_receipts:
+            receipt = _normalize_completion_receipt(raw)
+            if receipt is None or not receipt["predecessors"]:
+                continue
+            topic_id = receipt["topic_id"]
+            if topic_id in selected:
+                continue
+            if not all(p in selected for p in receipt["predecessors"]):
+                continue
+            chosen = latest.get(topic_id)
+            if chosen is None:
+                continue
+            topic = next(
+                (
+                    candidate
+                    for candidate in source.dialogue.topics
+                    if candidate.topic_id == topic_id
+                ),
+                None,
+            )
+            if topic is None:
+                continue
+            scene = _chain_scene(topic, chosen["scene_revision"], context)
+            if scene is None:
+                # The authored bytes behind this receipt no longer resolve:
+                # omit the node and every dependent node rather than ship a
+                # different scene than the receipt acknowledges.
+                continue
+            selected.add(topic_id)
+            nodes.append(
+                PureChainNode(
+                    delivery=SceneDelivery(
+                        delivery_id=chosen["delivery_id"],
+                        selection_id="",
+                        context_id=chosen["context_id"],
+                        actor_id=session.actor_id,
+                        owner_id=session.owner_id,
+                        host_id=int(getattr(host, "pk", 0) or 0),
+                        topic_id=topic_id,
+                        scene_id=scene.scene_id,
+                        scene_revision=scene.revision,
+                        phase_revision=chosen["phase_revision"],
+                        kind="formal",
+                        lines=scene.lines,
+                        updated_tick=session.updated_tick,
+                    ),
+                    predecessors=tuple(chosen["predecessors"]),
+                )
+            )
+            changed = True
+            if len(nodes) >= MAX_CHAIN_SUCCESSORS:
+                break
+    return tuple(nodes)
 
 
 @dataclass(frozen=True)
@@ -739,10 +1044,10 @@ def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
                 }
             )
 
-    comp_receipts = []
-    for c in raw.get("completion_receipts", ()):
-        if isinstance(c, Mapping):
-            comp_receipts.append(dict(c))
+    # Read-side normalization applies the same exact row schema and the same
+    # per-topic/total bounds as the writer, so a malformed persisted list can
+    # never present an out-of-contract receipt set to a reader.
+    comp_receipts = _merge_completion_receipts((), raw.get("completion_receipts", ()))
 
     raw_src = raw.get("source_identity")
     source_id = None
@@ -881,10 +1186,7 @@ def open_or_refresh_dialogue(
         if len(sel_receipts) > 16:
             sel_receipts.pop(0)
 
-    for c in completion_receipts:
-        comp_receipts.append(c)
-    if len(comp_receipts) > 32:
-        comp_receipts = comp_receipts[-32:]
+    comp_receipts = _merge_completion_receipts(comp_receipts, completion_receipts)
 
     kind = "scene" if delivery is not None else "line"
     stored_line = str(line)[:MAX_DIALOGUE_SESSION_LINE_CODE_POINTS] if line is not None else None
@@ -1115,44 +1417,30 @@ def _select_authored_topic(
             f"Scene {getattr(scene, 'scene_id', '')} ({scene_bytes} bytes) exceeds limit of {DIALOGUE_SCENE_MAX_BYTES}",
         )
 
-    # 2. Delivery plus public pure_chain successors bundle check. A refusal is
-    # not a chain delivery and reveals no successor, so only a formal selection
-    # is measured with its reachable public bundle: an undelivered successor's
-    # protected size never blocks the permitted refusal.
+    # 2. Delivery plus its eligible public successor bundle. A refusal is not a
+    # chain delivery and reveals no successor, so only a formal selection is
+    # measured with the exact closure it is about to pre-deliver: an
+    # undelivered successor's protected size never blocks the permitted
+    # refusal, and a qualified descendant is never part of the bundle.
+    chain_topics = (
+        _public_chain_topics(source, matched_topic.topic_id)
+        if kind == "formal"
+        else ()
+    )
     if kind == "formal":
-        successors_map: dict[str, list[str]] = {
-            t.topic_id: [] for t in source.dialogue.topics
-        }
-        for t in source.dialogue.topics:
-            for p in getattr(t, "predecessors", ()):
-                if p in successors_map:
-                    successors_map[p].append(t.topic_id)
-
-        topic_map = {t.topic_id: t for t in source.dialogue.topics}
-        reachable_pure: set[str] = set()
-        to_visit = [
-            succ
-            for succ in successors_map.get(matched_topic.topic_id, [])
-            if topic_map.get(succ) and getattr(topic_map[succ], "disclosure", "") == "pure_chain"
-        ]
-        while to_visit:
-            curr = to_visit.pop(0)
-            if curr not in reachable_pure:
-                reachable_pure.add(curr)
-                for nxt in successors_map.get(curr, []):
-                    if topic_map.get(nxt) and getattr(topic_map[nxt], "disclosure", "") == "pure_chain":
-                        to_visit.append(nxt)
-
         bundle_bytes = scene_bytes
-        for succ_id in reachable_pure:
-            succ_topic = topic_map[succ_id]
-            succ_scenes = [succ_topic.fallback] + [v.scene for v in getattr(succ_topic, "variants", ())]
-            max_succ_scene = max(
-                (scene_canonical_bytes(s) if hasattr(s, "lines") else json_byte_size(s))
-                for s in succ_scenes
+        for successor in chain_topics:
+            successor_scenes = [successor.fallback] + [
+                variant.scene for variant in getattr(successor, "variants", ())
+            ]
+            bundle_bytes += max(
+                (
+                    scene_canonical_bytes(candidate)
+                    if hasattr(candidate, "lines")
+                    else json_byte_size(candidate)
+                )
+                for candidate in successor_scenes
             )
-            bundle_bytes += max_succ_scene
-
         if bundle_bytes > DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES:
             raise DialogueBudgetExceededError(
                 "dialogue_bundle_oversized",
@@ -1175,6 +1463,45 @@ def _select_authored_topic(
         lines=scene.lines,
         updated_tick=_session_updated_tick(),
     )
+
+    # Pre-delivered public successors: exact scenes plus a server-issued
+    # receipt each, so an acknowledgement can never name an undelivered node.
+    # They carry no selection receipt and grant no effect (no affinity): the
+    # root is the interaction, the successors are reading progress only.
+    chain_nodes: list[PureChainNode] = []
+    completion_receipts: list[dict[str, Any]] = []
+    if kind == "formal":
+        completion_receipts.append(
+            _receipt_for(delivery, getattr(matched_topic, "predecessors", ()))
+        )
+        for successor in chain_topics:
+            successor_scene = select_scene_variant(successor, context)
+            node_delivery = SceneDelivery(
+                delivery_id=uuid.uuid4().hex[:16],
+                selection_id="",
+                context_id=target_context_id,
+                actor_id=int(getattr(actor, "pk", 0)),
+                owner_id=int(getattr(owner, "pk", 0)),
+                host_id=int(getattr(host, "pk", 0)),
+                topic_id=successor.topic_id,
+                scene_id=successor_scene.scene_id,
+                scene_revision=successor_scene.revision,
+                phase_revision=context.phase_revision,
+                kind="formal",
+                lines=successor_scene.lines,
+                updated_tick=delivery.updated_tick,
+            )
+            chain_nodes.append(
+                PureChainNode(
+                    delivery=node_delivery,
+                    predecessors=tuple(getattr(successor, "predecessors", ()) or ()),
+                )
+            )
+            completion_receipts.append(
+                _receipt_for(
+                    node_delivery, getattr(successor, "predecessors", ())
+                )
+            )
 
     # 3. Preview resulting dialogue panel budget check
     from web.webclient.presentation.affordances import _scripted_keyword_descriptors
@@ -1202,7 +1529,13 @@ def _select_authored_topic(
         "context_id": target_context_id,
         "delivery": delivery_to_wire(delivery),
         "choices": choices,
-        "pure_chain": [],
+        "pure_chain": [
+            {
+                "delivery": delivery_to_wire(node.delivery),
+                "predecessors": list(node.predecessors),
+            }
+            for node in chain_nodes
+        ],
         "reading_revision": 0,
         "completed_topic_ids": [],
         "unlock_batch": None,
@@ -1240,7 +1573,13 @@ def _select_authored_topic(
                 and getattr(context.source_identity, "dialogue_key", "") == GUILD_STAFF_DIALOGUE_KEY
                 and (matched_topic.keyword == GUILD_STAFF_TURNIN_KEYWORD or matched_topic.topic_id.endswith(".topic_04"))
             )
-            if kind == "formal" and not (is_guild_staff and is_turnin):
+            # A pre-delivered pure successor is effect-free, including the
+            # talk affinity the public root already granted once.
+            if (
+                kind == "formal"
+                and getattr(matched_topic, "disclosure", "qualified") != "pure_chain"
+                and not (is_guild_staff and is_turnin)
+            ):
                 outcome = apply_affinity_change(host, owner, AffinitySource.TALK, 1)
                 if outcome.budget_capped:
                     delivery = replace(delivery, affinity_budget_capped=True)
@@ -1257,6 +1596,7 @@ def _select_authored_topic(
                     "delivery_id": delivery_id,
                     "delivery": delivery,
                 },
+                completion_receipts=tuple(completion_receipts),
             )
     except Exception:
         restore_attribute_best_effort(host, "relations_data", relations_snapshot)
@@ -1264,6 +1604,191 @@ def _select_authored_topic(
         raise
 
     return delivery
+
+
+def complete_dialogue_delivery(
+    actor: Any,
+    *,
+    delivery_id: str,
+    context_id: str,
+    topic_id: str,
+    scene_revision: str,
+    session: "DialogueSession | None" = None,
+) -> CompletionOutcome:
+    """Record one formal reading completion for a retained delivered scene.
+
+    The refusal-reporting wrapper around :func:`_complete_dialogue_delivery`.
+    Every rejection is reported once with identifiers only and writes nothing.
+    """
+    try:
+        return _complete_dialogue_delivery(
+            actor,
+            delivery_id=delivery_id,
+            context_id=context_id,
+            topic_id=topic_id,
+            scene_revision=scene_revision,
+            session=session,
+        )
+    except DialogueCompletionError as error:
+        log_info(
+            "dialogue_completion_rejected",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "actor": str(getattr(actor, "pk", "?")),
+                "topic": str(topic_id),
+                "context": str(context_id),
+                "delivery": str(delivery_id),
+                "reason": error.code,
+            },
+        )
+        raise
+
+
+def _complete_dialogue_delivery(
+    actor: Any,
+    *,
+    delivery_id: str,
+    context_id: str,
+    topic_id: str,
+    scene_revision: str,
+    session: "DialogueSession | None" = None,
+) -> CompletionOutcome:
+    """The completion body behind the reported :func:`complete_dialogue_delivery`.
+
+    Acceptance never re-runs eligibility or settles an effect: it only proves
+    that the claim names a retained server receipt of the CURRENT authenticated
+    conversation (same host binding, owner, actor, control, context, phase,
+    topic and exact scene revision) and that its public predecessor reading is
+    already saved, then persists the completion through the narrative writer.
+    A supplied ``session`` is treated as a cache hint: liveness and the
+    authoritative receipt set always come from the actor's live session.
+    """
+    from evennia.objects.objects import ObjectDB
+
+    from typeclasses.npcs import NPC
+
+    from world.narrative.dialogue_reading import (
+        STATUS_ALREADY_SAVED,
+        completed_topic_ids,
+        record_completion,
+    )
+    from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
+
+    def _reject(code: str, message: str) -> None:
+        raise DialogueCompletionError(code, message)
+
+    for value, field in (
+        (delivery_id, "delivery_id"),
+        (context_id, "context_id"),
+        (topic_id, "topic_id"),
+        (scene_revision, "scene_revision"),
+    ):
+        if not isinstance(value, str) or not value:
+            _reject(COMPLETION_RECEIPT_UNKNOWN, f"empty {field}")
+
+    live = live_dialogue_session(actor)
+    if live is None:
+        _reject(COMPLETION_CLOSED, "沒有進行中的對話。")
+    if session is not None and (
+        session.context_id != live.context_id
+        or session.npc_id != live.npc_id
+        or session.control_key != live.control_key
+    ):
+        # A caller-captured session that is no longer the live one must never
+        # restore a retired receipt set.
+        _reject(COMPLETION_RECEIPT_STALE, "對話情境已過期。")
+    session = live
+    if not session.context_id or context_id != session.context_id:
+        _reject(COMPLETION_RECEIPT_STALE, "對話情境已過期。")
+    receipt = next(
+        (
+            item
+            for item in session.completion_receipts
+            if item.get("delivery_id") == delivery_id
+        ),
+        None,
+    )
+    if receipt is None:
+        _reject(COMPLETION_RECEIPT_UNKNOWN, "這段對話沒有交付紀錄。")
+    if receipt.get("kind") != "formal":
+        _reject(COMPLETION_RECEIPT_KIND, "這段對話沒有可記錄的正式內容。")
+    if (
+        receipt.get("context_id") != context_id
+        or receipt.get("topic_id") != topic_id
+        or receipt.get("scene_revision") != scene_revision
+        or receipt.get("phase_revision") != session.phase_revision
+    ):
+        _reject(COMPLETION_RECEIPT_STALE, "對話情境已過期。")
+
+    host = ObjectDB.objects.filter(id=session.npc_id).first()
+    if host is None or not isinstance(host, NPC):
+        _reject(COMPLETION_CLOSED, "對話已經結束。")
+    try:
+        context = resolve_dialogue_context(actor, host, session=session)
+    except DialogueContextError as error:
+        raise DialogueCompletionError(
+            COMPLETION_RECEIPT_STALE, "對話情境已過期。"
+        ) from error
+    if context.context_id is None or context.context_id != context_id:
+        _reject(COMPLETION_RECEIPT_STALE, "對話情境已過期。")
+    if (
+        context.host_key != session.host_key
+        or context.source_identity != session.source_identity
+        or context.phase_revision != session.phase_revision
+    ):
+        _reject(COMPLETION_RECEIPT_STALE, "對話情境已過期。")
+    owner = context.owner
+    if (
+        owner is None
+        or int(getattr(owner, "pk", 0) or 0) != int(session.owner_id)
+        or int(getattr(actor, "pk", 0) or 0) != int(session.actor_id)
+    ):
+        _reject(COMPLETION_RECEIPT_FOREIGN, "這段對話不屬於你。")
+
+    completed = set(completed_topic_ids(owner, context.host_key))
+    if any(
+        predecessor not in completed
+        for predecessor in receipt.get("predecessors", ())
+    ):
+        # A public successor is acknowledgeable only after its predecessor's
+        # reading is saved; nothing is written and no body is released.
+        _reject(COMPLETION_PREDECESSOR_UNREAD, "前面的話還沒讀完。")
+
+    outcome = record_completion(
+        owner, host_key=context.host_key, topic_id=receipt["topic_id"]
+    )
+    if outcome.status == STATUS_ALREADY_SAVED:
+        log_info(
+            "dialogue_reading_already_saved",
+            context={
+                "char": str(getattr(owner, "pk", "?")),
+                "host": context.host_key,
+                "topic": receipt["topic_id"],
+                "revision": outcome.reading_revision,
+                "context": context_id,
+            },
+        )
+    else:
+        log_info(
+            "dialogue_reading_completed",
+            context={
+                "char": str(getattr(owner, "pk", "?")),
+                "actor": str(getattr(actor, "pk", "?")),
+                "npc": str(session.npc_id),
+                "host": context.host_key,
+                "topic": receipt["topic_id"],
+                "context": context_id,
+                "revision": outcome.reading_revision,
+            },
+        )
+    # Committed completion only: a rejected claim has already returned above,
+    # so it can never schedule an availability refresh or any other effect.
+    from world.rules.dialogue_availability import refresh_dialogue_availability
+
+    refresh_dialogue_availability(owner, cause="reading_completed")
+    return CompletionOutcome(
+        status=outcome.status, reading_revision=outcome.reading_revision
+    )
 
 
 def clear_dialogue_session(character: Any, npc: Any | None = None) -> bool:

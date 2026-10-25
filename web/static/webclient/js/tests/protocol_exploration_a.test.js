@@ -279,6 +279,7 @@ test("possession affordances are closed exploration and context actions with exa
     "explore.possess",
     "explore.possess_release",
     "explore.deliver",
+    "explore.dialogue_complete",
   ];
   assert.deepEqual(Protocol.CONTEXT_ACTIONS_ACTION_CODES, EXPECTED_ACTION_CODES);
 

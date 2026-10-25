@@ -605,6 +605,8 @@ class DialogueAvailabilityTests(EvenniaTest):
                     "availability",
                     "requirement_hint",
                     "descriptor",
+                    "unread",
+                    "predecessors",
                 },
             )
         self.assertEqual(
@@ -789,11 +791,14 @@ class DialogueAvailabilityTests(EvenniaTest):
         self.addCleanup(release_possession, self.player, companion, "handback")
 
         with patch(
-            "web.webclient.presentation.dialogue_push.push_dialogue_update"
+            "web.webclient.presentation.dialogue_push.push_dialogue_reading"
         ) as push:
             with self.captureOnCommitCallbacks(execute=True):
                 refresh_dialogue_availability(self.player, cause="control")
-        push.assert_called_once_with(companion)
+        push.assert_called_once_with(self.player)
+        # The owner-scoped fan-out receives the owner and resolves the
+        # possessed acting body itself; the two-connection/account-isolation
+        # acceptance lives in the presentation reading-projection suite.
 
     # -- text surface ----------------------------------------------------
 

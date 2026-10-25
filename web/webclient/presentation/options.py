@@ -19,6 +19,7 @@ from typing import Any
 
 from web.webclient.actions.exploration_actions import (
     ExplorationActionError,
+    validate_dialogue_complete_payload,
     validate_engage_payload,
     validate_look_payload,
     validate_move_payload,
@@ -68,6 +69,7 @@ _ACTION_PAYLOAD_VALIDATORS = {
     "explore.look": validate_look_payload,
     "explore.talk_open": validate_talk_open_payload,
     "explore.talk_scripted": validate_talk_scripted_descriptor,
+    "explore.dialogue_complete": validate_dialogue_complete_payload,
     "explore.party_invite": validate_party_invite_payload,
     "explore.party_leave": validate_party_leave_payload,
     "explore.engage": validate_engage_payload,

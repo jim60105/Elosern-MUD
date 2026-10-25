@@ -43,14 +43,16 @@ from world.rules.service_gate import (
 )
 from world.observability import log_warn
 
-# The twelve action codes the allowlist admits. ``explore.interact`` is
+# The thirteen action codes the allowlist admits. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
 # per-target affordances, never a dispatcher action. ``explore.talk_open`` is
 # a member because the exploration panel folds each conversable host's talk
 # entries into one 交談 affordance naming it, but the vocabulary itself never
 # emits it (the per-keyword and free-form entries stay, so the
 # ``context_actions`` form, suggestion eligibility, and the AI proposal ladder
-# keep consuming them).
+# keep consuming them). ``explore.dialogue_complete`` is a member because the
+# in-conversation acknowledgement is a registered dispatcher action; it is
+# never emitted as an affordance or a suggestion.
 ACTION_CODE_ALLOWLIST = (
     "explore.move",
     "explore.look",
@@ -64,13 +66,16 @@ ACTION_CODE_ALLOWLIST = (
     "explore.possess",
     "explore.possess_release",
     "explore.deliver",
+    "explore.dialogue_complete",
 )
 
 # The subset of action codes a suggestion may carry: party management is a
 # dock affordance, not a suggested action, and ``explore.talk_open`` would
-# duplicate the dock's own 交談 row.
+# duplicate the dock's own 交談 row. Completion is a context-bound
+# acknowledgement, never a suggested or interact-target action.
 SUGGESTIBLE_ACTION_IDS = frozenset(ACTION_CODE_ALLOWLIST) - {
     "explore.talk_open",
+    "explore.dialogue_complete",
     "explore.party_invite",
     "explore.party_leave",
     "explore.possess",
@@ -391,8 +396,11 @@ def _scripted_keyword_descriptors(
                     "label": row.label,
                     "availability": row.availability,
                     "requirement_hint": row.requirement_hint,
-                    "unread": False,
-                    "predecessors": [],
+                    # Reading projection: an open uncompleted formal topic is
+                    # unread, a locked row keeps the lock marker instead, and
+                    # the declared gates ride the row for the client.
+                    "unread": row.unread,
+                    "predecessors": list(row.predecessors),
                     "action_payload": row.descriptor,
                 }
             )

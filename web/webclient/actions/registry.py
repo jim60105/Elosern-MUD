@@ -85,9 +85,9 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    fourteen exploration adapters (``explore.move``, ``explore.look``,
+    fifteen exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
-    ``explore.dialogue_leave``, ``explore.party_invite``,
+    ``explore.dialogue_complete``, ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
     ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
     ``explore.deliver``) plus the two SkillBook use adapters
@@ -150,6 +150,7 @@ def build_production_action_registry() -> ActionRegistry:
         _engage_adapter,
         _look_adapter,
         _move_adapter,
+        _dialogue_complete_adapter,
         _party_invite_adapter,
         _party_leave_adapter,
         _possess_adapter,
@@ -164,6 +165,7 @@ def build_production_action_registry() -> ActionRegistry:
         _practice_adapter,
         validate_engage_payload,
         validate_deliver_payload,
+        validate_dialogue_complete_payload,
         validate_dialogue_leave_payload,
         validate_look_payload,
         validate_move_payload,
@@ -512,6 +514,17 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_dialogue_leave_adapter,
             # Full snapshot so the mode recomputes back to exploration
             # atomically with the cleared session (align-11 D1).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.dialogue_complete",
+            validate_payload=validate_dialogue_complete_payload,
+            adapter=_dialogue_complete_adapter,
+            # Full snapshot so the committed reading projection
+            # (reading_revision/completed_topic_ids/unread) and any qualified
+            # successor the completion just unlocked arrive atomically.
             affected_panels=(),
         )
     )

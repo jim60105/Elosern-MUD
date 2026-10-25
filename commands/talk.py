@@ -4,6 +4,15 @@ On a ``guild_staff`` dialogue host the keyword ``回報`` is an action keyword:
 ``talk <npc> 回報`` lists reportable quests (read-only), while
 ``talk <npc> 回報 <quest_id>`` turns that quest in through the deterministic
 ``dialogue_turn_in`` service. Every other keyword resolves exactly as before.
+
+Authored scene topics are emitted complete and in order. A non-paged text
+client has no per-line pager, so a COMPLETE successful emission counts as
+reading: each emitted node is acknowledged through the same
+``complete_dialogue_delivery`` service the browser uses, predecessor first, and
+a failed/partial emission stops the chain without marking that node or any
+dependent node. A public (``pure_chain``) successor is only selectable after
+its predecessor's reading is saved; naming it earlier answers with the fixed
+refusal line and writes nothing.
 """
 
 import uuid
@@ -15,6 +24,9 @@ from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
+    DialogueCompletionError,
+    chain_deliveries,
+    complete_dialogue_delivery,
     dialogue_key_for,
     escape_evennia_greeting,
     is_dialogue_host,
@@ -28,6 +40,7 @@ from world.rules.dialogue import (
 from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
 from world.rules.dialogue_sources import resolve_dialogue_source
 from world.lore.scenes import Speech
+from world.observability import log_warn
 from world.rules.guild import (
     GuildDataError,
     GuildServiceError,
@@ -42,6 +55,62 @@ _AMBIGUOUS_TARGET = "這裡有好幾個目標，請說得更明確一些。"
 _NOT_NPC = "那不是你可以交談的對象。"
 _NO_RESPONSE = "對方沒有理會你。"
 _USAGE = "用法：talk <npc> 或 talk <npc> <keyword>"
+_PURE_CHAIN_UNREAD = "對方搖了搖頭：「前面的話還沒說完呢。」"
+
+
+def _emit_delivery(caller, npc: NPC, delivery) -> bool:
+    """Emit one whole attributed scene in order, reporting emission success.
+
+    A text client has no pager, so a fully emitted scene counts as read — but
+    only a COMPLETE emission does. Any transport failure returns ``False`` and
+    the caller must stop the chain without marking reading for this node or any
+    dependent node.
+    """
+    try:
+        for line in delivery.lines:
+            if isinstance(line, Speech):
+                if line.speaker == "actor":
+                    caller.msg(f"你說：{line.text}")
+                else:
+                    caller.msg(f"{npc.key}說：{line.text}")
+            else:
+                caller.msg(line.text)
+    except Exception as error:
+        # The player never saw the whole scene, so it is not reading progress:
+        # stop here and leave both this node and its dependents unmarked.
+        log_warn(
+            "talk_emission_failed",
+            context={
+                "char": str(getattr(caller, "pk", "?")),
+                "npc": str(getattr(npc, "pk", "?")),
+                "topic": str(getattr(delivery, "topic_id", None) or "?"),
+            },
+            exc=error,
+        )
+        return False
+    return True
+
+
+def _complete_delivery(caller, delivery) -> bool:
+    """Record one successfully emitted formal delivery as read.
+
+    Returns ``False`` when the server refused the acknowledgement (for example
+    a superseded receipt) so the caller stops emitting dependent chain nodes
+    that could no longer be marked either.
+    """
+    if delivery.kind != "formal" or not delivery.topic_id:
+        return True
+    try:
+        complete_dialogue_delivery(
+            caller,
+            delivery_id=delivery.delivery_id,
+            context_id=delivery.context_id,
+            topic_id=delivery.topic_id,
+            scene_revision=delivery.scene_revision,
+        )
+    except DialogueCompletionError:  # observability: ignore R2: the completion service already emitted dialogue_completion_rejected with identifiers
+        return False
+    return True
 
 
 def _resolve_npc(
@@ -115,7 +184,7 @@ class CmdsTalk(Command):
         if possessed:
             try:
                 resolve_dialogue_context(self.caller, npc)
-            except DialogueContextError:
+            except DialogueContextError:  # observability: ignore R2: the fixed player-facing refusal IS the command answer
                 self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
                 return
 
@@ -145,7 +214,7 @@ class CmdsTalk(Command):
             ):
                 try:
                     summary = reportable_quest_summary(self.caller, npc)
-                except (RewardClaimError, GuildDataError) as error:
+                except (RewardClaimError, GuildDataError) as error:  # observability: ignore R2: the bounded refusal line IS the command answer
                     self.caller.msg(f"無法回報任務：{error}")
                     return
                 if summary is not None:
@@ -164,7 +233,7 @@ class CmdsTalk(Command):
                     return
                 try:
                     result = run_scripted_talk(npc, self.caller, keyword)
-                except (RewardClaimError, GuildDataError) as error:
+                except (RewardClaimError, GuildDataError) as error:  # observability: ignore R2: the bounded refusal line IS the command answer
                     self.caller.msg(f"無法回報任務：{error}")
                     return
                 if result is None:
@@ -178,7 +247,7 @@ class CmdsTalk(Command):
             # Static authored dialogue
             try:
                 context = resolve_dialogue_context(self.caller, npc)
-            except DialogueContextError:
+            except DialogueContextError:  # observability: ignore R2: the fixed player-facing refusal IS the command answer
                 self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
                 return
             source = resolve_dialogue_source(context)
@@ -201,6 +270,21 @@ class CmdsTalk(Command):
                 None,
             )
             if matched_row is None:
+                # A public successor stays unlisted until its predecessor's
+                # reading is saved. Naming it explicitly is refused without a
+                # selection, a receipt or any reading write.
+                pending_successor = next(
+                    (
+                        topic
+                        for topic in source.dialogue.topics
+                        if (topic.keyword == keyword or topic.topic_id == keyword)
+                        and getattr(topic, "disclosure", "qualified") == "pure_chain"
+                    ),
+                    None,
+                )
+                if pending_successor is not None:
+                    self.caller.msg(_PURE_CHAIN_UNREAD)
+                    return
                 # Unknown or hidden keyword: no session write, no state change,
                 # and no formal prose through the legacy response view.
                 if possessed:
@@ -224,18 +308,27 @@ class CmdsTalk(Command):
                     selection_id=selection_id,
                     expected_context_id=expected_context_id,
                 )
-            except Exception:
+            except Exception:  # observability: ignore R2: the rules boundary reported the rejection; the no-response line IS the answer
                 self.caller.msg(_NO_RESPONSE)
                 return
 
-            for line in delivery.lines:
-                if isinstance(line, Speech):
-                    if line.speaker == "actor":
-                        self.caller.msg(f"你說：{line.text}")
-                    else:
-                        self.caller.msg(f"{npc.key}說：{line.text}")
-                else:
-                    self.caller.msg(line.text)
+            # The text interface emits the whole attributed scene; a complete
+            # emission counts as reading. Each successfully emitted node is
+            # marked through the same completion service the browser uses, in
+            # predecessor order, and emission stops at the first failure.
+            emitted = _emit_delivery(self.caller, npc, delivery)
+            if not emitted:
+                return
+            completed = _complete_delivery(self.caller, delivery)
+            if not completed:
+                return
+            session = live_dialogue_session(self.caller)
+            if session is not None:
+                for node in chain_deliveries(session, npc, actor=self.caller):
+                    if not _emit_delivery(self.caller, npc, node.delivery):
+                        return
+                    if not _complete_delivery(self.caller, node.delivery):
+                        return
             if delivery.affinity_budget_capped:
                 # The authored selection attempted the same +1 talk affinity
                 # the scripted writer grants; a budget-blocked gain still owes
@@ -264,10 +357,10 @@ class CmdsTalk(Command):
         """Turn in one quest through the local guild-staff dialogue host."""
         try:
             result = dialogue_turn_in(self.caller, npc, quest_id)
-        except GuildServiceError:
+        except GuildServiceError:  # observability: ignore R2: the bounded refusal line IS the command answer
             self.caller.msg("這裡沒有公會服務人員。")
             return
-        except (RewardClaimError, GuildDataError) as error:
+        except (RewardClaimError, GuildDataError) as error:  # observability: ignore R2: the bounded refusal line IS the command answer
             self.caller.msg(f"無法回報任務：{error}")
             return
         self.caller.msg(
