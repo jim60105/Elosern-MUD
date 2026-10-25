@@ -211,7 +211,8 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             "SYNTH_SHOPS": "world.lore.settlements.shops",
             "SYNTH_PRICES": "world.lore.economy",
             "SYNTH_BUFFS": "world.rules.buffs",
-            "SYNTH_DIALOGUE": "world.rules.dialogue",
+            # Both the legacy and the authored dialogue shapes live here.
+            "SYNTH_DIALOGUE": "world.lore.dialogue.shape",
             "SYNTH_ACTS": "world.skills.sexual_acts._builder",
         }
         for catalog_name, module_name in checks.items():

@@ -31,6 +31,7 @@ import {
 } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { observeLoad } from "./support/scene_layers.js";
+import { dialoguePanel as v3Panel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 
 // Every journey here mounts the whole shell and drives real commits, so an
 // individual test can exceed Vitest's default budget on a shared runner (two
@@ -38,18 +39,14 @@ import { observeLoad } from "./support/scene_layers.js";
 // same explicit headroom the project's other mount-heavy suites use.
 vi.setConfig({ testTimeout: 20000 });
 
-const DIALOGUE = {
-  schema_version: 2,
-  available: true,
-  kind: "dialogue",
-  host: { identity: 7, display_name: "店長", portrait_ref: null },
-  bond_stage: "熟識",
+const DIALOGUE = v3Panel({
+  hostId: 7,
+  hostName: "店長",
+  bondStage: "熟識",
   line: "歡迎來到西風酒館。",
-  choices: [
-    { keyword_id: "news", label: "最近有什麼消息？" },
-    { keyword_id: "town", label: "關於這座城鎮" },
-  ],
-};
+  keywords: ["news", "town"],
+  labels: ["最近有什麼消息？", "關於這座城鎮"],
+});
 
 describe("nextModeChange", () => {
   it("names a change between two known modes", () => {
@@ -238,7 +235,7 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     expect(hosts()).toHaveLength(1);
     expect(wrapper.get('[data-anchor="band-command"]').attributes("inert")).toBeDefined();
-    commit("exploration", { dialogue: { schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" } } });
+    commit("exploration", { dialogue: unavailableDialoguePanel("對話已結束") });
     await nextTick();
     expect(stage().attributes("data-mode-change")).toBe("dialogue-exploration");
     expect(wrapper.get('[data-anchor="band-command"]').attributes("inert")).toBeUndefined();
@@ -259,7 +256,7 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     const focus = vi.spyOn(HTMLElement.prototype, "focus");
     try {
-      commit("exploration", { dialogue: { schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話已結束" } } });
+      commit("exploration", { dialogue: unavailableDialoguePanel("對話已結束") });
       await nextTick();
       await nextTick();
       await nextTick();

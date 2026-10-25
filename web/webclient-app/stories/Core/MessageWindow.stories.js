@@ -1,7 +1,8 @@
-import { h, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import MessageWindow from "../../components/MessageWindow.vue";
 import FullLogOverlay from "../../components/FullLogOverlay.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
+import { useAuthoredScene } from "../../composables/use-authored-scene.js";
 import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
 
 // MessageWindow: the AVG message window (AVG stage design §6;
@@ -332,6 +333,80 @@ export const Dialogue = {
     ],
     marks: [],
     textSpeed: "instant",
+  },
+};
+
+// An authored scene (authored-dialogue-playback): the shared manual player
+// over one complete delivery — the acting body's line, two consecutive host
+// lines (the second long enough to page), and narration. The real
+// `useAuthoredScene` owns the lines; the window owns pages. Click or press
+// Enter on the page: a typing page completes, a shown page turns, the line's
+// last page moves to the next line, and the final page waits for one more
+// activation (its ■ breathes) before the scene reports it is finished. The
+// plate names each speaker (the bond suffix only for the host), narration
+// keeps the plate row as an invisible spacer, and nothing ever advances on
+// its own, even with auto-advance on.
+const SCENE_DELIVERY = {
+  delivery_id: "story-dlv-1",
+  context_id: "story-ctx",
+  topic_id: "t_synth_storyteller.tale",
+  scene_id: "t_synth_storyteller.tale_scene",
+  scene_revision: "r1",
+  phase_revision: null,
+  kind: "formal",
+  lines: [
+    { kind: "speech", speaker: "actor", text: "說個故事吧。" },
+    { kind: "speech", speaker: "host", text: "「好，就說雲杉驛站的冬天。」" },
+    {
+      kind: "speech",
+      speaker: "host",
+      text:
+        "「那年冬天，苔徑上的雪積得比門檻還高，驛站裡只剩一盞油燈。旅人們圍著爐火，一個接一個說起自己走過的路：" +
+        "有人說北岸的霧會吞掉腳印，有人說雲杉林深處有座無人看守的石橋，橋下的水從不結冰。我在櫃檯後聽了整整一夜，" +
+        "把每一段路都記在帳本的背面，直到天亮時才發現，那些故事拼起來，正好是一張從這裡通往山口的地圖。」",
+    },
+    { kind: "narration", text: "爐火劈啪一響，說書人的影子在牆上晃了晃。" },
+  ],
+};
+
+const renderAuthoredScene = (args) => ({
+  setup() {
+    const finished = ref(false);
+    const source = computed(() => ({
+      playable: true,
+      generation: 1,
+      contextId: SCENE_DELIVERY.context_id,
+      delivery: SCENE_DELIVERY,
+      actorName: "旅人",
+      hostName: "灰婆婆",
+      bondStage: "親睦",
+    }));
+    const scene = useAuthoredScene(source);
+    scene.onSceneFinished(() => {
+      finished.value = true;
+    });
+    return () => [
+      h(MessageWindow, { ...args, scene: scene.presentation.value, onSceneAdvance: () => scene.advance() }),
+      finished.value
+        ? h(
+            "span",
+            { style: "position: absolute; left: 24px; bottom: 16px; color: var(--paper-500); font: var(--text-xs) var(--f-sans);" },
+            "scene-finished：選項回到舞台中央",
+          )
+        : null,
+    ];
+  },
+});
+
+export const AuthoredScene = {
+  render: renderAuthoredScene,
+  args: {
+    mode: "dialogue",
+    dialogue: dialogueViewModel(DIALOGUE_PANEL),
+    lines: seqLines(1, [["out", "你說：說個故事吧。"]]),
+    marks: [],
+    textSpeed: "normal",
+    autoAdvance: true,
   },
 };
 

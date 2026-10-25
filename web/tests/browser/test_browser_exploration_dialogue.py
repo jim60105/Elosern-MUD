@@ -16,6 +16,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
+    wait_for_shell_active,
     open_dialogue_choices,
     outbound_messages,
     overview_target_with_affordance,
@@ -67,6 +68,42 @@ def _shipped_first_answer() -> str:
     return table[SHIPPED_DIALOGUE_KEY].responses[0].response
 
 
+#: Methods that boot the synthetic catalogs with the authored-scene table.
+AUTHORED_SCENE_METHODS = ("test_authored_scene_plays_line_by_line_with_synchronized_portraits",)
+
+
+def _scene_frame(page) -> dict:
+    """The authored scene's attribution as rendered in one frame."""
+    return page.evaluate(
+        """() => {
+          const win = document.querySelector('[data-testid="message-window"]');
+          const surface = document.querySelector('[data-testid="message-page"]');
+          const plate = document.querySelector('[data-testid="message-name-plate"] .message-window__plate-name');
+          const speaking = (anchor) => {
+            const el = document.querySelector(`[data-anchor="${anchor}"] [data-testid="stage-actor"]`);
+            return el ? el.dataset.speaking : null;
+          };
+          const text = document.querySelector('.message-window__text');
+          return {
+            scene: win && win.getAttribute('data-scene'),
+            speaker: win && win.getAttribute('data-scene-speaker'),
+            typing: win && win.getAttribute('data-typing'),
+            readingComplete: win && win.getAttribute('data-reading-complete'),
+            text: surface ? surface.innerText.trim() : null,
+            page: surface && surface.getAttribute('data-page'),
+            pages: surface && surface.getAttribute('data-pages'),
+            plate: plate ? plate.textContent : null,
+            spacer: !!document.querySelector('[data-testid="message-plate-spacer"]'),
+            actor: speaking('actor-left'),
+            host: speaking('actor-right'),
+            textHeight: text ? Math.round(text.getBoundingClientRect().height) : null,
+            choices: !!document.querySelector('[data-anchor="choices"] [data-testid="dialogue-choices"]'),
+            focusOnPage: document.activeElement === surface,
+          };
+        }"""
+    )
+
+
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with the exploration fixture."""
     @classmethod
@@ -81,6 +118,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # These journeys assert shipped fixture identity end to end and were
         # never migrated to kit seams.
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+        if self._testMethodName in AUTHORED_SCENE_METHODS:
+            # The authored-scene playback journey: the kit catalogs and the
+            # kit's multi-line scene table on the scripted host.
+            runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
+            runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -244,11 +286,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             lambda s: _connected_active(s) and greeting in narrative_log_text(page),
         )
+        # Version-3 panel: the greeting is the native opening delivery's one
+        # host line.
+        delivery = (
+            ((store_state(page).get("panels") or {}).get("dialogue") or {}).get("delivery")
+            or {}
+        )
+        self.assertEqual(delivery.get("kind"), "opening")
         self.assertEqual(
-            ((store_state(page).get("panels") or {}).get("dialogue") or {}).get(
-                "line"
-            ),
-            greeting,
+            [line.get("text") for line in delivery.get("lines") or []],
+            [greeting],
             "the dialogue panel carries the host's authored greeting",
         )
         wait_for_store_state(page, lambda s: (s.get("dockDepth") or 0) == 1)
@@ -405,10 +452,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             and s.get("dispatch", {}).get("inFlight") is None,
         )
         page.wait_for_timeout(150)
-        trail = page.evaluate("() => window.__speakingTrail")
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
-        self.assertIn("true", trail, "the player must be lit while the pick is in flight")
-        self.assertEqual(trail[-1], "false", "the host speaks again once the reply commits")
+        # authored-dialogue-playback: the reply is an authored scene whose
+        # first line is the player's own speech, so the player is lit by that
+        # line's explicit attribution; reading on to the host's line returns
+        # the light to the host.
+        self.assertEqual(page.evaluate("() => window.__speakingTrail").pop(), "true")
+        open_dialogue_choices(page)
+        trail = page.evaluate("() => window.__speakingTrail")
+        self.assertIn("true", trail, "the player must be lit on the scene's actor line")
+        self.assertEqual(trail[-1], "false", "the host speaks on the scene's host line")
 
         # `/` opens the command line; Escape returns to the choice list once
         # the reply is read.
@@ -757,6 +810,126 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "explore.move",
             ],
         )
+
+    @covers_requirement(
+        "webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
+    )
+    @covers_requirement("authored-scene-playback::one-player-renders-both-static-and-generated-scenes")
+    @covers_requirement("authored-scene-playback::manual-playback-synchronizes-every-line-boundary")
+    @covers_requirement("authored-scene-playback::playback-recovery-preserves-presentation-boundaries")
+    def test_authored_scene_plays_line_by_line_with_synchronized_portraits(self):
+        """authored-dialogue-playback 4.1: the shared manual scene player.
+
+        At 1451x790 the kit host's one topic delivers a complete scene: the
+        player's line, two consecutive host lines, a host line long enough to
+        page, and narration. Every Enter on the focused page surface is one
+        explicit activation: text, name plate and portrait emphasis change
+        together at each line start, the paged line keeps its speaker, the
+        narration names nobody and lights neither figure, the text area never
+        changes height, and the choices stay hidden until a further
+        activation after the final page. A reload mid-scene replays it from
+        line one without a second selection, and the playback appends no
+        transcript of its own.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        actor_name = store_state(page)["panels"]["dialogue"]["actor"]["display_name"]
+        host_name = store_state(page)["panels"]["dialogue"]["host"]["display_name"]
+
+        def wait_scene_line(text: str) -> None:
+            page.wait_for_function(
+                """(text) => {
+                  const win = document.querySelector('[data-testid="message-window"]');
+                  const surface = document.querySelector('[data-testid="message-page"]');
+                  return !!win && win.getAttribute('data-scene') === 'true'
+                    && !!surface && surface.innerText.includes(text);
+                }""",
+                arg=text,
+                timeout=30000,
+            )
+
+        _press(page, "1")  # 故事 -> explore.talk_scripted
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        wait_scene_line("說個故事吧。")
+        log_length = narrative_log_length(page)
+
+        frames = [_scene_frame(page)]
+        for _ in range(12):
+            if frames[-1]["choices"]:
+                break
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+            frames.append(_scene_frame(page))
+        steps = [
+            (f["speaker"], f["plate"], f["actor"], f["host"], f["page"], f["pages"])
+            for f in frames
+            if not f["choices"]
+        ]
+        lines = [(speaker, plate, actor, lit) for speaker, plate, actor, lit, _p, _n in steps]
+        # The player's line, two host lines (the third paged), narration.
+        self.assertEqual(lines[0], ("actor", actor_name, "true", "false"))
+        self.assertEqual(lines[1], ("host", host_name, "false", "true"))
+        self.assertEqual(lines[2], ("host", host_name, "false", "true"))
+        paged = [step for step in steps if step[0] == "host" and step[5] not in (None, "1")]
+        self.assertGreaterEqual(len(paged), 2, "the long host line spans pages under one speaker")
+        self.assertTrue(all(step[1] == host_name for step in paged))
+        self.assertEqual(lines[-1], ("narration", None, "false", "false"))
+        narration_frame = [f for f in frames if f["speaker"] == "narration"][-1]
+        self.assertTrue(narration_frame["spacer"], "narration keeps the plate row as a spacer")
+        self.assertEqual(
+            {f["textHeight"] for f in frames if f["scene"] == "true"},
+            {frames[0]["textHeight"]},
+            "the text area keeps its height across speakers: %r"
+            % [(f["speaker"], f["textHeight"]) for f in frames],
+        )
+        # The final page is fully shown, the choices still hidden ...
+        self.assertEqual(frames[-2]["readingComplete"], "false")
+        self.assertFalse(frames[-2]["choices"])
+        # ... and the further activation returns them with focus on the list.
+        self.assertTrue(frames[-1]["choices"])
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
+            )
+        )
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        self.assertEqual(narrative_log_length(page), log_length, "playback appends no transcript")
+
+        # A reload mid-scene replays the delivered scene from line one.
+        page.reload()
+        wait_for_shell_active(page)
+        install_outbound_recorder(page)
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        wait_scene_line("說個故事吧。")
+        replay = _scene_frame(page)
+        self.assertEqual(
+            (replay["speaker"], replay["plate"], replay["actor"], replay["host"], replay["choices"]),
+            ("actor", actor_name, "true", "false", False),
+        )
+        open_dialogue_choices(page)
+        self.assertEqual(sent_action_count(page), 0, "the replay selected nothing again")
 
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"

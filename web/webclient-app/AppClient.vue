@@ -82,6 +82,7 @@ const {
   panel, panelAvailable, dispatchIntent, modeChange, modeHydrating,
   dialogueVM, onDialoguePick, onDialogueFreeform, onDialogueLeave,
   onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
+  scenePresentation, sceneHold, onSceneAdvance, dialogueStageSpeaker,
   completionCandidates, possessionBanner,
   titleBallotPanel, titleBallotCandidates, onMapMove, showObjectiveTracker,
   skipDisabled, practiceFeedback, onPractice,
@@ -270,11 +271,19 @@ const explorationSpeakingIdentity = computed(() => {
   const figure = explorationFocusFigure.value;
   return figure && !figure.isControlled ? figure.identity : null;
 });
-// The dialogue emphasis is unchanged (design D3): the committed host while the
-// conversation is on and the host is the one speaking. Dialogue and
-// exploration are exclusive modes, so one prop carries both.
+// The dialogue emphasis (design D3; authored-dialogue-playback): the stage
+// speaker of use-dialogue-choices.js — an authored scene's current line
+// attribution, a native freeform line in flight, else the host — computed
+// from the same state as the message window's line, so text, name plate and
+// emphasis change in one render. "actor" lights the controlled figure (a
+// possessed companion when control is borrowed), "host" the host (a
+// companion host in its own lineup slot), and narration (null) lights
+// neither. Dialogue and exploration are exclusive modes, so one prop carries
+// both.
+const actorListening = computed(() => inDialogue.value && !!dialogueVM.value && dialogueStageSpeaker.value !== "actor");
+const hostListening = computed(() => inDialogue.value && !!dialogueVM.value && dialogueStageSpeaker.value !== "host");
 const dialogueSpeakingIdentity = computed(() =>
-  inDialogue.value && dialogueVM.value && store.view.dialogueSpeaker === "host"
+  inDialogue.value && dialogueVM.value && dialogueStageSpeaker.value === "host"
     ? panel("dialogue")?.host?.identity ?? null
     : null,
 );
@@ -702,6 +711,8 @@ const rootStyle = computed(() => {
         :auto-advance="store.view.autoAdvance"
         :motion-level="store.view.motionLevel"
         :beat-playback="store.view.beatPlayback"
+        :scene="scenePresentation"
+        :scene-hold="sceneHold"
         :mode-change="modeChange"
         :beat-hold="beatHold"
         :card-open="
@@ -740,6 +751,7 @@ const rootStyle = computed(() => {
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
         @reading-change="onReadingChange"
+        @scene-advance="onSceneAdvance"
         @beat-shown="store.beatShown"
         @beat-skip="store.skipBeats"
         @switch-character="onSwitchCharacter"
@@ -783,7 +795,7 @@ const rootStyle = computed(() => {
             :slots="companionLineupSlots"
             :compact="inDialogue"
             :speaking-identity="companionSpeakingIdentity"
-            :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
+            :dimmed="actorListening"
             :motion-level="store.view.motionLevel"
             :gesture="playerGesture?.gesture ?? null"
             :gesture-key="beatStage?.key ?? null"
@@ -822,7 +834,7 @@ const rootStyle = computed(() => {
               :panel="standee.panel"
               :has-reference="standee.hasReference"
               :name="standee.name"
-              :dimmed="inDialogue && store.view.dialogueSpeaker === 'player'"
+              :dimmed="hostListening"
               :motion-level="store.view.motionLevel"
             />
           </Transition>

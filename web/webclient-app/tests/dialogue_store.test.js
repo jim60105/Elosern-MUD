@@ -19,27 +19,14 @@ import { useElosernStore } from "../stores/elosern.js";
 import { createFrameResolver } from "../stores/frame-resolvers.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { partyWindowTab } from "../components/party-window-memory.js";
+import { dialoguePanel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 
-const DIALOGUE_PANEL = {
-  schema_version: 2,
-  available: true,
-  kind: "dialogue",
-  host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-  bond_stage: "親睦",
-  line: "「渡河要五枚銅板。」",
-  choices: [
-    { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-    { keyword_id: "smell", label: "含糊帶過氣味" },
-    { keyword_id: "chest", label: "直接問箱櫃下落" },
-    { keyword_id: "silence", label: "保持沉默" },
-  ],
-};
+const DIALOGUE_PANEL = dialoguePanel({
+  keywords: ["fare", "smell", "chest", "silence"],
+  labels: ["「就五枚，走嗎？」", "含糊帶過氣味", "直接問箱櫃下落", "保持沉默"],
+});
 
-const UNAVAILABLE_PANEL = {
-  schema_version: 2,
-  available: false,
-  reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" },
-};
+const UNAVAILABLE_PANEL = unavailableDialoguePanel();
 
 function dialogueSnapshot(overrides = {}) {
   return fx.snapshot({
@@ -491,10 +478,13 @@ describe("dialogue store mode lifecycle", () => {
   });
 });
 
-// webclient-dialogue-stage-actors (design D3): the stage's speaking state is
-// derived from the in-flight dispatch — "player" from a talk_scripted or
-// talk_freeform dispatch until its declared revision is accepted or it is
-// rejected, "host" otherwise.
+// webclient-dialogue-stage-actors (design D3), narrowed by authored-
+// dialogue-playback: the dispatch-derived speaking state is "player" only
+// while a native talk_freeform line is in flight, until its declared
+// revision is accepted or it is rejected, and "host" otherwise. A scripted
+// topic pick is not speech of its own — the scene it delivers attributes
+// every line explicitly (use-authored-scene.js) — so it leaves the state
+// on the host.
 describe("dialogueSpeaker follows the in-flight speech action", () => {
   let store;
   let sender;
@@ -510,11 +500,9 @@ describe("dialogueSpeaker follows the in-flight speech action", () => {
     expect(store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted).toBe(true);
   });
 
-  it("is the host at rest and the player from a pick's dispatch until its revision commits", () => {
+  it("is the player from a freeform line's dispatch until its revision commits", () => {
     expect(store.view.dialogueSpeaker).toBe("host");
-    // The choice list's pick activation: the single dispatch entry.
-    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 41, keyword_id: "fare" }, null)).not.toBe(null);
-    expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
+    expect(store.dispatchAction("explore.talk_freeform", { npc_id: 41, speech: "五枚就五枚。" }, null)).not.toBe(null);
     expect(store.view.dialogueSpeaker).toBe("player");
     // The handled result declares revision 5: the reply has not committed.
     store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: 5 })], {});
@@ -522,6 +510,14 @@ describe("dialogueSpeaker follows the in-flight speech action", () => {
     // The reply's revision commits: the light returns to the host.
     store.receive(1, "ui_update", [fx.update({ ...dialogueSnapshot(), revision: 5 })], {});
     expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.view.dialogueSpeaker).toBe("host");
+  });
+
+  it("stays on the host while a scripted topic pick awaits its scene", () => {
+    const payload = DIALOGUE_PANEL.choices[0].action_payload;
+    expect(store.dispatchAction("explore.talk_scripted", payload, null)).not.toBe(null);
+    expect(sender.sent.actions[0].action_id).toBe("explore.talk_scripted");
+    expect(store.view.dispatch.inFlight).not.toBe(null);
     expect(store.view.dialogueSpeaker).toBe("host");
   });
 

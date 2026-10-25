@@ -19,9 +19,12 @@ import {
 } from "./shared.js";
 import { stageTargetModel } from "./stage_targets.js";
 
-// The player's own dialogue speech actions (webclient-dialogue-stage-actors
-// D3): while one of them is in flight the player is the speaker.
-const DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_scripted", "explore.talk_freeform"]);
+// The player's own native dialogue speech (webclient-dialogue-stage-actors
+// D3): while a freeform line is in flight the player is the speaker. A
+// scripted topic pick is not speech of its own: the authored scene it
+// delivers attributes every line explicitly (authored-dialogue-playback), so
+// a pending pick keeps the stage on the scene or line already shown.
+const DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_freeform"]);
 
 // The combat frames that name one opened skill in their descriptor.
 const SKILL_FRAME_SOURCES = new Set(["combat.skill", "combat.target"]);
@@ -459,6 +462,10 @@ export function applyView(ctx) {
 
       dispatch: {
         inFlight: ctx.inFlight ? { requestId: ctx.inFlight.requestId, presentationRevision: ctx.inFlight.presentationRevision } : null,
+        // The in-flight action's id, so the authored-scene player can hold
+        // the message window while a dialogue pick awaits its reply
+        // (authored-dialogue-playback).
+        inFlightActionId: ctx.inFlight ? ctx.inFlight.actionId ?? null : null,
         uncertain: ctx.uncertain,
         submittedRequestId: ctx.lastSubmittedRequestId,
         // True while a combat round plays by itself: the command panel's

@@ -92,7 +92,9 @@ const rows = computed(() => {
       testId: "dialogue-pick",
       badge: String(index + 1),
       label: pick.label,
-      keywordId: pick.payload ? pick.payload.keyword_id : undefined,
+      // The bounded localized alias (v3 rows carry it beside the topic id;
+      // the composed payload names only the topic).
+      keywordId: pick.keywordId ?? (pick.payload ? pick.payload.keyword_id : undefined),
       enabled: true,
       pick,
     })),

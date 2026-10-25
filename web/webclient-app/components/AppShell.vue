@@ -88,6 +88,11 @@ const props = defineProps({
   // and the queue's own report of a shown beat and of the player ending the
   // round.
   beatPlayback: { type: Object, default: null },
+  // The authored scene's current line and the pick hold
+  // (authored-dialogue-playback, `use-authored-scene.js`), forwarded to
+  // MessageWindow; its `scene-advance` comes back out unchanged.
+  scene: { type: Object, default: null },
+  sceneHold: { type: Boolean, default: false },
   // The live mode-change signal (webclient-mode-transitions D2, from
   // composables/use-mode-change.js): `modeChange` names the last live
   // transition and is rendered on the stage root; `modeHydrating` is true
@@ -175,6 +180,7 @@ const emit = defineEmits([
   "reading-change",
   "beat-shown",
   "beat-skip",
+  "scene-advance",
   "switch-character",
   "create-character",
   "place-look",
@@ -552,6 +558,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :mode-hydrating="props.modeHydrating"
           :held="props.openSurfaces.length > 0"
           :beat-playback="props.beatPlayback"
+          :scene="props.scene"
+          :scene-hold="props.sceneHold"
+          @scene-advance="() => emit('scene-advance')"
           @beat-shown="(index) => emit('beat-shown', index)"
           @beat-skip="() => emit('beat-skip')"
           @reading-change="(complete) => emit('reading-change', complete)"

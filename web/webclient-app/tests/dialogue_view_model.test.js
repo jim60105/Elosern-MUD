@@ -9,19 +9,11 @@ import {
   dialogueViewModel,
   DIALOGUE_FREE_ROW_KEY,
 } from "../stores/dialogue-view.js";
+import { dialoguePanel as v3Panel, nativeDelivery, sceneDelivery, speech } from "./support/dialogue_panel.js";
 
 function availablePanel(overrides = {}) {
   return {
-    schema_version: 2,
-    available: true,
-    kind: "dialogue",
-    host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-    bond_stage: "親睦",
-    line: "「渡河要五枚銅板。」",
-    choices: [
-      { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-      { keyword_id: "smell", label: "含糊帶過氣味" },
-    ],
+    ...v3Panel({ keywords: ["fare", "smell"], labels: ["「就五枚，走嗎？」", "含糊帶過氣味"] }),
     ...overrides,
   };
 }
@@ -37,10 +29,22 @@ describe("dialogue view model", () => {
       key: "dlg-kw-fare",
       label: "「就五枚，走嗎？」",
       enabled: true,
+      keywordId: "fare",
+      topicId: "host.fare",
       actionId: "explore.talk_scripted",
-      payload: { npc_id: 41, keyword_id: "fare" },
+      payload: { npc_id: 41, topic_id: "host.fare", context_id: "ctx-1" },
       commandDisplay: { npcLabel: "灰婆婆", keywordLabel: "「就五枚，走嗎？」" },
     });
+  });
+
+  it("carries the acting body, the context and the delivery verbatim", () => {
+    const delivery = sceneDelivery([speech("actor", "消息？"), speech("host", "不太平。")]);
+    const vm = dialogueViewModel(availablePanel({ delivery }));
+    expect(vm.actor).toEqual({ identity: 1, displayName: "測試者", portraitRef: null });
+    expect(vm.contextId).toBe("ctx-1");
+    expect(vm.delivery).toBe(delivery);
+    // A native delivery's one host line is the session line.
+    expect(dialogueViewModel(availablePanel({ delivery: nativeDelivery("歡迎。") })).line).toBe("歡迎。");
   });
 
   it("keeps the bond stage null when the panel carries none", () => {
@@ -74,7 +78,7 @@ describe("dialogue view model", () => {
 
   it("yields null for the unavailable, absent, or foreign-kind forms", () => {
     expect(
-      dialogueViewModel({ schema_version: 2, available: false, kind: "dialogue", reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } }),
+      dialogueViewModel({ schema_version: 3, available: false, kind: "dialogue", reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } }),
     ).toBeNull();
     expect(dialogueViewModel(null)).toBeNull();
     expect(dialogueViewModel(undefined)).toBeNull();

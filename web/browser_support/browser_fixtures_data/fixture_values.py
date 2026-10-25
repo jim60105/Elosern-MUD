@@ -125,6 +125,10 @@ def art_room_monster_key() -> str:
 #: Kit dialogue table the art/exploration fixture hosts carry.
 SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"
 
+#: Kit dialogue table of the authored-scene playback journey: one complete
+#: multi-line scene (actor, two host lines, a paged host line, narration).
+SYNTH_SCENE_DIALOGUE_TABLE_KEY = "t_synth_storyteller"
+
 #: The kit quest the guild-board modes offer/accept.
 SYNTH_GUILD_OFFER_QUEST_KEY = "t_ember_cull"
 

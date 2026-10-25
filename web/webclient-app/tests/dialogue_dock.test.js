@@ -13,19 +13,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ActionDock from "../components/ActionDock.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { dialoguePanel as v3Panel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 
-const DIALOGUE_PANEL = {
-  schema_version: 2,
-  available: true,
-  kind: "dialogue",
-  host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-  bond_stage: "親睦",
-  line: "「渡河要五枚銅板。」",
-  choices: [
-    { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-    { keyword_id: "smell", label: "含糊帶過氣味" },
-  ],
-};
+const DIALOGUE_PANEL = v3Panel({
+  keywords: ["fare", "smell"],
+  labels: ["「就五枚，走嗎？」", "含糊帶過氣味"],
+});
 
 describe("the command region collapses in dialogue mode (store keys)", () => {
   let store;

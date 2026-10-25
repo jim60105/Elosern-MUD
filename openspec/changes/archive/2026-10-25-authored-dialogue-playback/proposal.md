@@ -32,4 +32,4 @@ depends-on: authored-dialogue-runtime
 
 Code conflicts: Conflicts with reading-client and availability UI in AppClient, use-dialogue-choices and dialogue-view; those depend on this slice. Combat behavior must remain unchanged.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; authored-dialogue-generated-packages exercises this same player with actual persisted generated content.
+Shared contract: `../archive/2026-10-25-authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; authored-dialogue-generated-packages exercises this same player with actual persisted generated content.

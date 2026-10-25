@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from world.lore.anchors import Anchor, AnchorKind
+from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic
+from world.lore.scenes import Narration, Scene, Speech
 from world.lore.anchor_placement import AnchorPlacement
 from world.lore.guild import GuildBranch, GuildRank
 from world.lore.names import FrozenDict, NamePack, NamePart
@@ -327,6 +329,30 @@ SYNTH_DIALOGUE: MappingProxyType = MappingProxyType(
             responses=(
                 KeywordResponse("住宿", "「雲杉驛站一晚十八銅，先付後住。」"),
                 KeywordResponse("補貨", "「熾焰噴射劑和鐵牙短刃都在櫃檯右側。」"),
+            ),
+        ),
+        # The authored-scene playback fixture (authored-dialogue-playback): one
+        # complete static scene with actor speech, two consecutive host
+        # lines, one host line long enough to span pages, and narration.
+        "t_synth_storyteller": AuthoredDialogue(
+            greeting="爐火邊的說書人放下杯子：「想聽故事就說一聲。」",
+            topics=(
+                AuthoredTopic(
+                    topic_id="t_synth_storyteller.tale",
+                    keyword="故事",
+                    label="故事",
+                    fallback=Scene(
+                        scene_id="t_synth_storyteller.tale_scene",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="說個故事吧。"),
+                            Speech(speaker="host", text="「好，就說雲杉驛站的冬天。」"),
+                            Speech(speaker="host", text="「你可得聽到最後。」"),
+                            Speech(speaker="host", text='「那年冬天，苔徑上的雪積得比門檻還高，驛站裡只剩一盞油燈。旅人們圍著爐火，一個接一個說起自己走過的路：有人說北岸的霧會吞掉腳印，有人說雲杉林深處有座無人看守的石橋，橋下的水從不結冰。我在櫃檯後聽了整整一夜，把每一段路都記在帳本的背面，直到天亮時才發現，那些故事拼起來，正好是一張從這裡通往山口的地圖。後來帳本被雨水泡爛了，地圖也只剩我記得的那一半。春天來的時候，有個年輕的獵人在門口停下，問我山口的路怎麼走。我把記得的那一半說給他聽，他點點頭，背起弓就往苔徑上去了。那之後我每年冬天都會在爐火邊等，想聽他回來說另一半的路，可是雪化了又積，積了又化，門口的腳印換了一批又一批，就是沒有他的。所以呀，如果你哪天走到山口，記得替我看看那座石橋還在不在。」'),
+                            Narration(text="爐火劈啪一響，說書人的影子在牆上晃了晃。"),
+                        ),
+                    ),
+                ),
             ),
         ),
     }

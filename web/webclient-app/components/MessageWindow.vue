@@ -100,6 +100,23 @@ import { PROSE_SCALE_DEFAULT } from "../lib/prose_scale.js";
 // surface, emits `beat-skip` instead of completing or advancing; the marker is
 // hidden and auto-advance is disarmed, because the queue paces the pages. At
 // `off` the beat pages and the following pages are ordinary reader pages.
+//
+// Authored scenes (authored-dialogue-playback; `use-authored-scene.js` owns
+// the line cursor): while the `scene` prop is set the window presents the
+// scene's CURRENT LINE instead of the narrative response — the server also
+// logs every line as transcript, which stays in the full log and is never
+// re-typed here. Each line is paginated and typed like a response; the
+// window owns pages and the composable owns lines. An activation while a
+// page types completes it; on a fully shown page with a further page it
+// turns the page; on the line's last fully shown page it emits
+// `scene-advance` (next line, or the explicit finish on the final line).
+// The scene mode never arms auto-advance and never binds a combat round.
+// Line changes patch the page in place (no clear layer between lines, so
+// text, plate and stage emphasis change in one frame); the clear layer plays
+// only when a new delivery replaces what was on screen. The plate row is
+// reserved for the whole scene — narration renders an invisible spacer in
+// its place — so the text area never re-measures between speakers. Leaving
+// a scene settles the narrative it covered on its last page, already read.
 export default {
   name: "MessageWindow",
   props: {
@@ -145,8 +162,16 @@ export default {
     // `startSeq` names the response it belongs to. Its `texts` are the beat
     // pages and `coveredLines` the response lines they replace.
     beatPlayback: { type: Object, default: null },
+    // The authored scene's current line (`useAuthoredScene().presentation`):
+    // null, or `{key, lineIndex, lineCount, kind, text, speaker, speakerName,
+    // bondStage, last, finished}`.
+    scene: { type: Object, default: null },
+    // True while a scripted topic pick awaits its reply in dialogue: the
+    // window keeps what it shows until the reply commits, so a transcript
+    // line arriving before its scene delivery never types on its own.
+    sceneHold: { type: Boolean, default: false },
   },
-  emits: ["open-full-log", "reading-change", "beat-shown", "beat-skip"],
+  emits: ["open-full-log", "reading-change", "beat-shown", "beat-skip", "scene-advance"],
   setup(props, { emit, expose }) {
     const rootRef = ref(null);
     const surfaceRef = ref(null);
@@ -158,8 +183,18 @@ export default {
     // The name plate renders while the dialogue panel is available, and in
     // exploration while a person is in focus.
     const dialoguePlated = computed(() => props.mode === "dialogue" && !!props.dialogue);
-    const plated = computed(() => dialoguePlated.value || (props.mode === "exploration" && !!props.speaker));
-    const plateName = computed(() => (dialoguePlated.value ? props.dialogue.host.displayName : props.speaker));
+    // An authored scene reserves the plate row: its speaker's plate, or an
+    // invisible spacer for narration.
+    const scenePlated = computed(() => !!props.scene);
+    const plated = computed(() => scenePlated.value || dialoguePlated.value || (props.mode === "exploration" && !!props.speaker));
+    const plateName = computed(() => {
+      if (scenePlated.value) return props.scene.speakerName || null;
+      return dialoguePlated.value ? props.dialogue.host.displayName : props.speaker;
+    });
+    const plateBond = computed(() => {
+      if (scenePlated.value) return props.scene.bondStage ?? null;
+      return dialoguePlated.value ? props.dialogue.bondStage ?? null : null;
+    });
     const responses = computed(() => segmentResponses(props.lines, props.marks));
 
     // A dispatch is out and no line has taken its ordinal yet.
@@ -183,7 +218,7 @@ export default {
     // reply — a pending mark, or a newest response holding only its echo
     // header — the latest response WITH text stays on screen, flushed to its
     // last page, so the window never blanks between an action and its reply.
-    const display = computed(() => {
+    const narrativeDisplay = computed(() => {
       const list = responses.value;
       let index = list.length - 1;
       let awaiting = pending.value;
@@ -204,12 +239,73 @@ export default {
       };
     });
 
+    // A scene line as one pageable block, memoized per line so a same-line
+    // re-render (an availability refresh) keeps the block identity and the
+    // reader's page.
+    let sceneBlockCache = null;
+    function sceneBlocks(scene) {
+      const id = `${scene.key}:${scene.lineIndex}`;
+      if (!sceneBlockCache || sceneBlockCache.id !== id || sceneBlockCache.text !== scene.text) {
+        sceneBlockCache = {
+          id,
+          text: scene.text,
+          blocks: [
+            {
+              kind: scene.kind === "narration" ? "narration" : "out",
+              seq: null,
+              text: scene.text,
+              tokens: [{ kind: "text", value: scene.text }],
+              mapArt: false,
+            },
+          ],
+        };
+      }
+      return sceneBlockCache.blocks;
+    }
+
+    // Scene bookkeeping: the clear group on screen, whether a scene line is
+    // on screen, and the narrative response the scene covered (settled, not
+    // re-typed, when the scene retires).
+    let shownGroup = null;
+    let shownScene = false;
+    let sceneCoveredKey = null;
+
+    // The display a pick froze while it awaits its reply. While held, the
+    // transcript arriving for the reply is not counted as read; when the
+    // hold releases onto a (new) scene, that transcript is the scene's own.
+    const heldDisplay = shallowRef(null);
+    watch(
+      () => props.sceneHold,
+      (hold, before) => {
+        heldDisplay.value = hold ? (props.scene ? null : narrativeDisplay.value) : null;
+        if (!hold && before && props.scene && shownScene) {
+          sceneCoveredKey = narrativeDisplay.value.key;
+        }
+      },
+      { flush: "sync", immediate: true },
+    );
+
+    const display = computed(() => {
+      const scene = props.scene;
+      if (scene) {
+        return {
+          key: `scene:${scene.key}:${scene.lineIndex}`,
+          group: `scene:${scene.key}`,
+          scene: true,
+          blocks: sceneBlocks(scene),
+          awaiting: false,
+          startSeq: null,
+        };
+      }
+      return heldDisplay.value || narrativeDisplay.value;
+    });
+
     // The round bound to the response on screen (design D6): the published
     // slice whose `startSeq` is this response's own start. A round attached to
     // any other response leaves the window alone.
     const boundBeats = computed(() => {
       const bound = props.beatPlayback;
-      if (!bound || typeof bound.startSeq !== "number") {
+      if (props.scene || !bound || typeof bound.startSeq !== "number") {
         return null;
       }
       return bound.startSeq === display.value.startSeq ? bound : null;
@@ -334,7 +430,12 @@ export default {
         return;
       }
       const fresh = whole ? page.blocks : page.blocks.filter((f) => f.start >= announcedEnd);
-      const text = fresh.map(fragmentText).filter(Boolean).join("\n");
+      let text = fresh.map(fragmentText).filter(Boolean).join("\n");
+      // A scene line names its speaker once, on its first page; narration
+      // and later pages carry the text alone.
+      if (props.scene && pageIndex.value === 0 && props.scene.speakerName && text) {
+        text = `${props.scene.speakerName}：${text}`;
+      }
       const pageEnd = page.blocks[page.blocks.length - 1].end;
       announcedEnd = Math.max(announcedEnd, pageEnd);
       announce(text);
@@ -487,10 +588,70 @@ export default {
       }
     }
 
+    // A scene line's page list. A new line (or delivery, or the scene's
+    // first line) opens on page 1 and types; the clear layer plays only for
+    // a new group. The same line re-measured (box, scale, font, a same-
+    // delivery refresh) keeps the page holding the reader's position.
+    function repageScene(shown) {
+      const anchor = readerAnchor();
+      const ready = measure.ready.value;
+      provisional.value = !ready;
+      const length = responseLength(shown.blocks);
+      const next = ready
+        ? measurePages(shown.blocks)
+        : [{ blocks: [{ ...shown.blocks[0], first: true, start: 0, end: length }], oversize: true }];
+      pages.value = next;
+      shownBlocks = shown.blocks;
+      shownLength = length;
+      initialized = true;
+      if (!shownScene) {
+        shownScene = true;
+        sceneCoveredKey = narrativeDisplay.value.key;
+      }
+      if (shown.key !== shownKey) {
+        if (shown.group !== shownGroup) {
+          clearKey.value += 1;
+        }
+        shownKey = shown.key;
+        shownGroup = shown.group;
+        announcedEnd = 0;
+        setPage(0);
+        announceCurrentPage({ whole: true });
+        typewriter.start(0);
+        if (!ready) {
+          typewriter.complete();
+        }
+        return;
+      }
+      const index = Math.min(pageIndexForOffset(next, anchor.offset), Math.max(0, next.length - 1));
+      setPage(index);
+      typewriter.start(unitsAtOffset(next[index], anchor.complete ? anchor.offset + 1 : anchor.offset));
+      if (!ready) {
+        typewriter.complete();
+      }
+    }
+
     function repage() {
       generation += 1;
       const shown = display.value;
       pagedBlocks.value = shown.blocks;
+      if (shown.scene) {
+        repageScene(shown);
+        return;
+      }
+      // Leaving a scene: the narrative it covered (its own transcript, or a
+      // reconnect's) was already read through the scene, so it settles on
+      // its last page; a response that arrived with the retirement types.
+      let settle = false;
+      if (shownScene) {
+        shownScene = false;
+        shownGroup = null;
+        liveText.value = "";
+        settle = shown.key === sceneCoveredKey || props.modeHydrating;
+        if (!settle) {
+          shownKey = null;
+        }
+      }
       if (boundBeats.value) {
         repageBeats(shown, boundBeats.value);
         return;
@@ -552,7 +713,7 @@ export default {
       // A trim of the log's oldest lines can cut into the shown (leading)
       // response and renumber its offsets; the anchor and watermark are then
       // meaningless, so it settles like a mount.
-      if (!initialized || shown.awaiting || shrank) {
+      if (!initialized || shown.awaiting || shrank || settle) {
         // Mount, resync, or the reader acted: the last page, already read.
         // A flush stops typing and shows the page complete.
         initialized = true;
@@ -602,6 +763,12 @@ export default {
         return true;
       }
       if (pageIndex.value >= pages.value.length - 1) {
+        // The line's last page, fully shown: the scene's next line or its
+        // explicit finish belongs to the line owner.
+        if (props.scene && !props.scene.finished) {
+          emit("scene-advance");
+          return true;
+        }
         return false;
       }
       setPage(pageIndex.value + 1);
@@ -626,7 +793,7 @@ export default {
     // sole owner of the armed wait then (webclient-combat-beat-queue D6).
     watch(
       () => [
-        props.autoAdvance,
+        props.autoAdvance && !props.scene,
         beatPlaying.value,
         provisional.value,
         typing.value,
@@ -769,6 +936,20 @@ export default {
       clearBeatPageTimer();
     });
 
+    // The transcript a scene covers: every narrative response that arrives
+    // while a scene line is on screen (registered before the paging watcher,
+    // so a retirement in the same flush is judged against the last response
+    // seen during the scene).
+    watch(
+      () => narrativeDisplay.value.key,
+      (key) => {
+        if (shownScene && props.scene && !props.sceneHold) {
+          sceneCoveredKey = key;
+        }
+      },
+      { flush: "post" },
+    );
+
     watch(
       () => [
         display.value.key,
@@ -807,6 +988,11 @@ export default {
     const readingComplete = computed(() => {
       // A playing round is not read yet: the shell's dialogue list waits for
       // the playback to end (webclient-combat-beat-queue D6).
+      if (props.scene) {
+        // An authored scene is read only once its final page received the
+        // further, explicit finish activation.
+        return props.scene.finished === true;
+      }
       if (!measure.ready.value || provisional.value || display.value.awaiting || beatPlaying.value) {
         return false;
       }
@@ -887,7 +1073,13 @@ export default {
     return () => {
       const page = pages.value[pageIndex.value] || null;
       const total = pages.value.length;
-      const onLast = pageIndex.value >= total - 1;
+      const onLastPage = pageIndex.value >= total - 1;
+      const scene = props.scene;
+      // A scene's ■ belongs to the final line's last page; every earlier
+      // line's last page still promises more (▼).
+      const onLast = onLastPage && (!scene || scene.last);
+      // The final page before its explicit finish activation.
+      const awaitingFinish = !!scene && onLast && !scene.finished;
       const isTyping = typing.value;
       // The queue paces a playing round, so it shows no marker of its own
       // (webclient-combat-beat-queue D6).
@@ -903,6 +1095,8 @@ export default {
           "data-variant": "paged",
           "data-reading-complete": readingComplete.value ? "true" : "false",
           "data-typing": isTyping ? "true" : "false",
+          "data-scene": scene ? "true" : null,
+          "data-scene-speaker": scene ? scene.speaker || "narration" : null,
           onClick,
           onWheel,
         },
@@ -916,26 +1110,51 @@ export default {
             Transition,
             {
               name: "plate",
-              css: props.motionLevel !== "off" && !props.modeHydrating,
+              // Between the lines of a scene the plate swaps in the commit's
+              // frame: a fading name must never outlive its line.
+              css: props.motionLevel !== "off" && !props.modeHydrating && !scene,
               ...inertWhileLeaving,
             },
-            () =>
-              plated.value
-                ? h("div", { class: "message-window__plate", "data-testid": "message-name-plate" }, [
-                    // The underline runs under this line only, from the
-                    // name's own left edge (webclient-message-typesetting).
-                    h("span", { class: "message-window__plate-line" }, [
-                      h("span", { class: "message-window__plate-name" }, plateName.value),
-                      !dialoguePlated.value || props.dialogue.bondStage == null
-                        ? null
-                        : h(
-                            "span",
-                            { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
-                            ` ‧ 羈絆 ${props.dialogue.bondStage}`,
-                          ),
-                    ]),
-                  ])
-                : null,
+            () => {
+              if (!plated.value) {
+                return null;
+              }
+              if (scene && !plateName.value) {
+                // Narration: no speaker plate, but the row keeps its box so
+                // the page below never re-measures between lines.
+                return h(
+                  "div",
+                  {
+                    class: "message-window__plate message-window__plate--spacer",
+                    "data-testid": "message-plate-spacer",
+                    "aria-hidden": "true",
+                  },
+                  [h("span", { class: "message-window__plate-line" }, [h("span", { class: "message-window__plate-name" }, "\u00a0")])],
+                );
+              }
+              return h(
+                "div",
+                {
+                  class: "message-window__plate",
+                  "data-testid": "message-name-plate",
+                  "data-speaker": scene ? scene.speaker : null,
+                },
+                [
+                  // The underline runs under this line only, from the
+                  // name's own left edge (webclient-message-typesetting).
+                  h("span", { class: "message-window__plate-line" }, [
+                    h("span", { class: "message-window__plate-name" }, plateName.value),
+                    plateBond.value == null
+                      ? null
+                      : h(
+                          "span",
+                          { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
+                          ` ‧ 羈絆 ${plateBond.value}`,
+                        ),
+                  ]),
+                ],
+              );
+            },
           ),
           // The measurer is an untracked DOM node appended after the page
           // surface by use-message-measure.js and must stay the text area's
@@ -988,6 +1207,7 @@ export default {
                     class: "message-window__marker",
                     "data-testid": "message-page-marker",
                     "data-state": onLast ? "end" : "more",
+                    "data-await-finish": awaitingFinish ? "true" : null,
                     "aria-hidden": "true",
                   },
                   onLast ? "■" : "▼",
@@ -997,7 +1217,11 @@ export default {
           h(
             "span",
             { id: pageLabelId, class: "message-window__sr" },
-            total > 0 ? `第 ${pageIndex.value + 1}／${total} 頁` : "",
+            total === 0
+              ? ""
+              : scene
+                ? `第 ${scene.lineIndex + 1}／${scene.lineCount} 句，第 ${pageIndex.value + 1}／${total} 頁`
+                : `第 ${pageIndex.value + 1}／${total} 頁`,
           ),
           h(
             "div",
@@ -1425,12 +1649,54 @@ export default {
   text-shadow: 0 0 calc(14px * var(--ui-scale)) var(--gold-glow), 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
+/* Authored scenes (authored-dialogue-playback). Narration keeps the plate
+   row's box with nothing in it, so the page never moves between speakers. */
+.message-window__plate--spacer {
+  visibility: hidden;
+}
+
+/* The acting body's plate seats its underline on an open lozenge, the
+   host's on the filled one: a shape cue for the side that speaks, beside
+   the name itself and the stage emphasis. */
+.message-window__plate[data-speaker="actor"] .message-window__plate-line::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--gold-400), 0 0 calc(6px * var(--ui-scale)) var(--gold-glow);
+}
+
+/* Narration reads as the scene's own voice: the quieter paper tone and a
+   touch more tracking, the same face and size as speech. */
+.message-window .narrative-line.narration {
+  color: var(--paper-300);
+  letter-spacing: 0.04em;
+}
+
+/* The final page waiting for its finish activation breathes on the motion
+   tokens (still at `reduced` / `off`, where the duration is 0); after the
+   finish the ■ is at rest. */
+.message-window__marker[data-await-finish="true"] {
+  animation: message-window-marker-breathe var(--motion-marker-bob) var(--ease-standard) infinite;
+}
+
+@keyframes message-window-marker-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .message-window__plate-bond {
   flex: none;
   white-space: pre;
   color: var(--paper-500);
   font-family: var(--f-sans);
   font-size: max(var(--text-xs), 0.46em);
+  /* The sans suffix sits inside the name's line box, so a host plate is
+     exactly as tall as the acting body's plate and the narration spacer:
+     the page below never re-measures between speakers. */
+  line-height: 1;
   letter-spacing: 0.12em;
 }
 </style>

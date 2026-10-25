@@ -114,6 +114,7 @@ def _exploration_fixture(character) -> None:
         SHIPPED_DIALOGUE_KEY,
         SYNTH_DIALOGUE_HOST_KEY,
         SYNTH_DIALOGUE_TABLE_KEY,
+        SYNTH_SCENE_DIALOGUE_TABLE_KEY,
         SYNTH_BARD_KEY,
         SYNTH_DEFEATED_MONSTER_KEY,
         SYNTH_HOSTILE_MONSTER_KEY,
@@ -126,11 +127,13 @@ def _exploration_fixture(character) -> None:
         key=SYNTH_DIALOGUE_HOST_KEY if synth else "公會職員",
         location=south_gate,
     )
-    host.components.add(
-        ScriptedDialogue.create(
-            host, dialogue_key=SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
-        )
-    )
+    # The authored-scene playback journey (authored-dialogue-playback 4.1)
+    # opts in to the kit's multi-line scene table; it is inert unless the
+    # synthetic catalogs are installed, so shipped runs never see it.
+    host_dialogue_key = SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
+    if synth and os.environ.get("ELOSERN_BROWSER_AUTHORED_SCENE") == "1":
+        host_dialogue_key = SYNTH_SCENE_DIALOGUE_TABLE_KEY
+    host.components.add(ScriptedDialogue.create(host, dialogue_key=host_dialogue_key))
     from world.rules.affinity import AffinitySource, apply_affinity_change
 
     apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
