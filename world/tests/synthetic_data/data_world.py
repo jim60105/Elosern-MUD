@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from world.lore.anchors import Anchor, AnchorKind
-from world.lore.dialogue.conditions import Exposure, RaceIs
+from world.lore.dialogue.conditions import All, Carries, Exposure, RaceIs
 from world.lore.dialogue.shape import AuthoredDialogue, AuthoredTopic, SceneVariant
 from world.lore.scenes import Narration, Scene, Speech
 from world.lore.anchor_placement import AnchorPlacement
@@ -424,6 +424,58 @@ SYNTH_DIALOGUE: MappingProxyType = MappingProxyType(
                                     ),
                                 ),
                             ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        # The locked-topic UI fixture (authored-dialogue-locked-ui): one open
+        # topic and one visibly locked topic whose requirement (two kit items
+        # the browser journey's player never carries) renders a canonical
+        # hint, with an authored refusal scene the journey plays instead of
+        # the protected formal body.
+        "t_synth_gatekeeper": AuthoredDialogue(
+            greeting="霧門前的守門人抬起燈：「要過門，先說來意。」",
+            topics=(
+                AuthoredTopic(
+                    topic_id="t_synth_gatekeeper.road",
+                    keyword="路況",
+                    label="路況",
+                    fallback=Scene(
+                        scene_id="t_synth_gatekeeper.road_scene",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="門外的路好走嗎？"),
+                            Speech(speaker="host", text="「霧散了就好走。」"),
+                        ),
+                    ),
+                ),
+                AuthoredTopic(
+                    topic_id="t_synth_gatekeeper.passage",
+                    keyword="霧門",
+                    label="霧門後",
+                    fallback=Scene(
+                        scene_id="t_synth_gatekeeper.passage_scene",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="霧門後是什麼地方？"),
+                            Speech(speaker="host", text="「門後是舊渡口，只有帶著證物的人能過。」"),
+                        ),
+                    ),
+                    requires=All(
+                        children=(
+                            Carries(item_key="t_wayfarer_pass"),
+                            Carries(item_key="t_veil_charm"),
+                        )
+                    ),
+                    unavailable="locked",
+                    refusal=Scene(
+                        scene_id="t_synth_gatekeeper.passage_refusal",
+                        revision="r1",
+                        lines=(
+                            Speech(speaker="actor", text="霧門後是什麼地方？"),
+                            Speech(speaker="host", text="「這不是你現在該問的。」"),
+                            Narration(text="守門人把燈壓低，霧又合攏了。"),
                         ),
                     ),
                 ),

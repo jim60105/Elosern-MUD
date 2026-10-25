@@ -14,5 +14,5 @@ Shared contract v2 treats source-aware IDs as opaque. Include generated-style ID
 
 ## 3. Browser and showcase acceptance
 
-- [ ] 3.1 Add one focused locked-refusal/hint browser method and Storybook fixture, register ownership and check app-shell.css duplicate overrides. Verify focused Vitest/browser acceptance and contract_gate without implementing reading persistence.
+- [x] 3.1 Add one focused locked-refusal/hint browser method and Storybook fixture, register ownership and check app-shell.css duplicate overrides. Verify focused Vitest/browser acceptance and contract_gate without implementing reading persistence.
 

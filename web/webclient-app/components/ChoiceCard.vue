@@ -218,6 +218,8 @@ watch(
   { flush: "post" },
 );
 
+// A scroll of the rows, or the end of a row's entrance rise (a tip opened
+// while the rows still travel), places the tip on its row again.
 function onRowsScroll() {
   if (tipShown.value) {
     void placeTip();
@@ -399,6 +401,7 @@ defineExpose({ focus, setActive });
       :class="cls('__rows')"
       :style="{ '--row-count': rows.length }"
       @scroll.passive="onRowsScroll"
+      @animationend="onRowsScroll"
     >
     <div
       v-for="(row, index) in rows"

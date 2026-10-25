@@ -134,6 +134,13 @@ SYNTH_SCENE_DIALOGUE_TABLE_KEY = "t_synth_storyteller"
 #: with a fallback scene the journey must never see when the variant qualifies.
 SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY = "t_synth_conditioned"
 
+#: Kit dialogue table of the locked-topic UI journey (authored-dialogue-locked-ui):
+#: one open topic and one visibly locked topic that requires both
+#: ``SYNTH_LOCKED_TOPIC_ITEM_KEYS``, with an authored refusal scene.
+SYNTH_LOCKED_DIALOGUE_TABLE_KEY = "t_synth_gatekeeper"
+SYNTH_LOCKED_TOPIC_ID = "t_synth_gatekeeper.passage"
+SYNTH_LOCKED_TOPIC_ITEM_KEYS = ("t_wayfarer_pass", "t_veil_charm")
+
 #: Kit accessory the same journey wears: its borrowed shipped modifier member
 #: carries a positive exposure bias, so the canonical effective-exposure
 #: overlay crosses the authored variant bound only while it is worn.
