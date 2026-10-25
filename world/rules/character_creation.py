@@ -701,7 +701,6 @@ def activate_player_character(
         attribute_values["creation_preset_key"] = preset.key
     persona_record = _persona_record_for(validated, request, persona)
     # Social identity: custom mode defaults empty; preset mode seeds preset's explicit tags.
-    from world.rules.social_identity import set_social_identities
     preset_social_identities = preset.social_identities if request.mode == "preset" else ()
     attribute_values["social_identities"] = tuple(sorted(set(preset_social_identities)))
 
