@@ -101,8 +101,82 @@ Verify condition boundaries and combinations; item inspection without consumptio
 
 Verify complete-versus-refusal reading, server synchronization, pure-chain ordering, first unlock notifications, repeated relock behavior, pending acknowledgement failure/retry/discard, reconnect replay, context invalidation, and exactly-once effects on replay. Exercise the same authored content offline and through the text interface. Update affected player command documentation, test ownership manifests, and OpenSpec contracts, preserving existing repository gates.
 
-## Delivery decomposition
+## Proposal inventory
 
-The 26 bounded planning changes comprise the original 24 revised proposals plus `authored-dialogue-yaml-loader` and `authored-dialogue-generated-packages`. Loader follows contracts and precedes runtime's 25-file static cutover/module deletion. Every engine feature is source-neutral from its owning slice. Generated-packages follows completed unread-notices and owns real producer/schema/publication/provider/effect cutover plus production-path acceptance. Ten content slices rewrite disjoint profile-key YAML files after runtime/notification prerequisites; they own no registry registration or runtime code. The exact dependency/conflict map is in Shared contract v2. Every condition and all existing authored topics remain in scope.
+The 26 bounded planning changes comprise the original 24 revised proposals plus
+`authored-dialogue-yaml-loader` and `authored-dialogue-generated-packages`. Each
+row is one engineer-day of implementation, owns the listed artifacts only, and
+carries its own tests and documentation. The authoritative interfaces are in
+`openspec/changes/authored-dialogue-contracts/design.md`, Shared contract v2.
 
-The user approved these planning revisions. Parent review and planning validation precede commits. No implementation, apply, worktree or archive is authorized by this document.
+| # | Change | Direct prerequisites | Owned scope | Planning commit |
+|---|---|---|---|---|
+| 1 | `authored-dialogue-contracts` | none | Immutable scenes, typed topic declarations, identity encoding, shared reference catalog | `6e676db8` |
+| 2 | `authored-dialogue-yaml-loader` | 1 | Sorted safe `content/<NpcProfile.key>.yaml` scan, whole-candidate rejection, immutable snapshot | `940cd538` |
+| 3 | `authored-dialogue-runtime` | 1, 2 | Static YAML cutover, source-neutral selection, version-3 protocol | `eef542a3` |
+| 4 | `authored-dialogue-playback` | 3 | Shared manual Vue scene player and synchronized stage attribution | `893cec1a` |
+| 5 | `authored-dialogue-possession` | 3, 4 | Lawful possessed conversations, acting body versus owning player | `8f1681d5` |
+| 6 | `authored-dialogue-social-identity` | 1 | Typed social identity, never parsed persona prose | `eb614701` |
+| 7 | `authored-dialogue-physical-conditions` | 3, 5, 6 | Race, items, present companion, in-world time, skills, exposure; reference catalog builder | `30df1917` |
+| 8 | `authored-dialogue-progression-conditions` | 7 | Owner guild rank, quest lifecycle, host-to-owner affinity | `133fd60f` |
+| 9 | `authored-dialogue-availability` | 8 | Server-qualified hidden/locked/open projection and disclosure | `5d2e5952` |
+| 10 | `authored-dialogue-locked-ui` | 9, 4 | Selectable locked refusal and canonical requirement hints | `5f21ee7d` |
+| 11 | `authored-dialogue-reading-server` | 9 | Narrative-owned formal reading, delivery receipts, pure-chain sync | `bfab4510` |
+| 12 | `authored-dialogue-reading-client` | 11, 10 | Memory-only completion retry and chain progression | `5151ade5` |
+| 13 | `authored-dialogue-unread-notices` | 12, 15 | Persistent unread markers and deferred deduplicated unlock batches | `d4d857a1` |
+| 14 | `authored-dialogue-refresh-physical` | 9 | Committed physical-source availability refresh | `09bab719` |
+| 15 | `authored-dialogue-refresh-lifecycle` | 14 | Committed progression, presence, clock and control refresh | `fbf7dcc6` |
+| 16 | `authored-dialogue-generated-packages` | 13 | Dream producer, scene schema, immutable DB publication, generated provider/effect cutover | `f0195978` |
+| 17 | `authored-dialogue-content-guild` | 13 | `guild_staff` -> `content/altoria_guild_master.yaml` | `f67a76f6` |
+| 18 | `authored-dialogue-content-lower-hospitality` | 13 | Eatery, tavern, lodging | `bfc52191` |
+| 19 | `authored-dialogue-content-lower-civic` | 13 | Bathhouse, guardhouse | `d4fdbaef` |
+| 20 | `authored-dialogue-content-middle-tools` | 13 | General store, forge, tailor | `d99425a4` |
+| 21 | `authored-dialogue-content-middle-exchange` | 13 | Jeweller, alchemist, merchant hall | `7ced2465` |
+| 22 | `authored-dialogue-content-upper-faith` | 13 | Temple, sanctum | `9c547f00` |
+| 23 | `authored-dialogue-content-upper-civic` | 13 | Noble watch, drill yard, academy | `53ded8b8` |
+| 24 | `authored-dialogue-content-ciaran-crafts` | 13 | Ciaran hailiel, vethiel, gwenaera | `02dede6f` |
+| 25 | `authored-dialogue-content-ciaran-fare` | 13 | Ciaran lareneth, nireth, valwyn | `8b3617e7` |
+| 26 | `authored-dialogue-content-ciaran-commons` | 13 | Ciaran elenis, teliel | `067e73f1` |
+
+Content rows 17-26 each own disjoint `world/lore/dialogue/content/<NpcProfile.key>.yaml`
+files plus their exclusive test and review files. No content row edits runtime code,
+another slice's YAML, or `NPC_PROFILE_REGISTRY`. The exact file mapping is in the
+Shared contract v2 coverage table.
+
+## Parallel implementation batch
+
+A wave begins only after every prerequisite change in earlier waves is merged to
+the primary branch; completion on a feature branch is not sufficient. Changes in
+one wave touch disjoint owned artifacts and may run concurrently. Apply workers
+use `feat/<change-slug>` in `.worktrees/<change-slug>`; the supervisor serializes
+merges, shared manifest integration, main-spec synchronization and archive.
+
+| Wave | Changes | Why concurrent |
+|---|---|---|
+| 0 | 1 | Pure declarations and identity encoding; every later change reads it |
+| 1 | 2, 6 | Loader owns the filesystem boundary; social identity owns profile/create/import shape; no shared files |
+| 2 | 3 | Sole static cutover and protocol adoption; highest backend blast radius |
+| 3 | 4 | Frontend player foundation |
+| 4 | 5 | Possession needs the player and the cut-over context |
+| 5 | 7 | First condition evaluator, extends the shared catalog |
+| 6 | 8 | Extends the same evaluator and catalog sequentially |
+| 7 | 9 | Sole projection and disclosure authority |
+| 8 | 10, 14 | Locked UI is frontend choices; physical refresh is backend writers |
+| 9 | 11 | Narrative reading storage and receipt/pusher backend |
+| 10 | 12, 15 | Reading client is frontend store; lifecycle refresh is backend writers |
+| 11 | 13 | Notification observation needs both predecessors merged |
+| 12 | 16, 17-26 | Generated packages owns the backend generated cutover; ten content slices own disjoint YAML and are mutually independent |
+
+Wave 12 runs eleven workers. Content workers serialize only their shared manifest
+entries, which each slice adds in its own commit and the integration owner merges.
+Generated packages writes no YAML, so it runs beside all content slices.
+
+Critical paths:
+
+`contracts -> yaml-loader -> runtime -> playback -> possession -> physical-conditions -> progression-conditions -> availability -> reading-server -> reading-client -> unread-notices -> generated-packages`
+
+`... -> availability -> refresh-physical -> refresh-lifecycle -> unread-notices -> content-*`
+
+The user approved these planning revisions. Parent review and planning
+validation precede commits. No implementation, apply, worktree or archive is
+authorized by this document.
