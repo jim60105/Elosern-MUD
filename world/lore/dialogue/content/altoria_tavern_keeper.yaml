@@ -1,55 +1,121 @@
 schema_version: 1
-greeting: 醉月酒館的蘿溫‧古橡把抹布往肩上一甩，靠著吧台打量你：「唷，新面孔嘛。我這兒就一條規矩，在這裡講的話，不會害到講話的人。想打聽什麼就自己找人聊；路上碰到聊得來、又想一起走的人，開口約就是了。消息啊，都在客人嘴裡，你不開口問，誰會跟你說？」
+greeting: 醉月酒館的老闆蘿溫‧古橡將抹布甩上右肩，耳垂的小銅鈴叮噹輕響。她靠著吧台挑眉一笑：「唷，新面孔。我這兒規矩最簡單，屋裡說過的話，出了門誰也別拿去搬弄是非。想打聽消息就多聽多問，碰上性情相投的人，喝兩杯再提結伴同行。消息都在過客嘴裡，光坐著發呆可不會有人替你開口。」
 topics:
 - topic_id: altoria_tavern.topic_01
   keyword: 傳聞
   label: 傳聞
+  variants:
+  - variant_id: var_companion_violet
+    priority: 10
+    when:
+      kind: companion_present
+      source_kind: preset
+      source_key: violet_altoria
+    scene:
+      scene_id: altoria_tavern.topic_01_scene_violet
+      revision: r2
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 「老闆娘，最近城裡有什麼值得留意的風聲？」
+      - kind: narration
+        text: 蘿溫目光掠過身旁衣著考究的同行少女，嘴角浮起一抹意味深長的笑意，用手背輕叩吧台。
+      - kind: speech
+        speaker: host
+        text: 「哎呀，看來你身邊跟了位氣度不凡的同伴呢。在這客棧巷裡，眼神銳利的人可不少，貴氣藏得再深也瞞不過常客。」
+      - kind: speech
+        speaker: actor
+        text: 「我們只是途經酒館稍作歇息。」
+      - kind: speech
+        speaker: host
+        text: 「放心，我屋裡的常客懂得進退。想打聽城外道路動靜，多留意西邊桌那幾位斥候的閒聊便是。」
   fallback:
     scene_id: altoria_tavern.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 傳聞
+      text: 「老闆娘，最近這附近有什麼值得留意的傳聞？」
     - kind: speech
       speaker: host
-      text: 「消息？我這兒可沒貼告示喔，都在客人嘴裡。誰剛從迷宮出來、誰熟東門外的路，聊了才知道嘛。挑個順眼的坐過去，聊得來的話，人家下次還會記得你。我呢，頂多告訴你該往哪桌走。」
+      text: 「消息全在客人的嘴裡打轉呢。誰剛從迷宮深處脫身、哪條商道有魔獸出沒，你坐過去跟人多聊兩句便分曉。」
+    - kind: narration
+      text: 蘿溫笑著提起銅壺斟滿木杯，推到櫃檯邊緣。
+    - kind: speech
+      speaker: host
+      text: 「我只管看著吧台與維持規矩。誰要是探人隱私踩了線，我可會請他出門吹冷風。挑張合眼緣的桌子坐下吧。」
+    - kind: speech
+      speaker: actor
+      text: 「多謝指點，我這就找人聊聊。」
 - topic_id: altoria_tavern.topic_02
   keyword: 同伴
   label: 同伴
+  predecessors:
+  - altoria_tavern.topic_01
+  disclosure: pure_chain
   fallback:
     scene_id: altoria_tavern.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 同伴
+      text: 「在酒館結識一起出發的冒險同伴，有什麼講究？」
+    - kind: narration
+      text: 蘿溫收斂起方才調侃的神情，指節在吧台上敲了兩記。
     - kind: speech
       speaker: host
-      text: 「想找人一起走？那得先碰得到人啊，路上也好、店裡也好。坐下來聊一聊，合得來再開口約，人家要不要是人家的事。我跟店裡的人就別想啦，我們有家有店，不出城。」
+      text: 「找同伴可不是買菜挑瓜。同桌喝得來是一回事，把後背交給對方又是另一回事。得先看那人臨危時的眼色。」
+    - kind: speech
+      speaker: host
+      text: 「我見過太多熱血沸騰組隊出城的年輕人，再也沒回這條巷子。脾氣投合、知根知底，才能談得上相伴前行。」
+    - kind: speech
+      speaker: actor
+      text: 「看來謹慎觀察才是長久之道。」
+    - kind: speech
+      speaker: host
+      text: 「正是這道理。先一起喝杯薄酒聊聊彼此身手，別急著許下諾言。」
 - topic_id: altoria_tavern.topic_03
   keyword: 委託
   label: 委託
   fallback:
     scene_id: altoria_tavern.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 委託
+      text: 「店裡有商隊或領主托付的委託單子可以接嗎？」
     - kind: speech
       speaker: host
-      text: 「正經的委託去公會看板找啦，我這兒不貼單子，也不幫人找人手。公會前那棟大廳就是。在外面認識了靠得住的人，帶回來這兒坐，事情談好了再一起出發。放心，這屋裡講的話，出了門沒人會提。」
+      text: 「想找正規差事請出門右轉去公會大廳，那裡木板上的單子才合法規。我這兒是酒館，不替官府派活。」
+    - kind: narration
+      text: 她俐落將擦乾淨的玻璃杯倒扣上架，搖了搖頭。
+    - kind: speech
+      speaker: host
+      text: 「在公會挑好討伐或護衛任務，再拉人回我這兒圍著壁爐細談分工，那才是老手慣常的做法。」
+    - kind: speech
+      speaker: actor
+      text: 「分工清楚才不至於忙中出錯。」
+    - kind: speech
+      speaker: host
+      text: 「說得沒錯。只要在屋裡說定章程，彼此心裡踏實，出了門自然少些意外。」
 - topic_id: altoria_tavern.topic_04
   keyword: 歇腳
   label: 歇腳
   fallback:
     scene_id: altoria_tavern.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 歇腳
+      text: 「天色有些晚了，今晚在哪裡能安心歇下腳步？」
     - kind: speech
       speaker: host
-      text: 「走到天都黑了吧？隔壁就是溫弗蕾德的旅店，床乾淨，門也鎖得牢。只是想坐一下的話，壁爐旁邊還有位子，我這兒比外面暖，也熱鬧多啦。」
+      text: 「只想歇歇腳，我店裡火塘邊長凳隨你坐；若是想闔眼沉睡，隔壁就是溫弗蕾德經營的爐火旅店。」
+    - kind: narration
+      text: 蘿溫指了指共用火塘的厚實石牆，語氣十分親切。
+    - kind: speech
+      speaker: host
+      text: 「她那裡的床單勤洗勤換，每扇門栓都結實得很。喝完了這杯就趕緊過去投宿，別等到熄燈才敲門。」
+    - kind: speech
+      speaker: actor
+      text: 「好，我稍後就去隔壁尋個房間。」

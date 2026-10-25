@@ -1,55 +1,90 @@
 schema_version: 1
-greeting: 餐館老闆西格瑪‧庫柏用圍裙擦著手，從灶後探出頭來：「喔，客人！吃飯了沒？湯還熱著喔，麵包跟帶出城的乾糧也都有。今天有什麼、還剩幾份，櫃檯上的單子都寫著，看中哪樣跟我說一聲就好。外面打到什麼好肉，也可以拿來給我瞧一下啦。來，先坐。」
+greeting: 餐館老闆西格瑪‧庫柏用圍裙擦了擦滿是麵粉的手，笑著從灶台後探出頭：「唷，客人，進來坐。肚子正餓吧？灶上的大鍋剛煮滾，熱湯跟剛出爐的黑麥麵包都備妥了。要當場吃飽還是帶出城啃的乾糧，櫃檯單子上全寫得清清楚楚。若是在野外獵到乾淨的新鮮好肉，也儘管拿來給我過目。」
 topics:
 - topic_id: altoria_eatery.topic_01
   keyword: 餐點
   label: 餐點
   fallback:
     scene_id: altoria_eatery.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 餐點
+      text: 「老闆，今天爐子上有什麼能填飽肚子的熱食？」
+    - kind: narration
+      text: 西格瑪掀開熱氣蒸騰的厚重鐵鍋蓋，濃郁的肉香與麥香頓時漫開。
     - kind: speech
       speaker: host
-      text: 「最基本的就是一碗熱湯配麵包，吃完保證有力氣。黑麥硬麵包很耐放，攜行口糧放進背包剛好。今天有什麼，看單子就知道，要什麼跟我講。」
+      text: 「最踏實的就是熱肉湯配厚切黑麥麵包，一碗落肚渾身都暖和。單子上有當季的燉菜，櫃檯旁也有剛烤好的硬麵包，隨挑隨有。」
+    - kind: speech
+      speaker: actor
+      text: 「出門走遠路的話，乾糧能撐多久？」
+    - kind: speech
+      speaker: host
+      text: 「硬麵包乾透了能放半個月，放背包裡不怕壓。吃飽了才有力氣拔劍，別餓著肚子上路。」
 - topic_id: altoria_eatery.topic_02
   keyword: 招牌
   label: 招牌
   fallback:
     scene_id: altoria_eatery.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 招牌
+      text: 「聽說店裡有幾樣遠近馳名的拿手菜？」
     - kind: speech
       speaker: host
-      text: 「招牌喔？當然是龍蝦濃湯啊！做法是港灣來的老船工教我，我熬了二十年都沒改過。想吃甜的就拿帝國的蜜漬果乾，精靈的蜜漬花蕊有時候也有，有沒有貨看單子吧。」
+      text: 「那可少不了東南港灣龍蝦濃湯。二十年前一位老船工把手藝教給我，火候和香料分量我半點都沒改過。」
+    - kind: narration
+      text: 老闆拍了拍灶台邊懸掛的銅鍋，神色格外得意。
+    - kind: speech
+      speaker: host
+      text: 「若是想嘗點甜嘴，帝國那邊運來的蜜漬水果乾滋味厚實。偶爾還能碰上極少見的精靈蜜漬花蕊，不過那種稀罕物全憑運氣，架上有才有得嘗。」
+    - kind: speech
+      speaker: actor
+      text: 「精靈的花蕊蜜餞在王都也能見到？」
+    - kind: speech
+      speaker: host
+      text: 「精靈老爺們難得流出一點點稀罕物，過路商隊一帶進城就給搶光了，價錢自然也高得多啦。」
 - topic_id: altoria_eatery.topic_03
   keyword: 乾糧
   label: 乾糧
   fallback:
     scene_id: altoria_eatery.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 乾糧
+      text: 「如果要出遠門進山，帶什麼乾糧最妥當？」
     - kind: speech
       speaker: host
-      text: 「要出城？那攜行口糧跟燻肉乾一定要帶幾份。肉乾鹹是鹹了點，放好幾天都不會壞。等肚子餓了才想到要吃，就來不及囉。要幾份先算好，我一次幫你包起來。」
+      text: 「長途跋涉的話，硬麵包塊和獸王國燻獸肉乾是首選。那肉乾雖然鹹口，但在密林裡放上好幾天都不走味。」
+    - kind: narration
+      text: 西格瑪指了指牆角整齊堆放的油紙包。
+    - kind: speech
+      speaker: host
+      text: 「不少新人總想著進林子再找野果，真遇上暴雨連柴火都生不起來。背包裡多塞兩份口糧，關鍵時刻能救命。」
+    - kind: speech
+      speaker: actor
+      text: 「受教了，我出發前一定備足。」
 - topic_id: altoria_eatery.topic_04
   keyword: 收食
   label: 收食
   fallback:
     scene_id: altoria_eatery.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 收食
+      text: 「城外獵到的獵物和採集的食材，店裡也收購嗎？」
     - kind: speech
       speaker: host
-      text: 「打到的肉、採到的東西，拿來讓我瞧一下嘛。乾淨新鮮的我就收，價錢照我店裡的規矩算。臭掉或說不出是哪來，我可不收，誰拿來都一樣。」
+      text: 「收啊，乾淨新鮮的獸肉和野味我都給公道價。不過我醜話說在前頭，破口爛掉或是帶怪味，我一概退回去。」
+    - kind: narration
+      text: 西格瑪正色收起笑容，語氣十分嚴肅。
+    - kind: speech
+      speaker: host
+      text: 「吃進嘴裡的東西半點馬虎不得。拿上好的新鮮貨來，我秤足銀錢收購；不合格品項，任誰說情我也不接。」
+    - kind: speech
+      speaker: actor
+      text: 「做廚房講究良心，自然該照規矩辦事。」
