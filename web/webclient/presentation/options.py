@@ -30,6 +30,7 @@ from web.webclient.actions.exploration_actions import (
     validate_talk_scripted_payload,
     validate_wait_payload,
     validate_deliver_payload,
+    validate_talk_scripted_descriptor,
 )
 from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
 from web.webclient.presentation.protocol import (
@@ -66,7 +67,7 @@ _ACTION_PAYLOAD_VALIDATORS = {
     "explore.move": validate_move_payload,
     "explore.look": validate_look_payload,
     "explore.talk_open": validate_talk_open_payload,
-    "explore.talk_scripted": validate_talk_scripted_payload,
+    "explore.talk_scripted": validate_talk_scripted_descriptor,
     "explore.party_invite": validate_party_invite_payload,
     "explore.party_leave": validate_party_leave_payload,
     "explore.engage": validate_engage_payload,

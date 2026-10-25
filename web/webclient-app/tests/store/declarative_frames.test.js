@@ -83,13 +83,39 @@ function roomChange(revision, identity) {
 // (webclient-talk-open-dock).
 function dialoguePanel() {
   return {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "dialogue",
     host: { identity: 7, display_name: "店長", portrait_ref: null },
+    actor: { identity: 1, display_name: "測試者", portrait_ref: null },
     bond_stage: "親睦",
-    line: "「渡河要五枚銅板。」",
-    choices: [{ keyword_id: "fare", label: "「就五枚，走嗎？」" }],
+    context_id: "ctx-1",
+    delivery: {
+      delivery_id: "deliv-1",
+      context_id: "ctx-1",
+      topic_id: null,
+      scene_id: "native_line",
+      scene_revision: "r1",
+      phase_revision: null,
+      kind: "opening",
+      lines: [{ kind: "speech", speaker: "host", text: "「渡河要五枚銅板。」" }],
+    },
+    choices: [
+      {
+        topic_id: "host.fare",
+        keyword_id: "fare",
+        label: "「就五枚，走嗎？」",
+        availability: "open",
+        requirement_hint: null,
+        unread: false,
+        predecessors: [],
+        action_payload: { npc_id: 7, topic_id: "host.fare", context_id: "ctx-1" },
+      },
+    ],
+    pure_chain: [],
+    reading_revision: 0,
+    completed_topic_ids: [],
+    unlock_batch: null,
   };
 }
 
@@ -516,7 +542,7 @@ describe("declarative frame stack (store contract)", () => {
       });
       expect(store.view.dockSource).toBe("exploration.root");
       // The conversation itself presents: the committed dialogue panel.
-      expect(store.view.panels.dialogue.line).toBe("「渡河要五枚銅板。」");
+      expect(store.view.panels.dialogue.delivery.lines[0].text).toBe("「渡河要五枚銅板。」");
     });
 
     it("a commit that keeps the mode dialogue leaves the open frame alone", () => {

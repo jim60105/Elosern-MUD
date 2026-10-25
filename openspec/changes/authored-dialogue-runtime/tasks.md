@@ -14,7 +14,7 @@ Remaining units implement Shared contract v2, including host_key/source identity
 
 ## 3. Transport and protocol cutover
 
-- [ ] 3.1 Migrate CmdTalk, authored adapter, Python presenter, UMD misc.js::validateDialoguePanel/constants.js and production reducer to v3. Implement descriptor validation and handle_ui_action pre-validator request-ID injection. Test two deliberate picks versus a transport retry, populated v3 adoption and v2 rejection. Reuse catalog keys and expose all <=16 rows, with complete attributed text before scene-player integration.
+- [x] 3.1 Migrate CmdTalk, authored adapter, Python presenter, UMD misc.js::validateDialoguePanel/constants.js and production reducer to v3. Implement descriptor validation and handle_ui_action pre-validator request-ID injection. Test two deliberate picks versus a transport retry, populated v3 adoption and v2 rejection. Reuse catalog keys and expose all <=16 rows, with complete attributed text before scene-player integration.
 
 ## 4. Native seams and documentation
 

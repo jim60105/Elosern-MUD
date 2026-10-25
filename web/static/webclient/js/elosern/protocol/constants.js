@@ -466,11 +466,16 @@ var COMBAT_BEATS_KINDS = ["roll", "damage", "target_defeated", "other"];
 // vocabulary, and the line bound is the shared dialogue-session prose bound
 // (never the generic protocol ceiling) — the write path truncates to it, so
 // over-bound dialogue is corruption and rejects.
-var DIALOGUE_SCHEMA_VERSION = 2;
+var DIALOGUE_SCHEMA_VERSION = 3;
 // Panel-owned bound tracked in lockstep with
 // web.webclient.presentation.dialogue.DIALOGUE_MAX_CHOICES (align-11: four,
 // independent of the exploration keyword-pool bound).
-var DIALOGUE_MAX_CHOICES = 4;
+var DIALOGUE_MAX_CHOICES = 16;
+var DIALOGUE_MAX_TOPIC_ID = 2048;
+var DIALOGUE_MAX_SCENE_ID = 2048;
+var DIALOGUE_MAX_CONTEXT_ID = 64;
+var DIALOGUE_PANEL_MAX_BYTES = 24576;
+var DIALOGUE_ENVELOPE_MAX_BYTES = 98304;
 var DIALOGUE_MAX_KEYWORD_ID = 64;
 var DIALOGUE_MAX_KEYWORD_LABEL = 128;
 var DIALOGUE_MAX_LINE = 2000;
@@ -521,7 +526,7 @@ var PANEL_ALLOWLIST = {
   exploration: 4,
   character: 9,
   lineage: 2,
-  dialogue: 2,
+  dialogue: DIALOGUE_SCHEMA_VERSION,
   title_ballot: 1,
   title_codex: 1,
   roster: ROSTER_SCHEMA_VERSION,
@@ -781,6 +786,11 @@ module.exports = {
   DIALOGUE_MAX_CHOICES: DIALOGUE_MAX_CHOICES,
   DIALOGUE_MAX_KEYWORD_ID: DIALOGUE_MAX_KEYWORD_ID,
   DIALOGUE_MAX_KEYWORD_LABEL: DIALOGUE_MAX_KEYWORD_LABEL,
+  DIALOGUE_MAX_TOPIC_ID: DIALOGUE_MAX_TOPIC_ID,
+  DIALOGUE_MAX_SCENE_ID: DIALOGUE_MAX_SCENE_ID,
+  DIALOGUE_MAX_CONTEXT_ID: DIALOGUE_MAX_CONTEXT_ID,
+  DIALOGUE_PANEL_MAX_BYTES: DIALOGUE_PANEL_MAX_BYTES,
+  DIALOGUE_ENVELOPE_MAX_BYTES: DIALOGUE_ENVELOPE_MAX_BYTES,
   DIALOGUE_MAX_LINE: DIALOGUE_MAX_LINE,
   ROSTER_SCHEMA_VERSION: ROSTER_SCHEMA_VERSION,
   ROSTER_MAX_ROWS: ROSTER_MAX_ROWS,

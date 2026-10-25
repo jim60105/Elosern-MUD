@@ -27,6 +27,12 @@ from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypa
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
 from world.rules.dialogue import (
     DIALOGUE_TABLE,
+    DuplicateSelectionError,
+    StaleContextError,
+    StaleSelectionError,
+    TopicLockedError,
+    TopicNotFoundError,
+    DialogueSourceUnavailableError,
     clear_dialogue_session,
     dialogue_key_for,
     escape_evennia_greeting,
@@ -36,7 +42,10 @@ from world.rules.dialogue import (
     resolve_greeting,
     opens_dialogue,
     run_scripted_talk,
+    select_authored_topic,
+    table_response,
 )
+from world.lore.scenes import Speech
 from world.rules.map_knowledge import KnowledgeError, decode_node
 from world.rules.npc_intents import (
     STALE_CONTEXT_NOTE,
@@ -176,18 +185,56 @@ def validate_talk_open_payload(payload: Any) -> dict[str, Any]:
 
 
 def validate_talk_scripted_payload(payload: Any) -> dict[str, Any]:
-    """Validate the exact ``explore.talk_scripted`` payload."""
+    """Validate the exact composed ``explore.talk_scripted`` payload."""
     if not isinstance(payload, dict):
         raise ExplorationActionError("explore.talk_scripted payload must be an object")
-    if set(payload) != {"npc_id", "keyword_id"}:
+    if set(payload) != {"npc_id", "topic_id", "context_id", "selection_id"}:
         raise ExplorationActionError(
-            "explore.talk_scripted requires exactly npc_id and keyword_id"
+            "explore.talk_scripted requires exactly npc_id, topic_id, context_id, selection_id"
         )
+    topic_id = payload["topic_id"]
+    if not isinstance(topic_id, str) or not topic_id.strip() or len(topic_id) > 2048:
+        raise ExplorationActionError("topic_id must be a non-empty string <= 2048 chars")
+    context_id = payload["context_id"]
+    if context_id is not None and (
+        not isinstance(context_id, str) or not context_id.strip() or len(context_id) > 64
+    ):
+        raise ExplorationActionError("context_id must be a string <= 64 chars or None")
+    selection_id = payload["selection_id"]
+    if (
+        not isinstance(selection_id, str)
+        or not selection_id.strip()
+        or len(selection_id) > 64
+    ):
+        raise ExplorationActionError("selection_id must be a non-empty string <= 64 chars")
     return {
         "npc_id": _require_positive_int(payload["npc_id"], "npc_id"),
-        "keyword_id": _require_non_empty_string(
-            payload["keyword_id"], "keyword_id", MAX_KEYWORD_ID_CHARS
-        ),
+        "topic_id": topic_id,
+        "context_id": context_id,
+        "selection_id": selection_id,
+    }
+
+
+def validate_talk_scripted_descriptor(params: Any) -> dict[str, Any]:
+    """Validate the projected ``explore.talk_scripted`` descriptor."""
+    if not isinstance(params, dict):
+        raise ExplorationActionError("explore.talk_scripted params must be an object")
+    if set(params) != {"npc_id", "topic_id", "context_id"}:
+        raise ExplorationActionError(
+            "explore.talk_scripted params requires exactly npc_id, topic_id, context_id"
+        )
+    topic_id = params["topic_id"]
+    if not isinstance(topic_id, str) or not topic_id.strip() or len(topic_id) > 2048:
+        raise ExplorationActionError("topic_id must be a non-empty string <= 2048 chars")
+    context_id = params["context_id"]
+    if context_id is not None and (
+        not isinstance(context_id, str) or not context_id.strip() or len(context_id) > 64
+    ):
+        raise ExplorationActionError("context_id must be a string <= 64 chars or None")
+    return {
+        "npc_id": _require_positive_int(params["npc_id"], "npc_id"),
+        "topic_id": topic_id,
+        "context_id": context_id,
     }
 
 
@@ -586,25 +633,70 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     if not is_dialogue_host(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
     dialogue_key = dialogue_key_for(npc)
+    if dialogue_key is None:
+        return _rejected("not_dialogue_host", "對方無法交談。")
+
+    topic_id = payload.get("topic_id")
+    if topic_id is not None:
+        context_id = payload.get("context_id")
+        selection_id = payload.get("selection_id") or "sel-" + str(npc.pk)
+        try:
+            delivery = select_authored_topic(
+                actor,
+                npc,
+                topic_id,
+                selection_id=selection_id,
+                expected_context_id=context_id,
+            )
+        except StaleContextError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("stale_context", "對話情境已過期。")
+        except StaleSelectionError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("stale_selection", "選取請求已過期。")
+        except DuplicateSelectionError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("duplicate_selection", "選取請求重複。")
+        except TopicLockedError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("topic_locked", "此話題目前無法選取。")
+        except TopicNotFoundError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("unregistered_keyword", "對方不明白這個話題。")
+        except DialogueSourceUnavailableError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("not_dialogue_host", "對方無法交談。")
+        except Exception as exc:
+            log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "topic_id": topic_id}, exc=exc)
+            return _rejected("dialogue_failed", "交談失敗。")
+
+        for line in delivery.lines:
+            if isinstance(line, Speech):
+                if line.speaker == "actor":
+                    actor.msg(f"你說：{line.text}")
+                else:
+                    actor.msg(f"{npc.key}說：{line.text}")
+            else:
+                actor.msg(line.text)
+
+        last_host_line = ""
+        for line in reversed(delivery.lines):
+            if getattr(line, "speaker", None) == "host":
+                last_host_line = line.text
+                break
+        summary = f"{npc.key}說：{last_host_line}" if last_host_line else f"{npc.key}與你交談。"
+        return _success("talked", summary, AFFECTED_FULL)
+
+    keyword = payload.get("keyword_id", "")
     definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
     keyword_ids = (
         [response.keyword for response in definition.responses]
         if definition is not None
         else []
     )
-    if payload["keyword_id"] not in keyword_ids:
+    if keyword not in keyword_ids:
         return _rejected("unregistered_keyword", "對方不明白這個話題。")
     try:
-        result = run_scripted_talk(npc, actor, payload["keyword_id"])
+        result = run_scripted_talk(npc, actor, keyword)
     except Exception as exc:
-        log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "keyword": payload["keyword_id"]}, exc=exc)
+        log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "keyword": keyword}, exc=exc)
         return _rejected("dialogue_failed", "交談失敗。")
     if result is None:
         return _rejected("no_response", "對方沒有理會你。")
-    # The delivered authored line IS the exchange: the deterministic-core
-    # session seam records it (webclient-align-07). The post-action full
-    # snapshot the dispatcher publishes after this result carries the session
-    # atomically with the delivered line.
     open_or_refresh_dialogue(actor, npc, result.response)
     hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
     message = f"{npc.key}說：{result.response}{hint}"
@@ -1557,5 +1649,6 @@ __all__ = [
     "validate_talk_freeform_payload",
     "validate_talk_open_payload",
     "validate_talk_scripted_payload",
+    "validate_talk_scripted_descriptor",
     "validate_wait_payload",
 ]

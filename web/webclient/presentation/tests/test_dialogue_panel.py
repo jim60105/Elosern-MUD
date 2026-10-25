@@ -61,6 +61,7 @@ from world.rules.dialogue import (
     DialogueDefinition,
     KeywordResponse,
     clear_dialogue_session,
+    live_dialogue_session,
     open_or_refresh_dialogue,
 )
 from world.rules.movement_settlement import settle_movement
@@ -114,7 +115,7 @@ _T_OVER_CAP_ROW = DialogueDefinition(
     greeting="櫃檯後的人抬起眼：「有事說一聲就好。」",
     responses=tuple(
         KeywordResponse(f"合成關鍵詞{index}", f"「合成回應{index}。」")
-        for index in range(6)
+        for index in range(18)
     ),
 )
 
@@ -133,7 +134,16 @@ class _RecordingSession:
 
 
 def _choice(keyword):
-    return {"keyword_id": keyword, "label": keyword}
+    return {
+        "topic_id": f"guild_staff.{keyword}",
+        "keyword_id": keyword,
+        "label": keyword,
+        "availability": "open",
+        "requirement_hint": None,
+        "unread": False,
+        "predecessors": [],
+        "action_payload": {"npc_id": 41, "topic_id": f"guild_staff.{keyword}", "context_id": "ctx-1"},
+    }
 
 
 def _available(**overrides):
@@ -146,9 +156,19 @@ def _available(**overrides):
             "display_name": "公會職員",
             "portrait_ref": None,
         },
+        "actor": {
+            "identity": 1,
+            "display_name": "測試者",
+            "portrait_ref": None,
+        },
         "bond_stage": "熟人",
-        "line": "歡迎來到冒險者公會。",
+        "context_id": "ctx-1",
+        "delivery": None,
         "choices": [_choice("公會"), _choice("任務")],
+        "pure_chain": [],
+        "reading_revision": 0,
+        "completed_topic_ids": [],
+        "unlock_batch": None,
     }
     payload.update(overrides)
     return payload
@@ -183,7 +203,21 @@ class DialoguePresenterTests(EvenniaTest):
         payload = self._render()
         self.assertEqual(
             set(payload),
-            {"schema_version", "available", "kind", "host", "bond_stage", "line", "choices"},
+            {
+                "schema_version",
+                "available",
+                "kind",
+                "host",
+                "actor",
+                "bond_stage",
+                "context_id",
+                "delivery",
+                "choices",
+                "pure_chain",
+                "reading_revision",
+                "completed_topic_ids",
+                "unlock_batch",
+            },
         )
         self.assertEqual(payload["schema_version"], DIALOGUE_SCHEMA_VERSION)
         self.assertIs(payload["available"], True)
@@ -199,12 +233,14 @@ class DialoguePresenterTests(EvenniaTest):
             },
         )
         self.assertEqual(payload["bond_stage"], self.host.relations.stage_for(self.player).name)
-        self.assertEqual(payload["line"], "任務板在右側。")
+        self.assertEqual(payload["delivery"]["lines"][0]["text"], "任務板在右側。")
         # Same vocabulary owner as the interact target descriptor, table order,
         # truncated to the panel's own bound (align-11).
         self.assertEqual(
             payload["choices"],
-            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+            _scripted_keyword_descriptors(self.host, context_id=live_dialogue_session(self.player).context_id)[
+                :DIALOGUE_MAX_CHOICES
+            ],
         )
         self.assertTrue(payload["choices"])
         # The shipped guild_staff row authors exactly the panel's pressable
@@ -318,13 +354,16 @@ class DialoguePresenterTests(EvenniaTest):
         host = _host_with_key(self.room, _T_OVER_CAP_KEY, key="合成對話主")
         open_or_refresh_dialogue(self.player, host, "歡迎。")
         full_pool = _scripted_keyword_descriptors(host)
-        self.assertEqual(len(full_pool), 6)
+        self.assertEqual(len(full_pool), 16)
         payload = self._render()
         self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)
-        self.assertEqual(payload["choices"], full_pool[:DIALOGUE_MAX_CHOICES])
+        expected_choices = _scripted_keyword_descriptors(
+            host, context_id=live_dialogue_session(self.player).context_id
+        )[:DIALOGUE_MAX_CHOICES]
+        self.assertEqual(payload["choices"], expected_choices)
         self.assertEqual(
             [row["keyword_id"] for row in payload["choices"]],
-            [row["keyword_id"] for row in full_pool[:DIALOGUE_MAX_CHOICES]],
+            [row["keyword_id"] for row in expected_choices],
         )
 
     def test_no_session_renders_the_registered_unavailable_form(self):
@@ -391,7 +430,7 @@ class DialoguePresenterTests(EvenniaTest):
         open_or_refresh_dialogue(self.player, self.host, "第二句。")
         second = self._render()
         self.assertIs(second["available"], True)
-        self.assertEqual(second["line"], "第二句。")
+        self.assertEqual(second["delivery"]["lines"][0]["text"], "第二句。")
         self.assertEqual(second["host"], first["host"])
         self.assertEqual(second["choices"], first["choices"])
 
@@ -428,8 +467,6 @@ class DialogueValidatorTests(unittest.TestCase):
             host={"identity": 41, "display_name": "公會職員", "portrait_ref": "42"}
         )
         self.assertEqual(validate_dialogue(keyed), keyed)
-        # Paired astral code points are legal text.
-        self.assertEqual(validate_dialogue(_available(line="歡迎\U0001F600。"))["line"], "歡迎\U0001F600。")
 
     def test_portrait_reference_bound_matches_the_combat_participant_bound(self):
         self.assertEqual(MAX_DIALOGUE_PORTRAIT_REF, MAX_PARTICIPANT_REF)
@@ -458,7 +495,7 @@ class DialogueValidatorTests(unittest.TestCase):
             {k: v for k, v in _available().items() if k != "choices"},
             # schema drift
             _available(schema_version=1),
-            _available(schema_version=3),
+            _available(schema_version=2),
             # the unavailable form is the registry's, not the validator's
             dict(UNAVAILABLE_PAYLOAD),
             _available(available=False),
@@ -609,7 +646,7 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
             "request_id": "d1",
             "base_revision": coordinator.revision,
             "action_id": "explore.talk_scripted",
-            "payload": {"npc_id": int(self.host.pk), "keyword_id": "公會"},
+            "payload": {"npc_id": int(self.host.pk), "topic_id": "guild_staff.topic_03", "context_id": None},
         }
         handle_ui_action(
             session, self.player, envelope, self.action_registry, self.registry
@@ -628,14 +665,16 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         # published panel already carries the authored reply.
         self.assertEqual(committed["mode"], "dialogue")
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
-        self.assertEqual(
-            committed["panels"]["dialogue"]["line"],
-            self.player.db.dialogue_session["line"],
+        self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
+        self.assertIn(
+            "冒險者公會",
+            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
         )
-        self.assertIn("冒險者公會", committed["panels"]["dialogue"]["line"])
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
-            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+            _scripted_keyword_descriptors(
+                self.host, context_id=committed["panels"]["dialogue"]["context_id"]
+            )[:DIALOGUE_MAX_CHOICES],
         )
         # End-to-end: the portrait reference the wire carries is a key of the
         # art catalog committed in the same envelope (design §8.2 — the client
@@ -838,9 +877,10 @@ class DialogueTextCommandSettlementTests(BattlefieldIsolation, EvenniaTest):
         # mode and the available dialogue panel commit in one envelope.
         self.assertEqual(committed["mode"], "dialogue")
         self.assertIs(committed["panels"]["dialogue"]["available"], True)
-        self.assertEqual(
-            committed["panels"]["dialogue"]["line"],
-            self.player.db.dialogue_session["line"],
+        self.assertIsNotNone(committed["panels"]["dialogue"]["delivery"])
+        self.assertIn(
+            "登記很簡單",
+            committed["panels"]["dialogue"]["delivery"]["lines"][1]["text"],
         )
 
 

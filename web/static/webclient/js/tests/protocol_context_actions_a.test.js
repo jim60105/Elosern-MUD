@@ -52,7 +52,7 @@ test("validates the available context_actions exploration form", () => {
   const affordance = {
     action_id: "explore.talk_scripted",
     label: "註冊",
-    params: { npc_id: 5, keyword_id: "註冊" },
+    params: { npc_id: 5, topic_id: "guild_staff.topic_01", context_id: null },
     freeform: false,
     navigation: false,
     enabled: true,

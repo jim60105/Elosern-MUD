@@ -47,6 +47,8 @@ def resolve_dialogue_context(
     owner = actor
 
     dialogue_key = dialogue_key_for(host)
+    if not isinstance(dialogue_key, str):
+        dialogue_key = None
     source_identity: StaticDialogueIdentity | GeneratedDialogueIdentity | None = None
     host_key: str
 

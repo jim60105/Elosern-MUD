@@ -25,7 +25,7 @@ from web.webclient.actions.exploration_actions import (
     validate_move_payload,
     validate_party_invite_payload,
     validate_party_leave_payload,
-    validate_talk_scripted_payload,
+    validate_talk_scripted_descriptor,
     validate_wait_payload,
 )
 from web.webclient.actions.node_ids import node_id_for_location
@@ -288,16 +288,14 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
 
 
 def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
-    """One ``explore.talk_scripted`` entry per current topic of a host.
+    """One ``explore.talk_scripted`` entry per current topic of a host."""
+    from world.rules.dialogue_context import resolve_dialogue_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
 
-    The topics come from the shared authored/generated resolver, so a generated
-    role's current permitted phase exposes the same keyword identities as an
-    authored table row.
-    """
-    keywords = dialogue_topic_keywords(npc)
-    if not keywords:
-        return []
+    context = resolve_dialogue_context(actor, npc) if actor else None
+    source = resolve_dialogue_source(context) if context else None
     npc_id = int(npc.pk)
+    context_id = context.context_id if context else None
     entries: list[AffordanceView] = []
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -307,37 +305,91 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
     possessed = actor is not None and is_possessed_actor(actor)
     disabled_reason = (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]) if possessed else None
 
-    for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]:
-        params = validate_talk_scripted_payload(
-            {"npc_id": npc_id, "keyword_id": keyword}
-        )
-        entries.append(
-            AffordanceView(
-                action_id="explore.talk_scripted",
-                label=_bounded_label(keyword),
-                params=params,
-                freeform=False,
-                navigation=False,
-                enabled=not possessed,
-                disabled_reason=disabled_reason,
+    if source is not None:
+        for topic in source.dialogue.topics[:MAX_SCRIPTED_KEYWORDS]:
+            params = validate_talk_scripted_descriptor(
+                {"npc_id": npc_id, "topic_id": topic.topic_id, "context_id": context_id}
             )
-        )
+            entries.append(
+                AffordanceView(
+                    action_id="explore.talk_scripted",
+                    label=_bounded_label(topic.label),
+                    params=params,
+                    freeform=False,
+                    navigation=False,
+                    enabled=not possessed,
+                    disabled_reason=disabled_reason,
+                )
+            )
+    else:
+        keywords = dialogue_topic_keywords(npc)
+        for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]:
+            params = validate_talk_scripted_descriptor(
+                {"npc_id": npc_id, "topic_id": keyword, "context_id": context_id}
+            )
+            entries.append(
+                AffordanceView(
+                    action_id="explore.talk_scripted",
+                    label=_bounded_label(keyword),
+                    params=params,
+                    freeform=False,
+                    navigation=False,
+                    enabled=not possessed,
+                    disabled_reason=disabled_reason,
+                )
+            )
     return entries
 
 
-def _scripted_keyword_descriptors(npc: Any) -> list[dict[str, str]]:
-    """Return the bounded scripted keyword descriptors of a dialogue host.
+def _scripted_keyword_descriptors(
+    npc: Any, context_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Return the bounded scripted keyword descriptors of a dialogue host for panel v3."""
+    from world.rules.dialogue_context import resolve_dialogue_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
 
-    The keyword pool is a version-1 panel serialization detail: the panel's
-    nested ``keywords`` list is bounded by ``MAX_SCRIPTED_KEYWORDS``
-    independently of the vocabulary's per-target affordance budget. It is read
-    from the same shared resolver as the affordances and the ``talk`` paths.
-    """
-    keywords = dialogue_topic_keywords(npc)
-    return [
-        {"keyword_id": keyword, "label": keyword}
-        for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]
-    ]
+    context = resolve_dialogue_context(npc, npc)
+    source = resolve_dialogue_source(context)
+    npc_id = int(npc.pk)
+    choices = []
+    if source is not None:
+        for topic in source.dialogue.topics[:16]:
+            choices.append(
+                {
+                    "topic_id": topic.topic_id,
+                    "keyword_id": topic.keyword,
+                    "label": topic.label,
+                    "availability": "open",
+                    "requirement_hint": None,
+                    "unread": False,
+                    "predecessors": list(topic.predecessors),
+                    "action_payload": {
+                        "npc_id": npc_id,
+                        "topic_id": topic.topic_id,
+                        "context_id": context_id,
+                    },
+                }
+            )
+    else:
+        keywords = dialogue_topic_keywords(npc)
+        for keyword in keywords[:16]:
+            choices.append(
+                {
+                    "topic_id": keyword,
+                    "keyword_id": keyword,
+                    "label": keyword,
+                    "availability": "open",
+                    "requirement_hint": None,
+                    "unread": False,
+                    "predecessors": [],
+                    "action_payload": {
+                        "npc_id": npc_id,
+                        "topic_id": keyword,
+                        "context_id": context_id,
+                    },
+                }
+            )
+    return choices
 
 
 def _freeform_entry(npc: Any, *, actor: Any = None) -> AffordanceView:

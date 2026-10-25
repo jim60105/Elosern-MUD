@@ -342,52 +342,59 @@ function validateObjectivesPanel(payload) {
 // schema_version, available, kind, host (party-row triple whose portrait_ref
 // is a nullable decimal catalog key, the combat participant vocabulary),
 // bond_stage (a stage NAME or null — never a number), a bounded line, and at
-// most DIALOGUE_MAX_CHOICES unique {keyword_id, label} rows. Every string
-// rejects lone surrogates exactly like the Python validator; over-bound or
-// corrupt values reject, never truncate. The client never constructs a
-// catalog key: it looks the server-authored one up in the committed art panel.
+// most DIALOGUE_MAX_CHOICES choices. Every string rejects lone surrogates.
 function validateDialoguePanel(payload) {
+  if (payload && payload.schema_version !== DIALOGUE_SCHEMA_VERSION) {
+    throw new Error("unsupported dialogue schema_version");
+  }
   requireExactFields(
     payload,
     "dialogue panel",
-    ["schema_version", "available", "kind", "host", "bond_stage", "line", "choices"],
+    [
+      "schema_version",
+      "available",
+      "kind",
+      "host",
+      "actor",
+      "bond_stage",
+      "context_id",
+      "delivery",
+      "choices",
+      "pure_chain",
+      "reading_revision",
+      "completed_topic_ids",
+      "unlock_batch",
+    ],
     []
   );
-  requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== DIALOGUE_SCHEMA_VERSION) {
-    throw new Error("unsupported dialogue schema_version");
-  }
   if (payload.available !== true) {
     throw new Error("dialogue panel must be available");
   }
   if (payload.kind !== "dialogue") {
     throw new Error("dialogue kind must be dialogue");
   }
-  requireExactFields(
-    payload.host,
-    "dialogue host",
-    ["identity", "display_name", "portrait_ref"],
-    []
-  );
-  requireInt(payload.host.identity, "identity", 1, MAX_SAFE_INTEGER);
-  var hostName = requireString(
-    payload.host.display_name,
-    "display_name",
-    PARTY_MAX_DISPLAY_NAME
-  );
-  if (!hostName.trim() || hasLoneSurrogate(hostName)) {
-    throw new Error("host display_name must be non-empty");
-  }
-  // Same rule, bound, and messages as a combat participant's portrait_ref.
-  var hostPortraitRef = payload.host.portrait_ref;
-  if (hostPortraitRef !== null) {
-    if (typeof hostPortraitRef !== "string" || !/^[0-9]+$/.test(hostPortraitRef)) {
-      throw new Error("portrait_ref must be an opaque decimal catalog key or null");
+
+  function validateEntity(entity, role) {
+    requireExactFields(entity, "dialogue " + role, ["identity", "display_name", "portrait_ref"], []);
+    requireInt(entity.identity, "identity", 1, MAX_SAFE_INTEGER);
+    var name = requireString(entity.display_name, "display_name", PARTY_MAX_DISPLAY_NAME);
+    if (!name.trim() || hasLoneSurrogate(name)) {
+      throw new Error(role + " display_name must be non-empty");
     }
-    if (hostPortraitRef.length > 32) {
-      throw new Error("portrait_ref exceeds its bound");
+    var portraitRef = entity.portrait_ref;
+    if (portraitRef !== null) {
+      if (typeof portraitRef !== "string" || !/^[0-9]+$/.test(portraitRef)) {
+        throw new Error("portrait_ref must be an opaque decimal catalog key or null");
+      }
+      if (portraitRef.length > 32) {
+        throw new Error("portrait_ref exceeds its bound");
+      }
     }
   }
+
+  validateEntity(payload.host, "host");
+  validateEntity(payload.actor, "actor");
+
   if (payload.bond_stage !== null) {
     var bondStage = requireString(
       payload.bond_stage,
@@ -398,10 +405,52 @@ function validateDialoguePanel(payload) {
       throw new Error("bond_stage must be non-empty when set");
     }
   }
-  var line = requireString(payload.line, "line", DIALOGUE_MAX_LINE);
-  if (!line.trim() || hasLoneSurrogate(line)) {
-    throw new Error("dialogue line must be non-empty");
+
+  var contextId = requireString(payload.context_id, "context_id", 64);
+  if (!contextId.trim() || hasLoneSurrogate(contextId)) {
+    throw new Error("dialogue context_id must be non-empty");
   }
+
+  if (payload.delivery !== null) {
+    var deliv = payload.delivery;
+    requireExactFields(
+      deliv,
+      "dialogue delivery",
+      ["delivery_id", "context_id", "topic_id", "scene_id", "scene_revision", "phase_revision", "kind", "lines"],
+      []
+    );
+    requireString(deliv.delivery_id, "delivery_id", 64);
+    requireString(deliv.context_id, "context_id", 64);
+    if (deliv.topic_id !== null) {
+      requireString(deliv.topic_id, "topic_id", 2048);
+    }
+    requireString(deliv.scene_id, "scene_id", 2048);
+    requireString(deliv.scene_revision, "scene_revision", 64);
+    if (deliv.kind !== "formal" && deliv.kind !== "refusal" && deliv.kind !== "opening" && deliv.kind !== "service") {
+      throw new Error("invalid delivery kind");
+    }
+    if (!Array.isArray(deliv.lines)) {
+      throw new Error("delivery lines must be an array");
+    }
+    for (var li = 0; li < deliv.lines.length; li++) {
+      var line = deliv.lines[li];
+      if (line.kind === "speech") {
+        requireExactFields(line, "speech line", ["kind", "speaker", "text"], []);
+        if (line.speaker !== "actor" && line.speaker !== "host") {
+          throw new Error("speech speaker must be actor or host");
+        }
+        var stext = requireString(line.text, "text", 2000);
+        if (!stext.trim() || hasLoneSurrogate(stext)) throw new Error("speech text must be non-empty");
+      } else if (line.kind === "narration") {
+        requireExactFields(line, "narration line", ["kind", "text"], []);
+        var ntext = requireString(line.text, "text", 2000);
+        if (!ntext.trim() || hasLoneSurrogate(ntext)) throw new Error("narration text must be non-empty");
+      } else {
+        throw new Error("unknown line kind");
+      }
+    }
+  }
+
   var choices = payload.choices;
   if (!Array.isArray(choices)) {
     throw new Error("dialogue choices must be a list");
@@ -411,48 +460,63 @@ function validateDialoguePanel(payload) {
       "dialogue choices must hold at most " + DIALOGUE_MAX_CHOICES + " entries"
     );
   }
-  // Prototype-null registry: a plain object would let a literal
-  // "__proto__" keyword_id defeat the own-property duplicate check.
-  var seen = Object.create(null);
+  var seenTopics = Object.create(null);
   for (var i = 0; i < choices.length; i++) {
     var choice = choices[i];
     var name = "dialogue choice " + (i + 1);
-    requireExactFields(choice, name, ["keyword_id", "label"], []);
-    var keywordId = requireString(
-      choice.keyword_id,
-      "keyword_id",
-      DIALOGUE_MAX_KEYWORD_ID
+    requireExactFields(
+      choice,
+      name,
+      ["topic_id", "keyword_id", "label", "availability", "requirement_hint", "unread", "predecessors", "action_payload"],
+      []
     );
+    var topicId = requireString(choice.topic_id, "topic_id", 2048);
+    if (!topicId.trim() || hasLoneSurrogate(topicId)) {
+      throw new Error(name + " topic_id must be non-empty");
+    }
+    if (Object.prototype.hasOwnProperty.call(seenTopics, topicId)) {
+      throw new Error("dialogue choice topic ids must be unique");
+    }
+    seenTopics[topicId] = true;
+
+    var keywordId = requireString(choice.keyword_id, "keyword_id", DIALOGUE_MAX_KEYWORD_ID);
     if (!keywordId.trim() || hasLoneSurrogate(keywordId)) {
       throw new Error(name + " keyword_id must be non-empty");
     }
-    var label = requireString(
-      choice.label,
-      "label",
-      DIALOGUE_MAX_KEYWORD_LABEL
-    );
+    var label = requireString(choice.label, "label", DIALOGUE_MAX_KEYWORD_LABEL);
     if (!label.trim() || hasLoneSurrogate(label)) {
       throw new Error(name + " label must be non-empty");
     }
-    if (Object.prototype.hasOwnProperty.call(seen, keywordId)) {
-      throw new Error("dialogue choice keyword ids must be unique");
+    if (choice.availability !== "open" && choice.availability !== "locked" && choice.availability !== "hidden") {
+      throw new Error(name + " availability invalid");
     }
-    seen[keywordId] = true;
+    requireBool(choice.unread, "unread");
+    if (!Array.isArray(choice.predecessors)) {
+      throw new Error(name + " predecessors must be an array");
+    }
+    requireExactFields(choice.action_payload, "action_payload", ["npc_id", "topic_id", "context_id"], []);
+    requireInt(choice.action_payload.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+    requireString(choice.action_payload.topic_id, "topic_id", 2048);
+    if (choice.action_payload.context_id !== null) {
+      requireString(choice.action_payload.context_id, "context_id", 64);
+    }
   }
-  var result = {
-    schema_version: DIALOGUE_SCHEMA_VERSION,
-    available: true,
-    kind: "dialogue",
-    host: payload.host,
-    bond_stage: payload.bond_stage,
-    line: line,
-    choices: choices,
-  };
-  // Envelope guarantee mirrors the Python validator's closing check.
-  if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
-    throw new Error("dialogue payload exceeds the OOB envelope limit");
+
+  if (!Array.isArray(payload.pure_chain) || payload.pure_chain.length > 15) {
+    throw new Error("pure_chain must be a list of at most 15 entries");
   }
-  return result;
+  requireInt(payload.reading_revision, "reading_revision", 0, MAX_SAFE_INTEGER);
+  if (!Array.isArray(payload.completed_topic_ids) || payload.completed_topic_ids.length > 16) {
+    throw new Error("completed_topic_ids must be a list of at most 16 entries");
+  }
+  if (payload.unlock_batch !== null) {
+    requireExactFields(payload.unlock_batch, "unlock_batch", ["batch_id", "host_id", "context_id", "topic_ids"], []);
+  }
+
+  if (jsonByteSize(payload) > 24576) {
+    throw new Error("dialogue payload exceeds 24576 bytes");
+  }
+  return payload;
 }
 
 // Exact available roster panel v3 schema (mirror of

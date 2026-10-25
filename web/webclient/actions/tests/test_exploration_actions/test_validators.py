@@ -70,17 +70,20 @@ class ExplorationValidatorTests(unittest.TestCase):
 
     def test_talk_scripted_payload_exact(self):
         self.assertEqual(
-            validate_talk_scripted_payload({"npc_id": 3, "keyword_id": "公會"}),
-            {"npc_id": 3, "keyword_id": "公會"},
+            validate_talk_scripted_payload(
+                {"npc_id": 3, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": "s1"}
+            ),
+            {"npc_id": 3, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": "s1"},
         )
         for bad in (
             None,
             {"npc_id": 3},
-            {"npc_id": 0, "keyword_id": "公會"},
-            {"npc_id": True, "keyword_id": "公會"},
-            {"npc_id": 3, "keyword_id": ""},
-            {"npc_id": 3, "keyword_id": "x" * (MAX_KEYWORD_ID_CHARS + 1)},
-            {"npc_id": 3, "keyword_id": "公會", "extra": 1},
+            {"npc_id": 0, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": "s1"},
+            {"npc_id": True, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": "s1"},
+            {"npc_id": 3, "topic_id": "", "context_id": "c1", "selection_id": "s1"},
+            {"npc_id": 3, "topic_id": "x" * 2049, "context_id": "c1", "selection_id": "s1"},
+            {"npc_id": 3, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": ""},
+            {"npc_id": 3, "topic_id": "guild_staff.topic_01", "context_id": "c1", "selection_id": "s1", "extra": 1},
         ):
             with self.assertRaises(ExplorationActionError):
                 validate_talk_scripted_payload(bad)

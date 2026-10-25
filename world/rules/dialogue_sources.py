@@ -16,6 +16,7 @@ from world.lore.dialogue.codec import (
 from world.lore.dialogue.shape import (
     AuthoredDialogue,
     AuthoredTopic,
+    MAX_TOPICS_PER_DIALOGUE,
     DialogueDefinition,
     SceneVariant,
 )
@@ -71,7 +72,7 @@ def to_authored_dialogue(
                 fallback=scene,
             )
         )
-    return AuthoredDialogue(greeting=defn.greeting, topics=tuple(topics))
+    return AuthoredDialogue(greeting=defn.greeting, topics=tuple(topics[:MAX_TOPICS_PER_DIALOGUE]))
 
 
 def resolve_dialogue_source(context: Any) -> ResolvedDialogueSource | None:

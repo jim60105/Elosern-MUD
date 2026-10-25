@@ -1004,7 +1004,18 @@ def select_authored_topic(
         from django.db import transaction
 
         with transaction.atomic():
-            apply_affinity_change(host, owner, AffinitySource.TALK, 1)
+            from typeclasses.components import GuildStaff
+            is_guild_staff = (
+                getattr(host, "components", None) is not None
+                and host.components.has(GuildStaff.name)
+            )
+            is_turnin = (
+                context.source_identity is not None
+                and getattr(context.source_identity, "dialogue_key", "") == GUILD_STAFF_DIALOGUE_KEY
+                and (matched_topic.keyword == GUILD_STAFF_TURNIN_KEYWORD or matched_topic.topic_id.endswith(".topic_04"))
+            )
+            if not (is_guild_staff and is_turnin):
+                apply_affinity_change(host, owner, AffinitySource.TALK, 1)
             open_or_refresh_dialogue(
                 owner,
                 host,
