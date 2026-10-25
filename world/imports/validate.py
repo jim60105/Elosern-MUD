@@ -32,6 +32,7 @@ from world.rules.creation_wizard import (
     APPARENT_AGE_MINIMUM,
 )
 from world.rules.npc_identity import validate_npc_title
+from world.lore.social_identities import MAX_SOCIAL_IDENTITIES, SOCIAL_IDENTITY_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -847,8 +848,35 @@ def validate_character(
         record, npc_target
     )
     report.rejections.extend(profession_issues)
+    report.rejections.extend(_check_social_identities(record))
     report.warnings.extend(_check_stats_band(record))
     return report
+
+def _check_social_identities(record: dict[str, Any]) -> list[Issue]:
+    """Validate optional social_identities field against the registered vocabulary."""
+    if "social_identities" not in record:
+        return []
+    raw = record["social_identities"]
+    if not isinstance(raw, list):
+        return [Issue("social_identities", "social_identities must be an array")]
+    if len(raw) > MAX_SOCIAL_IDENTITIES:
+        return [
+            Issue(
+                "social_identities",
+                f"social_identities exceeds maximum of {MAX_SOCIAL_IDENTITIES}",
+            )
+        ]
+    issues: list[Issue] = []
+    seen: set[str] = set()
+    for idx, item in enumerate(raw):
+        if not isinstance(item, str) or isinstance(item, bool):
+            issues.append(Issue("social_identities", f"item at index {idx} must be a string"))
+        elif item in seen:
+            issues.append(Issue("social_identities", f"duplicate social identity key: {item!r}"))
+        elif item not in SOCIAL_IDENTITY_REGISTRY:
+            issues.append(Issue("social_identities", f"unknown social identity key: {item!r}"))
+        seen.add(item)
+    return issues
 
 
 def validate_world_entry(record: dict[str, Any]) -> RecordReport:

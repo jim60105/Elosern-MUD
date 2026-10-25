@@ -63,6 +63,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "「旅人，這句話我沒有聽明白。請再說一次，我在這裡聽著。」"
             ),
         ),
+        social_identities=("clergy",),
     ),
     NpcProfile(
         key="altoria_sanctum_deacon",
@@ -109,6 +110,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "「嗯？這我沒聽懂呢。你是想挑櫃上的東西，還是想問聖所的事？」"
             ),
         ),
+        social_identities=("clergy",),
     ),
     NpcProfile(
         key="altoria_noble_watch_captain",
@@ -154,6 +156,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "「抱歉，訪客，這句我沒有聽明白。請再說一次。」"
             ),
         ),
+        social_identities=("official",),
     ),
     NpcProfile(
         key="altoria_drill_instructor",

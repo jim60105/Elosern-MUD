@@ -33,6 +33,7 @@ from world.lore.player_presets.validation import (
     _validate_preset_starting_companions,
     _validate_preset_starting_equipment,
     _validate_preset_starting_items,
+    _validate_preset_social_identities,
 )
 from world.lore.player_presets.vocab import (
     _PERSONA_PROSE_FIELDS,
@@ -122,3 +123,4 @@ _validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
 _validate_preset_sexual_baselines(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_companions(PLAYER_PRESET_REGISTRY)
 _validate_preset_fallback_keys(PLAYER_PRESET_REGISTRY)
+_validate_preset_social_identities(PLAYER_PRESET_REGISTRY)

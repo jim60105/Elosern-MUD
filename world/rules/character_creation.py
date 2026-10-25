@@ -45,6 +45,8 @@ _CREATION_ATTRIBUTE_KEYS = (
     # gallery fallback can find the preset's declared fallback key through
     # a subject keyed by the entity pk (gallery-builtin-fallbacks).
     "creation_preset_key",
+    # Social identities snapshot for atomic rollback (authored-dialogue-social-identity).
+    "social_identities",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -698,6 +700,10 @@ def activate_player_character(
         # resolver's declaration rung.
         attribute_values["creation_preset_key"] = preset.key
     persona_record = _persona_record_for(validated, request, persona)
+    # Social identity: custom mode defaults empty; preset mode seeds preset's explicit tags.
+    preset_social_identities = preset.social_identities if request.mode == "preset" else ()
+    attribute_values["social_identities"] = tuple(sorted(set(preset_social_identities)))
+
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)
     trait_snapshot = snapshot_traits(character)

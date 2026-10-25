@@ -262,5 +262,6 @@ ROWS: tuple[NpcProfile, ...] = (
                 "可以回答。」"
             ),
         ),
+        social_identities=("official",),
     ),
 )

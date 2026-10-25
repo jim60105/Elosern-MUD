@@ -71,7 +71,7 @@ EXTRA_CATALOG_MODULES = ("world.rules.dialogue",)
 # shipped-content identifiers (no registry/rulebook token is defined there),
 # so harvesting their module mappings would only retroactively flag behavior
 # tests that mention an entry kind or a terminal outcome name.
-PRESENTATION_MODULES = ("world.skills.narration",)
+PRESENTATION_MODULES = ("world.skills.narration", "world.lore.social_identities")
 SYMBOL_RE = re.compile(r"(_REGISTRY|_TABLE|_TIERS|_PACK_REGISTRY)$|^XYMAP_DATA$")
 DISPLAY_FIELDS = frozenset(
     {
