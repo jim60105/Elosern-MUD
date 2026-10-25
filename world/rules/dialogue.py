@@ -28,7 +28,8 @@ AI layer, or client payload may open, refresh, or clear it.
 The opener success paths are the ``explore.talk_open`` opener (a conversation
 with the host's greeting, or the fixed fallback line), the
 ``explore.talk_scripted`` and ``explore.talk_freeform`` adapters, and the
-``talk`` text command.
+``talk`` text command's authored topic deliveries (its keyword-less greeting
+stays text-only).
 The clear seams are: movement settlement, combat engage, NPC departure
 cleanup, and the ``explore.dialogue_leave`` adapter's explicit exit
 (webclient-align-11) — the adapter calls ``clear_dialogue_session`` here and
@@ -36,7 +37,7 @@ never touches ``db`` itself.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Any
 import uuid
@@ -149,6 +150,12 @@ class SceneDelivery:
     kind: str  # formal | refusal | opening | service
     lines: tuple[Speech | Narration, ...]
     updated_tick: int | None
+    # Server-only effect feedback for the delivering surface: the +1 talk
+    # affinity this selection attempted was blocked by the daily interaction
+    # budget. ``delivery_to_wire`` whitelists the wire fields, so it can never
+    # reach the panel, the session storage or a client payload; a replay
+    # reconstructs the delivery without it and re-sends no hint.
+    affinity_budget_capped: bool = False
 
 
 def delivery_to_wire(delivery: SceneDelivery | None) -> dict[str, Any] | None:
@@ -1112,7 +1119,9 @@ def select_authored_topic(
                 and (matched_topic.keyword == GUILD_STAFF_TURNIN_KEYWORD or matched_topic.topic_id.endswith(".topic_04"))
             )
             if not (is_guild_staff and is_turnin):
-                apply_affinity_change(host, owner, AffinitySource.TALK, 1)
+                outcome = apply_affinity_change(host, owner, AffinitySource.TALK, 1)
+                if outcome.budget_capped:
+                    delivery = replace(delivery, affinity_budget_capped=True)
             open_or_refresh_dialogue(
                 owner,
                 host,

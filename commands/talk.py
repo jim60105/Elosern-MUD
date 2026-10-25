@@ -121,7 +121,11 @@ class CmdsTalk(Command):
                 and getattr(npc, "components", None) is not None
                 and npc.components.has(GuildStaff.name)
             ):
-                summary = reportable_quest_summary(self.caller, npc)
+                try:
+                    summary = reportable_quest_summary(self.caller, npc)
+                except (RewardClaimError, GuildDataError) as error:
+                    self.caller.msg(f"無法回報任務：{error}")
+                    return
                 if summary is not None:
                     self.caller.msg(f"{npc.key}說：{summary}")
                     return
@@ -194,13 +198,17 @@ class CmdsTalk(Command):
                         self.caller.msg(f"{npc.key}說：{line.text}")
                 else:
                     self.caller.msg(line.text)
+            if delivery.affinity_budget_capped:
+                # The authored selection attempted the same +1 talk affinity
+                # the scripted writer grants; a budget-blocked gain still owes
+                # the fixed non-numeric hint (affinity-system).
+                self.caller.msg(AFFINITY_DAILY_CAP_HINT)
             return
 
         if is_dialogue_host(npc):
             greeting = resolve_greeting(npc)
             if greeting is not None:
                 speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
-                open_or_refresh_dialogue(self.caller, npc, speech)
                 self.caller.msg(f"{npc.key}說：{speech}\n{_USAGE}")
                 return
             self.caller.msg(_NO_RESPONSE)
