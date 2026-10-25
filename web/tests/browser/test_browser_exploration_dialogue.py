@@ -94,6 +94,9 @@ LOCKED_TOPIC_METHOD = "test_locked_topic_shows_its_hint_and_plays_its_refusal"
 #: same gatekeeper table, whose locked topic a GM console grant unlocks while
 #: another topic's scene plays.
 UNLOCK_NOTICE_METHOD = "test_unlock_during_a_scene_shows_one_deferred_notice"
+#: The generated-package journey (authored-dialogue-generated-packages): a
+#: synthetic published package bound to the scripted host, played offline.
+GENERATED_SCENE_METHOD = "test_generated_package_scene_plays_multi_line_on_the_stage"
 
 
 def _scene_frame(page) -> dict:
@@ -243,6 +246,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         if self._testMethodName in (LOCKED_TOPIC_METHOD, UNLOCK_NOTICE_METHOD):
             runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_LOCKED"] = "1"
+        if self._testMethodName == GENERATED_SCENE_METHOD:
+            runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
+            runtime.env["ELOSERN_BROWSER_GENERATED_SCENE"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -1050,6 +1056,76 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         open_dialogue_choices(page)
         self.assertEqual(sent_action_count(page), 0, "the replay selected nothing again")
+
+    def test_generated_package_scene_plays_multi_line_on_the_stage(self):
+        """A published generated package plays its complete scene offline.
+
+        The host carries a ``scene_role:<package>:<role>`` binding, the scene
+        arrives through the shared version-3 panel and manual player, and no
+        package/role identity beyond the opaque generated topic ID reaches the
+        wire. Reload replays the same committed delivery from line one without
+        a second selection.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        _press(page, "1")  # the first disclosed generated topic
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        panel = store_state(page)["panels"]["dialogue"]
+        delivery = panel["delivery"]
+        committed_delivery_id = delivery["delivery_id"]
+        committed_scene_id = delivery["scene_id"]
+        self.assertTrue(delivery["topic_id"].startswith("g:"))
+        self.assertGreaterEqual(len(delivery["lines"]), 2)
+        self.assertEqual(
+            (delivery["lines"][0]["kind"], delivery["lines"][0]["speaker"]),
+            ("speech", "actor"),
+        )
+        # Worth the same as every other host: no private package/role payload.
+        self.assertNotIn("package_id", json.dumps(panel))
+        first = _scene_frame(page)
+        self.assertEqual(
+            (first["speaker"], first["actor"], first["host"]),
+            ("actor", "true", "false"),
+        )
+        for _ in range(8):
+            if _scene_frame(page)["choices"]:
+                break
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+        self.assertTrue(_scene_frame(page)["choices"])
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+
+        page.reload()
+        wait_for_shell_active(page)
+        install_outbound_recorder(page)
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        replay_panel = store_state(page)["panels"]["dialogue"]
+        self.assertEqual(replay_panel["delivery"]["delivery_id"], committed_delivery_id)
+        self.assertEqual(replay_panel["delivery"]["scene_id"], committed_scene_id)
+        replay = _scene_frame(page)
+        self.assertEqual(
+            (replay["speaker"], replay["actor"], replay["host"], replay["choices"]),
+            ("actor", "true", "false", False),
+        )
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
 
     def _open_and_finish_storyteller_scene(self, page) -> str:
         """Open the kit storyteller, pick 故事 and play to the explicit finish.

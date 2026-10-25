@@ -529,11 +529,12 @@ class DialogueAvailabilityTests(EvenniaTest):
             )
         )
         context = availability_context(self.player, generated)
-        # The identity names exactly the currently permitted phase, so a phase
-        # change can never leave the old phase's topics addressable.
+        # An unresolved trusted package has no permitted phase; the bounded
+        # placeholder identity names that state, and the source resolver
+        # re-resolves the real phase (or returns no source) on every read.
         self.assertEqual(
             context.source_identity,
-            GeneratedDialogueIdentity("pkg_synth", "elder", "phase_1"),
+            GeneratedDialogueIdentity("pkg_synth", "elder", "unresolved"),
         )
         self.assertEqual(
             context.host_key, make_generated_host_key("pkg_synth", "elder")

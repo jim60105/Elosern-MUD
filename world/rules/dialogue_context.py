@@ -96,16 +96,24 @@ def host_dialogue_binding(
         return host_key, None
 
     if dialogue_key.startswith("scene_role:"):
-        parts = dialogue_key.split(":")
-        pkg_id = parts[1] if len(parts) > 1 else ""
-        role_id = parts[2] if len(parts) > 2 else ""
-        from world.rules.dialogue import dialogue_phase_revision
+        from world.rules.dialogue import (
+            generated_dialogue_parts,
+            generated_phase_binding,
+        )
 
-        phase_rev = dialogue_phase_revision(host)
-        phase_id = f"phase_{phase_rev}" if phase_rev is not None else "phase_1"
+        parts = generated_dialogue_parts(dialogue_key)
+        if parts is None:
+            return make_static_host_key(f"npc_{getattr(host, 'pk', 0)}"), None
+        package_id, role_id = parts
+        binding = generated_phase_binding(host)
+        # The identity names the phase the host actually presents right now,
+        # never a synthesized revision label. A currently unresolvable phase
+        # still carries a bounded placeholder identity; the source resolver
+        # re-resolves it and returns no source.
+        phase_id = binding.phase_id if binding is not None else "unresolved"
         return (
-            make_generated_host_key(pkg_id, role_id),
-            GeneratedDialogueIdentity(pkg_id, role_id, phase_id),
+            make_generated_host_key(package_id, role_id),
+            GeneratedDialogueIdentity(package_id, role_id, phase_id),
         )
 
     bindings = canonical_dialogue_bindings()
@@ -223,18 +231,30 @@ def resolve_dialogue_context(
     context_id: str | None = None
     context_phase: int | str | None = None
 
+    current_rev = dialogue_phase_revision(host)
+    generated = isinstance(source_identity, GeneratedDialogueIdentity)
     if session is not None and getattr(session, "npc_id", None) == int(
         getattr(host, "pk", 0)
     ):
         same_control = getattr(session, "control_key", "") == control_key_for(
             actor, owner
         )
-        current_rev = dialogue_phase_revision(host)
         session_rev = getattr(session, "phase_revision", None)
-        generated = isinstance(source_identity, GeneratedDialogueIdentity)
-        if same_control and not (generated and session_rev != current_rev):
+        same_source = (
+            getattr(session, "source_identity", None) == source_identity
+        )
+        if (
+            same_control
+            and same_source
+            and not (generated and session_rev != current_rev)
+        ):
             context_id = getattr(session, "context_id", None)
             context_phase = session_rev
+    if generated and context_phase is None:
+        # A brand-new generated context records the live phase revision so the
+        # delivered scene and its session can prove the phase it was authored
+        # against.
+        context_phase = current_rev
 
     return DialogueContext(
         actor=actor,

@@ -49,17 +49,28 @@ class PackageProposalSchemaTests(EvenniaTest):
     )
     def test_an_out_of_vocabulary_effect_verb_is_a_structural_failure(self):
         package = _package()
-        package["dialogue"][0]["phases"][0]["topics"] = [
+        package["dialogue"][0]["phases"][0]["topic_effects"] = [
             {
-                "keyword": "怪招",
-                "response": "測試文字",
-                "effect_verb": "grant_reward",
-                "effect_reference": "ai_deadbeef",
+                "topic_id": "greet_visitor",
+                "verb": "grant_reward",
+                "reference": "ai_deadbeef",
             }
         ]
         errors = package_schema_errors(package)
         self.assertTrue(errors)
-        self.assertIn("effect_verb", errors[0])
+        self.assertIn("verb", errors[0])
+
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
+    def test_a_response_only_topic_is_a_structural_failure(self):
+        package = _package()
+        package["dialogue"][0]["phases"][0]["topics"] = [
+            {"keyword": "怪招", "response": "測試文字"}
+        ]
+        errors = package_schema_errors(package)
+        self.assertTrue(errors)
+        self.assertIn("topic_id", errors[0])
 
     @covers_requirement(
         "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"

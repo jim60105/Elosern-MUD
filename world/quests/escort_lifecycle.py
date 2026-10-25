@@ -101,9 +101,9 @@ def _offer_context(owner, definition_key, issuer_key, actual_actor, expected_rev
     selected = next((item for item in (dialogue or {}).get("phases", [])
                      if item["phase_id"] == phase.selected_phase), None)
     if selected is None or not any(
-        topic.get("effect_verb") == "offer_commission"
-        and topic.get("effect_reference") == definition_key
-        for topic in selected.get("topics", [])
+        effect.get("verb") == "offer_commission"
+        and effect.get("reference") == definition_key
+        for effect in selected.get("topic_effects", [])
     ):
         raise EscortOperationError("offer_stale")
     definition = QUEST_DEFINITION_REGISTRY[definition_key]

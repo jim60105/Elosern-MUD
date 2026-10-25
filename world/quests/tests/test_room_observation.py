@@ -138,9 +138,32 @@ class EscortOfferMixin:
                                 "phase_id": "offer",
                                 "topics": [
                                     {
+                                        "topic_id": "escort",
                                         "keyword": "escort",
-                                        "effect_verb": "offer_commission",
-                                        "effect_reference": definition.key,
+                                        "label": "escort",
+                                        "fallback": {
+                                            "scene_id": "escort_scene",
+                                            "revision": "r1",
+                                            "lines": [
+                                                {
+                                                    "kind": "speech",
+                                                    "speaker": "actor",
+                                                    "text": "escort",
+                                                },
+                                                {
+                                                    "kind": "speech",
+                                                    "speaker": "host",
+                                                    "text": "escort",
+                                                },
+                                            ],
+                                        },
+                                    }
+                                ],
+                                "topic_effects": [
+                                    {
+                                        "topic_id": "escort",
+                                        "verb": "offer_commission",
+                                        "reference": definition.key,
                                     }
                                 ],
                             }

@@ -16,6 +16,30 @@ from world.quests.tests._compile_helpers import (
 LONG_PROSE = "南門的相遇，旅人在此停下腳步，等著一個承諾被實現。"
 
 
+def topic_scene(topic_id: str, host_line: str, *, actor_line: str = LONG_PROSE) -> dict:
+    """One complete actor-first synthetic scene for a generated topic."""
+    return {
+        "scene_id": f"{topic_id}_scene",
+        "revision": "r1",
+        "lines": [
+            {"kind": "speech", "speaker": "actor", "text": actor_line},
+            {"kind": "speech", "speaker": "host", "text": host_line},
+        ],
+    }
+
+
+def topic(topic_id: str, keyword: str, text: str, **overrides) -> dict:
+    """One complete synthetic generated topic declaration."""
+    entry = {
+        "topic_id": topic_id,
+        "keyword": keyword,
+        "label": keyword,
+        "fallback": topic_scene(topic_id, text),
+    }
+    entry.update(overrides)
+    return entry
+
+
 def characterization(tag: str) -> dict:
     return {
         "display_name": f"測試住民{tag}",
@@ -77,12 +101,12 @@ def dialogue(role_id: str, **overrides) -> dict:
             phase(
                 "acknowledgment",
                 [{"reunion": True}, {"closure": False}],
-                topics=[{"keyword": "重逢", "response": LONG_PROSE}],
+                topics=[topic("reunion", "重逢", LONG_PROSE)],
             ),
             phase(
                 "everyday",
                 [{"closure": True}],
-                topics=[{"keyword": "近況", "response": LONG_PROSE}],
+                topics=[topic("status", "近況", LONG_PROSE)],
             ),
         ],
     }

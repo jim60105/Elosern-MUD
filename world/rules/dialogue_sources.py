@@ -22,6 +22,7 @@ from world.lore.dialogue.shape import (
 )
 from world.lore.dialogue import DIALOGUE_SNAPSHOT, canonical_dialogue_bindings
 from world.lore.scenes import Scene, Speech
+from world.observability import log_warn
 
 
 @dataclass(frozen=True)
@@ -102,10 +103,47 @@ def resolve_dialogue_source(context: Any) -> ResolvedDialogueSource | None:
         )
 
     if isinstance(source_id, GeneratedDialogueIdentity):
-        # Prepared seam: generated-packages implements DB package cutover.
-        return None
+        from world.rules.dialogue import generated_phase_binding
+
+        host = getattr(context, "host", None)
+        binding = generated_phase_binding(host)
+        if binding is None:
+            _report_rejected(source_id, reason="unresolved")
+            return None
+        if (binding.package_id, binding.role_id) != (
+            source_id.package_id,
+            source_id.role_id,
+        ):
+            _report_rejected(source_id, reason="identity_mismatch")
+            return None
+        phase = binding.phase
+        return ResolvedDialogueSource(
+            identity=GeneratedDialogueIdentity(
+                binding.package_id, binding.role_id, binding.phase_id
+            ),
+            host_key=context.host_key,
+            dialogue=AuthoredDialogue(
+                greeting=phase.greeting,
+                topics=tuple(phase.topics),
+            ),
+            phase_revision=binding.revision,
+            effects={effect.topic_id: effect for effect in phase.topic_effects},
+        )
 
     return None
+
+
+def _report_rejected(identity: GeneratedDialogueIdentity, *, reason: str) -> None:
+    """Report one unresolvable trusted generated source, once per resolution."""
+    log_warn(
+        "dialogue_source_rejected",
+        context={
+            "package": identity.package_id,
+            "role": identity.role_id,
+            "phase": identity.phase_id,
+            "reason": reason,
+        },
+    )
 
 
 def dialogue_source_for_host(host: Any) -> ResolvedDialogueSource | None:

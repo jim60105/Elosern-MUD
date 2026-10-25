@@ -28,8 +28,9 @@ from world.rules.dialogue import (
     resolve_greeting,
     opens_dialogue,
     resolve_dialogue_component,
-    run_scripted_talk,
+    select_authored_topic,
 )
+from world.rules.dialogue_sources import dialogue_source_for_host
 from world.rules.player_messages import dialogue_open_fallback_line
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
@@ -200,12 +201,19 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player.race = "human"
         player.apply_race_baseline()
         host = self._affinity_host()
-        result = run_scripted_talk(host, player, "公會")
-        self.assertIn("冒險者公會", result.response)
-        self.assertFalse(result.budget_capped)
+        host.location = self.room1
+        player.location = self.room1
+        source = dialogue_source_for_host(host)
+        topic = next(t for t in source.dialogue.topics if t.keyword == "公會")
+        select_authored_topic(
+            player,
+            host,
+            topic.topic_id,
+            selection_id="affinity-selection",
+            expected_context_id=None,
+        )
         self.assertEqual(host.relations.affinity_for(player), 1)
-        unknown = run_scripted_talk(host, player, "謎語")
-        self.assertIn("明白", unknown.response)
+        self.assertIn("明白", dialogue_response(host, player, "謎語"))
         self.assertEqual(host.relations.affinity_for(player), 1)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
@@ -218,7 +226,11 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player.race = "human"
         player.apply_race_baseline()
         host = self._affinity_host()
+        host.location = self.room1
+        player.location = self.room1
         relations_before = host.db.relations_data
+        source = dialogue_source_for_host(host)
+        topic = next(t for t in source.dialogue.topics if t.keyword == "公會")
 
         class FakeAtomic:
             def __enter__(self):
@@ -229,7 +241,13 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
 
         with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
             with self.assertRaises(RuntimeError):
-                run_scripted_talk(host, player, "公會")
+                select_authored_topic(
+                    player,
+                    host,
+                    topic.topic_id,
+                    selection_id="failed-selection",
+                    expected_context_id=None,
+                )
         self.assertEqual(host.db.relations_data, relations_before)
 
     @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")

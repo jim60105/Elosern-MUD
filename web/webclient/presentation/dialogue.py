@@ -406,6 +406,7 @@ def _resolve_live_host(character: Any) -> Any | None:
 def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``dialogue`` panel for the authenticated puppet."""
     from world.narrative.dialogue_reading import read_reading
+    from world.lore.dialogue.codec import GeneratedDialogueIdentity
     from world.rules.dialogue import (
         chain_deliveries,
         delivery_to_wire,
@@ -415,6 +416,7 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
         DialogueContextError,
         resolve_dialogue_context,
     )
+    from world.rules.dialogue_sources import resolve_dialogue_source
     from world.rules.npc_identity import npc_display_name
 
     actor = context.actor
@@ -429,9 +431,25 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     if npc is None:  # observability: ignore R2: race between the liveness read and the re-resolve degrades to the registered unavailable form
         raise PanelUnavailableError
     try:
-        owner = resolve_dialogue_context(actor, npc).owner
+        dialogue_context = resolve_dialogue_context(actor, npc)
     except DialogueContextError:  # observability: ignore R2: a stale control context degrades to the unavailable panel
         raise PanelUnavailableError
+    owner = dialogue_context.owner
+    source = resolve_dialogue_source(dialogue_context)
+    if isinstance(session.source_identity, GeneratedDialogueIdentity):
+        # A stored generated delivery is publishable only while the trusted
+        # provider still resolves the SAME package/role/phase binding and the
+        # session context it was delivered under. A cancelled package, a
+        # rebound role or a missed phase refresh suppresses the panel instead
+        # of replaying the obsolete formal body.
+        if (
+            source is None
+            or source.identity != session.source_identity
+            or source.host_key != session.host_key
+            or source.phase_revision != session.phase_revision
+            or session.context_id != dialogue_context.context_id
+        ):
+            raise PanelUnavailableError
     # The host's bond is the owning player's relationship: a possessed
     # companion speaks with its own portrait and name but never its own record.
     bond_stage = (
@@ -483,8 +501,17 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     # read-only; a connection whose own scene is playing keeps its delivery.
     reading = read_reading(owner)
     host_reading = reading.hosts.get(session.host_key)
+    declared_topic_ids = (
+        {topic.topic_id for topic in source.dialogue.topics}
+        if source is not None
+        else set()
+    )
     completed_topic_ids = (
-        list(host_reading.completed_topic_ids())[:16]
+        [
+            topic_id
+            for topic_id in host_reading.completed_topic_ids()
+            if topic_id in declared_topic_ids
+        ][:16]
         if host_reading is not None
         else []
     )

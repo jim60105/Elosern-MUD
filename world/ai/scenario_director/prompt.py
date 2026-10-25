@@ -116,3 +116,30 @@ def build_scenario_prompt(
     }
     user = {"role": "user", "content": user_text}
     return system, user
+
+
+def build_scene_scenario_prompt(
+    context: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Build the deterministic scene-route (system, user) pair.
+
+    The scene route keeps the complete immutable planning frame: the confirmed
+    requirements, the package marker and the bounded permitted-reference
+    catalog are prompt data, never dropped or truncated field by field. The
+    system message is the dedicated ``scenario_director.scene_system`` template
+    with its deterministic name-inspiration bank; identical input always
+    produces byte-identical messages, and no live entity or model state enters
+    the prompt.
+    """
+    if not isinstance(context, dict):
+        raise TypeError("scenario-director scene context must be a mapping")
+    user_text = json.dumps(context, sort_keys=True, ensure_ascii=False)
+    system = {
+        "role": "system",
+        "content": render_prompt(
+            "scenario_director.scene_system",
+            name_inspiration=_name_inspirations(user_text),
+        ),
+    }
+    user = {"role": "user", "content": user_text}
+    return system, user

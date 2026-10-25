@@ -207,58 +207,9 @@ def make_generated_host_key(package_id: str, role_id: str) -> str:
     return key
 
 
-def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
-    """Return the JSON schema for dialogue payloads.
-
-    ``identity_kind`` is either "static" or "generated_local".
-    """
-    if identity_kind not in ("static", "generated_local"):
-        raise ValueError(f"Unknown identity_kind: {identity_kind!r}")
-
-    line_schema = {
-        "type": "object",
-        "oneOf": [
-            {
-                "properties": {
-                    "kind": {"type": "string", "enum": ["speech"]},
-                    "speaker": {"type": "string", "enum": ["actor", "host"]},
-                    "text": {"type": "string", "minLength": 1, "maxLength": MAX_LINE_CODE_POINTS},
-                },
-                "required": ["kind", "speaker", "text"],
-                "additionalProperties": False,
-            },
-            {
-                "properties": {
-                    "kind": {"type": "string", "enum": ["narration"]},
-                    "text": {"type": "string", "minLength": 1, "maxLength": MAX_LINE_CODE_POINTS},
-                },
-                "required": ["kind", "text"],
-                "additionalProperties": False,
-            },
-        ],
-    }
-
-    scene_id_pattern = (
-        r"^[a-z][a-z0-9_.-]{0,95}$" if identity_kind == "static" else r"^[a-z][a-z0-9_]{0,31}$"
-    )
-
-    scene_schema = {
-        "type": "object",
-        "properties": {
-            "scene_id": {"type": "string", "pattern": scene_id_pattern},
-            "revision": {"type": "string", "pattern": r"^[!-~]{1,32}$"},
-            "lines": {
-                "type": "array",
-                "items": line_schema,
-                "minItems": 1,
-                "maxItems": MAX_SCENE_LINES,
-            },
-        },
-        "required": ["scene_id", "revision", "lines"],
-        "additionalProperties": False,
-    }
-
-    condition_schema: dict[str, Any] = {
+def dialogue_condition_schema() -> dict[str, Any]:
+    """The one common condition-node schema shared by every authored source."""
+    return {
         "type": "object",
         "properties": {
             "kind": {
@@ -282,23 +233,80 @@ def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local
         "required": ["kind"],
     }
 
-    variant_schema = {
+
+def dialogue_scene_line_schema() -> dict[str, Any]:
+    """The one common scene-line schema (speech or narration)."""
+    return {
+        "type": "object",
+        "oneOf": [
+            {
+                "properties": {
+                    "kind": {"type": "string", "enum": ["speech"]},
+                    "speaker": {"type": "string", "enum": ["actor", "host"]},
+                    "text": {"type": "string", "minLength": 1, "maxLength": MAX_LINE_CODE_POINTS},
+                },
+                "required": ["kind", "speaker", "text"],
+                "additionalProperties": False,
+            },
+            {
+                "properties": {
+                    "kind": {"type": "string", "enum": ["narration"]},
+                    "text": {"type": "string", "minLength": 1, "maxLength": MAX_LINE_CODE_POINTS},
+                },
+                "required": ["kind", "text"],
+                "additionalProperties": False,
+            },
+        ],
+    }
+
+
+def _identity_pattern(identity_kind: str) -> str:
+    if identity_kind not in ("static", "generated_local"):
+        raise ValueError(f"Unknown identity_kind: {identity_kind!r}")
+    return (
+        r"^[a-z][a-z0-9_.-]{0,95}$" if identity_kind == "static" else r"^[a-z][a-z0-9_]{0,31}$"
+    )
+
+
+def dialogue_scene_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
+    """The one common scene schema, with the identity-appropriate local ID grammar."""
+    return {
+        "type": "object",
+        "properties": {
+            "scene_id": {"type": "string", "pattern": _identity_pattern(identity_kind)},
+            "revision": {"type": "string", "pattern": r"^[!-~]{1,32}$"},
+            "lines": {
+                "type": "array",
+                "items": dialogue_scene_line_schema(),
+                "minItems": 1,
+                "maxItems": MAX_SCENE_LINES,
+            },
+        },
+        "required": ["scene_id", "revision", "lines"],
+        "additionalProperties": False,
+    }
+
+
+def dialogue_variant_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
+    """The one common conditional-variant schema."""
+    return {
         "type": "object",
         "properties": {
             "variant_id": {"type": "string", "pattern": r"^[a-z][a-z0-9_]{0,31}$"},
             "priority": {"type": "integer"},
-            "when": condition_schema,
-            "scene": scene_schema,
+            "when": dialogue_condition_schema(),
+            "scene": dialogue_scene_schema(identity_kind=identity_kind),
         },
         "required": ["variant_id", "priority", "when", "scene"],
         "additionalProperties": False,
     }
 
-    topic_id_pattern = (
-        r"^[a-z][a-z0-9_.-]{0,95}$" if identity_kind == "static" else r"^[a-z][a-z0-9_]{0,31}$"
-    )
 
-    topic_schema = {
+def dialogue_topic_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
+    """The one common topic schema, including qualification, refusal and chains."""
+    topic_id_pattern = _identity_pattern(identity_kind)
+    scene_schema = dialogue_scene_schema(identity_kind=identity_kind)
+    return {
         "type": "object",
         "properties": {
             "topic_id": {"type": "string", "pattern": topic_id_pattern},
@@ -307,10 +315,10 @@ def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local
             "fallback": scene_schema,
             "variants": {
                 "type": "array",
-                "items": variant_schema,
+                "items": dialogue_variant_schema(identity_kind=identity_kind),
                 "maxItems": MAX_VARIANTS_PER_TOPIC,
             },
-            "requires": condition_schema,
+            "requires": dialogue_condition_schema(),
             "unavailable": {"type": "string", "enum": ["hidden", "locked"]},
             "refusal": scene_schema,
             "predecessors": {
@@ -324,20 +332,48 @@ def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local
         "additionalProperties": False,
     }
 
+
+def dialogue_phase_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
+    """The common greeting/topics fragment a package phase composes with its facts."""
+    if identity_kind not in ("static", "generated_local"):
+        raise ValueError(f"Unknown identity_kind: {identity_kind!r}")
+    greeting_schema = {
+        "type": ["string", "null"],
+        "maxLength": (
+            MAX_STATIC_GREETING_CODE_POINTS
+            if identity_kind == "static"
+            else MAX_GENERATED_GREETING_CODE_POINTS
+        ),
+    }
+    return {
+        "type": "object",
+        "properties": {
+            "greeting": greeting_schema,
+            "topics": {
+                "type": "array",
+                "items": dialogue_topic_schema(identity_kind=identity_kind),
+                "maxItems": MAX_TOPICS_PER_DIALOGUE,
+            },
+        },
+        "required": ["greeting", "topics"],
+    }
+
+
+def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local"]) -> dict[str, Any]:
+    """Return the JSON schema for dialogue payloads.
+
+    ``identity_kind`` is either "static" or "generated_local". Package phases
+    reuse :func:`dialogue_phase_schema` rather than restating this fragment.
+    """
+    if identity_kind not in ("static", "generated_local"):
+        raise ValueError(f"Unknown identity_kind: {identity_kind!r}")
+    phase_fragment = dialogue_phase_schema(identity_kind=identity_kind)
     if identity_kind == "static":
         return {
             "type": "object",
             "properties": {
                 "schema_version": {"type": "integer", "enum": [1]},
-                "greeting": {
-                    "type": ["string", "null"],
-                    "maxLength": MAX_STATIC_GREETING_CODE_POINTS,
-                },
-                "topics": {
-                    "type": "array",
-                    "items": topic_schema,
-                    "maxItems": MAX_TOPICS_PER_DIALOGUE,
-                },
+                **phase_fragment["properties"],
             },
             "required": ["schema_version", "greeting", "topics"],
             "additionalProperties": False,
@@ -346,17 +382,7 @@ def dialogue_payload_schema(*, identity_kind: Literal["static", "generated_local
         # Generated local fragment
         return {
             "type": "object",
-            "properties": {
-                "greeting": {
-                    "type": ["string", "null"],
-                    "maxLength": MAX_GENERATED_GREETING_CODE_POINTS,
-                },
-                "topics": {
-                    "type": "array",
-                    "items": topic_schema,
-                    "maxItems": MAX_TOPICS_PER_DIALOGUE,
-                },
-            },
+            "properties": dict(phase_fragment["properties"]),
             "required": ["greeting", "topics"],
             "additionalProperties": False,
         }
@@ -731,6 +757,12 @@ def validate_dialogue(
             all_topic_scenes.append(topic.refusal)
 
         for s in all_topic_scenes:
+            scene_bytes = scene_canonical_bytes(s)
+            if scene_bytes > MAX_SCENE_CANONICAL_BYTES:
+                raise ValueError(
+                    f"Scene {s.scene_id!r} canonical UTF-8 JSON bytes "
+                    f"({scene_bytes}) exceeds limit of {MAX_SCENE_CANONICAL_BYTES}"
+                )
             if s.scene_id in declared_scene_ids:
                 raise ValueError(f"Duplicate scene_id {s.scene_id!r} in dialogue definition")
             declared_scene_ids.add(s.scene_id)

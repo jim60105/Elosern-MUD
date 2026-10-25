@@ -423,7 +423,7 @@ class AuthoredDialoguePossessionTests(EvenniaTest):
         self.assertIs(context.owner, self.char1)
         self.assertEqual(
             context.source_identity,
-            GeneratedDialogueIdentity("pkg_synth", "elder", "phase_1"),
+            GeneratedDialogueIdentity("pkg_synth", "elder", "unresolved"),
         )
         self.assertEqual(
             context.host_key, make_generated_host_key("pkg_synth", "elder")

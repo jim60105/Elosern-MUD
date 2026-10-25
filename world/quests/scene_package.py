@@ -21,6 +21,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.lore.guild import GUILD_BRANCH_REGISTRY
+from world.lore.dialogue.codec import (
+    GENERATED_LOCAL_ID_PATTERN,
+    GeneratedDialogueIdentity,
+    make_generated_topic_id,
+    parse_dialogue,
+)
+from world.lore.dialogue.shape import AuthoredTopic
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.quests.characterization import (
     characterize_errors,
@@ -77,11 +84,10 @@ class ScenePackageError(QuestCompileError):
 EFFECT_VERBS: tuple[str, ...] = ("offer_commission",)
 
 MAX_ID_LENGTH = 64
-MAX_PHASE_TOPICS = 8
+MAX_PHASE_TOPICS = 16
 MAX_KNOWLEDGE_CLAIM_TEXT = 200
 MAX_PHASE_FREEFORM = 400
 MAX_OFFLINE_RESPONSE = 500
-MAX_TOPIC_RESPONSE = 500
 MAX_PHASE_GREETING = 500
 
 
@@ -129,11 +135,18 @@ class EncounterDefinition:
 
 
 @dataclass(frozen=True)
-class PhaseTopic:
-    keyword: str
-    response: str
-    effect_verb: str | None = None
-    effect_reference: str | None = None
+class TopicEffect:
+    """One source-owner validated effect association keyed by stable topic ID.
+
+    The association is external to the common prose declaration: the generated
+    package declares it beside the scene, and runtime authorization re-reads it
+    from the immutable payload. It is never authored inside a scene and never
+    inferred from a label.
+    """
+
+    topic_id: str
+    verb: str
+    reference: str
 
 
 @dataclass(frozen=True)
@@ -141,7 +154,8 @@ class DialoguePhase:
     phase_id: str
     conditions: tuple[dict[str, Any], ...]
     greeting: str
-    topics: tuple[PhaseTopic, ...]
+    topics: tuple[AuthoredTopic, ...]
+    topic_effects: tuple[TopicEffect, ...]
     freeform_situation: str
     freeform_goals: str
     offline_response: str
@@ -509,35 +523,170 @@ def _validate_encounters(
     return tuple(encounters)
 
 
-def _validate_effects(
-    entry: dict[str, Any], where: str, definition_keys: set[str]
-) -> tuple[str | None, str | None]:
-    has_verb = "effect_verb" in entry
-    has_reference = "effect_reference" in entry
-    if not has_verb and not has_reference:
-        return None, None
-    if not has_verb or not has_reference:
-        _reject_package(
-            f"{where} must declare effect_verb and effect_reference together"
+def _validate_topic_effects(
+    entries: Any,
+    *,
+    where: str,
+    phase: tuple[AuthoredTopic, ...],
+    identity: GeneratedDialogueIdentity,
+    definition_keys: set[str],
+    commission_role_ids: frozenset[str],
+) -> tuple[TopicEffect, ...]:
+    """Validate one phase's external effect associations.
+
+    Every row names a locally declared topic of the same phase, the one
+    allowlisted verb and a definition key this package's role actually issues a
+    commission for. An effect-bearing topic must be qualified and must carry a
+    safe refusal scene, because the deterministic domain authority can refuse
+    the effect after disclosure; a public pure-chain successor is never an
+    effect topic.
+    """
+    if entries is None:
+        return ()
+    if not isinstance(entries, list):
+        _reject_package(f"{where} topic_effects must be an array")
+    topics_by_id = {topic.topic_id: topic for topic in phase}
+    effects: list[TopicEffect] = []
+    seen: set[str] = set()
+    for position, entry in enumerate(entries):
+        row_where = f"{where} topic_effects[{position}]"
+        entry = _require_mapping(entry, row_where)
+        if set(entry) != {"topic_id", "verb", "reference"}:
+            _reject_package(
+                f"{row_where} must declare exactly topic_id, verb, reference"
+            )
+        local_topic_id = entry.get("topic_id")
+        if not isinstance(local_topic_id, str) or not GENERATED_LOCAL_ID_PATTERN.match(
+            local_topic_id
+        ):
+            _reject_package(
+                f"{row_where} topic_id must be a declared local ID "
+                "matching [a-z][a-z0-9_]{0,31}"
+            )
+        topic_id = make_generated_topic_id(
+            identity.package_id,
+            identity.role_id,
+            identity.phase_id,
+            local_topic_id,
         )
-    verb = entry.get("effect_verb")
-    reference = entry.get("effect_reference")
-    if verb not in EFFECT_VERBS:
-        _reject_package(f"{where} names unknown effect verb {verb!r}")
-    if not isinstance(reference, str) or reference not in definition_keys:
-        _reject_package(
-            f"{where} effect reference {reference!r} is not a validated package commission"
+        if topic_id in seen:
+            _reject_package(f"{row_where} repeats topic {local_topic_id!r}")
+        seen.add(topic_id)
+        topic = topics_by_id.get(topic_id)
+        if topic is None:
+            _reject_package(
+                f"{row_where} names topic {local_topic_id!r} not declared in "
+                f"phase {identity.phase_id!r}"
+            )
+        verb = entry.get("verb")
+        if verb not in EFFECT_VERBS:
+            _reject_package(f"{row_where} names unknown effect verb {verb!r}")
+        reference = entry.get("reference")
+        if reference not in definition_keys:
+            _reject_package(
+                f"{row_where} effect reference {reference!r} is not a validated "
+                "package commission"
+            )
+        if identity.role_id not in commission_role_ids:
+            _reject_package(
+                f"{row_where} declares an effect for role {identity.role_id!r}, "
+                "which declares no package commission"
+            )
+        if topic.disclosure == "pure_chain":
+            _reject_package(
+                f"{row_where} effect topic {local_topic_id!r} must not be a "
+                "pure-chain successor"
+            )
+        if topic.requires is None:
+            _reject_package(
+                f"{row_where} effect topic {local_topic_id!r} must declare requires"
+            )
+        if topic.refusal is None:
+            _reject_package(
+                f"{row_where} effect topic {local_topic_id!r} must declare a safe "
+                "refusal scene"
+            )
+        effects.append(
+            TopicEffect(topic_id=topic_id, verb=verb, reference=reference)
         )
-    return verb, reference
+    return tuple(effects)
+
+
+def _parse_generated_phase(
+    *,
+    where: str,
+    identity: GeneratedDialogueIdentity,
+    greeting: Any,
+    topics_payload: Any,
+    role_ids: frozenset[str],
+    definition_keys: set[str],
+) -> tuple[AuthoredTopic, ...]:
+    """Parse one phase through the one common generated-local codec."""
+    if not isinstance(topics_payload, list):
+        _reject_package(f"{where} topics must be an array")
+    if len(topics_payload) > MAX_PHASE_TOPICS:
+        _reject_package(f"{where} exceeds {MAX_PHASE_TOPICS} topics")
+    _reject_duplicate_local_topic_ids(where, topics_payload)
+    from world.rules.dialogue_references import static_dialogue_references
+
+    try:
+        dialogue = parse_dialogue(
+            {"greeting": greeting, "topics": topics_payload},
+            identity=identity,
+            references=static_dialogue_references(),
+            package_roles=role_ids,
+            package_quests=frozenset(definition_keys),
+        )
+    except (TypeError, ValueError) as error:
+        _reject_package(f"{where} dialogue is invalid: {error}")
+    keywords = [topic.keyword for topic in dialogue.topics]
+    if len(set(keywords)) != len(keywords):
+        _reject_package(f"{where} repeats a topic keyword")
+    return dialogue.topics
+
+
+def _reject_duplicate_local_topic_ids(where: str, topics_payload: list[Any]) -> None:
+    """Reject duplicate local topic IDs and duplicate variant IDs before parsing."""
+    seen_topics: set[str] = set()
+    for position, entry in enumerate(topics_payload):
+        if not isinstance(entry, dict):
+            _reject_package(f"{where} topic {position} must be an object")
+        topic_id = entry.get("topic_id")
+        if not isinstance(topic_id, str) or not topic_id:
+            _reject_package(f"{where} topic {position} requires a topic_id")
+        if topic_id in seen_topics:
+            _reject_package(f"{where} repeats topic id {topic_id!r}")
+        seen_topics.add(topic_id)
+        variants = entry.get("variants")
+        if variants is None:
+            continue
+        if not isinstance(variants, list):
+            _reject_package(f"{where} topic {topic_id!r} variants must be an array")
+        seen_variants: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                _reject_package(f"{where} topic {topic_id!r} variant must be an object")
+            variant_id = variant.get("variant_id")
+            if not isinstance(variant_id, str) or not variant_id:
+                _reject_package(f"{where} topic {topic_id!r} requires a variant_id")
+            if variant_id in seen_variants:
+                _reject_package(
+                    f"{where} topic {topic_id!r} repeats variant {variant_id!r}"
+                )
+            seen_variants.add(variant_id)
 
 
 def _validate_dialogue(
     entries: Any,
     roles: dict[str, RoleDefinition],
+    *,
+    package_id: str,
     definition_keys: set[str],
+    commission_role_ids: frozenset[str],
 ) -> tuple[RoleDialogue, ...]:
     if not isinstance(entries, list) or not entries:
         _reject_package("package.dialogue must be a non-empty array")
+    role_ids = frozenset(roles)
     dialogues: list[RoleDialogue] = []
     seen_roles: set[str] = set()
     for position, entry in enumerate(entries):
@@ -567,7 +716,7 @@ def _validate_dialogue(
             phase_entry = _require_mapping(
                 phase_entry, f"dialogue[{position}].phases[{index}]"
             )
-            if set(phase_entry) != {
+            allowed_phase_fields = {
                 "phase_id",
                 "conditions",
                 "greeting",
@@ -575,7 +724,13 @@ def _validate_dialogue(
                 "freeform_situation",
                 "freeform_goals",
                 "offline_response",
-            }:
+                "topic_effects",
+            }
+            required_phase_fields = allowed_phase_fields - {"topic_effects"}
+            if (
+                not set(phase_entry).issubset(allowed_phase_fields)
+                or not required_phase_fields.issubset(phase_entry)
+            ):
                 _reject_package(
                     f"dialogue[{position}].phases[{index}] declares an unsupported field set"
                 )
@@ -632,65 +787,31 @@ def _validate_dialogue(
                 MAX_OFFLINE_RESPONSE,
                 required=True,
             )
-            topics_payload = phase_entry.get("topics")
-            if not isinstance(topics_payload, list):
-                _reject_package(
-                    f"role {role_id!r} phase {phase_id!r} topics must be an array"
-                )
-            if len(topics_payload) > MAX_PHASE_TOPICS:
-                _reject_package(
-                    f"role {role_id!r} phase {phase_id!r} exceeds "
-                    f"{MAX_PHASE_TOPICS} topics"
-                )
-            topics: list[PhaseTopic] = []
-            keywords: set[str] = set()
-            for topic_index, topic_entry in enumerate(topics_payload):
-                topic_entry = _require_mapping(
-                    topic_entry,
-                    f"role {role_id!r} phase {phase_id!r} topic {topic_index}",
-                )
-                allowed = {"keyword", "response", "effect_verb", "effect_reference"}
-                if not set(topic_entry).issubset(allowed):
-                    _reject_package(
-                        f"role {role_id!r} phase {phase_id!r} topic {topic_index} "
-                        "declares an unsupported field"
-                    )
-                keyword = topic_entry.get("keyword")
-                if not isinstance(keyword, str) or not keyword:
-                    _reject_package(
-                        f"role {role_id!r} phase {phase_id!r} topic {topic_index} "
-                        "requires a non-empty keyword"
-                    )
-                if keyword in keywords:
-                    _reject_package(
-                        f"role {role_id!r} phase {phase_id!r} repeats keyword {keyword!r}"
-                    )
-                keywords.add(keyword)
-                _bounded_prose(
-                    f"role {role_id!r} phase {phase_id!r} topic {keyword!r} response",
-                    topic_entry.get("response"),
-                    MAX_TOPIC_RESPONSE,
-                    required=True,
-                )
-                verb, reference = _validate_effects(
-                    topic_entry,
-                    f"role {role_id!r} phase {phase_id!r} topic {keyword!r}",
-                    definition_keys,
-                )
-                topics.append(
-                    PhaseTopic(
-                        keyword=keyword,
-                        response=topic_entry["response"],
-                        effect_verb=verb,
-                        effect_reference=reference,
-                    )
-                )
+            identity = GeneratedDialogueIdentity(package_id, role_id, phase_id)
+            where = f"role {role_id!r} phase {phase_id!r}"
+            topics = _parse_generated_phase(
+                where=where,
+                identity=identity,
+                greeting=phase_entry["greeting"],
+                topics_payload=phase_entry.get("topics"),
+                role_ids=role_ids,
+                definition_keys=definition_keys,
+            )
+            topic_effects = _validate_topic_effects(
+                phase_entry.get("topic_effects"),
+                where=where,
+                phase=topics,
+                identity=identity,
+                definition_keys=definition_keys,
+                commission_role_ids=commission_role_ids,
+            )
             phases.append(
                 DialoguePhase(
                     phase_id=phase_id,
                     conditions=tuple(conditions),
                     greeting=phase_entry["greeting"],
                     topics=tuple(topics),
+                    topic_effects=topic_effects,
                     freeform_situation=phase_entry.get("freeform_situation") or "",
                     freeform_goals=phase_entry.get("freeform_goals") or "",
                     offline_response=phase_entry["offline_response"],
@@ -1090,8 +1211,10 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
 
     definition_keys = {definition_key}
     encounters = _validate_encounters(payload.get("encounters"), role_ids)
-    dialogue = _validate_dialogue(payload.get("dialogue"), role_index, definition_keys)
-
+    # The content identity is a pure digest of this proposal's immutable JSON
+    # and is independent of the namespaced dialogue IDs derived below, so it is
+    # computed first and supplied to the common generated-local codec. A
+    # revalidation of the stored payload reconstructs byte-identical full IDs.
     package_id = scene_package_id(
         {
             "display_name": payload["display_name"],
@@ -1105,6 +1228,15 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
             "commissions": commission_entries or [],
             "outcome_groups": payload.get("outcome_groups") or [],
         }
+    )
+    dialogue = _validate_dialogue(
+        payload.get("dialogue"),
+        role_index,
+        package_id=package_id,
+        definition_keys=definition_keys,
+        commission_role_ids=frozenset(
+            commission.role_id for commission in commissions
+        ),
     )
     return ScenePackageDefinition(
         package_id=package_id,
@@ -1198,7 +1330,6 @@ __all__ = [
     "EncounterDefinition",
     "EFFECT_VERBS",
     "KnowledgeClaim",
-    "PhaseTopic",
     "RELATIONSHIP_KINDS",
     "RelationshipDefinition",
     "RoleDefinition",
@@ -1206,6 +1337,7 @@ __all__ = [
     "ScenePackageDefinition",
     "ScenePackageError",
     "SymbolicIssuer",
+    "TopicEffect",
     "scene_package_id",
     "select_dialogue_phase",
     "validate_scene_package",

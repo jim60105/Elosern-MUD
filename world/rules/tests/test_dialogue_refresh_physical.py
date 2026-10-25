@@ -597,11 +597,11 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
                 queue_dialogue_refresh((self.player,), cause="control")
         push.assert_called_once_with(self.player)
 
-    def test_generated_binding_phase_is_resolved_at_callback_time(self):
-        """The callback re-resolves the generated phase and host binding.
+    def test_generated_phase_change_retires_the_previous_context(self):
+        """A phase move retires the old context and its receipt scope.
 
         The generated provider seam is replaced here, so this is provider-seam
-        coverage of the source-neutral callback contract; production published
+        coverage of the sole-writer retirement contract; production published
         package acceptance belongs to ``authored-dialogue-generated-packages``.
         """
         generated = create_object(NPC, key="合成生成刷新角色", location=self.room)
@@ -610,9 +610,6 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
                 generated, dialogue_key="scene_role:pkg_synth:elder"
             )
         )
-        open_or_refresh_dialogue(self.player, generated, "生成招呼。")
-        _real, recorded = self._register_watcher(self.player)
-
         def _source(context):
             phase_id = getattr(context.source_identity, "phase_id", None)
             local = "open_a" if phase_id == "phase_1" else "open_b"
@@ -634,26 +631,34 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
             )
 
         with patch(
-            "world.rules.dialogue.generated_dialogue_for",
-            return_value=SimpleNamespace(revision=1),
-        ), patch(
-            "world.rules.dialogue_sources.resolve_dialogue_source",
-            side_effect=_source,
-        ), self.captureOnCommitCallbacks(execute=False) as callbacks:
-            queue_dialogue_refresh((self.player,), cause="inventory")
-        self.assertEqual(len(list(callbacks)), 1)
-
-        # The published phase advances after the write but before commit
-        # callbacks run; the callback must project the NEW phase.
-        with patch(
-            "world.rules.dialogue.generated_dialogue_for",
-            return_value=SimpleNamespace(revision=2),
+            "world.rules.dialogue.generated_phase_binding",
+            return_value=SimpleNamespace(phase_id="phase_1", revision=1, phase=SimpleNamespace(greeting="生成招呼。")),
         ), patch(
             "world.rules.dialogue_sources.resolve_dialogue_source",
             side_effect=_source,
         ):
-            for callback in list(callbacks):
-                callback()
+            open_or_refresh_dialogue(self.player, generated, "生成招呼。")
+            _real, recorded = self._register_watcher(self.player)
+            before = live_dialogue_session(self.player)
+            before_context = before.context_id
+
+            # The published phase advances; the sole writer retires the old
+            # context, receipts and identity before B's choices are projected.
+            with patch(
+                "world.rules.dialogue.generated_phase_binding",
+                return_value=SimpleNamespace(phase_id="phase_2", revision=2, phase=SimpleNamespace(greeting="生成招呼。")),
+            ), patch(
+                "world.rules.dialogue_sources.resolve_dialogue_source",
+                side_effect=_source,
+            ), self.captureOnCommitCallbacks(execute=True):
+                from world.rules.dialogue import refresh_dialogue_phase
+
+                refresh_dialogue_phase(self.player, generated)
+                after = live_dialogue_session(self.player)
+                self.assertNotEqual(after.context_id, before_context)
+                self.assertEqual(after.source_identity.phase_id, "phase_2")
+                self.assertEqual(after.selection_receipts, ())
+                self.assertEqual(after.completion_receipts, ())
 
         choices = self._choices(recorded)
         self.assertEqual(set(choices), {"phase.open_b"})
@@ -678,7 +683,6 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
                 generated, dialogue_key="scene_role:pkg_synth:elder"
             )
         )
-        open_or_refresh_dialogue(self.player, generated, "生成招呼。")
         authored = AuthoredDialogue(
             greeting="生成招呼。",
             topics=(
@@ -708,12 +712,13 @@ class DialogueRefreshPhysicalTests(EvenniaTest):
 
         self.player.db.inventory = [_ACCESSORY_KEY]
         with patch(
-            "world.rules.dialogue.generated_dialogue_for",
-            return_value=SimpleNamespace(revision=1),
+            "world.rules.dialogue.generated_phase_binding",
+            return_value=SimpleNamespace(phase_id="phase_1", revision=1, phase=SimpleNamespace(greeting="生成招呼。")),
         ), patch(
             "world.rules.dialogue_sources.resolve_dialogue_source",
             side_effect=_source,
         ):
+            open_or_refresh_dialogue(self.player, generated, "生成招呼。")
             _real, recorded = self._register_watcher(self.player)
             self.assertEqual(
                 self._choices(recorded)["scene.generated_exposure"][
