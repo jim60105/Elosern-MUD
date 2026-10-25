@@ -24,6 +24,7 @@ from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import NPC
@@ -209,6 +210,9 @@ class ObservationSemanticsTests(_OwnerBase):
         self.assertIsNone(reading_for(self.player, _HOST).pending_batch)
         self.assertIsNone(self._observe(("a", "b", "c")))
 
+    @covers_requirement(
+        "authored-dialogue-unread::unread-markers-follow-formal-topic-history",
+    )
     def test_read_and_unread_topics_relock_and_reopen_without_a_new_batch(self):
         self._observe(("a",), initial=True)
         batch = self._observe(("a", "b", "c"))
@@ -246,6 +250,9 @@ class ObservationSemanticsTests(_OwnerBase):
         self.assertTrue(self._row("b").ever_open)
         self.assertTrue(self._row("b").announced)
 
+    @covers_requirement(
+        "authored-dialogue-unread::generated-phase-observation-preserves-unread-privacy-and-history",
+    )
     def test_new_phase_ids_initialize_and_phase_return_keeps_history(self):
         phase_1 = ("phase_1.a", "phase_1.b")
         phase_2 = ("phase_2.a", "phase_2.b")
@@ -392,6 +399,10 @@ class LiveUnlockBatchTests(_OwnerBase):
         self.assertFalse(self._row(_LOCKED).ever_open)
         self.assertFalse(self._row(_HIDDEN).ever_open)
 
+    @covers_requirement(
+        "authored-dialogue-unread::unread-markers-follow-formal-topic-history",
+        "authored-dialogue-unread::unlock-notifications-are-deferred-and-deduplicated-per-batch",
+    )
     def test_refusal_then_unlock_is_one_batch_for_every_owner_connection(self):
         self._open()
         session = live_dialogue_session(self.player)
@@ -453,6 +464,9 @@ class LiveUnlockBatchTests(_OwnerBase):
             ]["unread"]
         )
 
+    @covers_requirement(
+        "authored-dialogue-unread::unlock-notifications-are-deferred-and-deduplicated-per-batch",
+    )
     def test_no_watcher_consumes_the_batch_and_keeps_unread_markers(self):
         self._open()
         self._unlock()
@@ -482,6 +496,9 @@ class LiveUnlockBatchTests(_OwnerBase):
         self.assertEqual(list(callbacks), [])
         self.assertFalse(self._row(_LOCKED).ever_open)
 
+    @covers_requirement(
+        "authored-dialogue-unread::unread-markers-follow-formal-topic-history",
+    )
     def test_completion_survives_relock_and_reopen_without_another_batch(self):
         self._open()
         _real, _coordinator, recorded = self._watch(self.player)

@@ -51,7 +51,7 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 - **WHEN** an actor with no session submits a successful `explore.talk_open` for a present host
 - **THEN** the character holds a session naming that host whose line is the host's greeting (or
   the fixed fallback line), a live session naming another host is replaced by it, and no state
-  other than `db.dialogue_session` changes
+  other than db.dialogue_session and narrative-owned availability observation changes
 
 #### Scenario: Clear seams include movement, combat, NPC, phase and control retirement
 - **WHEN** a clear seam fires
@@ -61,9 +61,13 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 - **WHEN** an ordinary clear occurs without a phase or control transition
 - **THEN** the ordinary seams remain movement settlement, combat engage and NPC host departure/deletion/party cleanup; phase/control retirement is the additional explicitly authorized path above
 
-#### Scenario: The talk_open success path writes only the session opening
+#### Scenario: The talk_open success path writes the session opening and narrative observation
 - **WHEN** conversation open succeeds
-- **THEN** it writes only the session with the shared resolver's current fixed greeting or existing fallback and does not call a model
+- **THEN** it writes the session with the current greeting/fallback plus deterministic narrative availability observation and does not call a model
+
+#### Scenario: The talk_open success path writes only the session opening
+- **WHEN** a freeform-only conversation with no scene topic definition opens
+- **THEN** it retains session-only opening without scene availability observation or model call; static/generated scene hosts use the shared narrative-observation path
 
 #### Scenario: No other layer touches a session directly
 - **WHEN** a presenter, generative layer or client encounters a session
