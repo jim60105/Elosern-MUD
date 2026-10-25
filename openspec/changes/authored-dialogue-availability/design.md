@@ -12,6 +12,8 @@ Observed dialogue choices, exploration keyword affordances and adapters have sep
 
 ## Decisions
 
+Shared contract v2 makes trusted source resolution the sole common projection input. Static YAML/generated DB phases share requires/predecessors, hidden/locked/open, hints, refusal and variants. No static membership feature predicate. Resolve published noncancelled package, role binding and permitted selected phase first; private package/other-phase bodies never enter panels, affordances, hints, chain bundles or freeform context. Effect topics require common qualification plus existing domain authority before formal success delivery.
+
 Implement project_topics(context) as the sole pure availability/disclosure projection and use it from panel, exploration targets, action validator and text topic listing. None of these presenters writes reading or session state. For each qualified topic, requires and saved formal predecessors must pass; false gives hidden or locked according to unavailable. Locked rows contain only ID/label/lock/hint/action descriptor; selection delivers the permitted refusal, never fallback/variant formal body. Open qualified rows expose descriptors only; protected body appears only after server selection recheck. Remove every convenience field or exploration option that copies a full formal response. Never use a client-supplied availability flag.
 
 Before reading persistence lands, qualified predecessors cannot be satisfied and therefore fail closed; this does not pretend a runtime reading implementation exists. Pure-chain definitions remain complete public data, but actual delivery/reveal/receipt synchronization belongs to reading-server. An unmet pure-chain predecessor never becomes a quest/reward authorization primitive. Keep locked refusal effects zero and fixed variant during live playback. Text selecting a locked localized keyword plays the same refusal; hidden/unrecognized behaves as unknown without leaking identity or hint.
@@ -36,6 +38,8 @@ Boundary events use the existing world.observability facade with available owner
 - `web/webclient/actions/exploration_actions.py`
 - `web/webclient/presentation/dialogue_push.py`
 - `world/rules/dialogue_availability.py::refresh_dialogue_availability`
+
+Every successful open or selection re-projects and calls `refresh_dialogue_availability(owner, cause="open")`; the first call for a host carries `initial=True` into `observe_availability`, so a host's first-ever visit initializes every declared topic ID and later unlock batches are classified correctly. This is the only non-mutation refresh cause this slice adds, and it is distinct from the committed-state causes owned by the two refresh slices.
 
 ## Risks / Trade-offs
 

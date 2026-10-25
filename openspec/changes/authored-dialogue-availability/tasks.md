@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. One disclosure projection
 
+Shared contract v2 requires synthetic non-profile package-role scenes, binding/phase guards and recursive sentinel absence from every projection/freeform context. Shared qualification plus existing effect authority precedes formal body delivery.
+
 - [ ] 1.1 Implement hidden/locked/open project_topics for panel, affordance, text and action consumers, with stable hints and no formal-body leakage. Add world/rules/tests/test_dialogue_availability.py and presentation tests for hidden, locked refusal and recursive sentinel absence.
 
 ## 2. Selection recheck and explicit refresh API
@@ -12,5 +14,5 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 3. Stale invalidation and native paths
 
-- [ ] 3.1 Keep native generated phase authority and freeform unaffected; test selection losing equipment/quest eligibility, fixed live variant and phase/move/combat/host cleanup. Update dialogue command documentation for server-qualified topic/refusal semantics, manifests and traceability; run focused availability/action tests and contract_gate.
+- [ ] 3.1 Preserve deterministic phase authority/freeform generation while both scene sources share all disclosure/gate features. Test lost equipment/quest eligibility, fixed live variant and phase/move/combat/host cleanup; update command docs/manifests/traceability and run focused tests plus contract_gate.
 
