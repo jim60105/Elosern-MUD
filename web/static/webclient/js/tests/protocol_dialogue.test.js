@@ -652,3 +652,53 @@ test("unrelated envelope without available dialogue keeps unchanged 65536 bound"
   };
   assert.throws(() => Protocol.checkEnvelope(envelope), /canonical JSON exceeds 65536 bytes/);
 });
+
+// authored-dialogue-unread-notices: one watcher's wrapped unlock batch names
+// this panel's host and context and only its open choices, in order.
+test("dialogue unlock_batch mirrors the server wrapped-batch bounds", () => {
+  const second = validDialogueChoice({
+    topic_id: "guild_staff.topic_02",
+    keyword_id: "委託",
+    label: "委託",
+    action_payload: { npc_id: 41, topic_id: "guild_staff.topic_02", context_id: "ctx-1" },
+  });
+  const locked = validDialogueChoice({
+    topic_id: "guild_staff.topic_03",
+    keyword_id: "密談",
+    label: "密談",
+    availability: "locked",
+    requirement_hint: "需要信物",
+    action_payload: { npc_id: 41, topic_id: "guild_staff.topic_03", context_id: "ctx-1" },
+  });
+  const choices = [validDialogueChoice(), second, locked];
+  const batch = (overrides) =>
+    validDialoguePanel({
+      choices,
+      unlock_batch: Object.assign(
+        {
+          batch_id: "a".repeat(32),
+          host_id: 41,
+          context_id: "ctx-1",
+          topic_ids: ["guild_staff.topic_01", "guild_staff.topic_02"],
+        },
+        overrides || {}
+      ),
+    });
+  assert.deepEqual(Protocol.validateDialoguePanel(batch()), batch());
+  for (const bad of [
+    batch({ batch_id: "" }),
+    batch({ batch_id: "x".repeat(65) }),
+    batch({ batch_id: "批次" }),
+    batch({ host_id: 42 }),
+    batch({ host_id: 0 }),
+    batch({ context_id: "ctx-2" }),
+    batch({ topic_ids: [] }),
+    batch({ topic_ids: ["guild_staff.topic_01", "guild_staff.topic_01"] }),
+    batch({ topic_ids: ["guild_staff.topic_03"] }),
+    batch({ topic_ids: ["guild_staff.topic_99"] }),
+    batch({ topic_ids: ["guild_staff.topic_02", "guild_staff.topic_01"] }),
+    batch({ extra: 1 }),
+  ]) {
+    assert.throws(() => Protocol.validateDialoguePanel(bad));
+  }
+});

@@ -216,6 +216,57 @@ def _validate_choice(value: Any) -> dict[str, Any]:
     }
 
 
+MAX_UNLOCK_BATCH_ID_CHARS = 64
+MAX_UNLOCK_BATCH_TOPICS = 16
+
+
+def _validate_unlock_batch(
+    value: Any, *, host: dict[str, Any], context_id: str, rows: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Validate one live watcher's wrapped unlock batch (Shared contract v2).
+
+    ``{batch_id, host_id, context_id, topic_ids}``: an opaque ASCII batch ID,
+    this panel's own host identity and context, and 1..16 unique topic IDs
+    that are open choices of this same panel, in declaration order.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise DialoguePanelError("unlock_batch must be an object or null")
+    _require_exact_fields(
+        value, "unlock_batch", {"batch_id", "host_id", "context_id", "topic_ids"}, {}
+    )
+    batch_id = _require_str(value, "batch_id", maximum=MAX_UNLOCK_BATCH_ID_CHARS)
+    if not batch_id or not batch_id.isascii():
+        raise DialoguePanelError("unlock_batch batch_id must be non-empty ASCII")
+    host_id = _require_int(value, "host_id", minimum=1, maximum=MAX_SAFE_INTEGER)
+    if host_id != host["identity"]:
+        raise DialoguePanelError("unlock_batch host_id must be this panel's host")
+    if value["context_id"] != context_id:
+        raise DialoguePanelError("unlock_batch context_id must be this panel's context")
+    topic_ids = value["topic_ids"]
+    if not isinstance(topic_ids, list) or not 1 <= len(topic_ids) <= MAX_UNLOCK_BATCH_TOPICS:
+        raise DialoguePanelError(
+            f"unlock_batch topic_ids must hold 1..{MAX_UNLOCK_BATCH_TOPICS} entries"
+        )
+    open_order = [row["topic_id"] for row in rows if row["availability"] == "open"]
+    if len(set(topic_ids)) != len(topic_ids):
+        raise DialoguePanelError("unlock_batch topic_ids must be unique")
+    positions = []
+    for topic_id in topic_ids:
+        if not isinstance(topic_id, str) or topic_id not in open_order:
+            raise DialoguePanelError("unlock_batch topic_ids must be open choices")
+        positions.append(open_order.index(topic_id))
+    if positions != sorted(positions):
+        raise DialoguePanelError("unlock_batch topic_ids must keep declaration order")
+    return {
+        "batch_id": batch_id,
+        "host_id": host_id,
+        "context_id": context_id,
+        "topic_ids": list(topic_ids),
+    }
+
+
 def validate_dialogue(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``dialogue`` payload."""
     _require_exact_fields(
@@ -309,11 +360,9 @@ def validate_dialogue(payload: Any) -> dict[str, Any]:
     if len(set(completed_topic_ids)) != len(completed_topic_ids):
         raise DialoguePanelError("completed_topic_ids must be unique")
 
-    unlock_batch = payload.get("unlock_batch")
-    if unlock_batch is not None:
-        if not isinstance(unlock_batch, dict):
-            raise DialoguePanelError("unlock_batch must be an object or null")
-        _require_exact_fields(unlock_batch, "unlock_batch", {"batch_id", "host_id", "context_id", "topic_ids"}, {})
+    unlock_batch = _validate_unlock_batch(
+        payload.get("unlock_batch"), host=host, context_id=context_id, rows=rows
+    )
 
     result = {
         "schema_version": DIALOGUE_SCHEMA_VERSION,

@@ -44,15 +44,36 @@ outer transaction. On any failure the pre-write Attribute cache is restored
 best-effort, and a successful write resets the cache so the next read
 re-derives the committed row.
 
-Observation is NOT owned here: ``ever_open`` and ``announced`` stay ``False``
-and ``pending_batch`` stays ``None`` (initialized on the first host write) until
-``authored-dialogue-unread-notices`` adds ``observe_availability`` /
-``claim_unlock_batch``. ``reading_for`` never creates or repairs storage.
+Observation (``authored-dialogue-unread-notices``): ``observe_availability``
+records which declared topics are currently open after a committed open,
+selection or canonical refresh, and ``claim_unlock_batch`` consumes the one
+pending announcement batch before the live fan-out. Both reuse the same lock
+discipline as ``record_completion``. Classification is per stable topic ID:
+
+- an unseen topic (no row yet, including every ID of a newly permitted
+  generated phase) is inserted with ``ever_open``/``announced`` equal to its
+  current openness, so a first-ever visit or a phase's first appearance never
+  produces an unlock notice; ``initialized`` alone never classifies anything;
+- a seen topic that was never open and opens now becomes ``ever_open``; it is
+  an announcement candidate while it stays uncompleted, unannounced and open
+  (a completed topic, or a public chain successor whose openness derives only
+  from reading its predecessor, is marked announced silently);
+- a pending ID that is no longer declared (phase retirement) or is completed
+  is suppressed (marked announced); a pending ID that merely relocked is
+  dropped from the batch but stays eligible for a later reopening;
+- refusal playback, a variant change and relock/reopen never touch
+  ``completed``, and an announced topic never announces again.
+
+Observation never bumps ``revision`` (the revision counts saved completions,
+which the panel's ``reading_revision`` reflects) and never stores a recipient
+context. Presenters never call it. ``reading_for`` never creates or repairs
+storage.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -82,6 +103,7 @@ STATUS_ALREADY_SAVED = "already_saved"
 
 READING_COMPLETED_EVENT = "dialogue_reading_completed"
 READING_INTEGRITY_EVENT = "dialogue_reading_integrity"
+AVAILABILITY_OBSERVED_EVENT = "dialogue_availability_observed"
 
 
 @dataclass(frozen=True)
@@ -128,6 +150,16 @@ class CompletionRecord:
 
     status: str
     reading_revision: int
+
+
+@dataclass(frozen=True)
+class UnlockBatch:
+    """One owner/host announcement batch: stable ID and ordered topic IDs."""
+
+    batch_id: str
+    host_key: str
+    topic_ids: tuple[str, ...]
+    created_revision: int
 
 
 _EMPTY_RECORD = ReadingRecord(revision=0, hosts=MappingProxyType({}))
@@ -460,8 +492,248 @@ def _merged_host(
     )
 
 
+def _ordered_ids(values: Any, field: str) -> tuple[str, ...]:
+    """Validated, de-duplicated stable topic IDs in first-seen order."""
+    if isinstance(values, (str, bytes)):
+        raise TypeError(f"{field} must be an iterable of topic IDs")
+    ordered: list[str] = []
+    for value in values:
+        _require_bounded_str(value, MAX_TOPIC_ID_CHARS, field)
+        if value not in ordered:
+            ordered.append(value)
+    return tuple(ordered)
+
+
+def _write_record(owner: Any, record: ReadingRecord) -> None:
+    owner.attributes.add(READING_ATTRIBUTE, _serialize(record))
+
+
+def _reset_cache(owner: Any, host_key: str) -> None:
+    try:
+        owner.attributes.reset_cache()
+    except Exception as error:  # observability: ignore R2: a cache reset failure leaves a correct committed row; the next read still resolves it
+        log_warn(
+            READING_INTEGRITY_EVENT,
+            context={
+                "char": str(getattr(owner, "pk", "?")),
+                "host": host_key,
+                "reason": "cache_reset",
+            },
+            exc=error,
+        )
+
+
+def _observed_host(
+    current: HostReading | None,
+    host_key: str,
+    *,
+    declared: tuple[str, ...],
+    open_ids: frozenset[str],
+    quiet: frozenset[str],
+    revision: int,
+) -> HostReading:
+    """The host record after one observation (pure)."""
+    topics: dict[str, TopicReading] = {} if current is None else dict(current.topics)
+    for topic_id in declared:
+        is_open = topic_id in open_ids
+        row = topics.get(topic_id)
+        if row is None:
+            # First observation of this ID: whatever is open now was open
+            # from the start, so it is unread but never an unlock notice.
+            topics[topic_id] = TopicReading(
+                completed=False, ever_open=is_open, announced=is_open
+            )
+            continue
+        if is_open and not row.ever_open:
+            topics[topic_id] = TopicReading(
+                completed=row.completed,
+                ever_open=True,
+                announced=row.announced or row.completed or topic_id in quiet,
+            )
+    declared_set = frozenset(declared)
+    previous = () if current is None or current.pending_batch is None else tuple(
+        current.pending_batch["topic_ids"]
+    )
+    for topic_id in previous:
+        row = topics.get(topic_id)
+        if row is None:
+            continue
+        if topic_id not in declared_set or row.completed:
+            # Phase retirement or a completion before delivery: the obsolete
+            # announcement is suppressed while the reading row is retained.
+            topics[topic_id] = TopicReading(
+                completed=row.completed, ever_open=row.ever_open, announced=True
+            )
+    candidates = tuple(
+        topic_id
+        for topic_id in declared
+        if topic_id in open_ids
+        and topics[topic_id].ever_open
+        and not topics[topic_id].announced
+        and not topics[topic_id].completed
+    )[:MAX_PENDING_BATCH_TOPICS]
+    pending: Mapping[str, Any] | None = None
+    if candidates:
+        if current is not None and current.pending_batch is not None and previous == candidates:
+            pending = current.pending_batch
+        else:
+            pending = MappingProxyType(
+                {
+                    "batch_id": uuid.uuid4().hex,
+                    "topic_ids": candidates,
+                    "created_revision": revision,
+                }
+            )
+    return HostReading(
+        host_key=host_key,
+        initialized=True,
+        topics=MappingProxyType(topics),
+        pending_batch=pending,
+    )
+
+
+def _batch_of(host: HostReading) -> UnlockBatch | None:
+    pending = host.pending_batch
+    if pending is None:
+        return None
+    return UnlockBatch(
+        batch_id=pending["batch_id"],
+        host_key=host.host_key,
+        topic_ids=tuple(pending["topic_ids"]),
+        created_revision=pending["created_revision"],
+    )
+
+
+def observe_availability(
+    owner: Any,
+    host_key: str,
+    open_topic_ids: Iterable[str],
+    *,
+    declared_topic_ids: Iterable[str],
+    initial: bool,
+    context_id: str | None = None,
+    quiet_topic_ids: Iterable[str] = (),
+) -> UnlockBatch | None:
+    """Record one committed availability observation; return the pending batch.
+
+    ``declared_topic_ids`` is the current source's whole declaration (the
+    current generated phase's IDs for a generated host) and
+    ``open_topic_ids`` the subset the projection currently discloses as open.
+    ``quiet_topic_ids`` are public chain successors whose openness derives only
+    from reading their predecessor; their first opening is never announced.
+    ``initial`` marks the open/selection trigger (logged): first observation is
+    classified per unseen topic ID, so a host first observed by a later
+    canonical refresh initializes silently exactly like a first open.
+    ``context_id`` is diagnostic only and never persisted.
+
+    Returns the host's pending :class:`UnlockBatch` after the merge (possibly
+    one created earlier and not yet claimed), or ``None``. Writes only when the
+    record changed.
+    """
+    _owner_pk(owner)
+    _require_bounded_str(host_key, MAX_HOST_KEY_CHARS, "host_key")
+    declared = _ordered_ids(declared_topic_ids, "declared_topic_ids")
+    open_ids = frozenset(_ordered_ids(open_topic_ids, "open_topic_ids")) & frozenset(declared)
+    quiet = frozenset(_ordered_ids(quiet_topic_ids, "quiet_topic_ids"))
+
+    snapshot = attribute_snapshot(owner, READING_ATTRIBUTE)
+    changed = False
+    try:
+        with transaction.atomic():
+            _lock_owner_row(owner)
+            record = _parse_record(_raw_attribute_value(owner), owner=owner)
+            current = record.hosts.get(host_key)
+            merged = _observed_host(
+                current,
+                host_key,
+                declared=declared,
+                open_ids=open_ids,
+                quiet=quiet,
+                revision=record.revision,
+            )
+            changed = current != merged
+            if changed:
+                hosts = dict(record.hosts)
+                hosts[host_key] = merged
+                _write_record(
+                    owner,
+                    ReadingRecord(revision=record.revision, hosts=MappingProxyType(hosts)),
+                )
+    except Exception:
+        restore_attribute_best_effort(owner, READING_ATTRIBUTE, snapshot)
+        raise
+    batch = _batch_of(merged)
+    if changed:
+        _reset_cache(owner, host_key)
+        log_info(
+            AVAILABILITY_OBSERVED_EVENT,
+            context={
+                "char": str(owner.pk),
+                "host": host_key,
+                "context": context_id or "?",
+                "initial": bool(initial),
+                "first_seen": current is None or not current.initialized,
+                "open": len(open_ids),
+                "pending": len(batch.topic_ids) if batch is not None else 0,
+            },
+        )
+    return batch
+
+
+def claim_unlock_batch(owner: Any, batch_id: str) -> UnlockBatch | None:
+    """Consume one pending batch under the owner lock (at most once).
+
+    Marks the batch's topics announced and clears ``pending_batch`` BEFORE any
+    live delivery, so a duplicate refresh, a second connection's fan-out, a
+    failed push or a reconnect can never replay it. Returns the claimed batch,
+    or ``None`` when no host holds a pending batch with that ID any more.
+    """
+    _owner_pk(owner)
+    _require_bounded_str(batch_id, MAX_BATCH_ID_CHARS, "batch_id")
+    snapshot = attribute_snapshot(owner, READING_ATTRIBUTE)
+    claimed: UnlockBatch | None = None
+    try:
+        with transaction.atomic():
+            _lock_owner_row(owner)
+            record = _parse_record(_raw_attribute_value(owner), owner=owner)
+            for host_key, host in record.hosts.items():
+                batch = _batch_of(host)
+                if batch is None or batch.batch_id != batch_id:
+                    continue
+                topics = dict(host.topics)
+                for topic_id in batch.topic_ids:
+                    row = topics.get(topic_id)
+                    if row is not None:
+                        topics[topic_id] = TopicReading(
+                            completed=row.completed,
+                            ever_open=row.ever_open,
+                            announced=True,
+                        )
+                hosts = dict(record.hosts)
+                hosts[host_key] = HostReading(
+                    host_key=host_key,
+                    initialized=host.initialized,
+                    topics=MappingProxyType(topics),
+                    pending_batch=None,
+                )
+                _write_record(
+                    owner,
+                    ReadingRecord(revision=record.revision, hosts=MappingProxyType(hosts)),
+                )
+                claimed = batch
+                break
+    except Exception:
+        restore_attribute_best_effort(owner, READING_ATTRIBUTE, snapshot)
+        raise
+    if claimed is not None:
+        _reset_cache(owner, claimed.host_key)
+    return claimed
+
+
 __all__ = [
+    "AVAILABILITY_OBSERVED_EVENT",
     "MAX_BATCH_ID_CHARS",
+    "MAX_PENDING_BATCH_TOPICS",
     "MAX_HOST_KEY_CHARS",
     "MAX_TOPIC_ID_CHARS",
     "READING_ATTRIBUTE",
@@ -474,7 +746,10 @@ __all__ = [
     "HostReading",
     "ReadingRecord",
     "TopicReading",
+    "UnlockBatch",
+    "claim_unlock_batch",
     "completed_topic_ids",
+    "observe_availability",
     "read_reading",
     "reading_for",
     "reading_revision",

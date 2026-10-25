@@ -16,6 +16,15 @@ panel through the same ``PanelPushDeps`` collaborators the shared pusher uses â€
 one epoch-guarded publish per connection, each failure isolated and
 bounded-logged. Nothing is persisted; a missed push recovers on the next
 canonical sync.
+
+``unlock_batch`` (authored-dialogue-unread-notices) is the one already-claimed
+owner/host announcement batch of this refresh. It is wrapped separately for
+each watcher whose current puppet is talking to that same logical host: the
+wire form carries that watcher's own physical ``host_id`` and ``context_id``
+and only the batch topics the watcher's freshly rendered panel lists as open
+(a retired phase's IDs never ship). A watcher at another host, or one whose
+panel no longer lists any batch topic, receives the plain panel. Snapshots
+never carry a batch, so a reconnect cannot replay it.
 """
 
 from world.observability import log_warn
@@ -76,11 +85,42 @@ def _owner_connection(puppet: object, owner: object) -> bool:
     )
 
 
-def push_dialogue_reading(owner: object) -> None:
+def _wrap_unlock_batch(payload: dict, puppet: object, unlock_batch: object) -> dict:
+    """``payload`` carrying this watcher's wrapped batch, or ``payload`` itself."""
+    from web.webclient.presentation.dialogue import validate_dialogue
+    from world.rules.dialogue import live_dialogue_session
+
+    session = live_dialogue_session(puppet)
+    if session is None or session.host_key != getattr(unlock_batch, "host_key", None):
+        return payload
+    open_ids = {
+        choice["topic_id"]
+        for choice in payload.get("choices", ())
+        if choice.get("availability") == "open"
+    }
+    topic_ids = [topic for topic in unlock_batch.topic_ids if topic in open_ids]
+    if not topic_ids:
+        return payload
+    return validate_dialogue(
+        {
+            **payload,
+            "unlock_batch": {
+                "batch_id": unlock_batch.batch_id,
+                "host_id": payload["host"]["identity"],
+                "context_id": payload["context_id"],
+                "topic_ids": topic_ids,
+            },
+        }
+    )
+
+
+def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None:
     """Publish each of ``owner``'s current connections its own dialogue panel.
 
-    Never raises: a failure is isolated to one bounded diagnostic and the next
-    canonical sync re-establishes the truth.
+    ``unlock_batch`` is an already-claimed ``UnlockBatch`` (or ``None``); see
+    the module docstring for the per-watcher wrapping. Never raises: a failure
+    is isolated to one bounded diagnostic and the next canonical sync
+    re-establishes the truth.
     """
     deps = _deps()
     # The facade binding keeps the lint's syntactic facade-call recognition
@@ -106,6 +146,24 @@ def push_dialogue_reading(owner: object) -> None:
             try:
                 context = deps.build_context(watcher, puppet)
                 payload = registry.render("dialogue", context)
+                if (
+                    unlock_batch is not None
+                    and isinstance(payload, dict)
+                    and payload.get("available") is True
+                ):
+                    try:
+                        payload = _wrap_unlock_batch(payload, puppet, unlock_batch)
+                    except Exception as error:
+                        # The plain panel still ships; only the notice is lost.
+                        log_warn(
+                            "dialogue_unlock_batch_wrap_failed",
+                            context={
+                                "surface": "presentation",
+                                "char": str(getattr(owner, "pk", "?")),
+                                "session": str(getattr(watcher, "sessid", "?")),
+                            },
+                            exc=error,
+                        )
                 deps.publish(
                     watcher,
                     puppet,

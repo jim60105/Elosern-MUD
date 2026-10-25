@@ -101,11 +101,66 @@ value reads as empty with one `dialogue_reading_integrity` event. `record_comple
 opens `transaction.atomic()`, makes a guarded owner-row `UPDATE` its first statement (the
 SQLite write lock), reads the raw persisted Attribute through the `db_attributes` join,
 merges exactly one host/topic in fresh containers, and compensates the Attribute cache on
-failure. `ever_open`/`announced` stay false and `pending_batch` stays null until
-`authored-dialogue-unread-notices` adds observation. Keys are the stable `host_key` and
+failure. Observation (below) owns `initialized`, `ever_open`, `announced` and
+`pending_batch`; a completion never touches them. Keys are the stable `host_key` and
 source-aware `topic_id`: a physical dbid is never a reading key, so possession,
 save/reload, a rematerialized binding and a returning generated phase share one record,
 and equal local IDs in different package roles stay separate.
+
+### Unread observation and unlock batches
+
+`observe_availability(owner, host_key, open_topic_ids, *, declared_topic_ids, initial,
+context_id, quiet_topic_ids)` and `claim_unlock_batch(owner, batch_id)` reuse the
+completion lock discipline. Both run only inside the committed availability fan-out
+(`world.rules.dialogue_availability._fan_out_availability`, reached from every
+`refresh_dialogue_availability`/`queue_dialogue_refresh` call, including the
+`cause="open"` refresh of every successful open or selection). Presenters, snapshots and
+the client never call them, and a freeform-only host (no scene source) is never observed.
+
+Classification is per stable topic ID, for static and generated sources alike:
+
+- **First seen** (no row yet, including every ID of a newly permitted generated phase on
+  an already initialized host): the row is inserted with `ever_open` and `announced`
+  equal to its current openness, so a first visit or a phase's first appearance shows
+  unread markers without an unlock notice. A host first observed by a canonical
+  refresh rather than an open initializes exactly the same way.
+- **Later opening**: a previously observed locked/hidden row that opens becomes
+  `ever_open`. While it stays uncompleted and unannounced it joins the host's one
+  `pending_batch` (at most 16 IDs in declaration order; any further IDs follow in the
+  next batch). Refusal playback changes nothing, so a refusal then an unlock still
+  announces once. A completed row, and a public chain successor declared with
+  `disclosure: pure_chain` and no `requires` (its openness comes only from reading its
+  predecessor), are marked announced silently.
+- **Retirement**: a pending ID that is no longer declared (a retired phase) or is
+  completed is suppressed (marked announced); a pending ID that merely relocked leaves
+  the batch and stays eligible for a later reopening. Returning to a phase never resets
+  completion or history.
+- **Relock/reopen and variants** never reset `completed` and never re-announce.
+
+Observation does not bump `revision` and stores no recipient context. Right after it,
+the fan-out claims the pending batch under the owner lock (marking its topics announced)
+**before** pushing, with or without a live watcher, and emits
+`dialogue_unlock_batch_claimed` (`char`, `actor`, `npc`, `host`, `batch`, `topics`,
+`context`, `cause`). A claim is at most once, so a duplicate refresh, a second
+connection, a failed push or a reconnect can never replay it; the durable unread markers
+(`unread` on open, uncompleted rows) remain. An observation failure logs
+`dialogue_unlock_observation_failed` once and the plain panel is still pushed.
+
+`push_dialogue_reading(owner, unlock_batch=claimed)` wraps the claimed batch separately
+for each current watcher whose puppet talks to the same logical host: the wire
+`unlock_batch` is `{batch_id, host_id, context_id, topic_ids}` with that watcher's own
+physical host identity and context and only the batch topics its freshly rendered panel
+lists as open. Contexts C1 and C2 of one owner at host 41 both receive batch U, each with
+its own context; another character of the same account receives nothing. Snapshots
+always carry `unlock_batch: null`. The validators on both sides require the batch to name
+the panel's own host and context and 1..16 unique open choice IDs in declaration order.
+
+The client (`stores/elosern/dialogue_reading.js`) keeps a memory-only set of seen batch
+IDs and a bounded pending list per character and context. It defers every batch until
+the current scene's explicit finish returns the choices, then shows one non-focus-stealing
+`unlock` toast per batch naming the still-unread topics (topics saved or read meanwhile
+are dropped; an emptied batch shows nothing). A changed host, context or character, or a
+reload, discards pending notices; the persistent unread pips in the choice list remain.
 
 ### Session receipts
 
