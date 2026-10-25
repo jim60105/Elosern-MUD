@@ -1,55 +1,84 @@
 schema_version: 1
-greeting: 櫃檯後的瑪爾特‧金秤從帳簿上抬起頭，炭筆還捏在指間：「要出城，還是剛回來？出城的話，燈、羅盤、露營的東西架上都有；回來的話，帶了什麼先擱秤上。」
+greeting: 櫃檯後的瑪爾特‧金秤從帳簿抬起頭，炭筆俐落一擱：「要出城還是剛回王都？要出城，架上的燈與羅盤自己挑；剛回來的話，帶了什麼素材先擱上秤。」
 topics:
 - topic_id: altoria_general_store.topic_01
   keyword: 賣什麼
   label: 賣什麼
   fallback:
     scene_id: altoria_general_store.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 賣什麼
+      text: 請問店裡都備了些什麼行頭？
+    - kind: narration
+      text: 瑪爾特‧金秤順手拉過算盤，指著後方整齊的深色木架。
     - kind: speech
       speaker: host
-      text: 「出城用的都在這。魔法燈、附魔羅盤、迷宮探照符、通訊法螺，還有粗鐵礦、魔獸結晶這些料。價錢寫在牆上那塊板子，自己看，我不講價。就這樣。」
+      text: 「出門要用的都在這排。魔法燈、附魔羅盤、迷宮探照符，還有紮營用的防護石。想自己打鐵或找人做東西，粗鐵礦與魔獸結晶也收在底層。」
+    - kind: speech
+      speaker: actor
+      text: 價錢怎麼算？能稍微算便宜點嗎？
+    - kind: speech
+      speaker: host
+      text: 「價錢全刻在牆板上，一銅都不會多收，但也別跟我磨嘴皮講價。這把黃銅秤在東市過磅三十年，從來不偏任何一邊。就這樣。」
 - topic_id: altoria_general_store.topic_02
   keyword: 材料
   label: 材料
   fallback:
     scene_id: altoria_general_store.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 材料
+      text: 聽說你在收冒險者帶回來的素材？
+    - kind: narration
+      text: 瑪爾特‧金秤敲了敲手邊擦亮的小黃銅秤盤。
     - kind: speech
       speaker: host
-      text: 「迷宮裡帶回來的哥布林耳朵、史萊姆黏液、巨魔尖牙、地龍鱗片，我都收。擱上櫃檯，我看過就報數，錢當場點給你。要買也有，魔導晶核、龍鱗碎片、精靈蛛絲，在架子最上層。」
+      text: 「哥布林耳朵、史萊姆黏液、巨魔尖牙或地龍鱗片全收。不管是一口袋還是一枚，全擱上秤，過完磅報個實數，銅幣當面點清給你。」
+    - kind: speech
+      speaker: actor
+      text: 架上有沒有少見一點的好料？
+    - kind: speech
+      speaker: host
+      text: 「最上層留了幾樣好料。魔導晶核、地龍鱗片，還有商隊從中央山脈那頭帶回來的精靈蛛絲。識貨的人看一眼就明白，不買也別亂碰。」
 - topic_id: altoria_general_store.topic_03
   keyword: 行頭
   label: 行頭
   fallback:
     scene_id: altoria_general_store.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 行頭
+      text: 要是第一次出城，該帶些什麼才好？
+    - kind: narration
+      text: 瑪爾特‧金秤停下手中的炭筆，抬起眼打量著眼前的新面孔。
     - kind: speech
       speaker: host
-      text: 「第一次出城？好，照我說的帶。燈一定要帶，迷宮裡黑到看不見自己的手。羅盤防迷路，探照符撕開能把四周照亮一小段時間，露營魔導具一打開就是個小帳篷，風雨蟲子都進不來。通訊法螺留著走散的時候喊人用。嗯，大概就這些。」
+      text: 「年輕人剛來王都？那聽我一句叮嚀。燈一定要備妥，迷宮深處連指尖都看不清。羅盤帶著防兜圈子，探照符能在緊要關頭照出一條亮路。」
+    - kind: speech
+      speaker: host
+      text: 「要在野地過夜，營地防護石記得放在帳篷四周，能擋住宵小魔獸。碰上走散的時候，通訊法螺吹一聲，同伴就能辨出方向。帶齊這些再出城，別拿自己的命開玩笑。」
 - topic_id: altoria_general_store.topic_04
   keyword: 飾品藥水
   label: 飾品藥水
   fallback:
     scene_id: altoria_general_store.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 飾品藥水
+      text: 店裡有賣護身首飾或療傷藥水嗎？
+    - kind: narration
+      text: 瑪爾特‧金秤搖了搖頭，把剛記好的單據俐落翻過一頁。
     - kind: speech
       speaker: host
-      text: 「那兩樣不在我這了。飾品去隔壁首飾坊找艾蓮娜，藥水往東市的鍊金坊找希碧拉，都是老街坊。報我的名字也沒用，她們一樣不講價。要受洗聖水的話，得爬聖階上去，大神殿前的聖所有自己的櫃檯。」
+      text: 「這兩樣我不碰。飾品直接去隔壁找艾蓮娜，她那間首飾坊手藝頂尖；要藥水就沿街走到東市，希碧拉的鍊金坊就在那邊。兩位都是多年街坊，我不搶別人的飯碗。」
+    - kind: speech
+      speaker: actor
+      text: 如果要找教會的受洗聖水呢？
+    - kind: speech
+      speaker: host
+      text: 「受洗聖水得沿著大道往上爬到聖座前的大神殿，聖所專門設了櫃檯發放。那邊修女以肉體侍奉女神，聖水都受過光魔法祝聖。想求聖水，去上城準沒錯。」
