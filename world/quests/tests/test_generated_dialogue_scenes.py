@@ -156,6 +156,9 @@ class GeneratedSceneContractTests(EvenniaTest):
     @covers_requirement(
         "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
     )
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-scene-identity-survives-source-and-runtime-boundaries"
+    )
     def test_topics_and_scenes_are_namespaced_by_package_role_and_phase(self):
         payload = self._validated()
         definition = validate_scene_package(payload)
@@ -393,6 +396,9 @@ class GeneratedPackagePublicationTests(RegistryIsolationMixin, EvenniaTest):
     def _payload(self) -> dict:
         return _rich_package()
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-publication-uses-existing-immutable-database-ownership"
+    )
     def test_publication_is_idempotent_and_conflicting_content_is_refused(self):
         payload = self._payload()
         first = publish_scene_package(payload, owner="tester", source_id="beat-1")
@@ -407,6 +413,9 @@ class GeneratedPackagePublicationTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(ScenePackageConflictError):
             publish_scene_package(changed, owner="tester", source_id="beat-1")
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-publication-uses-existing-immutable-database-ownership"
+    )
     def test_publication_writes_no_static_registry_or_source_tree(self):
         before = dict(DIALOGUE_SNAPSHOT)
         publish_scene_package(self._payload(), owner="tester", source_id="beat-2")
@@ -415,6 +424,10 @@ class GeneratedPackagePublicationTests(RegistryIsolationMixin, EvenniaTest):
             DIALOGUE_SNAPSHOT.get("scene_role:anything")
         )
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-scene-identity-survives-source-and-runtime-boundaries",
+        "generated-dialogue-scenes::generated-publication-uses-existing-immutable-database-ownership",
+    )
     def test_a_durable_row_revalidates_to_byte_identical_namespaced_ids(self):
         published = publish_scene_package(
             self._payload(), owner="tester", source_id="beat-3"
@@ -464,6 +477,9 @@ class GeneratedSourceProviderTests(RegistryIsolationMixin, EvenniaTest):
         )
         return published, host
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature"
+    )
     def test_the_provider_returns_the_complete_current_phase_and_effects(self):
         payload = _rich_package()
         definition_key = _definition_key(payload)
@@ -499,6 +515,9 @@ class GeneratedSourceProviderTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(declared.verb, "offer_commission")
         self.assertEqual(declared.reference, definition_key)
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-publication-uses-existing-immutable-database-ownership"
+    )
     def test_a_removed_response_only_payload_resolves_to_no_source(self):
         # A pre-cutover row written directly to the immutable store: it cannot
         # pass the current validator, so the provider must not convert or
@@ -555,6 +574,9 @@ class GeneratedSourceProviderTests(RegistryIsolationMixin, EvenniaTest):
         )
         return published, host, player
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-phase-retirement-preserves-reading-without-stale-delivery"
+    )
     def test_a_qualified_completion_never_returns_as_chain_playback(self):
         _published, host, player = self._playable_host()
         from world.rules.dialogue import chain_deliveries
@@ -599,12 +621,18 @@ class GeneratedSourceProviderTests(RegistryIsolationMixin, EvenniaTest):
         nodes = chain_deliveries(session, host, actor=player)
         self.assertNotIn(qualified.topic_id, [node.delivery.topic_id for node in nodes])
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-phase-retirement-preserves-reading-without-stale-delivery"
+    )
     def test_a_cancelled_package_suppresses_the_stored_playback(self):
         published, _host, player = self._playable_host()
         scene_store.cancel_package(published.package_id)
         with self.assertRaises(PanelUnavailableError):
             dialogue_presenter(PresentationContext(actor=player, protocol_version=1))
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature"
+    )
     def test_the_panel_projects_only_the_current_phase_completions(self):
         published, host, player = self._playable_host()
         session = live_dialogue_session(player)
@@ -723,6 +751,11 @@ class GeneratedDispatchAcceptanceTests(
         binding = scene_store.get_role_binding(package_id, role_id)
         return ObjectDB.objects.filter(id=binding.npc_id).first()
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature",
+        "generated-dialogue-scenes::generated-phase-retirement-preserves-reading-without-stale-delivery",
+        "scenario-director::dream-scene-generation-proposes-the-complete-shared-dialogue-schema",
+    )
     def test_a_dispatched_generated_host_plays_offline_through_web_and_text(self):
         _request, work = self._queued_work()
         client = self._client()
@@ -843,6 +876,10 @@ class GeneratedDispatchAcceptanceTests(
 class GeneratedUnicodeIdentityTests(RegistryIsolationMixin, EvenniaTest):
     """Maximal Unicode components keep exact bytes through every Python boundary."""
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature",
+        "generated-dialogue-scenes::generated-scene-identity-survives-source-and-runtime-boundaries",
+    )
     def test_maximal_unicode_role_and_phase_round_trip(self):
         register_catalog_once()
         role_id = "母" * 64
@@ -1022,6 +1059,9 @@ class GeneratedEscortEffectRollbackTests(RegistryIsolationMixin, EvenniaTest):
         )
         return published, definition_key
 
+    @covers_requirement(
+        "generated-dialogue-scenes::qualification-and-existing-effects-precede-formal-success-delivery"
+    )
     def test_a_scope_enlisted_during_acceptance_rolls_back_after_a_late_failure(
         self,
     ):

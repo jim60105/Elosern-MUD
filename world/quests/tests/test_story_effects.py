@@ -130,6 +130,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
             expected_context_id=expected_context_id,
         )
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature"
+    )
     def test_generated_topics_and_greeting_resolve_through_the_shared_seam(self):
         from web.webclient.presentation.affordances import (
             _scripted_keyword_descriptors,
@@ -156,6 +159,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertEqual(dialogue_offline_response(self.mother), LONG_PROSE)
 
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-dialogue-participates-in-every-shared-scene-feature"
+    )
     def test_an_informational_selection_delivers_the_complete_scene(self):
         delivery = self._select(self.mother, INFORMATION_KEYWORD)
         self.assertEqual(delivery.kind, "formal")
@@ -217,6 +223,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(outcome.reason, "absent")
         self.assertEqual(read_records(self.player), [])
 
+    @covers_requirement(
+        "generated-dialogue-scenes::qualification-and-existing-effects-precede-formal-success-delivery"
+    )
     def test_a_domain_refusal_delivers_only_the_safe_refusal(self):
         topic_id = self._topic_id(self.mother, COMMISSION_KEYWORD)
         with patch(
@@ -233,6 +242,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         session = live_dialogue_session(self.player)
         self.assertEqual(session.completion_receipts, ())
 
+    @covers_requirement(
+        "generated-dialogue-scenes::qualification-and-existing-effects-precede-formal-success-delivery"
+    )
     def test_a_replayed_selection_applies_the_effect_at_most_once(self):
         first = self._select(self.mother, COMMISSION_KEYWORD)
         session = live_dialogue_session(self.player)
@@ -244,6 +256,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(first.delivery_id, replay.delivery_id)
         self.assertEqual(len(read_records(self.player)), 1)
 
+    @covers_requirement(
+        "generated-dialogue-scenes::qualification-and-existing-effects-precede-formal-success-delivery"
+    )
     def test_a_failed_session_publication_rolls_back_the_accepted_commission(self):
         from unittest.mock import patch as patch_fn
 
@@ -257,6 +272,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
 
     @covers_requirement(
         "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work"
+    )
+    @covers_requirement(
+        "generated-dialogue-scenes::generated-phase-retirement-preserves-reading-without-stale-delivery"
     )
     def test_a_phase_change_retires_the_previous_topics(self):
         transition_story_dialogue(

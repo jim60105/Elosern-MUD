@@ -6,8 +6,7 @@ Select complete generated story dialogue phases from committed observations whil
 ## Requirements
 
 ### Requirement: Packages declare complete finite dialogue phases
-
-Every reachable per-role phase SHALL provide bounded fixed greeting/topics/responses, validated conditions/effects, free-form situation/goals and offline response before publication. Only registered deterministic predicates SHALL be allowed. Missing coverage, ambiguous selection, conflicting selection, automatic cycles and generated expressions/code SHALL reject.
+Every reachable per-role phase SHALL provide bounded greeting, complete shared topic scenes/variants/qualification/refusal/predecessors, validated conditions/effects, freeform situation/goals and offline response before publication. Phase facts SHALL remain registered deterministic predicates. Missing coverage, ambiguous/conflicting selection, automatic cycles and generated code SHALL reject. Old response-only topics SHALL be unsupported.
 
 #### Scenario: Phase content remains in-world and private
 - **WHEN** fixed or generated phase dialogue is validated and presented
@@ -17,9 +16,12 @@ Every reachable per-role phase SHALL provide bounded fixed greeting/topics/respo
 - **WHEN** a package omits a reachable phase or declares overlapping selection, an automatic cycle, or unsupported condition/effect code
 - **THEN** publication fails before any writes
 
-### Requirement: Phase selection uses committed outcomes and permitted role knowledge
+#### Scenario: Complete scenes replace response-only topics
+- **WHEN** a package topic declares valid shared scene primitives or instead the old response-only fields
+- **THEN** the complete scene is accepted under shared bounds and the old representation rejects without compatibility conversion
 
-Phase selection SHALL use committed observations and per-role permitted knowledge. Exact participant identities and committed provenance SHALL drive owner-API transitions with monotonic revision, preserving persona and historical turns. Global stage changes SHALL confer no remote knowledge. Escort/reunion observations SHALL remain guarded until their owner lands and SHALL never derive from prose.
+### Requirement: Phase selection uses committed outcomes and permitted role knowledge
+Phase selection SHALL use committed observations and per-role permitted knowledge. Exact participant identities/provenance SHALL drive deterministic transitions with monotonic revision, preserving persona/history. Global stage changes SHALL confer no remote knowledge. Escort/reunion facts SHALL require existing committed owner authority and never derive from prose. Topic conditions SHALL use the shared permitted canonical/package reference catalog.
 
 #### Scenario: Unknown information stays out of mother-first dialogue
 - **WHEN** a searching role is encountered first without knowledge of its related role's location or private source text
@@ -30,9 +32,12 @@ Phase selection SHALL use committed observations and per-role permitted knowledg
 - **THEN** closure selects everyday greetings/topics without the old commission choice, abandonment selects unresolved content, and both preserve prior memories
 
 ### Requirement: Phase revision invalidates pending dialogue work
-
-A phase change SHALL refresh live greeting/topic models and invalidate obsolete choice capabilities using the existing versioned surface contract. A reply captured under an obsolete phase revision SHALL deliver no speech, apply no intent, and append no memory or exchange; the current phase SHALL be refreshed instead. Historical dialogue SHALL remain unchanged and an old topic SHALL never be reinterpreted as a new phase action.
+Phase change SHALL refresh live greeting/topics and retire obsolete scene deliveries, choice/reading receipts and notification scope through the common versioned surface. Obsolete freeform replies SHALL emit no speech/intent/memory. Historical dialogue and saved same-phase topic completion SHALL remain unchanged; an old topic SHALL never be reinterpreted as a new phase action.
 
 #### Scenario: Old choice and late reply are refused
 - **WHEN** a choice or pending free-form reply captured before a phase revision is delivered afterward
 - **THEN** neither applies effects or appends obsolete dialogue, late speech is suppressed, and the current window receives refreshed content
+
+#### Scenario: Old acknowledgement is retired without resetting reading
+- **WHEN** an old-phase completion retries after transition and that phase later becomes permitted again
+- **THEN** the old receipt rejects while already saved completion for that phase remains available
