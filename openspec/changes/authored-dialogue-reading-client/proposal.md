@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No durable browser queue, optimistic protected unlock or generated-specific acknowledgement path. Static and generated scene IDs are opaque through the same completion state machine.
 
 ## Batch:
 
@@ -33,4 +33,4 @@ depends-on: authored-dialogue-locked-ui
 
 Code conflicts: Touches player composable, choices, transport and AppClient after locked UI. Notifications depend on this return-to-choices boundary; no separate durable client storage.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; retain exact generated IDs in memory and request validation without truncation.

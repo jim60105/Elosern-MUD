@@ -2,6 +2,13 @@
 
 ## ADDED Requirements
 
+### Requirement: Generated acknowledgements use the same memory-only lifecycle
+Static/generated completion SHALL share one exact-ID in-memory retry/ordering state machine. Phase/control retirement SHALL discard obsolete pending memory while retaining server reading. Generated identifiers SHALL be preserved without truncation.
+
+#### Scenario: Generated phase retires pending completion
+- **WHEN** a generated completion is pending and its phase context retires
+- **THEN** the client discards the stale queue entry and uses current server reading without completing new-phase content
+
 ### Requirement: Frontend completion retries remain memory-only
 After explicit formal-scene finish, the client SHALL retry a failed completion acknowledgement in memory without requiring immediate rereading. It SHALL distinguish pending from saved and discard pending state on fresh reload, character exit or context retirement. No durable browser completion queue SHALL exist.
 

@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Pending completion state machine
 
+Shared contract v2 preserves full generated IDs in admission/queue/request/response fields. Test long generated IDs, phase-retired memory and identical completion with no source-specific branch or truncation.
+
 - [ ] 1.1 Implement applyDialogueReading and finishDialogueDelivery with dedup, exact response binding, retry/discard distinctions and no browser persistence. Add tests/stores/dialogue_reading.test.js (new) with synthetic saved/stale/error responses and document bounded memory lifecycle.
 
 ## 2. Pure-chain and playback wiring
