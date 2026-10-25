@@ -1,0 +1,39 @@
+# Terminal combat and completed time-skip alignment
+
+## Context
+
+M defines the committed fact interface, explicit per-session settlement token and mark_alignment integration. Current terminal combat converges on combat_session/settlement.py::settle_session, including forced-sleep opening and party exit, and adapters normalize through combat_result.py. Time skip has real immutable SkipResult fields, including elapsed_seconds, completed, partial, replayed and continuation; sleep entry and choice/handoff are separate zero-time outcomes. Deltas cannot be chosen solely from requested action IDs.
+
+## Goals / Non-Goals
+
+Add every approved nonmovement checkpoint without changing time, combat settlement or sleep-control authority. Reuse M exactly. No full alignment on ordinary combat start/nonterminal round, practice booking or choice-only sleep entry. No new clock event type or persistent flag.
+
+## Decisions
+
+### Terminal combat fact owner
+
+Inside the existing successful terminal transaction in `world/rules/combat_session/settlement.py::settle_session`, schedule one `combat_terminal` fact after final session clear, clock settlement, aftermath, exam restoration and terminal writes. The prior settled_tick replay branch emits no new fact. `_continue_or_settle` nonterminal branch emits none. Terminal opening (`settle_forced_sleep_opening` and instant-terminal field-combat opening), confirmed party exit/flee, victory/defeat/draw/exam and cleanup that successfully ends an active combat all converge on that terminal owner. A terminal cleanup in restore_active_session which actually retires a previously active presentation must call the same narrow post-commit fact helper after its final clear; already-settled replay cleanup emits none. Unparseable session clear emits a conservative alignment fact after the safe clear without trusting participant IDs; include `restore_active_session`/forfeit settlement branches in the inventory, without marking mere corrupt-read rejection as a completed battle. Captured commander/actor IDs target lawful current watchers through M, including possession.
+
+`world/rules/combat_result.py::settle_to_oob_result` and `web/webclient/actions/combat_actions.py::_settlement_result` retain round records and safe outcome normalization; stop using an empty affected set as an accidental full-snapshot trigger. `exploration_actions.py::_engage_adapter`, skill-use field cast and service guild exam adapter preserve committed start vs terminal classification from the deterministic owner. Do not trust action names or `mode` change alone. Graphical completion retains action-local frozen combat round in the single checkpoint context, so the terminal round's beats are available with the final authoritative panels. Reconnect/text contexts still carry no replay round.
+
+### Skip settlement predicate and owners
+
+A completed explicit awake skip is a successful nonreplayed `advance_wait` operation that actually settled elapsed_seconds>0, including a safety-truncated/partial interval that ends the accepted request without retaining an automatic continuation. It emits one skip_completed after clock/stages/booking outcome has committed. This covers CmdRest (with or without declared practice), CmdWaitUntil, and graphical explore.wait seconds/daypart. Zero-time wait, preflight rejection, rolled-back advance, duplicate operation receipt and practice-booking-only actions emit none.
+
+A sleep checkpoint occurs only when a newly committed accepted sleep operation has reached a terminal/completed result, never on SleepEntry, pending owner dream question, handoff choice or retained continuation. In `time_skip.py::continue_sleep` and `continue_owner_sleep`, qualify result.completed and not result.replayed after durable receipt/decision/result writes. The existing begin_sleep already-recovered branch has no accepted receipt and completed=False, so it emits none. A zero-elapsed result that actually marks a newly accepted receipt completed qualifies. A partial/interrupted sleep which retains continuation emits none until that continuation completes; a partial operation explicitly ended with no continuation qualifies as completed settlement when the owning result marks completed. Never infer completion merely from positive elapsed time, posture, request type or wake message. `_record` remains a ledger writer, not a hook, because it also records noncompleted receipts.
+
+All callers route through the same owners: `begin_sleep` may return entry-only or a completed result; `continue_sleep`, `continue_owner_sleep`, `resume_pending_owner_continuation`, use the result predicate at their owning write. `sleep_control.py::begin_all_party_sleep` is entry-only, emits none. `commands/skip.py::{CmdRest,CmdSleep,CmdWaitUntil}` and WebClient exploration `_wait_adapter`, `_sleep_party_adapter`, `_sleep_continue_adapter`, `_sleep_dream_adapter` preserve behavior and token lifecycle, with no action-ID checkpoint switch. `server/dream_service.py` completion/awaken paths must expose a completed retained sleep receipt to the same owner before their refresh; a dream utterance/draft alone is not a sleep checkpoint. Async completed continuation outside a token publishes through M's one-shot observer path.
+
+### Ordering and ownership
+
+Every fact is registered inside the successful outer owning transaction and delivered only after commit. Nested combat/skip/movement events coalesce in M's token into ONE final freshly rendered snapshot replacing the delta. Existing callback availability refresh and options generation run through B/M's candidate queue or as later separate async publication, never publish an old baseline. Explicit no_presentation result-only or sequence-retiring action exceptions stay as currently specified; puppet transition establishes its new full baseline. Do not add a second general settlement observer or periodic scheduler.
+
+Exact owned files are world/rules/combat_session/settlement.py, time_skip.py and narrow sleep/dream completion writers where the predicate's final write actually occurs, web/webclient/actions/{combat_actions,exploration_actions,skill_use_actions,service_actions}.py only normalization/candidate changes, combat_result.py and server/dream_service.py completion integration. M owns shared presentation_events/token API. commands/skip.py is integration coverage and changes only if needed to pass the explicit token through existing asynchronous continuation, never player syntax. `clock.py` is read-only in this slice: ordinary action/combat clock advance alone does not classify an explicit skip. Active authored-dialogue-refresh-lifecycle owns its world-time availability callback unchanged.
+
+## Verification and documentation
+
+Add `presentation/tests/test_settlement_alignment.py`. Exercise graphical and text terminal combat, terminal opening, successful escape/exam and ordinary start/nonterminal round; assert one full checkpoint vs changed-only delta. Exercise rest/wait completion, sleep entry-only, retained partial, completed continuation, dream return and failed/duplicate/rolled-back operations. Compare the exact freshly rendered eager data and mode/round/result revisions, not only message names. Inject a previously omitted candidate and observe full correction. Extend existing test_art_panel terminal tests without weakening their no-partial-terminal-state assertion. Update synchronization checkpoint docs and traceability in the same feature work.
+
+## Risks / Trade-offs
+
+A terminal round can include nested relocation/time settlement; reason coalescing is per token, so it cannot double-publish. Sleep field combinations are authoritative receipts, not new synchronization persistence. Hooks must follow existing compensation boundaries to avoid publishing a committed-looking fact for a rolled-back operation.
