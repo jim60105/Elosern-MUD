@@ -14,6 +14,8 @@ Covers:
 from dataclasses import FrozenInstanceError
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.dialogue.codec import (
     GeneratedDialogueIdentity,
     StaticDialogueIdentity,
@@ -59,12 +61,40 @@ from world.lore.scenes import (
     Scene,
     Speech,
     canonical_utf8_json_bytes,
+    line_to_dict,
     scene_canonical_bytes,
+    scene_to_dict,
 )
 
 
 class AuthoredScenesTests(unittest.TestCase):
     """Test pure scene declarations and UTF-8 budget validation."""
+
+    @covers_requirement("authored-scene-model::declarative-scenes-preserve-attribution")
+    def test_scene_serialization_preserves_order_and_speakerless_narration(self):
+        scene = Scene(
+            scene_id="merchant.opening",
+            revision="r1",
+            lines=(
+                Speech(speaker="actor", text="我想打聽消息。"),
+                Speech(speaker="host", text="哦？"),
+                Speech(speaker="host", text="說來聽聽。"),
+                Narration(text="老闆放下手中的帳本。"),
+            ),
+        )
+
+        wire = scene_to_dict(scene)
+
+        self.assertEqual(
+            [line["kind"] for line in wire["lines"]],
+            ["speech", "speech", "speech", "narration"],
+        )
+        self.assertEqual(
+            [line.get("speaker") for line in wire["lines"]],
+            ["actor", "host", "host", None],
+        )
+        self.assertNotIn("speaker", wire["lines"][-1])
+        self.assertEqual(len(canonical_utf8_json_bytes(wire)), scene_canonical_bytes(scene))
 
     def test_speech_and_narration_immutability(self):
         sp = Speech(speaker="actor", text="Hello world")
@@ -96,6 +126,7 @@ class AuthoredScenesTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             sc.revision = "rev2"  # type: ignore
 
+    @covers_requirement("authored-scene-model::declarative-scenes-preserve-attribution")
     def test_scene_rejection_on_bound_exceeded(self):
         # Empty lines
         with self.assertRaises(ValueError):
@@ -215,6 +246,9 @@ class AuthoredCodecAndDAGTests(unittest.TestCase):
         self.assertEqual(len(dialogue.topics), 1)
         self.assertEqual(dialogue.topics[0].topic_id, "merchant_talk.wares")
 
+    @covers_requirement(
+        "authored-scene-model::static-and-generated-primitives-share-immutable-scene-validation"
+    )
     def test_generated_dialogue_local_id_normalization(self):
         refs = DialogueReferences.empty()
         identity = GeneratedDialogueIdentity(package_id="pkg1", role_id="r1", phase_id="ph1")
@@ -246,6 +280,7 @@ class AuthoredCodecAndDAGTests(unittest.TestCase):
         self.assertEqual(dialogue.topics[0].topic_id, expected_t_id)
         self.assertEqual(dialogue.topics[0].fallback.scene_id, expected_s_id)
 
+    @covers_requirement("authored-scene-model::declarative-scenes-preserve-attribution")
     def test_formal_scene_must_begin_with_actor_speech(self):
         refs = DialogueReferences.empty()
         identity = StaticDialogueIdentity(profile_key="alpha_merchant", dialogue_key="merchant_talk")
@@ -307,6 +342,7 @@ class AuthoredCodecAndDAGTests(unittest.TestCase):
         self.assertIsNotNone(dialogue.topics[0].refusal)
         self.assertEqual(dialogue.topics[0].refusal.lines[0].speaker, "host")
 
+    @covers_requirement("authored-scene-model::topic-declarations-retain-stable-reading-identity")
     def test_predecessor_cycle_rejection(self):
         refs = DialogueReferences.empty()
         identity = StaticDialogueIdentity(profile_key="alpha_merchant", dialogue_key="merchant_talk")
@@ -346,6 +382,279 @@ class AuthoredCodecAndDAGTests(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             parse_dialogue(payload, identity=identity, references=refs)
         self.assertIn("Cycle detected", str(ctx.exception))
+
+    @covers_requirement(
+        "authored-scene-model::static-and-generated-primitives-share-immutable-scene-validation"
+    )
+    def test_static_and_generated_providers_share_scene_semantics(self):
+        refs = DialogueReferences.empty().child("race", {"human": "Race A"})
+        shared_lines = [
+            {"kind": "speech", "speaker": "actor", "text": "請問有什麼？"},
+            {"kind": "speech", "speaker": "host", "text": "這些都是上好的貨物。"},
+            {"kind": "narration", "text": "老闆拍了拍櫃檯。"},
+        ]
+
+        static_definition = parse_dialogue(
+            {
+                "schema_version": 1,
+                "greeting": None,
+                "topics": [
+                    {
+                        "topic_id": "merchant_talk.wares",
+                        "keyword": "商品",
+                        "label": "查看商品",
+                        "fallback": {
+                            "scene_id": "merchant.wares",
+                            "revision": "r1",
+                            "lines": shared_lines,
+                        },
+                    }
+                ],
+            },
+            identity=StaticDialogueIdentity(
+                profile_key="alpha_merchant", dialogue_key="merchant_talk"
+            ),
+            references=refs,
+        )
+        generated_definition = parse_dialogue(
+            {
+                "greeting": None,
+                "topics": [
+                    {
+                        "topic_id": "wares",
+                        "keyword": "商品",
+                        "label": "查看商品",
+                        "fallback": {"scene_id": "wares", "revision": "r1", "lines": shared_lines},
+                    }
+                ],
+            },
+            identity=GeneratedDialogueIdentity(package_id="pkg1", role_id="r1", phase_id="ph1"),
+            references=refs,
+        )
+
+        self.assertEqual(
+            [line_to_dict(line) for line in static_definition.topics[0].fallback.lines],
+            [line_to_dict(line) for line in generated_definition.topics[0].fallback.lines],
+        )
+
+        host_first_lines = [{"kind": "speech", "speaker": "host", "text": "我先說。"}]
+        duplicate_priority_variants = [
+            {
+                "variant_id": "tone_a",
+                "priority": 10,
+                "when": {"kind": "race_is", "race_key": "human"},
+                "scene": {"scene_id": "topic_a", "revision": "r1", "lines": shared_lines},
+            },
+            {
+                "variant_id": "tone_b",
+                "priority": 10,
+                "when": {"kind": "race_is", "race_key": "human"},
+                "scene": {"scene_id": "topic_b", "revision": "r1", "lines": shared_lines},
+            },
+        ]
+        malformed_cases = (
+            (
+                {
+                    "schema_version": 1,
+                    "greeting": None,
+                    "topics": [
+                        {
+                            "topic_id": "merchant_talk.wares",
+                            "keyword": "商品",
+                            "label": "查看商品",
+                            "fallback": {
+                                "scene_id": "merchant.bad",
+                                "revision": "r1",
+                                "lines": host_first_lines,
+                            },
+                        }
+                    ],
+                },
+                StaticDialogueIdentity(
+                    profile_key="alpha_merchant", dialogue_key="merchant_talk"
+                ),
+                "must begin with an actor Speech line",
+            ),
+            (
+                {
+                    "greeting": None,
+                    "topics": [
+                        {
+                            "topic_id": "wares",
+                            "keyword": "商品",
+                            "label": "查看商品",
+                            "fallback": {
+                                "scene_id": "bad",
+                                "revision": "r1",
+                                "lines": host_first_lines,
+                            },
+                        }
+                    ],
+                },
+                GeneratedDialogueIdentity(package_id="pkg1", role_id="r1", phase_id="ph1"),
+                "must begin with an actor Speech line",
+            ),
+            (
+                {
+                    "schema_version": 1,
+                    "greeting": None,
+                    "topics": [
+                        {
+                            "topic_id": "merchant_talk.wares",
+                            "keyword": "商品",
+                            "label": "查看商品",
+                            "fallback": {
+                                "scene_id": "merchant.wares",
+                                "revision": "r1",
+                                "lines": shared_lines,
+                            },
+                            "variants": duplicate_priority_variants,
+                        }
+                    ],
+                },
+                StaticDialogueIdentity(
+                    profile_key="alpha_merchant", dialogue_key="merchant_talk"
+                ),
+                "Duplicate variant priority",
+            ),
+            (
+                {
+                    "greeting": None,
+                    "topics": [
+                        {
+                            "topic_id": "wares",
+                            "keyword": "商品",
+                            "label": "查看商品",
+                            "fallback": {"scene_id": "wares", "revision": "r1", "lines": shared_lines},
+                            "variants": duplicate_priority_variants,
+                        }
+                    ],
+                },
+                GeneratedDialogueIdentity(package_id="pkg1", role_id="r1", phase_id="ph1"),
+                "Duplicate variant priority",
+            ),
+        )
+        for payload, identity, expected_message in malformed_cases:
+            with self.assertRaises(ValueError) as ctx:
+                parse_dialogue(payload, identity=identity, references=refs)
+            self.assertIn(expected_message, str(ctx.exception))
+
+    @covers_requirement(
+        "authored-scene-model::static-and-generated-primitives-share-immutable-scene-validation"
+    )
+    def test_generated_identity_is_collision_free_and_lossless(self):
+        first = make_generated_topic_id("pkg_a", "role_hero", "phase_act1", "intro")
+        second = make_generated_topic_id("pkg_b", "role_hero", "phase_act1", "intro")
+        self.assertNotEqual(first, second)
+        self.assertEqual(parse_generated_topic_id(first)[0], "pkg_a")
+        self.assertEqual(parse_generated_topic_id(second)[0], "pkg_b")
+
+        unicode_parts = ["套件甲", "角色" * 20, "階段", "local_topic"]
+        unicode_topic_id = make_generated_topic_id(*unicode_parts)
+        self.assertEqual(parse_generated_topic_id(unicode_topic_id), tuple(unicode_parts))
+        self.assertNotEqual(
+            unicode_topic_id, make_generated_topic_id(*unicode_parts[:-1], "other_topic")
+        )
+        self.assertTrue(unicode_topic_id.startswith("g:"))
+
+        long_parts = ("p" * 64, "r" * 64, "phase", "intro")
+        long_topic_id = make_generated_topic_id(*long_parts)
+        self.assertGreater(len(long_topic_id), 96)
+        self.assertEqual(parse_generated_topic_id(long_topic_id), long_parts)
+
+    @covers_requirement("authored-scene-model::topic-declarations-retain-stable-reading-identity")
+    def test_topic_identity_priorities_and_unconditional_fallback(self):
+        def scene(scene_id: str) -> Scene:
+            return Scene(
+                scene_id=scene_id,
+                revision="r1",
+                lines=(Speech(speaker="actor", text="請問？"),),
+            )
+
+        fallback = scene("merchant.wares_fallback")
+        variant = SceneVariant(
+            variant_id="tone_a",
+            priority=10,
+            when=RaceIs(race_key="human"),
+            scene=scene("merchant.wares_a"),
+        )
+        topic = AuthoredTopic(
+            topic_id="merchant_talk.wares",
+            keyword="商品",
+            label="查看商品",
+            fallback=fallback,
+            variants=(variant,),
+        )
+        relabelled = AuthoredTopic(
+            topic_id="merchant_talk.wares",
+            keyword="貨物",
+            label="檢視貨品",
+            fallback=fallback,
+        )
+
+        self.assertEqual(topic.topic_id, relabelled.topic_id)
+        self.assertEqual(relabelled.variants, ())
+        self.assertIsNone(relabelled.requires)
+        self.assertIs(relabelled.fallback, fallback)
+
+        with self.assertRaises(ValueError):
+            AuthoredTopic(
+                topic_id="merchant_talk.wares",
+                keyword="商品",
+                label="查看商品",
+                fallback=fallback,
+                variants=(
+                    variant,
+                    SceneVariant(
+                        variant_id="tone_b",
+                        priority=10,
+                        when=RaceIs(race_key="elf"),
+                        scene=scene("merchant.wares_b"),
+                    ),
+                ),
+            )
+        with self.assertRaises(ValueError):
+            AuthoredDialogue(greeting=None, topics=(topic, relabelled))
+
+    @covers_requirement("authored-scene-model::topic-declarations-retain-stable-reading-identity")
+    def test_pure_chain_topic_rejects_qualified_ancestor(self):
+        refs = DialogueReferences.empty().child("race", {"human": "Race A"})
+        identity = StaticDialogueIdentity(
+            profile_key="alpha_merchant", dialogue_key="merchant_talk"
+        )
+
+        def scene(scene_id: str) -> dict[str, object]:
+            return {
+                "scene_id": scene_id,
+                "revision": "r1",
+                "lines": [{"kind": "speech", "speaker": "actor", "text": "請問？"}],
+            }
+
+        payload = {
+            "schema_version": 1,
+            "greeting": None,
+            "topics": [
+                {
+                    "topic_id": "merchant_talk.gate",
+                    "keyword": "門檻",
+                    "label": "門檻",
+                    "fallback": scene("merchant.gate"),
+                    "requires": {"kind": "race_is", "race_key": "human"},
+                },
+                {
+                    "topic_id": "merchant_talk.follow",
+                    "keyword": "後續",
+                    "label": "後續",
+                    "fallback": scene("merchant.follow"),
+                    "predecessors": ["merchant_talk.gate"],
+                    "disclosure": "pure_chain",
+                },
+            ],
+        }
+
+        with self.assertRaises(ValueError) as ctx:
+            parse_dialogue(payload, identity=identity, references=refs)
+        self.assertIn("depends on ancestor", str(ctx.exception))
 
     def test_legacy_keyword_response_preserved(self):
         # Verification that existing legacy classes remain functional
