@@ -1,6 +1,5 @@
 schema_version: 1
-greeting: 櫃檯後的分會會長葛里安‧衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記，還是來交委託？還沒登記的話，請先在這本名冊上留下名字，從
-  F 級開始。登記之後，到大廳那面任務板挑一張合你階級的委託單，拿來櫃檯讓我登記。辦完了回到這裡向我回報，報上委託單的編號即可。」
+greeting: 櫃檯後的分會會長葛里安‧衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記，還是來交委託？還沒登記的話，請先在這本名冊上留下名字，從 F 級開始。登記之後，到大廳那面任務板挑一張合你階級的委託單，拿來櫃檯讓我登記。辦完了回到這裡向我回報，報上委託單的編號即可。」
 topics:
 - topic_id: guild_staff.topic_01
   keyword: 註冊
@@ -11,10 +10,15 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 註冊
+      text: 請問加入公會該怎麼辦理？我想在此登記成冒險者。
+    - kind: narration
+      text: 葛里安翻開桌上厚重名冊的全新一頁，取過墨水瓶，把羽毛筆遞向你。
     - kind: speech
       speaker: host
-      text: 「登記很簡單，在這本名冊上寫下名字，公會就認你是冒險者。每個人都從 F 級開始，先接採集這類簡單的委託，再逐級往上。名冊上記下的每一筆，公會都會負責到底。」
+      text: 「手續很清楚。在這本名冊寫下你的名字，公會就正式承認你的冒險者身分。」
+    - kind: speech
+      speaker: host
+      text: 「每個新人都從 F 級起步，先接採集藥草或清理近郊這類委託。名冊上記下的每一筆功績，公會都負責到底。」
 - topic_id: guild_staff.topic_02
   keyword: 任務
   label: 任務
@@ -24,23 +28,63 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 任務
+      text: 我想了解委託該如何接取與執行。
+    - kind: narration
+      text: 葛里安伸手指了指大廳正中央那面釘滿羊皮紙的厚木看板。
     - kind: speech
       speaker: host
-      text: 「委託單都釘在大廳那面任務板上，單子寫著階級、地點與報酬。挑一張合你階級的拿來櫃檯，我登記之後，這份委託就算你接下了。辦到哪一步，隨時可以來問，名冊上都有記錄。中途辦不下去，把單子交回來即可，不必勉強。」
+      text: 「委託單都釘在看板上，上面寫著承接階級、指定地點與交付報酬。」
+    - kind: speech
+      speaker: host
+      text: 「挑一張合你階級的揭下來拿到櫃檯，我蓋印登載之後才算正式承接。」
+    - kind: speech
+      speaker: host
+      text: 「要是中途遇險辦不下去，把委託單交還櫃檯便可，不必硬撐送命。」
 - topic_id: guild_staff.topic_03
   keyword: 公會
   label: 公會
+  variants:
+  - variant_id: senior_standing
+    priority: 10
+    when:
+      kind: guild_rank_at_least
+      rank_key: E
+    scene:
+      scene_id: guild_staff.topic_03_senior
+      revision: r1
+      lines:
+      - kind: speech
+        speaker: actor
+        text: 能跟我談談公會的體制與各地的運作嗎？
+      - kind: narration
+        text: 葛里安看著你胸前的公會徽章，神情略微放鬆，點頭致意。
+      - kind: speech
+        speaker: host
+        text: 「你已經通過考核，脫離最底層的新人階級，名冊上已有你的功績。」
+      - kind: speech
+        speaker: host
+        text: 「冒險者公會是跨國中立組織，總部設在格蘭迪亞帝都，三國共同承認我們的權限。」
+      - kind: speech
+        speaker: host
+        text: 「此處阿爾托利亞分會專責審核委託與晉升。只要踏實接案，升階考核的大門永遠為你敞開。」
   fallback:
     scene_id: guild_staff.topic_03_scene
     revision: r1
     lines:
     - kind: speech
       speaker: actor
-      text: 公會
+      text: 能跟我說說這座公會的背景嗎？
+    - kind: narration
+      text: 葛里安扶正胸前的銅徽，端正身姿，語調平穩而正式。
     - kind: speech
       speaker: host
-      text: 「埃洛西恩冒險者公會由三國共同承認，總部設在帝國首都，這裡是阿爾托利亞分會。分會負責冒險者的登記、委託的發放與結算，以及階級的晉升。想知道自己目前是幾級、離下一級還有多遠，到櫃檯問一聲，我翻名冊給你看。」
+      text: 「冒險者公會是跨國中立組織，總部設在帝國首都，全大陸共有兩百餘處分會。」
+    - kind: speech
+      speaker: host
+      text: 「三國皆承認公會的公正身分。我們負責登記冒險者、發放結算委託，並主持階級審核。」
+    - kind: speech
+      speaker: host
+      text: 「不論出身平原或貴族，只要站在櫃檯前，公會只認名冊上記下的實績。」
 - topic_id: guild_staff.topic_04
   keyword: 回報
   label: 回報
@@ -50,7 +94,15 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 回報
+      text: 關於完成委託後的結算與回報流程，能向你請教具體手續嗎？
+    - kind: narration
+      text: 葛里安輕敲桌上的名冊，目光嚴肅而慎重。
     - kind: speech
       speaker: host
-      text: 「回報？名冊上還沒有你的名字。請先在櫃檯登記成冒險者。接下委託、辦完之後，再回到這裡向我回報，並報上委託單的編號。公會只認名冊上寫下的事。」
+      text: 「交付委託必須依規矩來。未經登記核可的人，櫃檯無法受理結算。」
+    - kind: speech
+      speaker: host
+      text: 「你辦完委託之後回到這裡，向我報出單據編號，我會核對憑據無誤再撥付報酬。」
+    - kind: speech
+      speaker: host
+      text: 「公會只認名冊上寫下的事。帶著證據前來，公會便絕不會短少你半枚銅幣。」
