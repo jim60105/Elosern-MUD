@@ -50,13 +50,42 @@ class WakeTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("title-system::awakening-admission-observes-committed-player-transitions")
     def test_voluntary_sleep_awakening_schedules_nomination(self):
-        from world.rules.time_skip import begin_sleep
+        from world.rules.time_skip import (
+            begin_sleep,
+            continue_owner_sleep,
+            decline_owner_sleep_dream,
+            owner_sleep_view_state,
+        )
         from world.rules.fatigue import write_fatigue_state, SleepPosture
 
+        # The owner continuation reads the present party's real gauges, so the
+        # fixture body needs the same race baseline every played character has.
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.char1.save()
         write_fatigue_state(self.char1, 359000, SleepPosture.AWAKE)
+        # The whole journey stays under the patched seam and the captured
+        # commits, so an entry that nominated on its own would be counted.
         with patch("server.title_nomination_service.schedule_epithet_nomination") as schedule:
             with self.captureOnCommitCallbacks(execute=True):
-                outcome = begin_sleep(self.char1)
+                # The owner's accepted sleep is zero-time: its recovery interval
+                # waits for the owner-only dream decision, so only the
+                # continuation below can commit the wake this seam observes.
+                self.assertIsNone(begin_sleep(self.char1).result)
+                self.assertEqual(schedule.call_count, 0)
+                view = owner_sleep_view_state(self.char1)
+                decline_owner_sleep_dream(
+                    self.char1,
+                    sleep_id=view["sleep_id"],
+                    revision=view["revision"],
+                    generation=view["generation"],
+                )
+                result = continue_owner_sleep(
+                    self.char1,
+                    sleep_id=view["sleep_id"],
+                    expected_generation=view["generation"],
+                )
+            self.assertTrue(result.woke)
             self.assertEqual(schedule.call_count, 1)
             self.assertIs(schedule.call_args.args[0], self.char1)
             self.assertEqual(schedule.call_args.kwargs.get("trigger"), "wake")
