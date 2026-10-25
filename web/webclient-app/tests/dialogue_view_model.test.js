@@ -9,7 +9,7 @@ import {
   dialogueViewModel,
   DIALOGUE_FREE_ROW_KEY,
 } from "../stores/dialogue-view.js";
-import { dialoguePanel as v3Panel, nativeDelivery, sceneDelivery, speech } from "./support/dialogue_panel.js";
+import { choiceRow, dialoguePanel as v3Panel, nativeDelivery, sceneDelivery, speech } from "./support/dialogue_panel.js";
 
 function availablePanel(overrides = {}) {
   return {
@@ -26,9 +26,13 @@ describe("dialogue view model", () => {
     expect(vm.line).toBe("「渡河要五枚銅板。」");
     expect(vm.picks).toHaveLength(2);
     expect(vm.picks[0]).toEqual({
-      key: "dlg-kw-fare",
+      key: "dlg-topic-host.fare",
       label: "「就五枚，走嗎？」",
       enabled: true,
+      availability: "open",
+      locked: false,
+      hint: null,
+      unread: false,
       keywordId: "fare",
       topicId: "host.fare",
       actionId: "explore.talk_scripted",
@@ -88,5 +92,43 @@ describe("dialogue view model", () => {
     const vm = dialogueViewModel(availablePanel({ choices: [] }));
     expect(vm.picks).toHaveLength(0);
     expect(vm.freeRow).not.toBeNull();
+  });
+
+  // authored-dialogue-locked-ui: server availability is rendered, never
+  // re-evaluated. Only open and locked rows reach the client.
+  describe("locked topics", () => {
+    const LONG_ID = `g.${"p".repeat(64)}.${"x".repeat(2048 - 67)}`;
+    const choices = [
+      choiceRow("fare", { topicId: "host.fare" }),
+      { ...choiceRow("gate", { topicId: "host.gate" }), availability: "locked", requirement_hint: "  需要持有通行證  " },
+      { ...choiceRow("vault", { topicId: "host.vault" }), availability: "hidden" },
+      { ...choiceRow("odd", { topicId: "host.odd" }), availability: "unknown" },
+      { ...choiceRow("blank", { topicId: "host.blank" }), availability: "locked", requirement_hint: "   " },
+      { ...choiceRow("generated", { topicId: LONG_ID }), availability: "locked", requirement_hint: "需要好感階段至少為熟識", unread: true },
+    ];
+    const vm = () => dialogueViewModel(availablePanel({ choices }));
+
+    it("drops hidden and unknown availability rows, keeping payload order", () => {
+      expect(vm().picks.map((pick) => pick.topicId)).toEqual(["host.fare", "host.gate", "host.blank", LONG_ID]);
+    });
+
+    it("keeps a locked row selectable with its trimmed canonical hint", () => {
+      const gate = vm().picks[1];
+      expect(gate).toMatchObject({ enabled: true, locked: true, availability: "locked", hint: "需要持有通行證" });
+      expect(gate.payload).toEqual({ npc_id: 41, topic_id: "host.gate", context_id: "ctx-1" });
+      // An open row never carries a hint; an empty hint is no hint.
+      expect(vm().picks[0].hint).toBeNull();
+      expect(vm().picks[2]).toMatchObject({ locked: true, hint: null });
+    });
+
+    it("keeps a full generated identity opaque and untruncated, keyed by topic", () => {
+      const generated = vm().picks[3];
+      expect(generated.topicId).toBe(LONG_ID);
+      expect(generated.topicId).toHaveLength(2048);
+      expect(generated.payload.topic_id).toBe(LONG_ID);
+      expect(generated.key).toBe(`dlg-topic-${LONG_ID}`);
+      // The declared unread field rides along untouched for its later owner.
+      expect(generated.unread).toBe(true);
+    });
   });
 });

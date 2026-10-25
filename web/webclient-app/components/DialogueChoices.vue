@@ -32,6 +32,17 @@
 // is visible. It is the same `aria-activedescendant` state the keys move;
 // showing it activates nothing and takes no focus.
 //
+// Locked topics (authored-dialogue-locked-ui): the rows render the server's
+// availability verbatim and never reevaluate a condition. A visibly locked
+// topic is a SELECTABLE refusal: it keeps its digit badge, draws a padlock,
+// names its lock in text, and shows the server's canonical requirement hint
+// on pointer hover and keyboard focus (wired through `aria-describedby`);
+// activating it emits `pick` with its own committed payload exactly like an
+// open topic, and the server plays the authored refusal. It never takes
+// `aria-disabled`. An OPERATIONAL disabled state is different: the `locked`
+// prop (a dispatch in flight) and a disabled exit row emit nothing. Hidden
+// topics never reach this component (the view model drops them).
+//
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
@@ -95,7 +106,10 @@ const rows = computed(() => {
       // The bounded localized alias (v3 rows carry it beside the topic id;
       // the composed payload names only the topic).
       keywordId: pick.keywordId ?? (pick.payload ? pick.payload.keyword_id : undefined),
+      // A locked topic stays enabled: selecting it plays its refusal.
       enabled: true,
+      lock: pick.locked === true,
+      tip: pick.locked === true && pick.hint ? pick.hint : null,
       pick,
     })),
     { kind: "freeform", key: "freeform", testId: "dialogue-freeform", badge: "⌨", icon: "keyboard", label: "自由對話", enabled: true },

@@ -3,6 +3,8 @@
 // consumes (arrows with wrap, Home / End, digits, Enter / Space, Escape), the
 // held-repeat guard, the trailing back row, the focus trap, and the entrance
 // that a reconnect's frame (`entrance` false) shows at rest.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
@@ -212,4 +214,16 @@ describe("ChoiceCard", () => {
     await wrapper.setProps({ rows: [first[2]] });
     expect(wrapper.get('[data-active="true"]').attributes("data-row-key")).toBe("c");
   });
+
+  // authored-dialogue-locked-ui (web/webclient-app/AGENTS.md styling
+  // pitfall): the card's own style block is the one source of its rules.
+  // app-shell.css carries no `.elosern-root` duplicate or override of a
+  // choice-card or dialogue-choices selector that the live client would
+  // apply over the component (and Storybook would not show).
+  it("has no app-shell.css duplicate of its selectors", () => {
+    const shell = readFileSync(join(process.cwd(), "web/webclient-app/styles/app-shell.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const selectors = [...shell.matchAll(/([^{}]+)\{/g)].map((match) => match[1].trim());
+    expect(selectors.filter((selector) => /\.(choice-card|dialogue-choices)(?![\w-])|\.(choice-card|dialogue-choices)__/.test(selector))).toEqual([]);
+  });
 });
+

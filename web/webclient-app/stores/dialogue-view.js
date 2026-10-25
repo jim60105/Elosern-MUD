@@ -29,16 +29,36 @@ export function dialogueViewModel(panel) {
     return null;
   }
   const host = panel.host || {};
-  const picks = (Array.isArray(panel.choices) ? panel.choices : []).map((choice) => ({
-    key: `dlg-kw-${choice.keyword_id || choice.topic_id}`,
-    label: choice.label,
-    enabled: choice.availability ? choice.availability === "open" : true,
-    keywordId: choice.keyword_id ?? null,
-    topicId: choice.topic_id ?? null,
-    actionId: "explore.talk_scripted",
-    payload: choice.action_payload || { npc_id: host.identity, topic_id: choice.topic_id, context_id: panel.context_id },
-    commandDisplay: { npcLabel: host.display_name, keywordLabel: choice.label },
-  }));
+  // Locked topics (authored-dialogue-locked-ui): the server's availability
+  // and requirement hint travel verbatim. Only `open` and `locked` rows exist
+  // client-side: a `hidden` (or any unknown) availability is dropped, fail
+  // closed, so a hidden topic never renders a label, hint or row. A locked
+  // row stays ENABLED — selecting it dispatches its own action payload and
+  // the server plays the authored refusal — so it is never an operationally
+  // disabled row. The client evaluates no condition and never unlocks a row
+  // itself; the topic identity (static or generated, up to 2048 characters)
+  // is opaque and keys the row so focus follows it across refreshes.
+  const picks = (Array.isArray(panel.choices) ? panel.choices : [])
+    .filter((choice) => (choice.availability ?? "open") === "open" || choice.availability === "locked")
+    .map((choice) => {
+      const locked = choice.availability === "locked";
+      const hint = locked && typeof choice.requirement_hint === "string" ? choice.requirement_hint.trim() : "";
+      return {
+        key: `dlg-topic-${choice.topic_id ?? choice.keyword_id}`,
+        label: choice.label,
+        enabled: true,
+        availability: locked ? "locked" : "open",
+        locked,
+        hint: hint || null,
+        // Declared for the reading/notice owners; this slice draws no marker.
+        unread: choice.unread === true,
+        keywordId: choice.keyword_id ?? null,
+        topicId: choice.topic_id ?? null,
+        actionId: "explore.talk_scripted",
+        payload: choice.action_payload || { npc_id: host.identity, topic_id: choice.topic_id, context_id: panel.context_id },
+        commandDisplay: { npcLabel: host.display_name, keywordLabel: choice.label },
+      };
+    });
   const freeRow = {
     key: DIALOGUE_FREE_ROW_KEY,
     label: "自由對話（輸入任意話語）→ 指令列",

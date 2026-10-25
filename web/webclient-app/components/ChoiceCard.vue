@@ -38,6 +38,27 @@
 // active, shown quietly even while the card does not hold focus. A committed
 // update that re-renders the rows keeps the active row by its key while that
 // key survives, else keeps its position in range.
+//
+// Locked rows (authored-dialogue-locked-ui): a row may carry `lock` (a
+// visibly locked dialogue topic) and `tip` (the server's canonical
+// requirement hint). The two states the card distinguishes:
+// - a LOCKED row is selectable. It draws a padlock and carries the text
+//   （尚未解鎖） in its accessible name, it never takes `aria-disabled`, and
+//   Enter, Space, its digit and a click activate it like any enabled row
+//   (its consumer dispatches the row's server payload, and the server plays
+//   the authored refusal);
+// - a DISABLED row (`enabled: false`, an operational state such as a closed
+//   exit) takes `aria-disabled`, keeps its committed reason, and emits
+//   nothing.
+// A non-empty `tip` is wired to the row through `aria-describedby` (a
+// visually hidden copy outside the menu items, so it is a description and
+// never part of the name) and is shown in one visual tooltip beside the
+// card: the row the pointer rests on wins, else the active row while the
+// card holds keyboard focus. The tooltip is not focusable and adds no tab
+// stop; it is a descendant of the card, so the pointer can move onto it
+// without closing it, and Escape dismisses it (a keyboard-shown tip
+// consumes that Escape; a pointer-shown one lets Escape keep its meaning).
+// An empty hint renders no tooltip and no description at all.
 import { computed, nextTick, onMounted, ref, useId, watch } from "vue";
 
 const props = defineProps({
@@ -74,6 +95,7 @@ const emit = defineEmits(["pick", "back"]);
 
 const listRef = ref(null);
 const scrollRef = ref(null);
+const tipRef = ref(null);
 const idPrefix = useId();
 // The entrance is decided once, at mount; the rows' stillness ends at the
 // first view swap, whose new rows stagger in.
@@ -105,6 +127,103 @@ function reasonId(index) {
   return `${idPrefix}-reason-${index}`;
 }
 
+function tipId(index) {
+  return `${idPrefix}-tip-${index}`;
+}
+
+function describedBy(row, index) {
+  const ids = [];
+  if (row.reason) {
+    ids.push(reasonId(index));
+  }
+  if (row.tip) {
+    ids.push(tipId(index));
+  }
+  return ids.length ? ids.join(" ") : null;
+}
+
+// The tooltip's two sources: the row the pointer rests on (by key, so a
+// refresh that removes or moves it never shows another row's hint) and the
+// active row while the card holds focus.
+const hoverKey = ref(null);
+const cardFocused = ref(false);
+// The tip Escape dismissed, until its target changes.
+const tipDismissed = ref(null);
+const tipPlace = ref({ top: 0, side: "right", room: null });
+
+const tipTarget = computed(() => {
+  if (hoverKey.value !== null) {
+    const index = props.rows.findIndex((row) => row.key === hoverKey.value);
+    if (index >= 0 && props.rows[index].tip) {
+      return { index, source: "pointer", id: `pointer|${props.rows[index].key}` };
+    }
+  }
+  const active = props.rows[activeIndex.value];
+  if (cardFocused.value && active && active.tip) {
+    return { index: activeIndex.value, source: "focus", id: `focus|${active.key}` };
+  }
+  return null;
+});
+
+const tipShown = computed(() => {
+  const target = tipTarget.value;
+  if (!target || tipDismissed.value === target.id) {
+    return null;
+  }
+  return { ...target, text: props.rows[target.index].tip };
+});
+
+watch(
+  () => tipTarget.value?.id ?? null,
+  (id) => {
+    if (id !== tipDismissed.value) {
+      tipDismissed.value = null;
+    }
+  },
+);
+
+// Beside the card, top-aligned with its row and kept inside the card's
+// height; it takes the side with room (right first) and never grows past
+// the room that side has.
+const TIP_MARGIN = 8;
+async function placeTip() {
+  const shown = tipShown.value;
+  const card = listRef.value;
+  if (!shown || !card) {
+    return;
+  }
+  const rowEl = document.getElementById(rowId(shown.index));
+  const cardBox = card.getBoundingClientRect();
+  const viewport = window.innerWidth || document.documentElement.clientWidth || 0;
+  const desired = tipRef.value ? tipRef.value.offsetWidth : 0;
+  const roomRight = viewport - cardBox.right - TIP_MARGIN * 3;
+  const roomLeft = cardBox.left - TIP_MARGIN * 3;
+  const side = roomRight >= desired || roomRight >= roomLeft ? "right" : "left";
+  const room = Math.max(0, Math.floor(side === "right" ? roomRight : roomLeft));
+  tipPlace.value = { ...tipPlace.value, side, room: viewport ? room : null };
+  await nextTick();
+  const tipHeight = tipRef.value ? tipRef.value.offsetHeight : 0;
+  const rowTop = rowEl ? rowEl.getBoundingClientRect().top - cardBox.top : 0;
+  const top = Math.max(0, Math.min(rowTop, cardBox.height - tipHeight));
+  tipPlace.value = { side, room: viewport ? room : null, top: Math.round(top) };
+}
+
+watch(
+  () => (tipShown.value ? `${tipShown.value.id}|${tipShown.value.index}|${tipShown.value.text}` : null),
+  (shown) => {
+    if (shown !== null) {
+      void placeTip();
+    }
+  },
+  { flush: "post" },
+);
+
+function onRowsScroll() {
+  if (tipShown.value) {
+    void placeTip();
+  }
+}
+
 // A committed update keeps the active row by key while it survives, and
 // otherwise keeps the active position in range.
 watch(
@@ -116,6 +235,9 @@ watch(
       activeIndex.value = survivor;
     } else if (activeIndex.value > keys.length - 1) {
       activeIndex.value = Math.max(0, keys.length - 1);
+    }
+    if (hoverKey.value !== null && !keys.includes(hoverKey.value)) {
+      hoverKey.value = null;
     }
   },
 );
@@ -184,6 +306,16 @@ function onKeydown(event) {
     }
     return;
   }
+  if (key === "Escape" && tipShown.value) {
+    // Dismiss the visible tip. A tip the keyboard opened owns this Escape;
+    // a tip the pointer opened lets Escape keep its meaning below.
+    const shown = tipShown.value;
+    tipDismissed.value = shown.id;
+    if (shown.source === "focus") {
+      consume(event);
+      return;
+    }
+  }
   if (key === "Escape") {
     if (props.escapeBack) {
       consume(event);
@@ -249,6 +381,9 @@ defineExpose({ focus, setActive });
     :data-view="viewKey || null"
     :aria-activedescendant="rows.length ? rowId(activeIndex) : null"
     @keydown="onKeydown"
+    @focusin="cardFocused = true"
+    @focusout="cardFocused = false"
+    @mouseleave="hoverKey = null"
   >
     <span :class="cls('__corners')" aria-hidden="true"></span>
     <div v-if="caption" :class="cls('__caption')" aria-hidden="true">{{ caption }}</div>
@@ -258,7 +393,13 @@ defineExpose({ focus, setActive });
       :class="cls('__note')"
       data-testid="choice-card-note"
     >{{ note }}</p>
-    <div :key="viewKey" ref="scrollRef" :class="cls('__rows')" :style="{ '--row-count': rows.length }">
+    <div
+      :key="viewKey"
+      ref="scrollRef"
+      :class="cls('__rows')"
+      :style="{ '--row-count': rows.length }"
+      @scroll.passive="onRowsScroll"
+    >
     <div
       v-for="(row, index) in rows"
       :id="rowId(index)"
@@ -268,16 +409,19 @@ defineExpose({ focus, setActive });
         cls(`__row--${row.kind || 'row'}`),
         index === activeIndex ? cls('__row--active') : [],
         index === trailingIndex ? cls('__row--trailing') : [],
+        row.lock ? cls('__row--locked') : [],
       ]"
       role="menuitem"
       :data-testid="row.testId || 'choice-card-row'"
       :data-row-key="row.key"
       :data-keyword-id="row.keywordId"
       :data-active="index === activeIndex ? 'true' : 'false'"
+      :data-locked="row.lock ? 'true' : null"
       :style="{ '--row-index': index }"
       :aria-disabled="row.enabled === false ? 'true' : null"
-      :aria-describedby="row.reason ? reasonId(index) : null"
+      :aria-describedby="describedBy(row, index)"
       @click="onRowClick(index)"
+      @mouseenter="hoverKey = row.key"
     >
       <span :class="cls('__badge')" aria-hidden="true" :data-badge="row.badge">
         <!-- The keyboard glyph draws tiny in the loaded text faces, so a
@@ -337,8 +481,57 @@ defineExpose({ focus, setActive });
           :class="cls('__reason')"
           :data-testid="row.reasonTestId || 'choice-card-reason'"
         >{{ row.reason }}</span>
+        <!-- A locked topic says so in text, not only by its padlock. -->
+        <span v-if="row.lock" :class="cls('__sr')">（尚未解鎖）</span>
       </span>
+      <svg
+        v-if="row.lock"
+        :class="cls('__lock')"
+        data-testid="choice-card-lock"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6" />
+        <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.2v2.4" />
+      </svg>
     </div>
+    </div>
+    <!-- The accessible copies of the rows' hints: descriptions, outside every
+         menu item so they never join a row's name. -->
+    <div v-if="rows.some((row) => row.tip)" :class="cls('__sr')">
+      <template v-for="(row, index) in rows" :key="`tip-${viewKey}-${row.key}`">
+        <span v-if="row.tip" :id="tipId(index)" data-testid="choice-card-tip-text">{{ row.tip }}</span>
+      </template>
+    </div>
+    <!-- The visual hint (decorative copy of the description). -->
+    <div
+      v-if="tipShown"
+      ref="tipRef"
+      :class="[cls('__tip'), cls(`__tip--${tipPlace.side}`)]"
+      data-testid="choice-card-tip"
+      :data-tip-source="tipShown.source"
+      :data-tip-row="rows[tipShown.index]?.key"
+      aria-hidden="true"
+      :style="{ top: `${tipPlace.top}px`, '--choice-tip-room': tipPlace.room === null ? null : `${tipPlace.room}px` }"
+    >
+      <svg
+        :class="cls('__tip-icon')"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6" />
+        <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.2v2.4" />
+      </svg>
+      <span :class="cls('__tip-text')">{{ tipShown.text }}</span>
     </div>
   </div>
 </template>
@@ -745,5 +938,101 @@ defineExpose({ focus, setActive });
   border-color: var(--seal-500);
   background: var(--seal-600);
   color: var(--paper-50);
+}
+/* Locked topics (authored-dialogue-locked-ui). A locked row is selectable:
+   its label reads a step quieter and a padlock sits at the row's end, but it
+   keeps the enabled row's hover and the active row's gold fill, because
+   choosing it plays the host's refusal. It never takes the dashed badge of a
+   disabled row. */
+.choice-card__row--locked .choice-card__label {
+  color: var(--paper-300);
+}
+
+.choice-card__lock {
+  flex: none;
+  margin-left: auto;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+  color: var(--gold-500);
+  opacity: 0.85;
+}
+
+.choice-card:focus .choice-card__row--active .choice-card__lock {
+  color: var(--gold-300);
+  opacity: 1;
+}
+
+/* Text for assistive technology only: clipped, never `display: none`, so
+   a description reference still resolves. */
+.choice-card__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The requirement hint: one tooltip beside the card, top-aligned with its
+   row (placed by the card). Never focusable; the pointer may rest on it, and
+   its transparent bridge spans the gap so the move from the row onto it
+   never leaves the card. The hint wraps in full, never truncated, and its
+   width never exceeds the room on its side. */
+.choice-card__tip {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: calc(100% + 10px * var(--ui-scale));
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(calc(320px * var(--ui-scale)), var(--choice-tip-room, calc(320px * var(--ui-scale))));
+  display: flex;
+  align-items: flex-start;
+  gap: calc(8px * var(--ui-scale));
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  background: linear-gradient(180deg, rgba(27, 25, 29, 0.97), rgba(12, 13, 17, 0.97));
+  border: 1px solid rgba(185, 154, 96, 0.55);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font: var(--text-sm)/1.5 var(--f-sans);
+  color: var(--paper-200);
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  animation: elosern-choice-card-in var(--motion-fast) var(--ease-standard) backwards;
+}
+
+.choice-card__tip--left {
+  left: auto;
+  right: calc(100% + 10px * var(--ui-scale));
+}
+
+.choice-card__tip::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: calc(10px * var(--ui-scale) + 2px);
+}
+
+.choice-card__tip--left::before {
+  right: auto;
+  left: 100%;
+}
+
+.choice-card__tip-icon {
+  flex: none;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+  margin-top: calc(3px * var(--ui-scale));
+  color: var(--gold-500);
+}
+
+.choice-card__tip-text {
+  min-width: 0;
 }
 </style>
