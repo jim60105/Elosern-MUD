@@ -12,6 +12,8 @@ Observed owner.guild_rank stores a canonical GUILD_RANK_REGISTRY key whose row.o
 
 ## Decisions
 
+Shared contract v2 applies the same evaluator/hints to both sources. QuestIs resolves a canonical permitted definition or current package compiled definition from the immutable reference catalog, then uses the SAME owner read_records/claim semantics below. Generated quests need no static registry membership. Foreign-package references reject publication/runtime qualification. LLM conditions never assert completion or reward authority.
+
 Complete the condition union with GuildRankAtLeast, QuestIs and AffinityAtLeast. Resolve all reads from context.owner; the host is context.host. Guild rank requires valid registration and known canonical key; compare GUILD_RANK_REGISTRY[row].order, never alphabetic rank or displayed stats. A missing registration/rank fails, even if the possessed actor owns a rank. AffinityAtLeast takes a canonical affinity stage key; compare the existing stage config boundary to host.relations.affinity_for(owner). Hints show stage display label only, no private value or threshold number. No NPC-to-NPC relationship record and no exposure-driven gain.
 
 QuestIs names canonical definition_key, not user-entered prose. Match records from world.quests.runtime.read_records(owner). States supported by declarations are `not_accepted`, `in_progress`, `completed`, `reward_claimed`, `failed`, `invalidated`. `accepted` is not a second stored lifecycle; documentation calls in_progress accepted/in-progress. not_accepted means zero matching records ever; completed means any matching COMPLETED record regardless of reward claim; reward_claimed means a matching completed record whose quest_id is in parse_reward_claims(owner). in_progress/failed/invalidated match exact stored enum. Multiple repeatable instances use existential matching for positive states. Hints use definition display name and existing lifecycle display vocabulary; corruption raises bounded integrity failure and fails eligibility, never infer completed from prose, reward possession or a memory/thread. Do not change quest state or claim arithmetic.
@@ -30,6 +32,9 @@ Boundary events use the existing world.observability facade with available owner
 - `world/rules/dialogue_conditions.py`
 - `world/lore/dialogue/conditions.py`
 - `world/rules/dialogue.py`
+- `world/rules/dialogue_references.py (extend the physical-conditions builder)`
+
+This slice extends, and never re-creates, the static catalog builder from `authored-dialogue-physical-conditions`: it adds the `guild_rank` table from the existing guild rank registry, the `quest` table from existing quest definitions, and the `affinity_stage` table from the existing relation stage configuration, composing them onto the frozen `DialogueReferences` with `child()`. Declared keys in these three families validate against those tables, and a key in a family whose table is absent fails closed.
 
 ## Risks / Trade-offs
 

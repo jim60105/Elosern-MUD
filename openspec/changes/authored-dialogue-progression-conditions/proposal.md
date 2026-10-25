@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No alternate generated progression evaluator, new lifecycle/rank arithmetic or model-owned effects. Owner qualification applies equally to canonical and authorized package-scoped references.
 
 ## Batch:
 
@@ -32,4 +32,4 @@ depends-on: authored-dialogue-physical-conditions
 
 Code conflicts: Sequentially extends physical-condition files and capability. Quest/guild/affinity domain writers stay unchanged; no new lifecycle or rank arithmetic.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; generated package definitions resolve through the same validated catalog and quest record readers.

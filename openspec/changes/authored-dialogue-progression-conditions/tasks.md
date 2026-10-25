@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Guild and affinity leaves
 
+Shared contract v2 covers authorized package quest definitions through the same owner record/claim readers. Test foreign reference rejection without requiring static quest registry membership.
+
 - [ ] 1.1 Implement canonical registration/rank and host-to-owner stage readers/hints; add world/rules/tests/test_dialogue_progression_conditions.py with owner/actor inverse controls and private-number omission. Document existing registry ownership and no independent ordering.
 
 ## 2. Quest lifecycle predicates

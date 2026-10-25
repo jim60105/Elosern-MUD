@@ -2,6 +2,13 @@
 
 ## ADDED Requirements
 
+### Requirement: Generated progression references use the shared owner semantics
+Generated scenes SHALL qualify owner rank, quest lifecycle/claim and host affinity through the same canonical readers as static scenes. Quest references SHALL be permitted canonical definitions or the authorized current package's compiled definition; static registry membership SHALL not be required for a package definition.
+
+#### Scenario: Package quest lifecycle qualifies without static registration
+- **WHEN** the owner has a permitted current-package quest record and another package has a similarly named definition
+- **THEN** the matching current-package state qualifies and the foreign definition grants nothing
+
 ### Requirement: Progression conditions resolve the owner and host relationship
 Guild rank and quest conditions SHALL read the owning player. Affinity conditions SHALL read the conversation host relationship toward that owner. Canonical rank and affinity-stage order SHALL govern thresholds, and public hints SHALL omit private relationship numbers.
 
