@@ -447,6 +447,10 @@
     {
       "path": "world/imports/tests/test_social_identity_imports.py",
       "reason": "import schema, validation, loader, and profile social identity producers."
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_references.py",
+      "reason": "static permitted-reference catalog mirrors canonical registries"
     }
   ],
   "seedDebtPaths": [
