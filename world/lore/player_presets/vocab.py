@@ -318,6 +318,8 @@ class PlayerPreset:
     # -- the only ``world.art`` surface lore may import -- and is checked at
     # registry construction below so a typo fails loudly at import.
     fallback_key: str | None = None
+    # Optional registered social identity keys (authored-dialogue-social-identity)
+    social_identities: tuple[str, ...] = ()
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""

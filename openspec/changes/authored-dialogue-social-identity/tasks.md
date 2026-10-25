@@ -10,7 +10,7 @@ Shared contract v2 uses this reader for both sources. Test empty/typed identity 
 
 ## 2. Import and profile producers
 
-- [ ] 2.1 Add optional typed field to schema/semantic validation/loader and NpcProfile/profile application; seed only explicit producer mappings specified in design, with synthetic import/reload/invalid-batch tests. Update existing import author documentation and retain ages/card constraints.
+- [x] 2.1 Add optional typed field to schema/semantic validation/loader and NpcProfile/profile application; seed only explicit producer mappings specified in design, with synthetic import/reload/invalid-batch tests. Update existing import author documentation and retain ages/card constraints.
 
 ## 3. Player and guild construction integration
 

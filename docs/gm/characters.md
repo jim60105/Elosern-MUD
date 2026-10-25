@@ -24,6 +24,7 @@
 | `persona` | 物件型別的敘事資料。結構驗證只確認它是物件。**以 NPC 為匯入目標時**（預設），它必須是完整的精簡 NPC 角色卡：恰好七個欄位 `identity`（含 `public` 與 `hidden`）、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection`，全為純文字；`identity.hidden` 與 `social_connection` 可為空字串，其餘必填。不接受 `background` 或任何其他欄位。單一欄位上限 600 個碼點，身分段與整張卡都以渲染後的區塊（含欄位標籤與換行）計算，上限分別為 600 與 2000。驗證失敗時以 `persona.<欄位>` 點名並附穩定原因碼（如 `missing_field`、`unknown_field`、`required_empty`、`leaf_too_long`）。落庫的是去除首尾空白並統一換行後的正規形，並由共用的 NPC 人設寫入器同時寫入版本 1 的中繼資料（來源為 `import` 與記錄 `key`）。**以 `PlayerCharacter` 為目標時**此欄維持不透明，匯入器不解析其內部欄位，原樣落庫。 |
 | `profession` | 選填。非空白字串或 `null`；值必須是職業規則書列（`world/rules/rulebook/professions.yaml`）的金鑰。缺席時行為與變更前完全相同。**只對 NPC 匯入有效**；以 `PlayerCharacter` 為目標且宣告此欄時整批拒絕。職業列的預設階級僅在 `stats` 為空時作為特質基準；只要記錄宣告任何字面數值，職業不影響特質。 |
 | `components` | 選填。`{ "type": 字串, "kwargs": 物件 }` 條目陣列，只能與 `profession` 併用。條目定義最終組裝的元件集合。與藍圖同型的條目完全取代藍圖條目（kwargs 只取記錄值），藍圖未列的詞彙型別按記錄順序附加。身分辨識欄位（`service_id`、`shop_key`、`branch_key`、`dialogue_key`）一律由記錄手寫；匯入器絕不憑空補值，解析後仍缺身份欄的規畫會以具名問題整批拒絕。 |
+| `social_identities` | 選填。字串陣列，至多 8 個不重複的已註冊社會身分標籤（`noble`、`clergy`、`official`、`adventurer`）。未填時維持空集合。若包含未知鍵、重複項或非字串值，整批拒絕匯入。此欄位直接寫入 `entity.db.social_identities`，不由人設文字或稱號推導。 |
 
 `stats` 可提供 `hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power` 與 `guild_merit`。未提供的特質會以種族基準補足。`hp` 至少為 `1`；其餘數值為非負整數。若值落在種族建議區間外，驗證器會提出警告；`magic_power` 超過種族魔力帶上界、未知種族、錯誤亞種、未知技能與不合格的結構會直接拒絕匯入。
 

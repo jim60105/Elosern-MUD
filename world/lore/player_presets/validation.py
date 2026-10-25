@@ -4,7 +4,6 @@ Moved verbatim from the single-module history; each rejects a declaration an
 activation could never honour. ``__init__`` runs them over the assembled
 registry in the exact order the old module did.
 """
-
 from dataclasses import fields
 from math import isfinite
 from typing import Any
@@ -65,6 +64,27 @@ def _validate_preset_identities(registry: dict[str, PlayerPreset]) -> None:
                 f"preset {preset.key!r} declares subrace {preset.subrace!r} "
                 f"belonging to race {subrace.race_key!r}, not {preset.race!r}"
             )
+
+
+def _validate_preset_social_identities(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a preset whose declared social identities are invalid or unknown."""
+    from world.lore.social_identities import MAX_SOCIAL_IDENTITIES, SOCIAL_IDENTITY_REGISTRY
+
+    for key, preset in registry.items():
+        tags = preset.social_identities
+        if not isinstance(tags, tuple):
+            raise ValueError(
+                f"preset {key!r} social_identities must be a tuple of registered keys"
+            )
+        if len(tags) > MAX_SOCIAL_IDENTITIES:
+            raise ValueError(
+                f"preset {key!r} social_identities exceeds maximum of {MAX_SOCIAL_IDENTITIES}"
+            )
+        if len(set(tags)) != len(tags):
+            raise ValueError(f"preset {key!r} social_identities contains duplicate keys")
+        for tag in tags:
+            if not isinstance(tag, str) or tag not in SOCIAL_IDENTITY_REGISTRY:
+                raise ValueError(f"preset {key!r} has unknown social identity key: {tag!r}")
 
 
 def _validate_preset_skill_kits(

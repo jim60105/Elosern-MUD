@@ -65,6 +65,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "「抱歉，我沒有聽懂。請把你要辦的事再說一次，說得具體一些。」"
             ),
         ),
+        social_identities=("official",),
     ),
     NpcProfile(
         key="altoria_hok_adventurer",

@@ -270,6 +270,20 @@ CHARACTER_SCHEMA_V1 = {
                 "batch. null or an absent field means no anchor."
             ),
         },
+        "social_identities": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "minLength": 1,
+            },
+            "maxItems": 8,
+            "uniqueItems": True,
+            "description": (
+                "Optional array of up to 8 unique registered social identity "
+                "tags (noble, clergy, official, adventurer). Unknown keys, "
+                "duplicates, and non-string values fail validation."
+            ),
+        },
     },
     "additionalProperties": False,
 }

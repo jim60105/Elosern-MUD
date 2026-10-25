@@ -164,6 +164,10 @@ def _create_and_initialize_host(row, room, authored_map, profile=None) -> NPC:
         profile.card.to_record(),
         {"kind": "profile", "profile": row.profile_key},
     )
+    if profile.social_identities:
+        from world.rules.social_identity import set_social_identities
+        set_social_identities(host, profile.social_identities)
+
     # Authored official-content provenance (official-content-provenance): the
     # host's stable authored profile key, written once at creation inside the
     # same transaction as every other authored attribute, so the official

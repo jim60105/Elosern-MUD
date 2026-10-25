@@ -73,6 +73,7 @@ class NpcProfile:
     age: int
     apparent_age: int
     voice: NpcVoiceLines = NpcVoiceLines()
+    social_identities: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, str) or not _KEY_RE.match(self.key):
@@ -87,4 +88,22 @@ class NpcProfile:
             if type(val) is not int or not (0 <= val <= 10000):
                 raise ValueError(
                     f"NpcProfile {self.key!r} {field_name} must be an integer in 0..10000, got {val!r}"
+                )
+        if not isinstance(self.social_identities, tuple):
+            raise ValueError(
+                f"NpcProfile {self.key!r} social_identities must be a tuple of registered keys, got {type(self.social_identities).__name__}"
+            )
+        from world.lore.social_identities import MAX_SOCIAL_IDENTITIES, SOCIAL_IDENTITY_REGISTRY
+        if len(self.social_identities) > MAX_SOCIAL_IDENTITIES:
+            raise ValueError(
+                f"NpcProfile {self.key!r} social_identities exceeds maximum of {MAX_SOCIAL_IDENTITIES}"
+            )
+        if len(set(self.social_identities)) != len(self.social_identities):
+            raise ValueError(
+                f"NpcProfile {self.key!r} social_identities must contain unique keys"
+            )
+        for item in self.social_identities:
+            if not isinstance(item, str) or item not in SOCIAL_IDENTITY_REGISTRY:
+                raise ValueError(
+                    f"NpcProfile {self.key!r} has invalid social identity key: {item!r}"
                 )

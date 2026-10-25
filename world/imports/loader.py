@@ -319,6 +319,10 @@ def _instantiate_validated_character(
     # Authored construction establishes the full/awake fatigue baseline once;
     # the initializer is absent-only, so it never refills an imported body.
     initialize_fatigue_state(entity)
+    if "social_identities" in record and record["social_identities"]:
+        from world.rules.social_identity import set_social_identities
+        set_social_identities(entity, record["social_identities"])
+
     entity.race = record["race"]
     entity.subrace = record.get("subrace")
     entity.sex = record["sex"]

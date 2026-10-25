@@ -30,6 +30,7 @@ from world.rules.npc_identity import (
 )
 from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import get_rulebook, resolve_schedule, set_npc_schedule
+from world.rules.social_identity import set_social_identities
 from world.rules.progression import apply_lineage_auto_seed
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import _trait_config
@@ -219,6 +220,8 @@ def sync_persistent_adventurers(
                     ensure_npc_canonical_age(host, age=profile.age, apparent_age=profile.apparent_age)
                     initialize_npc_persona(host, profile.card.to_record(),
                                           {"kind": "profile", "profile": person.profile_key})
+                    identities = tuple(set(profile.social_identities) | {"adventurer"})
+                    set_social_identities(host, identities)
                     declared = (*UTILITY_SKILLS, person.sword_skill, *person.sword_branches)
                     host.db.skills = {
                         "active": [k for k in declared if SKILL_REGISTRY[k].kind is SkillKind.ACTIVE],

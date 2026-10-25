@@ -52,6 +52,7 @@ from world.rules.character_creation import (
     validate_affinity_seed,
 )
 from world.rules.npc_persona import initialize_npc_persona
+from world.rules.social_identity import set_social_identities
 from world.rules.creation_wizard import NAME_MAX_LENGTH
 from world.rules.equipment import toggle_equipment
 from world.rules.party import PARTY_MAX_COMPANIONS, join_party
@@ -202,6 +203,8 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
                 "owner": player.pk,
             },
         )
+        if preset.social_identities:
+            set_social_identities(npc, preset.social_identities)
         if preset.persona.greeting:
             npc.db.npc_offline_greeting = preset.persona.greeting
         # Declared starting equipment is applied through the sole equipment

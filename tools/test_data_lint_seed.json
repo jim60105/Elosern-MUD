@@ -431,6 +431,10 @@
     {
       "path": "world/maps/tests/test_map_district_partition.py",
       "reason": "the committed district partition recomputes exactly from shipped geography"
+    },
+    {
+      "path": "world/rules/tests/test_social_identity.py",
+      "reason": "social identity canonical tag model and reader/writer APIs."
     }
   ],
   "seedDebtPaths": [

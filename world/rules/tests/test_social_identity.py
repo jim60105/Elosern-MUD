@@ -1,4 +1,4 @@
-"""Tests for the social identity canonical tag model and reader/writer APIs."""
+"""Data-contract test: social identity canonical tag model and reader/writer APIs."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
