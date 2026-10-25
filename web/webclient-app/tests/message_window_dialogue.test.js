@@ -222,3 +222,191 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
     expect(c.get('[data-testid="message-page-marker"]').text()).toBe("■");
   });
 });
+
+// authored-dialogue-playback: the window's scene mode. The window owns pages
+// (typing, completion, page turns) and hands the line's last activation to
+// the line owner as `scene-advance`; the `scene` prop carries the line.
+describe("MessageWindow presenting an authored scene line", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  function line(overrides = {}) {
+    return {
+      key: "1|ctx-1|dlv-1",
+      lineIndex: 0,
+      lineCount: 3,
+      kind: "speech",
+      text: "北岸大道最近不太平。",
+      speaker: "host",
+      speakerName: "灰婆婆",
+      bondStage: "親睦",
+      last: false,
+      finished: false,
+      ...overrides,
+    };
+  }
+
+  function mountScene(scene, props = {}) {
+    wrapper = mount(MessageWindow, {
+      attachTo: document.body,
+      props: {
+        mode: "dialogue",
+        dialogue: vm,
+        marks: [],
+        pageFit: codePointFit(60),
+        textSpeed: "instant",
+        // The transcript the server logged for this scene stays in the log.
+        lines: withSeq([{ kind: "out", text: "灰婆婆說：北岸大道最近不太平。" }]),
+        scene,
+        ...props,
+      },
+    });
+    return wrapper;
+  }
+
+  const pageEl = () => wrapper.get('[data-testid="message-page"]');
+  const enter = (init = {}) => pageEl().trigger("keydown", { key: "Enter", ...init });
+
+  it("shows the line itself under its speaker's plate, never the logged transcript", async () => {
+    mountScene(line());
+    await nextTick();
+    expect(pageEl().text()).toBe("北岸大道最近不太平。");
+    expect(wrapper.get('[data-testid="message-name-plate"]').text()).toBe("灰婆婆 ‧ 羈絆 親睦");
+    expect(wrapper.get('[data-testid="message-name-plate"]').attributes("data-speaker")).toBe("host");
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-scene-speaker")).toBe("host");
+  });
+
+  it("names the acting body without a bond and keeps the plate row for narration", async () => {
+    mountScene(line({ speaker: "actor", speakerName: "旅人", bondStage: null, text: "嗯？" }));
+    await nextTick();
+    expect(wrapper.get('[data-testid="message-name-plate"]').text()).toBe("旅人");
+    await wrapper.setProps({ scene: line({ lineIndex: 1, kind: "narration", speaker: null, speakerName: null, bondStage: null, text: "風聲。" }) });
+    await nextTick();
+    expect(wrapper.find('[data-testid="message-name-plate"]').exists()).toBe(false);
+    const spacer = wrapper.get('[data-testid="message-plate-spacer"]');
+    expect(spacer.attributes("aria-hidden")).toBe("true");
+    expect(pageEl().get(".narrative-line").classes()).toContain("narration");
+    expect(pageEl().text()).toBe("風聲。");
+  });
+
+  it("pages a long line under one speaker, then hands the line's last activation over", async () => {
+    // 20 code points per sentence at a budget of 24: two pages.
+    const long = "一二三四五六七八九十一二三四五六七八九。甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬。";
+    mountScene(line({ text: long }), { pageFit: codePointFit(24) });
+    await nextTick();
+    await nextTick();
+    expect(pageEl().attributes("data-pages")).toBe("2");
+    expect(wrapper.get('[data-testid="message-page-marker"]').text()).toBe("▼");
+    expect(wrapper.text()).toContain("第 1／3 句，第 1／2 頁");
+    await enter();
+    expect(pageEl().attributes("data-page")).toBe("2");
+    expect(wrapper.get('[data-testid="message-name-plate"]').text()).toContain("灰婆婆");
+    // Not the final line: the marker still promises more.
+    expect(wrapper.get('[data-testid="message-page-marker"]').text()).toBe("▼");
+    expect(wrapper.emitted("scene-advance")).toBeUndefined();
+    await enter();
+    expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+  });
+
+  it("completes a typing page first, and ignores repeats and modified keys", async () => {
+    mountScene(line(), { textSpeed: "slow", motionLevel: "full" });
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("true");
+    await enter({ repeat: true });
+    await enter({ shiftKey: true });
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("true");
+    await enter();
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("false");
+    expect(wrapper.emitted("scene-advance")).toBeUndefined();
+    await enter();
+    expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+  });
+
+  it("advances on a surface click, but never while text is selected or on a control", async () => {
+    mountScene(line());
+    await nextTick();
+    // A selection inside the window (the reader copying text) is kept.
+    const range = document.createRange();
+    range.selectNodeContents(pageEl().element);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    await pageEl().trigger("click");
+    expect(wrapper.emitted("scene-advance")).toBeUndefined();
+    window.getSelection().removeAllRanges();
+    await pageEl().trigger("click");
+    expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+    // The click focuses the page surface, so Space/Enter keep reading.
+    expect(document.activeElement).toBe(pageEl().element);
+  });
+
+  it("marks the final page as awaiting its finish, and reports reading only after it", async () => {
+    mountScene(line({ lineIndex: 2, last: true }));
+    await nextTick();
+    const marker = () => wrapper.get('[data-testid="message-page-marker"]');
+    expect(marker().text()).toBe("■");
+    expect(marker().attributes("data-await-finish")).toBe("true");
+    expect(wrapper.emitted("reading-change").at(-1)).toEqual([false]);
+    await enter();
+    expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+    await wrapper.setProps({ scene: line({ lineIndex: 2, last: true, finished: true }) });
+    await nextTick();
+    expect(marker().attributes("data-await-finish")).toBeUndefined();
+    expect(wrapper.emitted("reading-change").at(-1)).toEqual([true]);
+    // A finished scene takes no further activation.
+    await enter();
+    expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+  });
+
+  it("never auto-advances a scene, whatever the preference or motion level", async () => {
+    mountScene(line({ text: "一二三四五六七八九十一二三四五六七八九。甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬。" }), {
+      pageFit: codePointFit(24),
+      autoAdvance: true,
+      motionLevel: "reduced",
+    });
+    await nextTick();
+    await nextTick();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    await nextTick();
+    expect(pageEl().attributes("data-page")).toBe("1");
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("false");
+    expect(wrapper.emitted("scene-advance")).toBeUndefined();
+  });
+
+  it("names the speaker once in the live region, on the line's first page", async () => {
+    mountScene(line());
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get('[data-testid="message-live"]').text()).toBe("灰婆婆：北岸大道最近不太平。");
+    await wrapper.setProps({ scene: line({ lineIndex: 1, kind: "narration", speaker: null, speakerName: null, bondStage: null, text: "風聲。" }) });
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get('[data-testid="message-live"]').text()).toBe("風聲。");
+  });
+
+  it("keeps the page on a same-line refresh and settles the covered transcript on retirement", async () => {
+    const long = "一二三四五六七八九十一二三四五六七八九。甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬。";
+    mountScene(line({ text: long }), { pageFit: codePointFit(24) });
+    await nextTick();
+    await nextTick();
+    await enter();
+    expect(pageEl().attributes("data-page")).toBe("2");
+    // An availability refresh: a new presentation object for the same line.
+    await wrapper.setProps({ scene: line({ text: long, bondStage: "熟識" }) });
+    await nextTick();
+    expect(pageEl().attributes("data-page")).toBe("2");
+    // Retirement: the logged transcript is shown settled, not re-typed.
+    await wrapper.setProps({ scene: null, textSpeed: "slow", motionLevel: "full" });
+    await nextTick();
+    await nextTick();
+    expect(pageEl().text()).toBe("灰婆婆說：北岸大道最近不太平。");
+    expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("false");
+    expect(wrapper.get('[data-testid="message-live"]').text()).toBe("");
+  });
+});
+
