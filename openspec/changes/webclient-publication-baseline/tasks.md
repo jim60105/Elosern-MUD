@@ -9,7 +9,7 @@ All checkboxes are implementation work, not authorization to apply during propos
 
 ## 2. One publication owner cutover
 
-- [ ] 2.1 Migrate every caller in the design inventory, remove duplicate _publish_presentation paths and migrate envelope-return consumers to PublicationReceipt. Graphical success/domain rejection and text settlement compare; explicit sync/stale/error recovery force snapshot. Preserve no_presentation/sequence-retiring exceptions, request cache and original text callback/Failure. Extend existing coordinator_push/art_push/dispatcher tests and update publisher documentation.
+- [ ] 2.1 Migrate every caller in the design inventory, remove duplicate _publish_presentation paths and use the ALWAYS-Deferred enqueue/semantic entry contract. Direct art_push and ingress sync must consume actual receipt callbacks; preflight/send failure errbacks, retirement None and queue overflow are explicit tests. Graphical success/domain rejection and text settlement compare; explicit sync/stale/error recovery force snapshot. Preserve no_presentation/sequence-retiring exceptions, request cache and original text callback/Failure. Extend existing coordinator_push/art_push/dispatcher tests and update publisher documentation.
 - [ ] 2.2 Implement full plan/result prevalidation and serialized send boundary, monotonic issued revision distinct from successful baseline, failed-send invalidation, bounded reentrant intent ordering and specialized map revision reconciliation. Inject first/middle/final send faults, invalid later map frame and reentrant sync; assert zero preflight sends, no reused escaped target, snapshot after failure and result order. Register new Python module once in evennia-shards and traceability.
 
 ## 3. Focused integrated verification
