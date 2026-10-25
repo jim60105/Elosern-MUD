@@ -165,6 +165,10 @@ class DialogueReadingStorageTests(EvenniaTest):
         "authored-dialogue-reading::"
         "generated-reading-persists-by-logical-package-role-identity"
     )
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "generated-acknowledgements-use-the-same-memory-only-lifecycle"
+    )
     def test_phase_return_keeps_completion(self):
         phase_topic = "g-phase.topic_01"
         self._complete(host_key=_PACKAGE_A_ROLE, topic=phase_topic)

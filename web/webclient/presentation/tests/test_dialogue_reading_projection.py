@@ -197,6 +197,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
         "authored-dialogue-reading::"
         "formal-reading-is-persistent-owner-shared-narrative-state"
     )
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "optimistic-public-reading-cannot-unlock-qualified-topics"
+    )
     def test_panel_reports_revision_completions_and_unread(self):
         self._select()
         panel = self._panel()
@@ -268,6 +272,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
         "authored-dialogue-reading::"
         "formal-reading-is-persistent-owner-shared-narrative-state"
     )
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "optimistic-public-reading-cannot-unlock-qualified-topics"
+    )
     def test_delayed_completion_leaves_the_other_connection_scene_intact(self):
         first = self._select(_ROOT, selection_id="sel-a")
         second = self._select(_ROOT, selection_id="sel-b")
@@ -326,6 +334,10 @@ class DialogueReadingProjectionTests(EvenniaTest):
     @covers_requirement(
         "authored-dialogue-reading::"
         "public-reading-chains-never-authorize-protected-content"
+    )
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "optimistic-public-reading-cannot-unlock-qualified-topics"
     )
     def test_chain_derivation_is_pure_and_bounded(self):
         delivery = self._select()

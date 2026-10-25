@@ -1027,11 +1027,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             _press(page, "Enter", wait_ms=120)
         raise AssertionError("the authored scene never reached its explicit finish")
 
-    # The delta requirement
-    # (authored-dialogue-reading::frontend-completion-retries-remain-memory-only)
-    # receives its covers_requirement annotation at delta sync, when the main
-    # spec gains the requirement (authored-dialogue-locked-ui precedent: the
-    # traceability gate only recognizes the synced requirement text).
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "frontend-completion-retries-remain-memory-only"
+    )
     def test_dialogue_completion_retry_without_rereading(self):
         """authored-dialogue-reading-client 3.1: one ack, failed then retried.
 
@@ -1087,7 +1086,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(status.count(), 0, "saved progress shows no pending status")
 
-    # Delta requirement annotation lands at delta sync (see the retry method).
+    @covers_requirement(
+        "authored-dialogue-reading::"
+        "frontend-completion-retries-remain-memory-only"
+    )
     def test_dialogue_completion_reload_discards_pending(self):
         """authored-dialogue-reading-client 3.1: a fresh reload has no pending.
 
