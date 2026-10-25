@@ -16,6 +16,7 @@ The approved authored-dialogue design requires lawful possessed authored convers
 - `authored-dialogue-possession`: Lawful possessed authored conversations with owner-correct relationships.
 
 ### Modified Capabilities
+- `webclient-dialogue-session`: amend the complete affected contract for this slice, preserving unrelated scenarios.
 - `webclient-possession-presentation`: update the complete affected requirement blocks while preserving unrelated scenarios.
 - `webclient-exploration-menu`: update the complete affected requirement blocks while preserving unrelated scenarios.
 - `exploration-affordances`: update the complete affected requirement blocks while preserving unrelated scenarios.
