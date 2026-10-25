@@ -16,6 +16,7 @@ The approved authored-dialogue design requires cut over all authored backend/tex
 - `authored-dialogue-selection`: Cut over all authored backend/text delivery and version-3 protocol.
 
 ### Modified Capabilities
+- `webclient-oob-protocol`: amend the complete affected contract for this slice, preserving unrelated scenarios.
 - `scripted-dialogue`: update the complete affected requirement blocks while preserving unrelated scenarios.
 - `webclient-dialogue-session`: update the complete affected requirement blocks while preserving unrelated scenarios.
 - `webclient-exploration-menu`: update the complete affected requirement blocks while preserving unrelated scenarios.

@@ -81,8 +81,8 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 The version-3 dialogue panel SHALL carry bounded host and acting-body identity/portrait descriptors, context-bound delivery, all reachable topic choices, public-chain descriptors, reading revision and optional live unlock batch. Available and unavailable forms SHALL be exact, read-only and JSON-safe. Numeric affinity and unauthorized qualified scene bodies SHALL never ship.
 
 #### Scenario: Generated choices obey existing panel bounds
-- **WHEN** a generated current phase exposes more than sixteen permitted topics
-- **THEN** the panel renders every permitted topic in declared order up to sixteen with version-3 descriptor fields and rejects schema drift
+- **WHEN** a generated current phase exposes more topics than its native declared bound
+- **THEN** the panel preserves the generated source bound and declared order with version-3 fields, while authored definitions expose every permitted topic up to sixteen
 
 #### Scenario: Reopening after closure shows current everyday topics
 - **WHEN** a supported committed closure transition removes the commission topic and the player reopens the conversation
@@ -107,9 +107,9 @@ The version-3 dialogue panel SHALL carry bounded host and acting-body identity/p
 - **THEN** `portrait_ref` is `null`, the rest of the payload is unaffected, and the panel stays
   available
 
-#### Scenario: A host with more than sixteen authored keywords is truncated to the all at most sixteen
+#### Scenario: Every declared authored topic is reachable
 - **WHEN** the session host's dialogue table carries sixteen authored topics
-- **THEN** the panel's `choices` carry exactly the all at most sixteen in table order and the server
+- **THEN** the panel's `choices` carry all sixteen in table order without prefix truncation and the server
   validator accepts the payload
 
 #### Scenario: An unbonded host discloses a null stage
@@ -135,8 +135,8 @@ The version-3 dialogue panel SHALL carry bounded host and acting-body identity/p
 - **WHEN** a dialogue payload renders `bond_stage`
 - **THEN** it SHALL be the affinity stage NAME from the rulebook stage table when the host NPC has a relationship with the viewer and `null` otherwise, and the raw affinity number SHALL NOT appear anywhere in the payload
 
-#### Scenario: The line carries the bounded latest reply
-- **WHEN** a dialogue payload renders `line`
+#### Scenario: The delivery carries bounded latest content
+- **WHEN** a dialogue payload renders `delivery`
 - **THEN** it SHALL be the current context-bound native line delivery or complete scene with per-line and total scene bounds
 
 #### Scenario: Choices follow the panel-owned sixteen-descriptor table bound
@@ -157,7 +157,7 @@ The version-3 dialogue panel SHALL carry bounded host and acting-body identity/p
 
 #### Scenario: Exact available field set
 - **WHEN** a current dialogue snapshot is serialized
-- **THEN** its fields are exactly schema_version, available, kind, host, actor, bond_stage, context_id, delivery, choices, pure_chain, reading_revision and unlock_batch; delivery and choices obey the shared version-3 bounds and mirrors reject version 2
+- **THEN** its fields are exactly schema_version, available, kind, host, actor, bond_stage, context_id, delivery, choices, pure_chain, reading_revision and unlock_batch plus completed_topic_ids; delivery and choices obey the shared version-3 bounds and mirrors reject version 2
 
 #### Scenario: The acting portrait is server-derived
 - **WHEN** an acting body differs from the owner during possession
@@ -182,3 +182,35 @@ Activation SHALL refresh existing room occupant/affordance and conversation proj
 #### Scenario: Scripted story works after models are disabled
 - **WHEN** profiles are disabled after package publication
 - **THEN** real scripted conversation, authorized acceptance, escort, combat/possession and exactly-once settlement remain usable without a model call
+
+### Requirement: Dialogue mode resolves after combat and before exploration
+The coordinator SHALL resolve the committed presentation mode in the order creation-pending →
+`creation`, active combat → `combat`, live dialogue session → `dialogue`, else `exploration`.
+Every session open, refresh, and clear SHALL mark the viewer's presentation dirty so the mode and
+`dialogue` panel commit atomically with the underlying state change.
+
+#### Scenario: Exploration panels keep shipping unchanged during dialogue mode
+- **WHEN** the committed mode is `dialogue`
+- **THEN** the `exploration` and `character` panels SHALL keep shipping their ordinary exploration-mode payloads unchanged
+
+#### Scenario: A refresh keeps the recorded line and choices current
+- **WHEN** a session refresh occurs
+- **THEN** it SHALL keep the recorded line and choices current without re-opening ceremony
+
+#### Scenario: The client protocol mirrors accept dialogue mode in lockstep
+- **WHEN** the client-side protocol mirrors (UMD and Vue store) handle the committed mode
+- **THEN** they SHALL accept mode `dialogue` and name the `dialogue` panel in lockstep with the server registry under the panel/mode agreement contract
+
+#### Scenario: A reply commits dialogue mode atomically
+- **WHEN** a scripted reply is recorded for a connected viewer
+- **THEN** one committed presentation carries mode `dialogue`, the available `dialogue` panel, and
+  the unchanged exploration panel together
+
+#### Scenario: Combat outranks a live session
+- **WHEN** combat becomes active while a session object still exists before its cleanup seam runs
+- **THEN** the committed mode is `combat`, never `dialogue`
+
+#### Scenario: A refresh updates the delivered content in place
+- **WHEN** the player exchanges another scripted keyword with the same host
+- **THEN** the committed `dialogue.delivery` equals the newest native line delivery or complete authored scene and the mode stays
+  `dialogue` without an intermediate unavailable commit

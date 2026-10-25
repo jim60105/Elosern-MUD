@@ -37,10 +37,19 @@ Boundary events use the existing world.observability facade with available owner
 - `world/lore/dialogue/{__init__,guild,altoria_lower,altoria_middle,altoria_upper,ciaran}.py`
 - `web/webclient/actions/exploration_actions.py`
 - `web/webclient/presentation/dialogue.py`
-- `web/static/webclient/js/elosern/protocol/panels/exotic.js`
+- `web/static/webclient/js/elosern/protocol/panels/misc.js::validateDialoguePanel`
+- `web/static/webclient/js/elosern/protocol/constants.js`
+- `web/static/webclient/js/elosern/protocol/core.js`
+- `web/static/webclient/js/elosern/protocol/store.js`
+- `web/webclient/presentation/protocol.py`
+- `web/webclient/presentation/coordinator.py`
+- `web/webclient/actions/dispatcher.py::handle_ui_action`
+- `web/webclient-app/stores/elosern/transport.js::dispatchAction`
 - `web/webclient-app/stores/dialogue-view.js`
 
 ## Risks / Trade-offs
+
+The complete review-resolved schemas and UTF-8 publication budgets in the shared contract are mandatory in this slice. The production client validator is misc.js, not exotic.js or dialogue-view.js. Protocol adoption tests belong to web/static/webclient/js/tests/protocol_dialogue.test.js and the production protocol-store tests, plus Python protocol/coordinator tests. Request identity injection occurs in handle_ui_action before full action payload validation, after duplicate/stale admission. Projection validates only the identity-free descriptor. Test two deliberate picks versus a retry, null-context direct entry and opening reconnect. No presenter creates context or receipt IDs.
 
 Highest backend blast radius. Conflicts with possession, availability, reading in dialogue.py, exploration_actions.py, protocol and presenter; dependent order is mandatory. Registry mechanical conversion precedes every prose slice. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
 

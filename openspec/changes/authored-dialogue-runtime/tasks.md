@@ -12,9 +12,13 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 3. Transport and protocol cutover
 
-- [ ] 3.1 Migrate CmdTalk and authored web adapter payload validator, Python presenter, UMD exotic.js validator and dialogue-view.js to v3. Reuse catalog keys. Add server/client mirror tests and expose all <=16 rows through existing scrollable choices, with complete attributed current-window text before scene-player integration.
+- [ ] 3.1 Migrate CmdTalk, authored adapter, Python presenter, UMD misc.js::validateDialoguePanel/constants.js and production reducer to v3. Implement descriptor validation and handle_ui_action pre-validator request-ID injection. Test two deliberate picks versus a transport retry, populated v3 adoption and v2 rejection. Reuse catalog keys and expose all <=16 rows, with complete attributed text before scene-player integration.
 
 ## 4. Native seams and documentation
 
 - [ ] 4.1 Keep freeform settled observer and world/quests/story_dialogue.py call paths native, test phase invalidation and guild listing/turn-in; update docs/game/commands.md and command-reference.md, replace full conflicting main-spec requirements in this change delta, and register new tests in manifests. Verify focused runtime/session/command/protocol tests and contract_gate.
+
+## 5. Dialogue publication budgets
+
+- [ ] 5.1 Implement the shared canonical UTF-8 Scene/bundle/panel limits and conditional 98304-byte dialogue envelope rule in Python protocol/coordinator and UMD constants/core/store before effects/session publication. Verify maximal multilingual chain/reconnect adoption, oversized pre-effect rejection and unchanged 65536-byte unrelated-envelope bounds in real protocol-store parity tests; update OOB docs in this unit.
 
