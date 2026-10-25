@@ -742,6 +742,9 @@ function checkWorldMapEnvelope(envelope) {
   var remainder = ownCopy(envelope);
   remainder.panels = panels;
   core.checkEnvelope(remainder);
+  if (core.jsonByteSize(remainder) > core.MAX_CANONICAL_JSON_BYTES) {
+    fail("world-map remainder exceeds generic " + core.MAX_CANONICAL_JSON_BYTES + " bytes");
+  }
   checkMapSafety(body, MAP_PANEL_DEPTH);
   if (core.jsonByteSize(body) > WORLD_MAX_BYTES) {
     fail("world_map exceeds " + WORLD_MAX_BYTES + " canonical bytes");

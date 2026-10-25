@@ -51,6 +51,14 @@ MAX_CORRELATION_ID = 32
 CORRELATION_ID_LENGTH = 32
 MAX_LAYOUT_VERSION = 65_535
 
+# Dialogue v3 panel and envelope publication bounds.
+DIALOGUE_PANEL = "dialogue"
+DIALOGUE_PANEL_MAX_BYTES = 24_576
+DIALOGUE_ENVELOPE_MAX_BYTES = 98_304
+DIALOGUE_SCENE_MAX_BYTES = 8_192
+DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES = 16_384
+DIALOGUE_BUNDLE_MAX_BYTES = 16_384
+
 # Adapter data slot (ui_action_result success only): a result value is not a
 # panel, so it caps at eight fields. The byte budget is the global canonical
 # envelope ceiling minus the reserve RESULT_DATA_STANDARD_RESERVE, the exact
@@ -212,13 +220,48 @@ def check_json_safety(
         raise JSONSafetyError(f"unsupported JSON value type {type(value).__name__}")
 
 
+def carries_available_dialogue(payload: Any) -> bool:
+    """Whether an envelope carries an available version-3 dialogue panel."""
+    if not isinstance(payload, dict):
+        return False
+    panels = payload.get("panels")
+    if not isinstance(panels, dict):
+        return False
+    dialogue = panels.get(DIALOGUE_PANEL)
+    if not isinstance(dialogue, dict):
+        return False
+    schema_version = dialogue.get("schema_version")
+    if type(schema_version) is not int or schema_version != 3:
+        return False
+    return dialogue.get("available") is True and dialogue.get("kind") == "dialogue"
+
+
 def check_envelope(payload: Any) -> None:
     """Enforce the global bounds over one whole envelope, including byte size."""
     check_json_safety(payload)
-    if json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
-        raise JSONSafetyError(
-            f"canonical JSON exceeds {MAX_CANONICAL_JSON_BYTES} bytes"
-        )
+    if carries_available_dialogue(payload):
+        if json_byte_size(payload) > DIALOGUE_ENVELOPE_MAX_BYTES:
+            raise JSONSafetyError(
+                f"canonical JSON exceeds {DIALOGUE_ENVELOPE_MAX_BYTES} bytes"
+            )
+        dialogue = payload["panels"][DIALOGUE_PANEL]
+        if json_byte_size(dialogue) > DIALOGUE_PANEL_MAX_BYTES:
+            raise JSONSafetyError(
+                f"dialogue panel canonical JSON exceeds {DIALOGUE_PANEL_MAX_BYTES} bytes"
+            )
+        stripped_panels = {
+            k: v for k, v in payload["panels"].items() if k != DIALOGUE_PANEL
+        }
+        stripped_envelope = {**payload, "panels": stripped_panels}
+        if json_byte_size(stripped_envelope) > MAX_CANONICAL_JSON_BYTES:
+            raise JSONSafetyError(
+                f"dialogue-removed envelope canonical JSON exceeds {MAX_CANONICAL_JSON_BYTES} bytes"
+            )
+    else:
+        if json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
+            raise JSONSafetyError(
+                f"canonical JSON exceeds {MAX_CANONICAL_JSON_BYTES} bytes"
+            )
 
 
 def _require_exact_fields(payload: Any, name: str, required: set[str], conditional: dict[str, Any]) -> None:

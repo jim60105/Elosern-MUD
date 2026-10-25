@@ -33,6 +33,7 @@ from world.rules.dialogue import (
     TopicLockedError,
     TopicNotFoundError,
     DialogueSourceUnavailableError,
+    DialogueBudgetExceededError,
     clear_dialogue_session,
     dialogue_key_for,
     escape_evennia_greeting,
@@ -660,6 +661,8 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
             return _rejected("unregistered_keyword", "對方不明白這個話題。")
         except DialogueSourceUnavailableError:  # observability: ignore R2: rejected response is the contract report
             return _rejected("not_dialogue_host", "對方無法交談。")
+        except DialogueBudgetExceededError:  # observability: ignore R2: rejected response is the contract report
+            return _rejected("dialogue_budget_exceeded", "對話內容超過預算上限。")
         except Exception as exc:
             log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "topic_id": topic_id}, exc=exc)
             return _rejected("dialogue_failed", "交談失敗。")

@@ -42,7 +42,7 @@ from typing import Any
 import uuid
 
 from world.lore.dialogue.codec import GeneratedDialogueIdentity, StaticDialogueIdentity
-from world.lore.scenes import Narration, Scene, Speech
+from world.lore.scenes import Narration, Scene, Speech, scene_canonical_bytes
 
 from typeclasses.components import ScriptedDialogue
 
@@ -121,6 +121,15 @@ class TopicNotFoundError(DialogueRuntimeError):
 
 class DialogueSourceUnavailableError(DialogueRuntimeError):
     """Host has no conversable dialogue source."""
+
+
+class DialogueBudgetExceededError(DialogueRuntimeError):
+    """Payload exceeds canonical UTF-8 JSON scene, bundle, or panel limits."""
+
+
+DIALOGUE_SCENE_MAX_BYTES = 8192
+DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES = 16384
+DIALOGUE_PANEL_MAX_BYTES = 24576
 
 
 @dataclass(frozen=True)
@@ -970,10 +979,59 @@ def select_authored_topic(
         raise TopicLockedError("topic_locked", "此話題目前無法選取。")
 
     owner = context.owner
-    relations_snapshot = attribute_snapshot(host, "relations_data")
-    session_snapshot = attribute_snapshot(owner, "dialogue_session")
-
     scene = matched_topic.fallback
+    from web.webclient.presentation.protocol import json_byte_size
+
+    # 1. Scene canonical UTF-8 JSON bytes check
+    scene_bytes = (
+        scene_canonical_bytes(scene)
+        if hasattr(scene, "lines")
+        else json_byte_size(scene)
+    )
+    if scene_bytes > DIALOGUE_SCENE_MAX_BYTES:
+        raise DialogueBudgetExceededError(
+            "dialogue_scene_oversized",
+            f"Scene {getattr(scene, 'scene_id', '')} ({scene_bytes} bytes) exceeds limit of {DIALOGUE_SCENE_MAX_BYTES}",
+        )
+
+    # 2. Delivery plus public pure_chain successors bundle check
+    successors_map: dict[str, list[str]] = {t.topic_id: [] for t in source.dialogue.topics}
+    for t in source.dialogue.topics:
+        for p in getattr(t, "predecessors", ()):
+            if p in successors_map:
+                successors_map[p].append(t.topic_id)
+
+    topic_map = {t.topic_id: t for t in source.dialogue.topics}
+    reachable_pure: set[str] = set()
+    to_visit = [
+        succ
+        for succ in successors_map.get(matched_topic.topic_id, [])
+        if topic_map.get(succ) and getattr(topic_map[succ], "disclosure", "") == "pure_chain"
+    ]
+    while to_visit:
+        curr = to_visit.pop(0)
+        if curr not in reachable_pure:
+            reachable_pure.add(curr)
+            for nxt in successors_map.get(curr, []):
+                if topic_map.get(nxt) and getattr(topic_map[nxt], "disclosure", "") == "pure_chain":
+                    to_visit.append(nxt)
+
+    bundle_bytes = scene_bytes
+    for succ_id in reachable_pure:
+        succ_topic = topic_map[succ_id]
+        succ_scenes = [succ_topic.fallback] + [v.scene for v in getattr(succ_topic, "variants", ())]
+        max_succ_scene = max(
+            (scene_canonical_bytes(s) if hasattr(s, "lines") else json_byte_size(s))
+            for s in succ_scenes
+        )
+        bundle_bytes += max_succ_scene
+
+    if bundle_bytes > DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES:
+        raise DialogueBudgetExceededError(
+            "dialogue_bundle_oversized",
+            f"Selected delivery bundle ({bundle_bytes} bytes) exceeds limit of {DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES}",
+        )
+
     delivery_id = uuid.uuid4().hex[:16]
     delivery = SceneDelivery(
         delivery_id=delivery_id,
@@ -990,6 +1048,45 @@ def select_authored_topic(
         lines=scene.lines,
         updated_tick=_session_updated_tick(),
     )
+
+    # 3. Preview resulting dialogue panel budget check
+    from web.webclient.presentation.affordances import _scripted_keyword_descriptors
+    from web.webclient.presentation.dialogue import DIALOGUE_MAX_CHOICES
+    from world.rules.npc_identity import npc_display_name
+
+    choices = _scripted_keyword_descriptors(host, context_id=target_context_id)[:DIALOGUE_MAX_CHOICES]
+    preview_panel = {
+        "schema_version": 3,
+        "available": True,
+        "kind": "dialogue",
+        "host": {
+            "identity": int(getattr(host, "pk", 1)),
+            "display_name": npc_display_name(host)[:64],
+            "portrait_ref": None,
+        },
+        "actor": {
+            "identity": int(getattr(actor, "pk", 1)),
+            "display_name": getattr(actor, "key", "")[:64],
+            "portrait_ref": None,
+        },
+        "bond_stage": None,
+        "context_id": target_context_id,
+        "delivery": delivery_to_wire(delivery),
+        "choices": choices,
+        "pure_chain": [],
+        "reading_revision": 0,
+        "completed_topic_ids": [],
+        "unlock_batch": None,
+    }
+    if json_byte_size(preview_panel) > DIALOGUE_PANEL_MAX_BYTES:
+        raise DialogueBudgetExceededError(
+            "dialogue_panel_oversized",
+            f"Resulting dialogue panel ({json_byte_size(preview_panel)} bytes) exceeds limit of {DIALOGUE_PANEL_MAX_BYTES}",
+        )
+
+    relations_snapshot = attribute_snapshot(host, "relations_data")
+    session_snapshot = attribute_snapshot(owner, "dialogue_session")
+
     context_with_id = DialogueContext(
         actor=context.actor,
         owner=context.owner,

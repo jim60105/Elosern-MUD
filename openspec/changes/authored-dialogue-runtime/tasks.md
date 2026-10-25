@@ -22,5 +22,5 @@ Remaining units implement Shared contract v2, including host_key/source identity
 
 ## 5. Dialogue publication budgets
 
-- [ ] 5.1 Implement the shared canonical UTF-8 Scene/bundle/panel limits and conditional 98304-byte dialogue envelope rule in Python protocol/coordinator and UMD constants/core/store before effects/session publication. Verify maximal multilingual chain/reconnect adoption, oversized pre-effect rejection and unchanged 65536-byte unrelated-envelope bounds in real protocol-store parity tests; update OOB docs in this unit.
+- [x] 5.1 Implement the shared canonical UTF-8 Scene/bundle/panel limits and conditional 98304-byte dialogue envelope rule in Python protocol/coordinator and UMD constants/core/store before effects/session publication. Verify maximal multilingual chain/reconnect adoption, oversized pre-effect rejection and unchanged 65536-byte unrelated-envelope bounds in real protocol-store parity tests; update OOB docs in this unit.
 

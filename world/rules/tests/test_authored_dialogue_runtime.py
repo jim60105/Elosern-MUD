@@ -23,6 +23,7 @@ from world.rules.affinity import AffinitySource
 from world.rules.clock import get_world_clock
 from world.rules.dialogue import (
     DialogueSession,
+    DialogueBudgetExceededError,
     DuplicateSelectionError,
     SceneDelivery,
     StaleContextError,
@@ -208,3 +209,57 @@ class AuthoredDialogueRuntimeTests(EvenniaTest):
             expected_context_id=session.context_id,
         )
         self.assertEqual(clock.tick, tick_before)
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_oversized_scene_rejected_before_effects(self):
+        affinity_before = self.host.relations.affinity_for(self.char1)
+        session_before = self.char1.db.dialogue_session
+
+        with patch("world.rules.dialogue.scene_canonical_bytes", return_value=8193):
+            with self.assertRaises(DialogueBudgetExceededError):
+                select_authored_topic(
+                    self.char1,
+                    self.host,
+                    "guild_staff.topic_01",
+                    selection_id="req-over-scene",
+                    expected_context_id=None,
+                )
+
+        self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_before)
+        self.assertEqual(self.char1.db.dialogue_session, session_before)
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_oversized_bundle_rejected_before_effects(self):
+        affinity_before = self.host.relations.affinity_for(self.char1)
+        session_before = self.char1.db.dialogue_session
+
+        with patch("world.rules.dialogue.DIALOGUE_DELIVERY_BUNDLE_MAX_BYTES", 100):
+            with self.assertRaises(DialogueBudgetExceededError):
+                select_authored_topic(
+                    self.char1,
+                    self.host,
+                    "guild_staff.topic_01",
+                    selection_id="req-over-bundle",
+                    expected_context_id=None,
+                )
+
+        self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_before)
+        self.assertEqual(self.char1.db.dialogue_session, session_before)
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_oversized_panel_rejected_before_effects(self):
+        affinity_before = self.host.relations.affinity_for(self.char1)
+        session_before = self.char1.db.dialogue_session
+
+        with patch("world.rules.dialogue.DIALOGUE_PANEL_MAX_BYTES", 500):
+            with self.assertRaises(DialogueBudgetExceededError):
+                select_authored_topic(
+                    self.char1,
+                    self.host,
+                    "guild_staff.topic_01",
+                    selection_id="req-over-panel",
+                    expected_context_id=None,
+                )
+
+        self.assertEqual(self.host.relations.affinity_for(self.char1), affinity_before)
+        self.assertEqual(self.char1.db.dialogue_session, session_before)

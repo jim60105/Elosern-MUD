@@ -126,13 +126,16 @@ class PresentationCoordinator:
         }
 
     def _build_presentation(
-        self, context: PresentationContext, panels: dict[str, Any]
+        self,
+        context: PresentationContext,
+        panels: dict[str, Any],
+        revision: int | None = None,
     ) -> dict[str, Any]:
         """Assemble one exact snapshot/update envelope from committed panel data."""
         return {
             "protocol_version": PROTOCOL_VERSION,
             "presentation_epoch": self._epoch,
-            "revision": self._next_revision(),
+            "revision": self._next_revision() if revision is None else revision,
             "mode": self._mode_provider(context),
             "panels": panels,
             "layout_version": LAYOUT_VERSION,
@@ -329,7 +332,11 @@ class PresentationCoordinator:
 
     def full_snapshot(self, context: PresentationContext) -> dict[str, Any]:
         """Build and send a full snapshot containing every eager panel."""
-        envelope = self._build_presentation(context, self._render_all(context))
+        envelope = self._build_presentation(
+            context, self._render_all(context), revision=self._revision + 1
+        )
+        check_envelope(envelope)
+        self._next_revision()
         self._send(SNAPSHOT_MESSAGE, envelope)
         return envelope
 
@@ -371,7 +378,9 @@ class PresentationCoordinator:
         map_names = sorted(set(panels) & self.registry.on_demand_panel_names)
         if map_names:
             return self._publish_with_maps(context, panels, map_names)
-        envelope = self._build_presentation(context, panels)
+        envelope = self._build_presentation(context, panels, revision=self._revision + 1)
+        check_envelope(envelope)
+        self._next_revision()
         self._send(UPDATE_MESSAGE, envelope)
         return envelope
 

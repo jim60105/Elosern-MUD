@@ -706,7 +706,12 @@ def check_world_map_envelope(envelope: Any) -> dict[str, Any]:
     panels = dict(envelope["panels"])
     body = panels[WORLD_MAP_PANEL]
     panels[WORLD_MAP_PANEL] = None
-    check_envelope({**envelope, "panels": panels})
+    remainder = {**envelope, "panels": panels}
+    check_envelope(remainder)
+    if json_byte_size(remainder) > MAX_CANONICAL_JSON_BYTES:
+        raise JSONSafetyError(
+            f"world-map remainder canonical JSON exceeds generic {MAX_CANONICAL_JSON_BYTES} bytes"
+        )
     return validate_map_panel(WORLD_MAP_PANEL, body)
 
 

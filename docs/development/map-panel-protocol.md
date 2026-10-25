@@ -295,7 +295,8 @@ intact `world_map` object (one without `part`) is checked in two pieces:
 - The rest of the envelope, with the world map replaced by `null`, passes the
   unchanged generic check. Metadata and every sibling panel keep the
   65,536-byte, 320-item, depth and string bounds. That includes `local_map`,
-  `area_map` and the dialogue companion.
+  `area_map` and the dialogue companion (the dialogue allowance applies only
+  to pure dialogue publications without the world-map exemption).
 - The world map passes the generic scalar rules, its exact schema and its
   logical ceiling of 2,097,152 canonical bytes.
 
