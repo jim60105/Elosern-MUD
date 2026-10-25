@@ -108,9 +108,39 @@ def resolve_dialogue_source(context: Any) -> ResolvedDialogueSource | None:
     return None
 
 
+def dialogue_source_for_host(host: Any) -> ResolvedDialogueSource | None:
+    """Resolve a host's dialogue source without admitting an interaction.
+
+    Presentation enumerates every present host -- including a schedule-blocked
+    one, whose rows must stay in the vocabulary -- so it cannot route through
+    actor context authorization. This host-only read shares the exact binding
+    and dispatch of :func:`resolve_dialogue_source`; it never authorizes a
+    selection.
+    """
+    from world.rules.dialogue_context import DialogueContext, host_dialogue_binding
+
+    if host is None:
+        return None
+    host_key, source_identity = host_dialogue_binding(host)
+    if source_identity is None:
+        return None
+    return resolve_dialogue_source(
+        DialogueContext(
+            actor=None,
+            owner=None,
+            host=host,
+            host_key=host_key,
+            source_identity=source_identity,
+            context_id=None,
+            phase_revision=None,
+        )
+    )
+
+
 __all__ = [
     "ResolvedDialogueSource",
     "canonical_dialogue_bindings",
+    "dialogue_source_for_host",
     "resolve_dialogue_source",
     "to_authored_dialogue",
 ]

@@ -491,6 +491,33 @@ def opens_dialogue(npc: Any) -> bool:
     return key in DIALOGUE_TABLE or _generated_dialogue_for_key(key) is not None
 
 
+def authorized_dialogue_open(actor: Any, host: Any) -> bool:
+    """Whether ``actor`` may open authored conversation with ``host`` right now.
+
+    An ordinary player keeps the existing host-only answer. A possessed acting
+    body additionally needs the complete possession authorization *and* an
+    authored source on the host: the newly authorized surface is authored
+    scene dialogue, so a freeform-only ``LLMNPC`` stays refused while
+    possessed. Schedule blocking stays out of this predicate (the vocabulary
+    keeps blocked hosts enumerated; only executable cards are filtered).
+    Read-only and never raises.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    if isinstance(actor, PlayerCharacter):
+        return True
+    from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
+
+    try:
+        context = resolve_dialogue_context(actor, host)
+    except DialogueContextError:  # observability: ignore R2: an unauthorized context is the disabled-row answer, not a failure
+        return False
+    except Exception:  # observability: ignore R2: an unreadable context authorizes nothing and disables the row
+        return False
+    return resolve_dialogue_source(context) is not None
+
+
 def dialogue_offline_response(npc: Any) -> str | None:
     """Return a generated host's current permitted offline response, or ``None``.
 
@@ -558,11 +585,16 @@ def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkRes
             return ScriptedTalkResult(response=response, budget_capped=False)
 
     relations_snapshot = attribute_snapshot(npc, "relations_data")
+    # Host affinity belongs to the owning player, never to a possessed acting
+    # body: the companion speaks, the owner's relationship record changes.
+    from world.rules.dialogue_context import session_control_owner
+
+    affinity_owner = session_control_owner(character) or character
     try:
         from django.db import transaction
 
         with transaction.atomic():
-            outcome = apply_affinity_change(npc, character, AffinitySource.TALK, 1)
+            outcome = apply_affinity_change(npc, affinity_owner, AffinitySource.TALK, 1)
     except Exception:
         restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
         raise
@@ -799,31 +831,41 @@ def open_or_refresh_dialogue(
     The ONLY opener: called from the deterministic-core success paths (the
     ``explore.talk_open`` opener, the scripted adapter/command branches, and
     the freeform settled observer). Refreshing replaces the value in place
-    (one session per character).
+    (one session per acting body). The session belongs to the actor, never to
+    the owner: a possessed companion carries its own ``db.dialogue_session``
+    while ``owner_id`` and the control key record the owning player.
     """
-    from world.rules.dialogue_context import resolve_dialogue_context
+    from world.rules.dialogue_context import control_key_for, resolve_dialogue_context
 
     existing = live_dialogue_session(character)
     npc_pk = int(getattr(npc, "pk", 0))
+    ctx = context if context is not None else resolve_dialogue_context(character, npc)
+    owner = ctx.owner
+    control_key = control_key_for(character, owner)
+    same_control = existing is not None and existing.control_key == control_key
 
-    if context is not None and getattr(context, "context_id", None):
-        context_id = str(context.context_id)
-        host_key = str(context.host_key)
-        source_id = context.source_identity
-        phase_rev = context.phase_revision
-    elif existing is not None and existing.npc_id == npc_pk and existing.context_id:
+    if getattr(ctx, "context_id", None):
+        context_id = str(ctx.context_id)
+        host_key = str(ctx.host_key)
+        source_id = ctx.source_identity
+        phase_rev = ctx.phase_revision
+    elif same_control and existing is not None and existing.npc_id == npc_pk and existing.context_id:
         context_id = existing.context_id
         host_key = existing.host_key
         source_id = existing.source_identity
         phase_rev = existing.phase_revision
     else:
-        ctx = resolve_dialogue_context(character, npc)
         context_id = uuid.uuid4().hex[:16]
         host_key = ctx.host_key
         source_id = ctx.source_identity
         phase_rev = ctx.phase_revision
 
-    if existing is not None and existing.npc_id == npc_pk and existing.context_id == context_id:
+    if (
+        same_control
+        and existing is not None
+        and existing.npc_id == npc_pk
+        and existing.context_id == context_id
+    ):
         sel_receipts = list(existing.selection_receipts)
         comp_receipts = list(existing.completion_receipts)
     else:
@@ -852,8 +894,7 @@ def open_or_refresh_dialogue(
     stored_line = str(line)[:MAX_DIALOGUE_SESSION_LINE_CODE_POINTS] if line is not None else None
     line_delivery_id = uuid.uuid4().hex[:16] if kind == "line" else None
     actor_id = int(getattr(character, "pk", 0))
-    owner_id = int(getattr(character, "pk", 0))
-    control_key = f"{owner_id}:{actor_id}"
+    owner_id = int(getattr(owner, "pk", 0) or 0)
     updated_tick = _session_updated_tick()
 
     session = DialogueSession(
@@ -936,9 +977,18 @@ def select_authored_topic(
     from world.rules.affinity import AffinitySource, apply_affinity_change
     from world.rules.dialogue_context import DialogueContext, resolve_dialogue_context
     from world.rules.dialogue_sources import resolve_dialogue_source
+    from world.rules.npc_schedules import interaction_reason
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 
     context = resolve_dialogue_context(actor, host, session=session)
+
+    # The deterministic selection boundary rechecks the host's talk schedule:
+    # a direct API call must reject a busy host before any effect or delivery,
+    # exactly like the web and text entry surfaces do.
+    if interaction_reason(host, "talk") is not None:
+        from world.rules.dialogue_context import DialogueContextError
+
+        raise DialogueContextError("schedule_blocked")
 
     # Context validation
     if expected_context_id is not None:
@@ -1092,7 +1142,7 @@ def select_authored_topic(
         )
 
     relations_snapshot = attribute_snapshot(host, "relations_data")
-    session_snapshot = attribute_snapshot(owner, "dialogue_session")
+    session_snapshot = attribute_snapshot(actor, "dialogue_session")
 
     context_with_id = DialogueContext(
         actor=context.actor,
@@ -1122,8 +1172,10 @@ def select_authored_topic(
                 outcome = apply_affinity_change(host, owner, AffinitySource.TALK, 1)
                 if outcome.budget_capped:
                     delivery = replace(delivery, affinity_budget_capped=True)
+            # The session lives on the acting body; the owner identity rides
+            # the delivered context and the selection receipt.
             open_or_refresh_dialogue(
-                owner,
+                actor,
                 host,
                 delivery=delivery,
                 context=context_with_id,
@@ -1136,7 +1188,7 @@ def select_authored_topic(
             )
     except Exception:
         restore_attribute_best_effort(host, "relations_data", relations_snapshot)
-        restore_attribute_best_effort(owner, "dialogue_session", session_snapshot)
+        restore_attribute_best_effort(actor, "dialogue_session", session_snapshot)
         raise
 
     return delivery
@@ -1194,14 +1246,25 @@ def live_dialogue_session(character: Any) -> DialogueSession | None:
     in place for the next clear seam or talk to retire, mirroring the party
     module's stale-dbid filtering. ``intent_context_ok`` is the canonical
     co-location + talk-interactability gate.
+
+    The stored control identity is rechecked against the acting body's current
+    lawful control: a session written under a previous account, possession or
+    ``since_tick`` is stale and never live, and a body without lawful control
+    (a forged or released possession mirror) holds no live session at all.
     """
     from evennia.objects.objects import ObjectDB
 
     from typeclasses.npcs import NPC
+    from world.rules.dialogue_context import control_key_for, session_control_owner
     from world.rules.npc_intents import intent_context_ok
 
     session = _parse_dialogue_session(character.db.dialogue_session)
     if session is None:
+        return None
+    owner = session_control_owner(character)
+    if owner is None:
+        return None
+    if session.control_key != control_key_for(character, owner):
         return None
     obj = ObjectDB.objects.filter(id=session.npc_id).first()
     if obj is None or not isinstance(obj, NPC):

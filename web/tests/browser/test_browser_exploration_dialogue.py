@@ -70,6 +70,11 @@ def _shipped_first_answer() -> str:
 
 #: Methods that boot the synthetic catalogs with the authored-scene table.
 AUTHORED_SCENE_METHODS = ("test_authored_scene_plays_line_by_line_with_synchronized_portraits",)
+#: The possessed authored-dialogue journey: kit catalogs, the scene table and
+#: one bound companion with an admitted portrait.
+POSSESSED_DIALOGUE_METHOD = (
+    "test_possessed_companion_plays_an_authored_scene_with_its_own_portrait"
+)
 
 
 def _scene_frame(page) -> dict:
@@ -123,6 +128,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             # kit's multi-line scene table on the scripted host.
             runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
             runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
+        if self._testMethodName == POSSESSED_DIALOGUE_METHOD:
+            runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
+            runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
+            runtime.env["ELOSERN_BROWSER_DIALOGUE_POSSESSION"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -930,6 +939,99 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         open_dialogue_choices(page)
         self.assertEqual(sent_action_count(page), 0, "the replay selected nothing again")
+
+    @covers_requirement(
+        "authored-dialogue-selection::authored-selection-delivers-complete-scenes-atomically"
+    )
+    @covers_requirement(
+        "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
+    )
+    def test_possessed_companion_plays_an_authored_scene_with_its_own_portrait(self):
+        """A lawful possessed companion opens and plays an authored scene.
+
+        The journey enters real possession through the party window's 附身
+        button, then opens the host's 交談. The dialogue panel names the
+        companion as the actor, carries the companion's own portrait
+        reference, and the first two played lines attribute the actor line and
+        the host line to the correct figures.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        self._wait_panel(page, "party", lambda p: p.get("available") is True)
+        companion = next(
+            row
+            for row in store_state(page)["panels"]["party"]["slots"]
+            if row.get("role") == "companion"
+        )
+        companion_id = int(companion["identity"])
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
+        page.locator('[data-testid="icon-tabs__tab--member"]').click()
+        entry = page.locator(f'[data-testid="member-rail__entry--{companion_id}"]')
+        entry.wait_for(timeout=30000)
+        if entry.get_attribute("aria-current") != "true":
+            entry.click()
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("party") or {}).get(
+                "viewed_member_id"
+            )
+            == companion_id,
+        )
+        page.locator('[data-testid="action-bar__btn--possess"]').click()
+        self.assertEqual(sent_action_count(page, "explore.possess"), 1)
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("possession_banner") or {}).get(
+                "available"
+            )
+            is True,
+        )
+        wait_for_store_state(
+            page,
+            lambda s: s.get("phase") == "active"
+            and (
+                ((s.get("panels") or {}).get("status") or {}).get("actor", {}).get(
+                    "identity"
+                )
+                == str(companion_id)
+            ),
+        )
+        self._wait_exploration_available(page)
+
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s)
+            and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        panel = store_state(page)["panels"]["dialogue"]
+        self.assertEqual(int(panel["actor"]["identity"]), companion_id)
+        self.assertEqual(panel["actor"]["display_name"], companion["display_name"])
+        self.assertTrue(panel["actor"]["portrait_ref"])
+
+        open_dialogue_choices(page)
+        _press(page, "1")  # the authored topic -> explore.talk_scripted
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        frames = [_scene_frame(page)]
+        for _ in range(6):
+            if len(frames) >= 2:
+                break
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+            frames.append(_scene_frame(page))
+        self.assertEqual(frames[0]["speaker"], "actor")
+        self.assertEqual(frames[0]["plate"], companion["display_name"])
+        self.assertEqual(frames[0]["actor"], "true")
+        self.assertEqual(frames[1]["speaker"], "host")
+        self.assertEqual(frames[1]["host"], "true")
 
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"

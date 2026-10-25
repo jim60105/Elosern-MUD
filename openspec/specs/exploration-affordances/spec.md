@@ -325,10 +325,9 @@ emission rules are scenario-pinned.
 - **THEN** nothing in the module mutates traits, knowledge, dialogue, quests, inventory, combat
   sessions, party, or world time
 
-#### Scenario: The possessed actor's talk entries stay visible disabled
+#### Scenario: The possessed actor's authored talk entries are enabled when lawful
 - **WHEN** the puppeted actor IS a possessed NPC and talk-entry hosts are present
-- **THEN** the talk entries are emitted disabled with stable possession-refusal codes and safe
-  Traditional Chinese messages; possession talk refusals remain visible disabled entries
+- **THEN** authored talk entries are enabled when the full actor/owner/host context is lawful, while freeform entries keep the stable possession-refusal code and safe Traditional Chinese message
 
 #### Scenario: Schedule-blocked hosts stay in the vocabulary
 - **WHEN** a dialogue host sits inside its schedule gate's blocked window
@@ -348,3 +347,7 @@ emission rules are scenario-pinned.
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
   possession gates, while the `context_actions` form, suggestion eligibility, and the deterministic
   fallback keep consuming the per-keyword and free-form entries unchanged
+
+#### Scenario: The possessed actor's talk entries stay visible disabled
+- **WHEN** the possessed actor is offered native freeform talk outside the authorized authored conversation surface
+- **THEN** that freeform entry keeps its existing stable visible-disabled possession refusal; lawful authored talk follows the separate enabled-context case

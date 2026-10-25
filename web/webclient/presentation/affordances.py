@@ -288,22 +288,36 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
 
 
 def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
-    """One ``explore.talk_scripted`` entry per current topic of a host."""
-    from world.rules.dialogue_context import resolve_dialogue_context
-    from world.rules.dialogue_sources import resolve_dialogue_source
+    """One ``explore.talk_scripted`` entry per current topic of a host.
 
-    context = resolve_dialogue_context(actor, npc) if actor else None
-    source = resolve_dialogue_source(context) if context else None
+    The host is enumerated source-first, so a schedule-blocked host keeps its
+    rows; a possessed acting body sees them enabled only when the complete
+    actor/owner/host context is lawful and the host carries an authored
+    source. Otherwise they stay visible disabled with the fixed possession
+    refusal.
+    """
+    from world.rules.dialogue import authorized_dialogue_open, live_dialogue_session
+    from world.rules.dialogue_sources import dialogue_source_for_host
+
+    source = dialogue_source_for_host(npc)
     npc_id = int(npc.pk)
-    context_id = context.context_id if context else None
+    session = live_dialogue_session(actor) if actor else None
+    context_id = (
+        session.context_id
+        if session is not None and session.npc_id == npc_id
+        else None
+    )
     entries: list[AffordanceView] = []
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
         REASON_POSSESSED_TALK,
-        is_possessed_actor,
     )
-    possessed = actor is not None and is_possessed_actor(actor)
-    disabled_reason = (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]) if possessed else None
+    authorized = actor is None or authorized_dialogue_open(actor, npc)
+    disabled_reason = (
+        None
+        if authorized
+        else (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+    )
 
     if source is not None:
         for topic in source.dialogue.topics[:MAX_SCRIPTED_KEYWORDS]:
@@ -317,7 +331,7 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
                     params=params,
                     freeform=False,
                     navigation=False,
-                    enabled=not possessed,
+                    enabled=authorized,
                     disabled_reason=disabled_reason,
                 )
             )
@@ -334,7 +348,7 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
                     params=params,
                     freeform=False,
                     navigation=False,
-                    enabled=not possessed,
+                    enabled=authorized,
                     disabled_reason=disabled_reason,
                 )
             )
@@ -345,11 +359,9 @@ def _scripted_keyword_descriptors(
     npc: Any, context_id: str | None = None
 ) -> list[dict[str, Any]]:
     """Return the bounded scripted keyword descriptors of a dialogue host for panel v3."""
-    from world.rules.dialogue_context import resolve_dialogue_context
-    from world.rules.dialogue_sources import resolve_dialogue_source
+    from world.rules.dialogue_sources import dialogue_source_for_host
 
-    context = resolve_dialogue_context(npc, npc)
-    source = resolve_dialogue_source(context)
+    source = dialogue_source_for_host(npc)
     npc_id = int(npc.pk)
     choices = []
     if source is not None:

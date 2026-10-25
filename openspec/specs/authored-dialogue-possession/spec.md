@@ -1,13 +1,12 @@
-# Spec Delta
+# authored-dialogue-possession Specification
 
 ## Purpose
-
 Provide lawful possessed authored conversations with owner-correct relationships through deterministic, independently testable behavior while preserving authoritative game ownership and offline play.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Possessed informational dialogue covers generated roles
-Lawful possessed actors SHALL use shared scene features with generated informational hosts without a static profile requirement. Existing commission, service and freeform authority restrictions SHALL remain in force.
+Lawful possessed actors SHALL use the shared source-neutral scene path with generated informational hosts without a static profile requirement. That path SHALL resolve through the trusted host binding and the shared provider seam; generated formal scenes stay unavailable until that provider is published, and this slice adds no static profile requirement, legacy adapter or second provider. Existing commission, service and freeform authority restrictions SHALL remain in force.
 
 #### Scenario: Generated host with no profile
 - **WHEN** a lawful possessed actor addresses a published generated role with informational scenes and a commission
@@ -34,4 +33,3 @@ Enabling authored talk SHALL preserve current possessed trade settlement using t
 #### Scenario: Self-host stays unavailable
 - **WHEN** a possessed companion is addressed as the conversation host
 - **THEN** existing self-host refusal causes no dialogue or affinity mutation
-

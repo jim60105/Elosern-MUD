@@ -53,9 +53,13 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
   the fixed fallback line), a live session naming another host is replaced by it, and no state
   other than `db.dialogue_session` changes
 
-#### Scenario: The clear seams are exactly the movement, engage, and NPC cleanup paths
+#### Scenario: Clear seams include movement, combat, NPC, phase and control retirement
 - **WHEN** a clear seam fires
-- **THEN** it is one of: a successful `settle_movement` of the character, an `engage` involving the actor, and NPC leave-room, despawn, or leave-party cleanup naming the session NPC
+- **THEN** it is a successful movement settlement, combat engage, host departure/deletion/party cleanup, phase invalidation or successful possession release/control switch; each retires playback, choices and receipts through the sole writer
+
+#### Scenario: The clear seams are exactly the movement, engage, and NPC cleanup paths
+- **WHEN** an ordinary clear occurs without a phase or control transition
+- **THEN** the ordinary seams remain movement settlement, combat engage and NPC host departure/deletion/party cleanup; phase/control retirement is the additional explicitly authorized path above
 
 #### Scenario: The talk_open success path writes only the session opening
 - **WHEN** conversation open succeeds
@@ -76,6 +80,10 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 #### Scenario: Session publication rollback compensates effects
 - **WHEN** a selection effect succeeds but delivery/session persistence fails
 - **THEN** no partial effect or session survives in the database or Attribute caches and no protected success body is delivered
+
+#### Scenario: Release retires acting-body playback
+- **WHEN** a possessed body has a live authored conversation and successful control handback completes
+- **THEN** the old body context and receipts retire, owner mode republishes correctly, and the old scene cannot resume on the owner body
 
 ### Requirement: Dialogue mode resolves after combat and before exploration
 The coordinator SHALL resolve the committed presentation mode in the order creation-pending →

@@ -25,6 +25,7 @@ from ._support import (
     T_DIALOGUE_KEY,
     VocabularyTestCase,
     _T_KEYWORDS,
+    _T_TOPIC_IDS,
     _monster,
     _player,
 )
@@ -56,8 +57,8 @@ class AffordanceRuleTests(VocabularyTestCase):
         entries = self._entries_for(host)
         self.assertEqual(len(entries), len(_T_KEYWORDS))
         self.assertTrue(all(entry.action_id == "explore.talk_scripted" for entry in entries))
-        keyword_ids = [entry.params["keyword_id"] for entry in entries]
-        self.assertEqual(keyword_ids, _T_KEYWORDS)
+        topic_ids = [entry.params["topic_id"] for entry in entries]
+        self.assertEqual(topic_ids, _T_TOPIC_IDS)
         self.assertTrue(all(entry.enabled for entry in entries))
         self.assertFalse(any(entry.freeform for entry in entries))
 
@@ -105,7 +106,7 @@ class AffordanceRuleTests(VocabularyTestCase):
             validate_move_payload,
             validate_party_invite_payload,
             validate_party_leave_payload,
-            validate_talk_scripted_payload,
+            validate_talk_scripted_descriptor,
             validate_wait_payload,
         )
 
@@ -127,7 +128,10 @@ class AffordanceRuleTests(VocabularyTestCase):
         validators = {
             "explore.move": validate_move_payload,
             "explore.look": validate_look_payload,
-            "explore.talk_scripted": validate_talk_scripted_payload,
+            # The projected descriptor is the documented exception to the
+            # composed four-field payload (the dispatcher injects
+            # ``selection_id``); validate it with its own projection validator.
+            "explore.talk_scripted": validate_talk_scripted_descriptor,
             "explore.party_invite": validate_party_invite_payload,
             "explore.party_leave": validate_party_leave_payload,
             "explore.engage": validate_engage_payload,

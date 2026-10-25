@@ -21,6 +21,7 @@ from ._support import (
     T_DIALOGUE_KEY,
     VocabularyTestCase,
     _T_KEYWORDS,
+    _T_TOPIC_IDS,
     _monster,
     _player,
 )
@@ -106,12 +107,12 @@ class DefaultCardsTests(VocabularyTestCase):
         host.components.add(ScriptedDialogue.create(host, dialogue_key=T_DIALOGUE_KEY))
         vocabulary = self._vocabulary()
         cards = default_cards(vocabulary, actor=self.player)
-        keyword_ids = [
-            entry.params["keyword_id"]
+        topic_ids = [
+            entry.params["topic_id"]
             for entry in cards
             if entry.action_id == "explore.talk_scripted"
         ]
-        self.assertEqual(keyword_ids, _T_KEYWORDS)
+        self.assertEqual(topic_ids, _T_TOPIC_IDS)
 
     def test_default_cards_are_pure(self):
         vocabulary = self._vocabulary()

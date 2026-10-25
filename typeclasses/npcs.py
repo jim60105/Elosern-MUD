@@ -224,15 +224,18 @@ class NPC(LivingEntity):
         """
         if room is None:
             return
-        from typeclasses.characters import PlayerCharacter
         from world.rules.dialogue import clear_dialogue_session
         from web.webclient.presentation.dialogue_push import push_dialogue_update
 
         host = self.pk if npc_id is None else npc_id
         for obj in room.contents:
-            if isinstance(obj, PlayerCharacter):
-                if clear_dialogue_session(obj, npc=host):
-                    push_dialogue_update(obj)
+            if obj is self:
+                continue
+            # Any acting body may hold the session: a player character or a
+            # possessed companion whose own db.dialogue_session names this
+            # host.
+            if clear_dialogue_session(obj, npc=host):
+                push_dialogue_update(obj)
 
     def get_display_desc(self, looker=None, **kwargs) -> str:
         """Append the affinity stage line to the ordinary zh-tw description.

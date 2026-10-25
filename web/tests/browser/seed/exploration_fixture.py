@@ -138,6 +138,20 @@ def _exploration_fixture(character) -> None:
 
     apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
 
+    if os.environ.get("ELOSERN_BROWSER_DIALOGUE_POSSESSION") == "1":
+        # The possessed authored-dialogue journey needs one lawful companion
+        # present for the possess affordance, with a real server-served
+        # portrait so the stage can show the acting body's own identity.
+        from world.rules.party import join_party
+
+        companion_race = "t_duskmari" if synth else "human"
+        possessed = create_object(LLMNPC, key="測試被附身者", location=south_gate)
+        possessed.race = companion_race
+        possessed.apply_race_baseline()
+        possessed.db.inventory = []
+        possessed.db.age = possessed.db.apparent_age = 24
+        join_party(possessed, character)
+
     if os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1":
         from world.rules.party import PARTY_MAX_COMPANIONS, join_party, party_size
 

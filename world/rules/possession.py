@@ -592,8 +592,13 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
 
 
 def _dialogue_open(npc: Any, player: Any) -> bool:
-    """Check whether ``npc`` is in an open dialogue session with anyone."""
-    from typeclasses.characters import PlayerCharacter
+    """Check whether ``npc`` is in an open dialogue session with anyone.
+
+    The scan covers every acting body in the room, not only player
+    characters: a possessed companion holds its own session on the NPC body,
+    so another owner must not possess a companion that is currently the host
+    of a live conversation.
+    """
     from world.rules.dialogue import live_dialogue_session
 
     session = live_dialogue_session(player)
@@ -603,10 +608,13 @@ def _dialogue_open(npc: Any, player: Any) -> bool:
     location = getattr(npc, "location", None)
     if location is not None and hasattr(location, "contents"):
         for obj in location.contents:
-            if isinstance(obj, PlayerCharacter) and obj.pk != player.pk:
-                other_sess = live_dialogue_session(obj)
-                if other_sess is not None and other_sess.npc_id == getattr(npc, "pk", None):
-                    return True
+            if obj is npc or obj.pk == player.pk:
+                continue
+            if getattr(obj, "db", None) is None:
+                continue
+            other_sess = live_dialogue_session(obj)
+            if other_sess is not None and other_sess.npc_id == getattr(npc, "pk", None):
+                return True
     return False
 
 
@@ -1346,19 +1354,28 @@ def release_possession(
                 f"NPC {getattr(npc, 'pk', '?')} is possessed by player {npc_possessed_by}, not {getattr(player, 'pk', '?')}",
             )
         # Full lifecycle repair for partial mirror under lock
-        with transaction.atomic():
-            list(ObjectDB.objects.select_for_update().filter(id__in=sorted([player.pk, npc.pk])))
-            _unmount_cmdset(npc)
-            account = _resolve_account(player, npc)
-            if account is not None:
-                for session in _acting_sessions(npc):
-                    try:
-                        account.unpuppet_object(session)
-                    except Exception:  # observability: ignore R2: best-effort session unpuppet on repair
-                        pass
-                _strip_puppet_lock(npc, account)
-            npc.db.possessed_by = None
-            _bump_released_owner_view(player)
+        from world.rules.dialogue import clear_dialogue_session
+        from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+
+        dialogue_before = attribute_snapshot(npc, "dialogue_session")
+        try:
+            with transaction.atomic():
+                list(ObjectDB.objects.select_for_update().filter(id__in=sorted([player.pk, npc.pk])))
+                _unmount_cmdset(npc)
+                account = _resolve_account(player, npc)
+                if account is not None:
+                    for session in _acting_sessions(npc):
+                        try:
+                            account.unpuppet_object(session)
+                        except Exception:  # observability: ignore R2: best-effort session unpuppet on repair
+                            pass
+                    _strip_puppet_lock(npc, account)
+                npc.db.possessed_by = None
+                clear_dialogue_session(npc)
+                _bump_released_owner_view(player)
+        except Exception:
+            restore_attribute_best_effort(npc, "dialogue_session", dialogue_before)
+            raise
         return
 
     canonical_npc_id = current["npc_dbid"]
@@ -1399,6 +1416,8 @@ def release_possession(
                 REASON_WRITE_FAILED,
                 f"Could not materialize the owner body's wilderness location: {error}",
             ) from error
+    from world.rules.dialogue import clear_dialogue_session
+
     control_before = snapshot_party_control(player, resolved_npc)
 
     try:
@@ -1419,6 +1438,10 @@ def release_possession(
             if hasattr(resolved_npc, "db"):
                 if getattr(resolved_npc.db, "possessed_by", None) == int(player.pk):
                     resolved_npc.db.possessed_by = None
+            # A successful release retires the acting body's authored
+            # playback through the sole session writer; the restored owner
+            # body republishes its own mode from the committed snapshot.
+            clear_dialogue_session(resolved_npc)
             _bump_released_owner_view(player)
     except PossessionWriteError:
         restore_party_control(player, resolved_npc, control_before)
@@ -1458,9 +1481,12 @@ def release_for_party_change(npc: Any, player: Any) -> None:
 
 def snapshot_party_control(player: Any, npc: Any) -> dict[str, Any]:
     """Capture control surfaces before a membership owner's outer transaction."""
+    from world.rules.surfaces import attribute_snapshot
+
     return {
         "player": deepcopy(player.db.possession),
         "npc": deepcopy(npc.db.possessed_by),
+        "dialogue_session": attribute_snapshot(npc, "dialogue_session"),
         "lock": npc.locks.get("puppet") or "",
         "lock_before": deepcopy(npc.db.possession_lock_before),
         "account": _resolve_account(player, npc),
@@ -1478,6 +1504,14 @@ def restore_party_control(player: Any, npc: Any, snapshot: dict[str, Any]) -> No
     from either transitional puppet cannot gain authority after rollback.
     """
     restore_possession_surfaces(player, npc, snapshot["player"], snapshot["npc"])
+    from world.rules.surfaces import restore_attribute_best_effort
+
+    # The acting body's authored playback retires with a successful release;
+    # a rolled-back handback must restore the Attribute (and its in-process
+    # cache) alongside the other control surfaces.
+    restore_attribute_best_effort(
+        npc, "dialogue_session", snapshot.get("dialogue_session")
+    )
     npc.db.possession_lock_before = snapshot["lock_before"]
     if snapshot["lock"]:
         npc.locks.add(snapshot["lock"])
