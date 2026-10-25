@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Durable first-open observation
 
+Shared contract v2 observes stable host_key and first-seen topic ID for both sources. Test new-phase initial observation without popup, phase-return history and permitted-current-phase-only batches; no static registry gate.
+
 - [ ] 1.1 Implement narrative observe_availability with initialized/ever_open/announced fields under reading-server lock discipline; add world/narrative/tests/test_dialogue_unread.py for initial open, hidden/locked, refusal, completion and relock/variant cases. Document no presenter writes.
 
 ## 2. Claim and post-commit live delivery

@@ -6,6 +6,13 @@ Provide persistent unread markers and deferred deduplicated unlock batches throu
 
 ## ADDED Requirements
 
+### Requirement: Generated phase observation preserves unread privacy and history
+Unread observation SHALL apply to both sources by stable host/topic identity. First-seen topics in a newly permitted phase SHALL initialize without unlock popups. Previously observed locked topics later opening SHALL follow shared notice rules. Only current permitted-phase IDs SHALL enter live batches.
+
+#### Scenario: Returning to a read phase creates no duplicate notice
+- **WHEN** a generated role changes phases and later returns to a previously read phase
+- **THEN** completion remains saved and neither obsolete-phase IDs nor repeated unlock notifications appear
+
 ### Requirement: Unread markers follow formal topic history
 Initially open uncompleted formal topics SHALL show unread markers. Locked topics SHALL show locks instead. A first later opening SHALL become unread regardless of refusal playback. Completion SHALL persist through variant changes and relock/reopen, and repeated opening SHALL not reset it.
 

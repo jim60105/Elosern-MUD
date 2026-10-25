@@ -61,8 +61,8 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 - **THEN** it writes the session with the current greeting/fallback plus deterministic narrative availability observation and does not call a model
 
 #### Scenario: The talk_open success path writes only the session opening
-- **WHEN** a native generated/freeform-only conversation with no authored topic registry opens
-- **THEN** it retains session-only opening with no authored availability observation or model call; authored hosts use the separate narrative-observation path
+- **WHEN** a freeform-only conversation with no scene topic definition opens
+- **THEN** it retains session-only opening without scene availability observation or model call; static/generated scene hosts use the shared narrative-observation path
 
 #### Scenario: No other layer touches a session directly
 - **WHEN** a presenter, generative layer or client encounters a session

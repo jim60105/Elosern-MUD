@@ -25,7 +25,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No static-only observation gate, reconnect popup replay or model-owned state. Every current static/generated scene source shares durable unread history and ephemeral live notices.
 
 ## Batch:
 
@@ -34,4 +34,4 @@ depends-on: authored-dialogue-refresh-lifecycle
 
 Code conflicts: Sequentially extends narrative Attribute, availability writer, pusher and frontend completion module. Existing party unlock_notices.py remains unchanged except reuse of commander_sessions discovery.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; narrative storage uses stable host_key while each wire batch uses its current bound physical host_id/context_id.

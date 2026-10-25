@@ -73,9 +73,9 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **THEN** opening rejects before any dialogue or narrative state change
 
 #### Scenario: Opening a conversation touches nothing but the session
-- **WHEN** a native generated/freeform-only host without authored topics opens with all model profiles disabled
+- **WHEN** a freeform-only host without scene topics opens with all model profiles disabled
 - **THEN** native opening writes only its session and changes no gameplay or authored-reading observation state
 
 #### Scenario: talk_open touches no state beyond the session
-- **WHEN** a native generated/freeform-only conversation opens without an authored topic registry
-- **THEN** no authored observation is written, no model or action-options generation runs, and only the native session changes; authored hosts use the explicit narrative-observation scenario
+- **WHEN** a freeform-only conversation opens without a scene topic definition
+- **THEN** no scene observation is written, no model/action-options generation runs and only its session changes; static/generated scene hosts use the shared observation path
