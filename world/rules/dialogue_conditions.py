@@ -74,6 +74,9 @@ REASON_COMPANION_PROVENANCE = "companion_provenance_malformed"
 REASON_PACKAGE = "companion_package_unresolved"
 REASON_ROLE = "companion_role_unavailable"
 
+#: Marker for a stored record whose shape/vocabulary is authoritative but corrupt.
+_INVALID = object()
+
 
 class DialogueConditionError(ValueError):
     """A condition cannot be evaluated or rendered from canonical data."""
@@ -124,9 +127,15 @@ def evaluate_condition(condition: Condition, context: Any) -> bool:
     """Return whether ``condition`` currently holds for ``context``'s actor."""
     evaluation = _Evaluation(context)
     try:
-        return _evaluate(condition, context, evaluation, depth=1)
+        result = _evaluate(condition, context, evaluation, depth=1)
     finally:
         evaluation.finish()
+    if evaluation.reason is not None:
+        # Corrupt authoritative state dominates the whole tree: a matching
+        # alternative never rescues a declaration whose evaluation could not
+        # read the actor's state truthfully.
+        return False
+    return result
 
 
 def condition_hint(condition: Condition, context: Any) -> str:
@@ -301,9 +310,9 @@ def _companion_present(
     for companion in live_companions(owner):
         if not is_companion(companion, owner):
             continue
-        matched = _companion_provenance_matches(companion, condition, evaluation)
-        if evaluation.reason is not None:
-            return False
+        matched = _companion_provenance_matches(companion, condition)
+        if matched is _INVALID:
+            return evaluation.fail(REASON_COMPANION_PROVENANCE)
         if not matched:
             continue
         if actor_location is None or getattr(companion, "location", None) is not actor_location:
@@ -313,9 +322,9 @@ def _companion_present(
 
 
 def _companion_provenance_matches(
-    companion: Any, condition: CompanionPresent, evaluation: _Evaluation
-) -> bool:
-    """Match one live companion's provenance against the declared source."""
+    companion: Any, condition: CompanionPresent
+) -> bool | object:
+    """Match one live companion's provenance, or ``_INVALID`` when it is corrupt."""
     if condition.source_kind == "profile":
         from world.rules.npc_persona import provenance_profile_key
 
@@ -324,20 +333,19 @@ def _companion_provenance_matches(
     provenance = _companion_provenance(companion)
     if provenance is None:
         return False
-    if provenance is False:
-        evaluation.fail(REASON_COMPANION_PROVENANCE)
-        return False
+    if provenance is _INVALID:
+        return _INVALID
     if provenance.get("kind") != "companion":
         return False
     profile = provenance.get("profile")
     return isinstance(profile, str) and profile == condition.source_key
 
 
-def _companion_provenance(companion: Any) -> Mapping[str, Any] | None | bool:
+def _companion_provenance(companion: Any) -> Mapping[str, Any] | None | object:
     """Read one companion's stored provenance mapping.
 
     ``None`` means "no persona metadata" (not this kind of companion);
-    ``False`` means present but malformed, which fails the evaluation closed.
+    ``_INVALID`` means present but malformed, which fails the evaluation closed.
     """
     attributes = getattr(companion, "attributes", None)
     if attributes is None or not hasattr(attributes, "has"):
@@ -348,12 +356,12 @@ def _companion_provenance(companion: Any) -> Mapping[str, Any] | None | bool:
     if meta is None:
         return None
     if not isinstance(meta, Mapping):
-        return False
+        return _INVALID
     provenance = meta.get("provenance")
     if provenance is None:
-        return False
+        return _INVALID
     if not isinstance(provenance, Mapping):
-        return False
+        return _INVALID
     return provenance
 
 
@@ -395,8 +403,11 @@ def _time_period_matches(
 ) -> bool:
     from world.rules.clock import CLOCK_YAML, read_world_clock
 
-    clock = read_world_clock()
-    calendar = getattr(clock, "calendar", None) if clock is not None else None
+    try:
+        clock = read_world_clock()
+        calendar = getattr(clock, "calendar", None) if clock is not None else None
+    except (TypeError, ValueError, OverflowError):  # observability: ignore R2: the evaluation fails closed and its single bounded integrity event reports the corrupt clock record
+        return evaluation.fail(REASON_CLOCK)
     if calendar is None:
         return evaluation.fail(REASON_CLOCK)
     dayparts = CLOCK_YAML.get("dayparts")
@@ -439,7 +450,10 @@ def _skill_owned(
     stored_skills = getattr(getattr(actor, "db", None), "skills", None)
     if not _skills_record_valid(stored_skills):
         return evaluation.fail(REASON_SKILLS)
-    owned = SkillHandler(actor).owned_keys()
+    try:
+        owned = SkillHandler(actor).owned_keys()
+    except (TypeError, ValueError, OverflowError):  # observability: ignore R2: the evaluation fails closed and its single bounded integrity event reports the corrupt skill counter record
+        return evaluation.fail(REASON_SKILLS)
     if condition.skill_key not in owned:
         # A conferred scale-only grant is not ownership.
         return False
@@ -451,7 +465,12 @@ def _skill_owned(
     proficiency = getattr(getattr(actor, "db", None), "skill_proficiency", None)
     if not _proficiency_record_valid(proficiency):
         return evaluation.fail(REASON_PROFICIENCY)
-    level = skill_proficiency_level(actor, condition.skill_key, proficiency=proficiency)
+    try:
+        level = skill_proficiency_level(
+            actor, condition.skill_key, proficiency=proficiency
+        )
+    except (TypeError, ValueError, OverflowError):  # observability: ignore R2: the evaluation fails closed and its single bounded integrity event reports the corrupt proficiency record
+        return evaluation.fail(REASON_PROFICIENCY)
     return level >= condition.min_proficiency
 
 
@@ -495,11 +514,20 @@ def _exposure_matches(
     actor = _actor(context)
     if actor is None:
         return evaluation.fail(REASON_ACTOR_MISSING)
+    stored = _strict_stored_exposure(actor)
+    if stored is _INVALID or stored is None:
+        # A present-but-corrupt record must never become valid again through
+        # the canonical reader's baseline fallback or a relabelled vocabulary.
+        return evaluation.fail(REASON_EXPOSURE)
     if normalized_equipment(actor) is None:
         # Malformed worn storage contributes no bias in the canonical reader;
         # the condition must not silently evaluate the bare stored level.
         return evaluation.fail(REASON_EQUIPMENT)
-    ordinal = _exposure_ordinal(effective_exposure(actor))
+    try:
+        effective = effective_exposure(actor)
+    except (KeyError, TypeError, ValueError, OverflowError):  # observability: ignore R2: the evaluation fails closed and its single bounded integrity event reports the corrupt exposure record
+        return evaluation.fail(REASON_EXPOSURE)
+    ordinal = _exposure_ordinal(effective)
     if ordinal is None:
         return evaluation.fail(REASON_EXPOSURE)
     if condition.minimum is not None and ordinal < condition.minimum:
@@ -507,6 +535,51 @@ def _exposure_matches(
     if condition.maximum is not None and ordinal > condition.maximum:
         return False
     return True
+
+
+def _strict_stored_exposure(entity: Any) -> Any:
+    """Validate the stored exposure record before the canonical overlay reads it.
+
+    Returns the validated stored value (a canonical level label or ordinal),
+    ``None`` when no exposure is stored at all, or ``_INVALID`` for a present
+    record whose shape or vocabulary is corrupt. The precedence mirrors
+    ``world.rules.stored_sexual_reads.stored_sexual_level`` exactly (materialized
+    trait record first, then the import-time baseline), so this is a strict
+    pre-check rather than a second exposure formula.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return None
+    traits = attributes.get("sexual_traits", default=None, category="traits")
+    if isinstance(traits, Mapping) and "exposure" in traits:
+        raw = traits["exposure"]
+        if not isinstance(raw, Mapping):
+            return _INVALID
+        levels = raw.get("levels")
+        value = raw.get("value")
+        if levels is not None:
+            if isinstance(levels, (str, bytes)) or not isinstance(
+                levels, (list, tuple)
+            ):
+                return _INVALID
+            if tuple(levels) != EXPOSURE_LEVELS:
+                return _INVALID
+        if isinstance(value, bool):
+            return _INVALID
+        if isinstance(value, int):
+            if levels is None:
+                return _INVALID
+            return value if 0 <= value < len(EXPOSURE_LEVELS) else _INVALID
+        if isinstance(value, str):
+            return value if value in EXPOSURE_LEVELS else _INVALID
+        return _INVALID
+    baseline = attributes.get("sexual", default=None)
+    if isinstance(baseline, Mapping) and "exposure" in baseline:
+        value = baseline.get("exposure")
+        if isinstance(value, str) and value in EXPOSURE_LEVELS:
+            return value
+        return _INVALID
+    return None
 
 
 def _exposure_ordinal(effective: Any) -> int | None:

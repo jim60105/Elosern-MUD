@@ -78,6 +78,7 @@ _LOCKED_TOPIC = f"{_TABLE_KEY}.locked"
 _CARRIES_TOPIC = f"{_TABLE_KEY}.carried"
 _PREDECESSOR_TOPIC = f"{_TABLE_KEY}.chained"
 _BUDGET_TOPIC = f"{_TABLE_KEY}.budgeted"
+_ANY_TOPIC = f"{_TABLE_KEY}.either"
 
 _EXPOSURE_BOUND = 2
 _EXPOSURE_BASELINE = EXPOSURE_LEVELS[_EXPOSURE_BOUND - 1]
@@ -179,6 +180,16 @@ def _authored_dialogue() -> AuthoredDialogue:
                         ),
                     ),
                 ),
+            ),
+            AuthoredTopic(
+                topic_id=_ANY_TOPIC,
+                keyword="合成其一",
+                label="合成其一",
+                fallback=_scene("t_conditioned_any_fallback", "合成其一答覆。"),
+                requires=AnyCondition(
+                    (Carries(item_key=_ITEM_KEY), RaceIs(race_key=_RACE_KEY))
+                ),
+                unavailable="hidden",
             ),
         ),
     )
@@ -437,6 +448,53 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             self.assertFalse(evaluate_condition(condition, context))
         leave_party(companion, self.char1, reason="test")
 
+    def test_package_role_requires_published_bound_present_and_owned(self):
+        companion = self._companion(
+            {"kind": "companion", "profile": "t_any", "owner": self.char1.pk}
+        )
+        condition = CompanionPresent(source_kind="package_role", source_key="t_package_role")
+        context = SimpleNamespace(
+            actor=self.char1,
+            owner=self.char1,
+            host=self.host,
+            source_identity=SimpleNamespace(package_id="t_pkg"),
+        )
+        binding = SimpleNamespace(npc_id=companion.pk, availability="bound")
+        published = SimpleNamespace(status="published")
+        cancelled = SimpleNamespace(status="cancelled")
+
+        cases = (
+            ("cancelled package", cancelled, binding),
+            (
+                "deleted bound npc",
+                published,
+                SimpleNamespace(npc_id=999999, availability="bound"),
+            ),
+            ("remote companion", published, binding),
+        )
+        for label, package, role_binding in cases:
+            with self.subTest(case=label), patch(
+                "world.quests.scene_store.read_package", return_value=package
+            ), patch(
+                "world.quests.scene_store.get_role_binding", return_value=role_binding
+            ), patch("world.rules.dialogue_conditions.log_warn"):
+                if label == "remote companion":
+                    companion.location = create_object(Room, key="合成遠處")
+                self.assertFalse(evaluate_condition(condition, context))
+                companion.location = self.room1
+
+        # A companion bound to another owner grants nothing.
+        other_owner = create_object(NPC, key="合成另一位主人", location=self.room1)
+        leave_party(companion, self.char1, reason="test")
+        join_party(companion, other_owner)
+        with patch(
+            "world.quests.scene_store.read_package", return_value=published
+        ), patch(
+            "world.quests.scene_store.get_role_binding", return_value=binding
+        ):
+            self.assertFalse(evaluate_condition(condition, context))
+        leave_party(companion, other_owner, reason="test")
+
     def test_static_context_has_no_permitted_package_role(self):
         condition = CompanionPresent(source_kind="package_role", source_key="t_package_role")
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -626,6 +684,41 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         self.assertTrue(evaluate_condition(condition, self._context()))
         self.assertNotIn("sexual", self.char1.__dict__)
 
+    def test_corrupt_materialized_exposure_never_becomes_valid(self):
+        """A present malformed record never falls back to a valid baseline."""
+        condition = Exposure(minimum=_EXPOSURE_BOUND - 1)
+        self.char1.db.sexual = {"exposure": _EXPOSURE_BASELINE}
+        self.char1.db.equipment = _empty_equipment()
+
+        corrupt_records = (
+            {
+                "value": _EXPOSURE_BASELINE,
+                "levels": ["合成甲", "合成乙"],
+            },
+            {"value": True, "levels": list(EXPOSURE_LEVELS)},
+            {
+                "value": len(EXPOSURE_LEVELS) + 3,
+                "levels": list(EXPOSURE_LEVELS),
+            },
+        )
+        for record in corrupt_records:
+            with self.subTest(record=record):
+                self.char1.attributes.add(
+                    "sexual_traits", {"exposure": record}, category="traits"
+                )
+                with patch(
+                    "world.rules.dialogue_conditions.log_warn"
+                ) as log_warn:
+                    self.assertFalse(
+                        evaluate_condition(condition, self._context())
+                    )
+                self.assertEqual(log_warn.call_count, 1)
+                self.assertEqual(
+                    log_warn.call_args.kwargs["context"]["reason"],
+                    "actor_exposure_unresolved",
+                )
+                self.assertNotIn("sexual", self.char1.__dict__)
+
     # -- combination, hints and variants ---------------------------------
 
     def test_all_any_combine_and_bound_the_tree(self):
@@ -672,6 +765,73 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         self.assertIn("）或（", hint)
         self.assertIn(f"需要持有{item_label}×2", hint)
         self.assertIn(EXPOSURE_LEVELS[1], hint)
+
+    def test_integrity_failure_dominates_any_matching_alternative(self):
+        """Corrupt state in one branch never lets another branch qualify the tree."""
+        self.char1.db.inventory = {_ITEM_KEY: 1}
+        condition = AnyCondition(
+            (Carries(item_key=_ITEM_KEY), RaceIs(race_key=_RACE_KEY))
+        )
+        with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
+            self.assertFalse(evaluate_condition(condition, self._context()))
+        self.assertEqual(log_warn.call_count, 1)
+        self.assertEqual(
+            log_warn.call_args.kwargs["context"]["reason"],
+            "actor_inventory_malformed",
+        )
+
+    def test_runtime_group_bounds_fail_closed(self):
+        for children in ((), tuple(RaceIs(race_key=_RACE_KEY) for _ in range(17))):
+            broken = All.__new__(All)
+            object.__setattr__(broken, "children", children)
+            with self.subTest(count=len(children)):
+                with patch(
+                    "world.rules.dialogue_conditions.log_warn"
+                ) as log_warn:
+                    self.assertFalse(
+                        evaluate_condition(broken, self._context())
+                    )
+                self.assertEqual(
+                    log_warn.call_args.kwargs["context"]["reason"],
+                    "condition_children_invalid",
+                )
+
+    def test_corrupt_world_clock_tick_fails_closed(self):
+        class _CorruptClock:
+            @property
+            def calendar(self):
+                raise TypeError("corrupt tick")
+
+        with patch(
+            "world.rules.clock.read_world_clock", return_value=_CorruptClock()
+        ), patch("world.rules.dialogue_conditions.log_warn") as log_warn:
+            self.assertFalse(
+                evaluate_condition(
+                    TimePeriod(start_daypart="dawn", end_daypart="noon"),
+                    self._context(),
+                )
+            )
+        self.assertEqual(
+            log_warn.call_args.kwargs["context"]["reason"], "world_clock_unresolved"
+        )
+
+    def test_non_finite_skill_counter_fails_closed(self):
+        from world.skills.sexual_acts import gated_counter_keys
+
+        counter_key = next(iter(gated_counter_keys()))
+        self.char1.db.skills = {"active": [_SKILL_KEY], "passive": []}
+        self.char1.attributes.add(
+            "sexual_traits",
+            {counter_key: {"current": float("nan")}},
+            category="traits",
+        )
+        with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
+            self.assertFalse(
+                evaluate_condition(SkillOwned(skill_key=_SKILL_KEY), self._context())
+            )
+        self.assertEqual(
+            log_warn.call_args.kwargs["context"]["reason"], "actor_skills_malformed"
+        )
 
     def test_hint_for_unknown_catalog_label_raises(self):
         with self.assertRaises(DialogueConditionError):
@@ -739,6 +899,18 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         with self.assertRaises(TopicNotFoundError):
             self._select(_HIDDEN_TOPIC)
         self.assertIsNone(self.char1.db.dialogue_session)
+
+    def test_corrupt_actor_state_cannot_qualify_an_any_requirement(self):
+        self.char1.db.inventory = {_ITEM_KEY: 1}
+        with self.assertRaises(TopicNotFoundError):
+            self._select(_ANY_TOPIC)
+        self.assertIsNone(self.char1.db.dialogue_session)
+
+        # With readable state the same disjunction qualifies through the race
+        # branch, proving the rejection above came from the corrupt branch.
+        self.char1.db.inventory = []
+        delivery = self._select(_ANY_TOPIC, selection_id="sel-any")
+        self.assertEqual(delivery.kind, "formal")
 
     def test_locked_topic_delivers_its_refusal_with_zero_effects(self):
         affinity_before = self.host.relations.affinity_for(self.char1)
