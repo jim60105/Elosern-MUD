@@ -23,6 +23,7 @@ from unittest.mock import patch
 
 import yaml
 
+from tools.spec_traceability import covers_requirement
 from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
@@ -47,6 +48,9 @@ class StaticDialogueReferencesTests(unittest.TestCase):
     def setUp(self) -> None:
         self.references = static_dialogue_references()
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_registry_families_match_their_canonical_sources(self):
         expected = {
             "race": (RACE_REGISTRY, "display_name_zh"),
@@ -67,6 +71,9 @@ class StaticDialogueReferencesTests(unittest.TestCase):
                         f"{family} label for {key!r}",
                     )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_profile_family_only_carries_uniquely_named_profiles(self):
         canonical_names: dict[str, set[str]] = {}
         for place in PLACE_REGISTRY.values():
@@ -85,6 +92,9 @@ class StaticDialogueReferencesTests(unittest.TestCase):
             with self.subTest(profile=profile_key):
                 self.assertEqual(canonical_names.get(profile_key), {label})
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_ambiguous_and_unlabelled_profiles_are_excluded(self):
         keys = sorted(NPC_PROFILE_REGISTRY)
         self.assertGreaterEqual(len(keys), 2, "need two profiles for the controls")

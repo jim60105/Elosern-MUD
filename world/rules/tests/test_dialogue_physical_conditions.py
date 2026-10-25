@@ -17,6 +17,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room
@@ -277,6 +278,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
 
     # -- identity, inventory and companions -------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_race_reads_the_acting_body_only(self):
         owner = self.char2
         owner.race = _OTHER_RACE_KEY
@@ -284,6 +288,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         self.assertTrue(evaluate_condition(RaceIs(race_key=_RACE_KEY), context))
         self.assertFalse(evaluate_condition(RaceIs(race_key=_OTHER_RACE_KEY), context))
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_unregistered_actor_race_fails_closed_with_one_event(self):
         self.char1.race = "t_unregistered_race"
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -295,6 +302,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"], "actor_race_unresolved"
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_social_identity_reads_actor_membership_and_rejects_corrupt_storage(self):
         identity_key = self._identity_key()
         set_social_identities(self.char1, [identity_key])
@@ -311,6 +321,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             "actor_social_identities_malformed",
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_carries_counts_the_actors_own_repeated_items_without_consuming(self):
         self.char1.db.inventory = [_ITEM_KEY, _ITEM_KEY]
         self.char2.db.inventory = [_ITEM_KEY, _ITEM_KEY, _ITEM_KEY]
@@ -325,6 +338,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         )
         self.assertEqual(self.char1.db.inventory, [_ITEM_KEY, _ITEM_KEY])
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_malformed_inventory_fails_closed(self):
         self.char1.db.inventory = {_ITEM_KEY: 2}
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -337,6 +353,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"], "actor_inventory_malformed"
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_preset_companion_requires_owner_membership_and_local_presence(self):
         preset_key = next(iter(static_dialogue_references().keys_for("preset")))
         companion = self._companion(
@@ -357,6 +376,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         leave_party(companion, self.char1, reason="test")
         self.assertFalse(evaluate_condition(condition, self._context()))
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_companion_of_another_owner_grants_nothing(self):
         other_owner = create_object(NPC, key="合成另一位主人", location=self.room1)
         preset_key = next(iter(static_dialogue_references().keys_for("preset")))
@@ -405,6 +427,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         )
         leave_party(companion, self.char1, reason="test")
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_package_role_companion_resolves_only_the_permitted_binding(self):
         companion = self._companion(
             {"kind": "companion", "profile": "t_any", "owner": self.char1.pk}
@@ -448,6 +473,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             self.assertFalse(evaluate_condition(condition, context))
         leave_party(companion, self.char1, reason="test")
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_package_role_requires_published_bound_present_and_owned(self):
         companion = self._companion(
             {"kind": "companion", "profile": "t_any", "owner": self.char1.pk}
@@ -495,6 +523,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             self.assertFalse(evaluate_condition(condition, context))
         leave_party(companion, other_owner, reason="test")
 
+    @covers_requirement(
+        "authored-dialogue-conditions::generated-physical-references-retain-canonical-and-package-scope"
+    )
     def test_static_context_has_no_permitted_package_role(self):
         condition = CompanionPresent(source_kind="package_role", source_key="t_package_role")
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
@@ -511,6 +542,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
 
         get_world_clock()._persist(seconds)
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_time_period_wraps_midnight_half_open(self):
         from world.rules.clock import CLOCK_YAML
 
@@ -553,6 +587,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
 
     # -- skills and exposure ----------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_skill_owned_uses_exact_ownership_never_conferral(self):
         self.char1.db.skills = {"active": [_SKILL_KEY], "passive": []}
         self.assertTrue(
@@ -569,6 +606,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             evaluate_condition(SkillOwned(skill_key=_OTHER_SKILL_KEY), self._context())
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_skill_proficiency_threshold_uses_the_canonical_reader(self):
         self.char1.db.skills = {"active": [_SKILL_KEY], "passive": []}
         self.char1.db.skill_proficiency = {_SKILL_KEY: SKILL_PROFICIENCY_XP_PER_LEVEL * 2.0}
@@ -611,6 +651,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             "actor_proficiency_malformed",
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_exposure_bounds_are_inclusive_ordinals(self):
         self.char1.db.sexual = {"exposure": _EXPOSURE_BASELINE}
         self.char1.db.equipment = _empty_equipment()
@@ -634,6 +677,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             )
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_worn_equipment_changes_exposure_without_materializing_a_handler(self):
         self.char1.db.sexual = {"exposure": _EXPOSURE_BASELINE}
         self.char1.db.equipment = _empty_equipment()
@@ -668,6 +714,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"], "actor_equipment_malformed"
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_kit_exposure_accessory_crosses_the_bound_through_the_shipped_rulebook(self):
         """The browser fixture's gear shifts the canonical read with no rule patching."""
         accessory = next(
@@ -684,6 +733,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         self.assertTrue(evaluate_condition(condition, self._context()))
         self.assertNotIn("sexual", self.char1.__dict__)
 
+    @covers_requirement(
+        "authored-dialogue-conditions::physical-conditions-use-the-acting-body-and-canonical-readers"
+    )
     def test_corrupt_materialized_exposure_never_becomes_valid(self):
         """A present malformed record never falls back to a valid baseline."""
         condition = Exposure(minimum=_EXPOSURE_BOUND - 1)
@@ -721,6 +773,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
 
     # -- combination, hints and variants ---------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_all_any_combine_and_bound_the_tree(self):
         context = self._context()
         self.assertTrue(
@@ -744,6 +799,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             "condition_depth_exceeded",
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_hints_recurse_over_the_same_tree_with_canonical_labels(self):
         references = static_dialogue_references()
         race_label = references.label("race", _RACE_KEY)
@@ -833,10 +891,16 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             log_warn.call_args.kwargs["context"]["reason"], "actor_skills_malformed"
         )
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_hint_for_unknown_catalog_label_raises(self):
         with self.assertRaises(DialogueConditionError):
             condition_hint(RaceIs(race_key="t_unlisted_race"), self._context())
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_variant_selection_takes_the_highest_matching_priority(self):
         low = SceneVariant(
             variant_id="low",
@@ -878,6 +942,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
 
     # -- selection integration -------------------------------------------
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_race_qualified_topic_delivers_the_variant_and_the_fallback(self):
         delivery = self._select(_RACE_TOPIC)
         self.assertEqual(delivery.kind, "formal")
@@ -895,11 +962,17 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         )
         self.assertEqual(fallback.scene_id, "t_conditioned_race_fallback")
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_hidden_topic_behaves_as_unknown_and_writes_no_session(self):
         with self.assertRaises(TopicNotFoundError):
             self._select(_HIDDEN_TOPIC)
         self.assertIsNone(self.char1.db.dialogue_session)
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_corrupt_actor_state_cannot_qualify_an_any_requirement(self):
         self.char1.db.inventory = {_ITEM_KEY: 1}
         with self.assertRaises(TopicNotFoundError):
@@ -912,6 +985,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         delivery = self._select(_ANY_TOPIC, selection_id="sel-any")
         self.assertEqual(delivery.kind, "formal")
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_locked_topic_delivers_its_refusal_with_zero_effects(self):
         affinity_before = self.host.relations.affinity_for(self.char1)
         delivery = self._select(_LOCKED_TOPIC)
@@ -942,6 +1018,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             self._select(_PREDECESSOR_TOPIC)
         self.assertIsNone(self.char1.db.dialogue_session)
 
+    @covers_requirement(
+        "authored-dialogue-conditions::combination-hints-and-complete-scene-variants-share-declarations"
+    )
     def test_replayed_selection_keeps_the_delivered_variant(self):
         delivery = self._select(_RACE_TOPIC, selection_id="sel-stable")
         session = live_dialogue_session(self.char1)
