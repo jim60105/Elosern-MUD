@@ -140,7 +140,7 @@ them.
 
 | kind | key | reviewed | greeting | responses | service-semantics | disposition |
 | --- | --- | --- | --- | --- | --- | --- |
-| `dialogue_table` | `guild_staff` | 2026-10-11 | 葛里安‧衛登 sets down the quill and welcomes the visitor to the branch, asking whether it is to register or to hand in a contract | four answers cover registration, contracts, the guild itself and handing in, each naming the register as the guild's only record | carries the one rule-bearing 回報 keyword route that resolves contracts, and no other table imitates it | accepted: greeting is the sole source and service semantics hold |
+| `dialogue_table` | `guild_staff` | 2026-10-26 | 葛里安‧衛登 sets down the quill and looks up from the heavy register, greeting the adventurer and outlining branch registration, picking contracts from the board, and returning to report | four newly authored scenes cover registering at F rank, taking commissions from the central board, guild neutrality and rank progression across three nations (with an E-rank qualified variant), and the formal turn-in settlement process | preserves the 回報 native service turn-in and summary listing semantics, registration/board/exam authority remain unchanged, and topic_04 serves as the informational fallback | accepted: greeting is the sole source and service semantics hold |
 
 | kind | key | reviewed | card | voice | disposition |
 | --- | --- | --- | --- | --- | --- |

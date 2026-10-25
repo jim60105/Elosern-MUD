@@ -6,7 +6,7 @@ topics:
   label: 註冊
   fallback:
     scene_id: guild_staff.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -15,7 +15,7 @@ topics:
       text: 葛里安翻開桌上厚重名冊的全新一頁，取過墨水瓶，把羽毛筆遞向你。
     - kind: speech
       speaker: host
-      text: 「手續很清楚。在這本名冊寫下你的名字，公會就正式承認你的冒險者身分。」
+      text: 「手續並不繁複。在這本名冊寫下你的名字，公會就正式承認你的冒險者身分。」
     - kind: speech
       speaker: host
       text: 「每個新人都從 F 級起步，先接採集藥草或清理近郊這類委託。名冊上記下的每一筆功績，公會都負責到底。」
@@ -24,7 +24,7 @@ topics:
   label: 任務
   fallback:
     scene_id: guild_staff.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -51,7 +51,7 @@ topics:
       rank_key: E
     scene:
       scene_id: guild_staff.topic_03_senior
-      revision: r1
+      revision: r2
       lines:
       - kind: speech
         speaker: actor
@@ -63,13 +63,13 @@ topics:
         text: 「你已經通過考核，脫離最底層的新人階級，名冊上已有你的功績。」
       - kind: speech
         speaker: host
-        text: 「冒險者公會是跨國中立組織，總部設在格蘭迪亞帝都，三國共同承認我們的權限。」
+        text: 「冒險者公會是跨國中立組織，總部設在格蘭迪亞帝都，三國共同承認公會的權限。」
       - kind: speech
         speaker: host
         text: 「此處阿爾托利亞分會專責審核委託與晉升。只要踏實接案，升階考核的大門永遠為你敞開。」
   fallback:
     scene_id: guild_staff.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -81,7 +81,7 @@ topics:
       text: 「冒險者公會是跨國中立組織，總部設在帝國首都，全大陸共有兩百餘處分會。」
     - kind: speech
       speaker: host
-      text: 「三國皆承認公會的公正身分。我們負責登記冒險者、發放結算委託，並主持階級審核。」
+      text: 「三國皆承認公會的公正身分。公會負責登記冒險者、發放結算委託，並主持階級審核。」
     - kind: speech
       speaker: host
       text: 「不論出身平原或貴族，只要站在櫃檯前，公會只認名冊上記下的實績。」
@@ -90,7 +90,7 @@ topics:
   label: 回報
   fallback:
     scene_id: guild_staff.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
