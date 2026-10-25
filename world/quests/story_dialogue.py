@@ -23,7 +23,7 @@ from typing import Any
 
 from django.db import transaction
 
-from world.observability import log_info
+from world.observability import log_info, log_warn
 
 from . import scene_store
 from .encounters import ScenePackageNotFound
@@ -216,6 +216,13 @@ def transition_story_dialogue(
         transaction.on_commit(
             lambda: _refresh_sessions(participants, actor, selected.greeting)
         )
+    if actor is not None:
+        # A committed phase moves the role's authored topics and greeting.
+        # Every live session naming this actor is retired through the existing
+        # phase seam after the commit, so an idle owner in another room also
+        # stops replaying the obsolete delivery/receipts; saved reading state
+        # is narrative-owned and untouched here.
+        transaction.on_commit(lambda: _refresh_phase_sessions(actor))
     log_info(
         "story_dialogue_transitioned",
         context={
@@ -336,6 +343,38 @@ def _refresh_sessions(participants: tuple[Any, ...], actor: Any, greeting: str) 
         if session is None or session.npc_id != int(actor.pk):
             continue
         open_or_refresh_dialogue(participant, actor, greeting)
+
+
+def _refresh_phase_sessions(actor: Any) -> None:
+    """Retire every live session replaying the actor's obsolete phase.
+
+    Discovery is the stored ``dialogue_session`` Attribute (see
+    ``world.rules.dialogue_availability.session_bearing_dialogue_bodies``), so
+    it reaches a valid owner whose face-to-face conversation with this actor
+    was opened from another connection. The existing ``refresh_dialogue_phase``
+    seam re-resolves the current context: a changed generated phase allocates a
+    fresh context and therefore drops the obsolete delivery and receipts,
+    while saved logical reading stays narrative-owned. Failure on one body is
+    isolated; the committed phase itself is never reversed.
+    """
+    from world.rules.dialogue import live_dialogue_session, refresh_dialogue_phase
+    from world.rules.dialogue_availability import session_bearing_dialogue_bodies
+
+    actor_id = int(getattr(actor, "pk", 0) or 0)
+    if actor_id <= 0:
+        return
+    for body in session_bearing_dialogue_bodies():
+        try:
+            session = live_dialogue_session(body)
+            if session is None or session.npc_id != actor_id:
+                continue
+            refresh_dialogue_phase(body, actor)
+        except Exception as error:  # observability: ignore R2: one body's refresh failure must not stop the others or reverse the committed phase
+            log_warn(
+                "dialogue_phase_refresh_failed",
+                exc=error,
+                context={"npc": str(actor_id), "actor": str(getattr(body, "pk", "?"))},
+            )
 
 
 def _declared_prerequisite_facts(definition) -> frozenset:

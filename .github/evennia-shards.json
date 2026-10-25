@@ -115,6 +115,7 @@
         "world.rules.tests.test_dialogue_references",
         "world.rules.tests.test_dialogue_progression_conditions",
         "world.rules.tests.test_dialogue_refresh_physical",
+        "world.rules.tests.test_dialogue_refresh_lifecycle",
         "world.rules.tests.test_dialogue_reading_completion"
       ]
     },

@@ -749,6 +749,17 @@ def settle_exam_outcome(
             _write_exams(actor, new_records)
             if passed:
                 actor.guild_rank = _next_rank(actor.guild_rank)
+                # A committed promotion changes owner guild-rank eligibility;
+                # the caller's settlement transaction owns the commit, so the
+                # refresh is registered here and discarded on any rollback.
+                from world.rules.dialogue_availability import (
+                    affected_dialogue_owners,
+                    queue_dialogue_refresh,
+                )
+
+                queue_dialogue_refresh(
+                    affected_dialogue_owners(actor), cause="guild_rank"
+                )
                 from world.rules.titles import award_guild_rank_title
 
                 # D3: the promotion transaction banks the new rank's paired

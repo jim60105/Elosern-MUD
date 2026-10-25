@@ -273,6 +273,17 @@ def register_adventurer(
                 salience=1,
                 award_results=title_awards,
             )
+            # Committed rank/membership refresh: the owner's current
+            # conversation is reprojected from the final registration state
+            # once this transaction (or the caller's outermost one) commits.
+            from world.rules.dialogue_availability import (
+                affected_dialogue_owners,
+                queue_dialogue_refresh,
+            )
+
+            queue_dialogue_refresh(
+                affected_dialogue_owners(actor), cause="guild_rank"
+            )
     except Exception:
         _restore_registration(actor, staff, snapshot)
         raise
@@ -359,6 +370,16 @@ def write_reward_claims(actor: Any, claims: list[str]) -> None:
     ``parse_reward_claims`` is the strict read seam.
     """
     actor.db.guild_reward_claims = list(claims)
+    # The claim ledger is the canonical receipt of a completed reward, so the
+    # owner's current choices are reprojected when the caller's transaction
+    # commits. Every caller (counter turn-in and automatic settlement) passes
+    # the same validated list through this single append point.
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(affected_dialogue_owners(actor), cause="reward_claimed")
 
 
 def _require_local_staff(actor: Any, staff: Any) -> None:

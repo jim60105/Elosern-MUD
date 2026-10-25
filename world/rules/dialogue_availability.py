@@ -56,6 +56,14 @@ owner plus its currently lawful possession owner, and any explicitly supplied
 prior owner captured before a detach -- never an account-wide sibling
 character. Neither helper creates a conversation, session or selection.
 
+``session_bearing_dialogue_bodies``/``session_bearing_dialogue_owners`` serve
+the sources that are not scoped to one changed entity: a world-time commit and
+a generated phase transition must reach an idle owner whose live conversation
+depends on the new clock period or phase. Their discovery is the stored
+``dialogue_session`` Attribute itself -- the single truth of who is speaking --
+validated through the same live-session reader every presenter uses, so no
+presence, party or account heuristic can invent a conversation.
+
 The canonical physical source matrix lived here by this slice (exact commit
 hooks, owner capture and acceptance) is documented in
 ``docs/development/dialogue-panel-protocol.md``; the lifecycle slice extends
@@ -358,6 +366,63 @@ def affected_dialogue_owners(
     return _unique_owners(candidates)
 
 
+def session_bearing_dialogue_bodies() -> tuple[Any, ...]:
+    """Every persistent body that currently holds one live authored session.
+
+    World-time and phase commits are not scoped to an action's entities: an
+    idle player in another room may still be talking to a host whose
+    eligibility depends on the new clock period or phase. The stored
+    ``dialogue_session`` Attribute is the discovery key (the single truth of
+    who is speaking), and each candidate is validated through the canonical
+    live-session reader, so a corrupt value, a departed host or a stale
+    control identity is skipped exactly as every presenter skips it.
+
+    Read-only and never raising: discovery is best-effort scheduling after a
+    successful owning write, so an unreadable candidate body is skipped
+    instead of failing the commit. Never creates a conversation or selection.
+    """
+    from evennia.objects.models import ObjectDB
+
+    from world.rules.dialogue import live_dialogue_session
+
+    try:
+        through = ObjectDB.db_attributes.through
+        body_ids = tuple(
+            dict.fromkeys(
+                through.objects.filter(attribute__db_key="dialogue_session")
+                .values_list("objectdb_id", flat=True)
+            )
+        )
+        if not body_ids:
+            return ()
+        rows = tuple(ObjectDB.objects.filter(id__in=body_ids))
+    except Exception:  # observability: ignore R2: discovery only schedules presentation for a write that already committed; the next canonical sync recovers, so a query failure must never fail the writer
+        return ()
+    bodies: list[Any] = []
+    for body in rows:
+        try:
+            if live_dialogue_session(body) is None:
+                continue
+        except Exception:  # observability: ignore R2: one unreadable body is skipped; another owner's refresh must still run and the commit must stand
+            continue
+        bodies.append(body)
+    return tuple(bodies)
+
+
+def session_bearing_dialogue_owners() -> tuple[Any, ...]:
+    """The lawful owners of every live session-bearing body, deduplicated.
+
+    The owner half of the world-time/phase discovery above: a player body owns
+    itself, while a possessed companion resolves through the same lawful
+    binding and possession checks as ``affected_dialogue_owners``. An
+    account-wide sibling never appears. Read-only; never creates state.
+    """
+    candidates: list[Any] = []
+    for body in session_bearing_dialogue_bodies():
+        candidates.extend(affected_dialogue_owners(body))
+    return _unique_owners(candidates)
+
+
 def _owner_identity(entity: Any) -> int | None:
     """The persistent pk of one legitimate dialogue owner, or ``None``."""
     from typeclasses.characters import PlayerCharacter
@@ -515,4 +580,6 @@ __all__ = [
     "project_topics",
     "queue_dialogue_refresh",
     "refresh_dialogue_availability",
+    "session_bearing_dialogue_bodies",
+    "session_bearing_dialogue_owners",
 ]

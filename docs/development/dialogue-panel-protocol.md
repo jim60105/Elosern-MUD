@@ -211,8 +211,26 @@ second call in `evaluate_cross_lineage_unlocks`; no new skill mutation API is
 introduced. A raw GM console Attribute repair stays outside ordinary gameplay
 publication and its next canonical sync re-evaluates state.
 
-The lifecycle slice (`authored-dialogue-refresh-lifecycle`) extends the same two helpers
-for quest, world-time, companion-presence and control sources. Completion-to-refresh
+### Canonical lifecycle source matrix
+
+These are the exact commit hooks `authored-dialogue-refresh-lifecycle` owns. They reuse
+`queue_dialogue_refresh`/`affected_dialogue_owners` unchanged; no third event bus exists.
+Every row registers on the owning transaction, so a rollback publishes nothing and the
+callback re-projects from the final committed state.
+
+| Condition source | Exact commit hook | Captured owner(s) | Committed acceptance |
+|---|---|---|---|
+| Guild registration and rank | `world/rules/guild.py::register_adventurer` after the registration write; `world/rules/guild_exams.py::settle_exam_outcome` after a passed rank assignment inside the settlement transaction | explicit actor | Registration and a promotion each open rank topics independently; a failed exam schedules nothing |
+| Quest lifecycle, every state | `world/quests/transitions.py::_schedule_transition_events` (the diff boundary every replacement/delta/pending-effect writer calls) plus `apply_quest_log_delta` after the final replacement | quest actor owner (`affected_dialogue_owners(actor)`) | Accepted, in-progress, completed, failed, invalidated and absence transitions all refresh; completion-only observers are not used |
+| Reward claimed | `world/rules/guild.py::write_reward_claims` inside the caller transaction | owner actor | Counter and automatic claims refresh the named completed record after commit |
+| Host affinity | `world/rules/affinity.py::apply_affinity_change` on a value change and `seed_affinity` after the save; `raise_affinity_cap` alone is not a source | explicit player | Another connection's write updates choices; a rollback opens nothing |
+| Companion membership | `world/rules/party.py::_write_binding` for join/leave/general/temporary mutations and `purge_npc_memberships` | player/prior owner captured before a detach | Removal, expiry and auto-leave refresh the owner's unrelated-host conversation |
+| Companion presence and deletion | `typeclasses/npcs.py::at_post_move` and `at_object_delete` | `affected_dialogue_owners` with the prior owner captured before purge | A bound companion leaving/returning changes `CompanionPresent` while the conversation host stays present |
+| World time | `world/rules/clock.py::WorldClock.advance` after tick persistence, only on a daypart crossing | `session_bearing_dialogue_owners()` (stored `dialogue_session` discovery), independent of the action scope | A midnight/daypart commit reaches an idle owner not participating in the initiating action; a within-daypart advance schedules nothing |
+| Generated phase | `world/quests/story_dialogue.py::transition_story_dialogue` commit callback through `refresh_dialogue_phase` | every live session naming the advanced role actor | A new phase retires the obsolete delivery/receipts before the new projection; saved reading persists |
+| Control | `world/rules/possession.py::_enter_possession`/`release_possession` after the verified transition | explicit player captured before the old body detaches | The old actor's session retires; release republishes the new body's own view without copying the obsolete possessed scene |
+
+Completion-to-refresh
 (`cause="reading_completed"`) is queued by `complete_dialogue_delivery` only after an
 accepted, committed reading write. Command and
 presentation observers are not a substitute: a committed writer with no live session

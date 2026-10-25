@@ -155,6 +155,19 @@ class NPC(LivingEntity):
             from web.webclient.presentation.party_push import push_party_update
 
             transaction.on_commit(lambda: push_party_update(owner))
+        # A deleted companion no longer satisfies any CompanionPresent
+        # topic, so the captured prior owner's current conversation is
+        # reprojected once the deletion commits. The owner was read BEFORE
+        # the membership purge above.
+        from world.rules.dialogue_availability import (
+            affected_dialogue_owners,
+            queue_dialogue_refresh,
+        )
+
+        queue_dialogue_refresh(
+            affected_dialogue_owners(self, prior_owner=owner),
+            cause="companion_presence",
+        )
         departure_room = self.location
         if departure_room is not None:
             # Same deferral as the post-move seam: the deletion commits with
@@ -200,6 +213,19 @@ class NPC(LivingEntity):
         from world.quests.encounter_dispatch import activate_for_move
 
         activate_for_move(self)
+        # Companion presence is a location fact: a bound companion leaving or
+        # returning changes the owner's topic eligibility even when the owner
+        # is talking to a DIFFERENT host. The owner is captured before the
+        # session-cleanup seam below, and the callback re-resolves the final
+        # committed membership and location.
+        from world.rules.dialogue_availability import (
+            affected_dialogue_owners,
+            queue_dialogue_refresh,
+        )
+
+        queue_dialogue_refresh(
+            affected_dialogue_owners(self), cause="companion_presence"
+        )
         if source_location is None:
             return
         from django.db import transaction

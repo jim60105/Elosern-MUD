@@ -787,6 +787,18 @@ def purge_npc_memberships(npc: Any) -> None:
             player.db.party_meta = meta_before
         npc.db.party_member = member
         raise PartyWriteError("purge_failed", str(error)) from error
+    # The owner captured before the detach still receives one committed
+    # refresh after the binding is gone (companion presence relocks its
+    # authored topics). The callback re-reads the final membership.
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(
+        affected_dialogue_owners(npc, prior_owner=player),
+        cause="companion_presence",
+    )
 
 
 def _write_binding(
@@ -813,6 +825,19 @@ def _write_binding(
         player.db.party_meta = meta_before
         npc.db.party_member = member_before
         raise PartyWriteError("write_failed", str(error)) from error
+    # Every membership mutation (join, leave, general/temporary change) can
+    # change CompanionPresent for the owner's current conversation. The owner
+    # is passed explicitly so a detach still refreshes the owner that lost
+    # the binding.
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(
+        affected_dialogue_owners(npc, prior_owner=player),
+        cause="companion_presence",
+    )
     log_info("party_membership_commit", context={"char": player.pk, "npc": npc.pk})
 
 
