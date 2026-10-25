@@ -115,6 +115,8 @@ def _exploration_fixture(character) -> None:
         SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY,
         SYNTH_DIALOGUE_HOST_KEY,
         SYNTH_DIALOGUE_TABLE_KEY,
+        SYNTH_LOCKED_DIALOGUE_TABLE_KEY,
+        SYNTH_LOCKED_TOPIC_ITEM_KEYS,
         SYNTH_SCENE_DIALOGUE_TABLE_KEY,
         SYNTH_BARD_KEY,
         SYNTH_DEFEATED_MONSTER_KEY,
@@ -138,6 +140,19 @@ def _exploration_fixture(character) -> None:
         # The possessed physical-conditions journey carries the conditioned
         # table: one race-qualified topic and one effective-exposure topic.
         host_dialogue_key = SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY
+    if synth and os.environ.get("ELOSERN_BROWSER_DIALOGUE_LOCKED") == "1":
+        # The locked-topic UI journey (authored-dialogue-locked-ui): the
+        # gatekeeper table's second topic stays visibly locked because the
+        # player carries neither required kit item. The Carries condition
+        # reads the strict inventory list (worn items stay listed there), so
+        # stripping both keys here keeps the topic locked even if the
+        # preset's default loadout ever starts with either item.
+        host_dialogue_key = SYNTH_LOCKED_DIALOGUE_TABLE_KEY
+        character.db.inventory = [
+            key
+            for key in (character.db.inventory or [])
+            if key not in SYNTH_LOCKED_TOPIC_ITEM_KEYS
+        ]
     host.components.add(ScriptedDialogue.create(host, dialogue_key=host_dialogue_key))
     from world.rules.affinity import AffinitySource, apply_affinity_change
 

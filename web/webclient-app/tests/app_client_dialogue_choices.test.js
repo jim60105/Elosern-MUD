@@ -18,6 +18,7 @@ import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 import {
+  choiceRow,
   dialoguePanel as v3Panel,
   narration,
   sceneDelivery,
@@ -458,6 +459,122 @@ describe("the dialogue choice list over the stage", () => {
       await settle();
       expect(list().exists()).toBe(true);
       expect(document.activeElement).toBe(elsewhere);
+    });
+  });
+
+  // authored-dialogue-locked-ui: a visibly locked topic is a selectable
+  // refusal through the same single dispatch entry and the same scene
+  // player, for static and generated (opaque, up to 2048-character) topics.
+  describe("locked topics", () => {
+    const GENERATED_ID = `g.${"r".repeat(40)}.${"k".repeat(2048 - 43)}`;
+    const openRow = (keyword, label) => choiceRow(keyword, { hostId: 7, topicId: `host.${keyword}`, label });
+    const lockedRow = (keyword, label, hint, topicId = `host.${keyword}`) => ({
+      ...choiceRow(keyword, { hostId: 7, topicId, label }),
+      availability: "locked",
+      requirement_hint: hint,
+    });
+    const CHOICES = [
+      openRow("news", "最近有什麼消息？"),
+      lockedRow("dream", "夢裡的約定", "需要好感階段至少為熟識", GENERATED_ID),
+      openRow("town", "關於這座城鎮"),
+    ];
+    const pickRows = () => list().findAll('[data-testid="dialogue-pick"]');
+    const activeRow = () => document.getElementById(list().attributes("aria-activedescendant"));
+    const listKey = async (key) => {
+      list().element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      await settle();
+    };
+
+    it("plays a generated locked topic's refusal through the ordinary player and returns to the choices", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(dialoguePanel({ choices: CHOICES }));
+      await press();
+      expect(list().exists()).toBe(true);
+      list().element.focus();
+      await listKey("ArrowDown");
+      // Keyboard focus shows the canonical hint; the row stays selectable.
+      expect(list().get('[data-testid="choice-card-tip"]').text()).toBe("需要好感階段至少為熟識");
+      expect(pickRows()[1].attributes("aria-disabled")).toBeUndefined();
+      await listKey("Enter");
+      expect(sender.sent.actions).toHaveLength(1);
+      expect(sender.sent.actions[0]).toMatchObject({
+        action_id: "explore.talk_scripted",
+        payload: { npc_id: 7, topic_id: GENERATED_ID, context_id: "ctx-1" },
+      });
+      expect(sender.sent.actions[0].payload.topic_id).toHaveLength(2048);
+      expect(list().exists()).toBe(false);
+      // The server answers with the authored refusal: the shared player
+      // presents it line by line; no formal body ever arrives.
+      store.receive(generation, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+      commit(
+        "dialogue",
+        scenePanel(
+          [speech("actor", "夢裡的約定？"), speech("host", "等我們更熟一點再說吧。")],
+          { kind: "refusal", topicId: GENERATED_ID, sceneId: `g.${"r".repeat(40)}.refusal_scene`, deliveryId: "dlv-refusal" },
+          { choices: CHOICES },
+        ),
+      );
+      await settle();
+      expect(win().attributes("data-scene")).toBe("true");
+      expect(frame()).toMatchObject({ text: "夢裡的約定？", plate: "旅人", actor: "true", host: "false" });
+      expect(list().exists()).toBe(false);
+      page().focus();
+      await press();
+      expect(frame()).toMatchObject({ text: "等我們更熟一點再說吧。", plate: "店長", actor: "false", host: "true" });
+      expect(list().exists()).toBe(false);
+      await press(); // the explicit finish
+      expect(list().exists()).toBe(true);
+      expect(document.activeElement).toBe(list().element);
+      // Back at the choices: nothing further was submitted, and the topic is
+      // still the server's locked row (the client unlocks nothing).
+      expect(sender.sent.actions).toHaveLength(1);
+      expect(pickRows()[1].attributes("data-locked")).toBe("true");
+    });
+
+    it("moves focus to the nearest remaining choice when a refresh hides the focused topic", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(dialoguePanel({ choices: CHOICES }));
+      await press();
+      list().element.focus();
+      await listKey("ArrowDown");
+      expect(activeRow()).toBe(pickRows()[1].element);
+      commit("dialogue", dialoguePanel({ choices: [CHOICES[0], CHOICES[2]] }));
+      await settle();
+      expect(list().exists()).toBe(true);
+      expect(document.activeElement).toBe(list().element);
+      expect(pickRows().map((row) => row.get(".dialogue-choices__label").text())).toEqual(["最近有什麼消息？", "關於這座城鎮"]);
+      expect(activeRow()).toBe(pickRows()[1].element);
+      expect(list().find('[data-testid="choice-card-tip"]').exists()).toBe(false);
+      expect(sender.sent.actions).toHaveLength(0);
+    });
+
+    it("keeps the playing line, plate and portrait emphasis when choices refresh mid-scene", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel(SCENE_LINES, {}, { choices: CHOICES }));
+      page().focus();
+      await press();
+      const before = frame();
+      expect(before).toMatchObject({ text: "北岸大道最近不太平。", host: "true", actor: "false" });
+      // A committed availability refresh: the locked topic opens, a fifth
+      // topic appears. The playing scene does not change and stays covered.
+      const refreshed = [
+        CHOICES[0],
+        { ...CHOICES[1], availability: "open", requirement_hint: null },
+        CHOICES[2],
+        openRow("road", "北岸大道"),
+        openRow("night", "夜裡的路"),
+      ];
+      commit("dialogue", scenePanel(SCENE_LINES, {}, { choices: refreshed }));
+      await settle();
+      expect(frame()).toEqual(before);
+      expect(list().exists()).toBe(false);
+      await press();
+      await press();
+      await press(); // the finish
+      expect(list().exists()).toBe(true);
+      expect(pickRows()).toHaveLength(5);
+      expect(pickRows()[1].attributes("data-locked")).toBeUndefined();
+      expect(sender.sent.actions).toHaveLength(0);
     });
   });
 });

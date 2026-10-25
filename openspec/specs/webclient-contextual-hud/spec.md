@@ -2106,7 +2106,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: The rows follow the payload exactly
 - **WHEN** the choice list renders
-- **THEN** its rows are, in order: one pick row per `dialogue.choices` entry in payload order, each carrying the digit badge of its 1-based position and its bounded label; a `⌨ 自由對話` row; a `↦ 移動…` row; and a `✕ 結束對話` row — and it renders no row the panel does not back, no reason tag, and no disabled pick
+- **THEN** its rows are, in order: one pick row per `dialogue.choices` entry in payload order, each carrying the digit badge of its 1-based position and its bounded label; a `⌨ 自由對話` row; a `↦ 移動…` row; and a `✕ 結束對話` row — and it renders no row the panel does not back, a lock and canonical focus/hover hint for locked selectable-refusal topics; operationally disabled picks retain no-dispatch behavior
 
 #### Scenario: Picks and exits dispatch their exact intents
 - **WHEN** the player activates a pick row, or an enabled exit row
@@ -2114,7 +2114,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: The free-form and exit rows dispatch nothing themselves
 - **WHEN** the player activates `⌨ 自由對話`, or `✕ 結束對話`
-- **THEN** `⌨ 自由對話` expands the command line and focuses its field through the free-form borrow path, bound to the host, and dispatches nothing itself; `✕ 結束對話` dispatches `explore.dialogue_leave` with `{npc_id: host.identity}` and nothing else
+- **THEN** `⌨ 自由對話` expands the command line and focuses its field through the free-form borrow path, bound to the host, and dispatches nothing itself; `✕ 結束對話` dispatches `explore.dialogue_leave` with `{npc_id: host.identity}` with declared lock/unread adornments and accessible hint associations only
 
 #### Scenario: The move row borrows the scene overview's exits
 - **WHEN** the player activates `↦ 移動…`
@@ -2154,11 +2154,11 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: The rows follow the committed panel
 - **WHEN** the list renders for a panel with three choices
-- **THEN** it shows pick rows badged `1`, `2`, `3` with the panel's labels in payload order, then `⌨ 自由對話`, `↦ 移動…`, and `✕ 結束對話`, and nothing else
+- **THEN** it shows pick rows badged `1`, `2`, `3` with the panel's labels in payload order, then `⌨ 自由對話`, `↦ 移動…`, and `✕ 結束對話`, with declared lock/unread adornments and accessible hint associations only
 
 #### Scenario: A pick dispatches the scripted keyword
 - **WHEN** the player activates pick 2 through pointer, Enter, or the `2` key
-- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after the scene's final fully visible page receives a further activation
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and stable static/generated topic/context payload is submitted, the list hides while in flight, focus stays on the message surface, and the list returns after the final fully visible scene page receives a further activation
 
 #### Scenario: Free dialogue borrows the command line
 - **WHEN** the player activates `⌨ 自由對話`
@@ -2187,6 +2187,10 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 #### Scenario: Reconnect replays scene from first line
 - **WHEN** the client reconnects to the same valid delivered scene
 - **THEN** choices stay hidden until that replay finishes explicitly and replay submits no new selection/effect
+
+#### Scenario: Locked topic is intentionally selectable
+- **WHEN** a visibly locked formal topic row receives Enter
+- **THEN** its permitted refusal is selected, canonical requirement hint is accessible and no formal reading completion is produced
 
 ### Requirement: The motion level is a client-local preference that governs every client animation
 The client SHALL have exactly three motion levels: `full`, `reduced`, and `off`. The settings surface SHALL offer them as one `動態效果` control with the three buttons `完整`, `減少`, and `關閉`. The pressed button SHALL be the effective level, marked by an indicator that does not rely on colour alone. Selecting a button SHALL store that level.

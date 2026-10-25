@@ -392,6 +392,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `artwork-failure`, `artwork-alpha`, `artwork-alpha-fill`（共用的在地失敗指示與 alpha 遮罩原語：face-rect 原始編輯器在讀到的失敗位置渲染前者、以觀測成功後的同一 URL 填色渲染後者；由 unified-image-loading-core 變更加入，受管旅程 `test_browser_image_loading_core.py` 首次鎖定前者。unified-portrait-image-contract 讓舞台與角色卡改由此原語繪製描述子自帶的 alpha 終端，並補登填色元素本身的掛鉤，其行內 --artwork-alpha-mask 自訂屬性載明所綁的終端資源 URL；受管旅程 `test_browser_stage_silhouette.py` 與 `test_browser_unified_figures.py` 鎖定它） | unified-image-loading-core（填色掛鉤由 unified-portrait-image-contract 補登） | REMAP-TO-TESTID |
 | `avatar-artwork` + `avatar-artwork__<suffix>`（`avatar-artwork__face`、`avatar-artwork__initial`）（共用的微型頭像渲染器：根節點、其真實影像與字素首字備援；由 unified-avatar-rendering 變更加入，受管旅程 `test_browser_avatar_artwork.py` 首次鎖定。presence medallion 仍以自己的 face／initial 掛鉤轉發此渲染器的影像與首字，故該 family 不變） | unified-avatar-rendering | REMAP-TO-TESTID |
 | `dream-panel`、`dream-reply`、`dream-scene-art`、`dream-art-control`、`dream-art-failure`、`dream-art-view`、`dream-art-view-image`、`dream-art-view-failure`、`data-row`（夢境舞台：對話 modal 的根節點與其回覆列、舞台上唯一的畫面層、該畫面的全圖控制與在地狀態標記、全圖對話方塊與其中的影像／狀態，以及念頭列的列屬性識別——覺醒步驟以該屬性選擇器鎖定。前兩者與列屬性為既有掛鉤，受管旅程 `test_browser_dream_artwork.py` 首次鎖定；其餘由 unified-dream-rendering 隨共用場景載入整合一併加入） | unified-dream-rendering | REMAP-TO-TESTID |
+| `choice-card-lock`、`choice-card-tip`、`choice-card-tip-text`（對話選項卡上可見鎖定話題的掛鎖圖示、指標懸停或鍵盤焦點時顯示於卡片旁的伺服器需求提示框，以及以 aria-describedby 指向的隱藏提示文字；由 authored-dialogue-locked-ui 變更加入，受管旅程 `test_browser_exploration_dialogue.py` 首次鎖定） | authored-dialogue-locked-ui | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
@@ -744,4 +745,9 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 - **§2.3 新 family：** 加入 `wait-card-tile`（休息入口第一層的兩個選擇磚，帶 `data-tile="wait"`／`"sleep"`）、`wait-card-close`（第一層右上角的 ✕）、`wait-form-card`（第二層的等待外殼）、`rest-step-back`／`rest-step-close`（第二層外殼的 ‹ 返回上一層與 ✕ 關閉角落按鈕），以及 `wait-form` + `wait-form-dawn`（等待表單與其「等待直到黎明」首鈕）。`place-card-wait` 掛鉤沿用，按鈕文字改為「休息」；`wait-card` 改指第一層的 TimeChoiceCard，`sleep-card` 改指第二層的睡眠外殼。
 - **§2.3 退役用法：** `wait-card-row`（等待卡的黎明／睡眠／自訂時長列）與 `rest-card`（自訂時長的獨立卡片）自探索房間卡退役；受管套件改以選擇磚、表單與角落按鈕操作。`exploration-rest-form` 仍由 `RestForm.vue` 承載，但探索房間卡不再使用它。
+- **§5 完整性聲明維持成立：** 所有新增受管目標均登記於上方 §2.3；`tests/test_webclient_frozen_contract.py` 維持綠燈。
+
+### authored-dialogue-locked-ui — 2026-10-25
+
+- **§2.3 新 family：** 加入 `choice-card-lock`（可見鎖定話題列尾的掛鎖）、`choice-card-tip`（懸停或鍵盤焦點時顯示於卡片旁、不可聚焦的需求提示框）與 `choice-card-tip-text`（列的 `aria-describedby` 所指的隱藏提示文字）。鎖定話題列仍可選取以播放拒絕場景，不帶 `aria-disabled`。
 - **§5 完整性聲明維持成立：** 所有新增受管目標均登記於上方 §2.3；`tests/test_webclient_frozen_contract.py` 維持綠燈。

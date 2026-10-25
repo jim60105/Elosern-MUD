@@ -28,11 +28,14 @@ from web.webclient.actions.exploration_actions import (
     validate_party_leave_payload,
     validate_talk_freeform_payload,
     validate_talk_open_payload,
+    validate_talk_scripted_descriptor,
     validate_talk_scripted_payload,
     validate_wait_payload,
 )
+from world.lore.dialogue.codec import make_generated_topic_id
 from world.rules.time_skip import MAX_WEB_SKIP_SECONDS
 import unittest
+from tools.spec_traceability import covers_requirement
 from ._support import _T_ITEM
 
 
@@ -87,6 +90,22 @@ class ExplorationValidatorTests(unittest.TestCase):
         ):
             with self.assertRaises(ExplorationActionError):
                 validate_talk_scripted_payload(bad)
+
+    @covers_requirement(
+        "authored-dialogue-availability::locked-presentation-treats-generated-identities-as-opaque"
+    )
+    def test_talk_scripted_admits_a_full_generated_topic_identity_verbatim(self):
+        topic_id = make_generated_topic_id("套" * 64, "r" * 64, "phase_1", "locked_intro")
+        self.assertGreater(len(topic_id), 96)
+        self.assertLessEqual(len(topic_id), 2048)
+        payload = validate_talk_scripted_payload(
+            {"npc_id": 3, "topic_id": topic_id, "context_id": "c1", "selection_id": "s1"}
+        )
+        self.assertEqual(payload["topic_id"], topic_id)
+        descriptor = validate_talk_scripted_descriptor(
+            {"npc_id": 3, "topic_id": topic_id, "context_id": "c1"}
+        )
+        self.assertEqual(descriptor["topic_id"], topic_id)
 
     def test_talk_open_payload_exact(self):
         self.assertEqual(validate_talk_open_payload({"npc_id": 1}), {"npc_id": 1})

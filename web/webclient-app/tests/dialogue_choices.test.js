@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
-import { dialoguePanel as v3Panel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
+import { choiceRow, dialoguePanel as v3Panel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 
 const PANEL = v3Panel({
   keywords: ["fare", "smell", "chest"],
@@ -306,5 +306,183 @@ describe("DialogueChoices", () => {
     expect(before).not.toHaveBeenCalled();
     expect(w.emitted("pick")).toBeUndefined();
     expect(w.emitted("leave")).toBeUndefined();
+  });
+
+  // authored-dialogue-locked-ui: a visibly locked topic is a selectable
+  // refusal with a lock and the server's canonical hint; an operational
+  // disabled state emits nothing.
+  describe("locked topics", () => {
+    const LONG_HINT = `需要（需要持有${"霧門通行證".repeat(12)}）且（需要好感階段至少為熟識）`;
+    const GENERATED_ID = `g.${"q".repeat(40)}.${"z".repeat(2048 - 43)}`;
+    const LOCKED_PANEL = v3Panel({
+      choices: [
+        choiceRow("fare", { topicId: "host.fare", label: "渡河的價錢" }),
+        { ...choiceRow("gate", { topicId: "host.gate", label: "霧門的事" }), availability: "locked", requirement_hint: "需要持有霧門通行證" },
+        { ...choiceRow("vault", { topicId: "host.vault", label: "密室" }), availability: "hidden" },
+        { ...choiceRow("blank", { topicId: "host.blank", label: "沉默的事" }), availability: "locked", requirement_hint: "" },
+        { ...choiceRow("dream", { topicId: GENERATED_ID, label: "夢裡的約定" }), availability: "locked", requirement_hint: LONG_HINT },
+      ],
+    });
+    const LOCKED_PICKS = dialogueViewModel(LOCKED_PANEL).picks;
+    const tip = (w) => w.find('[data-testid="choice-card-tip"]');
+    const description = (row) =>
+      (row.attributes("aria-describedby") || "")
+        .split(" ")
+        .filter(Boolean)
+        .map((id) => document.getElementById(id)?.textContent)
+        .join(" ");
+
+    it("renders open and locked rows in payload order and never a hidden one", () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      expect(labels(w)).toEqual(["渡河的價錢", "霧門的事", "沉默的事", "夢裡的約定", "自由對話", "移動…", "結束對話"]);
+      expect(w.text()).not.toContain("密室");
+      expect(badges(w).slice(0, 4)).toEqual(["1", "2", "3", "4"]);
+      expect(rows(w).map((row) => row.attributes("data-locked") ?? null).slice(0, 4)).toEqual([null, "true", "true", "true"]);
+    });
+
+    it("marks a locked row with a padlock and a text name, never aria-disabled", () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      const locked = rows(w)[1];
+      expect(locked.find('[data-testid="choice-card-lock"]').exists()).toBe(true);
+      expect(locked.get('[data-testid="choice-card-lock"]').attributes("aria-hidden")).toBe("true");
+      expect(locked.text()).toContain("（尚未解鎖）");
+      expect(locked.attributes("aria-disabled")).toBeUndefined();
+      expect(rows(w)[0].find('[data-testid="choice-card-lock"]').exists()).toBe(false);
+      expect(w.find('[aria-disabled="true"]').exists()).toBe(false);
+    });
+
+    it("describes a locked row with its canonical hint, outside the row's name", () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      const locked = rows(w)[1];
+      expect(description(locked)).toBe("需要持有霧門通行證");
+      expect(locked.text()).not.toContain("需要持有霧門通行證");
+      // An open row and an empty hint carry no description and no copy.
+      expect(rows(w)[0].attributes("aria-describedby")).toBeUndefined();
+      expect(rows(w)[2].attributes("aria-describedby")).toBeUndefined();
+      expect(w.findAll('[data-testid="choice-card-tip-text"]').map((el) => el.text())).toEqual(["需要持有霧門通行證", LONG_HINT]);
+    });
+
+    it("shows the hint for the active locked row while the list holds keyboard focus", async () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      expect(tip(w).exists()).toBe(false);
+      await key(w, "ArrowDown");
+      expect(tip(w).exists()).toBe(true);
+      expect(tip(w).text()).toBe("需要持有霧門通行證");
+      expect(tip(w).attributes("data-tip-source")).toBe("focus");
+      expect(tip(w).attributes("aria-hidden")).toBe("true");
+      expect(tip(w).attributes("tabindex")).toBeUndefined();
+      expect(w.findAll("[tabindex]")).toHaveLength(1);
+      // An empty hint produces no tooltip container at all.
+      await key(w, "ArrowDown");
+      expect(tip(w).exists()).toBe(false);
+      // A long hint shows in full.
+      await key(w, "ArrowDown");
+      expect(tip(w).text()).toBe(LONG_HINT);
+      // Leaving the list hides it.
+      list(w).element.blur();
+      await nextTick();
+      expect(tip(w).exists()).toBe(false);
+    });
+
+    it("shows the hint on pointer hover, keyed to the hovered row, and keeps it on the tooltip", async () => {
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+      wrapper = mount(DialogueChoices, { attachTo: document.body, props: { picks: LOCKED_PICKS, exits: EXITS, localMap: LOCAL_MAP } });
+      const w = wrapper;
+      await rows(w)[3].trigger("mouseenter");
+      expect(tip(w).text()).toBe(LONG_HINT);
+      expect(tip(w).attributes("data-tip-source")).toBe("pointer");
+      // Resting on the tooltip (a descendant of the card) keeps it.
+      await tip(w).trigger("mouseenter");
+      expect(tip(w).exists()).toBe(true);
+      await rows(w)[0].trigger("mouseenter");
+      expect(tip(w).exists()).toBe(false);
+      await rows(w)[1].trigger("mouseenter");
+      expect(tip(w).text()).toBe("需要持有霧門通行證");
+      await list(w).trigger("mouseleave");
+      expect(tip(w).exists()).toBe(false);
+      expect(document.activeElement).toBe(outside);
+    });
+
+    it("drops a pointer hint whose row a refresh removes", async () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      list(w).element.blur();
+      await rows(w)[1].trigger("mouseenter");
+      expect(tip(w).exists()).toBe(true);
+      await w.setProps({ picks: LOCKED_PICKS.filter((pick) => pick.topicId !== "host.gate") });
+      expect(tip(w).exists()).toBe(false);
+    });
+
+    it("Escape dismisses a keyboard hint and stops there; a pointer hint lets Escape through", async () => {
+      const w = mountList({ picks: LOCKED_PICKS });
+      await key(w, "ArrowDown");
+      expect(tip(w).exists()).toBe(true);
+      await key(w, "Escape");
+      expect(tip(w).exists()).toBe(false);
+      expect(documentKeys).not.toContain("Escape");
+      // The next target shows again.
+      await key(w, "ArrowDown");
+      await key(w, "ArrowDown");
+      expect(tip(w).text()).toBe(LONG_HINT);
+      await rows(w)[1].trigger("mouseenter");
+      expect(tip(w).attributes("data-tip-source")).toBe("pointer");
+      await key(w, "Escape");
+      expect(tip(w).exists()).toBe(false);
+      expect(documentKeys).toContain("Escape");
+    });
+
+    it("activates a locked row by Enter, digit, and pointer with its full committed payload", async () => {
+      const before = vi.fn();
+      const w = mountList({ picks: LOCKED_PICKS, beforeActivate: before });
+      await key(w, "ArrowDown");
+      await key(w, "Enter");
+      await key(w, "4");
+      await rows(w)[2].trigger("click");
+      expect(before).toHaveBeenCalledTimes(3);
+      const picked = w.emitted("pick").map(([pick]) => pick);
+      expect(picked.map((pick) => pick.topicId)).toEqual(["host.gate", GENERATED_ID, "host.blank"]);
+      expect(picked[1].payload).toEqual({ npc_id: 41, topic_id: GENERATED_ID, context_id: "ctx-1" });
+      expect(picked[1].payload.topic_id).toHaveLength(2048);
+    });
+
+    it("the dispatch lock suppresses a locked row too", async () => {
+      const w = mountList({ picks: LOCKED_PICKS, locked: true });
+      await key(w, "2");
+      await rows(w)[1].trigger("click");
+      expect(w.emitted("pick")).toBeUndefined();
+    });
+
+    it("keeps all sixteen declared topics reachable by keyboard and scrolls each into view", async () => {
+      const many = dialogueViewModel(
+        v3Panel({
+          choices: Array.from({ length: 16 }, (_, index) => ({
+            ...choiceRow(`t${index}`, { topicId: `host.t${index}`, label: `話題${index + 1}` }),
+            ...(index % 3 === 0 ? { availability: "locked", requirement_hint: `需要條件${index}` } : {}),
+          })),
+        }),
+      ).picks;
+      const scrolled = [];
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function scrollIntoView() {
+        scrolled.push(this.id);
+      };
+      try {
+        const w = mountList({ picks: many });
+        expect(rows(w)).toHaveLength(19);
+        for (let index = 1; index < 16; index += 1) {
+          await key(w, "ArrowDown");
+          await nextTick();
+        }
+        expect(activeRow(w)).toBe(rows(w)[15].element);
+        expect(tip(w).text()).toBe("需要條件15");
+        expect(scrolled).toContain(rows(w)[15].element.id);
+        await key(w, "Home");
+        await nextTick();
+        expect(activeRow(w)).toBe(rows(w)[0].element);
+      } finally {
+        Element.prototype.scrollIntoView = original;
+      }
+    });
   });
 });

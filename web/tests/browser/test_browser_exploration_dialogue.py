@@ -8,6 +8,7 @@ import json
 from tools.spec_traceability import covers_requirement
 from web.browser_support.browser_fixtures_data import (
     SHIPPED_DIALOGUE_KEY,
+    SYNTH_LOCKED_TOPIC_ID,
     synth_conditioned_fallback_host_line,
     synth_conditioned_variant_host_line,
 )
@@ -79,6 +80,9 @@ AUTHORED_SCENE_METHODS = ("test_authored_scene_plays_line_by_line_with_synchroni
 POSSESSED_DIALOGUE_METHOD = (
     "test_possessed_companion_plays_an_authored_scene_with_its_own_portrait"
 )
+#: The locked-topic UI journey: kit catalogs and the gatekeeper table, whose
+#: second topic stays visibly locked with a canonical hint and a refusal.
+LOCKED_TOPIC_METHOD = "test_locked_topic_shows_its_hint_and_plays_its_refusal"
 
 
 def _scene_frame(page) -> dict:
@@ -137,6 +141,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_POSSESSION"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_CONDITIONS"] = "1"
+        if self._testMethodName == LOCKED_TOPIC_METHOD:
+            runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
+            runtime.env["ELOSERN_BROWSER_DIALOGUE_LOCKED"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -1076,6 +1083,151 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(frames[-1]["speaker"], "host")
         self.assertIn(exposure_variant_line, frames[-1]["text"])
         self.assertNotIn(exposure_fallback_line, frames[-1]["text"])
+
+    @covers_requirement(
+        "authored-dialogue-availability::locked-topics-remain-readable-refusals-with-accessible-hints"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
+    )
+    def test_locked_topic_shows_its_hint_and_plays_its_refusal(self):
+        """authored-dialogue-locked-ui 3.1: a selectable locked refusal.
+
+        At 1451x790 the kit gatekeeper's second topic is visibly locked: its
+        row carries the padlock and a text lock name, never aria-disabled.
+        Pointer hover shows the server's canonical requirement hint in a
+        tooltip beside the card (the pointer may move onto it), and keyboard
+        focus on the row shows it too, wired through aria-describedby. Enter
+        submits exactly one explore.talk_scripted for the locked topic; the
+        server's refusal plays line by line through the shared player, the
+        protected formal body never reaches the page, and the explicit finish
+        returns the choices with nothing further submitted.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        choices = store_state(page)["panels"]["dialogue"]["choices"]
+        locked_choice = next(c for c in choices if c["topic_id"] == SYNTH_LOCKED_TOPIC_ID)
+        self.assertEqual(locked_choice["availability"], "locked")
+        hint = locked_choice["requirement_hint"]
+        self.assertTrue(hint)
+        open_dialogue_choices(page)
+
+        card = page.locator('[data-anchor="choices"] [data-testid="dialogue-choices"]')
+        picks = card.locator('[data-testid="dialogue-pick"]')
+        self.assertEqual(picks.count(), 2)
+        locked = picks.nth(1)
+        self.assertEqual(locked.get_attribute("data-locked"), "true")
+        self.assertIsNone(locked.get_attribute("aria-disabled"))
+        self.assertIn("（尚未解鎖）", locked.text_content())
+        self.assertNotIn(hint, locked.text_content())
+        self.assertTrue(locked.locator('[data-testid="choice-card-lock"]').is_visible())
+        tip = card.locator('[data-testid="choice-card-tip"]')
+        self.assertEqual(tip.count(), 0)
+
+        # Pointer hover: the hint shows beside the card, inside the viewport,
+        # and stays while the pointer moves onto the tooltip.
+        locked.hover()
+        tip.wait_for(state="visible", timeout=5000)
+        self.assertEqual(tip.get_attribute("data-tip-source"), "pointer")
+        self.assertEqual(tip.inner_text().strip(), hint)
+        # The tooltip and the rows settle (entrance and placement) before the
+        # geometry is read: two consecutive frames agree.
+        page.wait_for_function(
+            """() => new Promise((resolve) => {
+              const read = () => {
+                const tip = document.querySelector('[data-testid="choice-card-tip"]');
+                const row = document.querySelector('[data-testid="dialogue-pick"][data-locked="true"]');
+                return tip && row && tip.dataset.placed === 'true'
+                  ? `${tip.getBoundingClientRect().top}|${row.getBoundingClientRect().top}`
+                  : null;
+              };
+              const first = read();
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve(first !== null && read() === first)));
+            })""",
+            timeout=5000,
+        )
+        card_box = card.bounding_box()
+        tip_box = tip.bounding_box()
+        row_box = locked.bounding_box()
+        self.assertGreaterEqual(tip_box["x"], card_box["x"] + card_box["width"])
+        self.assertLessEqual(tip_box["x"] + tip_box["width"], 1451)
+        self.assertLessEqual(abs(tip_box["y"] - row_box["y"]), 2)
+        page.mouse.move(tip_box["x"] + 4, tip_box["y"] + tip_box["height"] / 2, steps=6)
+        page.wait_for_timeout(120)
+        self.assertTrue(tip.is_visible(), "the tooltip is hoverable")
+        page.mouse.move(4, 400)
+        tip.wait_for(state="detached", timeout=5000)
+
+        # Keyboard focus: the active locked row shows and describes the hint.
+        card.focus()
+        _press(page, "ArrowDown")
+        self.assertEqual(
+            page.evaluate(
+                "(id) => document.activeElement.getAttribute('aria-activedescendant') === id",
+                locked.get_attribute("id"),
+            ),
+            True,
+        )
+        tip.wait_for(state="visible", timeout=5000)
+        self.assertEqual(tip.get_attribute("data-tip-source"), "focus")
+        described = page.evaluate(
+            """(id) => (document.getElementById(id).getAttribute('aria-describedby') || '')
+                .split(' ').filter(Boolean)
+                .map((ref) => document.getElementById(ref).textContent).join(' ')""",
+            locked.get_attribute("id"),
+        )
+        self.assertEqual(described, hint)
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 0)
+        sent_before = sent_action_count(page)
+
+        # Enter selects the locked topic: its refusal plays, never the body.
+        _press(page, "Enter")
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        sent = [
+            args[0]
+            for cmdname, args, _kwargs in outbound_messages(page)
+            if cmdname == "ui_action" and args
+        ]
+        self.assertEqual(sent[-1]["payload"]["topic_id"], SYNTH_LOCKED_TOPIC_ID)
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "refusal",
+        )
+        frames = [_scene_frame(page)]
+        kinds = set()
+        for _ in range(10):
+            if frames[-1]["choices"]:
+                break
+            kinds.add((store_state(page)["panels"]["dialogue"].get("delivery") or {}).get("kind"))
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+            frames.append(_scene_frame(page))
+        self.assertEqual(kinds, {"refusal"})
+        speakers = [f["speaker"] for f in frames if not f["choices"]]
+        self.assertEqual(
+            [s for i, s in enumerate(speakers) if i == 0 or s != speakers[i - 1]],
+            ["actor", "host", "narration"],
+        )
+        self.assertTrue(frames[-1]["choices"])
+        self.assertNotIn("只有帶著證物的人能過", page.content())
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
+            )
+        )
+        # Back at the choices: one selection in all, the topic still locked.
+        self.assertEqual(sent_action_count(page), sent_before + 1)
+        self.assertEqual(picks.nth(1).get_attribute("data-locked"), "true")
 
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"

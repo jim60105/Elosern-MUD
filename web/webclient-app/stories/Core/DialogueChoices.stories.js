@@ -178,3 +178,63 @@ export const Stagger = {
   }),
   args: { picks: PICKS, exits: EXITS, localMap: LOCAL_MAP },
 };
+
+// Locked topics (authored-dialogue-locked-ui): the server's open and locked
+// rows (a hidden topic in the same payload never renders), each locked row
+// with a padlock, a text lock name and its canonical requirement hint. The
+// second pick is focused by keyboard, so its hint shows in the tooltip
+// beside the card; hovering a locked row shows its hint too. A locked row is
+// selectable (its refusal plays) and keeps the gold active fill; the empty
+// hint of the fourth pick renders no tooltip.
+const LOCKED_PICKS = dialogueViewModel({
+  ...DIALOGUE_PANEL_SAMPLE,
+  choices: [
+    { keyword_id: "fare", topic_id: "ferry.fare", label: "「就五枚，走嗎？」", availability: "open", requirement_hint: null },
+    { keyword_id: "gate", topic_id: "ferry.gate", label: "霧門後的渡口", availability: "locked", requirement_hint: "需要持有霧門通行證" },
+    { keyword_id: "vault", topic_id: "ferry.vault", label: "（隱藏的話題不會出現）", availability: "hidden", requirement_hint: null },
+    {
+      keyword_id: "oath",
+      topic_id: "g.package-role.phase_2.oath",
+      label: "夢裡的約定",
+      availability: "locked",
+      requirement_hint: "需要（需要好感階段至少為熟識）且（需要在黃昏至深夜之間）且（需要（需要持有霧門通行證）或（需要技能渡河術（熟練度至少 3）））",
+    },
+    { keyword_id: "silence", topic_id: "ferry.silence", label: "她沉默的理由", availability: "locked", requirement_hint: "" },
+  ],
+}).picks;
+
+const focusRow = (index) => (args) => ({
+  setup() {
+    const list = ref(null);
+    onMounted(() => {
+      const el = list.value?.$el;
+      list.value?.focus();
+      for (let step = 0; step < index; step += 1) {
+        el?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      }
+    });
+    return () => h(DialogueChoices, { ...args, ref: list });
+  },
+});
+
+export const LockedTopics = {
+  render: focusRow(1),
+  args: { picks: LOCKED_PICKS, exits: EXITS, localMap: LOCAL_MAP },
+};
+
+// The long canonical hint wraps in full beside the card, never truncated.
+export const LockedLongHint = {
+  render: focusRow(2),
+  args: { picks: LOCKED_PICKS, exits: EXITS, localMap: LOCAL_MAP },
+};
+
+// Desktop token scaling: the same rows at `--ui-scale: 1.25`, the card, the
+// padlock and the tooltip all grow together.
+export const LockedTopicsScaled = {
+  render: focusRow(2),
+  args: { picks: LOCKED_PICKS, exits: EXITS, localMap: LOCAL_MAP },
+  decorators: [
+    (story) => ({ render: () => h("div", { style: { "--ui-scale": "1.25", fontSize: "calc(16px * var(--ui-scale))" } }, [h(story())]) }),
+  ],
+};
+
