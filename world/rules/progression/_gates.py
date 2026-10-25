@@ -120,6 +120,12 @@ def award_practice_xp(entity: Any, skill_key: str, xp: float) -> None:
     :func:`proficiency_cap`, further XP is dropped and the stored value never
     exceeds ``cap * SKILL_PROFICIENCY_XP_PER_LEVEL``. Fails closed on a
     non-finite or negative amount before any write.
+
+    A stored assignment refreshes the learner's dialogue availability from the
+    committed state (authored-dialogue-refresh-physical), so a proficiency
+    threshold crossing changes the projected choices from any origin (study,
+    another session, a scheduled tick). The zero-effect and saturated paths
+    return before any write and register nothing.
     """
     if isinstance(xp, bool) or not isinstance(xp, (int, float)) or not isfinite(xp):
         raise ValueError(f"practice XP must be a finite number, got {xp!r}")
@@ -136,6 +142,14 @@ def award_practice_xp(entity: Any, skill_key: str, xp: float) -> None:
         current + float(xp), cap * SKILL_PROFICIENCY_XP_PER_LEVEL
     )
     entity.db.skill_proficiency = stored
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(
+        affected_dialogue_owners(entity), cause="practice_xp"
+    )
 
 
 def unlock_candidates_for(skill_key: str) -> tuple[SkillDef, ...]:

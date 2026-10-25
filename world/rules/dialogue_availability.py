@@ -43,9 +43,23 @@ AFTER the owning transaction commits, through the existing pusher discipline
 failed push recovers on the next canonical sync and never reverses a
 successful commit.
 
-Production mutation hooks -- which canonical item, equipment, identity, skill,
-quest, clock, companion and control writers call this -- are owned by
-``authored-dialogue-refresh-physical`` and ``authored-dialogue-refresh-lifecycle``.
+Production mutation hooks call ``queue_dialogue_refresh(owners, *, cause)``:
+the narrow deterministic companion of the single-owner API, which takes the
+canonical owner objects a writer captured BEFORE its destructive membership or
+control write, registers one commit callback for the deduplicated owner
+identities, and re-resolves each owner row plus its currently valid actor/host
+context inside that callback. A callback therefore never trusts pre-commit
+eligibility, and a rolled-back outer transaction discards the callback
+entirely. ``affected_dialogue_owners(entity, *, prior_owner=None)`` is the
+owner-discovery half: the persistent player itself, a companion's lawful bound
+owner plus its currently lawful possession owner, and any explicitly supplied
+prior owner captured before a detach -- never an account-wide sibling
+character. Neither helper creates a conversation, session or selection.
+
+The canonical physical source matrix lived here by this slice (exact commit
+hooks, owner capture and acceptance) is documented in
+``docs/development/dialogue-panel-protocol.md``; the lifecycle slice extends
+the same two helpers for quest, clock, companion-presence and control sources.
 Command and presentation observers are NOT a substitute for those hooks: a
 committed writer with no live session (Telnet, a scripted clock tick, an
 offline character, or another actor's state change) never walks a command,
@@ -59,6 +73,7 @@ this slice adds is ``"open"`` from the successful open/selection path.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -239,6 +254,156 @@ def refresh_dialogue_availability(owner: Any, *, cause: str) -> None:
     transaction.on_commit(lambda: _fan_out_availability(owner, cause))
 
 
+def queue_dialogue_refresh(owners: Iterable[Any], *, cause: str) -> None:
+    """Schedule one committed availability refresh for explicit owner objects.
+
+    The narrow deterministic helper the canonical physical writers call AFTER
+    their validated write. ``owners`` are owner entities the caller captured
+    before any destructive membership or control write; non-owner entries and
+    duplicates are dropped, so a writer can hand the raw helper output over.
+
+    The fan-out is registered on the owning transaction's commit hook. Inside
+    an outer transaction the callback runs only after that transaction
+    commits, so a late rollback discards it and no false eligibility or
+    reading mutation is ever published; outside an atomic block it runs after
+    the successful owning write. Each callback re-resolves the owner row from
+    its identity and then re-resolves its currently valid acting body and
+    conversation from committed state -- the pre-commit objects and their
+    pre-commit eligibility are never reused for projection or push. Several
+    callbacks from one outer operation may therefore all run; every one of
+    them evaluates the final committed state.
+
+    This helper never creates a conversation, a dialogue session or a
+    selection, and never touches an authored package.
+    """
+    if not isinstance(cause, str) or not cause or len(cause) > MAX_CAUSE_CHARS:
+        raise ValueError(
+            f"cause must be a non-empty string <= {MAX_CAUSE_CHARS} characters"
+        )
+    owner_ids = _owner_ids(owners)
+    if not owner_ids:
+        return
+    from django.db import transaction
+
+    transaction.on_commit(lambda: _fan_out_owner_ids(owner_ids, cause))
+
+
+def affected_dialogue_owners(
+    entity: Any, *, prior_owner: Any = None
+) -> tuple[Any, ...]:
+    """The dialogue owners whose availability ``entity``'s change can affect.
+
+    A persistent player owns itself. Any other changed actor (a companion or
+    any other NPC-shaped body) contributes its lawful bound party owner and
+    its currently lawful possession owner, resolved by reading the same
+    bidirectional bindings the dialogue authority boundary reads. A caller
+    that is about to detach a body captures the owner BEFORE the destructive
+    write and passes it as ``prior_owner``, so the owner that loses the body
+    still receives one refresh once the new committed state is visible.
+
+    Only lawful owner identities are returned: no account-wide sibling
+    character, no stale or one-sided binding, and no forged possession mirror.
+    The result is deduplicated in capture order and may be empty (an
+    unowned/NPC body, or construction that has no live conversation). This
+    helper only reads; it never creates a conversation, session or selection.
+    """
+    candidates: list[Any] = []
+    if _owner_identity(entity) is not None:
+        candidates.append(entity)
+    else:
+        from world.rules.party import bound_owner_of
+
+        candidates.append(bound_owner_of(entity) if entity is not None else None)
+        candidates.append(_possession_owner(entity))
+    candidates.append(prior_owner)
+    return _unique_owners(candidates)
+
+
+def _owner_identity(entity: Any) -> int | None:
+    """The persistent pk of one legitimate dialogue owner, or ``None``."""
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(entity, PlayerCharacter):
+        return None
+    pk = getattr(entity, "pk", None)
+    if isinstance(pk, bool) or not isinstance(pk, int) or pk <= 0:
+        return None
+    return pk
+
+
+def _possession_owner(body: Any) -> Any:
+    """The player lawfully possessing ``body`` right now, or ``None``.
+
+    Both directions of the stored possession mirror must agree AND the body
+    must still be bound to that player through the canonical party binding, so
+    a body whose party binding was removed (or whose possession mirror was
+    forged) resolves no possession owner even while the mirror references
+    still agree. The bound party owner remains the separate owner category.
+    """
+    holder = getattr(getattr(body, "db", None), "possessed_by", None)
+    if isinstance(holder, bool) or not isinstance(holder, int) or holder <= 0:
+        return None
+    from evennia.objects.objects import ObjectDB
+
+    from world.rules.party import bound_owner_of
+    from world.rules.possession import current_possession
+
+    player = ObjectDB.objects.filter(id=holder).first()
+    if _owner_identity(player) is None:
+        return None
+    if bound_owner_of(body) is not player:
+        return None
+    binding = current_possession(player)
+    if binding is None or binding["npc_dbid"] != int(getattr(body, "pk", 0) or 0):
+        return None
+    return player
+
+
+def _unique_owners(candidates: Iterable[Any]) -> tuple[Any, ...]:
+    """Filter to lawful owners and deduplicate them by persistent identity."""
+    owners: list[Any] = []
+    seen: set[int] = set()
+    for candidate in candidates:
+        identity = _owner_identity(candidate)
+        if identity is None or identity in seen:
+            continue
+        seen.add(identity)
+        owners.append(candidate)
+    return tuple(owners)
+
+
+def _owner_ids(owners: Iterable[Any]) -> tuple[int, ...]:
+    """The deduplicated persistent identities of an explicit owner iterable."""
+    if isinstance(owners, (str, bytes)) or not isinstance(owners, Iterable):
+        raise TypeError("owners must be an iterable of dialogue owner entities")
+    return tuple(
+        identity
+        for identity in map(_owner_identity, owners)
+        if identity is not None
+    )
+
+
+def _fan_out_owner_ids(owner_ids: tuple[int, ...], cause: str) -> None:
+    """Post-commit fan-out over re-resolved owner rows (never raises)."""
+    from evennia.objects.objects import ObjectDB
+
+    for owner_id in owner_ids:
+        try:
+            owner = ObjectDB.objects.filter(id=owner_id).first()
+        except Exception as error:
+            log_warn(
+                AVAILABILITY_REFRESH_FAILED_EVENT,
+                context={"char": str(owner_id), "cause": cause},
+                exc=error,
+            )
+            continue
+        if owner is None:
+            # A deleted owner has nothing to present; the next canonical sync
+            # of its surviving watchers owns that transition.
+            continue
+        _fan_out_availability(owner, cause)
+
+
 def _fan_out_availability(owner: Any, cause: str) -> None:
     """Post-commit current-state projection and panel fan-out (never raises)."""
     owner_id = str(getattr(owner, "pk", "?"))
@@ -268,9 +433,16 @@ def _fan_out_availability(owner: Any, cause: str) -> None:
 
 
 def _acting_body(owner: Any) -> Any:
-    """The body currently acting for ``owner``: its possessed companion or itself."""
+    """The body currently acting for ``owner``: its possessed companion or itself.
+
+    The stored possession mirror is only a locator: the companion must still
+    name ``owner`` as its possessor AND remain bound to that owner through the
+    canonical party binding, so a possession whose binding was removed between
+    scheduling and this callback never receives the owner's refresh instead.
+    """
     from evennia.objects.objects import ObjectDB
 
+    from world.rules.party import bound_owner_of
     from world.rules.possession import current_possession
 
     possession = current_possession(owner)
@@ -283,6 +455,8 @@ def _acting_body(owner: Any) -> Any:
         getattr(owner, "pk", 0)
     ):
         return owner
+    if bound_owner_of(body) is not owner:
+        return owner
     return body
 
 
@@ -294,7 +468,9 @@ __all__ = [
     "TOPIC_LOCKED",
     "TOPIC_OPEN",
     "TopicProjection",
+    "affected_dialogue_owners",
     "availability_context",
     "project_topics",
+    "queue_dialogue_refresh",
     "refresh_dialogue_availability",
 ]

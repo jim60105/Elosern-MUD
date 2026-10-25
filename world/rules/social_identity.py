@@ -70,6 +70,12 @@ def set_social_identities(entity: Any, keys: Iterable[str]) -> frozenset[str]:
     strings/bytes directly, non-iterables, bools, unknown keys, or exceeding
     MAX_SOCIAL_IDENTITIES. Stores sorted unique keys as a tuple on
     ``entity.db.social_identities`` and returns the resulting frozenset.
+
+    The committed identity write refreshes the changed actor's dialogue
+    availability (authored-dialogue-refresh-physical) because authored topics
+    qualify on these structured keys only. Construction on a body with no
+    lawful dialogue owner is a no-op: the owner helper returns nothing and no
+    callback is registered. Persona prose is deliberately not a source.
     """
     if entity is None:
         raise SocialIdentityError("Cannot set social identities on None")
@@ -101,4 +107,12 @@ def set_social_identities(entity: Any, keys: Iterable[str]) -> frozenset[str]:
     else:
         raise SocialIdentityError("Entity does not support attribute storage")
 
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(
+        affected_dialogue_owners(entity), cause="social_identity"
+    )
     return frozenset(sorted_keys)
