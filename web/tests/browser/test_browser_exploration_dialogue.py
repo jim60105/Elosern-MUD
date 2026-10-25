@@ -1085,6 +1085,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertNotIn(exposure_fallback_line, frames[-1]["text"])
 
     @covers_requirement(
+        "authored-dialogue-availability::locked-topics-remain-readable-refusals-with-accessible-hints"
+    )
+    @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
     )
     def test_locked_topic_shows_its_hint_and_plays_its_refusal(self):
