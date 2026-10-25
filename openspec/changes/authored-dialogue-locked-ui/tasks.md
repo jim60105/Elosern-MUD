@@ -10,7 +10,7 @@ Shared contract v2 treats source-aware IDs as opaque. Include generated-style ID
 
 ## 2. Playback and focus refresh
 
-- [ ] 2.1 Keep refusal completion local and formal-only completion event separate, preserve stable-ID focus through changed rows and allow scrolling every declared topic. Add DialogueChoices/AppClient tests for hidden absence, long hint, >4 topics and no portrait switch on refresh.
+- [x] 2.1 Keep refusal completion local and formal-only completion event separate, preserve stable-ID focus through changed rows and allow scrolling every declared topic. Add DialogueChoices/AppClient tests for hidden absence, long hint, >4 topics and no portrait switch on refresh.
 
 ## 3. Browser and showcase acceptance
 

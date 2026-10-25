@@ -44,6 +44,21 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
     scene.advance();
   }
 
+  // Formal completion only (authored-dialogue-locked-ui). A refusal, the
+  // scene a visibly locked topic plays, finishes locally: its finish only
+  // returns the choices (the `readingComplete` gate below) and is never a
+  // formal reading completion, so it can satisfy no predecessor and reveal
+  // no successor. This hook forwards exactly the finishes whose delivered
+  // kind is `formal`; any other or missing kind is ignored. The reading
+  // client wires persistence to it. Returns the unsubscribe function.
+  function onFormalSceneFinished(handler) {
+    return scene.onSceneFinished((detail) => {
+      if (detail && detail.kind === "formal") {
+        handler(detail);
+      }
+    });
+  }
+
   // A scripted topic pick awaiting its reply holds the window, so its
   // transcript never types before the scene delivery commits; so does a
   // freeform line sent over a scene, so its reply is read as new text when
@@ -159,6 +174,7 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
     sceneHold,
     onSceneAdvance,
     onSceneFinished: scene.onSceneFinished,
+    onFormalSceneFinished,
     dialogueStageSpeaker,
     choicesShown,
     dialogueExits,
