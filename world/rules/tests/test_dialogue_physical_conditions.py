@@ -398,7 +398,7 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         companion = self._companion(
             {"kind": "companion", "profile": "t_any", "owner": self.char1.pk}
         )
-        condition = CompanionPresent(source_kind="package_role", source_key="guard")
+        condition = CompanionPresent(source_kind="package_role", source_key="t_package_role")
         package = SimpleNamespace(status="published")
         binding = SimpleNamespace(npc_id=companion.pk, availability="bound")
         context = SimpleNamespace(
@@ -408,8 +408,8 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             source_identity=SimpleNamespace(package_id="t_pkg"),
         )
         store = {
-            ("t_pkg", "guard"): binding,
-            ("t_foreign_pkg", "guard"): binding,
+            ("t_pkg", "t_package_role"): binding,
+            ("t_foreign_pkg", "t_package_role"): binding,
         }
         with patch(
             "world.quests.scene_store.read_package", return_value=package
@@ -438,7 +438,7 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         leave_party(companion, self.char1, reason="test")
 
     def test_static_context_has_no_permitted_package_role(self):
-        condition = CompanionPresent(source_kind="package_role", source_key="guard")
+        condition = CompanionPresent(source_kind="package_role", source_key="t_package_role")
         with patch("world.rules.dialogue_conditions.log_warn") as log_warn:
             self.assertFalse(evaluate_condition(condition, self._context()))
         self.assertEqual(
