@@ -2,26 +2,102 @@
 // D3/D4/D7/D8): when the list is shown, where its exit rows come from, and
 // where focus goes around it. The list itself (DialogueChoices.vue) is
 // passive; every dispatch goes through the store's single entry.
+//
+// Authored scenes (authored-dialogue-playback): the shared manual player
+// (`use-authored-scene.js`) is instantiated here, over the committed panel's
+// delivery, because it gates the list. While a scene plays the list waits
+// for its explicit finish (never the window's last-page state), and the
+// stage speaker follows each line's explicit attribution; native lines
+// (the opening greeting, a freeform reply) keep the window's reader state
+// and the dispatch-state speaker.
 import { computed, nextTick, ref, watch } from "vue";
+import { useAuthoredScene } from "./use-authored-scene.js";
 
 export function useDialogueChoices(store, shellRef, dialogueVM) {
   // The window's reader state (design D3), reported by `reading-change`.
-  // True until the window says otherwise: a reconnect inside a conversation
-  // shows the last page complete, so the choices show at once.
+  // True until the window says otherwise: a reconnect inside a native
+  // conversation line shows the last page complete, so the choices show at
+  // once (an authored scene replays from line one instead, below).
   const readingComplete = ref(true);
   function onReadingChange(complete) {
     readingComplete.value = !!complete;
   }
 
+  // The shared scene player over the committed delivery. The transport
+  // generation is part of its key, so a reconnect replays the same delivery
+  // from line one without selecting again.
+  const sceneSource = computed(() => {
+    const vm = dialogueVM.value;
+    return {
+      playable: store.view.mode === "dialogue" && !!vm,
+      generation: store.view.generation,
+      contextId: vm?.contextId ?? null,
+      delivery: vm?.delivery ?? null,
+      actorName: vm?.actor?.displayName ?? "",
+      hostName: vm?.host?.displayName ?? "",
+      bondStage: vm?.bondStage ?? null,
+    };
+  });
+  const scene = useAuthoredScene(sceneSource);
+  const scenePresentation = scene.presentation;
+  function onSceneAdvance() {
+    scene.advance();
+  }
+
+  // A scripted topic pick awaiting its reply holds the window, so its
+  // transcript never types before the scene delivery commits.
+  const sceneHold = computed(
+    () =>
+      store.view.mode === "dialogue" &&
+      store.view.dispatch.inFlight?.actionId === "explore.talk_scripted",
+  );
+
+  // The stage speaker: "actor" | "host" | null (narration), or null outside
+  // an available conversation. A native freeform line in flight lights the
+  // actor (dispatch state); an authored scene follows its current line's
+  // explicit attribution (including while a later pick awaits its reply);
+  // a native line is the host's.
+  const dialogueStageSpeaker = computed(() => {
+    if (store.view.mode !== "dialogue" || !dialogueVM.value) {
+      return null;
+    }
+    if (store.view.dialogueSpeaker === "player") {
+      return "actor";
+    }
+    if (scene.active.value) {
+      return scene.speaker.value;
+    }
+    return "host";
+  });
+
   // Design D4: the list shows only in dialogue with the panel available,
-  // once the line is fully read, and never while an action is in flight (a
-  // pick or free speech awaiting its reply).
+  // once the line is fully read — an authored scene once its final page
+  // received the explicit finish activation — and never while an action is
+  // in flight (a pick or free speech awaiting its reply).
   const choicesShown = computed(
     () =>
       store.view.mode === "dialogue" &&
       !!dialogueVM.value &&
-      readingComplete.value &&
+      (scene.active.value ? scene.readingComplete.value : readingComplete.value) &&
       store.view.dispatch.inFlight == null,
+  );
+
+  // A scene that starts while focus fell to the document (a reconnect's
+  // replay) gives the page surface focus, so Space/Enter read it at once.
+  // Focus anywhere else is never moved.
+  watch(
+    scene.key,
+    async (key, previous) => {
+      if (key === null || key === previous || !scene.active.value) {
+        return;
+      }
+      await nextTick();
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement || !active.isConnected) {
+        shellRef.value?.focusMessagePage?.();
+      }
+    },
+    { flush: "post" },
   );
 
   // The committed exit rows (exploration-exit-compass design D9): the
@@ -73,6 +149,12 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
   return {
     readingComplete,
     onReadingChange,
+    scene,
+    scenePresentation,
+    sceneHold,
+    onSceneAdvance,
+    onSceneFinished: scene.onSceneFinished,
+    dialogueStageSpeaker,
     choicesShown,
     dialogueExits,
     onDialogueMove,

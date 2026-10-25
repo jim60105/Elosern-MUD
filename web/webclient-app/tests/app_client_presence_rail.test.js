@@ -22,6 +22,7 @@ import {
   artworkResource,
 } from "../stories/fixtures/art_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { dialoguePanel as v3Panel } from "./support/dialogue_panel.js";
 
 // The exploration panel is schema v4: its interact targets and look entities
 // carry a nullable `portrait_ref` that the presenter fills only for an
@@ -495,15 +496,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
             local_map: fx.localMapPanel(),
             context_actions: fx.explorationActions(),
             art: artPanel(),
-            dialogue: {
-              schema_version: 2,
-              available: true,
-              kind: "dialogue",
-              host: { identity: 7, display_name: "店長", portrait_ref: null },
-              bond_stage: "熟識",
-              line: "歡迎。",
-              choices: [{ keyword_id: "news", label: "最近有什麼消息？" }],
-            },
+            dialogue: v3Panel({ hostId: 7, hostName: "店長", bondStage: "熟識", line: "歡迎。", keywords: ["news"], labels: ["最近有什麼消息？"] }),
           },
         }),
       ],
@@ -1237,15 +1230,7 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
             art: artPanel(),
             roster: FOCUS_ROSTER,
             party: focusParty(101, 102),
-            dialogue: {
-              schema_version: 2,
-              available: true,
-              kind: "dialogue",
-              host: { identity: 101, display_name: "蕾娜", portrait_ref: null },
-              bond_stage: "熟識",
-              line: "歡迎。",
-              choices: [{ keyword_id: "news", label: "最近有什麼消息？" }],
-            },
+            dialogue: v3Panel({ hostId: 101, hostName: "蕾娜", bondStage: "熟識", line: "歡迎。", keywords: ["news"], labels: ["最近有什麼消息？"] }),
           },
         }),
       ],
@@ -1270,7 +1255,7 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
 
     // The player speaks: the existing dialogue host/player signals take over
     // and the hosted companion is dimmed again.
-    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 101, keyword_id: "news" }, null)).not.toBe(null);
+    expect(store.dispatchAction("explore.talk_freeform", { npc_id: 101, speech: "最近有什麼消息？" }, null)).not.toBe(null);
     await settle();
     expect(store.view.dialogueSpeaker).toBe("player");
     expect(speaks("101")).toBe("false");
@@ -1364,15 +1349,7 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
           revision,
           mode: "dialogue",
           panels: {
-            dialogue: {
-              schema_version: 2,
-              available: true,
-              kind: "dialogue",
-              host: { identity: 101, display_name: "蕾娜", portrait_ref: null },
-              bond_stage: null,
-              line: "歡迎。",
-              choices: [],
-            },
+            dialogue: v3Panel({ hostId: 101, hostName: "蕾娜", bondStage: null, line: "歡迎。", keywords: [] }),
           },
         }),
       ],

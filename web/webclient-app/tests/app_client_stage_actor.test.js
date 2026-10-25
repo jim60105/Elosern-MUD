@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
+import { dialoguePanel as v3Panel, narration, sceneDelivery, speech, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 import { useElosernStore } from "../stores/elosern.js";
 import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
 import {
@@ -57,19 +58,17 @@ function basePanels() {
   };
 }
 
-function dialoguePanel(portraitRef = "7") {
-  return {
-    schema_version: 2,
-    available: true,
-    kind: "dialogue",
-    host: { identity: 7, display_name: "店長", portrait_ref: portraitRef },
-    bond_stage: "熟識",
+function dialoguePanel(portraitRef = "7", overrides = {}) {
+  return v3Panel({
+    hostId: 7,
+    hostName: "店長",
+    hostPortraitRef: portraitRef,
+    bondStage: "熟識",
     line: "歡迎來到西風酒館。",
-    choices: [
-      { keyword_id: "news", label: "最近有什麼消息？" },
-      { keyword_id: "town", label: "關於這座城鎮" },
-    ],
-  };
+    keywords: ["news", "town"],
+    labels: ["最近有什麼消息？", "關於這座城鎮"],
+    ...overrides,
+  });
 }
 
 describe("the stage actors in the portrait anchors", () => {
@@ -202,31 +201,64 @@ describe("the stage actors in the portrait anchors", () => {
   });
 
   it("renders no host actor while the dialogue panel is unavailable", async () => {
-    commit("dialogue", { schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } });
+    commit("dialogue", unavailableDialoguePanel());
     await nextTick();
     expect(actorIn("actor-right").exists()).toBe(false);
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
   });
 
-  it("dims the listener: the player while the host speaks, the host while a pick is in flight", async () => {
+  it("dims the listener: the player while the host speaks, the host while a freeform line is in flight", async () => {
     commit("dialogue", dialoguePanel("7"));
     await nextTick();
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("false");
     expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
 
-    // The choice list's pick: the single dispatch entry.
-    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 7, keyword_id: "news" }, null)).not.toBe(null);
+    // A scripted pick is not native speech: the light stays where it was.
+    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 7, topic_id: "host.news", context_id: "ctx-1" }, null)).not.toBe(null);
+    await nextTick();
+    expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+    commit("dialogue", dialoguePanel("7"));
+    await nextTick();
+
+    // The player's freeform line lights the player until its reply commits.
+    const freeformRequest = store.dispatchAction("explore.talk_freeform", { npc_id: 7, speech: "你好。" }, null);
+    expect(freeformRequest).not.toBe(null);
     await nextTick();
     expect(store.view.dialogueSpeaker).toBe("player");
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("true");
     expect(actorIn("actor-right").attributes("data-speaking")).toBe("false");
 
     // The reply's revision commits: the host speaks again.
-    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
-    commit("dialogue", { ...dialoguePanel("7"), line: "北岸大道最近不太平。" });
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: freeformRequest, presentation_revision: revision })], {});
+    commit("dialogue", dialoguePanel("7", { line: "北岸大道最近不太平。" }));
     await nextTick();
     expect(actorIn("actor-left").attributes("data-speaking")).toBe("false");
     expect(actorIn("actor-right").attributes("data-speaking")).toBe("true");
+  });
+
+  it("follows an authored scene's explicit attribution, narration lighting neither", async () => {
+    store.setTextSpeed?.("instant");
+    commit(
+      "dialogue",
+      dialoguePanel("7", {
+        delivery: sceneDelivery([speech("actor", "消息？"), speech("host", "不太平。"), narration("燈火搖曳。")]),
+      }),
+    );
+    await nextTick();
+    await nextTick();
+    const lit = () => [actorIn("actor-left").attributes("data-speaking"), actorIn("actor-right").attributes("data-speaking")];
+    const page = () => wrapper.get('[data-testid="message-page"]').element;
+    const enter = async () => {
+      page().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await nextTick();
+      await nextTick();
+    };
+    expect(lit()).toEqual(["true", "false"]);
+    await enter();
+    expect(lit()).toEqual(["false", "true"]);
+    await enter();
+    expect(lit()).toEqual(["false", "false"]);
   });
 
   const choiceList = () => wrapper.get('[data-anchor="choices"] [data-testid="dialogue-choices"]').element;

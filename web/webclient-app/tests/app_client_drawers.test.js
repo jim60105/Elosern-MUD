@@ -24,6 +24,7 @@ import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { resetPartyWindowMemory } from "../components/party-window-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { dialoguePanel as v3Panel } from "./support/dialogue_panel.js";
 import {
   PARTY_PANEL_EMPTY_SAMPLE,
   PARTY_PANEL_FULL_SAMPLE,
@@ -975,9 +976,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(ids()).toEqual(["102", "101", "1", "103", "104"]);
     store.receive(1, "ui_update", [fx.update({ revision: 3, mode: "dialogue", panels: {
       status: fx.statusPanel({ actor: { identity: "102" } }),
-      dialogue: { schema_version: 2, available: true, kind: "dialogue",
-        host: { identity: 103, display_name: "測試同行", portrait_ref: null },
-        bond_stage: null, line: "測試台詞。", choices: [] },
+      dialogue: v3Panel({ hostId: 103, hostName: "測試同行", actorId: 102, bondStage: null, line: "測試台詞。", keywords: [] }),
     } })]);
     await wrapper.vm.$nextTick();
     const speaker = wrapper.get('[data-slot="3"]');

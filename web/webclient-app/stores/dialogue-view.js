@@ -33,6 +33,8 @@ export function dialogueViewModel(panel) {
     key: `dlg-kw-${choice.keyword_id || choice.topic_id}`,
     label: choice.label,
     enabled: choice.availability ? choice.availability === "open" : true,
+    keywordId: choice.keyword_id ?? null,
+    topicId: choice.topic_id ?? null,
     actionId: "explore.talk_scripted",
     payload: choice.action_payload || { npc_id: host.identity, topic_id: choice.topic_id, context_id: panel.context_id },
     commandDisplay: { npcLabel: host.display_name, keywordLabel: choice.label },
@@ -45,12 +47,20 @@ export function dialogueViewModel(panel) {
     npcLabel: host.display_name,
     actionId: null,
   };
+  const actor = panel.actor || null;
   return {
     host: {
       identity: host.identity,
       displayName: host.display_name,
       portraitRef: host.portrait_ref ?? null,
     },
+    // The acting body (Shared contract v2): the controlled figure whose
+    // speech an authored scene attributes to "actor" — a possessed
+    // companion when control is borrowed, so no second renderer exists.
+    actor: actor
+      ? { identity: actor.identity, displayName: actor.display_name, portraitRef: actor.portrait_ref ?? null }
+      : null,
+    contextId: panel.context_id ?? null,
     // The stage NAME travels verbatim (the server never ships numbers).
     bondStage: panel.bond_stage ?? null,
     line: panel.line ?? (panel.delivery?.lines?.[panel.delivery.lines.length - 1]?.text ?? ""),

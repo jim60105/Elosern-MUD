@@ -1,11 +1,15 @@
-// webclient-dialogue-choices-overlay D3/D4/D7/D8: the live wiring of the
-// dialogue choice list. It renders in the stage's `choices` anchor only in
-// dialogue with the panel available, once the message window reports the
-// line fully read, and never while an action is in flight. Its four intents
-// reach the store's single entry (a pick's `explore.talk_scripted`, the
-// free row's borrow, an exit's overview payload, and the leave), focus
-// moves onto it when it appears over the message window and parks on the
-// message page before an activation dispatches.
+// webclient-dialogue-choices-overlay D3/D4/D7/D8 and authored-dialogue-
+// playback: the live wiring of the dialogue choice list and the shared
+// manual scene player. The list renders in the stage's `choices` anchor only
+// in dialogue with the panel available, once the native line is fully read
+// or an authored scene received its explicit finish activation, and never
+// while an action is in flight. Its four intents reach the store's single
+// entry (a pick's `explore.talk_scripted`, the free row's borrow, an exit's
+// overview payload, and the leave); focus moves onto it when it appears over
+// the message window and parks on the message page before an activation
+// dispatches. A scene line updates the page text, the name plate and the
+// stage emphasis in one render; a reconnect replays the delivery from line
+// one without selecting again; a mode change retires it without finishing.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
@@ -13,25 +17,45 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import {
+  dialoguePanel as v3Panel,
+  narration,
+  sceneDelivery,
+  speech,
+  unavailableDialoguePanel,
+} from "./support/dialogue_panel.js";
 
 function dialoguePanel(overrides = {}) {
-  return {
-    schema_version: 2,
-    available: true,
-    kind: "dialogue",
-    host: { identity: 7, display_name: "店長", portrait_ref: null },
-    bond_stage: "熟識",
+  return v3Panel({
+    hostId: 7,
+    hostName: "店長",
+    actorName: "旅人",
+    bondStage: "熟識",
     line: "歡迎來到西風酒館。",
-    choices: [
-      { keyword_id: "news", label: "最近有什麼消息？" },
-      { keyword_id: "town", label: "關於這座城鎮" },
-    ],
+    keywords: ["news", "town"],
+    labels: ["最近有什麼消息？", "關於這座城鎮"],
     ...overrides,
-  };
+  });
+}
+
+// The deterministic multi-line scene: actor speech, two consecutive host
+// lines, narration.
+const SCENE_LINES = [
+  speech("actor", "最近有什麼消息？"),
+  speech("host", "北岸大道最近不太平。"),
+  speech("host", "夜裡別走那條路。"),
+  narration("店長壓低了聲音。"),
+];
+
+function scenePanel(lines = SCENE_LINES, deliveryOverrides = {}, panelOverrides = {}) {
+  return dialoguePanel({
+    delivery: sceneDelivery(lines, { topicId: "host.news", sceneId: "host.news_scene", ...deliveryOverrides }),
+    ...panelOverrides,
+  });
 }
 
 describe("the dialogue choice list over the stage", () => {
-  let store, sender, wrapper, revision;
+  let store, sender, wrapper, revision, generation, epoch;
 
   beforeEach(async () => {
     setActivePinia(createPinia());
@@ -42,7 +66,9 @@ describe("the dialogue choice list over the stage", () => {
     // typing until the reader completes it.
     store.setTextSpeed?.("normal");
     wrapper = mount(AppClient, { attachTo: document.body });
-    store.beginTransport(1);
+    generation = 1;
+    epoch = fx.EPOCH_A;
+    store.beginTransport(generation);
     store.setConnected(true);
     store.setLoggedIn(true);
     revision = 1;
@@ -72,18 +98,38 @@ describe("the dialogue choice list over the stage", () => {
     if (dialogue) {
       panels.dialogue = dialogue;
     }
-    const response = store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels })], {});
-    expect(response.accepted).toBe(true);
+    const response = store.receive(generation, "ui_snapshot", [fx.snapshot({ revision, mode, panels, presentation_epoch: epoch })], {});
+    expect(response.accepted, JSON.stringify(response)).toBe(true);
     revision += 1;
   }
 
   const list = () => wrapper.find('[data-anchor="choices"] [data-testid="dialogue-choices"]');
   const page = () => wrapper.get('[data-testid="message-page"]').element;
-  const typing = () => wrapper.get('[data-testid="message-window"]').attributes("data-typing");
+  const win = () => wrapper.get('[data-testid="message-window"]');
+  const typing = () => win().attributes("data-typing");
+  const pageText = () => wrapper.get('[data-testid="message-page"]').text();
+  const plate = () => wrapper.find('[data-testid="message-name-plate"]');
+  const actorSpeaking = () => wrapper.get('[data-anchor="actor-left"] [data-testid="stage-actor"]').attributes("data-speaking");
+  const hostSpeaking = () => wrapper.get('[data-anchor="actor-right"] [data-testid="stage-actor"]').attributes("data-speaking");
+
+  async function press(key = "Enter", init = {}) {
+    page().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
+    await settle();
+  }
 
   async function openDialogue(panel = dialoguePanel()) {
     commit("dialogue", panel);
     await settle();
+  }
+
+  // The scene's attribution as rendered in one frame.
+  function frame() {
+    return {
+      text: pageText(),
+      plate: plate().exists() ? plate().get(".message-window__plate-name").text() : null,
+      actor: actorSpeaking(),
+      host: hostSpeaking(),
+    };
   }
 
   it("renders nowhere outside dialogue and inside the choices anchor in dialogue", async () => {
@@ -96,7 +142,7 @@ describe("the dialogue choice list over the stage", () => {
   });
 
   it("renders nothing while the dialogue panel is unavailable", async () => {
-    await openDialogue({ schema_version: 2, available: false, reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" } });
+    await openDialogue(unavailableDialoguePanel());
     expect(store.view.mode).toBe("dialogue");
     expect(list().exists()).toBe(false);
   });
@@ -112,8 +158,7 @@ describe("the dialogue choice list over the stage", () => {
     expect(list().exists()).toBe(false);
     // Enter on the page completes the (last) page: the list appears and
     // takes focus with its first row active.
-    page().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    await settle();
+    await press();
     expect(typing()).toBe("false");
     expect(list().exists()).toBe(true);
     expect(document.activeElement).toBe(list().element);
@@ -129,34 +174,38 @@ describe("the dialogue choice list over the stage", () => {
     await wrapper.findComponent({ name: "AppShell" }).vm.focusCommandField();
     const field = document.getElementById("inputfield");
     expect(document.activeElement).toBe(field);
-    page().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    await settle();
+    await press();
     expect(list().exists()).toBe(true);
     expect(document.activeElement).toBe(field);
   });
 
-  it("a pick dispatches the scripted keyword, parks focus on the page, and hides the list while in flight", async () => {
+  it("a pick dispatches the scripted topic, parks focus on the page, and hides the list while in flight", async () => {
     await openDialogue();
     list().element.focus();
     list().element.dispatchEvent(new KeyboardEvent("keydown", { key: "2", bubbles: true, cancelable: true }));
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
       action_id: "explore.talk_scripted",
-      payload: { npc_id: 7, keyword_id: "town" },
+      payload: { npc_id: 7, topic_id: "host.town", context_id: "ctx-1" },
     });
     await settle();
     expect(list().exists()).toBe(false);
     expect(document.activeElement).toBe(page());
-    // The reply commits (the in-flight record releases) and its line arrives
-    // unread: the list stays away until it is read.
-    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+    // The reply commits its complete scene: the list stays away until the
+    // scene's final page receives a further activation.
+    store.receive(generation, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+    store.appendText("out", "你說：關於這座城鎮");
     store.appendText("out", "店長說：北岸大道最近不太平。");
-    commit("dialogue", dialoguePanel({ line: "北岸大道最近不太平。" }));
+    commit("dialogue", scenePanel([speech("actor", "關於這座城鎮"), speech("host", "北岸大道最近不太平。")]));
     await settle();
     expect(store.view.dispatch.inFlight).toBe(null);
     expect(list().exists()).toBe(false);
-    page().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    await settle();
+    await press(); // complete line 1
+    await press(); // line 2
+    await press(); // complete line 2 (the final page, fully shown)
+    expect(typing()).toBe("false");
+    expect(list().exists()).toBe(false);
+    await press(); // the explicit finish
     expect(list().exists()).toBe(true);
     expect(document.activeElement).toBe(list().element);
   });
@@ -203,5 +252,163 @@ describe("the dialogue choice list over the stage", () => {
     await list().get('[data-testid="dialogue-exit"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.dialogue_leave", payload: { npc_id: 7 } });
+  });
+
+  describe("the shared manual scene player", () => {
+    it("changes text, plate and emphasis together at every line start, one reading step per line", async () => {
+      await openDialogue(scenePanel());
+      page().focus();
+      const frames = [frame()];
+      // Each line: complete its typing, then advance to the next line.
+      for (let line = 1; line < SCENE_LINES.length; line += 1) {
+        await press();
+        await press();
+        frames.push(frame());
+      }
+      expect(frames).toEqual([
+        { text: "最近有什麼消息？", plate: "旅人", actor: "true", host: "false" },
+        { text: "北岸大道最近不太平。", plate: "店長", actor: "false", host: "true" },
+        // The same host again: a separate reading step, still the host's.
+        { text: "夜裡別走那條路。", plate: "店長", actor: "false", host: "true" },
+        // Narration: no plate (an invisible spacer keeps its row), and
+        // neither participant emphasized.
+        { text: "店長壓低了聲音。", plate: null, actor: "false", host: "false" },
+      ]);
+      expect(wrapper.find('[data-testid="message-plate-spacer"]').exists()).toBe(true);
+      // The bond suffix belongs to host speech only.
+      expect(wrapper.find('[data-testid="dialogue-bond"]').exists()).toBe(false);
+      expect(list().exists()).toBe(false);
+    });
+
+    it("finishes only on a further activation after the final page and reports completion once", async () => {
+      await openDialogue(scenePanel([speech("actor", "嗯？"), speech("host", "好。")]));
+      const shell = wrapper.findComponent({ name: "MessageWindow" });
+      page().focus();
+      await press(); // complete line 1
+      await press(); // line 2 typing
+      await press(); // line 2 complete: the ■ final page
+      expect(shell.get('[data-testid="message-page-marker"]').attributes("data-state")).toBe("end");
+      expect(shell.get('[data-testid="message-page-marker"]').attributes("data-await-finish")).toBe("true");
+      expect(win().attributes("data-reading-complete")).toBe("false");
+      expect(list().exists()).toBe(false);
+      await press();
+      expect(win().attributes("data-reading-complete")).toBe("true");
+      expect(list().exists()).toBe(true);
+      expect(shell.get('[data-testid="message-page-marker"]').attributes("data-await-finish")).toBeUndefined();
+      // Further activations on the finished scene change nothing.
+      page().focus();
+      await press();
+      expect(pageText()).toBe("好。");
+      expect(sender.sent.actions).toHaveLength(0);
+    });
+
+    it("plays without appending transcript and keeps auto-advance off for scenes", async () => {
+      store.setAutoAdvance?.(true);
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel());
+      const logLength = store.narrative.length;
+      page().focus();
+      // Instant speed: each line is fully shown at once, and nothing moves
+      // without an activation.
+      expect(typing()).toBe("false");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await settle();
+      expect(pageText()).toBe("最近有什麼消息？");
+      for (let line = 1; line < SCENE_LINES.length; line += 1) {
+        await press();
+      }
+      expect(pageText()).toBe("店長壓低了聲音。");
+      expect(list().exists()).toBe(false);
+      await press();
+      expect(list().exists()).toBe(true);
+      expect(store.narrative.length).toBe(logLength);
+    });
+
+    it("ignores a held key's repeat and modified keys", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel());
+      page().focus();
+      await press("Enter", { repeat: true });
+      await press(" ", { shiftKey: true });
+      await press("Enter", { ctrlKey: true });
+      expect(pageText()).toBe("最近有什麼消息？");
+      await press(" ");
+      expect(pageText()).toBe("北岸大道最近不太平。");
+    });
+
+    it("keeps the local line on a same-delivery availability refresh", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel());
+      page().focus();
+      await press();
+      expect(pageText()).toBe("北岸大道最近不太平。");
+      // The same delivery with refreshed choices.
+      commit("dialogue", scenePanel(SCENE_LINES, {}, { keywords: ["news"], labels: ["最近有什麼消息？"] }));
+      await settle();
+      expect(pageText()).toBe("北岸大道最近不太平。");
+      expect(plate().text()).toContain("店長");
+    });
+
+    it("replays from line one after a reconnect without selecting again", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel());
+      page().focus();
+      await press();
+      await press();
+      expect(pageText()).toBe("夜裡別走那條路。");
+      const logLength = store.narrative.length;
+      // The transport resets; the resync snapshot carries the same delivery.
+      generation = 2;
+      store.beginTransport(generation);
+      store.setConnected(true);
+      store.setLoggedIn(true);
+      await settle();
+      revision = 1;
+      epoch = fx.EPOCH_B;
+      commit("dialogue", scenePanel());
+      await settle();
+      expect(pageText()).toBe("最近有什麼消息？");
+      expect(frame()).toMatchObject({ plate: "旅人", actor: "true", host: "false" });
+      expect(list().exists()).toBe(false);
+      expect(sender.sent.actions).toHaveLength(0);
+      expect(store.narrative.length).toBe(logLength);
+    });
+
+    it("retires without finishing when combat begins midway, keeping the transcript", async () => {
+      store.setTextSpeed?.("instant");
+      store.appendText("out", "你說：最近有什麼消息？");
+      store.appendText("out", "店長說：北岸大道最近不太平。");
+      await openDialogue(scenePanel());
+      await press();
+      const transcript = store.narrative.map((line) => line.text);
+      commit("combat");
+      await settle();
+      expect(win().attributes("data-scene")).toBeUndefined();
+      expect(list().exists()).toBe(false);
+      expect(plate().exists()).toBe(false);
+      expect(store.narrative.map((line) => line.text)).toEqual(transcript);
+      // The covered transcript settles: it is shown, already read.
+      expect(typing()).toBe("false");
+    });
+
+    it("does not take focus from an open drawer when the finished scene returns the choices", async () => {
+      store.setTextSpeed?.("instant");
+      await openDialogue(scenePanel([speech("actor", "嗯？")]));
+      page().focus();
+      await press(); // the final page is shown at once; this is the finish
+      expect(list().exists()).toBe(true);
+      // A new scene, finished while focus sits elsewhere (a drawer control).
+      const elsewhere = document.createElement("button");
+      document.body.appendChild(elsewhere);
+      commit("dialogue", scenePanel([speech("actor", "再一次？")], { deliveryId: "dlv-2" }));
+      await settle();
+      expect(list().exists()).toBe(false);
+      page().focus();
+      page().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      elsewhere.focus();
+      await settle();
+      expect(list().exists()).toBe(true);
+      expect(document.activeElement).toBe(elsewhere);
+    });
   });
 });

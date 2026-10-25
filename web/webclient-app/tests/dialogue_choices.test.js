@@ -10,20 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
+import { dialoguePanel as v3Panel, unavailableDialoguePanel } from "./support/dialogue_panel.js";
 
-const PANEL = {
-  schema_version: 2,
-  available: true,
-  kind: "dialogue",
-  host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
-  bond_stage: "親睦",
-  line: "「渡河要五枚銅板。」",
-  choices: [
-    { keyword_id: "fare", label: "「就五枚，走嗎？」" },
-    { keyword_id: "smell", label: "含糊帶過氣味" },
-    { keyword_id: "chest", label: "直接問箱櫃下落" },
-  ],
-};
+const PANEL = v3Panel({
+  keywords: ["fare", "smell", "chest"],
+  labels: ["「就五枚，走嗎？」", "含糊帶過氣味", "直接問箱櫃下落"],
+});
 const PICKS = dialogueViewModel(PANEL).picks;
 
 const EXITS = [
