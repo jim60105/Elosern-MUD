@@ -541,3 +541,29 @@ class LiveUnlockBatchTests(_OwnerBase):
         ) as observe, self.captureOnCommitCallbacks(execute=True):
             open_or_refresh_dialogue(self.player, plain, "閒聊。")
         observe.assert_not_called()
+
+    def test_a_context_owner_other_than_the_refreshed_owner_observes_nothing(self):
+        from types import SimpleNamespace as _NS
+
+        from world.rules import dialogue_availability
+
+        self._open()
+        stranger = create_object(PlayerCharacter, key="合成他人主人")
+        session = live_dialogue_session(self.player)
+        foreign = _NS(owner=stranger, host_key=self.host_key)
+        with patch(
+            "world.rules.dialogue_context.resolve_dialogue_context",
+            return_value=foreign,
+        ), patch(
+            "world.narrative.dialogue_reading.observe_availability"
+        ) as observe, patch(
+            "world.rules.dialogue_availability.log_warn"
+        ) as log_warn:
+            claimed = dialogue_availability._observe_unlocks(
+                self.player, self.player, session, "inventory"
+            )
+        self.assertIsNone(claimed)
+        observe.assert_not_called()
+        self.assertEqual(
+            log_warn.call_args.kwargs["context"]["reason"], "owner_mismatch"
+        )

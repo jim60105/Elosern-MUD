@@ -784,12 +784,13 @@ export function applyDialogueReading(ctx) {
     }
     const rs = ctx.reducer.getState();
     const panel = rs.mode === "dialogue" && rs.panels ? rs.panels.dialogue : null;
-    const pending = memory.unlockPending;
-    memory.unlockPending = [];
     if (!panel || panel.available !== true) {
-      publishSnapshot();
+      // Nothing to show against: keep the batches; the next committed sync
+      // decides (a retired scope drops them there, never here).
       return 0;
     }
+    const pending = memory.unlockPending;
+    memory.unlockPending = [];
     const read = new Set([...savedTopics(), ...memory.finished]);
     const rows = new Map(
       (Array.isArray(panel.choices) ? panel.choices : [])

@@ -589,6 +589,19 @@ def _observe_unlocks(owner: Any, body: Any, session: Any, cause: str) -> Any:
             return None
         if context.owner is None or not context.host_key:
             return None
+        if int(getattr(context.owner, "pk", 0) or 0) != int(getattr(owner, "pk", 0) or 0):
+            # The reading row and the recipients must belong to one player:
+            # never observe or claim for an owner whose watchers differ.
+            log_warn(
+                UNLOCK_OBSERVATION_FAILED_EVENT,
+                context={
+                    "char": owner_id,
+                    "cause": cause,
+                    "reason": "owner_mismatch",
+                    "owner": str(getattr(context.owner, "pk", "?")),
+                },
+            )
+            return None
         source = resolve_dialogue_source(context)
         if source is None:
             # A freeform-only host has no scene topics to observe.
