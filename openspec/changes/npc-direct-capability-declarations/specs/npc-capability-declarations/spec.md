@@ -35,3 +35,14 @@ Each service-bearing capability SHALL explicitly declare person or place binding
 #### Scenario: Narrative dialogue
 - **WHEN** an ordinary dialogue component has no explicit service association
 - **THEN** it remains ordinary dialogue without service settings or a projected service
+
+### Requirement: Generated commissioners carry complete explicit capability configuration
+Generated commission roles SHALL carry validated direct capability configuration with explicit person binding and trusted scoped identifiers. Publication and activation SHALL reject absent or conflicting scope/binding before provisioning; ordinary generated narrative dialogue SHALL remain unbound.
+
+#### Scenario: Complete generated activation
+- **WHEN** a valid package commission role is published and activated through its real encounter owner
+- **THEN** its exact actor receives the declared person-bound quest-issuer plan through shared deterministic assembly, retaining the existing scoped issuer identity and registration checks
+
+#### Scenario: Missing binding rejects
+- **WHEN** a commission role omits its explicit capability binding or conflicts with the existing bound actor
+- **THEN** publication or activation rejects atomically, with no partial authority or fallback to an unbound service

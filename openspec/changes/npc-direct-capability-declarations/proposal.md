@@ -37,11 +37,12 @@ Approved source: `docs/superpowers/specs/2026-10-25-npc-capabilities-and-service
 
 world/imports/assembly.py resolves blueprint-minus-explicit overrides. profession_assembly owns attachment and binding. PlaceDefinition in world/lore/settlements/places.py owns profession and flat authored_kwargs; _hosts.py derives ServiceHostRow. Current six blueprint sets are merchant, guild_staff, guild_examiner (renamed by R), quest_issuer, attendant and clergy. All shipped schedule_template/default_tier values are null.
 
-This is a one-engineer-day runnable slice with 5 focused implementation/test/documentation units. Exact contracts and complete caller categories are in design.md; planned checks are not planning results.
+This is a one-engineer-day runnable slice with 6 focused implementation/test/documentation units. Exact contracts and complete caller categories are in design.md; planned checks are not planning results.
 
 ## Batch:
 
 depends-on: npc-service-host-identity
+depends-on: authored-dialogue-generated-packages
 
 code-conflicts: D follows H to avoid losing reuse identity when blueprints disappear. Shares places/imports/guild_config/core specs with title-authoring N; N follows D. Content batches keep profile/topic identity and may run before D; serialize docs and lore fixture changes. No active content prose is reauthored.
 

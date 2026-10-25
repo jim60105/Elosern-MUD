@@ -12,6 +12,8 @@
 
 - [ ] 1.5 Test mixed person/place components on one host, zero components, complete batch failure before persistence and injected assembly rollback including handler caches. Regress shipped merchant dialogue, clergy, issuer identity fallback and preserved stock/schedules; update all changed current specs/traceability and test ownership.
 
+- [ ] 1.6 Migrate generated commission RoleDefinition/package schema/prompt and RoleSpawn/encounter_activation/provision_scoped_issuer to explicit validated person-bound issuer plans with complete scoped identifiers. Test real publication/activation/rollback and update every named direct provisioning fixture. Keep narrative dialogue unbound and preserve exact existing-NPC scope/ownership conflict checks.
+
 ## Handoff evidence
 
 Every checkbox includes its named behavior tests and current documentation. Complete all implementation edits before the single focused verification batch in design.md. Report commands/results, changed spec coverage and preserved non-goal regressions. Proposed new focused labels must be implemented as permanent tests, not mocks or source-text checks. Do not run tests during this planning change.
