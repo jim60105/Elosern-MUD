@@ -1,0 +1,35 @@
+# Immutable browser ownership and local state
+
+## Context
+
+Current protocol/store.js::cloneState serializes/parses every panel/map for getState and every notification. Vue elosern.js ignores the subscriber payload and calls publishView, which calls getState again; frame-resolvers.js also uses getState at access time. Network suppression alone leaves this complete-copy path active. Existing callers rely on mutable getState snapshots being isolated from future commits and reducer internals.
+
+## Goals / Non-Goals
+
+Adopt isolated immutable payloads once, retain unchanged references on deltas, and use read-only shared committed state on ordinary subscriber/view/resolver paths. Preserve mutable public snapshot isolation. Do not redesign menus, remove semantic teardown, freeze local forms/queues or add performance/profiling gates.
+
+## Decisions
+
+### Two explicit read contracts on one reducer
+
+Keep `getState()` as an explicit detached mutable snapshot API with the existing deep-isolation contract. Add `getCommittedState()` returning an owned frozen committed record. This is a read API on the same reducer, never a second store. `subscribe(listener)` receives that immutable committed record; ordinary notify uses it directly, with no complete serialize/parse/clone. Each committed record and its panels/maps dictionaries is frozen. New incoming validated replacement payloads, metadata and result/error payloads are copied from transport-owned input then recursively Object.freeze'd once before adoption. Previously committed frozen objects are reused without recursive re-freezing. New panel dictionaries shallow-copy references and apply replacements/removals; no old nested payload is copied. Input-envelope mutation after receive cannot alter committed state.
+
+An unchanged eager panel retains === identity through a delta and any metadata/result-only notification. A snapshot replaces authoritative membership, but reuse an equal already-owned panel when cheap JSON-aware equality proves identical (no hashing or serialization); this also avoids replay/reset in equal checkpoint data. Deleting a panel removes its key; unavailable replaces it with that exact registered value. Same-epoch map references remain across eager snapshots; epoch reset clears them. Old immutable committed records remain unchanged after later commits, even when a listener retains them. Mutable getState snapshots can still be edited independently, and remain stable after future commits.
+
+### Complete live-consumer migration
+
+`web/webclient-app/stores/elosern.js` subscribes with the committed record and passes it to `ctx.publishView(rs)`; view.js::publishView takes optional current record and otherwise calls getCommittedState for local-only UI operations. buildView passes through frozen panels/maps references. `createFrameResolver({getState})` binds the callback to getCommittedState, so current declarative menus read committed facts without cloning the whole state. Exact observed getState call sites are elosern.js initial view/resolver binding; stores/elosern/combat.js participantNamesByIdentity, party-card lookup and action display facts; frames.js root reset, actor selection, command construction, item/exit/cross-side flows; hud.js drawer navigation gate; interaction.js dialogue borrow, exploration rows, key routing and exit; presence.js activation/digit flows; room_actions.js room look/card; skill_use.js preview entry; transport.js freeform speech target; and view.js stageTargetNow/publishView/followCombatItem. Migrate all those reads to getCommittedState. Leave local mutations such as toasts.value.splice and stage_targets.js sorting its newly built members array local. bridge.js, transport.js and composables/panel-view.js use existing committed view access; explicit browser debugging/snapshot tooling may keep getState when it needs a detached mutable snapshot. Update stale comments claiming protocol core cannot change. Public app subscribe forwards immutable records consistently.
+
+Audit consumers at the stated concrete paths for mutation operations against committed arrays/objects. Replace `.sort`, `.splice`, property assignments or model field decoration with local small copies only at the consumer that owns mutable selection. CombatMenu/SkillUseMenu models, frame descriptors/focus, creation drafts, dialogue playback/reading queues, form edits and animations remain local mutable state, with no mutable alias into committed data. Retain frame-resolvers.js::isolate for menu-return isolation where needed; removing all copy helpers is outside scope. Freeze tests must demonstrate caller mutation cannot corrupt internals even in non-strict JS (a rejected write or TypeError are both acceptable, unchanged authoritative value is required).
+
+### UI preservation
+
+A same-mode same-identity complete alignment must not remount AppClient or reset focus, open valid drawer/menu, unsaved form input, current playback progress or animations. Keep existing single teardown point for mode switch, transport/epoch reset and detach. Existing semantic close/pop remains for disappeared identity, unavailable backing panel, changed room identity, invalid service/skill selection or changed dialogue delivery identity. Snapshot kind/revision alone never triggers teardown. Preserve use-mode-change.js same-mode behavior and current invalid-selection rules. Immutable equal snapshots must not replay the same dialogue delivery or terminal combat beats; existing delivery/round identity gates remain authoritative.
+
+### Exact targets and verification
+
+Own protocol/store.js and small protocol/immutable.js ownership helper (new if needed), app stores/elosern.js, stores/elosern/view.js, stores/frame-resolvers.js and the live consumer read sites above. Add Node protocol_immutable.test.js and Vitest immutable_presentation.test.js. Existing frame-resolvers.test.js, app_client_completion.test.js, app_client_resync.test.js, mode_transitions.test.js, dialogue_view_model.test.js and relevant creation/form fixture tests remain regressions. Inject a source object and a hostile subscriber, assert unchanged references with === and mutation resistance, count exactly one subscriber notification per complete publication and zero per pending part, verify detached getState edits cannot affect either old/new committed data, and test same-mode alignment retaining focused row/open card/unsaved text. Functional assertions only; no elapsed-time/allocation counters or profile claims. Update ownership API documentation and frozen-contract audit if its preserved core boundary description changes, retaining real behavior assertions.
+
+## Risks / Trade-offs
+
+Object.freeze is required in production; a dev-only freeze would leave alias corruption possible. Freezing JSON data excludes transport/framework objects. No full-state traversal occurs in ordinary notify/view/resolver reads, while explicit detached snapshots still pay their documented copy cost. Active dialogue workers retain ownership of local reading queues and completion lifecycle.
