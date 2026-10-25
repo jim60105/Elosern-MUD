@@ -250,9 +250,11 @@ class DialoguePresenterTests(EvenniaTest):
         # truncated to the panel's own bound (align-11).
         self.assertEqual(
             payload["choices"],
-            _scripted_keyword_descriptors(self.host, context_id=live_dialogue_session(self.player).context_id)[
-                :DIALOGUE_MAX_CHOICES
-            ],
+            _scripted_keyword_descriptors(
+                self.host,
+                actor=self.player,
+                context_id=live_dialogue_session(self.player).context_id,
+            )[:DIALOGUE_MAX_CHOICES],
         )
         self.assertTrue(payload["choices"])
         # The shipped guild_staff row authors exactly the panel's pressable
@@ -365,12 +367,14 @@ class DialoguePresenterTests(EvenniaTest):
         # (webclient-align-11 decoupling).
         host = _host_with_key(self.room, _T_OVER_CAP_KEY, key="合成對話主")
         open_or_refresh_dialogue(self.player, host, "歡迎。")
-        full_pool = _scripted_keyword_descriptors(host)
+        full_pool = _scripted_keyword_descriptors(host, actor=self.player)
         self.assertEqual(len(full_pool), 16)
         payload = self._render()
         self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)
         expected_choices = _scripted_keyword_descriptors(
-            host, context_id=live_dialogue_session(self.player).context_id
+            host,
+            actor=self.player,
+            context_id=live_dialogue_session(self.player).context_id,
         )[:DIALOGUE_MAX_CHOICES]
         self.assertEqual(payload["choices"], expected_choices)
         self.assertEqual(
@@ -685,7 +689,9 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
             _scripted_keyword_descriptors(
-                self.host, context_id=committed["panels"]["dialogue"]["context_id"]
+                self.host,
+                actor=self.player,
+                context_id=committed["panels"]["dialogue"]["context_id"],
             )[:DIALOGUE_MAX_CHOICES],
         )
         # End-to-end: the portrait reference the wire carries is a key of the

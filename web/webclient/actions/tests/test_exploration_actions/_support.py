@@ -81,17 +81,15 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
 )
-from world.rules.tests._guild_service_probes import synthetic_branch_key
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_ITEMS, make_skill
 
-# Kit identities (test-data-independence): the dialogue/branch/item/skill
+# Kit identities (test-data-independence): the dialogue/item/skill
 # fixtures resolve through the kit rows; the shipped guild-staff table row is
 # merged into the scoped table through a runtime probe (the production
 # turnin-keyword special case keys off that table), never an import-time
 # symbol name.
 _T_DIALOGUE = "t_synth_lodgekeeper"
-_T_BRANCH = synthetic_branch_key()
 _T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
 _T_SKILL = make_skill("t_practice_drill").key
 

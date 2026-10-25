@@ -3,17 +3,11 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from evennia.utils.test_resources import EvenniaTestCase
 from world.ai.fake_client import FakeLLMClient
 from world.narrative.dialogue import pair_view
-from world.rules.dialogue import (
-    GUILD_STAFF_DIALOGUE_KEY,
-    GUILD_STAFF_TURNIN_KEYWORD,
-    DialogueDefinition,
-    KeywordResponse,
-)
 from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
 from world.rules.player_messages import STALE_PERSONA_NOTE
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.characters import PlayerCharacter
-from typeclasses.rooms import Room, TerrainRoom
+from typeclasses.rooms import Room
 from typeclasses.components import ScriptedDialogue
 from web.webclient.actions.exploration_actions import (
     MAX_EXIT_REF_CHARS,
@@ -59,7 +53,6 @@ from world.ai.npc_dialogue import register_npc_dialogue
 import unittest
 from ._support import (
     _HeldClient,
-    _T_BRANCH,
     _T_DIALOGUE,
     _T_ITEM,
     _T_LODGE_GREETING,
@@ -67,7 +60,6 @@ from ._support import (
     _T_LODGE_LINE,
     _T_SKILL,
     _T_SKILL_ROW,
-    _T_STAFF_TURNIN_LINE,
     _raw,
     _reply_text,
     _reset_guardrail,
@@ -80,11 +72,10 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def setUp(self):
         # Scope before construction: dialogue hosts answer from the kit
-        # table (shipped guild-staff row merged for the production turnin
-        # special case), and the practice suite resolves its drill skill in
-        # a scoped registry (the kit's forced-innate rows ride along so the
-        # engage path's production innate keys still resolve).
-        _t_dialogue_scope(self, with_staff=True)
+        # table, and the practice suite resolves its drill skill in a scoped
+        # registry (the kit's forced-innate rows ride along so the engage
+        # path's production innate keys still resolve).
+        _t_dialogue_scope(self)
         open_synthetic_scope(
             self,
             "skills",
@@ -141,7 +132,13 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
+            self.player,
+            {
+                "npc_id": int(host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_01",
+                "context_id": None,
+                "selection_id": "sel-topic-1",
+            },
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIn(_T_LODGE_LINE, result["message"])
@@ -151,36 +148,33 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "補貨"}
+            self.player,
+            {
+                "npc_id": int(host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_02",
+                "context_id": None,
+                "selection_id": "sel-topic-2",
+            },
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIn("櫃檯右側", result["message"])
 
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
-    def test_turnin_keyword_flows_through_the_shared_dialogue_resolution(self):
-        # The production turnin special case keys off the (imported-constant)
-        # staff-table/keyword pair: an unregistered player at a staff-hosted
-        # desk gets the authored register-first line through the shared
-        # resolution AND the known-keyword affinity gain is skipped purely.
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(
-            ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
-        )
-        from typeclasses.components import GuildStaff
-
-        host.components.add(
-            GuildStaff.create(host, service_id="staff", branch_key=_T_BRANCH)
-        )
+    def test_legacy_keyword_only_payload_rejects_without_writing(self):
+        # The composed payload is the exact topic/context/selection form; an
+        # old keyword-only payload must reject before any dialogue API call and
+        # never reach the authored prose.
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         relations_before = host.db.relations_data
         result = _talk_scripted_adapter(
-            self.player,
-            {"npc_id": int(host.pk), "keyword_id": GUILD_STAFF_TURNIN_KEYWORD},
+            self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
         )
-        self.assertEqual(result["outcome"], "success")
-        self.assertIn(_T_STAFF_TURNIN_LINE, result["message"])
-        # Losing the special case would route this known keyword through the
-        # normal +1 talk-affinity write; the fixture surface must stay pure.
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "unregistered_keyword")
+        self.assertNotIn(_T_LODGE_LINE, result.get("message") or "")
+        self.assertIsNone(self.player.db.dialogue_session)
         self.assertEqual(host.db.relations_data, relations_before)
 
 
@@ -188,7 +182,13 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
+            self.player,
+            {
+                "npc_id": int(host.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_99",
+                "context_id": None,
+                "selection_id": "sel-unknown",
+            },
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unregistered_keyword")
@@ -200,44 +200,36 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.location = create_object(Room, key="別處", location=None)
         with patch(
-            "web.webclient.actions.exploration_actions.run_scripted_talk"
-        ) as talk:
+            "web.webclient.actions.exploration_actions.select_authored_topic"
+        ) as select:
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
+                self.player,
+                {
+                    "npc_id": int(host.pk),
+                    "topic_id": f"{_T_DIALOGUE}.topic_01",
+                    "context_id": None,
+                    "selection_id": "sel-absent",
+                },
             )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_npc")
-        talk.assert_not_called()
+        select.assert_not_called()
 
 
     def test_non_dialogue_host_rejects_before_any_dialogue_api(self):
         plain = create_object(NPC, key="路人", location=self.room1)
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(plain.pk), "keyword_id": _T_LODGE_KEYWORD}
+            self.player,
+            {
+                "npc_id": int(plain.pk),
+                "topic_id": f"{_T_DIALOGUE}.topic_01",
+                "context_id": None,
+                "selection_id": "sel-plain",
+            },
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_dialogue_host")
 
-
-    def test_talk_response_failure_and_silence_are_rejected(self):
-        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
-        with patch(
-            "web.webclient.actions.exploration_actions.run_scripted_talk",
-            side_effect=RuntimeError("boom"),
-        ):
-            result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
-            )
-        self.assertEqual(result["code"], "dialogue_failed")
-        with patch(
-            "web.webclient.actions.exploration_actions.run_scripted_talk",
-            return_value=None,
-        ):
-            result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
-            )
-        self.assertEqual(result["code"], "no_response")
 
     def test_talk_scripted_budget_exceeded_rejects_with_specific_code(self):
         from world.rules.dialogue import DialogueBudgetExceededError
@@ -450,15 +442,21 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.db.schedule_state = "busy"
         with patch(
-            "web.webclient.actions.exploration_actions.run_scripted_talk"
-        ) as talk:
+            "web.webclient.actions.exploration_actions.select_authored_topic"
+        ) as select:
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
+                self.player,
+                {
+                    "npc_id": int(host.pk),
+                    "topic_id": f"{_T_DIALOGUE}.topic_01",
+                    "context_id": None,
+                    "selection_id": "sel-busy",
+                },
             )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIn("她現在正忙著", result["message"])
-        talk.assert_not_called()
+        select.assert_not_called()
 
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")

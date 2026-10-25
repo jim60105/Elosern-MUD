@@ -287,26 +287,24 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
-def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
-    """One ``explore.talk_scripted`` entry per current topic of a host.
+def _scripted_entries(npc: Any, *, actor: Any) -> list[AffordanceView]:
+    """One ``explore.talk_scripted`` entry per disclosed topic of a host.
 
     The host is enumerated source-first, so a schedule-blocked host keeps its
     rows; a possessed acting body sees them enabled only when the complete
     actor/owner/host context is lawful and the host carries an authored
     source. Otherwise they stay visible disabled with the fixed possession
-    refusal.
+    refusal. The shared availability projection decides which topics exist:
+    hidden rows are absent, locked rows are emitted as their refusal
+    descriptor (an enabled pick that plays the authored refusal on
+    selection), and no row ever carries a scene body.
     """
-    from world.rules.dialogue import authorized_dialogue_open, live_dialogue_session
+    from world.rules.dialogue import authorized_dialogue_open
+    from world.rules.dialogue_availability import availability_context, project_topics
     from world.rules.dialogue_sources import dialogue_source_for_host
 
     source = dialogue_source_for_host(npc)
     npc_id = int(npc.pk)
-    session = live_dialogue_session(actor) if actor else None
-    context_id = (
-        session.context_id
-        if session is not None and session.npc_id == npc_id
-        else None
-    )
     entries: list[AffordanceView] = []
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -320,14 +318,15 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
     )
 
     if source is not None:
-        for topic in source.dialogue.topics[:MAX_SCRIPTED_KEYWORDS]:
-            params = validate_talk_scripted_descriptor(
-                {"npc_id": npc_id, "topic_id": topic.topic_id, "context_id": context_id}
-            )
+        context = availability_context(actor, npc)
+        for row in project_topics(context, context_id=context.context_id)[
+            :MAX_SCRIPTED_KEYWORDS
+        ]:
+            params = validate_talk_scripted_descriptor(row.descriptor)
             entries.append(
                 AffordanceView(
                     action_id="explore.talk_scripted",
-                    label=_bounded_label(topic.label),
+                    label=_bounded_label(row.label),
                     params=params,
                     freeform=False,
                     navigation=False,
@@ -336,6 +335,14 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
                 )
             )
     else:
+        from world.rules.dialogue import live_dialogue_session
+
+        session = live_dialogue_session(actor) if actor is not None else None
+        context_id = (
+            session.context_id
+            if session is not None and session.npc_id == npc_id
+            else None
+        )
         keywords = dialogue_topic_keywords(npc)
         for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]:
             params = validate_talk_scripted_descriptor(
@@ -356,35 +363,42 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
 
 
 def _scripted_keyword_descriptors(
-    npc: Any, context_id: str | None = None
+    npc: Any, *, actor: Any, context_id: str | None = None
 ) -> list[dict[str, Any]]:
-    """Return the bounded scripted keyword descriptors of a dialogue host for panel v3."""
+    """Return the disclosed panel-v3 choices of a dialogue host.
+
+    ``actor`` is required so an authored host is ALWAYS projected against a
+    real actor context (a host-only read withholds every guarded topic and is
+    never a silent default). ``context_id`` stamps the action descriptor, and
+    each row contributes exactly the disclosure-safe fields: no scene, no
+    variant, no fallback body. Hidden rows are absent and locked rows carry
+    their availability, canonical hint and refusal descriptor so the client
+    can play the authored refusal on selection.
+    """
+    from world.rules.dialogue_availability import availability_context, project_topics
     from world.rules.dialogue_sources import dialogue_source_for_host
 
     source = dialogue_source_for_host(npc)
     npc_id = int(npc.pk)
     choices = []
     if source is not None:
-        for topic in source.dialogue.topics[:16]:
+        context = availability_context(actor, npc)
+        for row in project_topics(context, context_id=context_id):
             choices.append(
                 {
-                    "topic_id": topic.topic_id,
-                    "keyword_id": topic.keyword,
-                    "label": topic.label,
-                    "availability": "open",
-                    "requirement_hint": None,
+                    "topic_id": row.topic_id,
+                    "keyword_id": row.keyword,
+                    "label": row.label,
+                    "availability": row.availability,
+                    "requirement_hint": row.requirement_hint,
                     "unread": False,
-                    "predecessors": list(topic.predecessors),
-                    "action_payload": {
-                        "npc_id": npc_id,
-                        "topic_id": topic.topic_id,
-                        "context_id": context_id,
-                    },
+                    "predecessors": [],
+                    "action_payload": row.descriptor,
                 }
             )
     else:
         keywords = dialogue_topic_keywords(npc)
-        for keyword in keywords[:16]:
+        for keyword in keywords:
             choices.append(
                 {
                     "topic_id": keyword,

@@ -100,7 +100,10 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         # The actual presentation consumer (the version-2 panel's descriptor
         # source) reads the same generated topics in the same order.
         self.assertEqual(
-            [row["keyword_id"] for row in _scripted_keyword_descriptors(self.mother)],
+            [
+                row["keyword_id"]
+                for row in _scripted_keyword_descriptors(self.mother, actor=None)
+            ],
             [INFORMATION_KEYWORD, COMMISSION_KEYWORD],
         )
         self.assertEqual(greeting_for(self.mother), f"{LONG_PROSE}searching")

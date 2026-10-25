@@ -28,7 +28,6 @@ from world.rules.dialogue import (
     SceneDelivery,
     StaleContextError,
     StaleSelectionError,
-    TopicLockedError,
     TopicNotFoundError,
     clear_dialogue_session,
     live_dialogue_session,

@@ -37,7 +37,6 @@ from world.lore.scenes import scene_canonical_bytes, Scene, Speech
 from world.lore.sexual_vocab import EXPOSURE_LEVELS
 from world.rules.dialogue import (
     DialogueBudgetExceededError,
-    TopicLockedError,
     TopicNotFoundError,
     clear_dialogue_session,
     live_dialogue_session,
@@ -1014,7 +1013,9 @@ class DialoguePhysicalConditionTests(EvenniaTest):
             self._select(_CARRIES_TOPIC, selection_id="sel-short", expected=live_dialogue_session(self.char1).context_id)
 
     def test_predecessor_topic_stays_fail_closed(self):
-        with self.assertRaises(TopicLockedError):
+        # A default-hidden predecessor topic is indistinguishable from an
+        # unknown one until reading persistence exists: no label, hint or body.
+        with self.assertRaises(TopicNotFoundError):
             self._select(_PREDECESSOR_TOPIC)
         self.assertIsNone(self.char1.db.dialogue_session)
 
