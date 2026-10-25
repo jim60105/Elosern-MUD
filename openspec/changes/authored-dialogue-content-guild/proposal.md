@@ -6,7 +6,7 @@ The approved authored-dialogue design requires complete authored rewrite for gui
 
 ## What Changes
 
-- Complete authored rewrite for guild_staff.
+- Complete per-NPC YAML authored rewrite for guild_staff.
 - Implement this slice's exact shared interfaces and focused acceptance with its own tests and documentation.
 - Use the deterministic owner and declared dependencies; no implementation is performed by this proposal.
 
@@ -20,7 +20,7 @@ The approved authored-dialogue design requires complete authored rewrite for gui
 
 ## Impact
 
-Target files and APIs are enumerated in design.md. This is planning on the primary branch only; future implementation is bounded to one engineer-day and task units of roughly two hours or less. No data migration, generalized scripting engine or new gameplay effects.
+Exact profile-key YAML ownership and APIs are enumerated in design.md. Files are automatically discovered without manual content registration; canonical profiles remain read-only. This is planning on the primary branch only; future implementation is bounded to one engineer-day and task units of roughly two hours or less. No data migration, generalized scripting engine or new gameplay effects.
 
 ## Non-goals
 
@@ -30,6 +30,8 @@ Do not implement another slice, retain obsolete authored compatibility paths, ch
 
 depends-on: authored-dialogue-unread-notices
 
-Code conflicts: Same-domain siblings share world/lore/dialogue/guild.py and profile source modules; apply serially or coordinate disjoint host hunks. New content test/review files are exclusive. All content changes share manifest append entries and the authored-dialogue-content main spec at archive; supervisor serializes manifest integration/archive, never edits sibling-owned hosts.
+The dependency chain includes authored-dialogue-contracts, authored-dialogue-yaml-loader and authored-dialogue-runtime; content uses their completed v2 schema/scanner implementation.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Code conflicts: Content slices exclusively own their per-NPC YAML files and unique test/review files; they do not edit shared region Python modules, profile definitions, loader code or a registration list. Profiles and place bindings are read-only canonical inputs. The integration owner serializes test-manifest entries in tools/test_data_freeze.json and .github/evennia-shards.json, runs the combined gate, and serializes archive into the shared authored-dialogue-content spec. No manual content registration is added.
+
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
