@@ -5,8 +5,12 @@ import { ref, onScopeDispose } from "vue";
 import { TOAST_LIFETIME_MS, TOAST_QUEUE_MAX } from "./constants.js";
 
 // The frozen tone vocabulary (webclient-action-feedback): an unknown tone is
-// rejected, not coerced (the openHudDrawer precedent).
-const TOAST_TONES = new Set(["info", "crit"]);
+// rejected, not coerced (the openHudDrawer precedent). `unlock` is the
+// dialogue unlock notice (authored-dialogue-unread-notices): a quiet status
+// that names newly opened topics as chips.
+const TOAST_TONES = new Set(["info", "crit", "unlock"]);
+// Bounded chip list (an unlock batch names at most 16 topics).
+const TOAST_MAX_CHIPS = 16;
 
 export function applyToasts(ctx) {
   // Declared above the initial view because `initialView()` calls `buildView`,
@@ -15,7 +19,7 @@ export function applyToasts(ctx) {
   // dismisses re-render consumers without a republish — and
   // `handleActionResult` pushes DURING a publish, where a nested republish
   // would recurse.
-  const toasts = ref([]); // [{id, title, sub?, tone}]
+  const toasts = ref([]); // [{id, title, sub?, chips?, tone}]
   ctx.toasts = toasts;
   // Per-entry auto-dismiss timers (internal bookkeeping; never reaches the
   // entry shape or the view).
@@ -39,6 +43,14 @@ export function applyToasts(ctx) {
     const toast = { id: ++toastIdCounter, title: item.title, tone: item.tone };
     if (typeof item.sub === "string" && item.sub.trim() !== "") {
       toast.sub = item.sub;
+    }
+    if (Array.isArray(item.chips)) {
+      const chips = item.chips
+        .filter((chip) => typeof chip === "string" && chip.trim() !== "")
+        .slice(0, TOAST_MAX_CHIPS);
+      if (chips.length > 0) {
+        toast.chips = chips;
+      }
     }
     toasts.value.push(toast);
     while (toasts.value.length > TOAST_QUEUE_MAX) {

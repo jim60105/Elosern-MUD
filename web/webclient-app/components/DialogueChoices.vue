@@ -43,6 +43,11 @@
 // prop (a dispatch in flight) and a disabled exit row emit nothing. Hidden
 // topics never reach this component (the view model drops them).
 //
+// Unread topics (authored-dialogue-unread-notices): an open topic the owner
+// has not read yet carries the server's `unread` flag; its row draws a small
+// gold pip in the padlock's slot and says （未讀） in text. A locked row keeps
+// only its lock. The list never reorders or refocuses for it.
+//
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
@@ -109,6 +114,9 @@ const rows = computed(() => {
       // A locked topic stays enabled: selecting it plays its refusal.
       enabled: true,
       lock: pick.locked === true,
+      // The server's unread marker (authored-dialogue-unread-notices); the
+      // lock wins, so a locked row never shows the unread pip.
+      unread: pick.unread === true && pick.locked !== true,
       tip: pick.locked === true && pick.hint ? pick.hint : null,
       pick,
     })),

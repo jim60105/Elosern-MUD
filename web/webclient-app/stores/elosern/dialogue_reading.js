@@ -30,6 +30,15 @@
 //   acting character or a logical rejection drops the pending memory and the
 //   reveal; a transport generation change only suspends the queue for a
 //   same-context retry.
+// - Unlock notices (authored-dialogue-unread-notices): a live pushed panel may
+//   carry one `unlock_batch` wrapped for THIS connection. Its `batch_id` is
+//   remembered in a memory-only seen set (per acting character), the batch
+//   waits in a bounded pending list until the conversation's choices are back
+//   on screen (`releaseDialogueUnlocks`, called by the choices wiring after
+//   the scene's explicit finish), and then becomes ONE `unlock` toast naming
+//   the topics still open and unread. Nothing here persists: a reload or a
+//   character switch drops every pending notice while the server's durable
+//   unread markers stay in the choice list.
 import { ref } from "vue";
 
 // Matches the server's per-topic completion receipt bound (Shared contract v2:
@@ -46,6 +55,10 @@ export const DIALOGUE_ACK_TIMEOUT_MS = 5000;
 // acknowledgement answered long after its timeout may still settle the entry
 // (the server did commit), but the map never grows without bound.
 const MAX_RETAINED_REQUESTS = 64;
+// Unlock notices: remembered batch ids (dedup across repeated pushes) and the
+// deferred batches awaiting the return to choices.
+const MAX_SEEN_UNLOCK_BATCHES = 64;
+export const MAX_PENDING_UNLOCK_BATCHES = 8;
 
 // Stable rejection codes that make the acknowledgement itself meaningless
 // (Shared contract v2): the receipt is gone, foreign, retired or was never a
@@ -117,6 +130,9 @@ export function applyDialogueReading(ctx) {
     saveEpoch: 0,
     attempts: 0,
     timer: null,
+    // Unlock notices (memory-only; see the module header).
+    seenBatches: new Set(),
+    unlockPending: [],
   };
 
   function emptySnapshot() {
@@ -131,6 +147,7 @@ export function applyDialogueReading(ctx) {
       sending: false,
       retryable: false,
       revealed: null,
+      unlockPending: 0,
     };
   }
 
@@ -158,6 +175,7 @@ export function applyDialogueReading(ctx) {
             delivery: memory.reveal.delivery,
           }
         : null,
+      unlockPending: memory.unlockPending.length,
     };
   }
 
@@ -622,6 +640,7 @@ export function applyDialogueReading(ctx) {
       memory.settleRevision = 0;
     }
     if (rs.phase === "detached") {
+      memory.unlockPending = [];
       // Authoritative detachment (a `no_puppet` protocol error: the character
       // is gone). The pending memory and the transient reveal die with it; a
       // late answer must not settle into the next character's state.
@@ -643,6 +662,8 @@ export function applyDialogueReading(ctx) {
       if (memory.ownerId !== null && memory.ownerId !== ownerId) {
         // A different acting character: nothing queued may outlive it.
         discardAll();
+        memory.seenBatches.clear();
+        memory.unlockPending = [];
       }
       memory.ownerId = ownerId;
     }
@@ -650,6 +671,7 @@ export function applyDialogueReading(ctx) {
       if (memory.pending.length > 0 || memory.saved.size > 0 || memory.reveal) {
         discardAll();
       }
+      memory.unlockPending = [];
       publishSnapshot();
       return;
     }
@@ -658,6 +680,7 @@ export function applyDialogueReading(ctx) {
       if (memory.pending.length > 0 || memory.saved.size > 0 || memory.reveal) {
         discardAll();
       }
+      memory.unlockPending = [];
       publishSnapshot();
       return;
     }
@@ -702,9 +725,102 @@ export function applyDialogueReading(ctx) {
       }
       memory.serverDeliveryId = serverDeliveryId;
     }
+    admitUnlockBatch(panel);
     markPredecessorsResolved();
     flush();
     publishSnapshot();
+  };
+
+  function samePanelScope(batch, panel) {
+    return (
+      batch.contextId === panel.context_id &&
+      batch.hostId === ((panel.host && panel.host.identity) ?? null)
+    );
+  }
+
+  // Remember one wrapped batch of the current panel, once per batch id. A
+  // pending batch of another host or context (a retired conversation) is
+  // dropped here; one of the same scope survives every reconcile, so the
+  // order of the batch push and an action result's publication never loses it.
+  function admitUnlockBatch(panel) {
+    memory.unlockPending = memory.unlockPending.filter((batch) => samePanelScope(batch, panel));
+    const batch = panel.unlock_batch;
+    if (!batch || typeof batch.batch_id !== "string" || batch.batch_id === "") {
+      return;
+    }
+    if (batch.context_id !== panel.context_id || batch.host_id !== (panel.host && panel.host.identity)) {
+      return;
+    }
+    if (memory.seenBatches.has(batch.batch_id)) {
+      return;
+    }
+    memory.seenBatches.add(batch.batch_id);
+    while (memory.seenBatches.size > MAX_SEEN_UNLOCK_BATCHES) {
+      memory.seenBatches.delete(memory.seenBatches.values().next().value);
+    }
+    memory.unlockPending.push({
+      batchId: batch.batch_id,
+      hostId: batch.host_id,
+      contextId: batch.context_id,
+      topicIds: Array.isArray(batch.topic_ids) ? batch.topic_ids.slice(0, 16) : [],
+    });
+    while (memory.unlockPending.length > MAX_PENDING_UNLOCK_BATCHES) {
+      memory.unlockPending.shift();
+    }
+  }
+
+  /**
+   * Show the deferred unlock notices once the conversation's choices are back.
+   *
+   * Called by the choices wiring whenever the list is shown with notices
+   * pending. Each pending batch of the current host/context becomes ONE
+   * `unlock` toast naming the topics the current panel still lists as open
+   * and unread and that were not saved or read meanwhile; a batch emptied
+   * that way shows nothing. Never moves focus. Returns the toast count.
+   */
+  ctx.releaseDialogueUnlocks = function releaseDialogueUnlocks() {
+    if (memory.unlockPending.length === 0) {
+      return 0;
+    }
+    const rs = ctx.reducer.getState();
+    const panel = rs.mode === "dialogue" && rs.panels ? rs.panels.dialogue : null;
+    const pending = memory.unlockPending;
+    memory.unlockPending = [];
+    if (!panel || panel.available !== true) {
+      publishSnapshot();
+      return 0;
+    }
+    const read = new Set([...savedTopics(), ...memory.finished]);
+    const rows = new Map(
+      (Array.isArray(panel.choices) ? panel.choices : [])
+        .filter((choice) => choice.availability === "open" && choice.unread === true)
+        .map((choice) => [choice.topic_id, choice]),
+    );
+    const host = (panel.host && panel.host.display_name) || "";
+    let shown = 0;
+    for (const batch of pending) {
+      if (!samePanelScope(batch, panel)) {
+        continue;
+      }
+      const labels = batch.topicIds
+        .filter((topicId) => rows.has(topicId) && !read.has(topicId))
+        .map((topicId) => rows.get(topicId).label);
+      if (labels.length === 0) {
+        continue;
+      }
+      const id = ctx.pushToast({
+        tone: "unlock",
+        title: "新的話題",
+        sub: host ? `可以和${host}聊聊了` : "可以聊聊了",
+        chips: labels,
+      });
+      if (id !== null) {
+        shown += 1;
+      }
+    }
+    publishSnapshot();
+    ctx.publishView();
+    return shown;
   };
 
   /**
@@ -791,4 +907,4 @@ export function applyDialogueReading(ctx) {
   };
 }
 
-export default { applyDialogueReading, MAX_PENDING_COMPLETIONS, DIALOGUE_ACK_TIMEOUT_MS };
+export default { applyDialogueReading, MAX_PENDING_COMPLETIONS, MAX_PENDING_UNLOCK_BATCHES, DIALOGUE_ACK_TIMEOUT_MS };

@@ -238,3 +238,34 @@ export const LockedTopicsScaled = {
   ],
 };
 
+
+// Unread topics (authored-dialogue-unread-notices): the server's durable
+// unread marker on open formal topics the owner has not read yet. Each draws
+// a small gold diamond pip in the padlock's trailing slot with a soft halo
+// that glints once as the row enters, its label one step brighter, and the
+// text （未讀） for assistive technology. A locked row keeps only its
+// padlock (the lock wins over unread); a read row shows neither.
+const UNREAD_PICKS = dialogueViewModel({
+  ...DIALOGUE_PANEL_SAMPLE,
+  choices: [
+    { keyword_id: "fare", topic_id: "ferry.fare", label: "「就五枚，走嗎？」", availability: "open", requirement_hint: null, unread: false },
+    { keyword_id: "crossing", topic_id: "ferry.crossing", label: "霧門後的舊渡口", availability: "open", requirement_hint: null, unread: true },
+    { keyword_id: "lantern", topic_id: "ferry.lantern", label: "守門人的燈", availability: "open", requirement_hint: null, unread: true },
+    { keyword_id: "oath", topic_id: "ferry.oath", label: "夢裡的約定", availability: "locked", requirement_hint: "需要好感階段至少為熟識", unread: true },
+  ],
+}).picks;
+
+export const UnreadTopics = {
+  render: focusRow(1),
+  args: { picks: UNREAD_PICKS, exits: EXITS, localMap: LOCAL_MAP },
+};
+
+// The same rows at `--ui-scale: 1.25`: the pip, its halo and the padlock
+// scale together.
+export const UnreadTopicsScaled = {
+  render: focusRow(0),
+  args: { picks: UNREAD_PICKS, exits: EXITS, localMap: LOCAL_MAP },
+  decorators: [
+    (story) => ({ render: () => h("div", { style: { "--ui-scale": "1.25", fontSize: "calc(16px * var(--ui-scale))" } }, [h(story())]) }),
+  ],
+};

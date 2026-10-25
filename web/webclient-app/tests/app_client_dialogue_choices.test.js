@@ -704,4 +704,41 @@ describe("the dialogue choice list over the stage", () => {
       });
     });
   });
+  // authored-dialogue-unread-notices: an unlock batch pushed while a scene
+  // plays waits for the explicit finish, then shows one status toast without
+  // taking focus; the persistent pip marks the row.
+  it("defers an unlock notice until the scene returns the choices and keeps focus", async () => {
+    const unread = (panel) => ({
+      ...panel,
+      choices: panel.choices.map((choice) => ({ ...choice, unread: choice.topic_id === "host.town" })),
+    });
+    await openDialogue(unread(scenePanel([speech("actor", "嗯？"), speech("host", "好。")])));
+    page().focus();
+    const batched = unread(scenePanel([speech("actor", "嗯？"), speech("host", "好。")]));
+    batched.unlock_batch = { batch_id: "u".repeat(32), host_id: 7, context_id: "ctx-1", topic_ids: ["host.town"] };
+    commit("dialogue", batched);
+    await settle();
+    const toasts = () => store.view.toasts.filter((toast) => toast.tone === "unlock");
+    await press(); // complete line 1
+    await press(); // line 2
+    await press(); // line 2 complete
+    expect(toasts()).toEqual([]);
+    expect(list().exists()).toBe(false);
+    await press(); // the explicit finish
+    await settle();
+    expect(list().exists()).toBe(true);
+    expect(toasts()).toHaveLength(1);
+    expect(toasts()[0].chips).toEqual(["關於這座城鎮"]);
+    const toast = wrapper.get(`[data-testid="feedback-toast-${toasts()[0].id}"]`);
+    expect(toast.attributes("role")).toBe("status");
+    expect(toast.attributes("data-tone")).toBe("unlock");
+    expect(toast.element.contains(document.activeElement)).toBe(false);
+    expect(document.activeElement).toBe(list().element);
+    const town = list().findAll('[role="menuitem"]')[1];
+    expect(town.attributes("data-unread")).toBe("true");
+    // A later publication of the same batch never shows a second notice.
+    commit("dialogue", batched);
+    await settle();
+    expect(toasts()).toHaveLength(1);
+  });
 });

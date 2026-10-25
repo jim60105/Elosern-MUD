@@ -485,4 +485,45 @@ describe("DialogueChoices", () => {
       }
     });
   });
+  // authored-dialogue-unread-notices: the server's unread marker is a pip in
+  // the padlock's slot plus text; the lock always wins.
+  describe("unread topics", () => {
+    const UNREAD_PANEL = v3Panel({
+      choices: [
+        { ...choiceRow("fare", { topicId: "host.fare", label: "渡河的價錢" }), unread: true },
+        choiceRow("smell", { topicId: "host.smell", label: "河邊的氣味" }),
+        { ...choiceRow("gate", { topicId: "host.gate", label: "霧門的事" }), availability: "locked", requirement_hint: "需要信物", unread: true },
+      ],
+    });
+    const UNREAD_PICKS = dialogueViewModel(UNREAD_PANEL).picks;
+
+    it("draws a pip and the text name on an unread open row only", () => {
+      const w = mountList({ picks: UNREAD_PICKS });
+      const [fare, smell, gate] = rows(w);
+      expect(fare.attributes("data-unread")).toBe("true");
+      expect(fare.get('[data-testid="choice-card-unread"]').attributes("aria-hidden")).toBe("true");
+      expect(fare.text()).toContain("（未讀）");
+      expect(smell.attributes("data-unread")).toBeUndefined();
+      expect(smell.find('[data-testid="choice-card-unread"]').exists()).toBe(false);
+      expect(smell.text()).not.toContain("（未讀）");
+      // The lock marker wins: a locked row shows only its padlock.
+      expect(gate.attributes("data-unread")).toBeUndefined();
+      expect(gate.find('[data-testid="choice-card-unread"]').exists()).toBe(false);
+      expect(gate.find('[data-testid="choice-card-lock"]').exists()).toBe(true);
+      expect(gate.text()).not.toContain("（未讀）");
+    });
+
+    it("keeps the active row and focus when a refresh marks a topic read", async () => {
+      const w = mountList({ picks: UNREAD_PICKS });
+      await key(w, "ArrowDown");
+      const before = activeRow(w).getAttribute("data-row-key");
+      const read = v3Panel({
+        choices: UNREAD_PANEL.choices.map((choice) => ({ ...choice, unread: false })),
+      });
+      await w.setProps({ picks: dialogueViewModel(read).picks });
+      expect(activeRow(w).getAttribute("data-row-key")).toBe(before);
+      expect(document.activeElement).toBe(list(w).element);
+      expect(w.find('[data-testid="choice-card-unread"]').exists()).toBe(false);
+    });
+  });
 });

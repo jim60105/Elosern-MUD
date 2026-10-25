@@ -14,7 +14,7 @@ Shared contract v2 observes stable host_key and first-seen topic ID for both sou
 
 ## 3. Deferred frontend notice and markers
 
-- [ ] 3.1 Add lock/unread visual+accessible text, memory dedup and defer-until-choices toast using existing toasts.js without focus changes. Add synthetic component/store tests for concurrent completion suppression and stale host discard.
+- [x] 3.1 Add lock/unread visual+accessible text, memory dedup and defer-until-choices toast using existing toasts.js without focus changes. Add synthetic component/store tests for concurrent completion suppression and stale host discard.
 
 ## 4. Focused full lifecycle acceptance
 

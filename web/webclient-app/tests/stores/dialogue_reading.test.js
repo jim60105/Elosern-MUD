@@ -677,3 +677,110 @@ describe("the memory-only dialogue completion queue", () => {
     expect(h.store.view.dialogueReading.savedTopicIds).toEqual(["host.news"]);
   });
 });
+
+// authored-dialogue-unread-notices: deferred, deduplicated unlock notices.
+describe("the deferred dialogue unlock notices", () => {
+  let h;
+  const BATCH = "b".repeat(32);
+
+  function unreadPanel({ unread = ["host.news", "host.town"], batch = null, completed = [], ...rest } = {}) {
+    const base = panel({ completedTopicIds: completed, ...rest });
+    base.choices = base.choices.map((choice) => ({ ...choice, unread: unread.includes(choice.topic_id) }));
+    base.unlock_batch = batch;
+    return base;
+  }
+
+  function batch(overrides = {}) {
+    return { batch_id: BATCH, host_id: HOST, context_id: CTX, topic_ids: ["host.news", "host.town"], ...overrides };
+  }
+
+  function unlockToasts() {
+    return h.store.view.toasts.filter((toast) => toast.tone === "unlock");
+  }
+
+  beforeEach(() => {
+    h = harness();
+    h.commit("dialogue", unreadPanel());
+  });
+
+  it("defers a batch until release and shows one toast naming its open unread topics", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    expect(h.store.view.dialogueReading.unlockPending).toBe(1);
+    expect(unlockToasts()).toEqual([]);
+    expect(h.store.releaseDialogueUnlocks()).toBe(1);
+    const [toast] = unlockToasts();
+    expect(toast.title).toBe("新的話題");
+    expect(toast.sub).toContain("店長");
+    expect(toast.chips).toEqual(["最近有什麼消息？", "關於這座城鎮"]);
+    expect(h.store.view.dialogueReading.unlockPending).toBe(0);
+  });
+
+  it("deduplicates a repeated batch id across later pushes and snapshots", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    expect(h.store.view.dialogueReading.unlockPending).toBe(1);
+    h.store.releaseDialogueUnlocks();
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    expect(h.store.view.dialogueReading.unlockPending).toBe(0);
+    expect(h.store.releaseDialogueUnlocks()).toBe(0);
+    expect(unlockToasts()).toHaveLength(1);
+  });
+
+  it("keeps one toast per server batch for rapid separate refreshes", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch({ topic_ids: ["host.news"] }) }));
+    h.commit("dialogue", unreadPanel({ batch: batch({ batch_id: "c".repeat(32), topic_ids: ["host.town"] }) }));
+    expect(h.store.releaseDialogueUnlocks()).toBe(2);
+    expect(unlockToasts().map((toast) => toast.chips)).toEqual([["最近有什麼消息？"], ["關於這座城鎮"]]);
+  });
+
+  it("survives a same-context publication that no longer carries the batch", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    h.commit("dialogue", unreadPanel());
+    expect(h.store.releaseDialogueUnlocks()).toBe(1);
+  });
+
+  it("suppresses topics saved or read before display and shows nothing for an emptied batch", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    // Another connection saved news; town was finished locally.
+    h.commit("dialogue", unreadPanel({ unread: ["host.town"], completed: ["host.news"] }));
+    h.store.finishDialogueDelivery(detail(formal(LINES, { deliveryId: "dlv-town", topicId: "host.town" })));
+    expect(h.store.releaseDialogueUnlocks()).toBe(0);
+    expect(unlockToasts()).toEqual([]);
+  });
+
+  it("drops a pending batch once its host or context is retired", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    h.commit("dialogue", unreadPanel({ contextId: "ctx-2" }));
+    expect(h.store.view.dialogueReading.unlockPending).toBe(0);
+    expect(h.store.releaseDialogueUnlocks()).toBe(0);
+  });
+
+  it("discards pending notices on leaving dialogue and on a character switch", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    h.commit("exploration");
+    expect(h.store.view.dialogueReading.unlockPending).toBe(0);
+    h.commit("dialogue", unreadPanel({ batch: batch({ batch_id: "d".repeat(32) }) }));
+    h.commit("dialogue", unreadPanel(), {
+      status: fx.statusPanel({ actor: { identity: "43", location: { label: "測試起點", identity: "17" } } }),
+    });
+    expect(h.store.view.dialogueReading.unlockPending).toBe(0);
+    expect(unlockToasts()).toEqual([]);
+  });
+
+  it("never names a locked or no-longer-listed topic", () => {
+    h.commit("dialogue", unreadPanel({ batch: batch() }));
+    const relocked = unreadPanel({ unread: [] });
+    relocked.choices[1] = { ...relocked.choices[1], availability: "locked", requirement_hint: "需要信物", unread: false };
+    relocked.choices[0] = { ...relocked.choices[0], unread: true };
+    h.commit("dialogue", relocked);
+    h.store.releaseDialogueUnlocks();
+    expect(unlockToasts().map((toast) => toast.chips)).toEqual([["最近有什麼消息？"]]);
+  });
+
+  it("marks only open unread rows in the view model, never a locked one", () => {
+    const view = unreadPanel();
+    view.choices[1] = { ...view.choices[1], availability: "locked", requirement_hint: "需要信物", unread: true };
+    const picks = dialogueViewModel(view).picks;
+    expect(picks.map((pick) => pick.unread)).toEqual([true, false]);
+  });
+});

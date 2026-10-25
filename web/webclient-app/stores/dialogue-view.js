@@ -58,8 +58,9 @@ export function dialogueViewModel(panel, reading = null) {
         availability: locked ? "locked" : "open",
         locked,
         hint: hint || null,
-        // Declared for the reading/notice owners; this slice draws no marker.
-        unread: choice.unread === true,
+        // The server's durable unread marker (authored-dialogue-unread-
+        // notices); the choice list draws it, and a locked row never does.
+        unread: !locked && choice.unread === true,
         keywordId: choice.keyword_id ?? null,
         topicId: choice.topic_id ?? null,
         actionId: "explore.talk_scripted",
