@@ -29,6 +29,10 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **WHEN** the puppeted actor is a possessed NPC and submits `explore.talk_open`
 - **THEN** the adapter validates actor/owner/host context and opens authored dialogue using the companion body, without enabling generated commissions or freeform talk
 
+#### Scenario: A possessed actor cannot open a conversation
+- **WHEN** a possessed actor has mismatched mirrors, invalid membership or no authenticated lawful control
+- **THEN** conversation opening rejects before session, affinity or narrative effects
+
 #### Scenario: Opening a conversation touches nothing but the session
 - **WHEN** a successful `explore.talk_open` settles with every LLM profile disabled
 - **THEN** no network request is made, the world clock tick, affinity records, memories, and party bindings are byte-identical to before the action, and only `db.dialogue_session` changed

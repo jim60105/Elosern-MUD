@@ -5,7 +5,7 @@
 ### Requirement: The dispatcher preserves talk and engage refusals during possession
 Lawful possessed authored talk open, selection and leave SHALL use the acting-body/owning-player context. Freeform talk and combat engage SHALL retain stable possession refusals and epoch guards. Shop buy/sell SHALL retain ordinary commander-purse/member-bag rules without a new prohibition.
 
-#### Scenario: Freeform and engage attempts move nothing
+#### Scenario: Talk and engage attempts move nothing
 - **WHEN** a possessing client dispatches freeform talk or combat engage against a normally eligible local target
 - **THEN** the result is rejected with the corresponding `possessed_talk` or `possessed_engage` code and fixed line, and dialogue sessions, combat sessions, affinity and all other canonical state remain unchanged
 
@@ -36,9 +36,13 @@ While possessing a companion, guild register/board/quests/turnin/merit, guild ex
 - **WHEN** a possessing client attempts an existing guild or church action, or a quest-issuer commission interaction
 - **THEN** existing admission or domain authorization prevents the service and changes no registration, guild/church merit, wallet, offering, quest, reward, or exam state; the companion is never substituted with the commander to enable it
 
+#### Scenario: Conversation opening stays refused
+- **WHEN** a possessing client attempts to open a generated quest-issuer commission or a non-authored conversation outside the newly authorized authored surface
+- **THEN** its existing possession refusal remains and no commission, reward or generated service delegation is introduced
+
 #### Scenario: Authored conversation opening is enabled
-- **WHEN** a possessing client attempts `explore.talk_open` against a normally eligible host
-- **THEN** lawful authored conversation opens with actor/owner separation, while a generated quest-issuer commission remains unavailable through possession
+- **WHEN** a lawful possessing client opens an authored host
+- **THEN** conversation opens with actor/owner separation while generated quest-issuer commission authority remains unchanged
 
 #### Scenario: Authored service prose grants no delegation
 - **WHEN** a possessed actor selects the guild reporting topic or addresses a generated issuer

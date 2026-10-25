@@ -52,6 +52,10 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 - **WHEN** a clear seam fires
 - **THEN** it is a successful movement settlement, combat engage, host departure/deletion/party cleanup, phase invalidation or successful possession release/control switch; each retires playback, choices and receipts through the sole writer
 
+#### Scenario: The clear seams are exactly the movement, engage, and NPC cleanup paths
+- **WHEN** an ordinary clear occurs without a phase or control transition
+- **THEN** the ordinary seams remain movement settlement, combat engage and NPC host departure/deletion/party cleanup; phase/control retirement is the additional explicitly authorized path above
+
 #### Scenario: The talk_open success path writes only the session opening
 - **WHEN** conversation open succeeds
 - **THEN** it writes only the session with the shared resolver's current fixed greeting or existing fallback and does not call a model
