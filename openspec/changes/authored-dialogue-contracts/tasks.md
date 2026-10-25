@@ -4,7 +4,7 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Frozen scene contract
 
-- [ ] 1.1 Implement Speech/Narration/Scene and strict IDs, Unicode/codepoint bounds, plain-data serialization; add synthetic roundtrip/rejection tests and document reuse in the module docstring. Verify frozen mutation raises and narration cannot carry a speaker.
+- [ ] 1.1 Implement Speech/Narration/Scene and strict IDs, Unicode/codepoint and canonical UTF-8 Scene/bundle bounds, plain-data serialization; add synthetic roundtrip/rejection tests and document reuse in the module docstring. Verify frozen mutation raises and narration cannot carry a speaker.
 
 ## 2. Topic and condition declarations
 
