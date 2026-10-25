@@ -29,12 +29,13 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No compatibility paths, new game effects or freeform/phase authority changes. Static and generated scenes share the source-neutral runtime; generated-packages supplies the production generated provider in its bounded cutover. Content writing waits for the mandatory source prerequisite.
 
 ## Batch:
 
 depends-on: authored-dialogue-contracts
+depends-on: authored-dialogue-yaml-loader
 
 Code conflicts: Highest backend blast radius. Conflicts with possession, availability, reading in dialogue.py, exploration_actions.py, protocol and presenter; dependent order is mandatory. Registry mechanical conversion precedes every prose slice.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. This change migrates every static Python table directly to scanner-discovered profile-key YAML and removes obsolete modules. Generated-package cutover later uses these complete shared interfaces without a second scene runtime.

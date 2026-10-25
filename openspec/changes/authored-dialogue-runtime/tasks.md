@@ -4,9 +4,11 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Mechanical registry cutover
 
-- [ ] 1.1 Convert every existing dialogue table/import/test fixture to stable topic IDs and real two-line data; remove obsolete classes/re-exports. Add synthetic resolver tests for known, unknown, greeting and generated source distinctions, and document temporary prose ownership in design-linked module comments.
+- [ ] 1.1 Migrate all 25 Python tables directly to scanner-discovered profile-key YAML using canonical bindings and unchanged dialogue-key topic IDs. The conversion is one scripted, reviewed transformation over the frozen literal tables rather than 25 hand-written files, which is what keeps this unit inside its 120-minute bound; migrate every importer/fixture and delete obsolete domain modules/classes/re-exports, then implement source-neutral ResolvedDialogueSource. Test complete inventory, profile/service distinction, greeting/unknown behavior and generated-capable provider interfaces; document temporary prose ownership/no manual registration.
 
 ## 2. Selection and transactional session delivery
+
+Remaining units implement Shared contract v2, including host_key/source identity in context/session and static <=96/generated <=2048 IDs in all Python/UMD/Vue action, panel, receipt, completion and predecessor validators. Add worst valid ID and aggregate UTF-8 budget tests; generated-packages supplies the production provider later.
 
 - [ ] 2.1 Implement resolve_dialogue_context for the ordinary player and select_authored_topic/session forms with request dedup and rollback compensation. Add world/rules/tests/test_authored_dialogue_runtime.py covering stale envelope, duplicate after intervening topic, session-write failure, no time advancement and snapshot replay.
 

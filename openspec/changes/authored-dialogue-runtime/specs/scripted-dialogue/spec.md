@@ -144,7 +144,7 @@ Scripted hosts SHALL answer permitted authored topics with complete attributed s
   turn-in paths are both bypassed for the blocked interaction
 
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
-Authored dialogue SHALL use immutable stable topic identities and complete linear scenes with greetings. Shared source-aware resolution SHALL preserve native generated phase definitions without registry mutation. All authored topics up to the declared sixteen-topic bound SHALL be reachable, with unchanged guild, greeting, fallback and command-discovery semantics.
+Static/generated dialogue SHALL use immutable stable topic identities and complete linear scenes with greetings. Source-aware resolution SHALL read scanner-published static YAML or permitted immutable DB phases without global registry mutation. Every permitted topic up to sixteen SHALL be reachable, preserving guild, greeting, fallback and command-discovery semantics.
 
 #### Scenario: Authored table behavior remains unchanged
 - **WHEN** an authored guild host is queried through the resolver
@@ -152,7 +152,7 @@ Authored dialogue SHALL use immutable stable topic identities and complete linea
 
 #### Scenario: Generated topics use the existing conversation vocabulary
 - **WHEN** a generated conversable host's current phase is queried by text, presentation, and action-validation consumers
-- **THEN** they resolve the same permitted greeting, ordered topic identities and native generated responses without a model call or runtime registry mutation
+- **THEN** they resolve the same permitted greeting, ordered stable topic IDs and complete generated scenes without a model call, static profile requirement or global registry mutation
 
 #### Scenario: guild_staff definition registers and answers command guidance
 - **WHEN** the `guild_staff` dialogue definition is registered and queried

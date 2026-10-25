@@ -3,10 +3,10 @@
 ## MODIFIED Requirements
 
 ### Requirement: explore.talk_scripted invokes the deterministic dialogue API with keyword buttons
-The scripted-talk action SHALL accept the closed authored topic/context/selection payload or the native generated keyword payload, selected by server source type. It SHALL re-resolve current presence and eligibility and invoke the same deterministic selection/service seam as text. Stale, unknown and mismatched source payloads SHALL reject without mutation.
+The scripted-talk action SHALL accept the common static/generated topic/context/request-derived selection payload. It SHALL resolve trusted host source, presence, binding/phase and qualification before deterministic effects/delivery. Text SHALL use that same selection path. Stale, unknown, old keyword-only and mismatched source payloads SHALL reject without mutation.
 
 #### Scenario: Scripted keyword buttons match authored behavior
-- **WHEN** an actor submits the source-correct topic payload for a present authored host or native keyword payload for a generated host
+- **WHEN** an actor submits the common stable topic payload for a present static or generated host
 - **THEN** the player receives the authored response exactly as `talk` would produce it
 
 #### Scenario: An unregistered keyword rejects without writing
@@ -19,7 +19,7 @@ The scripted-talk action SHALL accept the closed authored topic/context/selectio
 
 #### Scenario: A scripted reply opens the dialogue session
 - **WHEN** an actor submits a valid `explore.talk_scripted` for a present host
-- **THEN** the character's dialogue session names that NPC with the complete attributed scene or native generated line,
+- **THEN** the character's dialogue session names that NPC with the complete attributed static/generated scene,
   recorded before the adapter's response is delivered
 
 #### Scenario: Target resolution never trusts stale or remote references

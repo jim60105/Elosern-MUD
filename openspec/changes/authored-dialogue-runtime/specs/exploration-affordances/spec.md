@@ -30,7 +30,7 @@ Action descriptors SHALL be validator-normalized. Authored topic descriptors SHA
 #### Scenario: Candid payload shapes are exact per action
 - **WHEN** a builder constructs the candid payload for each action
 - **THEN** the shapes are: `explore.move` `{"exit_ref", "current_node"}`, `explore.look`
-  `{"target_id"}` or `{"room": true}`, `explore.talk_scripted` authored descriptor `{"npc_id", "topic_id", "context_id"}` or native generated `{"npc_id", "keyword_id"}`; the dispatcher injects request-derived selection identity into authored requests before full validation,
+  `{"target_id"}` or `{"room": true}`, `explore.talk_scripted` static/generated scene descriptor `{"npc_id", "topic_id", "context_id"}`; the dispatcher injects request-derived selection identity before full validation,
   `explore.party_invite` `{"npc_id", "message"}` (message empty by construction),
   `explore.party_leave` `{"npc_id"}`, `explore.engage` `{"monster_id"}`, `explore.wait`
   `{"daypart": "noon"}`, `explore.possess` `{"npc_id"}`, `explore.possess_release`

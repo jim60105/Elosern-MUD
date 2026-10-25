@@ -12,8 +12,12 @@
 The version-3 dialogue panel SHALL carry bounded host and acting-body identity/portrait descriptors, context-bound delivery, all reachable topic choices, public-chain descriptors, reading revision and optional live unlock batch. Available and unavailable forms SHALL be exact, read-only and JSON-safe. Numeric affinity and unauthorized qualified scene bodies SHALL never ship.
 
 #### Scenario: Generated choices obey existing panel bounds
-- **WHEN** a generated current phase exposes more topics than its native declared bound
-- **THEN** the panel preserves the generated source bound and declared order with version-3 fields, while authored definitions expose every permitted topic up to sixteen
+- **WHEN** a generated current phase exposes topics within the common sixteen-topic bound
+- **THEN** the panel exposes every permitted topic in declaration order using the same version-3 scene fields as static content
+
+#### Scenario: Source-aware identifiers survive every populated field
+- **WHEN** a valid canonical generated ID up to 2048 ASCII bytes appears in scene/topic, predecessor, completed-topic, action or receipt fields
+- **THEN** Python and production UMD/Vue mirrors retain exact bytes without static identifier restrictions, while unchanged aggregate UTF-8 budgets still reject oversized payloads before effects
 
 #### Scenario: Reopening after closure shows current everyday topics
 - **WHEN** a supported committed closure transition removes the commission topic and the player reopens the conversation
@@ -22,8 +26,8 @@ The version-3 dialogue panel SHALL carry bounded host and acting-body identity/p
 #### Scenario: A live scripted session serializes the host triple and table choices
 - **WHEN** a viewer with a live dialogue session against a bonded table host receives a snapshot
 - **THEN** `dialogue` is available with the host's identity, display name, and the host's art
-  catalog key as `portrait_ref`, the bond stage name, the recorded native line or complete scene delivery, and the host's all at most sixteen
-  keyword descriptors in table order, with no affinity numeral present
+  catalog key as `portrait_ref`, the bond stage name, the recorded native line or complete scene delivery, and all at most sixteen
+  topic choices in declaration order as `{npc_id,topic_id,context_id}`, with no affinity numeral and no keyword field present
 
 #### Scenario: The host's portrait reference matches the art catalog
 - **WHEN** a viewer with a live session against a scripted host receives one snapshot carrying
