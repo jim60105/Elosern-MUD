@@ -193,6 +193,25 @@ def seconds_until_daypart(calendar: WorldDateTime, daypart_name: str) -> int:
     return remaining if remaining > 0 else remaining + _DAY_SECONDS
 
 
+def _daypart_index(tick: int) -> int:
+    """The current daypart region of ``tick``, indexed by its sorted start hour.
+
+    ``TimePeriod`` eligibility is a pure function of the daypart region, so a
+    committed advance changes it exactly when this index changes. Two advances
+    within one region therefore schedule no dialogue refresh, and a crossing
+    (including midnight, which is its own start hour) schedules exactly one.
+    """
+    calendar = WorldDateTime.from_tick(tick)
+    seconds_per_hour = CLOCK_YAML["seconds_per_hour"]
+    current = calendar.hour * seconds_per_hour + calendar.minute * 60 + calendar.second
+    starts = sorted({int(hour) * seconds_per_hour for hour in CLOCK_YAML["dayparts"].values()})
+    index = 0
+    for position, start in enumerate(starts):
+        if current >= start:
+            index = position
+    return index
+
+
 @dataclass(frozen=True)
 class ScheduledEvent:
     """A serializable event made due by a world-time boundary."""
@@ -1286,6 +1305,23 @@ class WorldClock:
                 # savepoint exit alone must not leave a clock_advance line
                 # behind a rollback (on_commit callbacks are discarded then).
                 tick_to = self.tick
+                # World-time is a dialogue eligibility source independent of
+                # the action's entity scope: an idle owner in another room may
+                # depend on the new daypart. Only a committed daypart crossing
+                # schedules anything, and the discovery plus projection run in
+                # the commit callback from the final tick.
+                if (
+                    seconds > 0
+                    and _daypart_index(tick_from) != _daypart_index(tick_to)
+                ):
+                    from world.rules.dialogue_availability import (
+                        queue_dialogue_refresh,
+                        session_bearing_dialogue_owners,
+                    )
+
+                    queue_dialogue_refresh(
+                        session_bearing_dialogue_owners(), cause="world_time"
+                    )
                 transaction.on_commit(
                     lambda: log_info(
                         "clock_advance",

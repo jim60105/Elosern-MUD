@@ -1230,6 +1230,14 @@ def _enter_possession(
 
     player_before = deepcopy(getattr(player.db, "possession", None))
     npc_before = deepcopy(getattr(npc.db, "possessed_by", None))
+    from world.rules.surfaces import (
+        attribute_snapshot,
+        restore_attribute_best_effort,
+    )
+
+    # The old acting body's conversation retires with the control change; the
+    # snapshot lets a failed entry restore it instead of losing the session.
+    dialogue_before = attribute_snapshot(player, "dialogue_session")
 
     try:
         with transaction.atomic():
@@ -1261,6 +1269,16 @@ def _enter_possession(
             # Seam call sites: transition change mounts puppet & cmdset here
             _mount_cmdset(npc)  # possession: seam R1-transition
             _transfer_puppet(player, npc)  # possession: seam R1-transition
+            # The owner's body is no longer the acting body, so its stored
+            # session is obsolete; the new possessed body's lawful view is what
+            # the committed refresh republishes. This is the single session
+            # writer, not a second playback path.
+            from world.rules.dialogue import clear_dialogue_session
+
+            clear_dialogue_session(player)
+            from world.rules.dialogue_availability import queue_dialogue_refresh
+
+            queue_dialogue_refresh((player,), cause="control")
     except PossessionGateError:
         restore_possession_surfaces(player, npc, player_before, npc_before)
         raise
@@ -1278,6 +1296,7 @@ def _enter_possession(
                     pass
             _strip_puppet_lock(npc, account)
         restore_possession_surfaces(player, npc, player_before, npc_before)
+        restore_attribute_best_effort(player, "dialogue_session", dialogue_before)
         raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
 
     log_info(
@@ -1373,6 +1392,9 @@ def release_possession(
                 npc.db.possessed_by = None
                 clear_dialogue_session(npc)
                 _bump_released_owner_view(player)
+                from world.rules.dialogue_availability import queue_dialogue_refresh
+
+                queue_dialogue_refresh((player,), cause="control")
         except Exception:
             restore_attribute_best_effort(npc, "dialogue_session", dialogue_before)
             raise
@@ -1443,6 +1465,9 @@ def release_possession(
             # body republishes its own mode from the committed snapshot.
             clear_dialogue_session(resolved_npc)
             _bump_released_owner_view(player)
+            from world.rules.dialogue_availability import queue_dialogue_refresh
+
+            queue_dialogue_refresh((player,), cause="control")
     except PossessionWriteError:
         restore_party_control(player, resolved_npc, control_before)
         raise

@@ -287,6 +287,18 @@ def apply_affinity_change(
                 # callers see the operation fail.
                 handler._save(player, record)
                 raise
+        if applied:
+            # A committed affinity-stage change qualifies or relocks the host's
+            # authored topics; the owner's current conversation is reprojected
+            # after the caller's outermost commit.
+            from world.rules.dialogue_availability import (
+                affected_dialogue_owners,
+                queue_dialogue_refresh,
+            )
+
+            queue_dialogue_refresh(
+                affected_dialogue_owners(player), cause="affinity"
+            )
         return AffinityChangeOutcome(
             delta_used=applied,
             applied=applied != 0,
@@ -323,6 +335,15 @@ def apply_affinity_change(
         # record's budget metadata never trails the current world day while no
         # budget is consumed (daily_gain stays 0).
         handler._save(player, record)
+    if applied > 0:
+        # Only a value change can move the affinity stage; the lazy day reset
+        # above changes no eligibility and therefore schedules nothing.
+        from world.rules.dialogue_availability import (
+            affected_dialogue_owners,
+            queue_dialogue_refresh,
+        )
+
+        queue_dialogue_refresh(affected_dialogue_owners(player), cause="affinity")
     return AffinityChangeOutcome(
         delta_used=applied,
         applied=applied != 0,
@@ -390,6 +411,15 @@ def seed_affinity(npc: Any, player: Any, value: int) -> None:
     transaction.on_commit(
         lambda context=context: log_info("affinity_seed", context=context)
     )
+    # A seed establishes the initial relationship stage, so a live
+    # conversation with this host re-projects its qualified topics once the
+    # caller's outermost commit is durable.
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(affected_dialogue_owners(player), cause="affinity")
 
 
 def raise_affinity_cap(npc: Any, player: Any, new_cap: int) -> bool:

@@ -31,6 +31,7 @@ def _record_signature(entry: Any) -> tuple | None:
     coercion-looking values such as ``state=None`` or ``stage_index='0'`` —
     yields ``None`` so the caller skips the whole diff instead of inventing
     a fictitious boundary from untrusted storage.
+
     """
     from world.quests.runtime import from_storage
 
@@ -66,7 +67,20 @@ def _schedule_transition_events(
     the outermost commit and are discarded on rollback, so a rolled-back
     operation leaves no event behind. Malformed logs skip the diff:
     observability must never affect a lifecycle write.
+
+    This is also the one committed observation boundary every lifecycle writer
+    shares (acceptance, bind, stage advance, abandon, deadline/protected-entity
+    failure, DEFEAT completion and the pending-effect seam), so the owner's
+    current dialogue choices are queued from here as well. The refresh is
+    scheduled before the diff, so a log the strict reader cannot arbitrate
+    still refreshes the canonical projection instead of silently skipping it.
     """
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(affected_dialogue_owners(actor), cause="quest_state")
     try:
         before: dict[str, tuple] = {}
         before_issuers: dict[str, str] = {}
@@ -717,6 +731,16 @@ def apply_quest_log_delta(
             [to_storage(record) for record in new_records],
             list(plan.chain_records),
         )
+    # The delta writer is the seam nested inventory and automatic settlement
+    # use, so it schedules its own post-commit refresh in addition to the diff
+    # boundary above. Both callbacks re-evaluate the final committed log, so
+    # the duplicated scheduling can never publish a pre-commit answer.
+    from world.rules.dialogue_availability import (
+        affected_dialogue_owners,
+        queue_dialogue_refresh,
+    )
+
+    queue_dialogue_refresh(affected_dialogue_owners(actor), cause="quest_state")
 
 
 def pending_effects_for_transition(
