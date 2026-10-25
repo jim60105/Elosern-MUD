@@ -4,6 +4,8 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Owner progression hook group
 
+Shared contract v2 includes package-role/phase-aware discovery and current-phase-only publication. Test phase/binding/cancellation retirement with saved reading retained; generated-packages exercises the actual production path.
+
 - [ ] 1.1 Wire guild registration/rank, all quest transition/claim and affinity hooks per matrix using existing helper, with world/rules/tests/test_dialogue_refresh_lifecycle.py. Verify each source independently and rollback/no-session controls; document canonical callback owners.
 
 ## 2. Membership and presence hook group

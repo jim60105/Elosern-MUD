@@ -2,6 +2,13 @@
 
 ## ADDED Requirements
 
+### Requirement: Generated lifecycle retirement preserves deterministic phase authority
+Generated phase, package cancellation or binding changes SHALL retire obsolete delivery/receipt/notification contexts through the shared lifecycle path. Existing committed-provenance phase authority SHALL remain unchanged and saved logical topic completion SHALL persist.
+
+#### Scenario: Cancelled package cannot replay
+- **WHEN** a live generated host's package is cancelled
+- **THEN** its old scene, choice and completion capabilities reject without exposing private content or altering saved reading
+
 ### Requirement: Progression and world lifecycle refresh every relevant conversation
 Owner guild, quest, claim and host-affinity changes, bound companion membership/presence changes and world-time commits SHALL refresh affected current dialogue contexts. Phase or control retirement SHALL clear obsolete delivery/receipts. No-session or another-connection origins SHALL preserve these semantics.
 

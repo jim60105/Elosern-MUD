@@ -12,6 +12,8 @@ Observed first physical refresh slice owns narrow callbacks. Existing NPC move h
 
 ## Decisions
 
+Shared contract v2 applies this matrix equally to static/generated sources. Existing transition_story_dialogue expected revision and committed escort/reunion provenance remain authoritative. Phase change/cancelled package/changed role binding retires context/delivery/receipts before projection/replay and suppresses obsolete notices. Stable host/topic reading persists. Generated-packages wires actual production phase/package invalidation through this same path.
+
 The shared contract in ../authored-dialogue-contracts/design.md is authoritative. Add `world/rules/dialogue_availability.py::queue_dialogue_refresh(owners, *, cause)` only as a narrow deterministic dialogue callback helper, not a general event bus. The caller supplies canonical owner objects captured before destructive membership/control writes. It registers transaction.on_commit callbacks after successful writes; outside atomic it runs after the successful owning write. Callback re-resolves owner and its currently valid actor/host context before projection or push, never uses precommit eligibility. Rollback discards callbacks and no projection/reading mutation runs early. Multiple callbacks from one outer operation may run, but each re-evaluates the final committed state; observation is monotonic so only the first changed final projection creates a batch, encompassing all newly open topics. Do not promise notification correctness from WebClient observe_command_settlement: it skips non-WebSocket clients and remains a presentation refresh only.
 
 Add `affected_dialogue_owners(entity, *, prior_owner=None)` for changed actors: persistent player -> itself, companion -> bound_owner_of and lawful current possession owner, plus explicitly supplied prior_owner captured before detach. Only legitimate owner identities are returned; no account-wide unrelated characters. For world-time changes, iterate persistent session-bearing PlayerCharacter/NPC rows via their dialogue_session Attribute key, re-resolve valid context and deduplicate owners. For companion presence, membership's owner is enough because CompanionPresent requires its own party membership; host departure additionally runs existing host-session cleanup. These helpers never create a conversation or rewrite a selected scene. Every pusher renders each authenticated watcher own context/epoch using commander_sessions plus resolve_commander filtering and current watchers_for registration.
@@ -51,6 +53,8 @@ Each task is a 45-120 minute unit with its own focused tests/docs. This proposal
 - `world/rules/clock.py::WorldClock.advance`
 - `world/quests/story_dialogue.py`
 - `world/rules/possession.py`
+
+This slice reuses `queue_dialogue_refresh` and `affected_dialogue_owners` exactly as `authored-dialogue-refresh-physical` defines them; it adds the world-time and control capture paths and its own source-family rows, and it never redefines or duplicates those two helpers.
 
 ## Risks / Trade-offs
 

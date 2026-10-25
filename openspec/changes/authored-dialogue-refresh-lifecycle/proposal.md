@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No duplicate generated hook system, model-authorized phase transitions or new service delegation. Existing phase authority and lifecycle commits refresh shared scene eligibility and retire obsolete receipts.
 
 ## Batch:
 
@@ -32,4 +32,4 @@ depends-on: authored-dialogue-refresh-physical
 
 Code conflicts: Follows physical callback helper and touches lifecycle writers only. Notification observation depends on this slice so no first-unlock source is missed. Shared source conflicts with possession/reading are already ordered by upstream availability dependencies.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Dependencies refer to completed implementation; generated-package cutover owns production use of these exact phase/package/control invalidations.
