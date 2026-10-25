@@ -13,9 +13,9 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **WHEN** a foe's stage actor renders
 - **THEN** it presents its committed catalog entry under the same complete-image, grounded-silhouette and display-name-placeholder rule
 
-#### Scenario: Authored speaking follows scene attribution, never prose
-- **WHEN** the committed mode is dialogue and the available host renders
-- **THEN** stage actors carry a speaking state — the speaker at full brightness, listeners dimmed to 60% through the shared dim token; authored scenes derive speaker from the current explicit line role with text/name/portrait updated together, narration emphasizes neither; native generated/freeform lines retain their dispatch-state behavior; no speaking state is parsed from prose
+#### Scenario: Speaking follows dispatch state, never prose
+- **WHEN** the committed mode is dialogue and a native generated/freeform response is presented
+- **THEN** native line speaking follows existing dispatch-state behavior, never prose; authored scenes instead follow their explicit line attribution as the separate authored-scene scenario defines
 
 #### Scenario: Companions listen unless they are the host
 - **WHEN** a companion's identity does, or does not, match the active host
@@ -41,7 +41,7 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **WHEN** a conversation opens and its greeting commits
 - **THEN** the host renders lit with `data-speaking="true"` and the player dimmed with `data-speaking="false"`; a companion host appears only in its raised existing slot
 
-#### Scenario: Native freeform player light follows reply commit
+#### Scenario: The player is lit until the reply commits
 - **WHEN** the player's native freeform speech remains in flight until its reply revision is accepted
 - **THEN** the player is lit and the host dim until that revision, then the host is lit and the player dim again
 
