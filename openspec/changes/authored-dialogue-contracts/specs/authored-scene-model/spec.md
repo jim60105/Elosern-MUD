@@ -6,6 +6,17 @@ Provide immutable reusable scenes and complete typed topic declarations through 
 
 ## ADDED Requirements
 
+### Requirement: Static and generated primitives share immutable scene validation
+Both static YAML primitives and generated JSON primitives SHALL obey the same immutable scene/topic schema, attribution, bounds, variant priority and predecessor rules. Generated identities SHALL be collision-free package-role-phase-local encodings, independent of static profile syntax. Static owner validation SHALL not apply to generated roles.
+
+#### Scenario: Same scene semantics across providers
+- **WHEN** equivalent valid primitives arrive from static YAML and generated JSON
+- **THEN** both produce equivalent immutable scenes and reject the same malformed attribution, priority, DAG and bound errors
+
+#### Scenario: Generated namespace does not use static bounds
+- **WHEN** two packages share local IDs or use maximum valid Unicode source identities
+- **THEN** full IDs remain distinct and lossless without applying the static lowercase/96-character pattern
+
 ### Requirement: Declarative scenes preserve attribution
 The system SHALL represent immutable ordered speech and narration with stable scene identity and explicit revision. Dialogue formal scenes SHALL begin with a complete acting-body utterance and SHALL allow consecutive lines by one speaker. Scenes SHALL contain no executable statements or in-scene choice branches.
 
@@ -24,7 +35,7 @@ Authored topics SHALL have stable identities independent of labels and variants,
 - **WHEN** two conditions match variants with priorities 10 and 20
 - **THEN** priority 20 selects the entire scene and no line-level branch is produced
 
-#### Scenario: Protected chain composition rejects
-- **WHEN** a public chain bundle contains a server-qualified descendant
-- **THEN** declaration validation rejects the bundle rather than disclosing its body
+#### Scenario: Protected descendants never enter a public chain
+- **WHEN** available-topic projection would place a server-qualified descendant in a `pure_chain` bundle
+- **THEN** the projection omits it and the selection delivers only public, predecessor-ordered nodes
 

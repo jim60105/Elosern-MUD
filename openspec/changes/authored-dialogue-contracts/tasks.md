@@ -8,7 +8,7 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 2. Topic and condition declarations
 
-- [ ] 2.1 Add the exact frozen union and AuthoredTopic/AuthoredDialogue/SceneVariant constructors from Shared contract v1; validate uniqueness, complete actor opening, priority, fallback and predecessor DAG. Tests cover duplicate IDs, ties, dangling/cyclic predecessors and illegal pure-chain eligibility/effects.
+- [ ] 2.1 Add exact Shared contract v2 frozen union, constructors, primitive parser/schema fragment, pure validator and canonical/package reference catalog interfaces. Test static/generated codecs, maximal Unicode/delimiter collisions, duplicate IDs, actor opening, priorities, fallback, DAG and effect-free chains; document exact provider-independent schema.
 
 ## 3. Focused model acceptance
 

@@ -6,7 +6,7 @@ The approved authored-dialogue design requires immutable reusable scenes and com
 
 ## What Changes
 
-- Immutable reusable scenes and complete typed topic declarations.
+- Immutable reusable scenes, exact primitive schema, source-neutral validation and collision-free generated topic/scene identity.
 - Implement this slice's exact shared interfaces and focused acceptance with its own tests and documentation.
 - Use the deterministic owner and declared dependencies; no implementation is performed by this proposal.
 
@@ -24,7 +24,7 @@ Target files and APIs are enumerated in design.md. This is planning on the prima
 
 ## Non-goals
 
-Do not implement another slice, retain obsolete authored compatibility paths, change native generated/freeform authority or invent gameplay/lore. Content writing waits for its mandatory private source prerequisite at apply time.
+No filesystem-generated content, profile requirement for generated roles, new effect verbs, compatibility migrations or gameplay/lore invention. The approved dialogue-specific YAML exception amends architecture D9; unrelated lore remains Python.
 
 ## Batch:
 
@@ -33,4 +33,4 @@ depends-on: none
 
 Code conflicts: Runtime cutover touches shape.py and its imports; serialize after this. No production consumers change here.
 
-Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v1. This change owns only the interfaces explicitly assigned in its design. All active proposals are planning context; dependencies refer to future completed implementation, not mere proposal existence.
+Shared contract: `../authored-dialogue-contracts/design.md`, Shared contract v2. Loader owns safe filesystem parsing; generated-packages owns production prompt/schema and existing atomic DB package cutover. This change owns the pure common declarations/parser/validator/identity codec.
