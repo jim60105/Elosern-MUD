@@ -17,6 +17,10 @@ Authored host reuse SHALL use canonical host provenance and SHALL NOT require an
 - **WHEN** a duplicate canonical host identity exists
 - **THEN** full-batch preflight rejects before mutations
 
+#### Scenario: The invariant is promoted from convention to enforcement
+- **WHEN** a source-managed host plan is validated
+- **THEN** canonical provenance uniqueness is enforced, with no first-component service-id invariant
+
 ### Requirement: The QuestIssuer component mirrors the existing service-host component shape
 The quest-issuer capability SHALL retain its service_id, optional issuer_key, binding and anchor fields as deterministic authority/configuration only. Host reuse SHALL depend on canonical host provenance, independently of these fields or declaration order.
 
@@ -35,3 +39,11 @@ The quest-issuer capability SHALL retain its service_id, optional issuer_key, bi
 #### Scenario: A missing service_id would break the roster-sync reuse path
 - **WHEN** host identity is resolved for a commissioner
 - **THEN** lookup does not read service_id and cannot fail due to its absence
+
+#### Scenario: Mutations delegate to the deterministic core
+- **WHEN** a quest, reward or record mutation is requested through a commissioner
+- **THEN** the component delegates to its deterministic owner and performs no business writes
+
+#### Scenario: The component resolves through the existing generic resolver
+- **WHEN** implicit discovery resolves a commissioner
+- **THEN** the existing generic component resolver retains its local zero/one/multiple-host behavior
