@@ -281,9 +281,11 @@ class PossessionPresentationTests(EvenniaTest):
             if entry.action_id == "explore.talk_scripted"
         ]
         self.assertTrue(talk)
+        # The lawful possessed actor may open the host's authored scenes; the
+        # freeform and engage refusals below stay in force.
         for entry in talk:
-            self.assertFalse(entry.enabled)
-            self.assertEqual(entry.disabled_reason[0], REASON_POSSESSED_TALK)
+            self.assertTrue(entry.enabled)
+            self.assertIsNone(entry.disabled_reason)
         engage = [entry for entry in vocabulary if entry.action_id == "explore.engage"]
         self.assertEqual(len(engage), 1)
         self.assertEqual(engage[0].disabled_reason[0], REASON_POSSESSED_ENGAGE)

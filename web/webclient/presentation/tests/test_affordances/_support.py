@@ -46,6 +46,11 @@ from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY, S
 # here (inside a dialogue scope).
 T_DIALOGUE_KEY = "t_synth_lodgekeeper"
 _T_KEYWORDS = [response.keyword for response in SYNTH_DIALOGUE[T_DIALOGUE_KEY].responses]
+#: The projected topic IDs the runtime maps the legacy rows onto.
+_T_TOPIC_IDS = [
+    f"{T_DIALOGUE_KEY}.topic_{index:02d}"
+    for index in range(1, len(_T_KEYWORDS) + 1)
+]
 _T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
 
 

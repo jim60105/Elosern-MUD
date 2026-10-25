@@ -6,15 +6,15 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 Shared contract v2 is source-neutral. Test non-profile package-role contexts opening informational scenes with owner reading, while existing commission/service/freeform authority still refuses unsupported mutation.
 
-- [ ] 1.1 Extend resolver with complete party_scope authorization, owner relationship routing and actor session ownership; add world/rules/tests/test_authored_dialogue_possession.py for asymmetric races, dual relation records and malformed mirrors. Document actor/owner/host boundaries in resolver.
+- [x] 1.1 Extend resolver with complete party_scope authorization, owner relationship routing and actor session ownership; add world/rules/tests/test_authored_dialogue_possession.py for asymmetric races, dual relation records and malformed mirrors. Document actor/owner/host boundaries in resolver.
 
 ## 2. Enable every authored entry surface
 
-- [ ] 2.1 Remove authored possession rejections from adapters, command and exploration/affordance producers while retaining freeform and other restrictions. Test open/select/leave and stale capabilities through web plus text; update docs/game/commands.md and command-reference.md for availability.
+- [x] 2.1 Remove authored possession rejections from adapters, command and exploration/affordance producers while retaining freeform and other restrictions. Test open/select/leave and stale capabilities through web plus text; update docs/game/commands.md and command-reference.md for availability.
 
 ## 3. Control cleanup and trade regression
 
-- [ ] 3.1 Clear actor delivery on successful release/control change through open/clear helpers, with cache rollback discipline. Add integration tests for actor portrait, owner progress identity and commander-purse/member-bag trade unchanged; update the historical possession capability delta only where authored initiation was prohibited.
+- [x] 3.1 Clear actor delivery on successful release/control change through open/clear helpers, with cache rollback discipline. Add integration tests for actor portrait, owner progress identity and commander-purse/member-bag trade unchanged; update the historical possession capability delta only where authored initiation was prohibited.
 
 ## 4. Focused acceptance ownership
 

@@ -219,11 +219,11 @@ def settle_movement(
         # post-compensation location, so a falsy wilderness return that was
         # moved back never clears; the plain-exit lineage returns ``None`` on
         # both branches, so the location is the only reliable success signal.
-        from typeclasses.characters import PlayerCharacter
         from world.rules.dialogue import clear_dialogue_session
 
-        if isinstance(traversing_object, PlayerCharacter):
-            clear_dialogue_session(traversing_object)
+        # The moving actor owns the session, including a possessed companion
+        # acting through the transferred puppet.
+        clear_dialogue_session(traversing_object)
     if narrate_traversal and not (wilderness_lineage and not result):
         from world.rules.map_discovery import publish_traversal_narrative
 
@@ -305,7 +305,7 @@ def settle_relocation(entity: Any, destination: Any) -> None:
             )
             observe_arrival_lore(entity, destination)
             reanchor_home_on_gate_arrival(entity, destination)
-            if isinstance(entity, PlayerCharacter) and source is not destination:
+            if source is not destination:
                 clear_dialogue_session(entity)
     except Exception:
         _compensate(snapshot)

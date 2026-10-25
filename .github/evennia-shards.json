@@ -70,6 +70,7 @@
         "world.rules.tests.test_dialogue_session",
         "world.rules.tests.test_dialogue_sources",
         "world.rules.tests.test_authored_dialogue_runtime",
+        "world.rules.tests.test_authored_dialogue_possession",
         "world.rules.tests.test_dice",
         "world.rules.tests.test_disengage",
         "world.rules.tests.test_disengage_integration",

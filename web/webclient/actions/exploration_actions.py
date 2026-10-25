@@ -46,6 +46,7 @@ from world.rules.dialogue import (
     select_authored_topic,
     table_response,
 )
+from world.rules.dialogue_context import DialogueContextError
 from world.lore.scenes import Speech
 from world.rules.map_knowledge import KnowledgeError, decode_node
 from world.rules.npc_intents import (
@@ -622,8 +623,7 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         is_possessed_actor,
     )
 
-    if is_possessed_actor(actor):
-        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+    possessed = is_possessed_actor(actor)
 
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
@@ -631,13 +631,31 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     reason = interaction_reason(npc, "talk")
     if reason is not None:
         return _rejected("schedule_blocked", reason)
+
+    topic_id = payload.get("topic_id")
+    if possessed:
+        from world.rules.dialogue_context import resolve_dialogue_context
+
+        try:
+            resolve_dialogue_context(actor, npc)
+        except DialogueContextError:  # observability: ignore R2: the stable refusal IS the action result
+            return _rejected(
+                REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
+            )
+        if topic_id is None:
+            # Non-authored keyword paths (legacy native lines and generated
+            # service/commission keywords) stay refused: only complete
+            # authored scenes are enabled while possessing.
+            return _rejected(
+                REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
+            )
+
     if not is_dialogue_host(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
     dialogue_key = dialogue_key_for(npc)
     if dialogue_key is None:
         return _rejected("not_dialogue_host", "對方無法交談。")
 
-    topic_id = payload.get("topic_id")
     if topic_id is not None:
         context_id = payload.get("context_id")
         selection_id = payload.get("selection_id") or "sel-" + str(npc.pk)
@@ -648,6 +666,12 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
                 topic_id,
                 selection_id=selection_id,
                 expected_context_id=context_id,
+            )
+        except DialogueContextError as error:  # observability: ignore R2: the stable refusal IS the action result
+            if error.reason == "schedule_blocked":
+                return _rejected("schedule_blocked", interaction_reason(npc, "talk") or "對方現在正忙著，沒有理會你。")
+            return _rejected(
+                REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
             )
         except StaleContextError:  # observability: ignore R2: rejected response is the contract report
             return _rejected("stale_context", "對話情境已過期。")
@@ -710,21 +734,23 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
 def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Open a conversation with the host's greeting (design D1).
 
-    Mirrors ``_talk_scripted_adapter``'s gates (possession, presence, talk
-    schedule, conversable host) and then records the session through the sole
-    writer with the authored greeting, or the fixed server-authored fallback
-    line when the host has none. It calls no LLM, advances no clock, and
-    changes no affinity or memory: the session write is the only state change.
+    Mirrors ``_talk_scripted_adapter``'s gates (presence, talk schedule,
+    conversable host) and then records the session through the sole writer
+    with the authored greeting, or the fixed server-authored fallback line
+    when the host has none. A lawfully possessed acting body additionally
+    passes the shared possession authorization and needs an authored source:
+    freeform-only and otherwise non-authored hosts keep the existing refusal.
+    It calls no LLM, advances no clock, and changes no affinity or memory: the
+    session write is the only state change.
     """
     del session
+    from world.rules.dialogue_context import resolve_dialogue_context
+    from world.rules.dialogue_sources import resolve_dialogue_source
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
         REASON_POSSESSED_TALK,
         is_possessed_actor,
     )
-
-    if is_possessed_actor(actor):
-        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
 
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
@@ -734,6 +760,19 @@ def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None)
         return _rejected("schedule_blocked", reason)
     if not opens_dialogue(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
+
+    context = None
+    if is_possessed_actor(actor):
+        try:
+            context = resolve_dialogue_context(actor, npc)
+        except DialogueContextError:  # observability: ignore R2: the stable refusal IS the action result
+            return _rejected(
+                REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
+            )
+        if resolve_dialogue_source(context) is None:
+            return _rejected(
+                REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]
+            )
 
     greeting = resolve_greeting(npc)
     if greeting is None:
@@ -745,7 +784,7 @@ def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None)
         line = greeting.text
         speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
         message = f"{npc.key}說：{speech}"
-    open_or_refresh_dialogue(actor, npc, line)
+    open_or_refresh_dialogue(actor, npc, line, context=context)
     actor.msg(message)
     return _success("dialogue_opened", message, AFFECTED_FULL)
 
@@ -761,15 +800,6 @@ def _dialogue_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = 
     atomically; the adapter pushes nothing itself.
     """
     del session
-    from world.rules.possession import (
-        POSSESSED_REFUSAL_MESSAGES,
-        REASON_POSSESSED_TALK,
-        is_possessed_actor,
-    )
-
-    if is_possessed_actor(actor):
-        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
-
     live = live_dialogue_session(actor)
     if live is None or live.npc_id != payload["npc_id"]:
         return _rejected("dialogue_inactive", "你目前沒有在和這個對象交談。")

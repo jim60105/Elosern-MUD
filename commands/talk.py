@@ -26,7 +26,7 @@ from world.rules.dialogue import (
     table_response,
     TopicLockedError,
 )
-from world.rules.dialogue_context import resolve_dialogue_context
+from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
 from world.rules.dialogue_sources import resolve_dialogue_source
 from world.lore.scenes import Speech
 from world.rules.guild import (
@@ -102,6 +102,24 @@ class CmdsTalk(Command):
             self.caller.msg(reason)
             return
 
+        # A possessed companion speaks through its own body but owns nothing:
+        # every authored path below routes relations and affinity to the
+        # commander. A forged or stale mirror rejects before any line, session
+        # or affinity write, exactly like the web dispatcher.
+        from world.rules.possession import (
+            POSSESSED_REFUSAL_MESSAGES,
+            REASON_POSSESSED_TALK,
+            is_possessed_actor,
+        )
+
+        possessed = is_possessed_actor(self.caller)
+        if possessed:
+            try:
+                resolve_dialogue_context(self.caller, npc)
+            except DialogueContextError:
+                self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+                return
+
         if keyword:
             kw_parts = keyword.split(maxsplit=1)
             action_keyword = kw_parts[0]
@@ -129,13 +147,17 @@ class CmdsTalk(Command):
                 if summary is not None:
                     self.caller.msg(f"{npc.key}說：{summary}")
                     return
-
             diag_key = dialogue_key_for(npc)
             if diag_key is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
 
             if diag_key.startswith("scene_role:"):
+                if possessed:
+                    # Generated service/commission keywords stay refused while
+                    # possessing: only complete authored scenes are enabled.
+                    self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+                    return
                 try:
                     result = run_scripted_talk(npc, self.caller, keyword)
                 except (RewardClaimError, GuildDataError) as error:
@@ -150,7 +172,11 @@ class CmdsTalk(Command):
                 return
 
             # Static authored dialogue
-            context = resolve_dialogue_context(self.caller, npc)
+            try:
+                context = resolve_dialogue_context(self.caller, npc)
+            except DialogueContextError:
+                self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+                return
             source = resolve_dialogue_source(context)
             if source is None:
                 self.caller.msg(_NO_RESPONSE)
@@ -163,6 +189,9 @@ class CmdsTalk(Command):
                     break
             if matched_topic is None:
                 # Unknown keyword: no session write, no state change
+                if possessed:
+                    self.caller.msg(_NO_RESPONSE)
+                    return
                 line = table_response(diag_key, keyword, npc=npc)
                 self.caller.msg(f"{npc.key}說：{line}")
                 return

@@ -438,10 +438,22 @@ def restore_relations_surfaces(snapshots: dict[int, Any]) -> None:
 def affinity_stage_line(npc: Any, looker: Any) -> str:
     """The stage flavor line for ``looker``, or ``""`` when no record exists.
 
-    The read never persists; the numeric value never appears.
+    The read never persists; the numeric value never appears. While a
+    companion is possessed, the matching relationship is the owning player's,
+    so the line reads the commander's record rather than the acting body's.
     """
     if looker is None or not hasattr(npc, "relations"):
         return ""
+    from world.rules.dialogue_context import session_control_owner
+    from world.rules.possession import is_possessed_actor
+
+    if is_possessed_actor(looker):
+        owner = session_control_owner(looker)
+        if owner is None:
+            # A possessed body without lawful control owns no relationship
+            # record to display.
+            return ""
+        looker = owner
     handler = npc.relations
     if not handler.has_record(looker):
         return ""

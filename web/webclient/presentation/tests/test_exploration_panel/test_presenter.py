@@ -282,14 +282,17 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
-    def test_possessed_actor_sees_a_disabled_talk_open(self):
+    def test_possessed_actor_sees_enabled_authored_talk_and_disabled_when_forged(self):
         from world.rules.party import join_party
         from world.rules.possession import enter_possession, release_possession
 
-        # The possessed puppet still sees every conversable host, but its 交談
-        # is the vocabulary's own possession refusal, never an enabled row.
+        # A lawful possessed acting body sees every authored host and its 交談
+        # is enabled: the authored scene uses the companion body. A forged
+        # control mirror disables the same row instead of raising.
         open_synthetic_scope(self, "dialogue")
         companion = create_object(LLMNPC, key="被附身者", location=self.south_gate)
+        companion.race = "human"
+        companion.apply_race_baseline()
         join_party(companion, self.player)
         host = create_object(NPC, key="公會職員", location=self.south_gate)
         host.components.add(
@@ -297,16 +300,42 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         enter_possession(self.player, companion)
         try:
-            payload = self._registry().render("exploration", _context(companion))
+            # EvenniaTestCase has no live account session; the driving-session
+            # half of the authority boundary is stubbed while both mirrors and
+            # the party binding stay real.
+            with (
+                patch("world.rules.party_scope.is_player_driven", return_value=True),
+                patch("world.rules.party_scope._possession_holds", return_value=True),
+            ):
+                payload = self._registry().render("exploration", _context(companion))
         finally:
             release_possession(self.player, npc=companion, reason="handback")
         target = next(t for t in payload["interact"] if t["identity"] == int(host.pk))
         talk = next(
             a for a in target["affordances"] if a.get("action_id") == "explore.talk_open"
         )
-        self.assertFalse(talk["enabled"])
-        self.assertEqual(talk["disabled_reason"]["code"], "possessed_talk")
-        self.assertTrue(talk["disabled_reason"]["message"].strip())
+        self.assertTrue(talk["enabled"])
+        self.assertIsNone(talk["disabled_reason"])
+
+        # A forged mirror (the acting body still says it is possessed while the
+        # owner-side record is gone) is not a lawful context.
+        enter_possession(self.player, companion)
+        try:
+            self.player.db.possession = None
+            with patch("world.rules.party_scope.is_player_driven", return_value=True):
+                forged = self._registry().render("exploration", _context(companion))
+        finally:
+            companion.db.possessed_by = None
+            release_possession(self.player, npc=companion, reason="handback")
+        forged_target = next(t for t in forged["interact"] if t["identity"] == int(host.pk))
+        forged_talk = next(
+            a
+            for a in forged_target["affordances"]
+            if a.get("action_id") == "explore.talk_open"
+        )
+        self.assertFalse(forged_talk["enabled"])
+        self.assertEqual(forged_talk["disabled_reason"]["code"], "possessed_talk")
+        self.assertTrue(forged_talk["disabled_reason"]["message"].strip())
 
     @covers_requirement("webclient-exploration-menu::exploration-affordances-are-server-authored-never-inferred-from-prose")
     def test_living_hostile_monster_offers_engage(self):

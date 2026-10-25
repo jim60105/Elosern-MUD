@@ -7,7 +7,7 @@ Provide lawful possessed authored conversations with owner-correct relationships
 ## ADDED Requirements
 
 ### Requirement: Possessed informational dialogue covers generated roles
-Lawful possessed actors SHALL use shared scene features with generated informational hosts without a static profile requirement. Existing commission, service and freeform authority restrictions SHALL remain in force.
+Lawful possessed actors SHALL use the shared source-neutral scene path with generated informational hosts without a static profile requirement. That path SHALL resolve through the trusted host binding and the shared provider seam; generated formal scenes stay unavailable until that provider is published, and this slice adds no static profile requirement, legacy adapter or second provider. Existing commission, service and freeform authority restrictions SHALL remain in force.
 
 #### Scenario: Generated host with no profile
 - **WHEN** a lawful possessed actor addresses a published generated role with informational scenes and a commission

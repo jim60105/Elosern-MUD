@@ -322,6 +322,10 @@ def _resolve_live_host(character: Any) -> Any | None:
 def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``dialogue`` panel for the authenticated puppet."""
     from world.rules.dialogue import delivery_to_wire, live_dialogue_session
+    from world.rules.dialogue_context import (
+        DialogueContextError,
+        resolve_dialogue_context,
+    )
     from world.rules.npc_identity import npc_display_name
 
     actor = context.actor
@@ -335,9 +339,15 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     npc = _resolve_live_host(actor)
     if npc is None:  # observability: ignore R2: race between the liveness read and the re-resolve degrades to the registered unavailable form
         raise PanelUnavailableError
+    try:
+        owner = resolve_dialogue_context(actor, npc).owner
+    except DialogueContextError:  # observability: ignore R2: a stale control context degrades to the unavailable panel
+        raise PanelUnavailableError
+    # The host's bond is the owning player's relationship: a possessed
+    # companion speaks with its own portrait and name but never its own record.
     bond_stage = (
-        npc.relations.stage_for(actor).name
-        if npc.relations.has_record(actor)
+        npc.relations.stage_for(owner).name
+        if npc.relations.has_record(owner)
         else None
     )
 

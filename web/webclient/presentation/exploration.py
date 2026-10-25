@@ -611,6 +611,7 @@ def _interact_targets(
     from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
+    from world.rules.dialogue import authorized_dialogue_open
     from world.rules.npc_persona import is_card_available
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
@@ -646,17 +647,19 @@ def _interact_targets(
         affordances: list[dict[str, Any]] = []
         if opens_dialogue(obj):
             # One 交談 per conversable host, listed before the vocabulary rows.
-            # A possessed actor sees the vocabulary's own possession refusal
-            # instead of an enabled row.
+            # A lawful possessed acting body opens authored scenes with its
+            # own body; a forged control context, or a non-authored host,
+            # keeps the vocabulary's own possession refusal.
+            talk_authorized = authorized_dialogue_open(actor, obj)
             affordances.append(
                 {
                     "kind": "action",
                     "action_id": "explore.talk_open",
                     "label": "交談",
-                    "enabled": not possessed,
+                    "enabled": talk_authorized,
                     "disabled_reason": (
                         None
-                        if not possessed
+                        if talk_authorized
                         else {
                             "code": REASON_POSSESSED_TALK,
                             "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK],
