@@ -19,6 +19,11 @@ Ownership rules the evaluator enforces:
   and that exact binding's live NPC;
 - time compares the in-world day against the clock rulebook's daypart
   boundaries as a cyclic half-open world-day interval.
+- guild rank, quest lifecycle and reward claims read the OWNING player, never
+  the acting body: a possessed companion's own registration or quest log can
+  never satisfy a progression condition;
+- host affinity reads the conversation host's relationship toward the owner and
+  compares the canonical stage boundary, never a second ordering table.
 
 Corrupt or unresolvable authoritative state fails closed (``False``) and emits
 exactly one bounded ``dialogue_condition_integrity`` facade event per
@@ -59,7 +64,6 @@ EVENT_CONDITION_INTEGRITY = "dialogue_condition_integrity"
 
 REASON_DEPTH = "condition_depth_exceeded"
 REASON_CHILDREN = "condition_children_invalid"
-REASON_UNSUPPORTED = "condition_kind_unsupported"
 REASON_ACTOR_MISSING = "actor_missing"
 REASON_ACTOR_RACE = "actor_race_unresolved"
 REASON_SOCIAL_IDENTITIES = "actor_social_identities_malformed"
@@ -70,6 +74,12 @@ REASON_SKILLS = "actor_skills_malformed"
 REASON_PROFICIENCY = "actor_proficiency_malformed"
 REASON_CLOCK = "world_clock_unresolved"
 REASON_OWNER = "owner_unresolved"
+REASON_GUILD_RANK = "owner_guild_rank_unresolved"
+REASON_QUEST_LOG = "owner_quest_log_malformed"
+REASON_REWARD_CLAIMS = "owner_reward_claims_malformed"
+REASON_QUEST_DEFINITION = "quest_definition_unpermitted"
+REASON_QUEST_STATE = "quest_state_unsupported"
+REASON_AFFINITY = "owner_affinity_unresolved"
 REASON_COMPANION_PROVENANCE = "companion_provenance_malformed"
 REASON_PACKAGE = "companion_package_unresolved"
 REASON_ROLE = "companion_role_unavailable"
@@ -121,6 +131,12 @@ def _actor(context: Any) -> Any:
 
 def _owner(context: Any) -> Any:
     return getattr(context, "owner", None)
+
+
+def _package_id(context: Any) -> str | None:
+    """The trusted current package identity of a generated dialogue source, if any."""
+    value = getattr(getattr(context, "source_identity", None), "package_id", None)
+    return value if isinstance(value, str) and value else None
 
 
 def evaluate_condition(condition: Condition, context: Any) -> bool:
@@ -181,18 +197,23 @@ def _evaluate(
     if isinstance(condition, All):
         if not _children_bounded(condition.children):
             return evaluation.fail(REASON_CHILDREN)
-        return all(
+        # Every bounded child is evaluated before combining, so corruption in
+        # any branch is discovered (and dominates) no matter the child order or
+        # whether an earlier child already decided the boolean answer.
+        results = [
             _evaluate(child, context, evaluation, depth=depth + 1)
             for child in condition.children
-        )
+        ]
+        return all(results)
 
     if isinstance(condition, AnyCondition):
         if not _children_bounded(condition.children):
             return evaluation.fail(REASON_CHILDREN)
-        return any(
+        results = [
             _evaluate(child, context, evaluation, depth=depth + 1)
             for child in condition.children
-        )
+        ]
+        return any(results)
 
     if isinstance(condition, RaceIs):
         return _race_matches(condition, context, evaluation)
@@ -215,10 +236,14 @@ def _evaluate(
     if isinstance(condition, Exposure):
         return _exposure_matches(condition, context, evaluation)
 
-    if isinstance(condition, (GuildRankAtLeast, QuestIs, AffinityAtLeast)):
-        # Owned by the progression slice; a physical evaluation must never
-        # answer for a condition whose reader does not exist yet.
-        return evaluation.fail(REASON_UNSUPPORTED)
+    if isinstance(condition, GuildRankAtLeast):
+        return _guild_rank_at_least(condition, context, evaluation)
+
+    if isinstance(condition, QuestIs):
+        return _quest_is(condition, context, evaluation)
+
+    if isinstance(condition, AffinityAtLeast):
+        return _affinity_at_least(condition, context, evaluation)
 
     raise DialogueConditionError(f"Unknown condition node: {condition!r}")
 
@@ -602,6 +627,131 @@ def _exposure_ordinal(effective: Any) -> int | None:
     return None
 
 
+def _guild_rank_at_least(
+    condition: GuildRankAtLeast, context: Any, evaluation: _Evaluation
+) -> bool:
+    """Compare the owner's canonical rank order against ``condition.rank_key``."""
+    from world.lore.guild import GUILD_RANK_REGISTRY
+    from world.rules.guild import GuildDataError, parse_guild_registration
+
+    owner = _owner(context)
+    if owner is None:
+        return evaluation.fail(REASON_OWNER)
+    target = GUILD_RANK_REGISTRY.get(condition.rank_key)
+    if target is None:
+        return evaluation.fail(REASON_GUILD_RANK)
+    try:
+        registration = parse_guild_registration(owner)
+    except GuildDataError:  # observability: ignore R2: corrupt owner state fails closed and is reported by the evaluation's bounded integrity event, never by the stored record
+        return evaluation.fail(REASON_GUILD_RANK)
+    if registration is None:
+        # An unregistered owner is a legitimate unqualified state, and an
+        # actor-side rank can never stand in for it.
+        return False
+    # AttributeProperty defaults autocreate on read, so the rank is read through
+    # the non-materializing handler: an evaluator never writes an attribute.
+    attributes = getattr(owner, "attributes", None)
+    rank_key = (
+        attributes.get("guild_rank")
+        if attributes is not None
+        else getattr(owner, "guild_rank", None)
+    )
+    if rank_key is None:
+        return False
+    if not isinstance(rank_key, str) or not rank_key:
+        return evaluation.fail(REASON_GUILD_RANK)
+    row = GUILD_RANK_REGISTRY.get(rank_key)
+    if row is None:
+        return evaluation.fail(REASON_GUILD_RANK)
+    return row.order >= target.order
+
+
+def _quest_is(condition: QuestIs, context: Any, evaluation: _Evaluation) -> bool:
+    """Match one permitted definition key against the owner's quest records."""
+    from world.quests.runtime import QuestDataError, QuestState, read_records
+
+    from world.rules.dialogue_references import permitted_quest_definition
+
+    owner = _owner(context)
+    if owner is None:
+        return evaluation.fail(REASON_OWNER)
+    if not permitted_quest_definition(
+        condition.definition_key, package_id=_package_id(context)
+    ):
+        return evaluation.fail(REASON_QUEST_DEFINITION)
+    db = getattr(owner, "db", None)
+    if db is None:
+        return evaluation.fail(REASON_QUEST_LOG)
+    raw = db.quest_log
+    # ``read_records`` treats a falsy scalar as an empty log; a malformed stored
+    # shape must fail closed instead of satisfying ``not_accepted``.
+    if raw is not None and (
+        isinstance(raw, (str, bytes, Mapping)) or not hasattr(raw, "__iter__")
+    ):
+        return evaluation.fail(REASON_QUEST_LOG)
+    try:
+        records = read_records(owner)
+    except QuestDataError:  # observability: ignore R2: corrupt owner state fails closed and is reported by the evaluation's bounded integrity event, never by the stored record
+        return evaluation.fail(REASON_QUEST_LOG)
+    matching = [
+        record
+        for record in records
+        if record.definition_key == condition.definition_key
+    ]
+    if condition.state == "not_accepted":
+        return not matching
+    if condition.state == "in_progress":
+        return any(record.state is QuestState.IN_PROGRESS for record in matching)
+    if condition.state == "completed":
+        return any(record.state is QuestState.COMPLETED for record in matching)
+    if condition.state == "failed":
+        return any(record.state is QuestState.FAILED for record in matching)
+    if condition.state == "invalidated":
+        return any(record.state is QuestState.INVALIDATED for record in matching)
+    if condition.state == "reward_claimed":
+        from world.rules.guild import RewardClaimError, parse_reward_claims
+
+        raw_claims = db.guild_reward_claims
+        if raw_claims is not None and (
+            isinstance(raw_claims, (str, bytes, Mapping))
+            or not hasattr(raw_claims, "__iter__")
+        ):
+            return evaluation.fail(REASON_REWARD_CLAIMS)
+        try:
+            claims = set(parse_reward_claims(owner))
+        except RewardClaimError:  # observability: ignore R2: corrupt claim state fails closed and is reported by the evaluation's bounded integrity event, never by the stored ledger
+            return evaluation.fail(REASON_REWARD_CLAIMS)
+        return any(
+            record.state is QuestState.COMPLETED and record.quest_id in claims
+            for record in matching
+        )
+    return evaluation.fail(REASON_QUEST_STATE)
+
+
+def _affinity_at_least(
+    condition: AffinityAtLeast, context: Any, evaluation: _Evaluation
+) -> bool:
+    """Compare the host-to-owner affinity value against the stage's canonical floor."""
+    from world.rules.affinity_config import AffinityConfigError, get_config
+
+    owner = _owner(context)
+    if owner is None:
+        return evaluation.fail(REASON_OWNER)
+    relations = getattr(getattr(context, "host", None), "relations", None)
+    if relations is None:
+        return evaluation.fail(REASON_AFFINITY)
+    try:
+        target = get_config().stage_by_id(condition.stage_key)
+    except AffinityConfigError:  # observability: ignore R2: a corrupt affinity rulebook fails closed and is reported by the evaluation's bounded integrity event, never by the rulebook contents
+        return evaluation.fail(REASON_AFFINITY)
+    if target is None:
+        return evaluation.fail(REASON_AFFINITY)
+    value = relations.affinity_for(owner)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return evaluation.fail(REASON_AFFINITY)
+    return value >= target.floor
+
+
 # ---------------------------------------------------------------------------
 # Hints
 # ---------------------------------------------------------------------------
@@ -678,12 +828,61 @@ def _hint(condition: Condition, context: Any, references: Any) -> str:
             return f"需要暴露程度至少為{_exposure_label(condition.minimum)}"
         return f"需要暴露程度至多為{_exposure_label(condition.maximum)}"
 
-    if isinstance(condition, (GuildRankAtLeast, QuestIs, AffinityAtLeast)):
-        raise DialogueConditionError(
-            f"Condition kind {type(condition).__name__} belongs to the progression slice"
+    if isinstance(condition, GuildRankAtLeast):
+        return (
+            "需要公會階級至少為"
+            f"{_label(references, 'guild_rank', condition.rank_key)}"
+        )
+
+    if isinstance(condition, QuestIs):
+        return _quest_hint(condition, context, references)
+
+    if isinstance(condition, AffinityAtLeast):
+        # The stage label is public wording; the current and threshold numeric
+        # relationship values never enter a hint.
+        return (
+            "需要好感階段至少為"
+            f"{_label(references, 'affinity_stage', condition.stage_key)}"
         )
 
     raise DialogueConditionError(f"Unknown condition node: {condition!r}")
+
+
+def _quest_hint(condition: QuestIs, context: Any, references: Any) -> str:
+    """Render one quest requirement using the canonical definition and state labels."""
+    from world.quests.describe import quest_state_label
+
+    label = _quest_label(condition, context, references)
+    state_label = quest_state_label(condition.state)
+    if state_label is None:
+        raise DialogueConditionError(
+            f"Quest state {condition.state!r} has no canonical hint label"
+        )
+    if condition.state == "not_accepted":
+        return f"需要尚未接取任務「{label}」"
+    return f"需要任務「{label}」{state_label}"
+
+
+def _quest_label(
+    condition: QuestIs, context: Any, references: Any
+) -> str:
+    """Resolve the canonical definition name or the permitted current package's name."""
+    label = references.label("quest", condition.definition_key)
+    if label:
+        return label
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+    from world.rules.dialogue_references import permitted_quest_definition
+
+    definition = QUEST_DEFINITION_REGISTRY.get(condition.definition_key)
+    if definition is not None and permitted_quest_definition(
+        condition.definition_key, package_id=_package_id(context)
+    ):
+        return definition.display_name
+    raise DialogueConditionError(
+        f"Condition label for quest key {condition.definition_key!r} "
+        "is not in the permitted catalog"
+    )
 
 
 def _companion_label(

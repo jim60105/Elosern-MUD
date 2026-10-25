@@ -37,14 +37,27 @@ if TYPE_CHECKING:
 
 _SECONDS_PER_HOUR = CLOCK_YAML["seconds_per_hour"]
 
+#: The canonical quest lifecycle display vocabulary. Four labels name the stored
+#: record states; ``not_accepted`` and ``reward_claimed`` are the two virtual
+#: states authored dialogue qualification distinguishes (absence, and a
+#: completed record carrying the shared reward-claim receipt). The mapping stays
+#: private: the shipped-content gate harvests public module mappings, and these
+#: state words are protocol vocabulary, not authored content.
 _STATE_LABELS = {
+    "not_accepted": "尚未接取",
     "in_progress": "進行中",
     "completed": "已完成",
+    "reward_claimed": "已領取報酬",
     "failed": "已失敗",
     # The terminal invalidation of an accepted alternative whose shared
     # exclusive outcome was resolved elsewhere: no payout, no penalty.
     "invalidated": "已作廢",
 }
+
+
+def quest_state_label(state: str) -> str | None:
+    """Return the canonical display label for one quest lifecycle state."""
+    return _STATE_LABELS.get(state)
 
 
 class QuestDescribeError(ValueError):
@@ -233,7 +246,7 @@ def describe_quest_detail(
     invalidated_reason = getattr(record, "invalidated_reason", None)
     lines = [
         f"{definition.display_name}",
-        f"狀態：{_STATE_LABELS.get(state_value, str(state_value))}",
+        f"狀態：{quest_state_label(state_value) or str(state_value)}",
         f"階段：{record.stage_index + 1}",
         f"目標：{describe_objective(stage.objective)}",
         f"進度：{record.stage_progress} / {stage.objective.quantity}",

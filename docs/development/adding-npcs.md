@@ -164,11 +164,11 @@ topics:
 
 話題可宣告 `requires` 與變體 `when`（同一套凍結的 `Condition` 型別），以及 `unavailable`／`refusal`。作者只需遵守下列規則：
 
-1. **參照鍵必須存在於許可目錄**：`world/rules/dialogue_references.py::static_dialogue_references()` 由既有正式註冊表組合出 `race`、`social_identity`、`item`、`skill`、`preset`、`profile`、`daypart` 等家族。宣告未登錄的鍵（例如拼錯的種族、物品、技能、日段或無法唯一對應公開名稱的 profile）會讓整個快照以 `DialogueSourceError` 拒收，錯誤會標明檔案、profile 與 dialogue_key。公會位階、任務與好感階段屬下一個切片，本波尚未加入目錄。
-2. **提示只看正式標籤**：鎖定話題顯示的需求提示由同一份目錄的公開標籤組成（種族／物品／技能／預設角色／地點主人或常駐冒險者名稱／時段用語／暴露程度用語），不讀取可編輯的顯示名稱或人物設定散文。`profile` 家族只收錄能唯一對應一個正式公開名稱的設定檔。
+1. **參照鍵必須存在於許可目錄**：`world/rules/dialogue_references.py::static_dialogue_references()` 由既有正式註冊表組合出 `race`、`social_identity`、`item`、`skill`、`preset`、`profile`、`daypart`、`guild_rank`（`GUILD_RANK_REGISTRY` 的正式階級鍵）、`quest`（`world/quests/catalog.py` 的正式委託宣告）與 `affinity_stage`（`world/rules/rulebook/affinity.yaml` 的階段鍵）等家族。宣告未登錄的鍵（例如拼錯的種族、物品、技能、日段、階級、委託、好感階段或無法唯一對應公開名稱的 profile）會讓整個快照以 `DialogueSourceError` 拒收，錯誤會標明檔案、profile 與 dialogue_key。靜態對話只能引用正式委託宣告；套件內的編譯委託只透過該套件自己的 `package_quests` 範圍與目前套件身分取得許可，外來套件的委託鍵在靜態目錄與執行期都不授予任何資格。
+2. **提示只看正式標籤**：鎖定話題顯示的需求提示由同一份目錄的公開標籤組成（種族／物品／技能／預設角色／地點主人或常駐冒險者名稱／時段用語／暴露程度用語／公會階級名稱／委託顯示名稱與生命週期用語／好感階段名稱），不讀取可編輯的顯示名稱或人物設定散文。好感提示只顯示階段名稱，永不顯示目前好感數值或門檻數字。`profile` 家族只收錄能唯一對應一個正式公開名稱的設定檔。
 3. **未達條件時的對外行為**：`unavailable: "hidden"` 與未知話題完全相同——不洩漏標籤、提示或內文；`unavailable: "locked"` 必須提供 `refusal`，玩家按下後播放該婉拒場景，不給好感或其他效果。`predecessors`（純接續話題）在讀取進度落地前一律拒絕選取。
 4. **變體選擇是確定的**：同一話題中合法且最高 `priority` 的變體會被選中，沒有命中時使用 `fallback`；已交付的場景在當前對話中不會因後續刷新而改變（重複的 `selection_id` 回傳已提交的交付）。宣告重複 `priority` 會被拒收。
-5. **求值為唯讀**：種族、社會身分、攜帶物、技能與暴露程度只讀行動者本身；同行條件要求目前的主人綁定且在行動者所在地；整個流程不消耗物品、不建立時鐘或性狀態處理器、不寫入技能練習、不授予任何效果。無效的執行期狀態一律判為不合格並留下一筆 `dialogue_condition_integrity` 邊界事件。
+5. **求值為唯讀，且進度條件讀主人**：種族、社會身分、攜帶物、技能與暴露程度只讀行動者本身；同行條件要求目前的主人綁定且在行動者所在地；公會階級、委託與報酬領取只讀支配該行動者的主人（`context.owner`）的正式註冊與任務記錄，被操控身體自己的階級或任務紀錄永不代替主人；好感條件只讀對話主人對該主人的關係階段。委託條件區分六種狀態：`not_accepted`（從未有任何符合紀錄）、`in_progress`、`completed`（無論是否已領取報酬）、`reward_claimed`（已完成且該任務 ID 在正式領取帳本中）、`failed`、`invalidated`；重複實例採存在性比對。整個流程不消耗物品、不建立時鐘或性狀態處理器、不寫入技能練習、不寫入任務或領取紀錄、不授予任何效果。無效的執行期狀態一律判為不合格並留下一筆 `dialogue_condition_integrity` 邊界事件。
 
 ### Step 3.1 — 人物設定切片、名冊清單與啟動門禁
 

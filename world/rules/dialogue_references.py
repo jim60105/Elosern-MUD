@@ -2,11 +2,11 @@
 
 ``static_dialogue_references()`` is the ONE place that composes a
 :class:`world.lore.dialogue.conditions.DialogueReferences` from the canonical
-lore registries plus the world-clock daypart vocabulary. Every family this
-slice evaluates (``race``, ``social_identity``, ``item``, ``skill``, ``preset``,
-``profile`` and ``daypart``) is built here; the progression slice extends this
-same builder with ``guild_rank``, ``quest`` and ``affinity_stage``. No slice
-keeps a second hand-written key copy.
+lore registries plus the world-clock daypart vocabulary and the affinity
+rulebook's stage table. Every family this slice evaluates (``race``,
+``social_identity``, ``item``, ``skill``, ``preset``, ``profile``, ``daypart``,
+``guild_rank``, ``quest`` and ``affinity_stage``) is built here. No slice keeps
+a second hand-written key copy.
 
 The catalog is rebuilt on every call rather than cached, because a canonical
 registry is read-only game data that the synthetic test-data kit swaps per
@@ -26,6 +26,19 @@ instead of importing :mod:`world.rules.clock`: the clock module pulls the
 Evennia/Django settlement stack, which must not load while the lore snapshot
 is being built. The keys stay the clock rulebook's own, so there is no second
 hand-written key copy; only their player-facing labels live here.
+
+The affinity-stage family follows the same rule for the same reason: the stage
+ids and their authored display names come from ``rulebook/affinity.yaml``
+itself, while the evaluator still compares through the validated
+:func:`world.rules.affinity_config.get_config` boundary.
+
+The quest family is the canonical declaration tuple only. That tuple is always
+readable, so the import-time lore snapshot validates a shipped quest reference
+in a cold process (the live registry is populated by the startup composition
+root), and it is exactly the static publication permission set. A compiled
+package definition is admitted through the package's own ``package_quests``
+publication scope and through :func:`permitted_quest_definition`'s current
+package identity; a foreign package definition never enters the static family.
 """
 
 from __future__ import annotations
@@ -37,6 +50,9 @@ from types import MappingProxyType
 import yaml
 
 CLOCK_RULEBOOK_PATH = Path(__file__).resolve().parent / "rulebook" / "clock.yaml"
+AFFINITY_RULEBOOK_PATH = (
+    Path(__file__).resolve().parent / "rulebook" / "affinity.yaml"
+)
 
 #: The player-facing daypart wording the time-skip surfaces use. These are the
 #: canonical labels requirement hints render; a clock rulebook daypart without
@@ -126,9 +142,101 @@ def _profile_table(registry_keys: Mapping[str, object]) -> dict[str, str]:
     return table
 
 
+def _affinity_stage_table() -> dict[str, str]:
+    """Return the affinity rulebook's stage ids mapped to their display names."""
+    document = yaml.safe_load(AFFINITY_RULEBOOK_PATH.read_text(encoding="utf-8"))
+    stages = document.get("stages") if isinstance(document, Mapping) else None
+    if not isinstance(stages, list) or not stages:
+        raise ValueError(
+            f"affinity rulebook {AFFINITY_RULEBOOK_PATH} declares no stages list"
+        )
+    table: dict[str, str] = {}
+    for position, entry in enumerate(stages, start=1):
+        if not isinstance(entry, Mapping):
+            raise ValueError(
+                f"affinity rulebook stage {position} must be a mapping"
+            )
+        stage_id = entry.get("id")
+        name = entry.get("name")
+        if not isinstance(stage_id, str) or not stage_id:
+            raise ValueError(
+                f"affinity rulebook stage {position} id must be a nonempty string"
+            )
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(
+                f"affinity rulebook stage {stage_id!r} name must be a nonempty string"
+            )
+        if stage_id in table:
+            raise ValueError(f"affinity rulebook stage id {stage_id!r} is duplicated")
+        table[stage_id] = name
+    return table
+
+
+def _quest_table() -> dict[str, str]:
+    """Return the canonical quest declarations' keys and display names."""
+    from world.quests.catalog import QUEST_CATALOG
+
+    return {definition.key: definition.display_name for definition in QUEST_CATALOG}
+
+
+#: Marker for stored package provenance that cannot be established at all.
+_UNRESOLVED_PROVENANCE = object()
+
+
+def _package_definition_owner(definition_key: str) -> str | None | object:
+    """The package id that owns ``definition_key``, ``None`` when provably unowned.
+
+    Ownership is read from every stored package row regardless of publication
+    status: a definition registered by a package before it was cancelled is
+    still package-scoped and must never become a global reference. A row whose
+    stored payload no longer validates makes ownership unresolvable, so the
+    reference is denied instead of being treated as an ordinary runtime quest.
+    """
+    try:
+        from world.quests import scene_store
+        from world.quests.scene_package import validated_package
+
+        for row in scene_store.list_packages():
+            definition = validated_package(row.package_id, row.payload)
+            if definition is None:
+                return _UNRESOLVED_PROVENANCE
+            if definition.quest.definition.key == definition_key:
+                return row.package_id
+    except Exception:  # observability: ignore R2: an unreadable package store cannot authorize a reference, so qualification fails closed
+        return _UNRESOLVED_PROVENANCE
+    return None
+
+
+def permitted_quest_definition(
+    definition_key: str, *, package_id: str | None = None
+) -> bool:
+    """Whether a quest reference is authorized for the current dialogue context.
+
+    Canonical declarations are always permitted. A definition registered by a
+    published scene package is permitted only for that exact current package
+    (a foreign package key grants nothing); a definition registered without any
+    package ownership is an ordinary runtime quest and stays permitted. The
+    package lookup is read-only; a stored package whose ownership cannot be
+    resolved fails the reference closed.
+    """
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+    if definition_key in _quest_table():
+        return True
+    if definition_key not in QUEST_DEFINITION_REGISTRY:
+        return False
+    owner = _package_definition_owner(definition_key)
+    if owner is _UNRESOLVED_PROVENANCE:
+        return False
+    if owner is None:
+        return True
+    return isinstance(package_id, str) and bool(package_id) and owner == package_id
+
+
 def static_dialogue_references() -> "DialogueReferences":
     """Compose the static permitted-reference catalog from canonical registries."""
     from world.lore.dialogue.conditions import DialogueReferences
+    from world.lore.guild import GUILD_RANK_REGISTRY
     from world.lore.items import ITEM_REGISTRY
     from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
     from world.lore.player_presets import PLAYER_PRESET_REGISTRY
@@ -155,11 +263,19 @@ def static_dialogue_references() -> "DialogueReferences":
     )
     catalog = catalog.child("profile", _profile_table(NPC_PROFILE_REGISTRY))
     catalog = catalog.child("daypart", _daypart_table())
+    catalog = catalog.child(
+        "guild_rank",
+        {key: row.display_name_zh for key, row in GUILD_RANK_REGISTRY.items()},
+    )
+    catalog = catalog.child("quest", _quest_table())
+    catalog = catalog.child("affinity_stage", _affinity_stage_table())
     return catalog
 
 
 __all__ = [
+    "AFFINITY_RULEBOOK_PATH",
     "CLOCK_RULEBOOK_PATH",
     "DAYPART_LABELS",
+    "permitted_quest_definition",
     "static_dialogue_references",
 ]
