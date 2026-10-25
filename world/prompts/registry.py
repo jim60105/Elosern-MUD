@@ -48,6 +48,12 @@ def _build() -> dict[str, PromptSpec]:
         ),
         PromptSpec("story_director.system", "story_director.yaml"),
         PromptSpec("scenario_director.system", "scenario_director.yaml", ("name_inspiration",)),
+        PromptSpec(
+            "scenario_director.scene_system",
+            "scenario_director.yaml",
+            ("name_inspiration",),
+            max_length=8192,
+        ),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
         PromptSpec(
             "art.character_description",

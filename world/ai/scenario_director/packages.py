@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from world.lore.dialogue.codec import dialogue_phase_schema, dialogue_topic_schema
+
 #: The closed structural vocabularies the payload may name. Registry keys
 #: (tier, archetype, anchor, item, quest type, rank) are validated semantically
 #: against the immutable lore registries by the deterministic boundary.
@@ -37,7 +39,7 @@ ESCORT_COMPLETIONS: tuple[str, ...] = ("destination", "rendezvous")
 
 MAX_ID_LENGTH = 64
 MAX_PROSE = 500
-MAX_TOPICS = 8
+MAX_TOPICS = 16
 MAX_ROLES = 32
 MAX_ENCOUNTERS = 16
 MAX_PHASES = 16
@@ -119,15 +121,19 @@ _ROLE = {
     },
 }
 
-_TOPIC = {
+_SCENE_TOPIC = dialogue_topic_schema(identity_kind="generated_local")
+
+#: One external effect association: a declared local topic of the same phase,
+#: the one allowlisted verb, and the package commission definition key it
+#: offers. The deterministic boundary re-validates all three.
+_TOPIC_EFFECT = {
     "type": "object",
-    "required": ["keyword", "response"],
+    "required": ["topic_id", "verb", "reference"],
     "additionalProperties": False,
     "properties": {
-        "keyword": {"type": "string", "minLength": 1, "maxLength": 32},
-        "response": {"type": "string", "minLength": 1, "maxLength": MAX_PROSE},
-        "effect_verb": {"enum": list(EFFECT_VERBS)},
-        "effect_reference": {"type": "string", "minLength": 1, "maxLength": 128},
+        "topic_id": {"type": "string", "pattern": r"^[a-z][a-z0-9_]{0,31}$"},
+        "verb": {"enum": list(EFFECT_VERBS)},
+        "reference": {"type": "string", "minLength": 1, "maxLength": MAX_ID_LENGTH},
     },
 }
 
@@ -144,6 +150,7 @@ _PHASE = {
     ],
     "additionalProperties": False,
     "properties": {
+        **dialogue_phase_schema(identity_kind="generated_local")["properties"],
         "phase_id": {"type": "string", "minLength": 1, "maxLength": MAX_ID_LENGTH},
         "conditions": {
             "type": "array",
@@ -151,8 +158,16 @@ _PHASE = {
             "maxItems": 4,
             "items": _CONDITION,
         },
-        "greeting": {"type": "string", "minLength": 1, "maxLength": MAX_PROSE},
-        "topics": {"type": "array", "maxItems": MAX_TOPICS, "items": _TOPIC},
+        "topics": {
+            "type": "array",
+            "maxItems": MAX_TOPICS,
+            "items": _SCENE_TOPIC,
+        },
+        "topic_effects": {
+            "type": "array",
+            "maxItems": MAX_TOPICS,
+            "items": _TOPIC_EFFECT,
+        },
         "freeform_situation": {"type": "string", "maxLength": MAX_PROSE},
         "freeform_goals": {"type": "string", "maxLength": MAX_PROSE},
         "offline_response": {"type": "string", "minLength": 1, "maxLength": MAX_PROSE},

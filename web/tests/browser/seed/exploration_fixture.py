@@ -64,6 +64,70 @@ def _settle_admitted_portrait(entity, stable_key: str) -> None:
     )
 
 
+def _publish_generated_dialogue_host(host, character) -> str:
+    """Publish one synthetic generated package and bind ``host`` to its role.
+
+    The browser journey needs a host whose dialogue comes from the immutable
+    scene-package store, not from a static table. Validation and publication
+    stay deterministic; the row is written directly so the fixture never mutates
+    the static dialogue snapshot or registers gameplay authority.
+    """
+    from world.lore.dialogue.codec import GeneratedDialogueIdentity
+    from world.quests import scene_store
+    from world.quests.scene_package import validate_scene_package
+    from world.quests.tests._scene_package_fixtures import (
+        dialogue as _dialogue,
+        package as _package,
+        topic as _topic,
+        topic_scene as _topic_scene,
+    )
+
+    payload = _package()
+    entry = _dialogue("mother")
+    entry["phases"][0]["topics"] = [
+        _topic(
+            "greeting",
+            "問候",
+            "她把門簾掀起一角，朝你點了點頭。",
+            fallback=_topic_scene(
+                "greeting",
+                "她把門簾掀起一角，朝你點了點頭。",
+                actor_line="我從南門一路走來，想問問這裡的消息。",
+            ),
+        ),
+        _topic(
+            "rumor",
+            "傳聞",
+            "她壓低聲音，說起昨夜鐘塔下的動靜。",
+            fallback=_topic_scene(
+                "rumor",
+                "她壓低聲音，說起昨夜鐘塔下的動靜。",
+                actor_line="昨夜鐘塔那邊是不是出了什麼事？",
+            ),
+        ),
+    ]
+    payload["dialogue"] = [entry]
+    definition = validate_scene_package(payload)
+    row, _created = scene_store.publish_package(
+        package_id=definition.package_id,
+        source_id="browser-generated-dialogue",
+        owner_id=str(character.pk),
+        payload=payload,
+    )
+    scene_store.bind_role(row, "mother", int(host.pk))
+    scene_store.set_dialogue_phase(
+        row,
+        "mother",
+        definition.role_dialogue("mother").initial_phase,
+    )
+    identity = GeneratedDialogueIdentity(
+        definition.package_id,
+        "mother",
+        definition.role_dialogue("mother").initial_phase,
+    )
+    return f"scene_role:{identity.package_id}:{identity.role_id}"
+
+
 def _exploration_fixture(character) -> None:
     """Deterministically prepare an exploration-menu fixture (webclient-exploration-menu).
 
@@ -153,6 +217,8 @@ def _exploration_fixture(character) -> None:
             for key in (character.db.inventory or [])
             if key not in SYNTH_LOCKED_TOPIC_ITEM_KEYS
         ]
+    if os.environ.get("ELOSERN_BROWSER_GENERATED_SCENE") == "1":
+        host_dialogue_key = _publish_generated_dialogue_host(host, character)
     host.components.add(ScriptedDialogue.create(host, dialogue_key=host_dialogue_key))
     from world.rules.affinity import AffinitySource, apply_affinity_change
 

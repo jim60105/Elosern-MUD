@@ -48,7 +48,10 @@ from world.ai.scenario_director.validators import (
     ScenarioDirectorNotRegisteredError,
     ScenarioDirectorTemplateError,
 )
-from world.ai.scenario_director.prompt import build_scenario_prompt
+from world.ai.scenario_director.prompt import (
+    build_scenario_prompt,
+    build_scene_scenario_prompt,
+)
 
 
 def _is_registered() -> bool:
@@ -295,23 +298,22 @@ def generate_beat_scene_blueprint(client: Any, *, context: dict[str, Any]):
     incomplete answer, or an embedded quest that does not fit the request)
     resolves to ``None``: this route never draws authored filler.
     """
-    from world.ai.scenario_director.blueprints import MAX_TOTAL_SIZE
+    from world.ai.scenario_director.blueprints import MAX_SCENE_CONTEXT_SIZE
 
     if client is None:
         raise ScenarioDirectorClientRequiredError(
             "beat scene generation requires a client"
         )
     _require_registered()
-    frame = json.dumps(context, ensure_ascii=False, sort_keys=True)
-    if len(frame) > MAX_TOTAL_SIZE:
-        return None
     try:
-        system, _generic_user = build_scenario_prompt(context)
+        system, user = build_scene_scenario_prompt(context)
     except PromptUnavailableError:
         return None
-    # The generic note cap is too small for the permissioned beat snapshot.
-    # Preserve the entire bounded immutable frame or refuse, never truncate it.
-    user = {"role": "user", "content": frame}
+    # The scene route has its own frame bound: the complete immutable planning
+    # frame (including the permitted-reference catalog) is preserved or the
+    # route refuses, never truncated.
+    if len(user["content"].encode("utf-8")) > MAX_SCENE_CONTEXT_SIZE:
+        return None
     descriptor = ChatRequestDescriptor(
         messages=(system, user),
         schema_id="scenario_director",

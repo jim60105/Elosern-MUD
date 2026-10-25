@@ -30,6 +30,24 @@ SCENE_REQUIREMENT_KINDS = frozenset({"place", "new_character", "private_commissi
 SCENE_PACKAGE_MARKER = "scene_package"
 
 
+def dialogue_reference_catalog() -> dict[str, dict[str, str]]:
+    """The bounded, deterministic permitted-reference catalog for one scene frame.
+
+    Built from the existing canonical registry readers. Every family is sorted
+    and carries only public keys and labels: no private location, hidden phase
+    body, editable display name or affinity numeral enters the prompt. Package
+    local roles and the package's own quest are added by the deterministic
+    compiler, never invented here as global registry entries.
+    """
+    from world.rules.dialogue_references import static_dialogue_references
+
+    catalog = static_dialogue_references()
+    return {
+        family: {key: label for key, label in sorted(table.items())}
+        for family, table in sorted(catalog.tables.items())
+    }
+
+
 def confirmed_requirements(invocation):
     """The confirmed direction's frozen executable requirements, in order."""
     from world.narrative.attention import SOURCE_REQUEST
@@ -150,6 +168,9 @@ def quest_context(invocation, proposal):
     context = {
         "allowed_rank": rank,
         "anchor": getattr(location, "anchor_key", None),
+        # The immutable permissioned frame carries the complete public
+        # reference catalog so the proposal can only name permitted keys.
+        "dialogue_references": dialogue_reference_catalog(),
         "note": json.dumps({
             "quest_seed": proposal.summary,
             "snapshot_id": invocation.snapshot_id,

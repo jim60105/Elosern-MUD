@@ -73,7 +73,9 @@ class EscortFixtureMixin:
                 "roles": [{"role_id": role} for role in ("issuer", "protected", "meeting")],
                 "commissions": [{"role_id": "issuer", "issuer_content_key": "synthetic_bound_issuer"}],
                 "dialogue": [{"role_id": "issuer", "phases": [{
-                    "phase_id": "offer", "topics": self.offer_topics(),
+                    "phase_id": "offer",
+                    "topics": self.offer_topics(),
+                    "topic_effects": self.offer_effects(),
                 }]}], "outcome_groups": self.outcome_groups(),
             },
         )
@@ -87,8 +89,25 @@ class EscortFixtureMixin:
         scene_store.set_dialogue_phase(self.package, "issuer", "offer")
 
     def offer_topics(self):
-        return [{"keyword": "escort", "effect_verb": "offer_commission",
-                 "effect_reference": self.definition.key}]
+        return [
+            {
+                "topic_id": "escort",
+                "keyword": "escort",
+                "label": "escort",
+                "fallback": {
+                    "scene_id": "escort_scene",
+                    "revision": "r1",
+                    "lines": [
+                        {"kind": "speech", "speaker": "actor", "text": "escort"},
+                        {"kind": "speech", "speaker": "host", "text": "escort"},
+                    ],
+                },
+            }
+        ]
+
+    def offer_effects(self):
+        return [{"topic_id": "escort", "verb": "offer_commission",
+                 "reference": self.definition.key}]
 
     def outcome_groups(self):
         return []
@@ -259,13 +278,13 @@ class EscortAlternativeMixin(EscortFixtureMixin):
     ALTERNATIVE = "synthetic_bound_escort_alternative"
     SINGLETON = "synthetic_bound_escort_singleton"
 
-    def offer_topics(self):
+    def offer_effects(self):
         return [
-            *super().offer_topics(),
-            {"keyword": "escort", "effect_verb": "offer_commission",
-             "effect_reference": self.ALTERNATIVE},
-            {"keyword": "escort", "effect_verb": "offer_commission",
-             "effect_reference": self.SINGLETON},
+            *super().offer_effects(),
+            {"topic_id": "escort_alternative", "verb": "offer_commission",
+             "reference": self.ALTERNATIVE},
+            {"topic_id": "escort_singleton", "verb": "offer_commission",
+             "reference": self.SINGLETON},
         ]
 
     def outcome_groups(self):
@@ -1059,13 +1078,13 @@ class EscortGeneratedPublicationTests(
     reload. Nothing is mocked to succeed and no objective is relabelled.
     """
 
-    def offer_topics(self):
+    def offer_effects(self):
         return [
-            *super().offer_topics(),
+            *super().offer_effects(),
             {
-                "keyword": "escort",
-                "effect_verb": "offer_commission",
-                "effect_reference": _GENERATED_ESCORT_KEY,
+                "topic_id": "escort_generated",
+                "verb": "offer_commission",
+                "reference": _GENERATED_ESCORT_KEY,
             },
         ]
 

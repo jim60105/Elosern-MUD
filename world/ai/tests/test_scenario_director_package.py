@@ -105,6 +105,9 @@ class BeatSceneRouteTests(TestCase):
     @covers_requirement(
         "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
     )
+    @covers_requirement(
+        "scenario-director::dream-scene-generation-proposes-the-complete-shared-dialogue-schema"
+    )
     def test_the_call_declares_the_extended_contract_inline(self):
         client = FakeLLMClient()
         client.add_response(
@@ -124,6 +127,9 @@ class BeatSceneRouteTests(TestCase):
 
     @covers_requirement(
         "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
+    @covers_requirement(
+        "scenario-director::dream-scene-generation-proposes-the-complete-shared-dialogue-schema"
     )
     def test_a_disabled_profile_resolves_to_none_without_a_template_draw(self):
         client = FakeLLMClient()

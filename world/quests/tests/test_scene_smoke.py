@@ -29,14 +29,16 @@ from world.quests.tests._scene_package_fixtures import (
     LONG_PROSE,
     dialogue as _dialogue,
     package as _package,
+    topic as _topic,
+    topic_scene as _topic_scene,
 )
 from world.rules.dialogue import (
-    dialogue_topic_keywords,
     greeting_for,
     live_dialogue_session,
     open_or_refresh_dialogue,
-    run_scripted_talk,
+    select_authored_topic,
 )
+from world.rules.dialogue_sources import dialogue_source_for_host
 from world.quests.scene_builder import materialize_stage
 from world.quests.tests._scene_package_fixtures import role as _role
 
@@ -76,9 +78,9 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
         definition_key = compile_blueprint_core(
             payload["quest"], package_roles=frozenset({"mother", "daughter"})
         ).definition.key
-        payload["dialogue"][0]["phases"][0]["topics"][-1]["effect_reference"] = (
-            definition_key
-        )
+        commission_phase = payload["dialogue"][0]["phases"][0]
+        commission_phase["topics"][-1]["requires"]["definition_key"] = definition_key
+        commission_phase["topic_effects"][0]["reference"] = definition_key
         published = publish_scene_package(payload, owner="tester", tick=4)
         self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
         self.assertEqual(read_records(player), [])
@@ -123,13 +125,26 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
 
         # 5. The conversation window shows the current phase and the commission topic.
         open_or_refresh_dialogue(player, mother, greeting_for(mother))
+        source = dialogue_source_for_host(mother)
         self.assertEqual(
-            dialogue_topic_keywords(mother), ("線索", COMMISSION_KEYWORD)
+            [topic.keyword for topic in source.dialogue.topics],
+            ["線索", COMMISSION_KEYWORD],
         )
         self.assertIsNotNone(live_dialogue_session(player))
 
         # 6. Accept the commission through the real consumer (offline, no model).
-        run_scripted_talk(mother, player, COMMISSION_KEYWORD)
+        commission_topic = next(
+            topic.topic_id
+            for topic in source.dialogue.topics
+            if topic.keyword == COMMISSION_KEYWORD
+        )
+        select_authored_topic(
+            player,
+            mother,
+            commission_topic,
+            selection_id="smoke-commission",
+            expected_context_id=live_dialogue_session(player).context_id,
+        )
         records = read_records(player)
         self.assertEqual([record.definition_key for record in records], [definition_key])
 
@@ -163,7 +178,10 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(transition.phase_id, "everyday")
         session = live_dialogue_session(player)
         self.assertEqual(session.line, greeting_for(mother))
-        self.assertEqual(dialogue_topic_keywords(mother), ("近況",))
+        self.assertEqual(
+            [topic.keyword for topic in dialogue_source_for_host(mother).dialogue.topics],
+            ["近況"],
+        )
 
         # 8. Committed reload: the package and its bindings survive a restart.
         from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
@@ -188,12 +206,28 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
 
     def _dialogue_with_commission(self, entry: dict) -> dict:
         entry["phases"][0]["topics"] = [
-            {"keyword": "線索", "response": LONG_PROSE},
+            _topic("information", "線索", LONG_PROSE),
+            _topic(
+                "offer",
+                COMMISSION_KEYWORD,
+                LONG_PROSE,
+                requires={
+                    "kind": "quest_is",
+                    "definition_key": "placeholder",
+                    "state": "not_accepted",
+                },
+                refusal=_topic_scene(
+                    "offer_refusal",
+                    "她沒有接下這個請求。",
+                    actor_line="你把話說完，等她回應。",
+                ),
+            ),
+        ]
+        entry["phases"][0]["topic_effects"] = [
             {
-                "keyword": COMMISSION_KEYWORD,
-                "response": LONG_PROSE,
-                "effect_verb": "offer_commission",
-                "effect_reference": "placeholder",
-            },
+                "topic_id": "offer",
+                "verb": "offer_commission",
+                "reference": "placeholder",
+            }
         ]
         return entry

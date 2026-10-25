@@ -75,6 +75,7 @@ from world.ai.scenario_director.blueprints import (
     MAX_BLUEPRINT_OCCUPANTS,
     MAX_CONTEXT_FIELD_LENGTH,
     MAX_NAME_LENGTH,
+    MAX_SCENE_CONTEXT_SIZE,
     MAX_SCENE_SENTENCE_LENGTH,
     MAX_TOTAL_SIZE,
     BlueprintFailure,
@@ -125,6 +126,7 @@ from world.ai.scenario_director.validators import (
 )
 from world.ai.scenario_director.prompt import (
     build_scenario_prompt,
+    build_scene_scenario_prompt,
     _CONTEXT_DROP_ORDER,
     _CONTEXT_KEYS,
     _INSPIRATION_COUNT,

@@ -35,7 +35,7 @@
 |---|---|---|
 | 劇本對話（`talk` 關鍵詞查表） | NPC 帶 `ScriptedDialogue` 元件，`dialogue_key` 指向 `world/lore/dialogue/` 已登錄的表 | 未知關鍵詞回覆無理解行；查得到的表永遠可用，完全離線可玩 |
 | 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `resolve_greeting(npc)` 的離線問候語（執行個體欄位優先，次為劇本／Profile）或沉默 |
-| 生成階段對話（已發表場景包） | 角色帶 `ScriptedDialogue`，`dialogue_key` 形如 `scene_role:<package id>:<role id>`；`world/rules/dialogue.py` 的共享解析器讀取該角色「目前允許」的階段定義 | 固定問候語、主題與離線回覆完全離線可用；階段一改變，舊主題與已開啟的對話窗立即失效並刷新為當前階段 |
+| 生成階段對話（已發表場景包） | 角色帶 `ScriptedDialogue`，`dialogue_key` 形如 `scene_role:<package id>:<role id>`；`world/rules/dialogue.py` 的共享解析器重新解析目前階段，回傳完整 `AuthoredDialogue` 與效果關聯 | 完整場景、變體、條件、婉拒、接續與閱讀完全離線可用；階段一改變，舊情境、交付與通知範圍立即失效並刷新為當前階段 |
 
 匯入器預設建 `NPC`（純劇本對話／無對話）。生成對話人物必須顯式傳 `typeclass=LLMNPC`。
 
@@ -208,6 +208,18 @@ topics:
 - 關鍵詞標籤的檢查只在一張表內生效：同表的標籤不得重複，但兩個主人可以合法共用同一組標籤，專案不再要求全域唯一的關鍵詞組。
 - 測試不釘死任何一句問候語、關鍵詞回應、角色卡或語音文字，改寫既有台詞不會讓測試失敗。
 - `LEDGER_FACES_BY_KIND`（`world/lore/npc_editorial_review.py`）是每個來源種類應審查面向的唯一宣告；某個種類多了新的文字面向時，連同那份宣告一起擴充。
+
+### Step 3.4 — 生成場景包對話（夢境協作）
+
+夢境協作產生的可交談角色不走 YAML，也不寫入任何來源目錄。它的不可變定義存放在 `world/quests` 的 `ScenePackage` 資料列中，由 `world/quests/encounters.py::publish_scene_package` 先驗證整包再寫入；`world/rules/dialogue_sources.py` 的共享提供者只讀取已發表且未取消的套件。角色不需要 `NpcProfile` 或靜態對話註冊。
+
+**區域識別碼與命名空間。** 作者在階段內宣告 `topic_id`、`scene_id`、`variant_id` 與 `predecessors`，一律使用 `[a-z][a-z0-9_]{0,31}`。`world/lore/dialogue/codec.py` 會把它們與 `GeneratedDialogueIdentity(package_id, role_id, phase_id)` 組成穩定完整 ID：`g:` 加上 UTF-8 JSON 陣列的無補位 URL-safe base64（`[package_id, role_id, phase_id, local_id]`）。完整 ID 是 ASCII、上限 2048 位元組；靜態對話的 96 字元小寫規則不適用。`role_id` 與 `phase_id` 各上限 64 個字元，可以含非 ASCII 字元。同一階段內識別碼不得重複，前置只能指向同階段已宣告的話題，且不得成環；跨階段的前置會被視為懸空而拒收。
+
+**效果關聯。** 階段可宣告選填的 `topic_effects`，每列恰好 `{topic_id, verb, reference}`。`verb` 目前只有 `offer_commission`；`reference` 必須等於該角色在本套件宣告的委託定義鍵。帶效果的話題必須同時宣告 `requires` 與 `refusal`，且不得是 `disclosure: "pure_chain"` 的公開接續。資格成立後仍可能在結算前被持有、地點、委託授權或既有委託狀態拒絕；拒絕時只播放 `refusal` 場景，不交付正式內容、不建立完成憑證、不給好感。效果與對話工作階段在同一個交易內提交，重播或重複選取最多套用一次。靜態 YAML 不支援 `topic_effects`。
+
+**內容身分與舊格式。** 套件識別碼是把提案 JSON（含區域對話 ID）排序序列化後的雜湊，因此對話文字或宣告不同就是不同套件，不可能覆寫已發表的不可變內容。舊的 `response`、`effect_verb`、`effect_reference` 欄位已停用；只含舊格式的既有資料列在執行期解析不到來源，提供者回傳 `None` 並留下一筆 `dialogue_source_rejected` 邊界事件，不會轉換或部分交付。
+
+**場景提示的輸入上限。** 夢境場景走專用的 `scenario_director.scene_system` 提示與 `ExtendedQuestBlueprint` 內嵌結構；使用者訊息保留完整規劃框，包含 `dialogue_references` 許可目錄。此路由的輸入上限是 65,536 UTF-8 位元組（`world/ai/scenario_director/blueprints.py::MAX_SCENE_CONTEXT_SIZE`），通用 `QuestBlueprint` 路由仍維持 12,000。以現行註冊表量測，完整標籤目錄的緊湊 JSON 為 16,109 位元組（profile 28、preset 8、daypart 4、race 3、social_identity 4、guild_rank 7、quest 10、item 123、skill 260、affinity_stage 7），其餘留給需求、來源摘要與指示。對話本身的位元組上限不變：單一場景 8,192、交付加公開接續 16,384、面板 24,576、帶對話的封包 98,304。
 
 ### Step 4 — 匯入
 

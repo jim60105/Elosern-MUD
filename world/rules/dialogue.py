@@ -12,12 +12,12 @@ authored exception: keyword ``回報`` resolves the read-only reportable-quest
 listing through ``world.rules.guild`` (or falls back to the authored line),
 and the keyword-less lookup never writes.
 
-The module also hosts the deterministic scripted-talk writer
-(``run_scripted_talk``), the only dialogue path that writes state: a known
-keyword grants +1 talk affinity with the host through the sole-writer
-affinity API (``world/rules/affinity.py``) in one transaction, restoring the
-relations surface on failure. It lives here because ``world/rules/`` is the
-deterministic core and this is the dialogue subsystem's own writer.
+Formal topic selection is the sole writing path: ``select_authored_topic``
+delivers one complete scene and grants the capped +1 talk affinity for an
+informational topic through the sole-writer affinity API in one transaction.
+Generated roles read their complete declarations from the quest-owned immutable
+package through :func:`generated_phase_binding`; there is no generated
+keyword-response or scripted-talk writer.
 
 The module also owns the character-held dialogue session (webclient-align-07)
 as its ONLY read/write surface: ``open_or_refresh_dialogue`` /
@@ -447,6 +447,14 @@ def chain_deliveries(
             )
             if topic is None:
                 continue
+            # Only an eligible public successor is chain-eligible. A qualified
+            # topic's retained receipt still serves a delayed acknowledgement,
+            # but its protected body must never be replayed as chain content
+            # after the reader selected it explicitly.
+            if getattr(topic, "disclosure", "qualified") != "pure_chain":
+                continue
+            if getattr(topic, "requires", None) is not None:
+                continue
             scene = _chain_scene(topic, chosen["scene_revision"], context)
             if scene is None:
                 # The authored bytes behind this receipt no longer resolve:
@@ -481,27 +489,25 @@ def chain_deliveries(
 
 
 @dataclass(frozen=True)
-class GeneratedPhaseDialogue:
-    """One generated role's current permitted phase, as a read-only view."""
+class GeneratedPhaseBinding:
+    """One generated host's trusted, currently permitted phase.
+
+    Server-only: the package/role pair comes from the host's stable dialogue
+    binding, and the phase/revision are re-read from the quest-owned runtime
+    store on every call. ``phase`` carries the complete immutable scene
+    declarations (topics, effects, freeform facts, greeting and offline reply).
+    """
 
     package_id: str
     role_id: str
     phase_id: str
     revision: int
-    greeting: str
-    topics: tuple[tuple[str, str], ...]
-    offline_response: str
+    phase: Any
+    definition: Any
 
 
-def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialogue | None:
-    """Resolve a generated dialogue key to its current permitted phase, or ``None``.
-
-    Read-only: a malformed key, an unpublished package, an unknown role or a
-    missing selected phase all resolve to ``None`` (the caller then falls back to
-    the authored table or the no-understanding line). Guarded reunion/escort
-    content is never invented here -- only the committed selected phase's own
-    validated fields are returned.
-    """
+def generated_dialogue_parts(dialogue_key: str | None) -> tuple[str, str] | None:
+    """Split a trusted ``scene_role:<package>:<role>`` key, or ``None``."""
     if not isinstance(dialogue_key, str) or not dialogue_key.startswith(
         GENERATED_DIALOGUE_PREFIX
     ):
@@ -509,13 +515,36 @@ def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialo
     package_id, _, role_id = dialogue_key[len(GENERATED_DIALOGUE_PREFIX):].partition(":")
     if not package_id or not role_id:
         return None
+    return package_id, role_id
+
+
+def generated_phase_binding(npc: Any) -> GeneratedPhaseBinding | None:
+    """Resolve one generated host's trusted current phase, or ``None``.
+
+    Every gate is deterministic and read-only: the published immutable package,
+    the exact role-to-actor binding, the conversable role definition, and the
+    current selected phase with its monotonic revision. A payload that no
+    longer validates (including the removed response-only shape) and a binding
+    that names another actor both yield ``None``; no partial or converted view
+    is produced.
+    """
+    parts = generated_dialogue_parts(dialogue_key_for(npc))
+    if parts is None:
+        return None
+    package_id, role_id = parts
     from world.quests import scene_store
 
     row = scene_store.read_package(package_id)
-    if row is None:
+    if row is None or row.status != scene_store.PACKAGE_STATUS_PUBLISHED:
+        return None
+    binding = scene_store.get_role_binding(package_id, role_id)
+    if binding is None or int(binding.npc_id) != int(getattr(npc, "pk", 0)):
         return None
     definition = _validated_package(package_id, row.payload)
     if definition is None:
+        return None
+    role = definition.role(role_id)
+    if role is None or not role.conversable:
         return None
     role_dialogue = definition.role_dialogue(role_id)
     if role_dialogue is None:
@@ -528,14 +557,13 @@ def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialo
     )
     if phase is None:
         return None
-    return GeneratedPhaseDialogue(
+    return GeneratedPhaseBinding(
         package_id=package_id,
         role_id=role_id,
         phase_id=phase.phase_id,
         revision=revision,
-        greeting=phase.greeting,
-        topics=tuple((topic.keyword, topic.response) for topic in phase.topics),
-        offline_response=phase.offline_response,
+        phase=phase,
+        definition=definition,
     )
 
 
@@ -551,15 +579,10 @@ def _validated_package(package_id: str, payload: Any) -> Any | None:
     return validated_package(package_id, payload)
 
 
-def generated_dialogue_for(npc: Any) -> GeneratedPhaseDialogue | None:
-    """Return the current generated phase definition for ``npc``, or ``None``."""
-    return _generated_dialogue_for_key(dialogue_key_for(npc))
-
-
 def dialogue_phase_revision(npc: Any) -> int | None:
     """Return the current phase revision of a generated host, or ``None``."""
-    generated = generated_dialogue_for(npc)
-    return None if generated is None else generated.revision
+    binding = generated_phase_binding(npc)
+    return None if binding is None else binding.revision
 
 
 def is_dialogue_host(npc: Any) -> bool:
@@ -578,19 +601,10 @@ def dialogue_key_for(npc: Any) -> str | None:
 def table_response(dialogue_key: str, keyword: str, npc: Any = None) -> str:
     """Return the resolved response for one keyword, or the no-understanding line.
 
-    The shared resolver answers authored rows and validated generated
-    current-phase definitions alike, so the text ``talk`` path, the webclient
-    adapter, the topic affordances and action validation all read one seam
-    (quest-scene-encounters 4.1).
+    This is the static authored-table line view retained for the legacy
+    authored rows. Generated roles answer through the common scene provider
+    (``resolve_dialogue_source``) and never through a keyword line.
     """
-    generated = _generated_dialogue_for_key(dialogue_key)
-    if generated is not None:
-        for candidate, response in generated.topics:
-            if candidate == keyword:
-                return response
-        if npc is not None:
-            return misunderstood_line_for(npc)
-        return NO_UNDERSTANDING_LINE
     definition = DIALOGUE_TABLE.get(dialogue_key)
     if definition is None:
         return NO_UNDERSTANDING_LINE
@@ -603,10 +617,7 @@ def table_response(dialogue_key: str, keyword: str, npc: Any = None) -> str:
 
 
 def dialogue_has_keyword(dialogue_key: str, keyword: str) -> bool:
-    """Whether ``keyword`` resolves in the named authored table or generated phase."""
-    generated = _generated_dialogue_for_key(dialogue_key)
-    if generated is not None:
-        return any(candidate == keyword for candidate, _ in generated.topics)
+    """Whether ``keyword`` resolves in the named authored table."""
     definition = DIALOGUE_TABLE.get(dialogue_key)
     if definition is None:
         return False
@@ -614,19 +625,16 @@ def dialogue_has_keyword(dialogue_key: str, keyword: str) -> bool:
 
 
 def dialogue_topic_keywords(npc: Any) -> tuple[str, ...]:
-    """Return the ordered topic keyword identities of a host's current definition.
+    """Return the ordered keyword identities of a host's static authored table.
 
-    Authored tables and generated current phases answer through the same
-    resolver, so the version-2 conversation panel, the text ``talk`` command and
-    the action-validation path can never disagree about which topics exist. An
-    empty or unresolved definition yields an empty tuple (no choices).
+    This is the compatibility fallback for a host whose static table still has
+    no validated scene source. Generated roles answer through the shared
+    availability projection; when their source cannot be resolved they have no
+    choices at all, so this returns an empty tuple for them.
     """
     key = dialogue_key_for(npc)
     if key is None:
         return ()
-    generated = _generated_dialogue_for_key(key)
-    if generated is not None:
-        return tuple(candidate for candidate, _ in generated.topics)
     definition = DIALOGUE_TABLE.get(key)
     if definition is None:
         return ()
@@ -663,9 +671,9 @@ def greeting_for(npc: Any) -> str | None:
     ``None`` so the caller falls back to the no-response line. A generated
     role answers with its current permitted phase's fixed greeting.
     """
-    generated = generated_dialogue_for(npc)
-    if generated is not None:
-        return generated.greeting
+    binding = generated_phase_binding(npc)
+    if binding is not None:
+        return binding.phase.greeting
     key = dialogue_key_for(npc)
     if key is None:
         return None
@@ -774,13 +782,12 @@ def opens_dialogue(npc: Any) -> bool:
     """Whether a conversation can open on ``npc`` (the conversable-host gate).
 
     True for an ``LLMNPC`` (the generative host) or for a host carrying a
-    ``ScriptedDialogue`` component whose ``dialogue_key`` resolves either in
-    ``DIALOGUE_TABLE`` or to a generated role's current phase definition. A
-    component host whose definition does not resolve has no greeting and no
-    choices, so opening a session on it would be a dead end; the caller shows
-    its disabled ``dialogue_unavailable`` affordance instead. The adapter and
-    the exploration panel share this one predicate, so the rendered affordance
-    and the committed action agree. Read-only.
+    ``ScriptedDialogue`` component whose trusted source resolves. A component
+    host whose source does not resolve has no greeting and no choices, so
+    opening a session on it would be a dead end; the caller shows its disabled
+    ``dialogue_unavailable`` affordance instead. The adapter and the exploration
+    panel share this one predicate, so the rendered affordance and the committed
+    action agree. Read-only.
     """
     from typeclasses.npcs import LLMNPC
 
@@ -789,7 +796,11 @@ def opens_dialogue(npc: Any) -> bool:
     key = dialogue_key_for(npc)
     if key is None:
         return False
-    return key in DIALOGUE_TABLE or _generated_dialogue_for_key(key) is not None
+    if key in DIALOGUE_TABLE:
+        return True
+    from world.rules.dialogue_sources import dialogue_source_for_host
+
+    return dialogue_source_for_host(npc) is not None
 
 
 def authorized_dialogue_open(actor: Any, host: Any) -> bool:
@@ -826,80 +837,8 @@ def dialogue_offline_response(npc: Any) -> str | None:
     offline response (design §6); an authored host has no such field, so the
     caller keeps its existing authored greeting/silence precedence.
     """
-    generated = generated_dialogue_for(npc)
-    return None if generated is None else generated.offline_response
-
-
-@dataclass(frozen=True)
-class ScriptedTalkResult:
-    """One applied scripted talk: the response and whether the gain was capped."""
-
-    response: str
-    budget_capped: bool
-
-
-def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkResult | None:
-    """Apply one known-keyword scripted talk atomically and return the result.
-
-    Shared by the text ``talk`` command and the webclient
-    ``explore.talk_scripted`` path. A known keyword commits the +1 ``talk``
-    affinity gain with the host in one transaction, restoring the relations
-    surface on failure; unknown keywords and componentless hosts return their
-    line without writing anything. The ``guild_staff`` ``回報`` action keyword
-    is the authored exception: it resolves its read-only listing purely and
-    never grants affinity (turn-in rewards follow the guild settlement
-    contract).
-    """
-    from world.rules.affinity import AffinitySource, apply_affinity_change
-    from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
-
-    response = dialogue_response(npc, character, keyword)
-    if response is None:
-        return None
-    dialogue_key = dialogue_key_for(npc)
-    if (
-        dialogue_key == GUILD_STAFF_DIALOGUE_KEY
-        and keyword == GUILD_STAFF_TURNIN_KEYWORD
-    ):
-        from typeclasses.components import GuildStaff
-
-        if getattr(npc, "components", None) is not None and npc.components.has(
-            GuildStaff.name
-        ):
-            return ScriptedTalkResult(response=response, budget_capped=False)
-    if dialogue_key is None or not dialogue_has_keyword(dialogue_key, keyword):
-        return ScriptedTalkResult(response=response, budget_capped=False)
-
-    if generated_dialogue_for(npc) is not None:
-        from world.rules.story_effects import apply_story_effect, effect_for_keyword
-
-        declared = effect_for_keyword(npc, keyword)
-        if declared is not None:
-            verb, reference = declared
-            apply_story_effect(
-                npc, character, keyword=keyword, verb=verb, reference=reference
-            )
-            # An effect-bearing topic is the interaction: the fixed topic line is
-            # the answer and no talk affinity is granted. A refused effect still
-            # answers with that line (the deterministic APIs already rechecked
-            # everything, and the refusal is logged by the effect boundary).
-            return ScriptedTalkResult(response=response, budget_capped=False)
-
-    relations_snapshot = attribute_snapshot(npc, "relations_data")
-    # Host affinity belongs to the owning player, never to a possessed acting
-    # body: the companion speaks, the owner's relationship record changes.
-    from world.rules.dialogue_context import session_control_owner
-
-    affinity_owner = session_control_owner(character) or character
-    try:
-        from django.db import transaction
-
-        with transaction.atomic():
-            outcome = apply_affinity_change(npc, affinity_owner, AffinitySource.TALK, 1)
-    except Exception:
-        restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
-        raise
-    return ScriptedTalkResult(response=response, budget_capped=outcome.budget_capped)
+    binding = generated_phase_binding(npc)
+    return None if binding is None else binding.phase.offline_response
 
 
 # ---------------------------------------------------------------------------
@@ -1145,12 +1084,26 @@ def open_or_refresh_dialogue(
     control_key = control_key_for(character, owner)
     same_control = existing is not None and existing.control_key == control_key
 
+    # A reused context must still name the SAME host, source identity (for a
+    # generated role that identity carries the phase) and phase revision. A
+    # changed phase or rebound role retires the old context and both receipt
+    # sets, so an obsolete delivery can never be replayed under the new one.
+    reusable_existing = bool(
+        same_control
+        and existing is not None
+        and existing.npc_id == npc_pk
+        and existing.context_id
+        and existing.host_key == str(ctx.host_key)
+        and existing.source_identity == ctx.source_identity
+        and existing.phase_revision == ctx.phase_revision
+    )
+
     if getattr(ctx, "context_id", None):
         context_id = str(ctx.context_id)
         host_key = str(ctx.host_key)
         source_id = ctx.source_identity
         phase_rev = ctx.phase_revision
-    elif same_control and existing is not None and existing.npc_id == npc_pk and existing.context_id:
+    elif reusable_existing and existing is not None:
         context_id = existing.context_id
         host_key = existing.host_key
         source_id = existing.source_identity
@@ -1161,12 +1114,7 @@ def open_or_refresh_dialogue(
         source_id = ctx.source_identity
         phase_rev = ctx.phase_revision
 
-    if (
-        same_control
-        and existing is not None
-        and existing.npc_id == npc_pk
-        and existing.context_id == context_id
-    ):
+    if reusable_existing and existing is not None and existing.context_id == context_id:
         sel_receipts = list(existing.selection_receipts)
         comp_receipts = list(existing.completion_receipts)
     else:
@@ -1370,6 +1318,14 @@ def _select_authored_topic(
     source = resolve_dialogue_source(context)
     if source is None:
         raise DialogueSourceUnavailableError("no_source", "對方目前無法交談。")
+    # The source-owner phase revision is authoritative for a generated scene;
+    # a brand-new context has no stored revision yet, so the live one is
+    # recorded with the delivery and its session.
+    phase_revision = (
+        source.phase_revision
+        if source.phase_revision is not None
+        else context.phase_revision
+    )
 
     matched_topic = None
     for t in source.dialogue.topics:
@@ -1401,6 +1357,12 @@ def _select_authored_topic(
     else:
         kind = "formal"
         scene = select_scene_variant(matched_topic, context)
+    # A declared effect is settled only for a formal, qualified selection. Its
+    # authorization is rechecked inside the settlement transaction, so the
+    # delivered kind can still fall back to the author's safe refusal.
+    requested_effect = (
+        source.effects.get(matched_topic.topic_id) if kind == "formal" else None
+    )
 
     owner = context.owner
     from web.webclient.presentation.protocol import json_byte_size
@@ -1458,7 +1420,7 @@ def _select_authored_topic(
         topic_id=matched_topic.topic_id,
         scene_id=scene.scene_id,
         scene_revision=scene.revision,
-        phase_revision=context.phase_revision,
+        phase_revision=phase_revision,
         kind=kind,
         lines=scene.lines,
         updated_tick=_session_updated_tick(),
@@ -1486,7 +1448,7 @@ def _select_authored_topic(
                 topic_id=successor.topic_id,
                 scene_id=successor_scene.scene_id,
                 scene_revision=successor_scene.revision,
-                phase_revision=context.phase_revision,
+                phase_revision=phase_revision,
                 kind="formal",
                 lines=successor_scene.lines,
                 updated_tick=delivery.updated_tick,
@@ -1548,6 +1510,18 @@ def _select_authored_topic(
 
     relations_snapshot = attribute_snapshot(host, "relations_data")
     session_snapshot = attribute_snapshot(actor, "dialogue_session")
+    quest_snapshot = None
+    escort_effect = False
+    escort_actors: tuple[Any, ...] = ()
+    if requested_effect is not None:
+        from world.quests.transitions import snapshot_quest_log
+
+        quest_snapshot = snapshot_quest_log(owner)
+        escort_effect = _is_escort_effect(requested_effect.reference)
+        if escort_effect:
+            escort_actors = _escort_effect_actors(
+                requested_effect.reference, context.source_identity
+            )
 
     context_with_id = DialogueContext(
         actor=context.actor,
@@ -1556,13 +1530,37 @@ def _select_authored_topic(
         host_key=context.host_key,
         source_identity=context.source_identity,
         context_id=target_context_id,
-        phase_revision=context.phase_revision,
+        phase_revision=phase_revision,
     )
+
+    from contextlib import ExitStack
+
+    compensation = ExitStack()
+    if escort_effect:
+        # The shared receipt owns one compensation stack for the complete
+        # selection transaction, so a later session-write failure restores every
+        # scope acceptance touched. The accepting package scope is enlisted
+        # BEFORE acceptance performs any write (a later enlistment would
+        # snapshot already-mutated state), and the new protected actors are
+        # captured explicitly because they are not yet in any record.
+        from world.quests.escort_events import (
+            enlist_escort_scope,
+            escort_event_boundary,
+        )
+
+        compensation.enter_context(escort_event_boundary((owner,)))
+        package_id = getattr(context.source_identity, "package_id", None)
+        if isinstance(package_id, str) and package_id:
+            enlist_escort_scope(owner, package_id)
+        if escort_actors:
+            from world.quests.escort_lifecycle import escort_compensation
+
+            compensation.enter_context(escort_compensation(owner, escort_actors))
 
     try:
         from django.db import transaction
 
-        with transaction.atomic():
+        with compensation, transaction.atomic():
             from typeclasses.components import GuildStaff
             is_guild_staff = (
                 getattr(host, "components", None) is not None
@@ -1573,10 +1571,38 @@ def _select_authored_topic(
                 and getattr(context.source_identity, "dialogue_key", "") == GUILD_STAFF_DIALOGUE_KEY
                 and (matched_topic.keyword == GUILD_STAFF_TURNIN_KEYWORD or matched_topic.topic_id.endswith(".topic_04"))
             )
+            if requested_effect is not None:
+                from world.rules.story_effects import apply_story_effect
+
+                outcome = apply_story_effect(
+                    host,
+                    actor,
+                    topic_id=matched_topic.topic_id,
+                    expected_phase_revision=phase_revision,
+                    context=context_with_id,
+                )
+                if not outcome.applied:
+                    # Operational/domain refusal: only the authored safe
+                    # refusal ships. No formal receipt, no protected body and
+                    # no affinity is produced.
+                    refusal_scene = matched_topic.refusal
+                    if refusal_scene is None:
+                        raise DialogueSourceUnavailableError(
+                            "refusal_unavailable", "對方目前無法回應。"
+                        )
+                    delivery = replace(
+                        delivery,
+                        kind="refusal",
+                        scene_id=refusal_scene.scene_id,
+                        scene_revision=refusal_scene.revision,
+                        lines=refusal_scene.lines,
+                    )
+                    completion_receipts = []
             # A pre-delivered pure successor is effect-free, including the
             # talk affinity the public root already granted once.
             if (
                 kind == "formal"
+                and requested_effect is None
                 and getattr(matched_topic, "disclosure", "qualified") != "pure_chain"
                 and not (is_guild_staff and is_turnin)
             ):
@@ -1601,9 +1627,58 @@ def _select_authored_topic(
     except Exception:
         restore_attribute_best_effort(host, "relations_data", relations_snapshot)
         restore_attribute_best_effort(actor, "dialogue_session", session_snapshot)
+        if quest_snapshot is not None:
+            from world.quests.transitions import restore_quest_log
+
+            restore_quest_log(owner, quest_snapshot)
         raise
 
     return delivery
+
+
+def _is_escort_effect(definition_key: str) -> bool:
+    """Whether the declared commission settles through the escort boundary."""
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY, ObjectiveKind
+
+    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
+    return definition is not None and any(
+        stage.objective.kind is ObjectiveKind.ESCORT
+        for stage in definition.stages
+    )
+
+
+def _escort_effect_actors(
+    definition_key: str, source_identity: Any
+) -> tuple[Any, ...]:
+    """The live protected actors of an escort commission, for rollback capture."""
+    from world.quests import scene_store
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY, ObjectiveKind
+
+    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
+    package_id = getattr(source_identity, "package_id", None)
+    if definition is None or not isinstance(package_id, str) or not package_id:
+        return ()
+    refs = tuple(
+        dict.fromkeys(
+            role
+            for stage in definition.stages
+            if stage.objective.kind is ObjectiveKind.ESCORT
+            for role in stage.objective.protected_role_refs
+        )
+    )
+    if not refs:
+        return ()
+    from evennia.objects.models import ObjectDB
+
+    actors: list[Any] = []
+    for role_id in refs:
+        binding = scene_store.get_role_binding(package_id, role_id)
+        if binding is None:
+            continue
+        actor = ObjectDB.objects.filter(id=int(binding.npc_id)).first()
+        if actor is not None:
+            actors.append(actor)
+    return tuple(actors)
 
 
 def complete_dialogue_delivery(

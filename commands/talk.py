@@ -35,7 +35,6 @@ from world.rules.dialogue import (
     live_dialogue_session,
     select_authored_topic,
     resolve_greeting,
-    run_scripted_talk,
 )
 from world.rules.dialogue_context import DialogueContextError, resolve_dialogue_context
 from world.rules.dialogue_sources import resolve_dialogue_source
@@ -225,26 +224,7 @@ class CmdsTalk(Command):
                 self.caller.msg(_NO_RESPONSE)
                 return
 
-            if diag_key.startswith("scene_role:"):
-                if possessed:
-                    # Generated service/commission keywords stay refused while
-                    # possessing: only complete authored scenes are enabled.
-                    self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
-                    return
-                try:
-                    result = run_scripted_talk(npc, self.caller, keyword)
-                except (RewardClaimError, GuildDataError) as error:  # observability: ignore R2: the bounded refusal line IS the command answer
-                    self.caller.msg(f"無法回報任務：{error}")
-                    return
-                if result is None:
-                    self.caller.msg(_NO_RESPONSE)
-                    return
-                open_or_refresh_dialogue(self.caller, npc, result.response)
-                hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
-                self.caller.msg(f"{npc.key}說：{result.response}{hint}")
-                return
-
-            # Static authored dialogue
+            # Authored and generated scene dialogue share this selection path.
             try:
                 context = resolve_dialogue_context(self.caller, npc)
             except DialogueContextError:  # observability: ignore R2: the fixed player-facing refusal IS the command answer
