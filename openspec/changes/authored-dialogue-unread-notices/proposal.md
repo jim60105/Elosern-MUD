@@ -30,6 +30,7 @@ Do not implement another slice, retain obsolete authored compatibility paths, ch
 ## Batch:
 
 depends-on: authored-dialogue-reading-client
+depends-on: authored-dialogue-refresh-lifecycle
 
 Code conflicts: Sequentially extends narrative Attribute, availability writer, pusher and frontend completion module. Existing party unlock_notices.py remains unchanged except reuse of commander_sessions discovery.
 

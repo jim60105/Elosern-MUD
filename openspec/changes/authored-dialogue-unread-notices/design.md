@@ -38,7 +38,9 @@ Boundary events use the existing world.observability facade with available owner
 
 ## Risks / Trade-offs
 
-Sequentially extends narrative Attribute, availability writer, pusher and frontend completion module. Existing party unlock_notices.py remains unchanged except reuse of commander_sessions discovery. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
+Use the exact review-resolved narrative storage and unlock_batch schemas in the shared contract. Persist no originating recipient context. A stable owner/host batch is wrapped separately for each live watcher current context_id: contexts C1 and C2 at host 41 receive the same batch U wrapped as C1 and C2. Another account character receives nothing. Compare saved completed_topic_ids before displaying deferred topics. Snapshots/reconnect never contain U; recipient retirement drops only its ephemeral notice.
+
+Sequentially extends narrative Attribute, availability writer, pusher and frontend completion module. The complete physical and lifecycle refresh source matrices are prerequisites; observation attaches to those canonical commit callbacks, not WebClient-only command observers. Existing party unlock_notices.py remains unchanged except reuse of commander_sessions discovery. Keep authored source validation separate from runtime eligibility. A failed post-commit push recovers on the next canonical sync, without reversing a successful owning commit. Read the approved design and dependency artifacts before edits; no interface decision is left open.
 
 ## Focused verification at implementation time
 

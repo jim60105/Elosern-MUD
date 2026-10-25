@@ -45,15 +45,16 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 #### Scenario: Opening a conversation is a session write
 - **WHEN** an actor with no session submits a successful `explore.talk_open` for a present host
 - **THEN** the character holds a session naming that host whose line is the host's greeting (or
-  the fixed fallback line), a live session naming another host is replaced by it, and no gameplay effect changes; only db.dialogue_session and narrative-owned availability observation are written
+  the fixed fallback line), a live session naming another host is replaced by it, and no state
+  other than db.dialogue_session and narrative-owned availability observation changes
 
-#### Scenario: The clear seams are exactly the movement, engage, and NPC cleanup paths
+#### Scenario: Clear seams include movement, combat, NPC, phase and control retirement
 - **WHEN** a clear seam fires
-- **THEN** it is one of: a successful `settle_movement` of the character, an `engage` involving the actor, and NPC leave-room, despawn, or leave-party cleanup naming the session NPC
+- **THEN** it is a successful movement settlement, combat engage, host departure/deletion/party cleanup, phase invalidation or successful possession release/control switch; each retires playback, choices and receipts through the sole writer
 
-#### Scenario: The talk_open success path writes only the session opening
+#### Scenario: The talk_open success path writes the session opening and narrative observation
 - **WHEN** conversation open succeeds
-- **THEN** it writes the session with the current greeting/fallback and deterministic narrative availability observation, without gameplay effects or a model call
+- **THEN** it writes the session with the current greeting/fallback plus deterministic narrative availability observation and does not call a model
 
 #### Scenario: No other layer touches a session directly
 - **WHEN** a presenter, generative layer or client encounters a session
@@ -70,3 +71,7 @@ The dialogue session SHALL remain deterministic-core-only persistent state for a
 #### Scenario: Session publication rollback compensates effects
 - **WHEN** a selection effect succeeds but delivery/session persistence fails
 - **THEN** no partial effect or session survives in the database or Attribute caches and no protected success body is delivered
+
+#### Scenario: Release retires acting-body playback
+- **WHEN** a possessed body has a live authored conversation and successful control handback completes
+- **THEN** the old body context and receipts retire, owner mode republishes correctly, and the old scene cannot resume on the owner body

@@ -31,7 +31,7 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 
 #### Scenario: Opening a conversation changes only dialogue and narrative observation
 - **WHEN** a successful `explore.talk_open` settles with every LLM profile disabled
-- **THEN** no network request is made, the world clock tick, affinity records, memories, and party bindings are byte-identical to before the action, and only `db.dialogue_session` changed
+- **THEN** no network request is made, the world clock tick, affinity records, memories, and party bindings are byte-identical to before the action; only the dialogue session and narrative-owned availability observation may change
 
 #### Scenario: A payload with extra or wrong fields is malformed
 - **WHEN** a client submits `explore.talk_open` with `keyword_id`, `speech`, a missing `npc_id`, or a non-positive `npc_id`
@@ -51,9 +51,9 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **THEN** a greeting is prefixed by the host's name and `說：`, and the fallback line is delivered verbatim
 - **AND** the deterministic success result publishes a full snapshot at one newer revision, so the committed mode `dialogue` and the available `dialogue` panel — carrying that line and the host's authored choices — arrive atomically
 
-#### Scenario: talk_open touches no state beyond the session
+#### Scenario: talk_open changes only the session and narrative observation
 - **WHEN** a successful `explore.talk_open` runs
-- **THEN** the adapter makes no LLM or network request, does not advance the world clock, does not change affinity, memory, party, quest, inventory, or any other state beyond the session, and does not schedule an action-options generation
+- **THEN** the adapter makes no LLM or network request, does not advance world time or change affinity, memory, party, quest or inventory, and writes only session state plus deterministic narrative availability observation without action-options generation
 
 #### Scenario: talk_open is allowlisted but never suggestible
 - **WHEN** the shared action-code registries are consulted
