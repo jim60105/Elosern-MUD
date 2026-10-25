@@ -22,6 +22,14 @@ Use existing request-envelope generation/epoch/revision rejection before selecti
 
 Panel v3 replaces the whole panel requirement, preserving portrait/privacy/unavailable invariants and unrelated scenarios. All <=16 static/generated topics remain reachable; command aliases stay vocabulary, with generated keyword action payload removed at generated cutover. Python action/panel/session validators, UMD misc.js/constants.js/core.js/store.js, Vue view admission and completion validators accept static <=96 or canonical generated <=2048 topic/scene IDs in all predecessor/completed/receipt fields. Scope exceptions to these fields; preserve aggregate UTF-8 budgets. Test worst valid Unicode binding IDs across selection/completion/replay/reconnect. Oversized actual payload rejects before effects without truncation. Empty definition stays empty.
 
+`SceneDelivery` keeps its Shared contract v2 fields and adds one defaulted,
+server-only flag, `affinity_budget_capped`. A talk-affinity gain blocked by the
+daily interaction budget is the only writer; `delivery_to_wire` omits it, so the
+panel, stored session and client never carry it, and a replay reconstructs the
+delivery without the flag and re-sends no hint. It exists because the text
+surface must keep presenting the fixed non-numeric capped-relationship hint that
+the previous native talk writer reported.
+
 ## Implementation handoff constraints
 
 This proposed slice is capped at one engineer-day. Each numbered task is intended as a 45-120 minute implementation-and-focused-test unit; tests/docs land with their owning behavior. Use a local untracked `.env.test` containing `MUD_TEST_SETTINGS=1` for the commands below (create that environment file only at apply time). Run focused commands from the repository root; new test labels are explicitly proposed, existing labels are regression targets. Also run `uv run --locked python -m tools.contract_gate` before implementation handoff, with test ownership updates in the same feature commit. No live external model/image requests. Planning created no production code or test results.
