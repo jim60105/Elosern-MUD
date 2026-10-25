@@ -30,7 +30,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`talk`](/game/command-reference?id=talk) | 與 NPC 交談；支援關鍵字場景對話，對公會職員說「回報」可交回完成任務。附身同伴時仍可與眼前的對話對象開啟完整的場景對話，好感與關係都記在指揮者身上。 |
+| [`talk`](/game/command-reference?id=talk) | 與 NPC 交談；支援關鍵字場景對話，完整輸出整段場景即算讀完並記錄閱讀進度。對公會職員說「回報」可交回完成任務。附身同伴時仍可與眼前的對話對象開啟完整的場景對話，好感、關係與閱讀紀錄都記在指揮者身上。 |
 | [`invite`](/game/command-reference?id=invite) | 邀請眼前的 NPC 成為一般同伴；護送同行者仍可接受邀請。 |
 | [`leave`](/game/command-reference?id=leave) | 移除一般同伴身分；有效護送委託仍保留同行關係。 |
 | [`possess`](/game/command-reference?id=possess) | 附身至同伴身上行動。 |

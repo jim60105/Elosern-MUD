@@ -99,6 +99,9 @@ class TopicProjection:
     is non-null only for a locked row. ``descriptor`` is the exact
     ``explore.talk_scripted`` projection (``npc_id``/``topic_id``/``context_id``)
     the client echoes back; it carries no request identity and no content.
+    ``unread`` marks an open formal topic this owner has not completed yet
+    (a locked row is never unread: the lock marker takes precedence), and
+    ``predecessors`` is the declared public-chain gate list.
     """
 
     topic_id: str
@@ -107,6 +110,8 @@ class TopicProjection:
     availability: str
     requirement_hint: str | None
     descriptor: dict[str, Any]
+    unread: bool
+    predecessors: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not isinstance(self.topic_id, str) or not self.topic_id:
@@ -121,6 +126,12 @@ class TopicProjection:
             raise ValueError("requirement_hint must be a str or None")
         if not isinstance(self.descriptor, dict):
             raise ValueError("descriptor must be an object")
+        if not isinstance(self.unread, bool):
+            raise ValueError("unread must be a boolean")
+        if not isinstance(self.predecessors, tuple) or any(
+            not isinstance(item, str) or not item for item in self.predecessors
+        ):
+            raise ValueError("predecessors must be a tuple of non-empty strings")
 
 
 def availability_context(actor: Any, host: Any) -> Any:
@@ -165,7 +176,10 @@ def project_topics(
     Declaration order is preserved. ``context_id`` stamps the action
     descriptor with the context the caller will publish (a live session's
     context, or the context a direct selection is about to establish); the
-    prompt never comes from the client.
+    prompt never comes from the client. The owner's saved reading is read once
+    per projection and gates every predecessor: a public successor appears only
+    after its predecessors are saved, and an open formal topic the owner has not
+    completed yet is marked unread.
     """
     from world.rules.dialogue_sources import resolve_dialogue_source
 
@@ -181,32 +195,56 @@ def project_topics(
     npc_id = int(getattr(getattr(context, "host", None), "pk", 0) or 0)
     if npc_id <= 0:
         return ()
+    completed = _completed_reading(context)
 
     rows: list[TopicProjection] = []
     for topic in source.dialogue.topics:
-        disclosure = _disclosure(topic, context)
+        disclosure = _disclosure(topic, context, completed)
         if disclosure is None:
             continue
         availability, hint = disclosure
+        topic_id = topic.topic_id
         rows.append(
             TopicProjection(
-                topic_id=topic.topic_id,
+                topic_id=topic_id,
                 keyword=topic.keyword,
                 label=topic.label,
                 availability=availability,
                 requirement_hint=hint,
                 descriptor={
                     "npc_id": npc_id,
-                    "topic_id": topic.topic_id,
+                    "topic_id": topic_id,
                     "context_id": context_id,
                 },
+                unread=availability == TOPIC_OPEN and topic_id not in completed,
+                predecessors=tuple(getattr(topic, "predecessors", ()) or ()),
             )
         )
     return tuple(rows)
 
 
-def _disclosure(topic: Any, context: Any) -> tuple[str, str | None] | None:
-    """Classify one topic: ``(availability, hint)``, or ``None`` when hidden."""
+def _completed_reading(context: Any) -> frozenset[str]:
+    """The owner's saved completions at this host, or an empty set. Read-only."""
+    owner = getattr(context, "owner", None)
+    host_key = getattr(context, "host_key", None)
+    if owner is None or not host_key:
+        return frozenset()
+    from world.narrative.dialogue_reading import completed_topic_ids
+
+    return frozenset(completed_topic_ids(owner, host_key))
+
+
+def _disclosure(
+    topic: Any, context: Any, completed: frozenset[str] | set[str]
+) -> tuple[str, str | None] | None:
+    """Classify one topic: ``(availability, hint)``, or ``None`` when hidden.
+
+    Predecessors are served by saved reading. An unmet predecessor withholds
+    the topic entirely — even one declared ``unavailable="locked"`` — because a
+    public successor must not be revealed before its predecessor is read and a
+    protected qualified descendant must never advertise itself early. A failed
+    ``requires`` keeps the existing locked/hidden declaration behavior.
+    """
     from world.rules.dialogue_conditions import (
         DialogueConditionError,
         condition_hint,
@@ -219,11 +257,12 @@ def _disclosure(topic: Any, context: Any) -> tuple[str, str | None] | None:
         # No lawful actor: evaluating would emit a spurious integrity event and
         # could only guess, so the guarded topic is withheld.
         return None
-    if not predecessors and (requires is None or evaluate_condition(requires, context)):
+    if any(predecessor not in completed for predecessor in predecessors):
+        return None
+    if requires is None or evaluate_condition(requires, context):
         return (TOPIC_OPEN, None)
 
-    # An unmet predecessor cannot be verified before reading persistence lands,
-    # and a failed ``requires`` is unqualified: both fail closed.
+    # A failed ``requires`` is unqualified: it fails closed.
     if getattr(topic, "unavailable", "hidden") != "locked":
         return None
     if getattr(topic, "refusal", None) is None:
@@ -408,7 +447,7 @@ def _fan_out_availability(owner: Any, cause: str) -> None:
     """Post-commit current-state projection and panel fan-out (never raises)."""
     owner_id = str(getattr(owner, "pk", "?"))
     try:
-        from web.webclient.presentation.dialogue_push import push_dialogue_update
+        from web.webclient.presentation.dialogue_push import push_dialogue_reading
         from world.rules.dialogue import live_dialogue_session
 
         body = _acting_body(owner)
@@ -423,7 +462,10 @@ def _fan_out_availability(owner: Any, cause: str) -> None:
                 "cause": cause,
             },
         )
-        push_dialogue_update(body)
+        # Every CURRENT connection of the owning player receives its OWN
+        # re-rendered panel: another character of the same account is excluded
+        # and no connection's locally playing scene is replaced.
+        push_dialogue_reading(owner)
     except Exception as error:
         log_warn(
             AVAILABILITY_REFRESH_FAILED_EVENT,

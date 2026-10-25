@@ -66,15 +66,92 @@ a fallback, a successor bundle or a private phase body. The projection is pure: 
 no session, reading record, affinity value or world state.
 
 Guarded topics fail closed. A `requires` that does not hold is hidden or visibly locked
-per the declaration; an unmet `predecessors` gate stays unavailable until reading
-persistence lands (so a `pure_chain` successor is not listed yet); a projection with no
-lawful actor withholds every guarded topic instead of asserting an availability; and a
-locked row whose canonical hint cannot render is withheld rather than shipped.
+per the declaration. `predecessors` are served by the owner's saved reading: a topic whose
+predecessors are not all saved is withheld entirely — even when declared
+`unavailable: "locked"` — so a public successor never advertises itself before its
+predecessor is read and a protected qualified descendant is never revealed early. A
+projection with no lawful actor withholds every guarded topic instead of asserting an
+availability; and a locked row whose canonical hint cannot render is withheld rather than
+shipped.
 
 Availability is never accepted from the client. The composed
 `explore.talk_scripted` payload is exactly `{npc_id, topic_id, context_id}` plus the
 server-injected `selection_id`; any extra field (including an `availability` flag) is a
 malformed payload.
+
+## Reading, Completion and Pure Chains
+
+`world/narrative/dialogue_reading.py` owns the owner's persisted reading record on the
+exact Shared-contract v2 Attribute shape:
+
+```
+dialogue_reading = {
+  schema_version: 1,
+  revision: int,                       # monotonic; increments only on a real change
+  hosts: {host_key: {
+    initialized: bool,                 # observation owns this (unread-notices)
+    topics: {topic_id: {completed, ever_open, announced}},
+    pending_batch: null | {batch_id, topic_ids, created_revision},
+  }},
+}
+```
+
+`reading_for(owner, host_key)` is pure: it never creates or repairs storage, and a corrupt
+value reads as empty with one `dialogue_reading_integrity` event. `record_completion`
+opens `transaction.atomic()`, makes a guarded owner-row `UPDATE` its first statement (the
+SQLite write lock), reads the raw persisted Attribute through the `db_attributes` join,
+merges exactly one host/topic in fresh containers, and compensates the Attribute cache on
+failure. `ever_open`/`announced` stay false and `pending_batch` stays null until
+`authored-dialogue-unread-notices` adds observation. Keys are the stable `host_key` and
+source-aware `topic_id`: a physical dbid is never a reading key, so possession,
+save/reload, a rematerialized binding and a returning generated phase share one record,
+and equal local IDs in different package roles stay separate.
+
+### Session receipts
+
+`db.dialogue_session.completion_receipts` holds at most 32 exact
+`{delivery_id, context_id, topic_id, scene_revision, phase_revision, kind, predecessors}`
+rows, at most the latest and previous formal delivery per topic. The sole session writer
+merges them: malformed rows are dropped, a repeated delivery replaces its row, and a third
+delivery of one topic retires that topic's oldest receipt. Refusal, opening and service
+deliveries never hold a receipt. A new context, phase or control identity starts an empty
+set, so a retired phase's receipts reject while the stable topic's saved completion stays.
+
+### Completion
+
+`explore.dialogue_complete` carries exactly
+`{npc_id, delivery_id, context_id, topic_id, scene_revision}`.
+`world.rules.dialogue.complete_dialogue_delivery` accepts it only when the actor's LIVE
+session (never a caller-supplied snapshot) still owns a retained receipt whose kind is
+formal and whose context, topic, exact scene revision and phase match the current
+authenticated context, host binding, owner and actor. It never re-runs eligibility or
+settles an effect. Refusals carry stable codes: `dialogue_context_closed`,
+`dialogue_receipt_unknown`, `dialogue_receipt_foreign`, `dialogue_receipt_stale`,
+`dialogue_receipt_kind` and `dialogue_predecessor_unread`; each writes nothing and
+schedules nothing. An accepted completion persists reading and then queues
+`refresh_dialogue_availability(owner, cause="reading_completed")` on commit, so a
+qualified successor that just became eligible is projected without waiting for an
+unrelated state change. A duplicate acknowledgement returns `already_saved` with the
+unchanged revision. Delayed completion of an earlier topic stays valid while its receipt
+is retained and never replaces the currently playing scene.
+
+### Pure chains versus qualified successors
+
+Selecting a formal root also pre-delivers its eligible public closure: every node declared
+`pure_chain` whose predecessors are the root or an earlier qualified public node, in
+predecessor order (at most 15). A node that needs an out-of-chain predecessor is omitted
+together with its dependents, and traversal never passes a qualification boundary, so no
+qualified descendant's body is bundled. Each public node gets its own server receipt
+(`kind: "formal"`, no selection receipt, no effect — including no talk affinity) and rides
+the panel's `pure_chain` as `{delivery, predecessors}`. The chain is re-derived for the
+CURRENT delivery from those receipts, requiring the exact authored scene revision, so a
+stale body is omitted with its dependents rather than replaced.
+
+The text interface emits the whole attributed scene in predecessor order; a complete
+successful emission counts as reading and each emitted node is completed through the same
+service. A failed or partial emission stops the chain and marks neither that node nor its
+dependents. Naming a public successor explicitly before its predecessor's reading is saved
+answers with a fixed refusal and never selects or marks anything.
 
 ## Availability Refresh
 
@@ -83,9 +160,15 @@ is the explicit refresh API. It re-resolves the owner's current acting body (the
 or the companion it lawfully possesses) **inside** a `transaction.on_commit` callback,
 emits the `dialogue_availability_refreshed` boundary event with
 `char`/`actor`/`npc`/`context`/`cause`, and fans the freshly rendered `dialogue` panel
-out to that body's live watchers through the existing epoch-guarded pusher. Nothing is
-persisted; a failed push is isolated to one `dialogue_availability_refresh_failed` event
-and recovers on the next canonical sync. A rolled-back owning write schedules nothing.
+out through `web/webclient/presentation/dialogue_push.py::push_dialogue_reading`. That
+helper discovers the owner's current account connections through
+`commander_sessions`, adds the owner's own body and its currently possessed companion,
+filters every candidate by `resolve_commander(puppet) is owner`, and publishes one
+epoch-guarded panel per connection from THAT connection's own puppet. Another character
+of the same account receives nothing, and no connection's locally playing scene is
+replaced. Nothing is persisted; a failed push is isolated to one
+`dialogue_availability_refresh_failed` event and recovers on the next canonical sync. A
+rolled-back owning write schedules nothing.
 
 Canonical mutation writers call the companion
 `world/rules/dialogue_availability.py::queue_dialogue_refresh(owners, *, cause)` with the
@@ -129,8 +212,9 @@ introduced. A raw GM console Attribute repair stays outside ordinary gameplay
 publication and its next canonical sync re-evaluates state.
 
 The lifecycle slice (`authored-dialogue-refresh-lifecycle`) extends the same two helpers
-for quest, world-time, companion-presence and control sources; completion-to-refresh
-(`cause="reading_completed"`) belongs to `authored-dialogue-reading-server`. Command and
+for quest, world-time, companion-presence and control sources. Completion-to-refresh
+(`cause="reading_completed"`) is queued by `complete_dialogue_delivery` only after an
+accepted, committed reading write. Command and
 presentation observers are not a substitute: a committed writer with no live session
 (Telnet, a scripted clock tick, another actor's change, or an offline character) never
 walks a command, panel render or action path, so only the owning writer can schedule the

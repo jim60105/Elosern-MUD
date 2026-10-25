@@ -144,6 +144,7 @@ var CONTEXT_ACTIONS_ACTION_CODES = [
   "explore.possess",
   "explore.possess_release",
   "explore.deliver",
+  "explore.dialogue_complete",
 ];
 var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
 var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];

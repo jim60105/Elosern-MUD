@@ -265,6 +265,41 @@ def validate_dialogue(payload: Any) -> dict[str, Any]:
     pure_chain = payload.get("pure_chain", [])
     if not isinstance(pure_chain, list) or len(pure_chain) > 15:
         raise DialoguePanelError("pure_chain must be a list of at most 15 entries")
+    validated_chain = []
+    for index, entry in enumerate(pure_chain):
+        _require_exact_fields(
+            entry, f"pure_chain entry {index}", {"delivery", "predecessors"}, {}
+        )
+        chain_delivery = _validate_delivery(entry["delivery"])
+        if chain_delivery is None or not chain_delivery["topic_id"]:
+            raise DialoguePanelError(
+                f"pure_chain entry {index} needs a formal delivery with a topic"
+            )
+        if chain_delivery["kind"] != "formal":
+            raise DialoguePanelError(
+                f"pure_chain entry {index} delivery must be formal"
+            )
+        predecessors = entry["predecessors"]
+        if not isinstance(predecessors, list) or not 1 <= len(predecessors) <= 16:
+            raise DialoguePanelError(
+                f"pure_chain entry {index} needs 1..16 predecessors"
+            )
+        for predecessor in predecessors:
+            if (
+                not isinstance(predecessor, str)
+                or not predecessor
+                or len(predecessor) > 2048
+            ):
+                raise DialoguePanelError(
+                    f"pure_chain entry {index} predecessor is invalid"
+                )
+        if len(set(predecessors)) != len(predecessors):
+            raise DialoguePanelError(
+                f"pure_chain entry {index} predecessors must be unique"
+            )
+        validated_chain.append(
+            {"delivery": chain_delivery, "predecessors": list(predecessors)}
+        )
 
     reading_revision = _require_int(payload, "reading_revision", minimum=0, maximum=MAX_SAFE_INTEGER)
 
@@ -290,7 +325,7 @@ def validate_dialogue(payload: Any) -> dict[str, Any]:
         "context_id": context_id,
         "delivery": delivery,
         "choices": rows,
-        "pure_chain": pure_chain,
+        "pure_chain": validated_chain,
         "reading_revision": reading_revision,
         "completed_topic_ids": completed_topic_ids,
         "unlock_batch": unlock_batch,
@@ -321,7 +356,12 @@ def _resolve_live_host(character: Any) -> Any | None:
 
 def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``dialogue`` panel for the authenticated puppet."""
-    from world.rules.dialogue import delivery_to_wire, live_dialogue_session
+    from world.narrative.dialogue_reading import read_reading
+    from world.rules.dialogue import (
+        chain_deliveries,
+        delivery_to_wire,
+        live_dialogue_session,
+    )
     from world.rules.dialogue_context import (
         DialogueContextError,
         resolve_dialogue_context,
@@ -388,6 +428,22 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
         npc, actor=actor, context_id=session.context_id
     )[:DIALOGUE_MAX_CHOICES]
 
+    # Reading is owner-shared narrative state: one record read per render gives
+    # this connection the owner's revision, its saved completions at this host
+    # and the current delivery's pre-delivered public chain. Every field is
+    # read-only; a connection whose own scene is playing keeps its delivery.
+    reading = read_reading(owner)
+    host_reading = reading.hosts.get(session.host_key)
+    completed_topic_ids = (
+        list(host_reading.completed_topic_ids())[:16]
+        if host_reading is not None
+        else []
+    )
+    pure_chain = [
+        {"delivery": delivery_to_wire(node.delivery), "predecessors": list(node.predecessors)}
+        for node in chain_deliveries(session, npc, actor=actor)
+    ]
+
     return validate_dialogue(
         {
             "schema_version": DIALOGUE_SCHEMA_VERSION,
@@ -407,9 +463,9 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
             "context_id": session.context_id,
             "delivery": delivery_wire,
             "choices": choices,
-            "pure_chain": [],
-            "reading_revision": 0,
-            "completed_topic_ids": [],
+            "pure_chain": pure_chain,
+            "reading_revision": reading.revision,
+            "completed_topic_ids": completed_topic_ids,
             "unlock_batch": None,
         }
     )

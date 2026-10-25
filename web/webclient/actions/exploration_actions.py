@@ -2,7 +2,7 @@
 
 The production exploration actions are ``explore.move``, ``explore.look``,
 ``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
-``explore.dialogue_leave``,
+``explore.dialogue_complete``, ``explore.dialogue_leave``,
 ``explore.party_invite``, ``explore.party_leave``, ``explore.engage``,
 ``explore.wait``, ``explore.practice``, ``explore.possess``, ``explore.possess_release``, and
 ``explore.deliver``. Each
@@ -13,6 +13,11 @@ public deterministic APIs, and never assigns ``.db`` attributes, location,
 knowledge, traits, dialogue, quests, inventory, party, combat, or time
 directly. No payload accepts an actor, host, session, destination room, price,
 stock, or clock field, and no action routes through the text command parser.
+
+``explore.dialogue_complete`` is the one in-conversation acknowledgement: its
+exact composed payload is ``{npc_id, delivery_id, context_id, topic_id,
+scene_revision}`` and the deterministic completion service validates the
+server-issued receipt. It is never projected as an affordance or a suggestion.
 """
 
 from typing import Any
@@ -257,6 +262,68 @@ def validate_dialogue_leave_payload(payload: Any) -> dict[str, Any]:
     if set(payload) != {"npc_id"}:
         raise ExplorationActionError("explore.dialogue_leave requires exactly npc_id")
     return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
+
+
+def validate_dialogue_complete_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact composed ``explore.dialogue_complete`` payload.
+
+    The five fields are exactly what the server issued: the host identity, the
+    delivery identity, the conversation context, the stable topic ID and the
+    exact authored scene revision. Nothing else (no selection identity, no
+    availability flag, no owner or actor) is accepted from the client.
+    """
+    if not isinstance(payload, dict):
+        raise ExplorationActionError(
+            "explore.dialogue_complete payload must be an object"
+        )
+    if set(payload) != {
+        "npc_id",
+        "delivery_id",
+        "context_id",
+        "topic_id",
+        "scene_revision",
+    }:
+        raise ExplorationActionError(
+            "explore.dialogue_complete requires exactly npc_id, delivery_id, "
+            "context_id, topic_id and scene_revision"
+        )
+    delivery_id = payload["delivery_id"]
+    if (
+        not isinstance(delivery_id, str)
+        or not delivery_id.strip()
+        or len(delivery_id) > 64
+    ):
+        raise ExplorationActionError(
+            "delivery_id must be a non-empty string <= 64 chars"
+        )
+    context_id = payload["context_id"]
+    if (
+        not isinstance(context_id, str)
+        or not context_id.strip()
+        or len(context_id) > 64
+    ):
+        raise ExplorationActionError(
+            "context_id must be a non-empty string <= 64 chars"
+        )
+    topic_id = payload["topic_id"]
+    if not isinstance(topic_id, str) or not topic_id.strip() or len(topic_id) > 2048:
+        raise ExplorationActionError("topic_id must be a non-empty string <= 2048 chars")
+    scene_revision = payload["scene_revision"]
+    if (
+        not isinstance(scene_revision, str)
+        or not scene_revision.strip()
+        or len(scene_revision) > 64
+    ):
+        raise ExplorationActionError(
+            "scene_revision must be a non-empty string <= 64 chars"
+        )
+    return {
+        "npc_id": _require_positive_int(payload["npc_id"], "npc_id"),
+        "delivery_id": delivery_id,
+        "context_id": context_id,
+        "topic_id": topic_id,
+        "scene_revision": scene_revision,
+    }
 
 
 def validate_party_invite_payload(payload: Any) -> dict[str, Any]:
@@ -778,6 +845,66 @@ def _dialogue_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = 
     message = "你結束了對話。"
     actor.msg(message)
     return _success("dialogue_left", message, AFFECTED_FULL)
+
+
+_COMPLETION_REFUSAL_MESSAGES = {
+    "dialogue_context_closed": "對話已經結束。",
+    "dialogue_receipt_unknown": "這段對話沒有交付紀錄。",
+    "dialogue_receipt_foreign": "這段對話不屬於你。",
+    "dialogue_receipt_stale": "對話情境已過期。",
+    "dialogue_receipt_kind": "這段對話沒有可記錄的正式內容。",
+    "dialogue_predecessor_unread": "前面的話還沒讀完。",
+}
+
+
+def _dialogue_complete_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Acknowledge one fully played formal delivery (Shared contract v2).
+
+    Re-resolves the named host's presence and the actor's LIVE session before
+    the deterministic completion service; the service owns every receipt,
+    owner, context, phase, topic and exact-revision check. An accepted
+    completion commits reading and schedules the availability refresh; a
+    rejected claim writes nothing and schedules nothing. The success message is
+    a bounded acknowledgement: the reading projection ships through the
+    post-action ``dialogue`` panel, never through this message.
+    """
+    del session
+    from world.rules.dialogue import DialogueCompletionError, complete_dialogue_delivery
+
+    npc = _resolve_npc(actor, payload["npc_id"])
+    if npc is None:
+        return _rejected("no_npc", "這裡沒有這個對象。")
+    live = live_dialogue_session(actor)
+    if live is None or live.npc_id != int(npc.pk):
+        return _rejected("stale_context", "對話情境已過期。")
+    try:
+        outcome = complete_dialogue_delivery(
+            actor,
+            delivery_id=payload["delivery_id"],
+            context_id=payload["context_id"],
+            topic_id=payload["topic_id"],
+            scene_revision=payload["scene_revision"],
+            session=live,
+        )
+    except DialogueCompletionError as error:  # observability: ignore R2: the stable refusal IS the action result
+        return _rejected(
+            error.code,
+            _COMPLETION_REFUSAL_MESSAGES.get(error.code, "這段對話無法記錄。"),
+        )
+    except Exception as exc:
+        log_error(
+            "dialogue_completion_failed",
+            context={"char": actor.pk, "npc": npc.pk, "topic_id": payload["topic_id"]},
+            exc=exc,
+        )
+        return _rejected("dialogue_completion_failed", "對話紀錄失敗。")
+    return _success(
+        "dialogue_completed",
+        "這段對話已讀完。" if outcome.status == "saved" else "這段對話先前已經讀完了。",
+        AFFECTED_FULL,
+    )
 
 
 def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
@@ -1638,9 +1765,11 @@ __all__ = [
     "_sleep_continue_adapter",
     "_sleep_dream_adapter",
     "_sleep_party_adapter",
+    "_dialogue_complete_adapter",
     "_talk_open_adapter",
     "validate_engage_payload",
     "validate_deliver_payload",
+    "validate_dialogue_complete_payload",
     "validate_look_payload",
     "validate_move_payload",
     "validate_party_invite_payload",

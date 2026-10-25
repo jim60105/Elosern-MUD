@@ -114,7 +114,8 @@
         "world.rules.tests.test_dialogue_physical_conditions",
         "world.rules.tests.test_dialogue_references",
         "world.rules.tests.test_dialogue_progression_conditions",
-        "world.rules.tests.test_dialogue_refresh_physical"
+        "world.rules.tests.test_dialogue_refresh_physical",
+        "world.rules.tests.test_dialogue_reading_completion"
       ]
     },
     {
@@ -313,7 +314,8 @@
         "world.narrative.tests.test_dream_dispatch_runner",
         "world.narrative.tests.test_dream_dispatch_smoke",
         "world.ai",
-        "world.lore"
+        "world.lore",
+        "world.narrative.tests.test_dialogue_reading"
       ]
     },
     {
@@ -379,7 +381,8 @@
         "web.webclient.presentation.tests.test_sleep_handoff",
         "web.webclient.presentation.tests.test_presentation_context",
         "web.webclient.presentation.tests.test_services_panel",
-        "web.webclient.presentation.tests.test_title_codex_panel"
+        "web.webclient.presentation.tests.test_title_codex_panel",
+        "web.webclient.presentation.tests.test_dialogue_reading_projection"
       ]
     },
     {
