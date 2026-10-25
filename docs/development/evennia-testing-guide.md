@@ -1201,6 +1201,16 @@ runtime state），它維持原本的 late-import 語義，scope 結束時由 la
 完整的多行 scene，依序為行動者台詞、兩句連續的對話對象台詞、一句長到會分頁的對話
 對象台詞，最後一句旁白。未開合成 catalog 時此開關不生效，shipped 行為不變。
 
+**條件式 authored scene fixture**：`authored-dialogue-physical-conditions` 的受附身
+瀏覽器驗收再加開關 `ELOSERN_BROWSER_DIALOGUE_CONDITIONS=1`（與
+`ELOSERN_BROWSER_DIALOGUE_POSSESSION=1` 一起使用）。開啟後，對話對象改掛 kit 的
+`t_synth_conditioned` 表（`SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY`）：第一話題帶
+`RaceIs` 變體，第二話題帶 `Exposure` 變體；seed 會把被附身同伴的 `db.sexual`
+baseline 寫在變體門檻的下一階，並讓其穿上 kit 的 `t_veil_charm`
+（`SYNTH_EXPOSURE_ITEM_KEY`）——這件飾品借用一個帶正值曝光偏差的 shipped 修飾鍵，
+因此只有穿著時才會跨過門檻。驗收方法會依序選取兩個話題，斷言各自播放變體台詞、
+不播放 fallback。其他旅程仍使用自己的表，shipped 行為不變。
+
 ### 專用派對管理驗收 fixture
 
 `party-acceptance-deterministic-fixture` 為 `party-management-acceptance` 的實際 UI

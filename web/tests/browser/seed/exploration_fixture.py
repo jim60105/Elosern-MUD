@@ -112,6 +112,7 @@ def _exploration_fixture(character) -> None:
     # the stage line.
     from web.browser_support.browser_fixtures_data import (
         SHIPPED_DIALOGUE_KEY,
+        SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY,
         SYNTH_DIALOGUE_HOST_KEY,
         SYNTH_DIALOGUE_TABLE_KEY,
         SYNTH_SCENE_DIALOGUE_TABLE_KEY,
@@ -133,6 +134,10 @@ def _exploration_fixture(character) -> None:
     host_dialogue_key = SYNTH_DIALOGUE_TABLE_KEY if synth else SHIPPED_DIALOGUE_KEY
     if synth and os.environ.get("ELOSERN_BROWSER_AUTHORED_SCENE") == "1":
         host_dialogue_key = SYNTH_SCENE_DIALOGUE_TABLE_KEY
+    if synth and os.environ.get("ELOSERN_BROWSER_DIALOGUE_CONDITIONS") == "1":
+        # The possessed physical-conditions journey carries the conditioned
+        # table: one race-qualified topic and one effective-exposure topic.
+        host_dialogue_key = SYNTH_CONDITIONED_DIALOGUE_TABLE_KEY
     host.components.add(ScriptedDialogue.create(host, dialogue_key=host_dialogue_key))
     from world.rules.affinity import AffinitySource, apply_affinity_change
 
@@ -151,6 +156,25 @@ def _exploration_fixture(character) -> None:
         possessed.db.inventory = []
         possessed.db.age = possessed.db.apparent_age = 24
         join_party(possessed, character)
+
+        if os.environ.get("ELOSERN_BROWSER_DIALOGUE_CONDITIONS") == "1":
+            from web.browser_support.browser_fixtures_data import (
+                SYNTH_EXPOSURE_ITEM_KEY,
+                synth_exposure_baseline_label,
+            )
+            from world.rules.equipment import toggle_equipment
+
+            # The stored baseline sits exactly one ordinal below the authored
+            # exposure variant bound; the worn accessory's borrowed shipped
+            # exposure bias crosses it. The fixture writes only the persisted
+            # baseline record and never mounts the sexual handler.
+            possessed.db.sexual = {"exposure": synth_exposure_baseline_label()}
+            possessed.db.inventory = [SYNTH_EXPOSURE_ITEM_KEY]
+            worn = toggle_equipment(possessed, SYNTH_EXPOSURE_ITEM_KEY)
+            if getattr(worn, "outcome", None) == "rejected":
+                raise RuntimeError(
+                    "dialogue conditions fixture: exposure accessory was rejected"
+                )
 
     if os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1":
         from world.rules.party import PARTY_MAX_COMPANIONS, join_party, party_size

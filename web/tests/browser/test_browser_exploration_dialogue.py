@@ -6,7 +6,11 @@ from __future__ import annotations
 import json
 
 from tools.spec_traceability import covers_requirement
-from web.browser_support.browser_fixtures_data import SHIPPED_DIALOGUE_KEY
+from web.browser_support.browser_fixtures_data import (
+    SHIPPED_DIALOGUE_KEY,
+    synth_conditioned_fallback_host_line,
+    synth_conditioned_variant_host_line,
+)
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     activate_first_compass_exit,
@@ -132,6 +136,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
             runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_POSSESSION"] = "1"
+            runtime.env["ELOSERN_BROWSER_DIALOGUE_CONDITIONS"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -947,13 +952,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "authored-dialogue-possession::lawful-possession-can-initiate-authored-dialogue"
     )
     def test_possessed_companion_plays_an_authored_scene_with_its_own_portrait(self):
-        """A lawful possessed companion opens and plays an authored scene.
+        """A lawful possessed companion opens and plays conditioned scenes.
 
         The journey enters real possession through the party window's 附身
         button, then opens the host's 交談. The dialogue panel names the
         companion as the actor, carries the companion's own portrait
         reference, and the first two played lines attribute the actor line and
-        the host line to the correct figures.
+        the host line to the correct figures. The fixture host carries the
+        conditioned table: the race-qualified topic plays its matching variant
+        for the possessed body, and a fresh selection of the effective-exposure
+        topic plays its worn-accessory variant rather than either fallback.
         """
         page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
@@ -1013,8 +1021,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(panel["actor"]["display_name"], companion["display_name"])
         self.assertTrue(panel["actor"]["portrait_ref"])
 
+        # The conditioned table's first topic is race-qualified: the possessed
+        # elf body matches, so the qualified variant scene plays, never the
+        # fallback.
+        race_variant_line = synth_conditioned_variant_host_line("lineage")
+        race_fallback_line = synth_conditioned_fallback_host_line("lineage")
         open_dialogue_choices(page)
-        _press(page, "1")  # the authored topic -> explore.talk_scripted
+        _press(page, "1")  # the race-qualified topic -> explore.talk_scripted
         self._wait_panel(
             page,
             "dialogue",
@@ -1022,7 +1035,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         frames = [_scene_frame(page)]
         for _ in range(6):
-            if len(frames) >= 2:
+            if frames[-1]["speaker"] == "host":
                 break
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
@@ -1030,8 +1043,39 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(frames[0]["speaker"], "actor")
         self.assertEqual(frames[0]["plate"], companion["display_name"])
         self.assertEqual(frames[0]["actor"], "true")
-        self.assertEqual(frames[1]["speaker"], "host")
-        self.assertEqual(frames[1]["host"], "true")
+        self.assertEqual(frames[-1]["speaker"], "host")
+        self.assertEqual(frames[-1]["host"], "true")
+        self.assertIn(race_variant_line, frames[-1]["text"])
+        self.assertNotIn(race_fallback_line, frames[-1]["text"])
+
+        # The second topic is keyed on the actor's canonical effective
+        # exposure; the seed wears the kit accessory whose shipped rule carries
+        # an exposure bias, so the variant crosses its authored bound. A fresh
+        # selection after playback re-evaluates instead of reusing the race
+        # scene, and the fallback never appears.
+        exposure_variant_line = synth_conditioned_variant_host_line("attire")
+        exposure_fallback_line = synth_conditioned_fallback_host_line("attire")
+        open_dialogue_choices(page)
+        _press(page, "2")  # the effective-exposure topic
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: (
+                ((p.get("delivery") or {}).get("kind")) == "formal"
+                and (p.get("delivery") or {}).get("scene_id")
+                == "t_synth_conditioned.attire_variant_scene"
+            ),
+        )
+        frames = [_scene_frame(page)]
+        for _ in range(6):
+            if frames[-1]["speaker"] == "host":
+                break
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=120)
+            frames.append(_scene_frame(page))
+        self.assertEqual(frames[-1]["speaker"], "host")
+        self.assertIn(exposure_variant_line, frames[-1]["text"])
+        self.assertNotIn(exposure_fallback_line, frames[-1]["text"])
 
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"

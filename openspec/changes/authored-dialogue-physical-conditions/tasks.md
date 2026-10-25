@@ -6,15 +6,15 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 Implement Shared contract v2 once for both sources. Include package_role companion references using authorized package role_id/current binding, safe labels and foreign/cancelled/detached/remote rejection in focused tests.
 
-- [ ] 1.1 Implement RaceIs, SocialIdentityIs, Carries and CompanionPresent against explicit sources; add world/rules/tests/test_dialogue_physical_conditions.py with owner/actor asymmetry, no consumption and stale/co-location controls. Document each source and fail-closed behavior.
+- [x] 1.1 Implement RaceIs, SocialIdentityIs, Carries and CompanionPresent against explicit sources; add world/rules/tests/test_dialogue_physical_conditions.py with owner/actor asymmetry, no consumption and stale/co-location controls. Document each source and fail-closed behavior.
 
 ## 2. Clock skills and exposure boundaries
 
-- [ ] 2.1 Implement cyclic daypart intervals, SkillHandler ownership plus canonical proficiency reader, effective_exposure inclusive bounds. Tests cover exact daypart edges/wrap, missing clock, ownership versus conferral, threshold edges and worn bias without handler writes.
+- [x] 2.1 Implement cyclic daypart intervals, SkillHandler ownership plus canonical proficiency reader, effective_exposure inclusive bounds. Tests cover exact daypart edges/wrap, missing clock, ownership versus conferral, threshold edges and worn bias without handler writes.
 
 ## 3. Hints and scene selection integration
 
-- [ ] 3.1 Implement All/Any bounded recursion, canonical labels and deterministic scene variant selection; wire select_authored_topic eligibility to fail closed with no protected body. Add tied-priority/unknown-label rejection tests and preserve fixed delivered variant on refresh.
+- [x] 3.1 Implement All/Any bounded recursion, canonical labels and deterministic scene variant selection; wire select_authored_topic eligibility to fail closed with no protected body. Add tied-priority/unknown-label rejection tests and preserve fixed delivered variant on refresh.
 
 ## 4. Independent offline and browser acceptance
 
