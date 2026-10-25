@@ -42,6 +42,12 @@ import { QUEST_IDS, newLight, worldBase, worldNewLight } from "../../stories/fix
 const { validateAreaMapPanel, validateWorldMapPanel } = MapPanels;
 const APP_DIR = resolve(__dirname, "../..");
 
+// The live-store journeys below mount the whole shell and drive real protocol
+// commits, so one test's mount/teardown/repaint cost exceeds Vitest's default
+// 5 s budget on a loaded CI worker: the file carries the same explicit
+// headroom the project's other mount-heavy AppClient suites declare.
+vi.setConfig({ testTimeout: 20000 });
+
 let wrappers = [];
 afterEach(() => {
   for (const w of wrappers) w.unmount();
