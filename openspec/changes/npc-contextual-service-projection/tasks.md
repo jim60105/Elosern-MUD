@@ -4,11 +4,11 @@
 
 - [ ] 1.1 Implement pure contextual projection with the exact bounded state/descriptor/route union and exhaustive mapping table; test mixed capabilities, same-class bystanders, person/place/schedule/control gates, operation-vs-entry eligibility and zero-write reads.
 
-- [ ] 1.2 Add explicit source services metadata to common static/generated codecs and source validation, with the one shipped guild report association and existing supported effect validation. Require bindings only for service-associated dialogue; test missing/duplicate/dangling/cross-phase associations, hidden/locked disclosure, source retirement and no inferred prose services.
+- [ ] 1.2 Add exact bounded source services metadata and the shipped guild report association. Extend D's generated role plan with explicitly person-bound scripted_dialogue and complete trusted role identifiers; carry through package validation, RoleSpawn and real activation via shared assembly. Reject missing bindings, unsupported/dangling/cross-phase topics and aggregate overflow before publication. Test narrative-only roles stay unbound.
 
 - [ ] 1.3 Cut exploration to v5 target services and remove coarse guild/shop affordances in Python/UMD/registry/fixtures; update the current flat builder and route consumers for every route. Implement exact church join <npc> target parser and command-input-only handoff, updating both command references and tests/test_command_docs.py now; no route may be an unwired placeholder.
 
-- [ ] 1.4 Exercise exact-provider services.open/drawer, explicit report dialogue and command-line handoff; use existing deterministic submission APIs, never new service effects. Revalidate stale target/binding/control/source before execution, including two same-class hosts and unchanged quest/exam authority.
+- [ ] 1.4 Exercise exact-provider drawer and command-input handoffs, plus actual generated package publication -> role activation -> projected commission service. Opening dialogue only focuses its still-disclosed topic and accepts no quest or reading receipt; a separate explicit activation uses current effect authority. Test stale phase/provider/control and two same-class hosts without substitution.
 
 - [ ] 1.5 Update dialogue/authoring/protocol docs, affected current specs and active generated-packages/content-guild amendments. Add permanent pure/Evennia/Node tests for projection/source/wire ownership, shard registrations and behavioral traceability.
 

@@ -56,7 +56,7 @@ Dialogue services SHALL reference an existing supported deterministic entry by e
 
 #### Scenario: Bound report dialogue
 - **WHEN** the guild report association references its current supported topic
-- **THEN** opening selects that exact host/topic through existing context checks without automatic turn-in
+- **THEN** opening targets that host and focuses the still-disclosed topic, without selecting it or performing automatic turn-in
 
 #### Scenario: Invalid association rejects atomically
 - **WHEN** an association is duplicate, dangling, cross-phase or names an informational unsupported topic
@@ -65,6 +65,18 @@ Dialogue services SHALL reference an existing supported deterministic entry by e
 #### Scenario: Source changes before selection
 - **WHEN** an opened generated service loses its phase/source authority
 - **THEN** submission rejects without effect, receipt or stale private scene
+
+#### Scenario: Commission opening is navigation only
+- **WHEN** an activated generated issuer's offer-commission service is opened
+- **THEN** the conversation opens with its associated topic focused, no quest/effect/reading receipt is created, and only a later explicit topic activation may invoke the existing authorized effect
+
+#### Scenario: Generated binding reaches the real actor
+- **WHEN** a package with explicit person-bound dialogue/issuer plans is published and activated
+- **THEN** the shared deterministic assembly installs both validated plans on the exact role actor and projection uses those bindings; a narrative-only role remains unbound
+
+#### Scenario: Complete authored list fits its declared bounds
+- **WHEN** a service association key exceeds 55 characters or native plus associated entries exceed 16 for any host phase
+- **THEN** the complete source/assembly candidate rejects before publication, without silent truncation or delayed runtime failure
 
 ### Requirement: Selections always revalidate the exact provider
 Execution SHALL re-resolve the selected visible co-present NPC and validate its current capability, binding and applicable permissions. A client enabled flag or another provider's presence SHALL confer no authority.

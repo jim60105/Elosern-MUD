@@ -53,7 +53,7 @@ The production presentation registry SHALL register panel name `exploration` at 
 - **WHEN** the presenter builds the `look` section
 - **THEN** it contains exactly `room`, `entities`, and `objects`: `room` is an exact room descriptor with a room marker for `explore.look`, `entities` is a bounded list of at most 32 present character/NPC/monster descriptors each carrying an opaque identity, bounded display name, bounded kind, and nullable opaque `portrait_ref`, and `objects` is a bounded list of at most 32 present object descriptors carrying an opaque identity and bounded display name
 
-#### Scenario: Interact targets carry their exact target fields and a bounded affordance list
+#### Scenario: Interact targets carry exactly their four fields and a bounded affordance list
 - **WHEN** the presenter builds `interact`
 - **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, services, and a bounded `affordances` list of at most 8 descriptors
 - **AND** a target descriptor carries no keyword list beyond its declared services routes, because a conversation's topics reach the browser only through the `dialogue` panel's `choices` once the conversation is open
