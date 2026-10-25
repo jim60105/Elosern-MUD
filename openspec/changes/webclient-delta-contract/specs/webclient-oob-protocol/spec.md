@@ -21,9 +21,9 @@ A version-1 ui_snapshot SHALL retain its seven exact metadata/panel fields. A ui
 - **WHEN** the server emits a valid `ui_update`
 - **THEN** it includes the active mode, current server time, and layout version together with its epoch, new revision, and a possibly empty panel subset plus exact base_revision and removed_panels
 
-#### Scenario: A dialogue-mode update compares a fresh dialogue candidate
+#### Scenario: A dialogue-mode update always carries the dialogue panel
 - **WHEN** an affected-panel update is published while the viewer's recomputed mode resolves to `dialogue` and its named subset omits the `dialogue` panel
-- **THEN** the server freshly renders dialogue as a candidate, includes it when changed, and the client validates mode/dialogue consistency against the whole staged committed state even when equal dialogue is omitted
+- **THEN** the staged committed presentation always carries the correct dialogue panel: the server freshly renders it as a candidate, transmits it when changed, and the client validates mode/dialogue consistency against the staged state even when equal dialogue is omitted from the wire
 
 #### Scenario: Top-level field value bounds are exact
 - **WHEN** a snapshot or update envelope is validated
