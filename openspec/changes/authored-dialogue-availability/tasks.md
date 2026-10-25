@@ -6,9 +6,9 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 - [ ] 1.1 Implement hidden/locked/open project_topics for panel, affordance, text and action consumers, with stable hints and no formal-body leakage. Add world/rules/tests/test_dialogue_availability.py and presentation tests for hidden, locked refusal and recursive sentinel absence.
 
-## 2. Selection recheck and source refresh
+## 2. Selection recheck and explicit refresh API
 
-- [ ] 2.1 Wire deterministic refresh into existing general action/text settlement and shared clock/NPC/party/control commit seams; add a source-family integration table testing every required cause and rollback nonpublication. Document exact hook ownership in dialogue_availability.py; do not create a general event bus.
+- [ ] 2.1 Implement the complete explicit refresh_dialogue_availability API and test current-state projection/fan-out, fixed delivered wording and rollback-safe invocation. Test stale selection after changing equipment/quest context directly through synthetic canonical fixtures. Production source hooks are wholly owned by the two named refresh changes, not deferred generic investigation here. Document that command presentation observers are insufficient.
 
 ## 3. Stale invalidation and native paths
 

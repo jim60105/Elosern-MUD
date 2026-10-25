@@ -17,14 +17,3 @@ Hidden topics SHALL be absent. Locked topics SHALL expose only permitted labels,
 - **WHEN** a listed open topic becomes ineligible before selection
 - **THEN** the server gives its allowed refusal or rejection with no formal body and no formal effect
 
-### Requirement: Committed state changes refresh eligibility without rewriting playback
-Relevant committed state changes SHALL refresh dialogue availability from canonical state. Failed or rolled-back changes SHALL publish no false opening. Ordinary eligibility refresh SHALL preserve a delivered scene variant, while host, phase or control invalidation SHALL retire it.
-
-#### Scenario: Equipped exposure refreshes choices
-- **WHEN** a lawful equipment commit crosses a topic exposure boundary during a scene
-- **THEN** choices reflect the new availability when shown and the playing scene retains its original wording
-
-#### Scenario: All source families refresh
-- **WHEN** item holdings, skills, owner rank/quest/claim/affinity, companion presence or world time commits a condition change
-- **THEN** the next committed dialogue projection reflects that source without a second topic selection
-

@@ -16,6 +16,7 @@ The approved authored-dialogue design requires server-qualified topic disclosure
 - `authored-dialogue-availability`: Server-qualified topic disclosure and committed-state refresh.
 
 ### Modified Capabilities
+- `exploration-affordances`: amend the complete affected contract for this slice, preserving unrelated scenarios.
 - None.
 
 ## Impact
