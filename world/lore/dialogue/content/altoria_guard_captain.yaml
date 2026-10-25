@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 衛兵隊長托瓦德‧鄧堡從值房的窗邊轉過身，胸前的銅牌映著火盆的光：「剛從南門進來的？這一帶由我負責。問路，我告訴你；問規矩，我也告訴你。另外，駐所牆上沒有委託單，要找工作，請到冒險者公會。」
+topics:
+- topic_id: altoria_guardhouse.topic_01
+  keyword: 進城
+  label: 進城
+  fallback:
+    scene_id: altoria_guardhouse.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 進城
+    - kind: speech
+      speaker: host
+      text: 「聽好。第一，腳下這條是南大道，一路往北，過了大道北段就是中央廣場。第二，廣場東邊是公會前，西邊是市場街，北邊是通往上城的聖階。第三，每個路口都有路牌，照著走不會迷路。記住了，我不說第二遍。」
+- topic_id: altoria_guardhouse.topic_02
+  keyword: 找活
+  label: 找活
+  fallback:
+    scene_id: altoria_guardhouse.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 找活
+    - kind: speech
+      speaker: host
+      text: 「找工作，往北到中央廣場，再往東到公會前。大廳裡有看板，委託都貼在那裡，看中了就向公會的人登記。熟人私下託你的事，屬於你們之間的約定。駐所不貼委託單，以後也不會貼，不必再問。」
+- topic_id: altoria_guardhouse.topic_03
+  keyword: 治安
+  label: 治安
+  fallback:
+    scene_id: altoria_guardhouse.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 治安
+    - kind: speech
+      speaker: host
+      text: 「城裡的治安由衛兵負責。白天巡街，夜間輪班守門。在街上遇到麻煩，就找穿藍色罩袍的人，南門駐所和上城的貴族區衛所都有人值勤。我們管街上的秩序；你和別人之間的交易糾紛，不歸駐所處理。」
+- topic_id: altoria_guardhouse.topic_04
+  keyword: 過夜
+  label: 過夜
+  fallback:
+    scene_id: altoria_guardhouse.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 過夜
+    - kind: speech
+      speaker: host
+      text: 「要找地方睡，趁天黑前沿南大道往北，右手邊的客棧巷有爐火旅店，隔壁是醉月酒館。累了在哪裡都能靠著打個盹，但這間值房只有長凳，沒有門閂。要睡在這裡，你自己決定。」

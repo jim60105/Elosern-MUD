@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 醉月酒館的蘿溫‧古橡把抹布往肩上一甩，靠著吧台打量你：「唷，新面孔嘛。我這兒就一條規矩，在這裡講的話，不會害到講話的人。想打聽什麼就自己找人聊；路上碰到聊得來、又想一起走的人，開口約就是了。消息啊，都在客人嘴裡，你不開口問，誰會跟你說？」
+topics:
+- topic_id: altoria_tavern.topic_01
+  keyword: 傳聞
+  label: 傳聞
+  fallback:
+    scene_id: altoria_tavern.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 傳聞
+    - kind: speech
+      speaker: host
+      text: 「消息？我這兒可沒貼告示喔，都在客人嘴裡。誰剛從迷宮出來、誰熟東門外的路，聊了才知道嘛。挑個順眼的坐過去，聊得來的話，人家下次還會記得你。我呢，頂多告訴你該往哪桌走。」
+- topic_id: altoria_tavern.topic_02
+  keyword: 同伴
+  label: 同伴
+  fallback:
+    scene_id: altoria_tavern.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 同伴
+    - kind: speech
+      speaker: host
+      text: 「想找人一起走？那得先碰得到人啊，路上也好、店裡也好。坐下來聊一聊，合得來再開口約，人家要不要是人家的事。我跟店裡的人就別想啦，我們有家有店，不出城。」
+- topic_id: altoria_tavern.topic_03
+  keyword: 委託
+  label: 委託
+  fallback:
+    scene_id: altoria_tavern.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 委託
+    - kind: speech
+      speaker: host
+      text: 「正經的委託去公會看板找啦，我這兒不貼單子，也不幫人找人手。公會前那棟大廳就是。在外面認識了靠得住的人，帶回來這兒坐，事情談好了再一起出發。放心，這屋裡講的話，出了門沒人會提。」
+- topic_id: altoria_tavern.topic_04
+  keyword: 歇腳
+  label: 歇腳
+  fallback:
+    scene_id: altoria_tavern.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 歇腳
+    - kind: speech
+      speaker: host
+      text: 「走到天都黑了吧？隔壁就是溫弗蕾德的旅店，床乾淨，門也鎖得牢。只是想坐一下的話，壁爐旁邊還有位子，我這兒比外面暖，也熱鬧多啦。」

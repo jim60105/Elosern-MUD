@@ -4,7 +4,7 @@ Read design.md and the named dependency shared contracts first. All boxes are fu
 
 ## 1. Mechanical registry cutover
 
-- [ ] 1.1 Migrate all 25 Python tables directly to scanner-discovered profile-key YAML using canonical bindings and unchanged dialogue-key topic IDs. The conversion is one scripted, reviewed transformation over the frozen literal tables rather than 25 hand-written files, which is what keeps this unit inside its 120-minute bound; migrate every importer/fixture and delete obsolete domain modules/classes/re-exports, then implement source-neutral ResolvedDialogueSource. Test complete inventory, profile/service distinction, greeting/unknown behavior and generated-capable provider interfaces; document temporary prose ownership/no manual registration.
+- [x] 1.1 Migrate all 25 Python tables directly to scanner-discovered profile-key YAML using canonical bindings and unchanged dialogue-key topic IDs. The conversion is one scripted, reviewed transformation over the frozen literal tables rather than 25 hand-written files, which is what keeps this unit inside its 120-minute bound; migrate every importer/fixture and delete obsolete domain modules/classes/re-exports, then implement source-neutral ResolvedDialogueSource. Test complete inventory, profile/service distinction, greeting/unknown behavior and generated-capable provider interfaces; document temporary prose ownership/no manual registration.
 
 ## 2. Selection and transactional session delivery
 

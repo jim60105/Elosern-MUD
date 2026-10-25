@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 織機聲在門內停下，維特希爾‧威爾德布瑞亞爾從經線間探出身子，手上還捏著梭子：「來了。你喜歡什麼顏色？墨黑、月白，還是霧一樣的淡綠？架上的衣服隨你看，看上哪件，我拿下來讓你摸一下料子。」
+topics:
+- topic_id: ciaran_vethiel_home.topic_01
+  keyword: 織衣
+  label: 織衣
+  fallback:
+    scene_id: ciaran_vethiel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 織衣
+    - kind: speech
+      speaker: host
+      text: 「經線我自己漿，緯線我自己染，一塊布從清晨織到星光出來。架上有墨黑的短袍、戰鬥服飾、白色的蛛絲傳統服飾，還有晨露織的森林輕紗，每一件的性子都不一樣。喜歡哪件，換去穿就是。」
+- topic_id: ciaran_vethiel_home.topic_02
+  keyword: 戰衣
+  label: 戰衣
+  fallback:
+    scene_id: ciaran_vethiel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 戰衣
+    - kind: speech
+      speaker: host
+      text: 「精靈戰鬥服飾，墨黑，貼身、好動，進林子打獵穿它最方便。它讓身體動得自在，遮住的地方不多，族裡的人都喜歡。」
+- topic_id: ciaran_vethiel_home.topic_03
+  keyword: 禮袍
+  label: 禮袍
+  fallback:
+    scene_id: ciaran_vethiel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 禮袍
+    - kind: speech
+      speaker: host
+      text: 「白色那件是精靈傳統服飾，用蛛絲織成，族裡祭禮時穿。我們覺得身體值得讓人看，所以它織得很薄。外面的人看了常會臉紅呢。森林輕紗是晨露編的長裙，透光像霧，只在那一季做得出來。」
+- topic_id: ciaran_vethiel_home.topic_04
+  keyword: 舊衣
+  label: 舊衣
+  fallback:
+    scene_id: ciaran_vethiel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 舊衣
+    - kind: speech
+      speaker: host
+      text: 「我織的衣服穿舊了、用不到了，拿回來給我，我收下，回你幾枚銅幣。布還能拆開，再織進別的衣服裡。別人織的衣服，我就不收了。」

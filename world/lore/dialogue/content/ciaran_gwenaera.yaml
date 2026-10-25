@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 銀葉坡頂的屋裡，格威娜拉‧希爾維爾莉夫從工作檯後抬起頭，舉起兩朵銀絲絞花湊到你面前：「欸，你來得正好！這兩朵哪一朵比較好看？左邊這朵嘛……算了，我等一下再改。做好的都掛在窗邊繩上，喜歡哪件就跟我說；有東西壞了要修，也拿過來吧。」
+topics:
+- topic_id: ciaran_gwenaera_home.topic_01
+  keyword: 綴飾
+  label: 綴飾
+  fallback:
+    scene_id: ciaran_gwenaera_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 綴飾
+    - kind: speech
+      speaker: host
+      text: 「銀絲我自己絞，貝殼在溪邊撿，晶砂要磨一整晚才會亮。做好的都掛在窗邊那條繩上，族人喜歡就拿去戴。你喜歡哪件就跟我說，看著給點什麼都好嘛。」
+- topic_id: ciaran_gwenaera_home.topic_02
+  keyword: 晶符
+  label: 晶符
+  fallback:
+    scene_id: ciaran_gwenaera_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 晶符
+    - kind: speech
+      speaker: host
+      text: 「三稜晶符用族裡傳下來的老方法磨，光照進去，會分成三種顏色跑出來，很漂亮對吧？欸，戴在脖子上就是好看而已，沒有什麼神奇的力量喔。村裡的孩子成年時，常來跟我討一枚。」
+- topic_id: ciaran_gwenaera_home.topic_03
+  keyword: 耳環
+  label: 耳環
+  fallback:
+    scene_id: ciaran_gwenaera_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 耳環
+    - kind: speech
+      speaker: host
+      text: 「月牙耳環是我最常做的東西，一對接一對地絞，絞到閉著眼睛都會。瓦爾溫耳朵上那對也出自我手，跟我身上這幾枚同一批。合不合眼緣要你自己挑，我幫你舉著鏡子嘛。」
+- topic_id: ciaran_gwenaera_home.topic_04
+  keyword: 舊飾
+  label: 舊飾
+  fallback:
+    scene_id: ciaran_gwenaera_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 舊飾
+    - kind: speech
+      speaker: host
+      text: 「斷掉的耳勾、鬆掉的絲結，拿來我幫你修，不用錢。東西壞了就丟，太可惜了嘛。用不到的晶符或耳環也可以拿回來，我會看銀的成色，回你一點東西。」

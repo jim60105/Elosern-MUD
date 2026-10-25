@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯‧米斯特瓦勒正替藥爐壓小火，回頭先把你上下打量了一遍：「沒受傷吧？那就好。這輪藥剛起罐，強效治療藥水和魔力藥水都還有一些，要帶幾罐上路就跟我說喔。」
+topics:
+- topic_id: ciaran_nireth_home.topic_01
+  keyword: 調藥
+  label: 調藥
+  fallback:
+    scene_id: ciaran_nireth_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 調藥
+    - kind: speech
+      speaker: host
+      text: 「藥草從園裡採，方子是族裡老一輩傳下來的方法，一爐小火從早熬到晚。精靈不會生病，可是傷口和用光的魔力，不管哪一族都一樣。手邊有的就兩種，強效治療藥水和魔力藥水。」
+- topic_id: ciaran_nireth_home.topic_02
+  keyword: 重傷
+  label: 重傷
+  fallback:
+    scene_id: ciaran_nireth_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 重傷
+    - kind: speech
+      speaker: host
+      text: 「紅色那罐是強效治療藥水，傷得重才開，小傷用清水和草灰就夠了，別浪費喔。要帶幾罐防身，留幾枚銅幣給我就好。」
+- topic_id: ciaran_nireth_home.topic_03
+  keyword: 魔力
+  label: 魔力
+  fallback:
+    scene_id: ciaran_nireth_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 魔力
+    - kind: speech
+      speaker: host
+      text: 「藍色那罐是魔力藥水，施法的人累了，喝一口就能緩過來，精靈喝也一樣有效。聽說外頭把這東西當寶，在谷裡只是多熬一爐的事啊。」
+- topic_id: ciaran_nireth_home.topic_04
+  keyword: 藥草
+  label: 藥草
+  fallback:
+    scene_id: ciaran_nireth_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 藥草
+    - kind: speech
+      speaker: host
+      text: 「園裡的藥草我自己採，外頭的我不收，誰知道藥性有沒有走掉。我熬的藥你要是用不到，原封不動拿回來，我收下就是。」

@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 鍛造鋪裡砧聲沒停，維爾登‧黑潭頭也沒抬：「用什麼兵器？哪隻手？說。」
+topics:
+- topic_id: altoria_forge.topic_01
+  keyword: 兵器
+  label: 兵器
+  fallback:
+    scene_id: altoria_forge.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 兵器
+    - kind: speech
+      speaker: host
+      text: 「牆上那排。普通劍、鐵短刀、狩獵擲斧。弓和法杖在左邊，獵手長弓、見習術師法杖。價錢看門邊木牌。拿下來試手感，別揮到人。」
+- topic_id: altoria_forge.topic_02
+  keyword: 好貨
+  label: 好貨
+  fallback:
+    scene_id: altoria_forge.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 好貨
+    - kind: speech
+      speaker: host
+      text: 「最裡面那把。騎士制式長劍，我親手打，校場的見習騎士都用它。旁邊那把魔導長劍，刃裡導過元素，貴。錢夠再看。」
+- topic_id: altoria_forge.topic_03
+  keyword: 賣鐵
+  label: 賣鐵
+  fallback:
+    scene_id: altoria_forge.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 賣鐵
+    - kind: speech
+      speaker: host
+      text: 「我只收牆上掛著那幾樣。用不著的劍、斧、弓拿回來，還能用，我就收。礦石、碎鐵別往這擱，拿去市場街的雜貨店。」
+- topic_id: altoria_forge.topic_04
+  keyword: 保養
+  label: 保養
+  fallback:
+    scene_id: altoria_forge.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 保養
+    - kind: speech
+      speaker: host
+      text: 「磨刀石自己帶。鈍了就磨，別拿去砍石頭。收劍前擦乾，上油。斷了就換一把，接回去的劍不可靠。」

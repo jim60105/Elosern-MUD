@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 公共浴場管理員伊莎貝爾‧葦沼抱著一大疊布巾從水氣裡鑽出來，上下瞄了你一眼：「新來的吧！男生左邊、女生右邊，各走各的門，這裡就這一條規矩！池子是燒熱的河水，深的淺的都有。要問什麼快問，我還有一堆布巾沒摺！」
+topics:
+- topic_id: altoria_bathhouse.topic_01
+  keyword: 規矩
+  label: 規矩
+  fallback:
+    scene_id: altoria_bathhouse.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 規矩
+    - kind: speech
+      speaker: host
+      text: 「就一條啦，男左女右，中間一道牆，各走各的門！今天我已經叫回來好幾個走錯的了，大多剛進城，被水氣熏到眼花。走錯也沒關係，聽到我喊就轉回來嘛！」
+- topic_id: altoria_bathhouse.topic_02
+  keyword: 精靈
+  label: 精靈
+  fallback:
+    scene_id: altoria_bathhouse.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 精靈
+    - kind: speech
+      speaker: host
+      text: 「精靈喔！他們覺得那道牆根本多餘。人類跟獸人進來都要先脫外衣，還要互相別過頭去，覺得遮起來才有禮貌。精靈從小就不覺得身體需要遮，看你遮著身子，他們反而覺得怪。到底誰比較對？我顧了二十年櫃檯還是搞不懂。反正牆在那裡，分開洗，大家都相安無事啦！」
+- topic_id: altoria_bathhouse.topic_03
+  keyword: 泡湯
+  label: 泡湯
+  fallback:
+    scene_id: altoria_bathhouse.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 泡湯
+    - kind: speech
+      speaker: host
+      text: 「水夠熱喔，泡到臉紅再起來，沖一桶冷水，整個人都鬆了！有人說泡完傷好了一半，我才不信呢，那是他前一晚睡得好啦。傷口痛就去找治療師，別指望我的池子。洗乾淨再走，別帶一身灰回旅店！」
+- topic_id: altoria_bathhouse.topic_04
+  keyword: 歇息
+  label: 歇息
+  fallback:
+    scene_id: altoria_bathhouse.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 歇息
+    - kind: speech
+      speaker: host
+      text: 「洗完想坐一下？外面有長椅。我這邊水氣暖，坐沒多久就想睡了。真的想睡個好覺，去客棧巷找溫弗蕾德，那邊有床啦！」

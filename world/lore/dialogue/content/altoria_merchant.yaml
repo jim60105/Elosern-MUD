@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 櫃檯後的瑪爾特‧金秤從帳簿上抬起頭，炭筆還捏在指間：「要出城，還是剛回來？出城的話，燈、羅盤、露營的東西架上都有；回來的話，帶了什麼先擱秤上。」
+topics:
+- topic_id: altoria_general_store.topic_01
+  keyword: 賣什麼
+  label: 賣什麼
+  fallback:
+    scene_id: altoria_general_store.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 賣什麼
+    - kind: speech
+      speaker: host
+      text: 「出城用的都在這。魔法燈、附魔羅盤、迷宮探照符、通訊法螺，還有粗鐵礦、魔獸結晶這些料。價錢寫在牆上那塊板子，自己看，我不講價。就這樣。」
+- topic_id: altoria_general_store.topic_02
+  keyword: 材料
+  label: 材料
+  fallback:
+    scene_id: altoria_general_store.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 材料
+    - kind: speech
+      speaker: host
+      text: 「迷宮裡帶回來的哥布林耳朵、史萊姆黏液、巨魔尖牙、地龍鱗片，我都收。擱上櫃檯，我看過就報數，錢當場點給你。要買也有，魔導晶核、龍鱗碎片、精靈蛛絲，在架子最上層。」
+- topic_id: altoria_general_store.topic_03
+  keyword: 行頭
+  label: 行頭
+  fallback:
+    scene_id: altoria_general_store.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 行頭
+    - kind: speech
+      speaker: host
+      text: 「第一次出城？好，照我說的帶。燈一定要帶，迷宮裡黑到看不見自己的手。羅盤防迷路，探照符撕開能把四周照亮一小段時間，露營魔導具一打開就是個小帳篷，風雨蟲子都進不來。通訊法螺留著走散的時候喊人用。嗯，大概就這些。」
+- topic_id: altoria_general_store.topic_04
+  keyword: 飾品藥水
+  label: 飾品藥水
+  fallback:
+    scene_id: altoria_general_store.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 飾品藥水
+    - kind: speech
+      speaker: host
+      text: 「那兩樣不在我這了。飾品去隔壁首飾坊找艾蓮娜，藥水往東市的鍊金坊找希碧拉，都是老街坊。報我的名字也沒用，她們一樣不講價。要受洗聖水的話，得爬聖階上去，大神殿前的聖所有自己的櫃檯。」

@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 村北古樹下的屋裡，瓦爾溫‧斯蒂爾瓦特爾正把一串貝殼掛上繩結，聽見腳步聲就回頭笑了：「哎，有人來了！你從哪裡來呀？路上看到什麼了？先別急著走，坐下來聊一會兒。這屋裡掛的東西都有故事，想聽哪一樣，我都講給你聽。」
+topics:
+- topic_id: ciaran_valwyn_home.topic_01
+  keyword: 蒐羅
+  label: 蒐羅
+  fallback:
+    scene_id: ciaran_valwyn_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 蒐羅
+    - kind: speech
+      speaker: host
+      text: 「這些呀，路上撿到、林子裡換來、溪水沖上岸，全都在這兒。哎，你看那根羽毛，三百年前一隻大鳥掉下來，那天下了好大的雨……啊，又扯遠了。這幾樣我要留著，不換，你看就好。」
+- topic_id: ciaran_valwyn_home.topic_02
+  keyword: 蛛絲
+  label: 蛛絲
+  fallback:
+    scene_id: ciaran_valwyn_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 蛛絲
+    - kind: speech
+      speaker: host
+      text: 「精靈蛛絲是林子裡的蛛吐的絲，韌得很，編成繩子，風雨都扯不斷。村裡每個人都會編，我編得多一點，就掛出來給大家取用。你要幾束就跟我說，我替你從繩上解下來。」
+- topic_id: ciaran_valwyn_home.topic_03
+  keyword: 耳環
+  label: 耳環
+  fallback:
+    scene_id: ciaran_valwyn_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 耳環
+    - kind: speech
+      speaker: host
+      text: 「這對月牙耳環？格威娜拉的手藝，我跟她換來，戴了好多年了。哎，要是你也喜歡，去銀葉坡找她，她窗邊掛著一整排呢。我這對可不給喔，上面有故事。」
+- topic_id: ciaran_valwyn_home.topic_04
+  keyword: 以物易物
+  label: 以物易物
+  fallback:
+    scene_id: ciaran_valwyn_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 以物易物
+    - kind: speech
+      speaker: host
+      text: 「我最喜歡換東西了！不過我換的是故事，你說一段路上的見聞，我就講一段這屋裡哪樣東西的來歷。蛛絲要是用不完，原封不動拿回來，我收下，回你幾枚銅幣。」

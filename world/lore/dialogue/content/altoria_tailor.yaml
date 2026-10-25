@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 裁縫坊的妮絲塔‧狐溪從布堆裡探出頭，軟尺還掛在脖子上：「來，進來呀！讓我瞧一下你這身……嗯，要出遠門對吧？打算往哪裡去呢？」
+topics:
+- topic_id: altoria_tailor.topic_01
+  keyword: 衣甲
+  label: 衣甲
+  fallback:
+    scene_id: altoria_tailor.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 衣甲
+    - kind: speech
+      speaker: host
+      text: 「要護身的話，皮甲最輕、最好動，鎖子甲擋得住刀，就是重了點喲。想再穩一點，騎士全套板甲和鐵盾也有，不過那要有力氣撐得住呢。會施法的人，穿術師長袍就好，袖口我都改得很順手。」
+- topic_id: altoria_tailor.topic_02
+  keyword: 旅裝
+  label: 旅裝
+  fallback:
+    scene_id: altoria_tailor.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 旅裝
+    - kind: speech
+      speaker: host
+      text: 「走遠路呀，衣服合身最要緊，磨肩又磨腳，走三天就受不了。錢不多就先挑件皮甲，一件合身，勝過三件湊合著穿。常施法的話，大術師補綴長袍的內裡縫滿了符文，施法比較不累喔，就是貴了點。」
+- topic_id: altoria_tailor.topic_03
+  keyword: 禮服
+  label: 禮服
+  fallback:
+    scene_id: altoria_tailor.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 禮服
+    - kind: speech
+      speaker: host
+      text: 「上城的貴族小姐常來訂禮服，大神殿那邊會送修女聖袍的單子來，那件我縫得最仔細呢。聖女聖袍聽說最早是聖女親手繡，我這幾件照老樣子仿，可不敢說一模一樣喲。還有……咳，那套誘蠱蕾絲內衣嘛，有客人特地來問過，想看我就拿出來，不用不好意思喲。」
+- topic_id: altoria_tailor.topic_04
+  keyword: 收衣
+  label: 收衣
+  fallback:
+    scene_id: altoria_tailor.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 收衣
+    - kind: speech
+      speaker: host
+      text: 「穿不下的、不合身的拿回來吧，我這裡做的衣甲都收，記得先洗乾淨喲。破成布條的就算了，我也縫不回來呢。收回來的我會拆線重縫，再給下一個人穿。」

@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 學院長廳的黑板前，奧德溫‧薩契院長擦去一行算式，回頭看見你便放下粉筆：「歡迎。此刻沒有開課，但隨時可以提問。等級、元素、親和，你想從哪裡問起？學院傳授的是知識，捷徑這裡沒有。」
+topics:
+- topic_id: altoria_academy.topic_01
+  keyword: 魔法等級
+  label: 魔法等級
+  fallback:
+    scene_id: altoria_academy.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 魔法等級
+    - kind: speech
+      speaker: host
+      text: 「魔法造詣分為五級，初級、中級、高級、超級、究極。初級能施展火球、水箭、風刃、治癒術、身體強化；中級多了火焰風暴、冰牆、飛行術；高級有熔岩術、暴風雪、高級治癒、統御術；超級是龍炎術、地震術、神聖光輝，人類能走到這一級的極少；究極則近乎傳說。學院的書庫就照這五級排書，你想從哪一級讀起都可以。」
+- topic_id: altoria_academy.topic_02
+  keyword: 元素
+  label: 元素
+  fallback:
+    scene_id: altoria_academy.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 元素
+    - kind: speech
+      speaker: host
+      text: 「元素共有八種，入門課的第一堂就會講。火，攻勢最猛；水，牽動魔力的潮汐；風，兼顧攻擊與身法；土，掌管地形與防護；雷，搶在對手之前出手；冰，讓對手動彈不得；光，治療與淨化；暗，削弱與侵蝕。課堂上背得再熟，也比不上自己親手練過的一道咒文。」
+- topic_id: altoria_academy.topic_03
+  keyword: 親和
+  label: 親和
+  fallback:
+    scene_id: altoria_academy.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 親和
+    - kind: speech
+      speaker: host
+      text: 「問得好，這個問題分兩層。第一層是元素，同一道法術，與你親和的元素學起來快一些，沒有親和的慢一些。第二層是種族，精靈天生親近魔法，學什麼都比人類快得多；人類各有偏好，得靠自己摸索。稟賦沒有辦法在學院裡教；學院能幫你認清自己該往哪條路走。」
+- topic_id: altoria_academy.topic_04
+  keyword: 拜師
+  label: 拜師
+  fallback:
+    scene_id: altoria_academy.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 拜師
+    - kind: speech
+      speaker: host
+      text: 「拜師？學院沒有拜師這條路。本事要靠自己日積月累練出來，劍術也好，咒文也好，都得花時間反覆練習；想知道自己練到什麼程度，可以去冒險者公會參加階級考核。學院願意給你一個學生的名分，但名分沒有辦法替你練。」

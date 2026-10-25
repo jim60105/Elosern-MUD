@@ -1,61 +1,63 @@
-"""Authored scripted-dialogue rows, split by domain (place-attendant-profession).
+"""Authored scripted-dialogue snapshot loaded from YAML content.
 
-``DIALOGUE_TABLE`` is authored prose keyed by a stable identifier — immutable
-identity, which the repo puts under ``world/lore/``. The rows move out of
-``world/rules/dialogue.py`` (which keeps its lookup surface, the
-``DialogueDefinition``/``KeywordResponse`` re-exports and the frozen
-``DIALOGUE_TABLE`` read) and arrive already split by domain: ``shape.py`` owns
-the two dataclasses, ``guild.py`` carries the guild hall's row, and the
-per-settlement slices (``altoria_lower.py``, ``altoria_middle.py``,
-``altoria_upper.py``, ``ciaran.py``) carry the capital's terraces and
-the village's hosts as the content changes land them.
-
-The assembly mirrors how ``world/lore/settlements/places.py`` assembles its
-settlement slices: the slice order below is fixed and commented, and every
-slice exports one ``ROWS`` tuple of ``(dialogue_key, DialogueDefinition)``
-pairs. This package must never import ``world/rules/`` — the lore side is
-registry-only.
+``DIALOGUE_SNAPSHOT`` is immutable authored dialogue keyed by a stable
+identifier (``dialogue_key``). The rows are loaded from scanner-discovered
+per-profile YAML files under ``world/lore/dialogue/content/<profile_key>.yaml``
+using canonical place bindings.
 """
 
+from pathlib import Path
 from types import MappingProxyType
+from typing import Mapping
 
-from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
-
-# The rows are assembled from the domain slices in fixed, commented order (the
-# world/lore/settlements/places.py assembly precedent): the table a consumer
-# reads is deterministic regardless of import history, and the content changes
-# that each add tables never edit the same slice.
-from world.lore.dialogue.guild import ROWS as GUILD_STAFF_ROWS  # the guild hall counter
-from world.lore.dialogue.altoria_lower import ROWS as ALTORIA_LOWER_ROWS  # 聖潔王都 LOWER terrace hosts
-from world.lore.dialogue.altoria_middle import ROWS as ALTORIA_MIDDLE_ROWS  # 聖潔王都 MIDDLE terrace hosts
-from world.lore.dialogue.altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # 聖潔王都 UPPER terrace hosts
-from world.lore.dialogue.ciaran import ROWS as CIARAN_ROWS  # 暗影谷村's hosts
-
-# Authored identity is read-only at runtime (the scripted-dialogue registry
-# contract): the assembled mapping itself is frozen, not just the
-# world/rules/dialogue.py view over it — a consumer must never mutate the
-# table the service-host validators resolve against.
-DIALOGUE_ROWS: MappingProxyType = MappingProxyType(
-    {
-        key: definition
-        for rows in (
-            GUILD_STAFF_ROWS,
-            ALTORIA_LOWER_ROWS,
-            ALTORIA_MIDDLE_ROWS,
-            ALTORIA_UPPER_ROWS,
-            CIARAN_ROWS,
-        )
-        for key, definition in rows
-    }
+from world.lore.dialogue.conditions import DialogueReferences
+from world.lore.dialogue.loader import load_dialogue_snapshot
+from world.lore.dialogue.shape import (
+    AuthoredDialogue,
+    AuthoredTopic,
+    DialogueDefinition,
+    KeywordResponse,
+    SceneVariant,
 )
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
+
+CONTENT_DIR = Path(__file__).resolve().parent / "content"
+
+
+def canonical_dialogue_bindings() -> dict[str, str]:
+    """Derive canonical dialogue_key -> profile_key mappings from PLACE_REGISTRY."""
+    bindings: dict[str, str] = {}
+    for place in PLACE_REGISTRY.values():
+        diag_key = None
+        for k, v in place.authored_kwargs:
+            if k == "dialogue_key":
+                diag_key = v
+                break
+        if diag_key and place.host_profile_key:
+            bindings[diag_key] = place.host_profile_key
+    return bindings
+
+
+def _load_snapshot() -> Mapping[str, AuthoredDialogue]:
+    bindings = canonical_dialogue_bindings()
+    profiles = frozenset(NPC_PROFILE_REGISTRY.keys())
+    return load_dialogue_snapshot(
+        CONTENT_DIR,
+        profiles=profiles,
+        bindings=bindings,
+        references=DialogueReferences.empty(),
+    )
+
+
+DIALOGUE_SNAPSHOT: MappingProxyType[str, AuthoredDialogue] = MappingProxyType(
+    _load_snapshot()
+)
+DIALOGUE_ROWS: MappingProxyType[str, AuthoredDialogue] = DIALOGUE_SNAPSHOT
 
 __all__ = [
-    "ALTORIA_LOWER_ROWS",
-    "ALTORIA_MIDDLE_ROWS",
-    "ALTORIA_UPPER_ROWS",
-    "CIARAN_ROWS",
+    "CONTENT_DIR",
     "DIALOGUE_ROWS",
-    "DialogueDefinition",
-    "GUILD_STAFF_ROWS",
-    "KeywordResponse",
+    "DIALOGUE_SNAPSHOT",
+    "canonical_dialogue_bindings",
 ]

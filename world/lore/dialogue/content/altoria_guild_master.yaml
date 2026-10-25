@@ -1,0 +1,56 @@
+schema_version: 1
+greeting: 櫃檯後的分會會長葛里安‧衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記，還是來交委託？還沒登記的話，請先在這本名冊上留下名字，從
+  F 級開始。登記之後，到大廳那面任務板挑一張合你階級的委託單，拿來櫃檯讓我登記。辦完了回到這裡向我回報，報上委託單的編號即可。」
+topics:
+- topic_id: guild_staff.topic_01
+  keyword: 註冊
+  label: 註冊
+  fallback:
+    scene_id: guild_staff.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 註冊
+    - kind: speech
+      speaker: host
+      text: 「登記很簡單，在這本名冊上寫下名字，公會就認你是冒險者。每個人都從 F 級開始，先接採集這類簡單的委託，再逐級往上。名冊上記下的每一筆，公會都會負責到底。」
+- topic_id: guild_staff.topic_02
+  keyword: 任務
+  label: 任務
+  fallback:
+    scene_id: guild_staff.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 任務
+    - kind: speech
+      speaker: host
+      text: 「委託單都釘在大廳那面任務板上，單子寫著階級、地點與報酬。挑一張合你階級的拿來櫃檯，我登記之後，這份委託就算你接下了。辦到哪一步，隨時可以來問，名冊上都有記錄。中途辦不下去，把單子交回來即可，不必勉強。」
+- topic_id: guild_staff.topic_03
+  keyword: 公會
+  label: 公會
+  fallback:
+    scene_id: guild_staff.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 公會
+    - kind: speech
+      speaker: host
+      text: 「埃洛西恩冒險者公會由三國共同承認，總部設在帝國首都，這裡是阿爾托利亞分會。分會負責冒險者的登記、委託的發放與結算，以及階級的晉升。想知道自己目前是幾級、離下一級還有多遠，到櫃檯問一聲，我翻名冊給你看。」
+- topic_id: guild_staff.topic_04
+  keyword: 回報
+  label: 回報
+  fallback:
+    scene_id: guild_staff.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 回報
+    - kind: speech
+      speaker: host
+      text: 「回報？名冊上還沒有你的名字。請先在櫃檯登記成冒險者。接下委託、辦完之後，再回到這裡向我回報，並報上委託單的編號。公會只認名冊上寫下的事。」

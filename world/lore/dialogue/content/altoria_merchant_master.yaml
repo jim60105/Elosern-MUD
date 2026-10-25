@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向你略一點頭：「歡迎來到商會公所。閣下若想了解商隊、商路或公所的事務，本人樂意說明。另外請閣下先知道一件事，公所不發委託。」
+topics:
+- topic_id: altoria_merchant_hall.topic_01
+  keyword: 商隊
+  label: 商隊
+  fallback:
+    scene_id: altoria_merchant_hall.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 商隊
+    - kind: speech
+      speaker: host
+      text: 「本季出城的商隊，書記會用粉筆把隊名寫在牆上路線圖的旁邊，只記哪一隊出發、哪一隊回城。公所負責登錄與協調，不安排旁人同行，也不替任何人擔保貨物。」
+- topic_id: altoria_merchant_hall.topic_02
+  keyword: 商路
+  label: 商路
+  fallback:
+    scene_id: altoria_merchant_hall.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 商路
+    - kind: speech
+      speaker: host
+      text: 「王都的大宗貨物多半從東門出城，沿官道往東。東市原是舊城牆邊發展起來的貨棧街，穀物與玻璃都在這裡集散，外國的錢幣也從這裡流進城；工匠巷的鐵器走市場街，鍊金坊的藥材多從東門進城。閣下若要問路，城門的衛兵比本人清楚。」
+- topic_id: altoria_merchant_hall.topic_03
+  keyword: 委託
+  label: 委託
+  fallback:
+    scene_id: altoria_merchant_hall.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 委託
+    - kind: speech
+      speaker: host
+      text: 「公所的牆上沒有委託，門邊也沒有名單。商隊確實需要護衛，但這類工作目前沒有正式的安排，本人不能讓閣下去做一件沒有著落的差事。若想找事做，請到公會前的冒險者公會大廳，看他們的任務板。」
+- topic_id: altoria_merchant_hall.topic_04
+  keyword: 會務
+  label: 會務
+  fallback:
+    scene_id: altoria_merchant_hall.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 會務
+    - kind: speech
+      speaker: host
+      text: 「公所負責三件事，調停各行會之間的利益、評議關稅章程，以及在季底清算各家的帳目。若想入會，請帶引薦人當面來談。稅則抄在窗下那張長桌上，閣下可以自行翻閱，要抄一份也無妨。」

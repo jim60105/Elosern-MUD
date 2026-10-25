@@ -1,0 +1,55 @@
+schema_version: 1
+greeting: 貴族區衛所的古利安‧鷹守隊長從登記桌後抬起頭，推了推眼鏡：「訪客，貴族區不設關卡，進出無須登記。本衛所負責街面的巡守，若有需要詢問的事，請說。」
+topics:
+- topic_id: altoria_noble_watch.topic_01
+  keyword: 貴族區
+  label: 貴族區
+  fallback:
+    scene_id: altoria_noble_watch.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 貴族區
+    - kind: speech
+      speaker: host
+      text: 「貴族區對所有人開放，衛所只巡街，不盤查來人。各府邸的門關著，那是各家自己的門；街道本身，任何人都可以走。請自便。」
+- topic_id: altoria_noble_watch.topic_02
+  keyword: 謁見
+  label: 謁見
+  fallback:
+    scene_id: altoria_noble_watch.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 謁見
+    - kind: speech
+      speaker: host
+      text: 「目前沒有任何謁見的安排，也沒有需要遞交的文書。沿著街走到盡頭就是王宮前庭，王宮的門開著，訪客可以自行進去。裡面很安靜，安靜到連我都覺得冷清。」
+- topic_id: altoria_noble_watch.topic_03
+  keyword: 衛所
+  label: 衛所
+  fallback:
+    scene_id: altoria_noble_watch.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 衛所
+    - kind: speech
+      speaker: host
+      text: 「本衛所負責三件事，巡邏的班次、防火的水源，以及各家報來的瑣事。下城的街道與城門歸南門的衛兵隊長托瓦德‧鄧堡管，我們換班時會互通消息；這一區的街面，我可以回答。」
+- topic_id: altoria_noble_watch.topic_04
+  keyword: 委託
+  label: 委託
+  fallback:
+    scene_id: altoria_noble_watch.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 委託
+    - kind: speech
+      speaker: host
+      text: 「衛所不發委託，牆上也不貼告示，這句話我對每位訪客都說一遍。若想找事做，冒險者公會在中央廣場東邊，大廳裡有任務板。若有府邸私下託付差事，那是府裡的人與訪客之間的約定，與衛所無關。」
