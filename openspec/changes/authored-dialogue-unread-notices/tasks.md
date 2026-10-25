@@ -18,5 +18,5 @@ Shared contract v2 observes stable host_key and first-seen topic ID for both sou
 
 ## 4. Focused full lifecycle acceptance
 
-- [ ] 4.1 Add one browser method exercising unlock-during-scene, final return, single batch, relock/reload and persistent marker; register ownership and update dialogue help/author docs. Run focused narrative/Vitest/browser tests and contract_gate, keeping party skill notice behavior unchanged.
+- [x] 4.1 Add one browser method exercising unlock-during-scene, final return, single batch, relock/reload and persistent marker; register ownership and update dialogue help/author docs. Run focused narrative/Vitest/browser tests and contract_gate, keeping party skill notice behavior unchanged.
 

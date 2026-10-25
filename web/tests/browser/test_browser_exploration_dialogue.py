@@ -9,6 +9,7 @@ from tools.spec_traceability import covers_requirement
 from web.browser_support.browser_fixtures_data import (
     SHIPPED_DIALOGUE_KEY,
     SYNTH_LOCKED_TOPIC_ID,
+    SYNTH_LOCKED_TOPIC_ITEM_KEYS,
     synth_conditioned_fallback_host_line,
     synth_conditioned_variant_host_line,
 )
@@ -89,6 +90,10 @@ POSSESSED_DIALOGUE_METHOD = (
 #: The locked-topic UI journey: kit catalogs and the gatekeeper table, whose
 #: second topic stays visibly locked with a canonical hint and a refusal.
 LOCKED_TOPIC_METHOD = "test_locked_topic_shows_its_hint_and_plays_its_refusal"
+#: The unread/unlock notice journey (authored-dialogue-unread-notices): the
+#: same gatekeeper table, whose locked topic a GM console grant unlocks while
+#: another topic's scene plays.
+UNLOCK_NOTICE_METHOD = "test_unlock_during_a_scene_shows_one_deferred_notice"
 
 
 def _scene_frame(page) -> dict:
@@ -157,6 +162,55 @@ def _intercept_first_completion(page) -> None:
     )
 
 
+def _gm_console(page, verb: str, arguments: dict) -> dict:
+    """POST one GM console verb as the seeded operator (same-origin, CSRF).
+
+    The console runs inside the managed server process, so its validated
+    owner write commits through the canonical writer and its availability
+    refresh fans out to the live webclient exactly like any committed change.
+    """
+    page.evaluate("async () => { await fetch('/gm/', {credentials: 'same-origin'}); }")
+    token = next(
+        cookie["value"]
+        for cookie in page.context.cookies()
+        if cookie["name"] == "csrftoken"
+    )
+    return page.evaluate(
+        """async ([path, body, token]) => {
+            const response = await fetch(path, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': token},
+                body: JSON.stringify(body),
+            });
+            return {status: response.status, body: await response.json()};
+        }""",
+        [f"/gm/api/console/{verb}", arguments, token],
+    )
+
+
+def _gm_character(page) -> str:
+    """The managed runtime's sole player character as a console target."""
+    payload = page.evaluate(
+        """async () => {
+            const response = await fetch('/gm/api/state/characters?limit=200', {credentials: 'same-origin'});
+            return {status: response.status, body: await response.json()};
+        }"""
+    )
+    assert payload["status"] == 200, payload["body"]
+    items = payload["body"]["data"]["items"]
+    assert len(items) == 1, [item["label"] for item in items]
+    return f"#{items[0]['dbref']}"
+
+
+def _unlock_toasts(page) -> list:
+    """The rendered unlock notices' text, in queue order."""
+    return page.evaluate(
+        """() => [...document.querySelectorAll('[data-testid="feedback-toast-queue"] [data-tone="unlock"]')]
+            .map((toast) => toast.innerText)"""
+    )
+
+
 def _completion_failures(page) -> int:
     """How many completion attempts the interception rejected."""
     return page.evaluate("window.__completionFailures || 0")
@@ -186,7 +240,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             runtime.env["ELOSERN_BROWSER_AUTHORED_SCENE"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_POSSESSION"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_CONDITIONS"] = "1"
-        if self._testMethodName == LOCKED_TOPIC_METHOD:
+        if self._testMethodName in (LOCKED_TOPIC_METHOD, UNLOCK_NOTICE_METHOD):
             runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
             runtime.env["ELOSERN_BROWSER_DIALOGUE_LOCKED"] = "1"
 
@@ -1804,3 +1858,129 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page.click('[data-testid="dialogue-exit"]')
             wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
             page.close()
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
+    def test_unlock_during_a_scene_shows_one_deferred_notice(self):
+        """authored-dialogue-unread-notices 4.1: a deferred, single unlock notice.
+
+        The gatekeeper opens with its open topic unread and its second topic
+        locked (lock, no pip). While the open topic's scene plays, two GM
+        console grants commit the required items through the canonical
+        inventory writer; the second grant unlocks the topic and its committed
+        refresh claims ONE batch. Nothing shows until the scene's explicit
+        finish returns the choices; then one status toast names the topic
+        without taking focus, and its row carries the unread pip. A relock and
+        reopen shows no second notice, and a reload keeps the pip with no
+        replayed notice.
+        """
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        character = _gm_character(page)
+        host = overview_target_with_affordance(page, "explore.talk_open")
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s) and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        card = page.locator('[data-anchor="choices"] [data-testid="dialogue-choices"]')
+        picks = card.locator('[data-testid="dialogue-pick"]')
+        self.assertEqual(picks.nth(0).get_attribute("data-unread"), "true")
+        self.assertIn("（未讀）", picks.nth(0).text_content())
+        self.assertEqual(picks.nth(1).get_attribute("data-locked"), "true")
+        self.assertIsNone(picks.nth(1).get_attribute("data-unread"))
+        self.assertEqual(_unlock_toasts(page), [], "a first visit is not an unlock")
+
+        # Select the open topic: its scene starts playing.
+        card.focus()
+        _press(page, "Enter")
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
+        )
+        self.assertFalse(_scene_frame(page)["choices"])
+
+        # The qualification commits mid-scene through the canonical writer.
+        for item_key in SYNTH_LOCKED_TOPIC_ITEM_KEYS:
+            response = _gm_console(
+                page, "give_item", {"target": character, "key": item_key, "quantity": 1}
+            )
+            self.assertEqual(response["status"], 200, response["body"])
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("dialogueReading") or {}).get("unlockPending") == 1,
+        )
+        self.assertEqual(_unlock_toasts(page), [], "deferred while the scene plays")
+        self.assertFalse(_scene_frame(page)["choices"])
+
+        # Read to the end and give the explicit finish.
+        for _ in range(12):
+            if _scene_frame(page)["choices"]:
+                break
+            page.locator('[data-testid="message-page"]').focus()
+            _press(page, "Enter", wait_ms=150)
+        self.assertTrue(_scene_frame(page)["choices"])
+        page.wait_for_selector(
+            '[data-testid="feedback-toast-queue"] [data-tone="unlock"]', timeout=10000
+        )
+        toasts = _unlock_toasts(page)
+        self.assertEqual(len(toasts), 1)
+        self.assertIn("霧門後", toasts[0])
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
+            ),
+            "the notice never takes focus",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="feedback-toast-queue"] [data-tone="unlock"]').get_attribute("role"),
+            "status",
+        )
+        passage = card.locator(f'[data-testid="dialogue-pick"][data-row-key="dlg-topic-{SYNTH_LOCKED_TOPIC_ID}"]')
+        self.assertEqual(passage.get_attribute("data-unread"), "true")
+        self.assertIsNone(passage.get_attribute("data-locked"))
+
+        # Relock then reopen: the topic stays unread and announces nothing.
+        key = SYNTH_LOCKED_TOPIC_ITEM_KEYS[0]
+        response = _gm_console(page, "take_item", {"target": character, "key": key, "quantity": 1})
+        self.assertEqual(response["status"], 200, response["body"])
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: any(
+                c["topic_id"] == SYNTH_LOCKED_TOPIC_ID and c["availability"] == "locked"
+                for c in p.get("choices") or []
+            ),
+        )
+        response = _gm_console(page, "give_item", {"target": character, "key": key, "quantity": 1})
+        self.assertEqual(response["status"], 200, response["body"])
+        self._wait_panel(
+            page,
+            "dialogue",
+            lambda p: any(
+                c["topic_id"] == SYNTH_LOCKED_TOPIC_ID and c["availability"] == "open" and c["unread"]
+                for c in p.get("choices") or []
+            ),
+        )
+        page.wait_for_timeout(600)
+        self.assertEqual((store_state(page).get("dialogueReading") or {}).get("unlockPending"), 0)
+        self.assertEqual(len(_unlock_toasts(page)), 1, "no second notice on reopen")
+
+        # Reload: the durable pip stays, no notice is replayed.
+        page.reload()
+        wait_for_shell_active(page)
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        self.assertIsNone(store_state(page)["panels"]["dialogue"]["unlock_batch"])
+        open_dialogue_choices(page)
+        passage = page.locator(
+            f'[data-anchor="choices"] [data-testid="dialogue-pick"][data-row-key="dlg-topic-{SYNTH_LOCKED_TOPIC_ID}"]'
+        )
+        self.assertEqual(passage.get_attribute("data-unread"), "true")
+        page.wait_for_timeout(600)
+        self.assertEqual(_unlock_toasts(page), [])

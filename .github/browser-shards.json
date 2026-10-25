@@ -242,6 +242,7 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_completion_reload_discards_pending",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_possessed_companion_plays_an_authored_scene_with_its_own_portrait",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_locked_topic_shows_its_hint_and_plays_its_refusal",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_unlock_during_a_scene_shows_one_deferred_notice",
         "web.tests.browser.test_harness.PortAllocationTests"
       ],
       "files_b": [
