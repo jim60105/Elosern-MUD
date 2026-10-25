@@ -157,3 +157,7 @@ emission rules are scenario-pinned.
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
   possession gates, while the `context_actions` form, suggestion eligibility, and the deterministic
   fallback keep consuming the per-keyword and free-form entries unchanged
+
+#### Scenario: The possessed actor's talk entries stay visible disabled
+- **WHEN** the possessed actor is offered native freeform talk outside the authorized authored conversation surface
+- **THEN** that freeform entry keeps its existing stable visible-disabled possession refusal; lawful authored talk follows the separate enabled-context case
