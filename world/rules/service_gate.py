@@ -18,13 +18,13 @@ Contract:
   whose anchor room cannot be resolved, refuse service
   (``malformed_binding``) — the resolver never defaults open, mirroring the
   equipment fail-closed normalization idiom.
-- New professions with new service surfaces wire their gate in HERE; they do
+- New service capabilities declare their binding in the capability core
+  (``world/rules/npc_capabilities.py``) and wire their gate in HERE; they do
   not re-decide location semantics at the call site.
 
 Availability comes exclusively from persisted component fields
-(``service_binding`` / ``anchor_room_id``, written by the shared profession
-assembly). This module must never import ``profession_config`` — runtime
-gates read components, never the blueprint table.
+(``service_binding`` / ``anchor_room_id``, written by the shared capability
+assembly). Runtime gates read components, never the authored declaration.
 """
 
 from __future__ import annotations
@@ -96,22 +96,21 @@ def service_available(actor: Any, host: Any, component: Any) -> ServiceVerdict:
     2. ``person``-bound components serve anywhere the host stands beside the
        actor; ``place``-bound components additionally require the host to
        stand in their anchor room (else ``off_anchor``).
-    3. Anything malformed in the stored data — an UNKNOWN binding value, or
-       a ``place`` whose anchor room cannot resolve — is ``malformed_binding``
-       and fails closed.
+    3. Anything malformed in the stored data — a MISSING binding, an UNKNOWN
+       binding value, or a ``place`` whose anchor room cannot resolve — is
+       ``malformed_binding`` and fails closed.
 
-    An UNSET binding (``None``) reads as the design-D1 default co-presence:
-    convergence writes an authored value on every component it touches, so an
-    unset field is by construction a component the assembly never ran for —
-    hand-built NPCs, never shipped service data. The delta carves exactly
-    these out ("missing … on a converged component" is the malformed row;
-    converged components structurally cannot lack the field). An UNKNOWN
-    value (``"portable"``) is the fail-closed row.
+    A bound service capability always carries a stored binding: the shared
+    assembly writes one on every component it touches, and every service type
+    requires a declared binding. An unset field therefore describes state the
+    assembly never produced, and an unknown value describes corruption; both
+    fail closed rather than defaulting open. Ordinary narrative dialogue is
+    never queried here — it carries no service and keeps its own talk gates.
     """
     if actor.location is None or host.location != actor.location:
         return _REMOTE
     binding = getattr(component, "service_binding", None)
-    if binding is None or binding == "person":
+    if binding == "person":
         return _ALLOWED
     if binding != "place":
         _warn_malformed(host, component)
@@ -158,8 +157,8 @@ def off_anchor_place_service(npc: Any) -> str | None:
        the party module (the same safe read ``typeclasses/npcs.py`` uses).
     2. the npc carries at least one component with persisted
        ``service_binding == "place"`` — component classes are imported
-       function-locally from ``typeclasses.components`` (this module never
-       imports ``profession_config``; it reads components, never the table).
+       function-locally from ``typeclasses.components`` (this module reads
+       components, never the authored declaration).
     3. the component's anchor does not cover the npc's current room. An
        UNRESOLVABLE anchor (corrupt id, deleted or non-room row) counts as
        off-anchor here: unlike the interaction resolver this predicate

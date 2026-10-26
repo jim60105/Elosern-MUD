@@ -3,8 +3,8 @@
 ``sync_guild_economy()`` is the single idempotent entry point called after
 quest synchronization. It reloads the validated catalog against the current
 quest definition registry, installs service content (interiors, NPC hosts,
-components, and initial merchant stock), and registers the clock event
-sources.
+their declared capabilities, and initial merchant stock), and registers the
+clock event sources.
 
 ``restore_persisted_sessions()`` restores or terminates persisted
 combat/examination sessions. It is owned by this module but called from
@@ -32,14 +32,13 @@ from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.bootstrap import sync_service_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
-from world.rules.profession_assembly import (
-    assemble_profession_components,
+from world.rules.npc_capabilities import (
+    COMPONENT_TYPES,
+    assemble_capabilities,
     component_attribute_keys,
-    converge_managed_components,
-    project_row_kwargs,
-    resolve_component_plan,
+    managed_type_keys,
+    validate_capabilities,
 )
-from world.rules.profession_config import PROFESSION_COMPONENT_TYPES
 from world.rules.surfaces import (
     restore_component_state,
     snapshot_attributes,
@@ -53,7 +52,7 @@ CONTENT_SOURCE_TAG_CATEGORY = "content_source"
 
 #: The managed capability set this owner reconciles is the closed capability
 #: vocabulary itself — one declaration of the managed slots, not a second list.
-MANAGED_TYPE_KEYS: frozenset[str] = frozenset(PROFESSION_COMPONENT_TYPES)
+MANAGED_TYPE_KEYS: frozenset[str] = managed_type_keys()
 
 #: Host-level attributes the source batch may write on a reused host: the
 #: component slot list, the canonical age pair the existing age owner fills,
@@ -79,6 +78,13 @@ def _room_by_tag(tag):
 
     rooms = search_object_by_tag(tag)
     return rooms[0] if rooms else None
+
+
+def _rooms_by_tag(tag):
+    """Every object carrying this tag; the capability core picks the one Room."""
+    from evennia.utils.search import search_object_by_tag
+
+    return list(search_object_by_tag(tag))
 
 
 class ServiceHostIntegrityError(RuntimeError):
@@ -117,29 +123,20 @@ def _find_service_host(host_key: str) -> NPC | None:
     return host
 
 
-def _authored_shop_identity(authored_map) -> str | None:
-    """The shop or branch the row's components author, if any (no order tie)."""
-    for kwargs in authored_map.values():
-        identity = kwargs.get("shop_key") or kwargs.get("branch_key")
-        if identity:
-            return identity
-    return None
-
-
-def _apply_authored_initial_arousal(host: NPC, authored_map, attached: list[str]) -> None:
-    """Seed a clergy host's spawn-data arousal from its authored kwarg.
+def _apply_authored_initial_arousal(host: NPC, plan, attached: list[str]) -> None:
+    """Seed a clergy host's spawn-data arousal from its declared capability.
 
     The church design authors a small raised initial arousal on clergy hosts
-    through the ``initial_arousal`` identity kwarg of the ``church_host``
-    component (design §5.3: sanctuary NPCs start already-aroused). The seed
-    applies exactly when this sync newly attached a ``church_host`` — host
-    creation and the converged reuse of a pre-change host alike — and never
-    overwrites an existing raw baseline (an imported or previously authored
-    ``db.sexual`` wins), so a second sync changes nothing.
+    through the ``church_host`` capability's ``initial_arousal`` kwarg (design
+    §5.3: sanctuary NPCs start already-aroused). The seed applies exactly when
+    this sync newly attached a ``church_host`` — host creation and the
+    converged reuse of a pre-change host alike — and never overwrites an
+    existing raw baseline (an imported or previously authored ``db.sexual``
+    wins), so a second sync changes nothing.
     """
     if "church_host" not in attached:
         return
-    level = authored_map.get("church_host", {}).get("initial_arousal")
+    level = plan.kwargs_for("church_host").get("initial_arousal")
     if level is None:
         return
     if getattr(host, "db", None) is None or getattr(host.db, "sexual", None) is not None:
@@ -149,7 +146,7 @@ def _apply_authored_initial_arousal(host: NPC, authored_map, attached: list[str]
     host.db.sexual = build_initial_arousal_baseline(level)
 
 
-def _sync_service_host(row, room, host=None, *, created: list[NPC]) -> NPC:
+def _sync_service_host(row, room, plan, host=None, *, created: list[NPC]) -> NPC:
     """Create or converge one source-managed host from a roster row.
 
     A reused host keeps its dbref, name, title, persona, traits, inventory,
@@ -157,37 +154,25 @@ def _sync_service_host(row, room, host=None, *, created: list[NPC]) -> NPC:
     rebuilds anything identity-shaped. What it does converge is the declaration:
     the managed capability set (add missing, remove obsolete) and the authored
     configuration allowlist the shared assembly writes. Components attach ONLY
-    through the shared profession-assembly helper.
+    through the one capability assembler, from the validated plan.
 
     ``created`` receives a newly created instance as soon as the object exists,
     before the rest of its initialization can fail, so the surrounding batch can
     evict it if it has to roll back.
     """
-    authored_map = project_row_kwargs(row.profession, row.service_id, row.authored_kwargs)
     profile = NPC_PROFILE_REGISTRY.get(row.profile_key)
     prof_age = profile.age if profile else None
     prof_app_age = profile.apparent_age if profile else None
     if host is None:
         host = _create_and_initialize_host(
-            row, room, authored_map, profile, created=created
+            row, room, profile, created=created
         )
     else:
         # The existing canonical-age owner fills only absent values; it never
         # resets a live identity.
         ensure_npc_canonical_age(host, age=prof_age, apparent_age=prof_app_age)
-    attached = assemble_profession_components(
-        host, row.profession, authored_map, anchor_room=room
-    )
-    declared = frozenset(
-        type_key
-        for type_key, _kwargs in resolve_component_plan(row.profession, authored_map)
-    )
-    converge_managed_components(
-        host,
-        managed_type_keys=MANAGED_TYPE_KEYS,
-        declared_type_keys=declared,
-    )
-    _apply_authored_initial_arousal(host, authored_map, attached)
+    attached = assemble_capabilities(host, plan, reconcile=True)
+    _apply_authored_initial_arousal(host, plan, attached)
     # Normal sync is what marks a host source-owned: from here on the roster
     # lifecycle owner may retire it once its whole declaration is gone.
     host.tags.add(SERVICE_HOST_TAG, category=CONTENT_SOURCE_TAG_CATEGORY)
@@ -195,7 +180,7 @@ def _sync_service_host(row, room, host=None, *, created: list[NPC]) -> NPC:
 
 
 def _create_and_initialize_host(
-    row, room, authored_map, profile=None, *, created: list[NPC]
+    row, room, profile=None, *, created: list[NPC]
 ) -> NPC:
     """Build, baseline, initialize persona, and schedule creation event."""
     from world.rules.npc_identity import validate_npc_name, validate_npc_title
@@ -203,10 +188,10 @@ def _create_and_initialize_host(
     host = create_object(NPC, key=validate_npc_name(row.name), location=room)
     created.append(host)
     host.npc_title = validate_npc_title(row.title)
-    place = PLACE_REGISTRY.get(row.anchor_room)
+    place = PLACE_REGISTRY.get(row.spawn_room)
     if place is None:
         raise RuntimeError(
-            f"roster row {row.service_id!r} anchors at {row.anchor_room!r}, "
+            f"roster row {row.host_key!r} spawns at {row.spawn_room!r}, "
             "which has no place registry row"
         )
     host.race = place.host_race
@@ -238,10 +223,9 @@ def _create_and_initialize_host(
     transaction.on_commit(
         lambda context={
             "char": host.key,
-            "service": row.service_id,
-            "shop": _authored_shop_identity(authored_map),
-            "profession": row.profession.key,
+            "host_key": row.host_key,
             "profile": row.profile_key,
+            "components": list(row.component_types()),
         }: log_info("guild_service_host_created", context=context)
     )
     return host
@@ -251,7 +235,7 @@ def _host_service_ids(host: NPC) -> list[str]:
     """The service ids this host currently declares, in vocabulary order."""
     service_ids: list[str] = []
     for type_key in sorted(MANAGED_TYPE_KEYS):
-        slot = PROFESSION_COMPONENT_TYPES[type_key].get_component_slot()
+        slot = COMPONENT_TYPES[type_key].get_component_slot()
         component = host.components.get(slot)
         service_id = getattr(component, "service_id", None) if component else None
         if service_id is not None:
@@ -408,7 +392,7 @@ def _validate_roster(roster) -> None:
     for row in roster:
         if row.profile_key not in NPC_PROFILE_REGISTRY:
             raise ServiceHostIntegrityError(
-                f"service {row.service_id!r} names profile_key {row.profile_key!r} "
+                f"service host {row.host_key!r} names profile_key {row.profile_key!r} "
                 "which is absent from the NPC profile registry"
             )
         prof = NPC_PROFILE_REGISTRY[row.profile_key]
@@ -416,7 +400,7 @@ def _validate_roster(roster) -> None:
             val = getattr(prof, field_name, None)
             if type(val) is not int or not (0 <= val <= 10000):
                 raise ServiceHostIntegrityError(
-                    f"service {row.service_id!r} profile {row.profile_key!r} has invalid "
+                    f"service host {row.host_key!r} profile {row.profile_key!r} has invalid "
                     f"{field_name} {val!r}; must be an integer in 0..10000"
                 )
         if row.host_key in seen:
@@ -431,26 +415,23 @@ def sync_service_content() -> None:
     """Install the roster-declared permanent service content (design D7).
 
     The place-derived roster is the single truth for which hosts exist and what
-    they carry; this is its pure interpreter: per row, resolve the anchor room
-    by tag, find-or-create the host on its canonical authored identity, and
-    assemble the profession blueprint through the shared helper — never through
-    a code-side component literal.
+    they carry; this is its pure interpreter: per row, resolve each declared
+    capability's anchor room by tag, find-or-create the host on its canonical
+    authored identity, and assemble the validated capability plan — never
+    through a code-side component literal.
 
     Order is the contract. Every row's authored identities are validated and
     every canonical identity is resolved (duplicate and person-ownership
-    conflicts fail closed) BEFORE the first persistent write, including the
-    interiors repair. The row operation then runs as ONE transaction: root
-    component convergence for every resolvable row, the stock initializer for
-    hosts that are still uninitialized, and whole-row retirement of source-owned
-    hosts whose declaration is gone. Any failure rolls the database back and
-    restores the in-process attribute, tag and component caches of every reused
-    host, evicts every object this batch created, and puts back the owner-side
+    conflicts fail closed) BEFORE the first persistent write. Interior
+    preparation, COMPLETE room resolution for every row, and every write then
+    share ONE transaction: a missing, ambiguous or non-Room anchor rejects the
+    whole operation — no row is ever skipped, and the prepared interiors roll
+    back with it. The batch also converges each host's managed capability set,
+    seeds still-uninitialized stock, and retires source-owned hosts whose
+    declaration is gone. Any failure rolls the database back and restores the
+    in-process attribute, tag and component caches of every reused host, evicts
+    every object this batch created, and puts back the owner-side
     party/possession surfaces a retirement had already touched.
-
-    A row whose room tag resolves to no room emits the named per-row warning
-    and is skipped alone (the existing interiors-missing retry still runs
-    first). An empty or wholly unresolvable roster still retires the hosts it
-    no longer authorizes.
     """
     catalog = get_catalog()
     roster = catalog.service_hosts
@@ -458,25 +439,6 @@ def sync_service_content() -> None:
     # Room- and write-independent identity preflight for EVERY roster row.
     hosts = {row.host_key: _find_service_host(row.host_key) for row in roster}
     declared = frozenset(row.host_key for row in roster)
-    rooms = {row.host_key: _room_by_tag(row.anchor_room) for row in roster}
-    if any(room is None for room in rooms.values()):
-        log_warn(
-            "guild_economy_service_interiors_missing",
-            context={"action": "sync_service_interiors_first"},
-        )
-        sync_service_interiors()
-        rooms = {row.host_key: _room_by_tag(row.anchor_room) for row in roster}
-    for row in roster:
-        if rooms[row.host_key] is None:
-            log_warn(
-                "guild_service_host_anchor_room_missing",
-                context={
-                    "service": row.service_id,
-                    "anchor_room": row.anchor_room,
-                    "action": "skip_service_host_row",
-                },
-            )
-    processable = [row for row in roster if rooms[row.host_key] is not None]
     retirement_candidates = _undeclared_source_hosts(declared)
     reused = [
         (host, snapshot_attributes(host, HOST_ATTRIBUTE_SURFACES))
@@ -487,12 +449,14 @@ def sync_service_content() -> None:
     retired: list[dict[str, Any]] = []
     try:
         with transaction.atomic():
+            rooms, plans = _resolve_service_plans(roster)
             synced: list[NPC] = []
-            for row in processable:
+            for row in roster:
                 synced.append(
                     _sync_service_host(
                         row,
                         rooms[row.host_key],
+                        plans[row.host_key],
                         hosts[row.host_key],
                         created=created,
                     )
@@ -502,11 +466,42 @@ def sync_service_content() -> None:
     except Exception:
         _restore_batch(created=created, reused=reused, retired=retired)
         raise
-    if not processable:
+
+
+def _resolve_service_plans(roster):
+    """Resolve every spawn room and every capability anchor, or fail closed.
+
+    Interiors are prepared first (the existing repair pass) and then EVERY
+    row's spawn room and every declared place anchor is resolved. A missing,
+    ambiguous or non-Room anchor raises :class:`ServiceHostIntegrityError`
+    naming the row, so the surrounding transaction rolls the whole batch —
+    prepared interiors included — back. Nothing here writes a host.
+    """
+    rooms = {row.host_key: _room_by_tag(row.spawn_room) for row in roster}
+    if any(room is None for room in rooms.values()):
         log_warn(
-            "guild_economy_service_interiors_still_missing",
-            context={"action": "skip_service_content"},
+            "guild_economy_service_interiors_missing",
+            context={"action": "sync_service_interiors_first"},
         )
+        sync_service_interiors()
+        rooms = {row.host_key: _room_by_tag(row.spawn_room) for row in roster}
+    unresolved = sorted(row.host_key for row in roster if rooms[row.host_key] is None)
+    if unresolved:
+        raise ServiceHostIntegrityError(
+            f"service host spawn room unresolved for {unresolved}; the complete "
+            "operation rolls back"
+        )
+    plans = {}
+    for row in roster:
+        try:
+            plans[row.host_key] = validate_capabilities(
+                row.components, room_resolver=_rooms_by_tag
+            )
+        except Exception as error:
+            raise ServiceHostIntegrityError(
+                f"service host {row.host_key!r} declares unusable capabilities: {error}"
+            ) from error
+    return rooms, plans
 
 
 def _initialize_merchant_stock(hosts: list[NPC]) -> None:
@@ -519,7 +514,7 @@ def _initialize_merchant_stock(hosts: list[NPC]) -> None:
     skipped for an unresolved anchor are never passed here.
     """
     catalog = get_catalog()
-    merchant_slot = PROFESSION_COMPONENT_TYPES["merchant"].get_component_slot()
+    merchant_slot = COMPONENT_TYPES["merchant"].get_component_slot()
     for host in hosts:
         merchant = host.components.get(merchant_slot)
         if merchant is None or merchant.merchant_stock is not None:
