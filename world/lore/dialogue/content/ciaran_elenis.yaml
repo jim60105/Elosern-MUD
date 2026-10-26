@@ -1,55 +1,90 @@
 schema_version: 1
-greeting: 長老古樹下的坐石曬得微溫，艾莉妮斯‧達恩斯特瑞德爾抬眼看你，膝上擱著一縷剛剝下的樹皮：「是啊，坐吧，小傢伙。老人家這裡沒有東西可以給你，也沒有事情要你辦。想聽村子的事、林子的事，還是這一族為什麼愛刀？記得的我就說。」
+greeting: 長老古樹下的坐石被山風吹得微涼，艾莉妮斯‧達恩斯特瑞德爾赤足坐在盤根間，膝上擱著一縷剛剝下的樹皮。她抬起眼，眼角浮起溫和的淺笑：「坐吧，小傢伙。我這裡沒有事情要你辦，也沒有值得爭搶的寶物。想聽村子的由來、山裡的林子，還是族裡的舊事？只要我這把老骨頭還記得，都能陪你說說。」
 topics:
 - topic_id: ciaran_elenis_home.topic_01
   keyword: 村子
   label: 村子
   fallback:
     scene_id: ciaran_elenis_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 村子
+      text: 請問長老，這座暗影谷村是怎麼建起來的？在山脈西側的地下隱居這麼久，平日大家都是怎麼過日子的？
+    - kind: narration
+      text: 艾莉妮斯‧達恩斯特瑞德爾低下頭，指尖順著樹皮上的細紋撫平，語調不急不躁。
     - kind: speech
       speaker: host
-      text: 「嗯……這村子早年不在這裡。古樹長穩了、溪水改了道，族人才跟著搬過來，一棵樹接一棵樹地認熟。你問村子的來歷，我能說的都是這種小事。精靈不寫史書，往事都記在記得的人心裡，還有那幾棵老樹下。」
+      text: 「嗯……這座村子早年不在這片谷底。幾百年前，外頭的古樹長穩了，地下的溪水改了道，族人才順著水聲遷過來，一處岩洞接一處林地認熟。族裡沒有官員，也沒有誰管著誰，大家各做各喜歡的事，日子就這麼自然過下來了。」
+    - kind: speech
+      speaker: actor
+      text: 竟然沒有任何規矩或首領管轄嗎？那要是遇上爭執，大家該聽誰的？
+    - kind: speech
+      speaker: host
+      text: 「是啊，外頭的人總覺得凡事都要分個尊卑高低。在我們這裡，想吃東西就去村中廣場的共食棚，想磨練身手就去練刀場，遇上拿不準的事，大家聚在老樹下坐著商量幾句，事情也就過去了。你看，沒有命令，大家不也平穩過了上千年嗎？」
 - topic_id: ciaran_elenis_home.topic_02
   keyword: 基亞蘭
   label: 基亞蘭
+  predecessors:
+  - ciaran_elenis_home.topic_01
+  disclosure: pure_chain
   fallback:
     scene_id: ciaran_elenis_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 基亞蘭
+      text: 剛才聽你說起村子的由來，我還想請教，基亞蘭一族為什麼會對刀術如此執著？外頭的傳聞都說黑暗精靈極擅長使刀呢。
+    - kind: narration
+      text: 艾莉妮斯‧達恩斯特瑞德爾望向練刀場的方向，眼底泛起一抹遙遠而溫暖的笑意。
     - kind: speech
       speaker: host
-      text: 「是啊，基亞蘭這一支愛刀。外頭說我們脾氣硬，我們自己覺得是記性長。刀柄上刻的名字一代比一代多，刀柄磨舊了，名字還在。那對黑髮的雙生子也在這裡長大，悠花在練刀場從雨季待到天晴，泰莉爾說，那孩子一握上木刀，整個場子都安靜下來。」
+      text: 「是啊，基亞蘭這一支偏愛用刀。外頭的旅人常說我們性格剛硬，可我們自己心裡清楚，這純粹是記性長。刀柄上的刻痕一代接一代傳下來，握柄磨光滑了，上頭的名字與心意都還在。對我們來說，握著刀不是為了奪取，而是守護親人和村子最踏實的方式。」
+    - kind: speech
+      speaker: actor
+      text: 原來刀術對大家來說是這層意義。那村裡的後輩也都是這樣練出來的嗎？
+    - kind: speech
+      speaker: host
+      text: 「可不是嗎。那對黑髮的雙生子也是在谷裡長大。悠花那孩子小時候性子倔，在練刀場從晨霧練到落霜，泰莉爾總在一旁看著。她第一次握穩木刀時，整個場子的風聲彷彿都跟著沉靜下來。看著這些孩子握起刀，我就知道村子的心意一直都在。」
 - topic_id: ciaran_elenis_home.topic_03
   keyword: 森林
   label: 森林
   fallback:
     scene_id: ciaran_elenis_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 森林
+      text: 長老，中央山脈西側這片深林地勢複雜，外人進山時常迷失方向。要如何才能在林中安全行走？
+    - kind: narration
+      text: 艾莉妮斯‧達恩斯特瑞德爾側耳傾聽樹冠間掠過的風聲，神情安詳從容。
     - kind: speech
       speaker: host
-      text: 「林子認得村裡每一雙腳。打獵有打獵的路，採集有採集的時節，哪片坡哪一年該讓它歇著，族裡的老一輩都記得。你要進林子，記住一句就夠，帶走多少，就還回去多少。森林不計較，可是它會記得。」
+      text: 「嗯……山裡的林子認得腳步。打獵有常走的山脊，採藥草有順應的時節，哪一片山坡該讓它歇上幾年，族裡的老一輩都替草木記著。林木有自己的呼吸，你踩在落葉上的力道急了，樹根與蟲鳥自然察覺得到。」
+    - kind: speech
+      speaker: actor
+      text: 這麼說來，只要尊重這片山林，林地就不會與人為難？
+    - kind: speech
+      speaker: host
+      text: 「是啊，道理其實很簡單，帶走多少果實，就留下多少敬意。山林從不主動開口討要，但它會把每一次取用都記在枝葉間。只要心裡不存貪念，端正心思順著山勢走，這片樹海自然會替你留下一條回來的路。」
 - topic_id: ciaran_elenis_home.topic_04
   keyword: 往事
   label: 往事
   fallback:
     scene_id: ciaran_elenis_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 往事
+      text: 長老在這棵古樹下坐了數百年，見證過許多世代交替吧？不知有什麼印象深刻的往事可以分享？
+    - kind: narration
+      text: 艾莉妮斯‧達恩斯特瑞德爾輕聲笑了笑，把手裡的樹皮擱回膝頭，目光悠遠。
     - kind: speech
       speaker: host
-      text: 「往事啊……有一年冬天溪水結了冰，孩子們跑到冰上練刀，摔得滿身是雪，笑聲一路傳到古樹這裡。族裡的往事多半是這樣的小事，已經很多年沒有什麼『重要的事』了。常有人來找我做主，可是我不管事，也沒有什麼能准你或攔你。」
+      text: 「往事啊……有一年寒冬，山谷深處的溪水結了厚冰。村裡的孩子們脫了鞋跑到冰面上練刀，滿身是雪，笑聲一路飄到這棵古樹下。幾百年過去了，留在我心裡的淨是這種瑣碎小事，暗影谷村已經很久沒有發生所謂的大事了。」
+    - kind: speech
+      speaker: actor
+      text: 原來在漫長的歲月裡，真正被長久記住的都是這些平凡的日常。
+    - kind: speech
+      speaker: host
+      text: 「是啊，小傢伙。外頭的王公貴族常把征戰與盟約刻在石碑上，可歲月一晃，石碑也會崩解。偶爾有人帶著煩惱跑來請我定奪，我都勸他們去溪邊洗把臉。凡事順著自己的心意過，等活到我這個年歲，你就會發現那些爭執其實輕得像一陣風。」
