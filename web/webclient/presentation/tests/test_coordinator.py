@@ -147,17 +147,25 @@ class CoordinatorBasicsTests(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::full-snapshots-and-updates-have-registered-replacement-semantics"
     )
-    def test_over_budget_envelope_rejects_before_revision_consumption_or_send(self):
+    def test_structurally_invalid_envelope_rejects_before_revision_consumption_or_send(self):
+        # An aggregate above 65,536 bytes is now a legal logical publication
+        # that travels as bounded parts (webclient-publication-codec); a
+        # structurally invalid document still fails preflight.
         from web.webclient.presentation.protocol import JSONSafetyError
 
         from web.webclient.presentation.tests._support import publication_failure
 
+        invalid = {
+            "available": True,
+            **{f"pad_{i}": "x" * 1500 for i in range(50)},
+            "overflow": "x" * 2100,
+        }
         session = FakeSession()
         over_spec = PresenterSpec(
             name="status",
             schema_version=1,
             unavailable_reason=("missing_data", "無法讀取角色資料"),
-            presenter=lambda context: {"available": True, **{f"pad_{i}": "x" * 1500 for i in range(50)}},
+            presenter=lambda context: dict(invalid),
         )
         coordinator = _coordinator(session, _registry(over_spec))
         self.assertEqual(coordinator.revision, 0)
@@ -166,9 +174,7 @@ class CoordinatorBasicsTests(unittest.TestCase):
         self.assertEqual(len(session.sent), 0)
 
         publication_failure(
-            coordinator.panel_update(
-                _context(), {"status": {f"pad_{i}": "x" * 1500 for i in range(50)}}
-            )
+            coordinator.panel_update(_context(), {"status": dict(invalid)})
         ).trap(JSONSafetyError)
         self.assertEqual(coordinator.revision, 0)
         self.assertEqual(len(session.sent), 0)

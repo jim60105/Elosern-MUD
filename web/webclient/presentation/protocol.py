@@ -23,6 +23,8 @@ UI_SNAPSHOT = "ui_snapshot"
 UI_UPDATE = "ui_update"
 UI_ACTION_RESULT = "ui_action_result"
 UI_PROTOCOL_ERROR = "ui_protocol_error"
+# One bounded part of a logical snapshot/delta that cannot travel intact.
+UI_PUBLICATION_PART = "ui_publication_part"
 
 # The only protocol schema shipped by this delivery unit.
 PROTOCOL_VERSION = 1
@@ -124,7 +126,9 @@ _SEASON_LABEL_RE = re.compile(r"^[\s\S]{1,32}$")
 # The server messages that a client may synchronize or act against, and the
 # client messages the server accepts. Used by the input-function boundary.
 CLIENT_MESSAGES = frozenset({UI_SYNC, UI_ACTION})
-SERVER_MESSAGES = frozenset({UI_SNAPSHOT, UI_UPDATE, UI_ACTION_RESULT, UI_PROTOCOL_ERROR})
+SERVER_MESSAGES = frozenset(
+    {UI_SNAPSHOT, UI_UPDATE, UI_ACTION_RESULT, UI_PROTOCOL_ERROR, UI_PUBLICATION_PART}
+)
 
 
 class ProtocolError(ValueError):
@@ -238,11 +242,17 @@ def carries_available_dialogue(payload: Any) -> bool:
     return dialogue.get("available") is True and dialogue.get("kind") == "dialogue"
 
 
-def check_envelope(payload: Any) -> None:
-    """Enforce the global bounds over one whole envelope, including byte size."""
-    check_json_safety(payload)
+def check_envelope_bytes(payload: Any, byte_size: int | None = None) -> None:
+    """Enforce the envelope byte allowances over one JSON-safe payload.
+
+    ``byte_size`` may carry the already-computed canonical UTF-8 size of the
+    whole payload, so a caller that owns those bytes never serializes the
+    document twice. A dialogue-carrying envelope additionally measures its
+    dialogue panel and its dialogue-removed form, exactly as before.
+    """
+    size = json_byte_size(payload) if byte_size is None else byte_size
     if carries_available_dialogue(payload):
-        if json_byte_size(payload) > DIALOGUE_ENVELOPE_MAX_BYTES:
+        if size > DIALOGUE_ENVELOPE_MAX_BYTES:
             raise JSONSafetyError(
                 f"canonical JSON exceeds {DIALOGUE_ENVELOPE_MAX_BYTES} bytes"
             )
@@ -260,10 +270,16 @@ def check_envelope(payload: Any) -> None:
                 f"dialogue-removed envelope canonical JSON exceeds {MAX_CANONICAL_JSON_BYTES} bytes"
             )
     else:
-        if json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
+        if size > MAX_CANONICAL_JSON_BYTES:
             raise JSONSafetyError(
                 f"canonical JSON exceeds {MAX_CANONICAL_JSON_BYTES} bytes"
             )
+
+
+def check_envelope(payload: Any) -> None:
+    """Enforce the global bounds over one whole envelope, including byte size."""
+    check_json_safety(payload)
+    check_envelope_bytes(payload)
 
 
 def _require_exact_fields(payload: Any, name: str, required: set[str], conditional: dict[str, Any]) -> None:
@@ -751,6 +767,20 @@ def validate_ui_action(payload: Any) -> dict[str, Any]:
     }
 
 
+def validate_ui_publication_part(payload: Any) -> dict[str, Any]:
+    """Validate one ``ui_publication_part`` frame through its owning codec.
+
+    The part wire belongs to :mod:`web.webclient.presentation.publication_parts`,
+    which imports this module; dispatch stays lazy so registration never
+    depends on import order. Field shape, header consistency, canonical base64
+    chunks and the generic frame ceiling all apply.
+    """
+    from web.webclient.presentation.publication_parts import validate_publication_part
+
+    header, _raw = validate_publication_part(payload)
+    return header
+
+
 # Per-message validator table used by input functions and the dispatcher.
 VALIDATORS: dict[str, Any] = {
     UI_SYNC: validate_ui_sync,
@@ -759,6 +789,7 @@ VALIDATORS: dict[str, Any] = {
     UI_UPDATE: validate_ui_update,
     UI_ACTION_RESULT: validate_ui_action_result,
     UI_PROTOCOL_ERROR: validate_ui_protocol_error,
+    UI_PUBLICATION_PART: validate_ui_publication_part,
 }
 
 

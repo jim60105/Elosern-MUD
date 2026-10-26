@@ -336,6 +336,16 @@ var map_parts = require("./protocol/map_parts.js");
     MAP_PART_SCHEMA_VERSION: map_parts.MAP_PART_SCHEMA_VERSION,
     MAP_PART_RAW_BYTES: map_parts.MAP_PART_RAW_BYTES,
     MAP_PART_CHUNK_CHARS: map_parts.MAP_PART_CHUNK_CHARS,
+    // General publication parts (mirror of
+    // web.webclient.presentation.publication_parts). The browser assembler
+    // that consumes them belongs to the next delivered change.
+    PUBLICATION_MAX_BYTES: C.PUBLICATION_MAX_BYTES,
+    PUBLICATION_PART_BYTES: C.PUBLICATION_PART_BYTES,
+    PUBLICATION_CHUNK_BYTES: C.PUBLICATION_CHUNK_BYTES,
+    PUBLICATION_MAX_CHUNKS: C.PUBLICATION_MAX_CHUNKS,
+    PUBLICATION_MAX_PARTS: C.PUBLICATION_MAX_PARTS,
+    PUBLICATION_ASSEMBLY_TIMEOUT_MS: C.PUBLICATION_ASSEMBLY_TIMEOUT_MS,
+    PUBLICATION_MAX_ASSEMBLIES: C.PUBLICATION_MAX_ASSEMBLIES,
     validateAreaMapPanel: map_panels.validateAreaMapPanel,
     validateWorldMapPanel: map_panels.validateWorldMapPanel,
     validateMapPanel: map_panels.validateMapPanel,
