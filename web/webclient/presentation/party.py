@@ -67,7 +67,6 @@ from web.webclient.presentation.protocol import (
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.action import stored_gauge_pair
 from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
-from world.rules.npc_identity import npc_display_name
 from world.rules.party import (
     PARTY_MAX_COMPANIONS,
     bound_owner_of,
@@ -438,9 +437,7 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
     slots: list[dict[str, Any]] = [
         {
             "identity": commander_id,
-            "display_name": npc_display_name(owner)[
-                :MAX_DISPLAY_NAME_CODE_POINTS
-            ],
+            "display_name": getattr(owner, "key", "")[:MAX_DISPLAY_NAME_CODE_POINTS],
             "portrait_ref": _resolve_portrait_ref(owner, commander_members),
             "hp_current": commander_hp_current,
             "hp_maximum": commander_hp_maximum,
@@ -466,9 +463,7 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
         slots.append(
             {
                 "identity": int(npc.pk),
-                "display_name": npc_display_name(npc)[
-                    :MAX_DISPLAY_NAME_CODE_POINTS
-                ],
+                "display_name": getattr(npc, "key", "")[:MAX_DISPLAY_NAME_CODE_POINTS],
                 "portrait_ref": _resolve_portrait_ref(npc, members),
                 "hp_current": hp_current,
                 "hp_maximum": hp_maximum,

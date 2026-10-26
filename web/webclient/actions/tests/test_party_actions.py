@@ -135,6 +135,7 @@ class PartyTransferAdapterTests(EvenniaTestCase):
     )
     def test_success_returns_the_fixed_message_and_full_snapshot(self):
         self.commander.db.inventory = [_POTION.key, _POTION.key]
+        self.aila.npc_title = "合成稱號"
 
         result = _party_transfer_adapter(self.commander, self._payload(quantity=2))
 

@@ -133,7 +133,8 @@ class NpcPersonaActionsAdmissionAndMutationTest(_NpcPersonaActionsFixture, Evenn
         data = result["data"]
         self.assertEqual(data["npc_id"], self.npc.id)
         self.assertEqual(data["display_name"], "接待員愛麗絲")
-        self.assertEqual(data["npc_title"], "資深接待員")
+        # The stored title is inert: the private snapshot never emits it.
+        self.assertNotIn("npc_title", data)
         self.assertEqual(data["persona_version"], 1)
         self.assertEqual(data["persona"]["identity"]["hidden"], "秘密情報員")
 
@@ -493,7 +494,7 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         self.addCleanup(self._registry_patch.stop)
 
     @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
-    def test_read_returns_exactly_seven_keys_with_field_and_profile_default(self):
+    def test_read_returns_exactly_six_keys_with_field_and_profile_default(self):
         self.npc.db.npc_offline_greeting = "自訂開場白。"
         session, coordinator = self._session_and_coordinator()
         result = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id})
@@ -501,7 +502,7 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         data = result["data"]
         self.assertEqual(
             set(data),
-            {"npc_id", "display_name", "npc_title", "persona_version", "persona", "offline_greeting", "default_greeting"},
+            {"npc_id", "display_name", "persona_version", "persona", "offline_greeting", "default_greeting"},
         )
         self.assertEqual(data["offline_greeting"], "自訂開場白。")
         self.assertEqual(data["default_greeting"], "「歡迎來到公會。」")

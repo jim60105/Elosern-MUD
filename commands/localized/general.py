@@ -38,7 +38,6 @@ from world.rules.equipment import (
     plan_inventory_delta,
     registry_key_for_object,
 )
-from world.rules.npc_identity import npc_display_name
 from world.rules.party_inventory import (
     PartyTransferError,
     resolve_item_token,
@@ -627,7 +626,7 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
             return True
         caller.msg(
             f"你把 {outcome.quantity} 個{item_display_name(outcome.item_key)}"
-            f"交給了{npc_display_name(outcome.receiver)}。"
+            f"交給了{outcome.receiver.key}。"
         )
         return True
 

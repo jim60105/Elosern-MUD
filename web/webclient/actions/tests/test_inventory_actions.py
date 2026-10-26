@@ -634,6 +634,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
     )
     def test_companion_toggle_names_the_member_and_leaves_the_commander_alone(self):
         companion = self._companion()
+        companion.npc_title = "合成稱號"
         companion.db.inventory = [_T_BLADE.key]
         self.player.db.inventory = [_T_BLADE.key]
         result = _inventory_toggle_equip_adapter(
@@ -641,6 +642,7 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIn(f"{companion.key}裝備了", result["message"])
+        self.assertNotIn("合成稱號", result["message"])
         self.assertEqual(companion.db.equipment["weapon_main"], _T_BLADE.key)
         self.assertIsNone(self.player.db.equipment)
         # The unequip direction keeps the same member subject.

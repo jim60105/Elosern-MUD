@@ -1,7 +1,7 @@
 """Fixed-fixture reader tests: NPCs (task 2.2 / 6.1).
 
 Establishes the delta requirement "Complete curated entity summaries" for the
-NPC kind: every player-character field plus title/profession, service
+NPC kind: every player-character field with the plain authored name, service
 components, the seven-section persona card with its version, today's schedule
 with the current slot, and the dialogue key. Its ``gm-runtime-state``
 requirement annotation was attached when the delta spec synced into the main
@@ -77,15 +77,39 @@ class NpcReaderTests(EvenniaTest):
         self.assertEqual(keys[0], "identity")
         self.assertEqual(failed_sections(detail), {})
 
-    def test_identity_reports_title_profession_and_dialogue_key(self):
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
+    def test_identity_reports_the_plain_name_and_dialogue_key(self):
         detail = npcs.detail(self.npc)
         identity = section_of(detail, "npc_identity")
-        self.assertIn("合成頭銜", row_value(identity, "名稱"))
-        self.assertEqual(row_value(identity, "稱號"), "合成頭銜")
+        # The stored title is inert: the reader shows the authored plain name,
+        # never the title and never a duplicate profession summary row.
+        self.assertEqual(row_value(identity, "名稱"), self.npc.key)
+        self.assertNotIn("合成頭銜", str(identity))
+        labels = [entry["label"] for entry in identity["rows"]]
+        self.assertNotIn("稱號", labels)
+        self.assertNotIn("職業", labels)
         self.assertEqual(row_value(identity, "對話鍵"), "t_reader_dialogue")
-        professions = row_value(identity, "職業")
-        self.assertIn("腳本對話", professions)
-        self.assertIn("公會櫃檯", professions)
+
+    def test_labels_agree_with_the_text_and_exploration_name(self):
+        # One plain-name source: the GM label, the identity row, the item
+        # label and the text/webclient display name all read the same key.
+        detail = npcs.detail(self.npc)
+        item = npcs.item_of(self.npc)
+        display_name = self.npc.get_display_name()
+        self.assertEqual(detail["label"], display_name)
+        self.assertEqual(item["label"], display_name)
+        self.assertEqual(row_value(section_of(detail, "npc_identity"), "名稱"), display_name)
+
+    def test_a_raising_title_accessor_never_reaches_the_reader(self):
+        def _raise() -> str:
+            raise RuntimeError("corrupt persisted attribute read")
+
+        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
+            detail = npcs.detail(self.npc)
+            item = npcs.item_of(self.npc)
+        self.assertEqual(detail["label"], self.npc.key)
+        self.assertEqual(item["label"], self.npc.key)
+        self.assertEqual(failed_sections(detail), {})
 
     def test_persona_card_exposes_seven_sections_and_the_version(self):
         detail = npcs.detail(self.npc)
@@ -104,6 +128,11 @@ class NpcReaderTests(EvenniaTest):
         self.assertIn(ScriptedDialogue.name, slots)
         self.assertIn(GuildStaff.name, slots)
         self.assertIn("t_reader_service", " ".join(column_values(services, "fields")))
+
+    def test_item_fields_keep_only_the_room_summary(self):
+        item = npcs.item_of(self.npc)
+        labels = [field["label"] for field in item["fields"]]
+        self.assertEqual(labels, ["所在房間"])
 
     def test_schedule_marks_today_plan_and_the_current_slot(self):
         states = npc_schedules.get_rulebook().states

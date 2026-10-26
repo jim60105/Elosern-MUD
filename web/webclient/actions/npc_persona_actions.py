@@ -172,11 +172,10 @@ _NPC_CARD_FIELD_NAMES: dict[str, str] = {
 }
 
 def _editor_data(target: NPC, version: int, card: NpcCard) -> dict[str, Any]:
-    """The seven-key editor snapshot shared by read and update successes."""
+    """The six-key editor snapshot shared by read and update successes."""
     return {
         "npc_id": target.id,
         "display_name": target.key,
-        "npc_title": getattr(target, "npc_title", None) or "",
         "persona_version": version,
         "persona": card.to_record(),
         "offline_greeting": read_offline_greeting(target),

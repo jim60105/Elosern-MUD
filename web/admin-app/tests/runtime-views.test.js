@@ -12,8 +12,6 @@ const NPC_ITEM = {
   dbref: 12,
   label: "合成守衛",
   fields: [
-    { key: "職業", label: "職業", value: "公會櫃檯" },
-    { key: "稱號", label: "稱號", value: "合成頭銜" },
     { key: "所在房間", label: "所在房間", value: "合成廣場" },
   ],
 };
@@ -56,8 +54,6 @@ describe("RuntimeListView", () => {
     expect(wrapper.get("h2").text()).toBe("NPC");
     expect(wrapper.findAll("th").map((node) => node.text())).toEqual([
       "名稱",
-      "職業",
-      "稱號",
       "所在房間",
     ]);
     expect(wrapper.get(".gm-list__name a").attributes("href")).toBe("/gm/runtime/npcs/12");

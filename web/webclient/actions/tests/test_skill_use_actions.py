@@ -344,6 +344,18 @@ class SkillPreviewActionTests(_SkillUseCase):
         self.assertNotEqual(by_id[first.pk], by_id[second.pk])
         self.assertTrue(by_id[first.pk].startswith("twin villager"))
 
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
+    def test_target_labels_carry_the_plain_key_and_keep_the_label_bound(self):
+        sentinel = self._npc("sentinel villager")
+        sentinel.npc_title = "合成稱號"
+        long_npc = self._npc("長" * 80)
+        self._act("explore.skill_preview", {"skill_key": _T_HEAL})
+        targets = self._panel()["skill"]["targets"]
+        by_id = {row["identity"]: row["label"] for row in targets}
+        self.assertEqual(by_id[sentinel.pk], "sentinel villager")
+        self.assertNotIn("合成稱號", str(targets))
+        self.assertEqual(by_id[long_npc.pk], "長" * 48)
+
     def test_area_opening_discloses_every_living_monster(self):
         wolves = [self._wolf(f"area wolf {index}") for index in range(3)]
         self._act("explore.skill_preview", {"skill_key": _T_AREA_DAMAGE})

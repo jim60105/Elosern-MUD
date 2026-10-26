@@ -1,11 +1,12 @@
-"""NPC typeclass tests: canonical-age helper and the title identity surface.
+"""NPC typeclass tests: canonical-age helper and the title storage surface.
 
-The title cases (npc-title-identity-core) pin the immutable-by-structure
-attribute, the opt-in ``full_identity`` display flag, and the deliberate
-absence of any title write API on the typeclass or the command surface.
+The title cases pin the immutable-by-structure attribute, its inertness on
+every display read, and the deliberate absence of any title write API on the
+typeclass or the command surface.
 """
 
 import inspect
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -17,10 +18,12 @@ from commands.character_creation import CharacterCreationCmdSet
 from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
 from commands.localized import ProjectXYZGridCmdSet
 from commands.title import CmdTitle
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.rules.npc_identity import validate_npc_title
+
+
+def _raise_corrupt_title_read() -> str:
+    raise RuntimeError("corrupt persisted attribute read")
 
 
 class EnsureNpcCanonicalAgeTests(EvenniaTestCase):
@@ -102,7 +105,7 @@ class EnsureNpcCanonicalAgeTests(EvenniaTestCase):
 
 
 class NPCTitleDisplayTests(EvenniaTestCase):
-    """The immutable-by-structure attribute and the opt-in display flag."""
+    """The immutable-by-structure attribute is inert on every display read."""
 
     def setUp(self):
         super().setUp()
@@ -113,31 +116,16 @@ class NPCTitleDisplayTests(EvenniaTestCase):
         self.assertEqual(self.npc.npc_title, "")
         self.assertIsNone(self.npc.attributes.get("npc_title", return_obj=True))
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
-    def test_display_name_without_the_flag_stays_byte_identical_plain_name(self):
+    def test_display_name_stays_the_plain_name_with_a_title_stored(self):
         self.npc.npc_title = validate_npc_title("南門守衛")
-        plain = self.npc.get_display_name(self.npc)
-        self.assertEqual(plain, "塞提斯")
-        self.assertEqual(self.npc.get_display_name(self.npc, full_identity=False), plain)
+        self.assertEqual(self.npc.get_display_name(self.npc), "塞提斯")
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
-    def test_full_identity_flag_composes_name_and_title(self):
+    def test_a_raising_title_accessor_never_reaches_the_display_name(self):
         self.npc.npc_title = validate_npc_title("南門守衛")
-        self.assertEqual(
-            self.npc.get_display_name(self.npc, full_identity=True), "塞提斯　南門守衛"
-        )
-
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
-    def test_flag_is_inert_for_player_and_monster(self):
-        entities = (
-            create_object(PlayerCharacter, key="冒險者甲"),
-            create_object(Monster, key="哥布林甲"),
-        )
-        for entity in entities:
-            with self.subTest(entity=type(entity).__name__):
-                self.assertEqual(
-                    entity.get_display_name(entity, full_identity=True), entity.key
-                )
+        with patch.object(
+            NPC, "npc_title", new=property(lambda self: _raise_corrupt_title_read())
+        ):
+            self.assertEqual(self.npc.get_display_name(self.npc), "塞提斯")
 
 
 class NPCTitleWriteSurfaceAbsenceTests(EvenniaTestCase):

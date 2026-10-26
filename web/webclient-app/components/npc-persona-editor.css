@@ -82,14 +82,6 @@
   overflow-wrap: anywhere;
 }
 
-.npe-npc-title {
-  margin: calc(4px * var(--ui-scale)) 0 0;
-  color: var(--paper-400);
-  font-family: var(--f-serif);
-  font-size: var(--text-md);
-  letter-spacing: .08em;
-}
-
 .npe-meta {
   display: flex;
   flex-wrap: wrap;
@@ -278,7 +270,7 @@
 @media (min-width: 901px) and (max-height: 800px) {
   .npe-side { gap: calc(10px * var(--ui-scale)); padding: calc(14px * var(--ui-scale)); }
   .npe-dossier { padding-bottom: calc(10px * var(--ui-scale)); }
-  .npe-dossier .npe-name, .npe-dossier .npe-npc-title { display: none; }
+  .npe-dossier .npe-name { display: none; }
   .npe-capacity { grid-template-columns: calc(52px * var(--ui-scale)) 1fr; }
   .npe-ring { width: calc(52px * var(--ui-scale)); height: calc(52px * var(--ui-scale)); }
   .npe-capacity__figure strong { font-size: var(--text-xl); }

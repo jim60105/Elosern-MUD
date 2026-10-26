@@ -344,11 +344,6 @@ class LoaderTitleTests(EvenniaTestCase):
             instantiate_character(record)
         self.assertFalse(NPC.objects.filter(db_key="human_reference").exists())
 
-    def test_composed_full_identity_needs_no_display_layer_change(self):
-        from world.rules.npc_identity import npc_display_name
-
-        entity = instantiate_character(example_record())
-        self.assertEqual(npc_display_name(entity), "human_reference\u3000參考範例")
 
     @covers_requirement("npc-identity-titles::the-existing-import-contracts-are-unchanged-by-the-added-title-field")
     def test_verbatim_seams_survive_the_added_field(self):

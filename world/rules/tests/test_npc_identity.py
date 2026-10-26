@@ -1,58 +1,25 @@
-"""NPC identity validator and composer tests (npc-title-identity-core).
+"""NPC identity validation tests.
 
-Covers the single-validator contract (strip-normalize, reject-on-stripped-form,
-the 32-code-point bound, and the whitespace/control/markup rejections), the
-composer's 「姓名　稱號」 rendering with its plain-name degradations (untitled,
-non-NPC, malformed stored state), and the pure-read invariant: reading a title
-never materializes a storage row. Validator cases are pure
-``unittest.TestCase``; entity cases need ``EvenniaTest``.
+Covers the single-validator contracts: strip-normalize, reject-on-stripped-form,
+the code-point bounds, and the whitespace/control/markup rejections for both an
+authored title and an authored name, plus cross-registry name uniqueness.
 """
 
 import unittest
 
 from tools.spec_traceability import covers_requirement
 
-from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
-
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
-from typeclasses.npcs import LLMNPC, NPC
 from world.rules.npc_identity import (
     MAX_NPC_NAME_CODE_POINTS,
     MAX_NPC_TITLE_CODE_POINTS,
     NPCNameError,
     NPCTitleError,
-    npc_display_name,
-    npc_title_value,
     validate_npc_name,
     validate_unique_npc_names,
     validate_npc_title,
 )
 
 _FULL_WIDTH_SPACE = "\u3000"
-
-# The example identity the composer tests below use. It is explicitly
-# synthetic and local to this module: no assertion here names a shipped
-# character or borrows another test area's example, so a content edit or a
-# later slice rename cannot break the composer contract.
-_EXAMPLE_NAME = "合成身分甲"
-_EXAMPLE_TITLE = "合成稱號甲"
-
-
-class RaisingTitleNPC(NPC):
-    """An NPC whose persisted title accessor explodes on every read."""
-
-    @property
-    def npc_title(self) -> str:
-        raise RuntimeError("corrupt persisted attribute read")
-
-
-class BreakingStr:
-    """A key-like object whose __str__ raises."""
-
-    def __str__(self) -> str:
-        raise RuntimeError("corrupt key __str__")
 
 
 class ValidateNPCTitleTests(unittest.TestCase):
@@ -194,144 +161,6 @@ class ValidateNPCNameTests(unittest.TestCase):
                 self.assertTrue(
                     all(ord(char) < 128 for char in str(caught.exception))
                 )
-
-
-class NPCTitleComposerTests(EvenniaTest):
-    """The single deterministic composer and the pure-read invariant."""
-
-
-    def setUp(self):
-        super().setUp()
-        self.npc = create_object(NPC, key=_EXAMPLE_NAME)
-
-    def _assert_no_title_row(self, entity):
-        # autocreate=False keeps an absent title unmaterialized: a read must
-        # never persist a storage row (the composer is a pure read).
-        self.assertIsNone(entity.attributes.get("npc_title", return_obj=True))
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_titled_npc_composes_with_full_width_separator(self):
-        self.npc.npc_title = _EXAMPLE_TITLE
-        self.assertEqual(npc_display_name(self.npc), f"{_EXAMPLE_NAME}　{_EXAMPLE_TITLE}")
-        self.assertNotIn("  ", npc_display_name(self.npc))
-        self.assertEqual(
-            [ord(char) for char in npc_display_name(self.npc) if char == _FULL_WIDTH_SPACE],
-            [0x3000],
-        )
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_untitled_npc_degrades_to_plain_name(self):
-        self._assert_no_title_row(self.npc)
-        self.assertEqual(npc_title_value(self.npc), "")
-        self.assertEqual(npc_display_name(self.npc), _EXAMPLE_NAME)
-        self._assert_no_title_row(self.npc)
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_player_and_monster_never_compose(self):
-        player = create_object(PlayerCharacter, key="行旅客")
-        for entity in (player, create_object(Monster, key="哥布林")):
-            with self.subTest(entity=type(entity).__name__):
-                self.assertEqual(npc_title_value(entity), "")
-                self.assertEqual(npc_display_name(entity), entity.key)
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_player_and_monster_carrying_a_stray_title_row_never_compose(self):
-        monster = create_object(Monster, key="哥布林")
-        monster.db.npc_title = "深林領主"
-        self.assertEqual(npc_title_value(monster), "")
-        self.assertEqual(npc_display_name(monster), "哥布林")
-        player = create_object(PlayerCharacter, key="冒險者二")
-        player.db.npc_title = "深林領主"
-        self.assertEqual(npc_title_value(player), "")
-        self.assertEqual(npc_display_name(player), "冒險者二")
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_malformed_stored_state_degrades_without_raising(self):
-        for stored in (123, None, True, ["南門守衛"], "   ", _FULL_WIDTH_SPACE):
-            with self.subTest(stored=repr(stored)):
-                self.npc.db.npc_title = stored
-                self.assertEqual(npc_title_value(self.npc), "")
-                self.assertEqual(npc_display_name(self.npc), _EXAMPLE_NAME)
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_corrupt_stored_strings_degrade_instead_of_rendering(self):
-        # A stored string failing the validator's content rules could never
-        # come from an authored path; rendering it would emit Evennia markup
-        # or a separator-ambiguous identity, so the composer hides it.
-        for stored in (
-            "|r南門守衛|n",  # display markup
-            "南|r門",
-            f"南門{_FULL_WIDTH_SPACE}守衛",  # internal separator
-            "南門 守衛",  # internal space
-            "南門\x00守衛",  # control characters
-            "南門\x1b守衛",
-        ):
-            with self.subTest(stored=repr(stored)):
-                self.npc.db.npc_title = stored
-                self.assertEqual(npc_title_value(self.npc), "")
-                self.assertEqual(npc_display_name(self.npc), _EXAMPLE_NAME)
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_overlong_stored_title_is_content_legal_and_still_composes(self):
-        # Length is deliberately NOT part of the render filter: the overlong
-        # row is the documented degraded state the display bounds truncate,
-        # distinct from content corruption, which degrades to the plain name.
-        self.npc.db.npc_title = "壞" * 200
-        self.assertEqual(npc_title_value(self.npc), "壞" * 200)
-        self.assertEqual(
-            npc_display_name(self.npc), f"{_EXAMPLE_NAME}{_FULL_WIDTH_SPACE}{'壞' * 200}"
-        )
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_a_raising_title_accessor_degrades_to_the_plain_name(self):
-        broken = create_object(RaisingTitleNPC, key="炸裂")
-        self.assertEqual(npc_title_value(broken), "")
-        self.assertEqual(npc_display_name(broken), "炸裂")
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_an_unreadable_key_degrades_instead_of_composing_ambiguity(self):
-        # No key attribute, a raising key accessor, and a key whose __str__
-        # raises all yield "" — never 「　稱號」-style leading-separator junk.
-        self.assertEqual(npc_display_name(object()), "")
-
-        class _RaisingKey:
-            @property
-            def key(self):
-                raise RuntimeError("corrupt key accessor")
-
-        self.assertEqual(npc_display_name(_RaisingKey()), "")
-
-        class _Holder:
-            key = "placeholder"
-
-        holder = _Holder()
-        holder.key = BreakingStr()
-        self.assertEqual(npc_display_name(holder), "")
-        titled = create_object(NPC, key="無名")
-        titled.db.npc_title = _EXAMPLE_TITLE
-        titled.key = ""
-        self.assertEqual(npc_display_name(titled), "")
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_stored_title_is_read_back_stripped(self):
-        # Only authored paths write through validate_npc_title, but a value
-        # that arrives with surrounding whitespace still composes cleanly.
-        self.npc.db.npc_title = f" {_EXAMPLE_TITLE} "
-        self.assertEqual(npc_display_name(self.npc), f"{_EXAMPLE_NAME}　{_EXAMPLE_TITLE}")
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
-    def test_llmnpc_subclass_composes(self):
-        llm_npc = create_object(LLMNPC, key="米拉")
-        llm_npc.npc_title = "酒館女合夥人"
-        self.assertEqual(npc_display_name(llm_npc), "米拉　酒館女合夥人")
-
-    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity', 'npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
-    def test_boundary_composition_stays_under_panel_bound(self):
-        npc = create_object(NPC, key="長" * 64)
-        npc.npc_title = "守" * MAX_NPC_TITLE_CODE_POINTS
-        composed = npc_display_name(npc)
-        self.assertEqual(len(composed), 64 + 1 + MAX_NPC_TITLE_CODE_POINTS)
-        self.assertLessEqual(len(composed), 128)
 
 
 class ValidateUniqueNPCNamesTests(unittest.TestCase):

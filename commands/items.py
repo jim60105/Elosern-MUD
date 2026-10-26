@@ -33,7 +33,6 @@ from world.rules.combat_session import (
 from world.rules.equipment_effects import toggle_equipment_message
 from world.rules.event_log import render_plain_text
 from world.rules.items import use_item
-from world.rules.npc_identity import npc_display_name
 from world.rules.party_inventory import (
     PartyTransferError,
     resolve_item_token,
@@ -258,9 +257,7 @@ class CmdToggleEquip(Command):
         if result.outcome != "success":
             self.caller.msg(rejection_message(result.reason))
             return
-        subject = "你" if outcome.member is self.caller else npc_display_name(
-            outcome.member
-        )
+        subject = "你" if outcome.member is self.caller else str(outcome.member.key)
         self.caller.msg(toggle_equipment_message(result, item_key, subject))
 
 
@@ -304,6 +301,6 @@ class CmdRetrieve(NumberedTargetCommand):
             caller.msg(error.message)
             return
         caller.msg(
-            f"你從{npc_display_name(outcome.giver)}那裡取回了 "
+            f"你從{outcome.giver.key}那裡取回了 "
             f"{outcome.quantity} 個{item_display_name(outcome.item_key)}。"
         )

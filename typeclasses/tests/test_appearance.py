@@ -9,6 +9,7 @@ from evennia.objects.objects import DefaultObject
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
+from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom, Room
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
@@ -737,12 +738,11 @@ class TitleAppearanceLineTests(EvenniaTest):
 
 
 class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
-    """The two opt-in surfaces render 「姓名　稱號」; every other path stays plain.
+    """Every text appearance surface renders the plain authored name.
 
-    npc-title-identity-core: room character line and look header are the only
-    text surfaces carrying the flag (D3/D4); the webclient ``explore.look``
-    shares the appearance framework, so header parity across entry paths is
-    the localized-appearance contract, not an extra feature.
+    A stored title is inert: the room character line, the look header, the
+    webclient ``explore.look`` seam and the real 「看 <目標>」 command all read
+    the plain key, and a corrupt title accessor cannot take any of them down.
     """
 
     def setUp(self):
@@ -751,10 +751,10 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         self.room1.save()
         self.char1.location = self.room1
         self.char2.location = self.room1
-        self.titled = create_object(
+        self.sentinel = create_object(
             "typeclasses.npcs.NPC", key="塞提斯", location=self.room1
         )
-        self.titled.npc_title = "南門守衛"
+        self.sentinel.npc_title = "南門守衛"
         self.plain = create_object(
             "typeclasses.npcs.NPC", key="布魯諾", location=self.room1
         )
@@ -762,29 +762,33 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
             "typeclasses.monsters.Monster", key="野狼", location=self.room1
         )
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
-    def test_room_character_line_composes_the_npc_only(self):
+    def _raising_title(self):
+        def _raise() -> str:
+            raise RuntimeError("corrupt persisted attribute read")
+
+        return patch.object(NPC, "npc_title", new=property(lambda self: _raise()))
+
+    @covers_requirement('npc-identity-titles::every-npc-identity-surface-uses-the-plain-authored-name')
+    def test_room_character_line_renders_plain_names_only(self):
         appearance = self.char1.at_look(self.room1)
         self.assertIn("人物：", appearance)
-        self.assertIn("塞提斯　南門守衛", appearance)
-        self.assertIn("布魯諾", appearance)
-        self.assertIn("野狼", appearance)
-        # Untitled NPC, the player, and the monster render no separator.
-        for name in ("布魯諾", "野狼", self.char2.key):
+        for name in ("塞提斯", "布魯諾", "野狼", self.char2.key):
+            self.assertIn(name, appearance)
             self.assertNotIn(f"{name}\u3000", appearance)
-        self.assertNotIn("南門守衛南門", appearance)
+        self.assertNotIn("南門守衛", appearance)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces', 'npc-identity-titles::the-existing-appearance-and-exploration-contracts-are-unchanged')
-    def test_look_header_is_composed_on_every_entry_path(self):
+    @covers_requirement('npc-identity-titles::the-existing-appearance-and-exploration-contracts-are-unchanged')
+    def test_look_header_is_plain_on_every_entry_path(self):
         from commands.localized.general import CmdLook
         from evennia.utils import ansi
 
-        text = self.char1.at_look(self.titled)
-        self.assertIn("塞提斯　南門守衛", text)
+        text = self.char1.at_look(self.sentinel)
+        self.assertIn("塞提斯", text)
+        self.assertNotIn("南門守衛", text)
         from web.webclient.actions.exploration_actions import _look_adapter
 
         with patch.object(self.char1, "msg") as msg:
-            result = _look_adapter(self.char1, {"target_id": int(self.titled.pk)})
+            result = _look_adapter(self.char1, {"target_id": int(self.sentinel.pk)})
         self.assertEqual(result["outcome"], "success")
         webclient = str(msg.call_args[0][0])
         # Same object, same looker, same framework: the headers must be equal.
@@ -793,42 +797,39 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         # and renders the same appearance (the localized-appearance contract
         # names all three entry paths, not just the two seams above).
         command = self.call(CmdLook(), "塞提斯", msg=None)
-        self.assertIn("塞提斯　南門守衛", command)
+        self.assertIn("塞提斯", command)
+        self.assertNotIn("南門守衛", command)
         # self.call strips ANSI (noansi default); normalize the seam string the
         # same way so the three paths compare on identical rendered text.
         self.assertEqual(ansi.parse_ansi(text, strip_ansi=True).strip(), command)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_a_raising_title_accessor_leaves_every_surface_plain(self):
+        with self._raising_title():
+            room = self.char1.at_look(self.room1)
+            header = self.char1.at_look(self.sentinel)
+        self.assertIn("塞提斯", room)
+        self.assertIn("塞提斯", header)
+        self.assertNotIn("南門守衛", room + header)
+
     def test_untitled_and_plain_targets_keep_their_headers(self):
         self.assertIn("布魯諾", self.char1.at_look(self.plain))
         self.assertNotIn("\u3000", self.char1.at_look(self.plain))
         self.assertNotIn("\u3000", self.char1.at_look(self.monster))
         self.assertNotIn("\u3000", self.char1.at_look(self.char2))
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
-    def test_explicit_flag_off_keeps_the_header_plain(self):
-        appearance = self.titled.return_appearance(self.char1, full_identity=False)
-        self.assertNotIn("南門守衛", appearance)
-        self.assertIn("塞提斯", appearance)
-
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_looking_at_an_npc_carrying_characters_raises_nothing(self):
-        # The flag injected for the header rides **kwargs into this same
-        # appearance pass's character line; the merge form in
-        # get_display_characters must survive the already-present key (D3).
-        self.plain.npc_title = "馬伕"
-        self.plain.location = self.titled
-        appearance = self.char1.at_look(self.titled)
-        self.assertIn("塞提斯　南門守衛", appearance)
-        self.assertIn("布魯諾　馬伕", appearance)
+        self.plain.location = self.sentinel
+        appearance = self.char1.at_look(self.sentinel)
+        self.assertIn("塞提斯", appearance)
+        self.assertIn("布魯諾", appearance)
 
 
 class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
     """Process text (move/say/whisper/get/give) names the NPC by plain key only.
 
-    Each case renders once with the title stored and once with it removed and
-    asserts byte equality — the untitled rendering is the frozen baseline, and
-    no title may ever leak into an echo.
+    Each case renders once with a sentinel title stored and once behind a
+    raising title accessor, asserting byte equality between the two and that
+    no title text or separator reaches the echo.
     """
 
     def setUp(self):
@@ -848,23 +849,26 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
         return texts
 
     def _both_ways(self, emit, receiver=None):
-        """Capture ``emit`` once titled, once untitled; assert plain equality."""
+        """Capture ``emit`` with a sentinel title and behind a raising accessor."""
         receiver = receiver if receiver is not None else self.char1
         self.npc.npc_title = "南門守衛"
-        with patch.object(receiver, "msg") as titled_msg:
+        with patch.object(receiver, "msg") as sentinel_msg:
             emit()
-        titled = self._texts(titled_msg)
-        del self.npc.npc_title
-        with patch.object(receiver, "msg") as plain_msg:
-            emit()
-        plain = self._texts(plain_msg)
-        self.assertEqual(titled, plain)
-        self.assertTrue(titled, "the echo captured no message at all")
-        for text in titled:
+        sentinel = self._texts(sentinel_msg)
+
+        def _raise() -> str:
+            raise RuntimeError("corrupt persisted attribute read")
+
+        with patch.object(NPC, "npc_title", new=property(lambda self: _raise())):
+            with patch.object(receiver, "msg") as broken_msg:
+                emit()
+        broken = self._texts(broken_msg)
+        self.assertEqual(sentinel, broken)
+        self.assertTrue(sentinel, "the echo captured no message at all")
+        for text in sentinel:
             self.assertNotIn("南門守衛", text)
             self.assertNotIn("\u3000", text)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_movement_announcements_stay_plain(self):
         def move_round_trip():
             self.npc.move_to(self.room2)
@@ -872,7 +876,6 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(move_round_trip)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_say_location_echo_stays_plain(self):
         def say():
             self.npc.at_say(
@@ -881,7 +884,6 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(say)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_whisper_receiver_echo_stays_plain(self):
         def whisper():
             self.npc.at_say(
@@ -895,7 +897,6 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(whisper)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_pickup_echo_stays_plain(self):
         # The localized 拿 command's room echo is the observed surface (the
         # at_get hook itself is silent in Evennia 6.1).
@@ -909,7 +910,6 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(pickup)
 
-    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_give_echo_stays_plain(self):
         # The receiver's echo renders the giver's display name (the localized
         # 給 command emits no third-party broadcast; at_give is silent).

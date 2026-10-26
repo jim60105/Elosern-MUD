@@ -278,9 +278,7 @@ def _reason(choice: Any, cost: dict[str, int]) -> dict[str, str] | None:
 
 
 def _entity_name(entity: Any) -> str:
-    from world.rules.npc_identity import npc_display_name
-
-    name = npc_display_name(entity).strip() or "？"
+    name = str(getattr(entity, "key", "")).strip() or "？"
     return name[:48]
 
 

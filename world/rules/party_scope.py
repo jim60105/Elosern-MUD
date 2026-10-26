@@ -29,7 +29,6 @@ Decisions (``openspec/changes/party-member-authority/design.md``):
 
 from typing import Any
 
-from world.rules.npc_identity import npc_display_name
 from world.rules.party import bound_owner_of, live_companions
 from world.rules.player_control import is_player_driven
 
@@ -99,9 +98,7 @@ def _plain_key(entity: Any) -> str:
 
 
 def _answers_to(entity: Any, token: str) -> bool:
-    """Whether ``entity`` answers to ``token`` by composed name or plain key."""
-    if npc_display_name(entity) == token:
-        return True
+    """Whether ``entity``'s plain key answers to ``token``."""
     key = _plain_key(entity)
     return bool(key) and key == token
 

@@ -96,7 +96,7 @@ for declaration semantics.
 
 複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的五條規則：
 
-- **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列與探索面板把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
+- **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列、`看` 標題、探索面板、對話、隊伍與 GM 檢視一律只顯示這個純姓名；`title` 是建立期資料，不會被組成顯示字串。
 - **`title` 對 NPC 必填**，規則是 `world/rules/npc_identity.validate_npc_title` 的單一 validator 契約：去首尾空白後 1–32 碼點、無任何空白（含 U+3000）、無控制字元、無 `|`。落庫的是驗證器回傳的正規形（已去空白）。
 - **`age`／`apparent_age` 各自獨立**，0–10000 整數（拒絕布林值）。常駐 host 與考官由 `NpcProfile` 作者宣告明確定案數值（`age` 與 `apparent_age` 必填），落庫與同步時優先使用 profile 定義的年齡；未指定 profile 或無作者年齡的路徑由 `ensure_npc_canonical_age` 獨立補 `NPC_DEFAULT_AGE`（18）。既有欄位值永不覆寫，重用與重啟時保留玩家編輯的 persona 與既有年齡。既有開發世界若需完整套用作者年齡，請依照 reset runbook 重設資料庫。
 - **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，不只是欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
@@ -402,7 +402,7 @@ uv run --locked python -m tools.spec_traceability check
 |---|---|
 | 用匯入卡建永久服務主人（店主、公會主管） | 匯入卡建的主人不帶 `content_source`／`service_host` 標籤，同步永不接管也不會刪除它，於是世上多了一個同名卻不受名冊管轄的人；永久主人只能宣告在 `places.py` |
 | `key` 寫英文卻期待人物列顯示中文名 | 載入器用 `key` 建物件，`display_name` 不參與顯示；顯示名就是 `key` |
-| `title` 帶空白、全形空格、`|` 或超過 32 碼點 | 語意驗證拒收；U+3000 是「姓名　稱號」合成器的專用分隔符，永不允許出現在名字或稱號裡 |
+| `title` 帶空白、全形空格、`|` 或超過 32 碼點 | 語意驗證拒收；U+3000 全形空格永不允許出現在名字或稱號裡 |
 | place-bound 元件卻漏寫或寫錯 `anchor_room` | tag 解析不到唯一房間→整批拒收；person-bound（`quest_issuer`）反過來帶 anchor 也被拒 |
 | merchant 職業不寫 `dialogue_key` | 藍圖覆蓋檢查具名拒收。無問候語的店主是 `merchant-dialogue` 移除的缺陷，永不作為預設 |
 | 自創能力型別或綁定種類 | 兩者都是閉合詞彙；新能力屬規格驅動變更，見 §6 |
