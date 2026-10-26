@@ -364,6 +364,7 @@
         "web.webclient.presentation.tests.test_coordinator",
         "web.webclient.presentation.tests.test_coordinator_push",
         "web.webclient.presentation.tests.test_incremental_publication",
+        "web.webclient.presentation.tests.test_publication_settlements",
         "web.webclient.presentation.tests.test_creation_panel",
         "web.webclient.presentation.tests.test_dialogue_panel",
         "web.webclient.presentation.tests.test_lineage_panel",

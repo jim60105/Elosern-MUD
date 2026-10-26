@@ -121,6 +121,12 @@ def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None
     the module docstring for the per-watcher wrapping. Never raises: a failure
     is isolated to one bounded diagnostic and the next canonical sync
     re-establishes the truth.
+
+    A claimed batch is a one-shot delivery notice: the wire contract allows it
+    only on a delta (snapshots always carry ``null``), and the claim is already
+    consumed, so this push publishes as its own independent entry and can never
+    be merged into a settlement group that a checkpoint would promote to a
+    snapshot. A plain reading push joins whatever causal group is active.
     """
     deps = _deps()
     # The facade binding keeps the lint's syntactic facade-call recognition
@@ -164,13 +170,23 @@ def push_dialogue_reading(owner: object, *, unlock_batch: object = None) -> None
                             },
                             exc=error,
                         )
-                deps.publish(
-                    watcher,
-                    puppet,
-                    {"dialogue": payload},
-                    context=context,
-                    expected_epoch=epoch,
-                )
+                if unlock_batch is not None:
+                    deps.publish(
+                        watcher,
+                        puppet,
+                        {"dialogue": payload},
+                        context=context,
+                        expected_epoch=epoch,
+                        independent=True,
+                    )
+                else:
+                    deps.publish(
+                        watcher,
+                        puppet,
+                        {"dialogue": payload},
+                        context=context,
+                        expected_epoch=epoch,
+                    )
             except Exception as error:
                 log_warn(
                     "dialogue_reading_push_failed",

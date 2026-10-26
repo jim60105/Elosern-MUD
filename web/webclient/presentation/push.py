@@ -18,6 +18,12 @@ though the push closure rebinds it from the shell-provided dependency bundle
 below: the import makes this file an observability-facade adopter, so the R2
 silent-swallow gate keeps guarding the factory's three except handlers. Do not
 clean it up as dead code.
+
+A push that runs inside a committed operation's causal publication group submits
+the panel *name* instead of an eagerly rendered payload: the coordinator renders
+it from current canonical state at the publication boundary, where it coalesces
+with the same commit's checkpoint presentation. The fan-out outside a group
+keeps rendering the payload itself, exactly as B defined the shared pusher.
 """
 
 from collections.abc import Callable
@@ -25,6 +31,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.observability import log_warn
+from world.rules.presentation_events import current_publication_group
 
 __all__ = ["PanelPushDeps", "make_panel_pusher"]
 
@@ -78,8 +85,9 @@ def make_panel_pusher(
             return
         if not watchers:
             return
+        grouped = current_publication_group() is not None
         try:
-            registry = resolved.build_registry()
+            registry = None if grouped else resolved.build_registry()
         except Exception as error:
             # A registry-construction defect must degrade to a bounded
             # diagnostic (final rubber-duck round): raising from an
@@ -93,6 +101,18 @@ def make_panel_pusher(
             return
         for session, epoch in watchers:
             try:
+                if grouped:
+                    # The coordinator re-renders this name from current state at
+                    # the group's publication boundary; nothing is rendered
+                    # against a snapshot that the commit has already moved past.
+                    resolved.publish(
+                        session,
+                        player,
+                        {},
+                        expected_epoch=epoch,
+                        affected_panels=(panel_key,),
+                    )
+                    continue
                 context = resolved.build_context(session, player)
                 payload = registry.render(panel_key, context)
                 resolved.publish(

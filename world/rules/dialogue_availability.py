@@ -301,15 +301,17 @@ def refresh_dialogue_availability(owner: Any, *, cause: str) -> None:
     presentation failure as a gameplay failure. The acting body (the owner, or
     the companion it lawfully possesses) is resolved inside that callback, so a
     control change between scheduling and commit refreshes the body that is
-    actually acting.
+    actually acting. The registration captures the causal publication group, so
+    the dialogue panel push coalesces with the same commit's checkpoint
+    presentation for every watcher.
     """
     if not isinstance(cause, str) or not cause or len(cause) > MAX_CAUSE_CHARS:
         raise ValueError(
             f"cause must be a non-empty string <= {MAX_CAUSE_CHARS} characters"
         )
-    from django.db import transaction
+    from world.rules.presentation_events import on_publication_commit
 
-    transaction.on_commit(lambda: _fan_out_availability(owner, cause))
+    on_publication_commit(lambda: _fan_out_availability(owner, cause))
 
 
 def queue_dialogue_refresh(owners: Iterable[Any], *, cause: str) -> None:
@@ -333,6 +335,9 @@ def queue_dialogue_refresh(owners: Iterable[Any], *, cause: str) -> None:
 
     This helper never creates a conversation, a dialogue session or a
     selection, and never touches an authored package.
+
+    The registration captures the causal publication group of the operation that
+    wrote the state, so every owner's push belongs to that one committed group.
     """
     if not isinstance(cause, str) or not cause or len(cause) > MAX_CAUSE_CHARS:
         raise ValueError(
@@ -341,9 +346,9 @@ def queue_dialogue_refresh(owners: Iterable[Any], *, cause: str) -> None:
     owner_ids = _owner_ids(owners)
     if not owner_ids:
         return
-    from django.db import transaction
+    from world.rules.presentation_events import on_publication_commit
 
-    transaction.on_commit(lambda: _fan_out_owner_ids(owner_ids, cause))
+    on_publication_commit(lambda: _fan_out_owner_ids(owner_ids, cause))
 
 
 def affected_dialogue_owners(

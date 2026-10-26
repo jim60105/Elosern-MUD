@@ -82,6 +82,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "art_official_catalog",
     "art_sync_all",
     "connect_art_push",
+    "connect_alignment_observer",
     "narrative_projection_init",
     "narrative_correspondence_projection_init",
     "start_dream_dispatch_pump",
@@ -660,6 +661,14 @@ def at_server_start():
     _startup_step(
         "connect_art_push",
         lambda: _late("web.webclient.presentation.art_push", "connect_art_push"),
+    )
+    # Committed checkpoint facts reach every lawful watcher's coordinator
+    # through the one registered observer (idempotent registration).
+    _startup_step(
+        "connect_alignment_observer",
+        lambda: _late(
+            "web.webclient.presentation.alignment", "connect_alignment_observer"
+        ),
     )
     _startup_step(
         "narrative_projection_init",

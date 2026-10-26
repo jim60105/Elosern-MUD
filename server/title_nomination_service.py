@@ -479,9 +479,15 @@ def _schedule_after_commit(
     occurrence_id: str | None = None,
     trigger: str = "unknown",
 ) -> None:
-    from django.db import transaction
+    """Schedule the committed nomination trigger, capturing the causal group.
 
-    transaction.on_commit(
+    The captured publication group keeps the ballot push that a completed
+    settlement produces inside the same publication as that settlement's own
+    checkpoint presentation.
+    """
+    from world.rules.presentation_events import on_publication_commit
+
+    on_publication_commit(
         lambda: _schedule_committed(
             entity,
             source_id=source_id,

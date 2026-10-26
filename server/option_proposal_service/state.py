@@ -138,7 +138,15 @@ def _state(
 
 
 def _push_options_update(session: Any, actor: Any, captured_epoch: str) -> None:
-    """Push the session's current options state through the epoch-guarded push."""
+    """Push the session's current options state through the epoch-guarded push.
+
+    An immediate current-state push inherits the causal publication group of the
+    operation that triggered it (the group active at this call, captured by the
+    coordinator at the enqueue boundary), so it coalesces with that operation's
+    checkpoint presentation. An *asynchronous* generation completion runs after
+    the triggering scope closed and therefore starts a new standalone group,
+    whose comparison and revision are independent of the earlier publication.
+    """
     from web.webclient.presentation.coordinator import publish_panel_update
     from web.webclient.presentation.ingress import build_presentation_context
     from web.webclient.presentation.registry import build_production_registry

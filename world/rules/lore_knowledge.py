@@ -133,7 +133,9 @@ def _schedule_lore_codex_push(player: Any) -> None:
     autocommit mode; a registration failure (manual transaction management)
     must NEVER fall back to an inline push, because an inline push could
     publish state that the open transaction later rolls back. The callback
-    keeps the reveal write itself isolated from any presentation failure.
+    keeps the reveal write itself isolated from any presentation failure, and
+    the captured causal publication group makes its panel push coalesce with
+    the same commit's checkpoint presentation.
     """
 
     def _safe_push() -> None:
@@ -148,10 +150,10 @@ def _schedule_lore_codex_push(player: Any) -> None:
                 exc=error,
             )
 
-    from django.db import transaction
+    from world.rules.presentation_events import on_publication_commit
 
     try:
-        transaction.on_commit(_safe_push)
+        on_publication_commit(_safe_push)
     except Exception as error:
         log_warn(
             "lore_codex_push_register_failed",
@@ -219,14 +221,15 @@ def schedule_lore_reveal_best_effort(
     """Schedule a best-effort lore reveal to execute after transaction commit.
 
     Protects both key validation and transaction registration so unexpected
-    failures never bubble into gameplay.
+    failures never bubble into gameplay. The registration captures the current
+    causal publication group, so the reveal's own codex push joins it.
     """
     if not isinstance(key, str) or not key or not isinstance(category, str) or not category:
         return
     try:
-        from django.db import transaction
+        from world.rules.presentation_events import on_publication_commit
 
-        transaction.on_commit(
+        on_publication_commit(
             lambda: reveal_lore_best_effort(player, category, key)
         )
     except Exception as exc:

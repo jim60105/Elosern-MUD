@@ -16,6 +16,15 @@ once the complete batch (every presentation frame and the matching action
 result) has been sent. A publication that changes nothing consumes no revision
 and sends no presentation frame.
 
+Every queued intent belongs to one ephemeral *causal publication group*
+(``world.rules.presentation_events``). Intents that share a committed
+operation's group id merge into **one** pending group entry, so an ordinary
+panel push and a checkpoint fact from the same commit coalesce into one fresh
+publication for every watcher, whatever order the commit callbacks ran in.
+Group-less work (an explicit sync, a text-command refresh, an async generation
+completion) stays its own independent entry and never joins an ambient command
+group.
+
 Only one publication batch runs at a time. ``enqueue_publication`` appends the
 intent and runs the drain, which is a private synchronous critical section:
 nothing awaits and no other publication can interleave between an action's
@@ -24,6 +33,15 @@ returns, so a sequence-retiring effect the adapter scheduled for a later turn
 always runs after its result. A reentrant publish (a sync, push or completion
 requested from inside a send or a receipt callback) joins the same queue and is
 drained immediately after the current batch, in order.
+
+Grouped work drains at the reactor's next turn instead: every on-commit
+callback of the synchronous owning transaction runs before the reactor returns,
+so the group entry is complete before it is planned and sent. A process without
+a running reactor (the test runner, a one-off command) has no live transport to
+observe frames, so the injected scheduler publishes at the enqueue boundary
+there. A completing action's result-only answer is flushed immediately (its
+adapter may already have scheduled a sequence retirement for the next turn),
+which is the narrow exception B already carved out for those actions.
 
 The coordinator never writes canonical game state and never reaches for a
 mutation helper: calendar data comes only from the read-only
@@ -39,6 +57,10 @@ from twisted.internet.defer import Deferred, succeed
 from twisted.python.failure import Failure
 
 from world.observability import log_debug, log_error, log_info, log_warn
+from world.rules.presentation_events import (
+    current_publication_group,
+    new_publication_group,
+)
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
@@ -79,10 +101,11 @@ UPDATE_MESSAGE = "ui_update"
 # mode and the committed dialogue panel can never diverge on the wire.
 DIALOGUE_PANEL = "dialogue"
 
-# Bound on queued publication intents for one live sequence. Reaching it is a
-# defect (a publisher loop), never ordinary traffic: the overflow is reported
-# and the baseline is invalidated so the next publication announces a fresh
-# snapshot instead of a delta from a stale base.
+# Bound on queued publication groups and on the waiting callers of one live
+# sequence (64 each, result-only answers exempt). Reaching it is a defect (a
+# publisher loop), never ordinary traffic: the overflow is reported and the
+# baseline is invalidated so the next publication announces a fresh snapshot
+# instead of a delta from a stale base.
 MAX_PENDING_PUBLICATIONS = 64
 
 _MISSING = object()
@@ -134,18 +157,148 @@ class _Baseline:
 
 @dataclass(frozen=True)
 class _Intent:
-    """One immutable queued publication request."""
+    """One immutable, validated publication request.
+
+    ``group_id`` is the causal group the request belongs to; every request with
+    the same id merges into one :class:`_PendingGroup`. ``declared`` names an
+    explicit eager scope (empty when the request declares none) and
+    ``unknown_scope`` marks "compare every eager panel"; a candidate-only push
+    declares neither and compares only its own candidates.
+    """
 
     context_factory: Callable[[], PresentationContext]
-    affected_panels: frozenset[str] | None
     candidates: Mapping[str, Any] | None
+    declared: frozenset[str]
+    unknown_scope: bool
     removed_panels: tuple[str, ...]
     force_snapshot: bool
     result_only: bool
+    group_id: str
+    standalone: bool
     epoch: str
     expected_epoch: str | None
     completion: PublicationCompletion | None
     deferred: Deferred
+
+
+@dataclass(eq=False)
+class _PendingGroup:
+    """One queued causal group: merged declarations and their waiters.
+
+    Every intent enqueued for the same ephemeral group id merges here, so one
+    publication answers all of them: the union of candidate names and explicit
+    removals, "unknown scope" if any request declared it, checkpoint promotion
+    if any request forced a snapshot, and one receipt for every waiting
+    ``Deferred``. ``grouped`` records whether the group was captured from a
+    committed operation (deferred drain) or is a standalone request (drained at
+    the enqueue boundary).
+    """
+
+    group_id: str
+    context_factory: Callable[[], PresentationContext]
+    candidates: dict[str, Any] | None
+    declared: frozenset[str]
+    unknown_scope: bool
+    removed_panels: tuple[str, ...]
+    force_snapshot: bool
+    result_only: bool
+    grouped: bool
+    epoch: str
+    expected_epoch: str | None
+    completion: PublicationCompletion | None
+    waiters: list[Deferred]
+    completion_factory: bool
+
+    @classmethod
+    def from_intent(cls, intent: "_Intent", *, grouped: bool) -> "_PendingGroup":
+        candidates = dict(intent.candidates) if intent.candidates is not None else None
+        return cls(
+            group_id=intent.group_id,
+            context_factory=intent.context_factory,
+            candidates=candidates,
+            declared=intent.declared,
+            unknown_scope=intent.unknown_scope,
+            removed_panels=intent.removed_panels,
+            force_snapshot=intent.force_snapshot,
+            result_only=intent.result_only,
+            grouped=grouped,
+            epoch=intent.epoch,
+            expected_epoch=intent.expected_epoch,
+            completion=intent.completion,
+            waiters=[intent.deferred],
+            completion_factory=intent.completion is not None,
+        )
+
+    def merge(self, intent: "_Intent") -> None:
+        """Merge one validated request into this entry.
+
+        A removal always wins over a replacement of the same panel: an explicit
+        removal is a declaration that the panel is gone, and B rejects a frame
+        that both replaces and removes a name, so the merged entry can never
+        plan one. A completion's context factory (it carries the action-local
+        round record) survives later ordinary pushes; otherwise the newest
+        factory wins, and every grouped factory rebuilds current canonical
+        state.
+        """
+        if intent.candidates:
+            merged = dict(self.candidates or {})
+            merged.update(intent.candidates)
+            self.candidates = merged
+        if intent.declared:
+            self.declared = self.declared | intent.declared
+        self.unknown_scope = self.unknown_scope or intent.unknown_scope
+        self.force_snapshot = self.force_snapshot or intent.force_snapshot
+        self.result_only = self.result_only and intent.result_only
+        if intent.completion is not None:
+            self.completion = intent.completion
+            self.context_factory = intent.context_factory
+            self.completion_factory = True
+        elif not self.completion_factory:
+            self.context_factory = intent.context_factory
+        self.removed_panels = _merge_removals(
+            self.removed_panels, intent.removed_panels
+        )
+        if self.removed_panels:
+            removed = set(self.removed_panels)
+            if self.candidates:
+                self.candidates = {
+                    name: value
+                    for name, value in self.candidates.items()
+                    if name not in removed
+                } or None
+            if self.declared:
+                self.declared = frozenset(
+                    name for name in self.declared if name not in removed
+                )
+        if self.expected_epoch is None:
+            self.expected_epoch = intent.expected_epoch
+        self.waiters.append(intent.deferred)
+
+
+def _merge_removals(first: tuple[str, ...], second: tuple[str, ...]) -> tuple[str, ...]:
+    """Union two ordered removal tuples without repeating a panel name."""
+    merged = list(first)
+    seen = set(first)
+    for name in second:
+        if name not in seen:
+            seen.add(name)
+            merged.append(name)
+    return tuple(merged)
+
+
+def _reactor_scheduler(callback: Callable[[], None]) -> Any:
+    """Run ``callback`` after the current reactor turn, or now without a reactor.
+
+    Publication only reaches a live transport while the reactor is running; in
+    a process without one (the test runner, a one-off command) no session can
+    observe frames, so the enqueue boundary is the deterministic drain point.
+    """
+    from twisted.internet import reactor
+
+    if not getattr(reactor, "running", False):
+        callback()
+        return None
+    return reactor.callLater(0, callback)
 
 
 @dataclass(frozen=True)
@@ -182,18 +335,24 @@ class PresentationCoordinator:
         registry: PresentationRegistry,
         calendar_provider: Callable[[], Any] = read_world_clock_calendar,
         mode_provider: Callable[[PresentationContext], str] | None = None,
+        scheduler: Callable[[Callable[[], None]], Any] | None = None,
     ) -> None:
         self.session = session
         self.registry = registry
         self._calendar_provider = calendar_provider
         self._mode_provider = mode_provider or self.mode_for
+        #: Injected reactor-next-turn seam for grouped publications. Tests pass
+        #: a queued scheduler to prove coalescing deterministically.
+        self._scheduler = scheduler or _reactor_scheduler
         self._epoch = new_presentation_epoch()
         self._revision = 0
         self._baseline: _Baseline | None = None
         # A publication that was dropped or failed after a frame escaped leaves
         # the client's committed state uncertain until a snapshot repairs it.
         self._repair_required = False
-        self._pending: deque[_Intent] = deque()
+        self._pending: deque[_PendingGroup] = deque()
+        self._pending_groups: dict[str, _PendingGroup] = {}
+        self._drain_scheduled = False
         self._draining = False
 
     @property
@@ -243,10 +402,16 @@ class PresentationCoordinator:
         self._repair_required = False
 
     def _retire_pending(self) -> None:
-        """Resolve every queued intent with ``None``: its sequence is retired."""
+        """Resolve every queued publication with ``None``: its sequence retired.
+
+        Completed group metadata is dropped with the waiters, so no group history
+        outlives the pending queue and a retired sequence can never reuse one.
+        """
         pending, self._pending = self._pending, deque()
-        for intent in pending:
-            intent.deferred.callback(None)
+        self._pending_groups = {}
+        self._drain_scheduled = False
+        for entry in pending:
+            self._resolve(entry, None)
 
     def _invalidate_baseline(self) -> None:
         """Forbid deltas from the current baseline values (they were not held)."""
@@ -284,6 +449,8 @@ class PresentationCoordinator:
         expected_epoch: str | None = None,
         completion: PublicationCompletion | None = None,
         result_only: bool = False,
+        group_id: str | None = None,
+        independent: bool = False,
     ) -> Deferred:
         """Queue one publication and return its always-present Deferred.
 
@@ -301,6 +468,14 @@ class PresentationCoordinator:
         with no presentation at all (the pre-existing ``no_presentation`` and
         safe-failure exception). An intent whose sequence retires before it
         executes resolves ``None``.
+
+        ``group_id`` is the internal causal group of the committed operation the
+        request belongs to; when it is absent the group bound to this call is
+        used, and a request outside any binding becomes its own standalone
+        group. Requests sharing a group merge into one publication, so every
+        waiting Deferred resolves with the same actual receipt. ``independent``
+        marks an explicit entry (a sync or a recovery answer) that must never
+        join an ambient command group.
         """
         deferred: Deferred = Deferred()
         try:
@@ -313,29 +488,58 @@ class PresentationCoordinator:
                 expected_epoch=expected_epoch,
                 completion=completion,
                 result_only=result_only,
+                group_id=group_id,
+                independent=independent,
                 deferred=deferred,
             )
         except Exception as error:  # observability: ignore R2: a rejected declaration is reported to its caller through the returned Deferred's errback; the receipt consumer owns the diagnosis and its own log event
             deferred.errback(error)
             return deferred
-        # A result-only answer is one admitted action's completion, not a
-        # presentation intent: it is bounded by the sequence's single in-flight
-        # marker, so the queue bound (a publisher-loop guard) never drops it.
-        if not intent.result_only and len(self._pending) >= MAX_PENDING_PUBLICATIONS:
-            self._invalidate_baseline()
-            deferred.errback(
-                PresentationQueueFull(
-                    "presentation queue full for %s" % self.describe_session()
+        entry = self._pending_groups.get(intent.group_id)
+        if entry is None:
+            # A result-only answer is one admitted action's completion, not a
+            # presentation intent: it is bounded by the sequence's single
+            # in-flight marker, so the queue bound (a publisher-loop guard)
+            # never drops it.
+            if not intent.result_only and (
+                len(self._pending) >= MAX_PENDING_PUBLICATIONS
+                or self._pending_waiter_count() >= MAX_PENDING_PUBLICATIONS
+            ):
+                self._invalidate_baseline()
+                deferred.errback(
+                    PresentationQueueFull(
+                        "presentation queue full for %s" % self.describe_session()
+                    )
                 )
-            )
-            return deferred
-        self._pending.append(intent)
-        self._schedule_drain()
+                return deferred
+            entry = _PendingGroup.from_intent(intent, grouped=not intent.standalone)
+            self._pending.append(entry)
+            self._pending_groups[intent.group_id] = entry
+        else:
+            if (
+                not intent.result_only
+                and len(entry.waiters) >= MAX_PENDING_PUBLICATIONS
+            ):
+                self._invalidate_baseline()
+                deferred.errback(
+                    PresentationQueueFull(
+                        "presentation group overflow for %s"
+                        % self.describe_session()
+                    )
+                )
+                return deferred
+            entry.merge(intent)
+        if entry.grouped:
+            self._schedule_deferred_drain()
+        else:
+            self._schedule_drain()
         return deferred
 
     def full_snapshot(self, context: PresentationContext) -> Deferred:
         """Publish the complete eager snapshot at one fresh revision."""
-        return self.enqueue_publication(lambda: context, force_snapshot=True)
+        return self.enqueue_publication(
+            lambda: context, force_snapshot=True, independent=True
+        )
 
     def panel_update(
         self,
@@ -362,7 +566,9 @@ class PresentationCoordinator:
         Errbacks with :class:`ClockUnavailable` when the world-clock singleton
         is absent so the ingress can emit ``presentation_unavailable``.
         """
-        return self.enqueue_publication(lambda: context, force_snapshot=True)
+        return self.enqueue_publication(
+            lambda: context, force_snapshot=True, independent=True
+        )
 
     def _build_intent(
         self,
@@ -375,6 +581,8 @@ class PresentationCoordinator:
         expected_epoch: str | None,
         completion: PublicationCompletion | None,
         result_only: bool,
+        group_id: str | None,
+        independent: bool,
         deferred: Deferred,
     ) -> _Intent:
         """Validate one raw declaration and isolate its supplied candidates.
@@ -385,6 +593,11 @@ class PresentationCoordinator:
         removals, replace/remove overlap, and a candidate+affected combination
         all fail. An invalid *affected* declaration is not an error (it means
         unknown scope) and is widened during planning.
+
+        The causal group is resolved here, at the call boundary: an explicit
+        ``group_id`` wins, otherwise the group bound to this synchronous call,
+        otherwise a fresh standalone group. ``independent`` deliberately ignores
+        an ambient binding.
         """
         if candidate_panels is not None and affected_panels is not None:
             raise ValueError(
@@ -423,13 +636,22 @@ class PresentationCoordinator:
             raise ValueError(
                 f"publication both replaces and removes {sorted(overlap)}"
             )
+        ambient = None if independent else current_publication_group()
+        captured = group_id if group_id is not None else (
+            ambient.id if ambient is not None else None
+        )
         return _Intent(
             context_factory=context_factory,
-            affected_panels=declared,
             candidates=candidates,
+            declared=frozenset(declared or ()),
+            unknown_scope=(
+                not result_only and declared is None and candidates is None
+            ),
             removed_panels=removed,
             force_snapshot=bool(force_snapshot),
             result_only=bool(result_only),
+            group_id=captured or new_publication_group().id,
+            standalone=captured is None,
             epoch=self._epoch,
             expected_epoch=expected_epoch,
             completion=completion,
@@ -461,51 +683,138 @@ class PresentationCoordinator:
     # ------------------------------------------------------------------
 
     def _schedule_drain(self) -> None:
-        """Run the serialized drain before returning to the caller.
+        """Run the serialized drain for standalone intents before returning.
 
-        The drain must happen inside the enqueueing callback, not on a later
-        reactor turn: an admitted action's result has to be on the wire before
-        a sequence-retiring effect that the adapter already scheduled can retire
-        the epoch (the effect then runs after the result by construction). One
-        publication batch therefore completes before ``enqueue_publication``
-        returns; reentrant work joins the queue and drains immediately after the
-        current batch, in order.
+        An intent that belongs to no captured group publishes at its own enqueue
+        boundary, as B defined: an explicit sync or recovery answer must be on
+        the wire before a sequence-retiring effect the adapter already scheduled
+        can retire the epoch. Grouped intents are deliberately left queued for
+        :meth:`_schedule_deferred_drain`, because their own commit callbacks have
+        not all run yet; publishing them here would split one causal group into
+        an intermediate delta plus its checkpoint snapshot.
         """
         if self._draining:
             return
-        self._drain()
+        self._drain(standalone_only=True)
 
     def drain(self) -> None:
         """Run every queued publication now (deterministic seam for tests/tooling)."""
         self._drain()
 
-    def _drain(self) -> None:
-        """Run every queued intent in order inside the publication critical section."""
+    def flush_publication_group(self, group_id: str) -> None:
+        """Publish one pending group now, in place, without touching the others.
+
+        The dispatcher's result-only completion uses this narrow seam: its
+        adapter may already have scheduled a sequence retirement for the next
+        reactor turn, so that answer must leave first. Every other group keeps
+        waiting for the deferred boundary, so no unrelated group is finalized
+        before its own commit callbacks finish.
+        """
+        entry = self._pending_groups.get(group_id)
+        if entry is None:
+            return
+        self._drain(only=entry)
+
+    def _schedule_deferred_drain(self) -> None:
+        """Schedule one drain after the current reactor turn.
+
+        A committed operation's on-commit callbacks all run before the reactor
+        returns, so its group entry is complete when the scheduled drain runs.
+        """
+        if self._drain_scheduled:
+            return
+        self._drain_scheduled = True
+        try:
+            self._scheduler(self._deferred_drain)
+        except Exception as error:  # observability: R2 reported here; no waiter may hang because scheduling failed
+            self._drain_scheduled = False
+            log_warn(
+                "publication_schedule_failed",
+                context={
+                    "surface": "presentation",
+                    "session": getattr(self.session, "sessid", "?"),
+                },
+                exc=error,
+            )
+            self._drain()
+
+    def _deferred_drain(self) -> None:
+        """The scheduled boundary: clear the marker, then drain every entry."""
+        self._drain_scheduled = False
+        self._drain()
+
+    def _pending_waiter_count(self) -> int:
+        """Every queued Deferred across all pending groups."""
+        return sum(len(entry.waiters) for entry in self._pending)
+
+    def _drain(
+        self,
+        *,
+        standalone_only: bool = False,
+        only: "_PendingGroup | None" = None,
+    ) -> None:
+        """Run queued group entries in order inside the publication critical section.
+
+        ``standalone_only`` publishes the entries that belong to no captured
+        group and leaves grouped entries for their deferred boundary.
+        ``only`` publishes exactly one identified entry in place.
+        """
         if self._draining:
             return
         self._draining = True
         try:
             while self._pending:
-                self._execute(self._pending.popleft())
+                if only is not None:
+                    if self._pending_groups.get(only.group_id) is not only:
+                        return
+                    entry = only
+                else:
+                    entry = next(
+                        (
+                            candidate
+                            for candidate in self._pending
+                            if not standalone_only or not candidate.grouped
+                        ),
+                        None,
+                    )
+                    if entry is None:
+                        return
+                self._pending.remove(entry)
+                self._pending_groups.pop(entry.group_id, None)
+                self._execute(entry)
         finally:
             self._draining = False
+        if standalone_only and self._pending and not self._drain_scheduled:
+            # A reentrant enqueue hit the draining guard: retry the grouped work
+            # at its deferred boundary instead of stranding its waiters.
+            self._schedule_deferred_drain()
 
-    def _execute(self, intent: _Intent) -> None:
-        """Execute one intent, resolving its Deferred exactly once."""
-        if intent.epoch != self._epoch:
-            intent.deferred.callback(None)
+    def _execute(self, entry: _PendingGroup) -> None:
+        """Execute one group entry, resolving every waiter exactly once."""
+        if entry.epoch != self._epoch:
+            self._resolve(entry, None)
             return
-        if intent.expected_epoch is not None and intent.expected_epoch != self._epoch:
-            intent.deferred.callback(None)
+        if entry.expected_epoch is not None and entry.expected_epoch != self._epoch:
+            self._resolve(entry, None)
             return
         try:
-            receipt = self._publish_now(intent)
-        except Exception as error:  # observability: ignore R2: the real error is delivered to the intent's errback, where the publisher reports it with its own catalogued event
-            intent.deferred.errback(error)
+            receipt = self._publish_now(entry)
+        except Exception as error:  # observability: ignore R2: the real error is delivered to every waiter's errback, where the publisher reports it with its own catalogued event
+            self._fail(entry, error)
             return
-        intent.deferred.callback(receipt)
+        self._resolve(entry, receipt)
 
-    def _publish_now(self, intent: _Intent) -> PublicationReceipt | None:
+    @staticmethod
+    def _resolve(entry: _PendingGroup, receipt: PublicationReceipt | None) -> None:
+        for deferred in entry.waiters:
+            deferred.callback(receipt)
+
+    @staticmethod
+    def _fail(entry: _PendingGroup, error: BaseException) -> None:
+        for deferred in entry.waiters:
+            deferred.errback(error)
+
+    def _publish_now(self, entry: _PendingGroup) -> PublicationReceipt | None:
         """Plan, prevalidate and send one publication batch synchronously.
 
         Nothing awaits and nothing reenters: the whole batch (every planned
@@ -515,18 +824,18 @@ class PresentationCoordinator:
         frames all sent; the issued revision advances at the first attempted
         send so an escaped target is never reused.
         """
-        if intent.result_only:
+        if entry.result_only:
             revision = self.published_revision
-            envelope = self._completion_envelope(intent, revision)
+            envelope = self._completion_envelope(entry, revision)
             if envelope is not None:
                 self._send_result(envelope)
             return PublicationReceipt(self._epoch, revision, "unchanged", False)
-        context = intent.context_factory()
+        context = entry.context_factory()
         mode = self._mode_provider(context)
         server_time = copy_json_value(self.server_time())
         baseline = self._baseline
         if (
-            intent.force_snapshot
+            entry.force_snapshot
             or baseline is None
             or not baseline.valid
             or self._repair_required
@@ -536,15 +845,15 @@ class PresentationCoordinator:
                 self._plan_snapshot(context, mode, server_time)
             ]
         else:
-            plans = self._plan_delta(context, intent, baseline, mode, server_time)
+            plans = self._plan_delta(context, entry, baseline, mode, server_time)
         target = plans[-1].revision if plans else self.published_revision
-        result_envelope = self._completion_envelope(intent, target)
+        result_envelope = self._completion_envelope(entry, target)
         self._send_plans(plans)
         if result_envelope is not None:
             self._send_result(result_envelope)
-        if self._epoch != intent.epoch:
+        if self._epoch != entry.epoch:
             # The sequence was retired while the batch was sending; nothing
-            # about the new sequence may be reported as this intent's result.
+            # about the new sequence may be reported as this entry's result.
             return None
         if not plans:
             return PublicationReceipt(
@@ -554,12 +863,12 @@ class PresentationCoordinator:
         return PublicationReceipt(self._epoch, plans[-1].revision, kind, True)
 
     def _completion_envelope(
-        self, intent: _Intent, revision: int
+        self, entry: _PendingGroup, revision: int
     ) -> dict[str, Any] | None:
         """Build and prevalidate the matching action result before any send."""
-        if intent.completion is None:
+        if entry.completion is None:
             return None
-        envelope = intent.completion.envelope(self._epoch, revision)
+        envelope = entry.completion.envelope(self._epoch, revision)
         validate_ui_action_result(envelope)
         return envelope
 
@@ -651,20 +960,23 @@ class PresentationCoordinator:
     def _plan_delta(
         self,
         context: PresentationContext,
-        intent: _Intent,
+        entry: _PendingGroup,
         baseline: _Baseline,
         mode: str,
         server_time: dict[str, Any],
     ) -> list[_LogicalPublication]:
-        """Plan only the differences between the declared scope and the baseline."""
+        """Plan only the differences between the declared scope and the baseline.
+
+        A merged group may combine supplied candidates with a declared scope or
+        with unknown scope, so the compared scope is their union and the
+        unknown-scope flag widens it to every eager panel exactly as before.
+        """
         eager_names = self.registry.eager_panel_names
-        if intent.candidates is not None:
-            scope = set(intent.candidates)
-            unknown_scope = False
-        else:
-            scope = set(intent.affected_panels or ())
-            unknown_scope = not intent.affected_panels
-        removed_now = set(intent.removed_panels)
+        scope = set(entry.declared)
+        if entry.candidates is not None:
+            scope |= set(entry.candidates)
+        unknown_scope = entry.unknown_scope
+        removed_now = set(entry.removed_panels)
         if unknown_scope or mode != baseline.mode:
             # Unknown scope and every mode transition recompute all eager
             # panels: a transition into or out of dialogue must carry the
@@ -683,8 +995,8 @@ class PresentationCoordinator:
         values: dict[str, Any] = {}
         map_bodies: dict[str, Any] = {}
         for name in sorted(scope):
-            supplied = intent.candidates is not None and name in intent.candidates
-            value = intent.candidates[name] if supplied else self.registry.render(name, context)
+            supplied = entry.candidates is not None and name in entry.candidates
+            value = entry.candidates[name] if supplied else self.registry.render(name, context)
             if name in self.registry.on_demand_panel_names:
                 map_bodies[name] = self._checked_map_body(name, value)
                 continue
@@ -695,12 +1007,12 @@ class PresentationCoordinator:
             known = baseline.panels.get(name, _MISSING)
             if known is not _MISSING and json_value_equal(known, value):
                 continue
-            supplied = intent.candidates is not None and name in intent.candidates
+            supplied = entry.candidates is not None and name in entry.candidates
             # Own the adopted value before anything is sent, so a presenter that
             # reuses its returned container cannot change what was published.
             replacements[name] = value if supplied else copy_json_value(value)
         removed = tuple(
-            name for name in intent.removed_panels if name in baseline.panels
+            name for name in entry.removed_panels if name in baseline.panels
         )
         metadata_changed = (
             mode != baseline.mode
@@ -1015,8 +1327,10 @@ def publish_panel_update(
     actor: Any,
     panels: Mapping[str, Any],
     *,
-    context: PresentationContext,
+    context: PresentationContext | None = None,
     expected_epoch: str,
+    affected_panels: tuple[str, ...] | list[str] | None = None,
+    independent: bool = False,
 ) -> Deferred:
     """Push one validated panel subset to a live session under the epoch guard.
 
@@ -1034,22 +1348,46 @@ def publish_panel_update(
     attaches on the session's next sync. ``context`` is the caller's
     :class:`PresentationContext`, assembled through the shared ingress factory
     so the ``context_actions`` presenter renders from the ``OptionsSnapshot``.
+
+    The queued request always rebuilds its context through that same ingress
+    factory at drain time, so a grouped push can never re-render from a stale
+    snapshot. ``affected_panels`` lets a producer submit the panel *names* it
+    changed instead of an eagerly rendered payload; the coordinator then renders
+    them from current canonical state, which is what a grouped ordinary push
+    does. When it is supplied, ``panels`` is ignored. ``independent`` marks a
+    delivery that must never join an ambient group: a one-shot notice whose
+    decoration cannot survive a checkpoint promotion (a claimed dialogue unlock
+    batch) publishes as its own entry.
     """
     ndb = getattr(session, "ndb", None)
     coordinator = getattr(ndb, "elosern_coordinator", None) if ndb is not None else None
     if coordinator is None or coordinator.epoch != expected_epoch:
         return succeed(None)
-    deferred = coordinator.enqueue_publication(
-        lambda: context,
-        candidate_panels=panels,
-        expected_epoch=expected_epoch,
+    declared = (
+        tuple(str(name) for name in affected_panels)
+        if affected_panels is not None
+        else None
     )
+
+    def _context() -> PresentationContext:
+        from web.webclient.presentation.ingress import build_presentation_context
+
+        return build_presentation_context(session, actor)
+
+    deferred = coordinator.enqueue_publication(
+        _context,
+        candidate_panels=panels if declared is None else None,
+        affected_panels=declared,
+        expected_epoch=expected_epoch,
+        independent=independent,
+    )
+    names = declared if declared is not None else tuple(panels)
 
     def _failed(failure: Any) -> Any:
         error = failure.value if isinstance(failure, Failure) else failure
         log_warn(
             "presentation_push_failed",
-            context={"surface": "presentation", "panels": ",".join(sorted(panels))},
+            context={"surface": "presentation", "panels": ",".join(sorted(names))},
             exc=error,
         )
         return None
