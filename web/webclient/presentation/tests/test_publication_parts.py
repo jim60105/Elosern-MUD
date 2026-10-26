@@ -1031,24 +1031,47 @@ class BrowserAssemblyFixtureTests(unittest.TestCase):
 const fs = require('node:fs');
 const P = require('./web/static/webclient/js/elosern/protocol.js');
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+function summary(state) {
+  return {
+    phase: state.phase,
+    epoch: state.activeEpoch,
+    revision: state.revision,
+    mode: state.mode,
+    hour: state.serverTime === null ? null : state.serverTime.hour,
+    panelCount: Object.keys(state.panels).length,
+    hasCodex: Object.prototype.hasOwnProperty.call(state.panels, 'lore_codex'),
+  };
+}
 const store = P.createStore();
 let notified = 0;
 let notifiedAfterSnapshot = 0;
 store.subscribe(() => { notified += 1; });
 store.beginTransport(1);
 const baseline = notified;
-const snapshotResults = input.snapshot.map(
-  (part) => store.receive(1, 'ui_publication_part', [part], {})
-);
+const initial = summary(store.getState());
+const snapshotIntermediates = [];
+const snapshotResults = input.snapshot.map((part) => {
+  const result = store.receive(1, 'ui_publication_part', [part], {});
+  snapshotIntermediates.push(summary(store.getState()));
+  return result;
+});
 const afterSnapshot = store.getState();
 notifiedAfterSnapshot = notified - baseline;
-const deltaResults = input.delta.map(
-  (part) => store.receive(1, 'ui_publication_part', [part], {})
-);
+const beforeDelta = summary(afterSnapshot);
+const deltaIntermediates = [];
+const deltaResults = input.delta.map((part) => {
+  const result = store.receive(1, 'ui_publication_part', [part], {});
+  deltaIntermediates.push(summary(store.getState()));
+  return result;
+});
 const afterDelta = store.getState();
 process.stdout.write(JSON.stringify({
+  initial: initial,
   snapshotResults: snapshotResults,
+  snapshotIntermediates: snapshotIntermediates,
   deltaResults: deltaResults,
+  deltaIntermediates: deltaIntermediates,
+  beforeDelta: beforeDelta,
   notifiedAfterSnapshot: notifiedAfterSnapshot,
   notified: notified - baseline,
   snapshotState: {
@@ -1076,6 +1099,23 @@ process.stdout.write(JSON.stringify({
         # Nothing is adopted or notified before the final snapshot part.
         for result in outcome["snapshotResults"][:-1]:
             self.assertEqual(result, {"accepted": False, "pending": True, "revision": 1})
+        # Every intermediate part leaves the committed state untouched.
+        self.assertEqual(
+            outcome["snapshotIntermediates"][:-1],
+            [outcome["initial"]] * (len(outcome["snapshotIntermediates"]) - 1),
+        )
+        self.assertEqual(
+            outcome["initial"],
+            {
+                "phase": "awaiting_initial_snapshot",
+                "epoch": None,
+                "revision": None,
+                "mode": None,
+                "hour": None,
+                "panelCount": 0,
+                "hasCodex": False,
+            },
+        )
         self.assertEqual(
             outcome["snapshotResults"][-1],
             {"accepted": True, "established": True, "revision": 1},
@@ -1091,6 +1131,10 @@ process.stdout.write(JSON.stringify({
         # The fragmented delta commits exactly once, at its final part.
         for result in outcome["deltaResults"][:-1]:
             self.assertEqual(result, {"accepted": False, "pending": True, "revision": 2})
+        self.assertEqual(
+            outcome["deltaIntermediates"][:-1],
+            [outcome["beforeDelta"]] * (len(outcome["deltaIntermediates"]) - 1),
+        )
         self.assertEqual(outcome["deltaResults"][-1], {"accepted": True, "revision": 2})
         self.assertEqual(outcome["notified"], 2)
         self.assertEqual(outcome["deltaState"]["revision"], 2)

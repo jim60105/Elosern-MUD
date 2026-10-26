@@ -678,6 +678,32 @@ test("clear and prune release buffers without a recovery signal", () => {
   assert.equal(failures.length, 0);
 });
 
+test("a superseded transfer's queued timer cannot orphan the new deadline", () => {
+  const clock = fakeClock();
+  const failures = [];
+  const assembler = makeAssembler(clock, failures);
+  const panel = nearCapCodex();
+  const context = { phase: "awaiting_initial_snapshot", committedRevision: null };
+  const older = framesFor(snapshotDoc({ lore_codex: panel }, { revision: 5 }), {
+    transferId: TRANSFER,
+  });
+  const newer = framesFor(snapshotDoc({ lore_codex: panel }, { revision: 7 }), {
+    transferId: TRANSFER_B,
+  });
+  const first = Protocol.validatePublicationPart(older.frames[0]);
+  assembler.accept(first.header, first.chunks, context);
+  const superseding = Protocol.validatePublicationPart(newer.frames[0]);
+  assert.equal(assembler.accept(superseding.header, superseding.chunks, context).status, "pending");
+  // The older transfer's cancelled callback was already queued: it must not
+  // relinquish the replacement timer.
+  clock.fireCleared();
+  assert.equal(assembler.stats().transferId, TRANSFER_B);
+  assert.equal(clock.pending(), 1);
+  assembler.clear();
+  assert.equal(clock.pending(), 0);
+  assert.equal(failures.length, 0);
+});
+
 // ---------------------------------------------------------------------------
 // Store integration: one invisible atomic adoption.
 // ---------------------------------------------------------------------------
@@ -773,7 +799,49 @@ test("the logical document must agree with its part headers", () => {
   const state = store.getState();
   assert.equal(state.revision, 1);
   assert.equal(state.recovery.status, "needed");
+  assert.equal(state.recovery.cause, "invalid");
   assert.equal(state.mutationsLocked, true);
+});
+
+test("a stale malformed part never disturbs newer work or starts recovery", () => {
+  const clock = fakeClock();
+  const store = activeStore(clock);
+  const panel = nearCapCodex();
+  const latest = framesFor(snapshotDoc({ lore_codex: panel }, { revision: 2 }));
+  assert.equal(store.receive(1, "ui_publication_part", [latest.frames[0]], {}).pending, true);
+
+  // A trustworthy stale header whose chunk is non-canonical base64: decode is
+  // never reached, so the live revision-2 transfer and recovery state stay
+  // untouched.
+  const staleChunk = {
+    protocol_version: 1,
+    presentation_epoch: EPOCH,
+    revision: 1,
+    publication_kind: "snapshot",
+    transfer_id: "ef".repeat(16),
+    part_index: 0,
+    part_count: 1,
+    total_bytes: 1,
+    chunks: ["AB=="],
+  };
+  const staleResult = store.receive(1, "ui_publication_part", [staleChunk], {});
+  assert.equal(staleResult.accepted, false);
+  assert.equal(staleResult.reason, "not_newer");
+  assert.equal(staleResult.recovery, undefined);
+  assert.equal(store.getState().recovery.status, "idle");
+  assert.equal(store.publicationAssemblyStats().live, true);
+
+  // The same stale target with a header that cannot even be inspected stays
+  // inert as well (identifiable epoch and revision, corrupt count).
+  const staleInspected = Object.assign({}, staleChunk, {
+    part_count: 4,
+    part_index: 3,
+  });
+  const second = store.receive(1, "ui_publication_part", [staleInspected], {});
+  assert.equal(second.reason, "not_newer");
+  assert.equal(store.getState().recovery.status, "idle");
+  assert.equal(store.publicationAssemblyStats().live, true);
+  assert.equal(clock.pending(), 1);
 });
 
 test("assembly never legalizes a panel-local or on-demand violation", () => {
@@ -828,6 +896,8 @@ test("a base mismatch at final adoption preserves the committed presentation", (
   assert.equal(last.recovery, "needed");
   const state = store.getState();
   assert.equal(state.revision, 3);
+  assert.equal(state.recovery.status, "needed");
+  assert.equal(state.recovery.cause, "base_mismatch");
   assert.deepEqual(state.panels.status, validStatusPanel());
   assert.equal(Object.prototype.hasOwnProperty.call(state.panels, "lore_codex"), false);
 });

@@ -241,6 +241,13 @@ function receivePublicationPart(payload) {
       payload !== null && typeof payload === "object" && typeof payload.presentation_epoch === "string"
         ? payload.presentation_epoch
         : null;
+    var revisionHint =
+      payload !== null &&
+      typeof payload === "object" &&
+      typeof payload.revision === "number" &&
+      Number.isInteger(payload.revision)
+        ? payload.revision
+        : null;
     if (epochHint !== null) {
       if (retired.has(epochHint)) {
         return { accepted: false, reason: "retired_epoch" };
@@ -251,6 +258,13 @@ function receivePublicationPart(payload) {
       if (phase === "detached" && epochHint === activeEpoch) {
         return { accepted: false, reason: "different_epoch" };
       }
+    }
+    // An obsolete target stays an ordinary stale discard even when its chunks
+    // are corrupt: it must never disturb newer in-flight work or start
+    // recovery.
+    if (phase === "active" && revisionHint !== null && revisionHint <= revision) {
+      publicationAssembler.pruneThrough(revision);
+      return { accepted: false, reason: "not_newer" };
     }
     // Otherwise the corrupt transfer cannot be identified: discard the live
     // assembly and record one recovery need.
@@ -281,6 +295,13 @@ function receivePublicationPart(payload) {
     if (phase === "detached" && header.epoch === activeEpoch) {
       return { accepted: false, reason: "different_epoch" };
     }
+  }
+
+  // A trustworthy but obsolete header is rejected before its chunks are even
+  // decoded, so a corrupted replay can never destroy newer work.
+  if (phase === "active" && header.revision <= revision) {
+    publicationAssembler.pruneThrough(revision);
+    return { accepted: false, reason: "not_newer" };
   }
 
   var decoded;

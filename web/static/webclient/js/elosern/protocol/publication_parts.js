@@ -325,10 +325,12 @@ function createPublicationAssembler(options) {
     // One expiry callback at the fixed first-part deadline; later parts never
     // reschedule it. A callback from a cleared/superseded assembly is inert.
     timer = setTimer(function () {
-      timer = null;
+      // A callback from a cleared/superseded assembly is inert and must not
+      // relinquish ownership of the replacement's timer handle.
       if (live !== captured) {
         return;
       }
+      timer = null;
       fail("timeout", true);
     }, PUBLICATION_ASSEMBLY_TIMEOUT_MS);
   }
