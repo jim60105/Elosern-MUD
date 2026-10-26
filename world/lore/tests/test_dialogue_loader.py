@@ -244,7 +244,10 @@ class DialogueLoaderTests(unittest.TestCase):
             self.assertIn("utf8_host.yaml", str(ctx.exception))
             self.assertIn("not valid utf-8", str(ctx.exception).lower())
 
-    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    @covers_requirement(
+        "authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_duplicate_mapping_keys_rejected(self) -> None:
         """Duplicate mapping keys at root or nested levels are strictly rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -345,7 +348,10 @@ topics: []
                 )
             self.assertIn("yaml merge keys", str(ctx.exception).lower())
 
-    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    @covers_requirement(
+        "authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_unsafe_tags_rejected(self) -> None:
         """Custom and object-construction YAML tags are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -385,7 +391,10 @@ topics: []
                 )
             self.assertIn("expected a single document", str(ctx.exception).lower())
 
-    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
+    @covers_requirement(
+        "authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_filename_stem_not_in_registered_profiles_rejected(self) -> None:
         """Discovered file whose stem is not a registered NpcProfile.key rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -439,7 +448,10 @@ topics: []
             self.assertIn("missing_diag", str(ctx.exception))
             self.assertIn("has no discovered file", str(ctx.exception))
 
-    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    @covers_requirement(
+        "authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_discovered_file_without_binding_rejected(self) -> None:
         """A discovered file whose profile has no binding rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -492,7 +504,10 @@ topics: []
                 )
             self.assertIn("duplicate canonical binding", str(ctx.exception).lower())
 
-    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
+    @covers_requirement(
+        "authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_forbidden_explicit_owner_field_rejected(self) -> None:
         """Explicit owner fields in YAML root (npc_id, profile_key, owner) are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -513,6 +528,9 @@ topics: []
                     )
                 self.assertIn("forbidden explicit owner field", str(ctx.exception))
 
+    @covers_requirement(
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership"
+    )
     def test_schema_version_type_strictness(self) -> None:
         """schema_version must be exact int 1; bool or float rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -532,7 +550,10 @@ topics: []
                     )
                 self.assertIn("schema_version must be integer 1", str(ctx.exception))
 
-    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    @covers_requirement(
+        "authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_all_or_nothing_snapshot_rejection(self) -> None:
         """One invalid neighbor rejects the entire load atomically."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -652,7 +673,10 @@ topics:
             self.assertNotIn("fixture_master", snapshot)
             self.assertEqual(snapshot["fixture_staff"].topics[0].topic_id, "fixture_staff.topic_01")
 
-    @covers_requirement("authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot")
+    @covers_requirement(
+        "authored-dialogue-sources::unsafe-or-invalid-content-rejects-the-whole-candidate-snapshot",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_unknown_condition_reference_rejects(self) -> None:
         """A dialogue condition referencing an unknown key against DialogueReferences rejects."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -797,7 +821,10 @@ topics:
             self.assertEqual(ctx.exception.profile_key, "bound_host")
             self.assertIn("EXPOSURE_LEVELS", str(ctx.exception))
 
-    @covers_requirement("authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename")
+    @covers_requirement(
+        "authored-dialogue-sources::static-dialogue-discovery-derives-owner-from-profile-key-filename",
+        "authored-dialogue-content::guild-content-has-exclusive-profile-key-yaml-ownership",
+    )
     def test_new_valid_registered_profile_discovered_with_no_file_index_edit(self) -> None:
         """Adding a new file for a new registered profile & binding succeeds dynamically."""
         with tempfile.TemporaryDirectory() as tmpdir:

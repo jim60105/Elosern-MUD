@@ -7,7 +7,7 @@ The approved authored-dialogue design requires complete authored rewrite for gui
 ## What Changes
 
 - Complete per-NPC YAML authored rewrite for guild_staff.
-- Implement this slice's exact shared interfaces and focused acceptance with its own tests and documentation.
+- Implement this slice's exact shared interfaces and focused acceptance with its own documentation; authored data ships without a content test, because tests cover logic only.
 - Use the deterministic owner and declared dependencies; no implementation is performed by this proposal.
 
 ## Capabilities
