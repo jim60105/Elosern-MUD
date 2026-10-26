@@ -32,6 +32,58 @@ from ._support import (
 class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
     """Source ownership alone authorizes retirement; rooms never gate it."""
 
+    def test_a_zero_capability_row_still_requires_exactly_one_room_per_tag(self):
+        # The exact-one-Room rule belongs to the spawn room itself, not to a
+        # capability anchor: a host that declares no capability must still fail
+        # closed on an ambiguous or non-Room spawn tag.
+        bare_row = dataclasses.replace(
+            next(
+                row
+                for row in get_catalog().service_hosts
+                if row.host_key == MERCHANT_SERVICE_ID
+            ),
+            components=(),
+        )
+        ambiguous_tag = "t_ambiguous_spawn_tag"
+        create_object(NPC, key="ambiguous first", tags=[ambiguous_tag])
+        create_object(NPC, key="ambiguous second", tags=[ambiguous_tag])
+        for tag, fragment in (
+            (ambiguous_tag, "resolves to"),
+            ("t_absent_spawn_tag", "resolves to no room"),
+        ):
+            with self.subTest(tag=tag):
+                row = dataclasses.replace(bare_row, spawn_room=tag)
+                self._patch_roster((row,))
+                with self.assertRaises(ServiceHostIntegrityError) as caught:
+                    sync_service_content()
+                self.assertIn(fragment, str(caught.exception))
+
+    def test_interior_preparation_rolls_back_with_the_failed_batch(self):
+        # A later failure must take the prepared interiors with it: the repair
+        # pass runs inside the same transaction as the plan resolution and the
+        # writes, so the recreated room is gone after the rollback.
+        from evennia.objects.models import ObjectDB
+        from world.rules import guild_economy
+
+        interior_tag = _merchant_row().spawn_room
+        for obj in list(search_object_by_tag(interior_tag)):
+            obj.delete()
+        self.assertEqual(list(search_object_by_tag(interior_tag)), [])
+        with patch.object(
+            guild_economy, "_initialize_merchant_stock", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                sync_service_content()
+        self.assertEqual(
+            list(search_object_by_tag(interior_tag)),
+            [],
+            "the rolled-back interior must not persist",
+        )
+        self.assertFalse(
+            ObjectDB.objects.filter(db_key=_merchant_host_name()).exists(),
+            "no host row survives the rolled-back batch",
+        )
+
     def _rows_with_tags(self, tag):
         catalog = get_catalog()
         return tuple(

@@ -491,12 +491,105 @@ class AssemblyTests(EvenniaTestCase):
         with self.assertRaises(CapabilityValidationError) as caught:
             assemble_capabilities(self.npc, plan)
         self.assertTrue(
-            any("missing authored kwargs" in issue for issue in caught.exception.issues)
+            any("shop_key" in issue for issue in caught.exception.issues)
         )
 
     def test_assembly_requires_a_validated_plan(self):
         with self.assertRaises(TypeError):
             assemble_capabilities(self.npc, ())
+
+    def test_a_forged_plan_cannot_smuggle_runtime_state_or_an_unbound_service(self):
+        forged_runtime = CapabilityPlan(
+            (
+                PlannedCapability(
+                    type=Merchant.name,
+                    kwargs={
+                        "service_id": "probe_service",
+                        "shop_key": "probe_shop",
+                        "merchant_stock": {"probe_item": 1},
+                    },
+                    binding=person_bound(),
+                ),
+            )
+        )
+        with self.assertRaises(CapabilityValidationError) as caught:
+            assemble_capabilities(self.npc, forged_runtime)
+        self.assertTrue(
+            any("runtime-owned field" in issue for issue in caught.exception.issues)
+        )
+        self.assertFalse(self.npc.components.has(Merchant.name))
+
+        forged_unbound = CapabilityPlan(
+            (
+                PlannedCapability(
+                    type=Merchant.name,
+                    kwargs={"service_id": "probe_service", "shop_key": "probe_shop"},
+                    binding=None,
+                ),
+            )
+        )
+        with self.assertRaises(CapabilityValidationError) as unbound:
+            assemble_capabilities(self.npc, forged_unbound)
+        self.assertTrue(
+            any("must declare" in issue for issue in unbound.exception.issues)
+        )
+        self.assertFalse(self.npc.components.has(Merchant.name))
+
+    def test_unknown_kwargs_and_duplicate_types_cannot_reach_a_component_factory(self):
+        with self.assertRaises(CapabilityValidationError) as unknown:
+            CapabilityPlan(
+                (
+                    PlannedCapability(
+                        type="blacksmith",
+                        kwargs={},
+                        binding=person_bound(),
+                    ),
+                )
+            )
+        self.assertIn("vocabulary", unknown.exception.issues[0])
+
+        with self.assertRaises(CapabilityValidationError) as duplicate:
+            CapabilityPlan(
+                (
+                    PlannedCapability(
+                        type=Merchant.name,
+                        kwargs={"service_id": "probe_service", "shop_key": "probe_shop"},
+                        binding=person_bound(),
+                    ),
+                    PlannedCapability(
+                        type=Merchant.name,
+                        kwargs={"service_id": "probe_service_2", "shop_key": "probe_shop"},
+                        binding=person_bound(),
+                    ),
+                )
+            )
+        self.assertIn("more than once", duplicate.exception.issues[0])
+
+    def test_omitting_an_optional_authored_field_clears_it_on_reuse(self):
+        authored = validate_capabilities([_issuer(issuer_key="probe_commission")])
+        assemble_capabilities(self.npc, authored)
+        issuer = self.npc.components.get(QuestIssuer.get_component_slot())
+        self.assertEqual(issuer.issuer_key, "probe_commission")
+        # The same declaration without the optional key converges the host back
+        # to the canonical identity form instead of keeping the stale value.
+        assemble_capabilities(self.npc, validate_capabilities([_issuer()]))
+        converged = self.npc.components.get(QuestIssuer.get_component_slot())
+        self.assertIsNone(converged.issuer_key)
+
+    def test_a_non_mapping_kwargs_value_is_a_named_rejection(self):
+        with self.assertRaises(CapabilityValidationError) as caught:
+            validate_capabilities(
+                [
+                    {
+                        "type": Merchant.name,
+                        "kwargs": "not-a-mapping",
+                        "binding": {"kind": "person"},
+                    }
+                ]
+            )
+        self.assertTrue(
+            any("must be a mapping" in issue for issue in caught.exception.issues)
+        )
 
     def test_reconcile_removes_undeclared_managed_slots_only(self):
         plan = validate_capabilities(

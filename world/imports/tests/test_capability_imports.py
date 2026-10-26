@@ -290,6 +290,39 @@ class CapabilityLoaderTests(CapabilityBatchHarness):
         self.assertEqual(resolve_issuer_key(npc), npc_issuer_key("probe_commission"))
 
     @covers_requirement(
+        "npc-capability-declarations::each-bound-capability-authors-its-own-binding-and-unique-room"
+    )
+    def test_a_place_bound_merchant_and_a_person_bound_commission_coexist(self):
+        # Mixed bindings on one NPC: the merchant pauses off-anchor, the
+        # commission keeps its co-presence gate, and neither inherits the
+        # other's anchor.
+        from world.rules.service_gate import REASON_OFF_ANCHOR, service_available
+
+        npc = load_batch(
+            [
+                self.write(
+                    "mixed_bindings.json",
+                    self.record(
+                        "capability_probe_mixed",
+                        [merchant_entry(), issuer_entry()],
+                    ),
+                )
+            ]
+        )[0]
+        merchant = npc.components.get(Merchant.get_component_slot())
+        issuer = npc.components.get(QuestIssuer.get_component_slot())
+        elsewhere = create_object(Room, key="mixed elsewhere")
+        actor = create_object(NPC, key="mixed actor", location=elsewhere)
+        npc.location = elsewhere
+        npc.save()
+        # The merchant is place-bound to the probe anchor: off it, trade pauses.
+        merchant_verdict = service_available(actor, npc, merchant)
+        self.assertEqual(merchant_verdict.reason, REASON_OFF_ANCHOR)
+        # The commission is person-bound: co-presence alone allows it.
+        issuer_verdict = service_available(actor, npc, issuer)
+        self.assertTrue(issuer_verdict.allowed)
+
+    @covers_requirement(
         "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline"
     )
     def test_the_loader_never_invents_an_issuer_key(self):

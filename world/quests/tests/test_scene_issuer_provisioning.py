@@ -67,3 +67,29 @@ class ScopedIssuerProvisioningTests(EvenniaTestCase):
                 host, content_key=_SCOPE_KEY, plan=validate_capabilities([])
             )
         self.assertIsNone(resolve_issuer_key(host))
+
+    def test_incompatible_existing_authored_state_is_not_repurposed(self):
+        # A reused actor whose issuer capability is place-bound (or carries
+        # another scoped service identity) is authored state, not a slot to
+        # rewrite: the generated person-bound plan is refused before any write.
+        from typeclasses.components import QuestIssuer
+
+        for fields in (
+            {"service_binding": "place"},
+            {"anchor_room_id": 1},
+            {"service_id": "another_scoped_service"},
+        ):
+            with self.subTest(fields=fields):
+                host = create_object(NPC, key="incompatible issuer")
+                component = QuestIssuer.create(host)
+                for name, value in fields.items():
+                    setattr(component, name, value)
+                host.components.add(component)
+                with self.assertRaises(QuestIssuanceError):
+                    provision_scoped_issuer(
+                        host, content_key=_SCOPE_KEY, plan=_plan()
+                    )
+                live = host.components.get(QuestIssuer.get_component_slot())
+                for name, value in fields.items():
+                    self.assertEqual(getattr(live, name), value)
+                self.assertIsNone(live.issuer_key)

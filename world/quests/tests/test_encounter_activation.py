@@ -313,6 +313,27 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(grant.npc_id, 0)
 
     @covers_requirement(
+        "quest-scene-encounters::activation-commits-one-durable-identity-or-no-partial-scene"
+    )
+    def test_a_failure_after_successful_registration_rolls_everything_back(self):
+        # The failure lands AFTER the commission authority was registered and
+        # provisioned (the settled escort pass raises), so this exercises the
+        # real rollback of committed-but-not-committed work rather than a
+        # failure injected before the write.
+        with patch(
+            "world.quests.escort_events.collect_escort_actors",
+            side_effect=RuntimeError("injected post-registration failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self._activate("market")
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
+        self.assertEqual(scene_store.list_role_bindings(self.published.package_id), [])
+        grant = scene_store.list_commission_grants(self.published.package_id)[0]
+        self.assertFalse(grant.registered)
+        self.assertEqual(grant.npc_id, 0)
+        self.assertEqual(ObjectDB.objects.filter(db_key="測試住民mother").count(), 0)
+
+    @covers_requirement(
         "npc-capability-declarations::generated-commissioners-carry-complete-explicit-capability-configuration"
     )
     def test_the_generated_commissioner_receives_its_declared_person_bound_plan(self):

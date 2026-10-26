@@ -87,12 +87,17 @@ def _services_fixture_synth(character, mode: str) -> None:
 
     def _ensure_component(host, component_cls, **fields):
         slot = component_cls.get_component_slot()
-        if not host.components.has(component_cls.name):
-            host.components.add(component_cls.create(host, **fields))
-        return host.components.get(slot)
+        component = host.components.get(slot)
+        if component is None:
+            component = component_cls.create(host, **fields)
+            host.components.add(component)
+        # A serving host declares its authored availability binding (the gate
+        # fails closed on a missing one); these fixtures are co-present hosts.
+        component.service_binding = "person"
+        return component
 
     # Authored host names are free-form fixture identity; the branch/shop
-    # identity is the kit rows. service_binding stays unset (co-presence).
+    # identity is the kit rows.
     staff = _make_host("合成公會職員", hall)
     _ensure_component(staff, GuildStaff, branch_key=SYNTH_GUILD_BRANCH_KEY)
     merchant_host = _make_host("合成商店店員", store)

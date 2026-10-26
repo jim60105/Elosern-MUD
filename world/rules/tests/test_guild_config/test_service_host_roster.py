@@ -258,6 +258,47 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 validate_service_hosts()
         self.assertIn("duplicate service_id", str(caught.exception))
 
+    def test_two_rows_claiming_one_authored_commission_identity_are_rejected(self):
+        # A source-host declaration is commission authoring too: one authored
+        # issuer_key is one commission identity, exactly like the import batch.
+        guild = PLACE_REGISTRY["altoria_guild_hall"]
+        store = PLACE_REGISTRY["altoria_general_store"]
+        first = replace(
+            store,
+            key="t_commission_first",
+            host_profile_key="t_commission_first",
+            assortment_keys=(),
+            components=(
+                capability(
+                    "quest_issuer",
+                    binding=place_bound("t_commission_first"),
+                    service_id="t_commission_first_service",
+                    issuer_key="t_shared_commission",
+                ),
+            ),
+        )
+        second = replace(
+            guild,
+            key="t_commission_second",
+            host_profile_key="t_commission_second",
+            components=(
+                capability(
+                    "quest_issuer",
+                    binding=place_bound("t_commission_second"),
+                    service_id="t_commission_second_service",
+                    issuer_key="t_shared_commission",
+                ),
+            ),
+        )
+        with mock.patch.dict(
+            PLACE_REGISTRY,
+            {"t_commission_first": first, "t_commission_second": second},
+            clear=True,
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_service_hosts()
+        self.assertIn("t_shared_commission", str(caught.exception))
+
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
