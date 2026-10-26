@@ -1,0 +1,81 @@
+# Complete map editor proposal batch
+
+This batch preserves both source documents in full. It is planning only. Neither their written-spec status nor design substance changes. The user authorized OpenSpec proposal creation and later requested prescriptive artifacts for a gpt-luna-level worker. Each set therefore includes fixed interfaces, named owners, negative cases and bounded tasks; implementation decisions already settled here must not be reopened or silently omitted.
+
+## Mandatory dependency and code-conflict matrix
+
+A row depends on its explicit prerequisite rows, transitively. Rows without an edge may proceed independently only when their listed shared files are not edited concurrently. Every pair not listed as sharing a surface is independent after prerequisites; shared lock/manifest/docs writes always serialize.
+
+| Change | Depends on | Code conflict / serialization |
+| --- | --- | --- |
+| map-core-sparse-geometry | none | Serialize shared map algorithms, synthetic factories, traceability and dependency metadata with the later source cutovers. No active proposal owns these algorithms. |
+| map-core-authoring-documents | map-core-sparse-geometry | Core schema changes serialize with every domain cutover. No temporary Python/YAML fallback reader is introduced. |
+| map-qualified-static-references | map-core-sparse-geometry, npc-title-authoring-removal | Hard dependency on npc-title-authoring-removal (transitively direct-capability-declarations, host-identity and plain-name); this resolves overlapping place edits and their settlement-place-registry deltas. Serialize bootstrap/exit/presenter and knowledge-test edits with webclient-movement-alignment, without changing settlement receipts or publication ownership. |
+| map-geography-yaml-cutover | map-core-authoring-documents | Serialize anchors/wilderness/room-art and lore-sync edits with later settlement/district/interior cutovers; no active NPC prose/service schema is changed here. |
+| map-settlement-yaml-cutover | map-qualified-static-references, map-geography-yaml-cutover | Follows qualified references to avoid half-migrated targets. Serialize bootstrap, lore sync, source-contract tests and manifests with interiors/districts; preserve active webclient movement and settlement publication facts. |
+| map-district-yaml-cutover | map-settlement-yaml-cutover | Serializes map_districts.py, partition-input assembly, continental docs and district tests with geography and partition-core. |
+| map-interior-runtime-cutover | map-district-yaml-cutover, map-partition-core-generation | Qualified references already follows npc-title-authoring-removal, so this change owns the final amendment of settlement-place-registry and place-driven-service-sync, superseding only their geometry/prose/topology ownership. Preserve active NPC component/profile/host reuse contracts. Serialize guild_economy/bootstrap and static checks with NPC synchronization; serialize source/caller contracts and manifests with webclient movement/publication changes. |
+| map-reference-context-export | map-interior-runtime-cutover | Serialize all later static-reference/source changes with regeneration of this committed output. NPC producers and titles must already be final through the runtime prerequisite; active UI-only proposals have no semantic dependency. |
+| map-view-shared-foundations | none | Serialize pnpm metadata and game map component imports with webclient-immutable-adoption when it edits the same view consumers. No semantic dependency on game transport proposals and no protocol/store edits are needed. |
+| map-editor-standalone-service | map-interior-runtime-cutover, map-reference-context-export, map-view-shared-foundations | Serializes root/package frontend locks with shared foundations. No game GM account or app route is reused; game NPC/publication proposals do not own this independent shell. |
+| map-editor-document-commands | map-editor-standalone-service | Service command/history modules are shared with turn/recovery and domain handlers; sequence this prerequisite, then keep domain commands in separate modules. One writer implementation only. |
+| map-editor-turn-recovery | map-editor-document-commands | Sequence after writer integration. Generation later adds a state guard to this same state machine; no second watcher, session owner or merge protocol. |
+| map-editor-interaction-shell | map-editor-turn-recovery | Frontend shell/focus modules are shared with domain editors; keep commands/tools in domain-owned modules. The visual specialist is an apply-time deliverable and never replaces any approved functional requirement. |
+| map-editor-continent-tools | map-editor-interaction-shell | Geography handlers own separate service/frontend modules; footprint writes intentionally share settlement document serialization with settlement tools. No simultaneous same-document command writers. |
+| map-editor-settlement-tools | map-editor-interaction-shell | Settlement command module is separate from geography/interior modules, but footprint and cross-layer relationships use the same serialized owning-document writer. Domain slices may proceed after the shared shell without duplicated interaction state. |
+| map-editor-interior-tools | map-editor-interaction-shell | Reuses the initial layout handler rather than replacing it. Serialize shared schema/selector components through interaction shell; no source conflict with separately owned settlement handler. |
+| map-editor-entrance-tools | map-editor-continent-tools, map-editor-settlement-tools, map-editor-interior-tools | Relationship handlers extend settlement/interior domain modules after those slices; serialize these edits and shared selector/navigation modules. No mirrored reverse owner or second deletion validator. |
+| map-partition-core-generation | map-district-yaml-cutover | Serializes partition algorithm/input/decoder/artifact and district tests with district/source cutovers. Editor generation integration depends on this real implementation. |
+| map-editor-partition-jobs | map-partition-core-generation, map-editor-entrance-tools | Extends the same state machine/writer from workspace slices; serialize those files rather than add a job-specific mutation authority. Partition artifact remains generated/read-only. |
+| map-editor-integrated-acceptance | map-editor-partition-jobs | Final gate depends transitively on every functional batch slice; serialize browser/Python shard manifests, source signatures and traceability claims. It does not supersede or waive earlier focused evidence. |
+
+## Existing active proposal overlap resolution
+
+The active list at planning time contains the ten NPC-capability/service proposals and seven webclient-sync proposals below. This batch does not edit their artifacts or quietly apply their unimplemented contracts.
+
+| Active proposal(s) | Affected map slices | Resolution |
+| --- | --- | --- |
+| npc-examination-reception; npc-service-host-identity; npc-direct-capability-declarations; npc-plain-name-presentation; npc-title-authoring-removal | map-qualified-static-references, then settlement/interior/runtime sources and reference export | Hard dependency on npc-title-authoring-removal, which transitively includes the other four and their external prerequisites. Its final direct-component/no-title/profile-provenance behavior is the baseline. Map interior cutover then explicitly supersedes only geometry/prose/topology ownership in settlement-place-registry and place-driven-service-sync. Do not reintroduce removed professions/titles or host recreation. |
+| npc-targeted-service-flows; npc-contextual-service-projection; npc-service-text-parity; npc-interaction-service-card; npc-service-management-inspection | qualified-reference/runtime caller adapters, game service/GM readers | No semantic prerequisite beyond the final source identity. Serialize shared place/guild_economy/GM/presenter/tests/docs edits and preserve target-bound provider selection, descriptors, focus and text parity. They keep service behavior; this batch changes only where static map targets resolve. |
+| webclient-publication-codec; webclient-publication-assembly; webclient-sync-recovery | map-core/game caller migrations if presenter fixtures overlap | No map-editor transport dependency. Never reuse game OOB for standalone editor or change E/R/B/envelope/assembly/recovery contracts. Serialize shared protocol/presenter fixtures only if actually edited. |
+| webclient-immutable-adoption | map-view-shared-foundations | No semantic dependency; serialize overlapping map component read adapters. Retain immutable committed game reads and local selection policy. Shared library gets no store dependency. |
+| webclient-movement-alignment; webclient-settlement-alignment | qualified-reference/runtime synchronization and movement consumers | Serialize exit/bootstrap/movement/presenter fixture work. Preserve existing committed movement/causal settlement facts and post-commit publications without changing player commands. |
+| webclient-sync-functional-smoke | final acceptance and shared manifests | Separate product acceptance; serialize shard/frozen audit/traceability manifests. Its game socket/browser proof cannot substitute for the independent editor browser proof. |
+
+If an active prerequisite has already archived by apply time, use its merged current contract. If still proposed, queue it first; do not implement it inside a map slice. Archived dialogue-related dependencies appearing in NPC proposals are resolved through that prerequisite's own pipeline, not duplicated here.
+
+## Coherent source authority timeline
+
+1. Core extraction changes algorithm ownership while current authored Python declarations remain the only data authority. The codec slice operates on explicit inputs and synthetic documents; it adds no alternate production authority.
+2. Qualified references migrate every static target while existing source domains remain single-owned. No coordinate fallback is retained.
+3. Geography cutover converts the complete continent/location domains, including unbuilt locations; Python settlement/interior/district domains remain their current sole authorities until their named slices.
+4. Settlement cutover converts the complete graph/prototype/options/binding/footprint/start/wilderness-entry/node-scene domains. District cutover converts the whole district domain. Package adapters are permanent domain boundaries, not old-format fallback readers.
+5. Partition core conversion uses the already converted geography/settlement/district inputs and writes the existing artifact with signatures. It precedes final runtime adoption, avoiding a dependency cycle or stale-artifact exemption.
+6. Interior/runtime cutover converts every remaining static room/prose/link/place-scene declaration and completes one all-world immutable game publication. From this point every static map authority is YAML; non-map service/NPC/quest/lore/art catalogs remain with their existing owners and declare qualified targets.
+7. Reference exporter reads final authoritative static game declarations and publishes a read-only deterministic context. The editor checks its source closure without game imports. Runtime never trusts it as authority.
+
+No phase permits a converted domain to be read from both Python and YAML. No generated Python, compatibility alias, migration or multi-file merge machinery is introduced. Conversion compares the prior declarations once and then removes the converter/approval tables.
+
+## Complete source-document coverage and acceptance owners
+
+| Approved scope | Owning changes | Required evidence |
+| --- | --- | --- |
+| Architecture §§1-3 and D9 | core-sparse-geometry, core-authoring-documents, geography/settlement/district/interior-runtime cutovers, shared view | Independent core, one source authority, every caller migrated, real game and editor consumers |
+| Architecture §4, YAML/identity/units | authoring-documents, qualified-static-references, all four domain cutovers | Restricted parsing, complete schema/prototypes, retained comments/prose/masks, stable refs, exact synthetic cell/metre transform |
+| Architecture §5, complete migration inventory | qualified refs, geography, settlement, district, interior/runtime, partition core | Temporary source comparison; no old authoring tables, roster imports, special bootstrap links or map-owned scene tables; non-map lore untouched |
+| Architecture §6, all validation gates and external closure | authoring-documents, interior/runtime, reference-context-export, entrance-tools | Structural versus WIP/runtime; actual registry preflight; deterministic closure/membership/freshness; conservative deletion and live-dependent safety |
+| Architecture §§7-8; frontend §§5-6, 9 | document-commands, turn-recovery, interaction-shell | Real replacement failures, no blind retry, one-op history, drained handoff, external read-only, directory create/replace/rename/delete, explicit disk return/reconnect/restart |
+| Architecture §9; frontend regeneration states | partition-core-generation, editor-partition-jobs | No game imports, optional heavy modules, explicit background single job, cancellation/prior output, source invalidation and current-signature publication |
+| Architecture §10, security/environment/API | standalone-service | Independent locks and actual browser, no game DB/Node runtime/CDN, Host/Origin/token, confinement/traversal/symlink rejection, bounded parser and inert prose |
+| Frontend §§1-3, 7-8, 11 | interaction-shell and domain tools | Mandatory specialist annotated designs/review doc, Traditional Chinese UI, full state/focus/keyboard contracts, copy-only context, compact/zoom and accessible textual alternatives |
+| Frontend §4.1; river/location/footprint/district acceptance | continent-tools | Every mainland/waterway/forest/ridge/pass/ford/classifier/location/district/footprint/binding control and numeric/cell alternative; no invented local content or editable derived borders |
+| Frontend §4.2; settlement acceptance | settlement-tools | Create/move/duplicate/delete nodes, all prototype fields/scenes, directed/bidirectional/bent roads, explicit direction, physical route checks and one-owner list multi-selection |
+| Frontend §4.3; interior acceptance | interior-tools | Standalone and service rooms, create/duplicate/delete/prose/scenes/named connections, coordinate-free layout separate from runtime |
+| Frontend §4.4; entrance/deletion acceptance | entrance-tools | All supported cross-layer endpoints/labels/meaning, single owner, qualified selectors, navigation/return context, references and no cascades |
+| Architecture §11; frontend §10, all 21 scenario rows | every owning slice plus integrated-acceptance | Focused mechanisms per change, real complete independent browser/filesystem smoke and committed game reload, specialist human review; no viewer-only completion |
+
+## Requirement shape decisions
+
+Every new requirement is a short mechanism sentence with concrete scenarios and discoverable test owners in its design. Human-only tone/wording/visual quality/fidelity is reviewed in docs/design/map-editor-review.md, never tested by copied shipped wording/markup/counts. Integrated acceptance has skip_specs=true because it adds proof, not behavior. It creates zero duplicate smoke requirements.
+
+The geography/anchor, metric settlement, district roster and gate-source deltas replace source-file/roster/coordinate approval pins with discovery, identity, unit, reference or adoption mechanisms. This changes the evidence shape rather than authored geography. Existing topology/prose/units are preserved through temporary conversion comparison; unrelated lore numbers and canonical content do not change. Source-independent existing scenarios are retained when replacing their source-owner requirement. Interior ownership and snapshot-scoped reference-cache changes are intentional approved map-architecture amendments, not cosmetic rewrites. All post-archive requirements need real discoverable coverage and canonical IDs obtained from the tool, without waivers.
