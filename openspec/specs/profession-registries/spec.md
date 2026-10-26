@@ -18,7 +18,7 @@ value is stored here and first read by the service-anchoring gate.
      scenario, so this historical title now covers the whole shipped table. -->
 - **WHEN** the professions rulebook is loaded
 - **THEN** `get_profession("merchant")` carries a `merchant` and a `scripted_dialogue`
-  component, `get_profession("guild_staff")` / `get_profession("guild_examiner")` carry the
+  component, `get_profession("guild_staff")` / `get_profession("guild_exam_reception")` carry the
   component sets the guild-economy sync attaches, `get_profession("quest_issuer")` carries one
   person-bound `quest_issuer` component, `get_profession("attendant")` carries one place-bound
   `scripted_dialogue` component, and every row's `schedule_template` and `default_tier` are null
@@ -37,7 +37,7 @@ value is stored here and first read by the service-anchoring gate.
 
 #### Scenario: The shipped table's exact membership
 - **WHEN** the shipped table is loaded
-- **THEN** it contains exactly the `merchant`, `guild_staff`, `guild_examiner`, `quest_issuer` and `attendant` professions, each with `schedule_template: null` and `default_tier: null`
+- **THEN** it contains exactly the `merchant`, `guild_staff`, `guild_exam_reception`, `quest_issuer`, `attendant` and `clergy` professions, each with `schedule_template: null` and `default_tier: null`
 
 #### Scenario: The merchant blueprint trades and answers
 - **WHEN** the `merchant` row is read
@@ -48,7 +48,7 @@ value is stored here and first read by the service-anchoring gate.
 - **THEN** it mirrors the guild-hall host component tuple that sync attaches
 
 #### Scenario: The guild_examiner blueprint is a prescribed reusable subset
-- **WHEN** the `guild_examiner` row is read
+- **WHEN** the `guild_exam_reception` row is read
 - **THEN** it is the prescribed examiner/dialogue blueprint (a reusable subset; sync attaches no examiner-only host today)
 
 #### Scenario: The quest_issuer blueprint may not anchor a roster row

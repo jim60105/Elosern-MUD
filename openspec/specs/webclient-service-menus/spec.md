@@ -92,7 +92,7 @@ The presenter SHALL strictly read canonical records and registries through the n
 Outside combat each available service surface SHALL resolve its local host independently from the actor's current room under the same deterministic rule as commands. Guild and rank use their normal staff and examination-counter classes; shop uses a merchant. Zero or multiple hosts SHALL make only that surface unavailable. While possessed, guild and rank SHALL be omitted without resolving their services; the merchant SHALL still resolve normally and supply host metadata.
 
 #### Scenario: Guild hall resolves one guild host and its examiner
-- **WHEN** an unpossessed actor stands in a room containing exactly one `GuildStaff` host that also carries `GuildExaminer`
+- **WHEN** an unpossessed actor stands in a room containing exactly one `GuildStaff` host that also carries `GuildExamReception`
 - **THEN** `host` names that host, `guild` and `rank` surfaces are present, and `shop` is null
 
 #### Scenario: General store resolves one merchant
@@ -121,7 +121,7 @@ Outside combat each available service surface SHALL resolve its local host indep
 
 #### Scenario: Different host classes never create cross-class ambiguity
 - **WHEN** different host classes are present in the same room for an unpossessed actor
-- **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` makes
+- **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExamReception` makes
   both the guild and rank surfaces available
 
 #### Scenario: Top-level host follows the guild-then-merchant preference
@@ -213,7 +213,7 @@ The guild section SHALL retain its existing exact branch/rank/registration/board
 
 #### Scenario: Rank section presence and exact fields
 - **WHEN** the `rank` section is computed
-- **THEN** it is present only when exactly one local examination counter (the `GuildExaminer` counter of the
+- **THEN** it is present only when exactly one local examination counter (the `GuildExamReception` counter of the
   hall) resolves, whether or not the qualified persistent host is present, and contains exactly `rank`, `merit`,
   `next_rank`, `next_threshold`, `merit_qualified`, and `exam_request`
 

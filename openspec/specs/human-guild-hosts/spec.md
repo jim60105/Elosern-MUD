@@ -6,7 +6,7 @@ Define author complete persistent hok, cassandra and augustine adventurers with 
 ## Requirements
 
 ### Requirement: Altoria qualifications select one persistent adventurer per branch and target
-The qualification registry SHALL select one authored persistent adventurer per branch and target rank. Missing, duplicate, wrong-branch or insufficient-rank bindings SHALL fail closed. Profession SHALL remain adventurer with separate exam authority. Person identity and qualification membership SHALL remain data; synchronization SHALL reuse the same person without overwriting live ordinary state.
+The qualification registry SHALL select one authored persistent adventurer per branch and target rank. Missing, duplicate, wrong-branch or insufficient-rank bindings SHALL fail closed. No profession field SHALL be authored or written; examination authority SHALL remain separate from counter reception capability. Person identity and qualification membership SHALL remain data; synchronization SHALL reuse the same person without overwriting live ordinary state.
 
 #### Scenario: Different qualified hosts co-locate
 - **WHEN** multiple differently qualified persistent hosts stand at the guild

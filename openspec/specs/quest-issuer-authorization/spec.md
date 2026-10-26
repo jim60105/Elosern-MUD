@@ -46,7 +46,7 @@ Private commission authority SHALL reside exclusively in the registered `QuestIs
 ### Requirement: The QuestIssuer component mirrors the existing service-host component shape
 
 `QuestIssuer` SHALL be a component named `quest_issuer` carrying `service_id`, `issuer_key`,
-`service_binding`, and `anchor_room_id` — the same four-field shape `GuildStaff`, `GuildExaminer`,
+`service_binding`, and `anchor_room_id` — the same four-field shape `GuildStaff`, `GuildExamReception`,
 and `Merchant` carry, with `issuer_key` in the place of `branch_key`. `service_id` SHALL be present
 because the roster-sync reuse path reads it unconditionally on whichever component class anchors a
 profession row.
