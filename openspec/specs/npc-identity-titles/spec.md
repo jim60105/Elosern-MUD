@@ -71,26 +71,21 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 - **THEN** it is the absence of a title-specific write API on this capability's surfaces: Evennia's generic attribute access (`entity.db.npc_title = ...`) remains framework infrastructure deliberately outside the claim, and tests seed malformed stored state through it
 
 ### Requirement: The NPC dialogue context carries the title as read-only data
-
-`LLMNPC._npc_context()` SHALL carry the NPC's name, description and location without an independent title field. Player title context SHALL remain unchanged. Building the context SHALL remain a pure read that never creates, persists, or mutates state.
+NPC dialogue context SHALL carry name, description and location without an independent title field. Player title context SHALL remain unchanged.
 
 #### Scenario: NPC context omits independent title
-
 - **WHEN** an NPC with historical title attributes builds dialogue context
 - **THEN** the context neither reads nor includes that title
 
 #### Scenario: Player context preserves title
-
 - **WHEN** a player with an equipped title builds its existing context
 - **THEN** its current title information is unchanged
 
 #### Scenario: A titled NPC exposes its title to the dialogue context
-
 - **WHEN** an NPC with historical title data builds context
 - **THEN** the title is neither read nor emitted; ordinary name/description/location remain
 
 #### Scenario: An untitled NPC exposes an empty title and an unchanged prompt
-
 - **WHEN** an NPC without title data builds context
 - **THEN** the same title-free context is emitted without creating an attribute
 
@@ -109,7 +104,6 @@ Player command and object-search targeting SHALL continue to resolve NPCs by the
 - **THEN** the search does not resolve the NPC through that composed string
 
 #### Scenario: Composed member aliases are removed
-
 - **WHEN** a member is targeted with an old name-plus-title token rather than its current key/dbref
 - **THEN** no composed-name alias matches and existing ambiguity rules still apply
 

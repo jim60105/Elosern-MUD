@@ -20,6 +20,10 @@ Activating a target's 編輯人物設定 navigation SHALL open one editor window
 - **THEN** it reuses the client's existing drawer frame, header, overlay, typography, spacing, and focus primitives
 - **AND** no full-screen NPC catalogue or new layout system is added
 
+#### Scenario: Header contains no independent NPC title
+- **WHEN** the selected NPC editor opens
+- **THEN** the header shows the plain name and the private read result contains no npc_title field
+
 ### Requirement: The editor presents the full card and the offline greeting with notices and budgets
 In its ready states the editor SHALL present the complete labeled card — the seven card sections as labeled text controls in the card's render order, with public and hidden identity as separate controls inside the identity section — followed by one optional offline-greeting control (離線問候語) with its own 300-code-point budget that does not count toward the card total.
 
