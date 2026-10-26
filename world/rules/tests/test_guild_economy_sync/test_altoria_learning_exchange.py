@@ -417,8 +417,23 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # no-understanding fallback — each answer is its authored line.
         ranks_keyword = next(k for k in keywords if "魔法等級" in k)
         elements_keyword = next(k for k in keywords if "元素" in k)
-        ranks_answer = answers[ranks_keyword]
-        elements_answer = answers[elements_keyword]
+
+        def _spoken_answer(keyword: str) -> str:
+            """Every host line of one topic's authored answer, joined.
+
+            ``AuthoredDialogue.responses`` is the legacy one-line view; the
+            substance check reads the whole authored scene, which is what a
+            player actually hears.
+            """
+            topic = next(t for t in definition.topics if t.keyword == keyword)
+            return "".join(
+                line.text
+                for line in topic.fallback.lines
+                if getattr(line, "speaker", None) == "host"
+            )
+
+        ranks_answer = _spoken_answer(ranks_keyword)
+        elements_answer = _spoken_answer(elements_keyword)
         self.assertNotEqual(ranks_answer, elements_answer)
         for tier in _magic_ladder().values():
             self.assertIn(

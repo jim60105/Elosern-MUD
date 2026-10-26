@@ -3,7 +3,7 @@ Evennia integration checks for idempotent lore synchronization."""
 
 from tools.spec_traceability import covers_requirement
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 
 from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
@@ -11,7 +11,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
-from world.lore.sync import _ALL_REGISTRIES, _db_safe, sync_all, sync_one
+from world.lore.sync import _ALL_REGISTRIES, _db_safe, _plain, sync_all, sync_one
 
 
 class LoreSyncTests(EvenniaTestCase):
@@ -21,7 +21,7 @@ class LoreSyncTests(EvenniaTestCase):
             for key, entry in registry.items():
                 matches = search_script(f"lore:{category}:{key}")
                 self.assertEqual(len(matches), 1, f"duplicate or missing {category}:{key}")
-                self.assertEqual(matches[0].db.fields, _db_safe(asdict(entry)))
+                self.assertEqual(matches[0].db.fields, _db_safe(_plain(entry)))
                 records.append(matches[0])
         return records
 
@@ -55,7 +55,7 @@ class LoreSyncTests(EvenniaTestCase):
 
     @covers_requirement("anchor-placement::anchor-placement-registry-is-mirrored-into-lorerecord-scripts-idempotently")
     def test_anchor_placements_record_is_mirrored_and_idempotent(self):
-        expected = _db_safe(asdict(ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]))
+        expected = _db_safe(_plain(ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]))
 
         sync_all()
         records = search_script("lore:anchor_placements:capital_altoria")
@@ -96,7 +96,6 @@ class LoreSyncTests(EvenniaTestCase):
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_wilderness_entry_v2_payload_is_mirrored_in_primitive_shape(self):
-        from dataclasses import asdict
         from unittest.mock import patch
 
         from world.lore.wilderness_entry import (
@@ -128,7 +127,7 @@ class LoreSyncTests(EvenniaTestCase):
         self.assertEqual(len(first), 1)
         self.assertEqual(len(second), 1)
         self.assertEqual(first[0].id, second[0].id)
-        self.assertEqual(first[0].db.fields, _db_safe(asdict(probe)))
+        self.assertEqual(first[0].db.fields, _db_safe(_plain(probe)))
         self.assertEqual(
             first[0].db.fields["gates"],
             ({"return_direction": "n", "grid_xy": (3050, 150), "z_map_key": "capital_altoria"},),
