@@ -88,3 +88,19 @@ A non-map settlement record SHALL retain its authored archetype and resolve its 
 - **WHEN** a non-map service settlement or qualified room is absent
 - **THEN** static validation rejects before persistence while archetype and geographic kind remain distinct
 
+#### Scenario: A place in an unknown settlement fails load
+- **WHEN** a place names an unknown service settlement
+- **THEN** validation rejects with that place and missing settlement before persistent writes
+
+#### Scenario: Two settlements' places resolve in their own coordinate spaces
+- **WHEN** service places target distinct qualified rooms whose maps have equal numeric coordinates
+- **THEN** each resolves only its own room/map and neither attaches to the other
+
+#### Scenario: Exterior coordinates resolve inside the settlement's space
+- **WHEN** a joined interior relationship resolves a settlement exterior
+- **THEN** its qualified target determines the owning map and current coordinates without a duplicate coordinate field in the place
+
+#### Scenario: Archetypes are not anchor kinds
+- **WHEN** non-map settlement archetypes and geographic location kinds are validated
+- **THEN** each uses its own closed vocabulary and a non-settlement location needs no invented settlement archetype
+
